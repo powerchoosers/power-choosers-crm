@@ -1360,10 +1360,27 @@ class EmailManager {
             // Choose final CTA text
             const looksEHC2 = /energy\s*health\s*check/i.test(body);
             const looksInvoice2 = /standard\s*invoice\s*request|invoice\s+request|invoice\b/i.test(body);
-            let cta = detectedCTA
-                || (looksEHC2 ? 'Does Tuesday 10am-12pm or Thursday 2-4pm work for a brief review?'
-                : looksInvoice2 ? 'Could you send a copy of your latest invoice today by EOD so my team can get started right away?'
-                : 'Does Tuesday 2-3pm or Thursday 10-11am work for a 15-minute call?');
+            const looksColdEmail = /cold.*email|could.*not.*reach/i.test(body);
+            
+            let cta = detectedCTA;
+            if (!cta) {
+                if (looksEHC2) {
+                    cta = 'Does Tuesday 10am-12pm or Thursday 2-4pm work for a brief review?';
+                } else if (looksInvoice2) {
+                    cta = 'Could you send a copy of your latest invoice today by EOD so my team can get started right away?';
+                } else if (looksColdEmail) {
+                    // Use qualifying questions for cold emails instead of direct meeting requests
+                    const coldEmailCTAs = [
+                        'When does your current energy contract expire?',
+                        'Would you be open to discussing your current energy setup?',
+                        'Would it make sense to have a brief conversation about your energy strategy?',
+                        'If your contract is in the next 12 months, would you be interested in what we\'re seeing in the market?'
+                    ];
+                    cta = coldEmailCTAs[Math.floor(Math.random() * coldEmailCTAs.length)];
+                } else {
+                    cta = 'Does Tuesday 2-3pm or Thursday 10-11am work for a 15-minute call?';
+                }
+            }
             // Keep CTA very short
             const ctaWords = cta.split(/\s+/).filter(Boolean);
             if (ctaWords.length > 16) cta = ctaWords.slice(0, 16).join(' ').replace(/[,;:]$/, '') + (cta.endsWith('?') ? '' : '?');
@@ -2056,7 +2073,6 @@ class EmailManager {
     // Template 5: Cold Email (Modern red urgency theme)
     buildColdEmailHtml(data, recipient, fromEmail) {
         const mail = fromEmail || 'l.patterson@powerchoosers.com';
-        const painPoints = Array.isArray(data.pain_points) ? data.pain_points : [data.pain_points || ''];
         
         return `
 <div style="text-align:left; margin:0 0 20px 0;">
@@ -2065,35 +2081,26 @@ class EmailManager {
     </p>
 </div>
 
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0;">
-    <tr>
-        <td style="background:linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding:25px; border-radius:8px; text-align:center; box-shadow:0 4px 12px rgba(239, 68, 68, 0.3);">
-            <h2 style="color:#ffffff; font-size:22px; margin:0; font-weight:600;">⚠️ Energy Costs Rising Fast</h2>
-        </td>
-    </tr>
-</table>
-
 <div style="background:linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); padding:20px; border-radius:8px; margin:20px 0; border:1px solid #fca5a5;">
-    <h3 style="color:#b91c1c; font-size:18px; margin:0 0 15px 0; font-weight:600;">Common Challenges We're Seeing</h3>
-    ${painPoints.map(point => 
-        `<div style="background:#ffffff; padding:12px; margin:8px 0; border-radius:6px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
-            <p style="color:#1f2937; font-size:14px; margin:0;">❌ ${this.escapeHtml(point)}</p>
-        </div>`
-    ).join('')}
+    <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
+        ${this.escapeHtml(data.opening_hook || 'Companies are facing significant energy cost increases as contracts come up for renewal.')}
+    </p>
 </div>
 
 <div style="background:linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%); border:1px solid #99f6e4; padding:20px; border-radius:8px; margin:20px 0;">
     <h3 style="color:#0f766e; font-size:18px; margin:0 0 10px 0; font-weight:600;">✓ How Power Choosers Helps</h3>
     <p style="color:#1f2937; font-size:15px; line-height:1.6; margin:0;">
-        ${this.escapeHtml(data.solution_intro || 'We help businesses reduce energy costs through competitive procurement and efficiency solutions.')}
+        ${this.escapeHtml(data.value_proposition || 'We help businesses reduce energy costs through competitive procurement and efficiency solutions.')}
     </p>
 </div>
 
+${data.social_proof_optional ? `
 <div style="background:linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); padding:15px; border-radius:8px; margin:20px 0;">
     <p style="color:#1e40af; font-size:14px; line-height:1.5; margin:0; font-style:italic;">
-        ${this.escapeHtml(data.social_proof || 'Companies like yours are saving 20-30% on energy costs.')}
+        ${this.escapeHtml(data.social_proof_optional)}
     </p>
 </div>
+` : ''}
 
 <table border="0" cellspacing="0" cellpadding="0" style="margin:25px 0;">
     <tr>
