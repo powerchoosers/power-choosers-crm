@@ -135,7 +135,37 @@ class EmailManager {
     async loadEmails() {
         console.log('[EmailManager] Loading emails from tracking system...');
         try {
-            // Load emails from the tracking system (both sent and received)
+            // PRIORITY 1: Try BackgroundEmailsLoader for instant access
+            if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.getEmailsData === 'function') {
+                const allEmails = window.BackgroundEmailsLoader.getEmailsData();
+                
+                if (allEmails && allEmails.length > 0) {
+                    console.log('[EmailManager] Using BackgroundEmailsLoader:', allEmails.length, 'emails');
+                    
+                    if (this.currentFolder === 'sent') {
+                        const sentEmails = allEmails.filter(email => 
+                            email.emailType === 'sent' || email.type === 'sent' || email.isSentEmail
+                        );
+                        this.renderEmails(sentEmails);
+                    } else if (this.currentFolder === 'inbox') {
+                        const receivedEmails = allEmails.filter(email => 
+                            email.emailType === 'received' || email.provider === 'sendgrid_inbound'
+                        );
+                        this.renderEmails(receivedEmails);
+                    } else {
+                        // For all emails, get conversation threads from the data
+                        if (window.emailTrackingManager && typeof window.emailTrackingManager.getConversationThreads === 'function') {
+                            const threads = await window.emailTrackingManager.getConversationThreads();
+                            this.renderConversationThreads(threads);
+                        } else {
+                            this.renderEmails(allEmails);
+                        }
+                    }
+                    return;
+                }
+            }
+            
+            // FALLBACK: Use emailTrackingManager if BackgroundEmailsLoader not ready
             if (window.emailTrackingManager) {
                 if (this.currentFolder === 'sent') {
                     const emails = await window.emailTrackingManager.getSentEmails();
@@ -1388,7 +1418,7 @@ class EmailManager {
             let cta = detectedCTA;
             if (!cta) {
                 if (looksEHC2) {
-                    cta = 'Does Tuesday 10am-12pm or Thursday 2-4pm work for a brief review?';
+                    cta = 'Would you be open to scheduling a brief review of your energy setup?';
                 } else if (looksInvoice2) {
                     cta = 'Could you send a copy of your latest invoice today by EOD so my team can get started right away?';
                 } else if (looksColdEmail) {
@@ -1401,7 +1431,7 @@ class EmailManager {
                     ];
                     cta = coldEmailCTAs[Math.floor(Math.random() * coldEmailCTAs.length)];
                 } else {
-                    cta = 'Does Tuesday 2-3pm or Thursday 10-11am work for a 15-minute call?';
+                    cta = 'When does your current energy contract expire?';
                 }
             }
             // Keep CTA very short
@@ -6990,6 +7020,14 @@ function initEmailsPage() {
     // Always load emails from tracking system (regardless of Gmail auth)
     // The tracking system handles both sent and received emails
         emailManager.loadEmails();
+
+    // Listen for email updates from background loader
+    document.addEventListener('pc:emails-loaded', (e) => {
+        if (emailManager && e.detail && e.detail.count > 0) {
+            console.log('[EmailManager] Emails updated via pc:emails-loaded, reloading...');
+            emailManager.loadEmails();
+        }
+    });
 
     // Debug helper: run search and force open suggestions under To field
     window.debugComposeAutocomplete = async function(query = '') {
