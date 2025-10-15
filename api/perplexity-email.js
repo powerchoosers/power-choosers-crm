@@ -30,6 +30,83 @@ function cors(req, res) {
   return false;
 }
 
+// Company research cache (session-level)
+const companyResearchCache = new Map();
+
+async function researchCompanyInfo(companyName, industry) {
+  if (!companyName) return null;
+  
+  const cacheKey = `${companyName}_${industry}`;
+  if (companyResearchCache.has(cacheKey)) {
+    console.log(`[Research] Using cached info for ${companyName}`);
+    return companyResearchCache.get(cacheKey);
+  }
+  
+  try {
+    const researchPrompt = `Research ${companyName}${industry ? `, a ${industry} company` : ''}. Provide a brief 1-2 sentence description of what they do, their business focus, and any relevant operational details for energy cost discussions. Focus on operations, not financials. Be specific and factual.`;
+    
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-sonar-small-128k-online',
+        messages: [{ role: 'user', content: researchPrompt }],
+        max_tokens: 150,
+        temperature: 0.3
+      })
+    });
+    
+    if (!response.ok) {
+      console.error(`[Research] API error: ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    const description = data.choices?.[0]?.message?.content || null;
+    
+    if (description) {
+      console.log(`[Research] Found info for ${companyName}`);
+      companyResearchCache.set(cacheKey, description);
+    }
+    
+    return description;
+  } catch (error) {
+    console.error('[Research] Company research failed:', error);
+    return null;
+  }
+}
+
+async function saveAccountDescription(accountId, description) {
+  if (!accountId || !description) return false;
+  
+  try {
+    const { db } = await import('./_firebase.js');
+    if (!db) {
+      console.warn('[Research] Firestore not available, skipping save');
+      return false;
+    }
+    
+    const updateData = {
+      shortDescription: description,
+      descriptionUpdatedAt: new Date().toISOString(),
+      descriptionSource: 'web_research'
+    };
+    
+    await db.collection('accounts').doc(accountId).update(updateData);
+    
+    console.log(`[Research] Saved description for account ${accountId}`);
+    
+    // Return the saved data so we can notify the frontend
+    return { id: accountId, description, timestamp: updateData.descriptionUpdatedAt };
+  } catch (error) {
+    console.error('[Research] Failed to save description:', error);
+    return false;
+  }
+}
+
 // Template type detection (exact match + pattern matching)
 function getTemplateType(prompt) {
   const promptLower = String(prompt || '').toLowerCase();
@@ -100,17 +177,27 @@ function getCTAPattern(recipient) {
       type: 'direct_meeting',
       template: 'Does [time1] or [time2] work for a quick call?',
       guidance: 'Direct but flexible - only for warm leads'
+    },
+    {
+      type: 'industry_specific',
+      template: `How is ${recipient?.company || 'your company'} approaching energy cost management for 2025?`,
+      guidance: 'Company-specific strategic question'
+    },
+    {
+      type: 'problem_aware_question',
+      template: 'Are rising electricity costs affecting your operational budget?',
+      guidance: 'Problem-aware qualifying question'
     }
   ];
   
-  // Weighted random selection (heavily favor qualifying questions)
-  const weights = [0.35, 0.30, 0.20, 0.10, 0.05]; // Favor qualifying questions
+  // Weighted random selection (heavily favor qualifying and soft asks)
+  const weights = [0.25, 0.25, 0.20, 0.15, 0.10, 0.04, 0.01];
   const random = Math.random();
   let cumulative = 0;
   
   for (let i = 0; i < patterns.length; i++) {
     cumulative += weights[i];
-    if (random < cumulative) return patterns[i];
+    if (random <= cumulative) return patterns[i];
   }
   
   return patterns[0];
@@ -379,7 +466,7 @@ function getTemplateSchema(templateType) {
   return schemas[templateType] || generalSchema;
 }
 
-function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType }) {
+async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType }) {
   // Extract recipient data
   const r = recipient || {};
   const name = r.fullName || r.full_name || r.name || '';
@@ -402,11 +489,25 @@ function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Pa
     .replace(/\s+/g, ' ') // Normalize whitespace
     .trim();
 
-  // Take first sentence or 80 characters, whichever is shorter
-  if (accountDescription.includes('.')) {
-    accountDescription = accountDescription.split('.')[0] + '.';
+  // If no description and we have company name, research it
+  let researchData = null;
+  if (!accountDescription && company) {
+    console.log(`[Research] No description for ${company}, researching...`);
+    accountDescription = await researchCompanyInfo(company, industry);
+    
+    // Save to Firestore if we found something and have account ID
+    if (accountDescription && r.account?.id) {
+      researchData = await saveAccountDescription(r.account.id, accountDescription);
+    }
   }
-  accountDescription = accountDescription.slice(0, 80).trim();
+
+  // Take first sentence or 80 characters, whichever is shorter
+  if (accountDescription) {
+    if (accountDescription.includes('.')) {
+      accountDescription = accountDescription.split('.')[0] + '.';
+    }
+    accountDescription = accountDescription.slice(0, 80).trim();
+  }
   
   // Format contract end date
   const toMonthYear = (val) => {
@@ -493,7 +594,7 @@ TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: "Hello ${firstName},"
 - opening_hook: Start with problem awareness or market condition (1-2 sentences). ${accountDescription ? `Reference: "${accountDescription}".` : 'Reference their business.'} Examples: "Companies in ${industry || 'your industry'} are seeing X", "${company} likely faces Y challenge", "Current market conditions for ${industry || 'businesses like yours'}..."
-- value_proposition: How Power Choosers helps (1-2 sentences). Include SPECIFIC measurable value: "save 10-20%", "reduce costs by $X annually", "helped similar companies achieve Y". Be concrete, not vague.
+- value_proposition: How Power Choosers helps (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save 10-20%", "reduce costs by $X annually", "helped similar companies achieve Y". Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]".
 - social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional)
 - cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation.
 - cta_type: Return "${ctaPattern.type}"
@@ -502,6 +603,7 @@ CRITICAL QUALITY RULES:
 - PROBLEM AWARENESS: Lead with industry-specific problem or market condition
 - SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
 - MEASURABLE CLAIMS: "save 10-20%" or "$X annually" NOT "significant savings"
+- COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
 - QUALIFYING CTAs: Prefer questions over meeting requests for cold emails
 - SOCIAL PROOF: Use real outcomes when mentioning similar companies
 - USE ACCOUNT DESCRIPTION: If provided, naturally reference "${accountDescription || 'their business'}"
@@ -512,6 +614,7 @@ CRITICAL QUALITY RULES:
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
 - EMAIL LENGTH: Keep total email body under 100 words
 - CTA LENGTH: CTAs should be 10-12 words maximum
+- VALUE PROP MUST: Include HOW we help AND WHAT results (e.g., "We help [industry] companies secure better rates before contracts expire. Clients typically save 10-20%.")
 
 FORBIDDEN PHRASES:
 - "I've been tracking how [industry] companies..."
@@ -569,7 +672,10 @@ CRITICAL RULES:
 - Keep sections concise and actionable`
     };
 
-    return basePrompt + (templateInstructions[templateType] || templateInstructions.general);
+    return { 
+      prompt: basePrompt + (templateInstructions[templateType] || templateInstructions.general),
+      researchData: researchData
+    };
   }
 
   // Standard text mode (existing logic)
@@ -609,6 +715,7 @@ CRITICAL QUALITY RULES:
 - PROBLEM AWARENESS: Lead with industry-specific problem or market condition
 - SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
 - MEASURABLE CLAIMS: "save 10-20%" or "$X annually" NOT "significant savings"
+- COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
 - QUALIFYING CTAs: Prefer questions over meeting requests for cold emails
 - SOCIAL PROOF: Use real outcomes when mentioning similar companies
 - USE ACCOUNT DESCRIPTION: ${accountDescription ? `Must naturally reference: "${accountDescription}"` : 'Reference their specific business'}
@@ -626,11 +733,13 @@ Examples:
 - "With contracts renewing in 2025, ${company} is likely seeing [specific impact]"
 - "${industry || 'Your industry'} operations are experiencing [market condition]"
 
-VALUE PROPOSITION (1-2 sentences):
+VALUE PROPOSITION (1-2 sentences MINIMUM):
 - Explain how Power Choosers helps with SPECIFIC MEASURABLE VALUE
-- Include concrete numbers: "save 10-20%", "reduce costs by $X", "clients typically see Y"
+- MUST include: (1) What we do, (2) Concrete numbers: "save 10-20%", "reduce costs by $X", "clients typically see Y"
 - Reference: ${accountDescription ? `"${accountDescription}"` : 'their business type'}
 - Add social proof if relevant: "helped similar companies achieve [specific result]"
+- Example: "We help ${industry || 'businesses'} secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs."
+- NEVER end with incomplete phrases or "within [company name]"
 
 CTA:
 Use qualifying question or soft ask: "${ctaPattern.template}"
@@ -651,7 +760,10 @@ CTA LENGTH: 8-12 words maximum, must be complete
 TONE: Problem-aware, consultative, and value-focused
 `;
 
-    return [identity, recipientContext, coldEmailRules, outputFormat].join('\n\n');
+    return { 
+      prompt: [identity, recipientContext, coldEmailRules, outputFormat].join('\n\n'),
+      researchData: researchData
+    };
   }
 
   // Check if this is an invoice request in standard mode
@@ -702,7 +814,10 @@ Will you be able to send over the invoice by end of day so me and my team can ge
 
 DO NOT include closing or sender name - these will be added automatically.`;
 
-    return [identity, recipientContext, invoiceRules, invoiceOutputFormat].join('\n');
+    return { 
+      prompt: [identity, recipientContext, invoiceRules, invoiceOutputFormat].join('\n'),
+      researchData: researchData
+    };
   }
 
   const qualityRules = `
@@ -733,7 +848,10 @@ CRITICAL RULES:
 ✅ MUST include question mark in CTA
 ✅ MUST use the suggested meeting times with proper "this week" or "next week" context`;
 
-  return [identity, recipientContext, qualityRules, outputFormat].join('\n');
+  return { 
+    prompt: [identity, recipientContext, qualityRules, outputFormat].join('\n'),
+    researchData: researchData
+  };
 }
 
 export default async function handler(req, res) {
@@ -777,13 +895,14 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    const systemPrompt = dateContext + buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType });
+    const { prompt: systemPrompt, researchData } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType });
+    const fullSystemPrompt = dateContext + systemPrompt;
     
     // Call Perplexity API
     const body = {
       model: 'sonar',
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: fullSystemPrompt },
         { role: 'user', content: prompt || 'Draft a professional email' }
       ],
       max_tokens: 600, // Increased to prevent CTA truncation
@@ -819,11 +938,24 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         const jsonData = JSON.parse(content);
         console.log('[Perplexity] Parsed JSON for template:', templateType);
         
+        // Validate value proposition completeness for cold emails
+        if (templateType === 'cold_email' && jsonData.value_proposition) {
+          const incomplete = /\b(within|like|such as|including)\s+[A-Z][^.!?]*$/i.test(jsonData.value_proposition);
+          if (incomplete) {
+            console.warn('[Validation] Incomplete value prop detected, fixing...');
+            jsonData.value_proposition = jsonData.value_proposition.replace(
+              /\b(within|like|such as|including)\s+[A-Z][^.!?]*$/i,
+              'secure better energy rates before contracts expire. Clients typically save 10-20% on annual costs.'
+            );
+          }
+        }
+        
         return res.status(200).json({ 
           ok: true, 
           output: jsonData,
           templateType: templateType,
           citations: citations,
+          researchData: researchData,
           metadata: {
             subject_style: jsonData.subject_style,
             cta_type: jsonData.cta_type,
