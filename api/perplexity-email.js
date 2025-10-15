@@ -77,29 +77,34 @@ function getTemplateType(prompt) {
 function getCTAPattern(recipient) {
   const patterns = [
     {
-      type: 'soft_ask',
-      template: 'Would you be open to a brief [duration] call to discuss [topic]?',
-      guidance: 'Low commitment, asks permission first'
+      type: 'qualifying_question',
+      template: 'When does your current energy contract expire?',
+      guidance: 'Qualifying question, low pressure, gets useful info'
     },
     {
-      type: 'value_offer', 
-      template: 'Would you be interested in [specific value/analysis] for [company]?',
-      guidance: 'Offers value before asking for time'
+      type: 'soft_ask_with_context',
+      template: 'Would you be open to discussing your current energy setup?',
+      guidance: 'Soft ask focused on their situation, not meeting'
     },
     {
-      type: 'question_based',
-      template: 'Any thoughts on how [company] is handling [specific challenge]?',
-      guidance: 'Asks for opinion, very low pressure'
+      type: 'value_question',
+      template: 'Would it make sense to have a brief conversation about your energy strategy?',
+      guidance: 'Consultative, positions as strategic discussion'
+    },
+    {
+      type: 'timing_question',
+      template: 'If your contract is in the next 12 months, would you be interested in what we\'re seeing in the market?',
+      guidance: 'Conditional offer, provides value'
     },
     {
       type: 'direct_meeting',
-      template: 'Does [time1] or [time2] work for a quick [duration] call?',
-      guidance: 'Direct but flexible with options'
+      template: 'Does [time1] or [time2] work for a quick call?',
+      guidance: 'Direct but flexible - only for warm leads'
     }
   ];
   
-  // Weighted random selection (favor softer approaches for cold emails)
-  const weights = [0.35, 0.35, 0.20, 0.10]; // Heavily favor soft_ask and value_offer
+  // Weighted random selection (heavily favor qualifying questions)
+  const weights = [0.35, 0.30, 0.20, 0.10, 0.05]; // Favor qualifying questions
   const random = Math.random();
   let cumulative = 0;
   
@@ -115,24 +120,24 @@ function getCTAPattern(recipient) {
 function getOpeningStyle(recipient) {
   const styles = [
     {
-      type: 'industry_insight',
-      prompt: 'Start with company-specific observation from account description',
-      example: 'I noticed [company] specializes in [specific detail from description], and wanted to reach out about energy cost management...'
+      type: 'problem_aware',
+      prompt: 'Start with industry-specific problem or market condition affecting their business',
+      example: '[Industry] operations are facing [specific challenge]. [Company] is likely seeing [specific impact]...'
     },
     {
-      type: 'market_urgency',
-      prompt: 'Open with relevant market condition specific to their business',
-      example: 'With the current energy market affecting [industry] businesses, I thought [company] might be interested in...'
+      type: 'timing_urgency',
+      prompt: 'Open with timing-related urgency relevant to their situation',
+      example: 'Companies renewing electricity contracts in 2025 are facing significantly higher rates. [Company]...'
     },
     {
       type: 'social_proof',
-      prompt: 'Reference work with similar companies without specifics',
-      example: 'I work with several [industry] companies on energy cost management, and noticed [company]...'
+      prompt: 'Reference work with similar companies without revealing specifics',
+      example: 'We work with several [industry] companies on energy cost management. Given [company]\'s [business aspect]...'
     },
     {
-      type: 'direct_problem',
-      prompt: 'Address likely pain point based on their business',
-      example: 'Given [company]\'s [business aspect from description], energy costs are probably a significant concern...'
+      type: 'insight_based',
+      prompt: 'Lead with valuable industry insight specific to their business',
+      example: '[Industry] companies are proactively addressing energy costs before contracts renew. [Company]...'
     }
   ];
   
@@ -304,13 +309,13 @@ const coldEmailSchema = {
           description: "Style used: quick_question, re_prefix, thoughts, industry_specific, or value_prop"
         },
         greeting: { type: "string", description: "Hello {firstName}," },
-        pain_points: { type: "array", items: { type: "string" }, description: "2-3 industry challenges (NO statistics, use natural language)" },
-        solution_intro: { type: "string", description: "How we help (1-2 sentences, reference account description, avoid numbers)" },
-        social_proof: { type: "string", description: "Brief credibility mention (avoid percentages and statistics)" },
+        opening_hook: { type: "string", description: "Problem-aware opening about industry challenge or market condition (1-2 sentences, NO statistics)" },
+        value_proposition: { type: "string", description: "How we help with specific measurable value (include percentages or dollar amounts)" },
+        social_proof_optional: { type: "string", description: "Brief credibility with real outcomes (optional, 1 sentence)" },
         cta_text: { type: "string", description: "Complete call to action sentence with proper ending punctuation" },
-        cta_type: { type: "string", description: "CTA pattern used: soft_ask, value_offer, question_based, or direct_meeting" }
+        cta_type: { type: "string", description: "CTA pattern used: qualifying_question, soft_ask_with_context, value_question, timing_question, or direct_meeting" }
       },
-      required: ["subject", "subject_style", "greeting", "pain_points", "solution_intro", "social_proof", "cta_text", "cta_type"],
+      required: ["subject", "subject_style", "greeting", "opening_hook", "value_proposition", "cta_text", "cta_type"],
       additionalProperties: false
     }
   }
@@ -385,8 +390,23 @@ function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Pa
   const energy = r.energy || {};
   const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 1000);
   const notes = [r.notes, r.account?.notes].filter(Boolean).join('\n').slice(0, 500);
-  // Add account description
-  const accountDescription = (r.account?.shortDescription || r.account?.short_desc || r.account?.descriptionShort || '').slice(0, 300);
+  // Clean and sanitize account description
+  let accountDescription = (r.account?.shortDescription || r.account?.short_desc || r.account?.descriptionShort || '')
+    .replace(/Not disclosed/gi, '')
+    .replace(/undefined/gi, '')
+    .replace(/null/gi, '')
+    .replace(/\d+\s+employees/gi, '')
+    .replace(/operating from facilities totaling[^.]*square feet/gi, '')
+    .replace(/Under the leadership of[^.]*$/gi, '')
+    .replace(/based in [^,]*, [^,]*/gi, '') // Remove location details
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+
+  // Take first sentence or 80 characters, whichever is shorter
+  if (accountDescription.includes('.')) {
+    accountDescription = accountDescription.split('.')[0] + '.';
+  }
+  accountDescription = accountDescription.slice(0, 80).trim();
   
   // Format contract end date
   const toMonthYear = (val) => {
@@ -472,22 +492,26 @@ Generate text for these fields:
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: "Hello ${firstName},"
-- pain_points: Array of 2-3 industry challenges (NATURAL LANGUAGE ONLY - NO statistics, NO percentages)
-- solution_intro: How Power Choosers helps (1-2 sentences). ${accountDescription ? `MUST reference: "${accountDescription}" in a natural way.` : 'Reference their business naturally.'} NO percentages or statistics.
-- social_proof: Brief credibility statement (NO numbers, NO percentages, keep vague like "similar companies" or "other businesses in your industry")
-- cta_text: Customize this pattern for the recipient: "${ctaPattern.template}". Replace placeholders with specific details. MUST be a complete sentence with proper ending punctuation.
-- cta_type: Return "${ctaPattern.type}" as the CTA pattern used
+- opening_hook: Start with problem awareness or market condition (1-2 sentences). ${accountDescription ? `Reference: "${accountDescription}".` : 'Reference their business.'} Examples: "Companies in ${industry || 'your industry'} are seeing X", "${company} likely faces Y challenge", "Current market conditions for ${industry || 'businesses like yours'}..."
+- value_proposition: How Power Choosers helps (1-2 sentences). Include SPECIFIC measurable value: "save 10-20%", "reduce costs by $X annually", "helped similar companies achieve Y". Be concrete, not vague.
+- social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional)
+- cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation.
+- cta_type: Return "${ctaPattern.type}"
 
 CRITICAL QUALITY RULES:
-- USE ACCOUNT DESCRIPTION: If provided, naturally weave "${accountDescription || 'their business'}" into the email
-- NO STATISTICS: Avoid all percentages (15-25%, 20-30%, etc.) and specific savings numbers
-- NO YEAR RANGES: Don't mention "2025-2026" or specific contract years
+- PROBLEM AWARENESS: Lead with industry-specific problem or market condition
+- SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
+- MEASURABLE CLAIMS: "save 10-20%" or "$X annually" NOT "significant savings"
+- QUALIFYING CTAs: Prefer questions over meeting requests for cold emails
+- SOCIAL PROOF: Use real outcomes when mentioning similar companies
+- USE ACCOUNT DESCRIPTION: If provided, naturally reference "${accountDescription || 'their business'}"
 - NATURAL LANGUAGE: Write like a real person, not a template
 - SPECIFIC TO THEM: Reference actual company details, not generic industry statements
-- ONE NUMBER MAX: If you must use a number, only use ONE in the entire email
 - COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
 - SINGLE CTA: Generate exactly ONE call to action per email
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
+- EMAIL LENGTH: Keep total email body under 100 words
+- CTA LENGTH: CTAs should be 10-12 words maximum
 
 FORBIDDEN PHRASES:
 - "I've been tracking how [industry] companies..."
@@ -582,11 +606,13 @@ DO NOT include closing or sender name - these will be added automatically.`;
 EMAIL TYPE: Cold Email (Never Spoke Before)
 
 CRITICAL QUALITY RULES:
-- NO STATISTICS: Avoid percentages, specific numbers, year ranges
+- PROBLEM AWARENESS: Lead with industry-specific problem or market condition
+- SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
+- MEASURABLE CLAIMS: "save 10-20%" or "$X annually" NOT "significant savings"
+- QUALIFYING CTAs: Prefer questions over meeting requests for cold emails
+- SOCIAL PROOF: Use real outcomes when mentioning similar companies
 - USE ACCOUNT DESCRIPTION: ${accountDescription ? `Must naturally reference: "${accountDescription}"` : 'Reference their specific business'}
 - NATURAL LANGUAGE: Write like a real person researching their company
-- ONE PROBLEM FOCUS: Pick one specific challenge, not multiple statistics
-- CONSULTATIVE TONE: Ask for thoughts, don't pitch
 - COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
 - SINGLE CTA: Generate exactly ONE call to action per email
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
@@ -594,20 +620,24 @@ CRITICAL QUALITY RULES:
 OPENING (1-2 sentences):
 Style: ${openingStyle.type}
 ${openingStyle.prompt}
-${accountDescription ? `MUST incorporate: "${accountDescription}" naturally` : ''}
-Example structure: "I noticed ${company} [specific detail]..." or "Given ${company}'s focus on [aspect]..."
+Lead with PROBLEM AWARENESS or MARKET CONDITION relevant to ${company}
+Examples: 
+- "Companies in ${industry || 'your industry'} are facing [specific challenge]"
+- "With contracts renewing in 2025, ${company} is likely seeing [specific impact]"
+- "${industry || 'Your industry'} operations are experiencing [market condition]"
 
-BODY (2-3 sentences):
-- Briefly explain how Power Choosers helps (NO numbers, NO percentages)
-- Reference context: ${industry ? `their industry (${industry})` : 'their business'}, ${accountDescription ? `their description: "${accountDescription}"` : 'their company focus'}
-- Create relevance through their specific situation, NOT market statistics
-- FORBIDDEN: "15-25%", "20-30%", "2025-2026", "data center demand"
+VALUE PROPOSITION (1-2 sentences):
+- Explain how Power Choosers helps with SPECIFIC MEASURABLE VALUE
+- Include concrete numbers: "save 10-20%", "reduce costs by $X", "clients typically see Y"
+- Reference: ${accountDescription ? `"${accountDescription}"` : 'their business type'}
+- Add social proof if relevant: "helped similar companies achieve [specific result]"
 
 CTA:
-Customize this pattern for the recipient: "${ctaPattern.template}"
-- Replace ALL placeholders: [duration], [topic], [company], [specific value/analysis], [specific challenge], [time1], [time2]
-- MUST be a complete sentence with proper ending punctuation
-- Make it consultative - ask for thoughts or offer value, don't just request meetings
+Use qualifying question or soft ask: "${ctaPattern.template}"
+- Qualifying questions work best: "When does your contract expire?", "Would you be open to discussing your energy setup?"
+- Avoid requesting specific meeting times in first email
+- Keep under 12 words
+- MUST be complete sentence with proper ending punctuation
 - Generate ONLY ONE CTA
 
 SUBJECT LINE:
@@ -616,8 +646,9 @@ SUBJECT LINE:
 - NO numbers or percentages
 - Examples: "Quick question about ${company}'s energy strategy", "${firstName}, thoughts on energy planning?"
 
-TOTAL LENGTH: 70-100 words (shorter is better for cold emails)
-TONE: Consultative and curious, not sales-heavy
+TOTAL LENGTH: 65-85 words (INCLUDING the CTA)
+CTA LENGTH: 8-12 words maximum, must be complete
+TONE: Problem-aware, consultative, and value-focused
 `;
 
     return [identity, recipientContext, coldEmailRules, outputFormat].join('\n\n');
