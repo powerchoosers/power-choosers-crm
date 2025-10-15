@@ -30,8 +30,37 @@ function cors(req, res) {
   return false;
 }
 
-// Template type detection (exact match)
+// Template type detection (exact match + pattern matching)
 function getTemplateType(prompt) {
+  const promptLower = String(prompt || '').toLowerCase();
+  
+  // Check for cold email patterns first
+  if (/cold.*email|could.*not.*reach/i.test(promptLower)) {
+    return 'cold_email';
+  }
+  
+  // Check for other patterns
+  if (/warm.*intro|after.*call/i.test(promptLower)) {
+    return 'warm_intro';
+  }
+  
+  if (/follow.*up|followup/i.test(promptLower)) {
+    return 'follow_up';
+  }
+  
+  if (/energy.*health.*check/i.test(promptLower)) {
+    return 'energy_health';
+  }
+  
+  if (/proposal.*delivery|proposal/i.test(promptLower)) {
+    return 'proposal';
+  }
+  
+  if (/invoice.*request|send.*invoice/i.test(promptLower)) {
+    return 'invoice';
+  }
+  
+  // Exact matches for specific prompts
   const promptMap = {
     'Warm intro after a call': 'warm_intro',
     'Follow-up with tailored value props': 'follow_up',
@@ -356,6 +385,8 @@ function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Pa
   const energy = r.energy || {};
   const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 1000);
   const notes = [r.notes, r.account?.notes].filter(Boolean).join('\n').slice(0, 500);
+  // Add account description
+  const accountDescription = (r.account?.shortDescription || r.account?.short_desc || r.account?.descriptionShort || '').slice(0, 300);
   
   // Format contract end date
   const toMonthYear = (val) => {
@@ -370,11 +401,16 @@ function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Pa
   
   const contractEndLabel = toMonthYear(energy.contractEnd || '');
   
+  // Get dynamic patterns for cold emails (needed for both HTML and standard modes)
+  const ctaPattern = templateType === 'cold_email' ? getCTAPattern(recipient) : null;
+  const openingStyle = templateType === 'cold_email' ? getOpeningStyle(recipient) : null;
+  
   const recipientContext = `
 RECIPIENT INFORMATION:
 - Name: ${firstName || 'there'} ${company ? `at ${company}` : ''}
 ${job ? `- Role: ${job}` : ''}
 ${industry ? `- Industry: ${industry}` : ''}
+${accountDescription ? `- Company Description: ${accountDescription}` : ''}
 ${energy.supplier ? `- Current Supplier: ${energy.supplier}` : ''}
 ${energy.currentRate ? `- Current Rate: ${energy.currentRate}/kWh` : ''}
 ${contractEndLabel ? `- Contract Ends: ${contractEndLabel}` : ''}
@@ -384,9 +420,6 @@ ${notes ? `- Additional Notes: ${notes}` : ''}
 
   // For HTML mode, return text-only prompts based on template type
   if (mode === 'html') {
-    // Get dynamic patterns for cold emails
-    const ctaPattern = templateType === 'cold_email' ? getCTAPattern(recipient) : null;
-    const openingStyle = templateType === 'cold_email' ? getOpeningStyle(recipient) : null;
     
     const basePrompt = `You are generating TEXT CONTENT ONLY for Power Choosers email templates.
 
@@ -517,6 +550,14 @@ KEY CONTEXT:
 - Companies with contracts ending 2025-2026 face higher renewal rates
 - Early renewals save 20-30% vs. waiting`;
 
+  const outputFormat = `
+OUTPUT FORMAT:
+Subject: [Your subject line]
+
+[Body as plain text paragraphs]
+
+DO NOT include closing or sender name - these will be added automatically.`;
+
   // Check if this is a cold email in standard mode
   const isColdEmailStandard = /cold.*email|could.*not.*reach/i.test(String(prompt || ''));
   
@@ -633,21 +674,6 @@ CRITICAL RULES:
 ✅ MUST include question mark in CTA
 ✅ MUST use the suggested meeting times with proper "this week" or "next week" context`;
 
-  const outputFormat = `
-OUTPUT FORMAT:
-Subject: [Your subject line]
-
-Hi ${firstName || 'there'},
-
-[Paragraph 1: Reference call and their situation ${job ? `as ${job}` : ''} - 2 sentences]
-
-[Paragraph 2: Value prop and urgency ${contractEndLabel ? `- mention contract ending ${contractEndLabel}` : ''} - 3-4 sentences]
-
-[Paragraph 3: CTA with 2 COMPLETE time slots - USE THE SUGGESTED MEETING TIMES PROVIDED ABOVE]
-Example: "Would Tuesday next week 2-3pm or Thursday next week 10-11am work for a 15-minute call?"
-
-DO NOT include closing or sender name - these will be added automatically.`;
-
   return [identity, recipientContext, qualityRules, outputFormat].join('\n');
 }
 
@@ -664,8 +690,8 @@ export default async function handler(req, res) {
 
     const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson' } = req.body || {};
     
-    // Detect template type for HTML mode
-    const templateType = mode === 'html' ? getTemplateType(prompt) : null;
+    // Detect template type for both HTML and standard modes
+    const templateType = getTemplateType(prompt);
     
     console.log('[Perplexity] Template type:', templateType, 'for prompt:', prompt);
     
