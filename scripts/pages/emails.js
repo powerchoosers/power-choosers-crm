@@ -750,8 +750,14 @@ class EmailManager {
                     let acct = null;
                     if (comp) {
                         acct = accounts.find(a => {
-                            const an = norm(a.accountName || a.name || a.companyName || '');
-                            return an === comp || an.includes(comp) || comp.includes(an);
+                            // Only use accountName field (the field that actually exists)
+                            const accountName = a.accountName || '';
+                            if (!accountName) return false; // Skip accounts without accountName
+                            
+                            const normalizedAccountName = norm(accountName);
+                            return normalizedAccountName === comp || 
+                                   normalizedAccountName.includes(comp) || 
+                                   comp.includes(normalizedAccountName);
                         }) || null;
                     }
                     if (!acct && domain) {
@@ -769,7 +775,7 @@ class EmailManager {
                         };
                         enrichedRecipient.account = enrichedRecipient.account || {
                             id: acct.id,
-                            name: acct.accountName || acct.name || acct.companyName || '',
+                            name: acct.accountName || '',
                             industry: acct.industry || '',
                             domain: acct.domain || acct.website || '',
                             city: acct.city || acct.billingCity || acct.locationCity || '',
@@ -2690,8 +2696,14 @@ ${sections.length > 1 ? `
                     let acct = null;
                     if (comp) {
                         acct = accounts.find(a => {
-                            const an = norm(a.accountName || a.name || a.companyName || '');
-                            return an === comp || an.includes(comp) || comp.includes(an);
+                            // Only use accountName field (the field that actually exists)
+                            const accountName = a.accountName || '';
+                            if (!accountName) return false; // Skip accounts without accountName
+                            
+                            const normalizedAccountName = norm(accountName);
+                            return normalizedAccountName === comp || 
+                                   normalizedAccountName.includes(comp) || 
+                                   comp.includes(normalizedAccountName);
                         }) || null;
                     }
                     if (!acct && domain) {
@@ -2709,7 +2721,7 @@ ${sections.length > 1 ? `
                         };
                         enrichedRecipient.account = enrichedRecipient.account || {
                             id: acct.id,
-                            name: acct.accountName || acct.name || acct.companyName || '',
+                            name: acct.accountName || '',
                             industry: acct.industry || '',
                             domain: acct.domain || acct.website || '',
                             shortDescription: acct.shortDescription || acct.short_desc || acct.descriptionShort || ''
@@ -3177,7 +3189,11 @@ ${sections.length > 1 ? `
             }
             if (!account && personCompany) {
                 const cmp = String(personCompany).toLowerCase().trim();
-                account = accounts.find(a => String(a.accountName || a.name || a.companyName || '').toLowerCase().trim() === cmp) || null;
+                account = accounts.find(a => {
+                    const accountName = a.accountName || '';
+                    if (!accountName) return false;
+                    return String(accountName).toLowerCase().trim() === cmp;
+                }) || null;
             }
             if (!account && personDomain) {
                 account = accounts.find(a => {
@@ -3193,7 +3209,7 @@ ${sections.length > 1 ? `
                 firstName: person.firstName || person.first_name || (name?.split(' ')[0]) || '',
                 lastName: person.lastName || person.last_name || '',
                 fullName: person.fullName || person.full_name || name || '',
-                company: person.company || person.companyName || person.accountName || (account?.accountName || account?.name || account?.companyName) || '',
+                company: person.company || person.companyName || person.accountName || (account?.accountName) || '',
                 title: person.title || person.jobTitle || person.role || '',
                 industry: person.industry || person.sector || account?.industry || '',
                 // Use non-specific facility size; exact sqft will not be echoed by AI
@@ -3207,7 +3223,7 @@ ${sections.length > 1 ? `
                 notes: person.notes || person.note || '',
                 account: account ? {
                     id: account.id,
-                    name: account.accountName || account.name || account.companyName || '',
+                    name: account.accountName || '',
                     industry: account.industry || '',
                     domain: account.domain || account.website || '',
                     notes: account.notes || account.note || '',
@@ -3340,7 +3356,11 @@ ${sections.length > 1 ? `
             }
             if (!account && personCompany) {
                 const cmp = String(personCompany).toLowerCase().trim();
-                account = accounts.find(a => String(a.accountName || a.name || a.companyName || '').toLowerCase().trim() === cmp) || null;
+                account = accounts.find(a => {
+                    const accountName = a.accountName || '';
+                    if (!accountName) return false;
+                    return String(accountName).toLowerCase().trim() === cmp;
+                }) || null;
             }
             if (!account && personDomain) {
                 account = accounts.find(a => {
@@ -3355,7 +3375,7 @@ ${sections.length > 1 ? `
                 firstName: person.firstName || person.first_name || '',
                 lastName: person.lastName || person.last_name || '',
                 email: e,
-                company: person.company || person.companyName || person.accountName || (account?.accountName || account?.name || account?.companyName) || '',
+                company: person.company || person.companyName || person.accountName || (account?.accountName) || '',
                 title: person.title || person.jobTitle || person.role || '',
                 industry: person.industry || person.sector || account?.industry || '',
                 energy: {
@@ -3366,7 +3386,7 @@ ${sections.length > 1 ? `
                 },
                 account: account ? {
                     id: account.id,
-                    name: account.accountName || account.name || account.companyName || '',
+                    name: account.accountName || '',
                     industry: account.industry || '',
                     domain: account.domain || account.website || '',
                     city: account.city || account.billingCity || account.locationCity || '',
