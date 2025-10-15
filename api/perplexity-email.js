@@ -307,7 +307,7 @@ const coldEmailSchema = {
         pain_points: { type: "array", items: { type: "string" }, description: "2-3 industry challenges (NO statistics, use natural language)" },
         solution_intro: { type: "string", description: "How we help (1-2 sentences, reference account description, avoid numbers)" },
         social_proof: { type: "string", description: "Brief credibility mention (avoid percentages and statistics)" },
-        cta_text: { type: "string", description: "Call to action" },
+        cta_text: { type: "string", description: "Complete call to action sentence with proper ending punctuation" },
         cta_type: { type: "string", description: "CTA pattern used: soft_ask, value_offer, question_based, or direct_meeting" }
       },
       required: ["subject", "subject_style", "greeting", "pain_points", "solution_intro", "social_proof", "cta_text", "cta_type"],
@@ -475,7 +475,7 @@ Generate text for these fields:
 - pain_points: Array of 2-3 industry challenges (NATURAL LANGUAGE ONLY - NO statistics, NO percentages)
 - solution_intro: How Power Choosers helps (1-2 sentences). ${accountDescription ? `MUST reference: "${accountDescription}" in a natural way.` : 'Reference their business naturally.'} NO percentages or statistics.
 - social_proof: Brief credibility statement (NO numbers, NO percentages, keep vague like "similar companies" or "other businesses in your industry")
-- cta_text: ${ctaPattern.guidance}. Use this pattern: "${ctaPattern.template}". Customize with specific details from recipient context.
+- cta_text: Customize this pattern for the recipient: "${ctaPattern.template}". Replace placeholders with specific details. MUST be a complete sentence with proper ending punctuation.
 - cta_type: Return "${ctaPattern.type}" as the CTA pattern used
 
 CRITICAL QUALITY RULES:
@@ -485,6 +485,9 @@ CRITICAL QUALITY RULES:
 - NATURAL LANGUAGE: Write like a real person, not a template
 - SPECIFIC TO THEM: Reference actual company details, not generic industry statements
 - ONE NUMBER MAX: If you must use a number, only use ONE in the entire email
+- COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
+- SINGLE CTA: Generate exactly ONE call to action per email
+- PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
 
 FORBIDDEN PHRASES:
 - "I've been tracking how [industry] companies..."
@@ -584,6 +587,9 @@ CRITICAL QUALITY RULES:
 - NATURAL LANGUAGE: Write like a real person researching their company
 - ONE PROBLEM FOCUS: Pick one specific challenge, not multiple statistics
 - CONSULTATIVE TONE: Ask for thoughts, don't pitch
+- COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
+- SINGLE CTA: Generate exactly ONE call to action per email
+- PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
 
 OPENING (1-2 sentences):
 Style: ${openingStyle.type}
@@ -598,10 +604,11 @@ BODY (2-3 sentences):
 - FORBIDDEN: "15-25%", "20-30%", "2025-2026", "data center demand"
 
 CTA:
-Pattern: ${ctaPattern.type}
-${ctaPattern.guidance}
-Template: "${ctaPattern.template}"
-Make it consultative - ask for thoughts or offer value, don't just request meetings.
+Customize this pattern for the recipient: "${ctaPattern.template}"
+- Replace ALL placeholders: [duration], [topic], [company], [specific value/analysis], [specific challenge], [time1], [time2]
+- MUST be a complete sentence with proper ending punctuation
+- Make it consultative - ask for thoughts or offer value, don't just request meetings
+- Generate ONLY ONE CTA
 
 SUBJECT LINE:
 - Under 50 characters
