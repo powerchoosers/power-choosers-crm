@@ -701,7 +701,49 @@ class EmailManager {
             let enrichedRecipient = recipient ? JSON.parse(JSON.stringify(recipient)) : null;
             try {
                 if (enrichedRecipient && (enrichedRecipient.company || enrichedRecipient.email)) {
-                    const accounts = (typeof window.getAccountsData === 'function') ? (window.getAccountsData() || []) : [];
+                    // Ensure account data is available before matching
+                    // This is non-blocking - uses whatever is available but triggers loading
+                    if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.start === 'function') {
+                        // Trigger loading if not already started (idempotent)
+                        if (window.BackgroundAccountsLoader.getAccountsData().length === 0) {
+                            console.log('[AI] Triggering BackgroundAccountsLoader...');
+                            window.BackgroundAccountsLoader.start();
+                        }
+                    }
+
+                    // PRIORITY: Try all data sources for complete account data
+                    let accounts = [];
+
+                    // 1. BackgroundAccountsLoader (most complete, pre-loaded)
+                    if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+                        const bgAccounts = window.BackgroundAccountsLoader.getAccountsData();
+                        if (bgAccounts && bgAccounts.length > 0) {
+                            accounts = bgAccounts;
+                            console.log('[AI] Using BackgroundAccountsLoader:', accounts.length, 'accounts');
+                        }
+                    }
+
+                    // 2. Fallback to window.getAccountsData
+                    if (accounts.length === 0 && typeof window.getAccountsData === 'function') {
+                        accounts = window.getAccountsData() || [];
+                        if (accounts.length > 0) {
+                            console.log('[AI] Using window.getAccountsData:', accounts.length, 'accounts');
+                        }
+                    }
+
+                    // 3. Final fallback to CacheManager (async but complete)
+                    if (accounts.length === 0 && window.CacheManager && typeof window.CacheManager.get === 'function') {
+                        try {
+                            const cached = await window.CacheManager.get('accounts');
+                            if (cached && cached.length > 0) {
+                                accounts = cached;
+                                console.log('[AI] Using CacheManager:', accounts.length, 'accounts');
+                            }
+                        } catch (e) {
+                            console.warn('[AI] CacheManager failed:', e);
+                        }
+                    }
+
                     const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g,' ').replace(/\s+/g,' ').trim();
                     const comp = norm(enrichedRecipient.company || '');
                     const domain = (enrichedRecipient.email || '').split('@')[1]?.toLowerCase() || '';
@@ -732,11 +774,31 @@ class EmailManager {
                             domain: acct.domain || acct.website || '',
                             city: acct.city || acct.billingCity || acct.locationCity || '',
                             state: acct.state || acct.billingState || acct.region || '',
-                            shortDescription: acct.shortDescription || acct.short_desc || acct.descriptionShort || ''
+                            shortDescription: acct.shortDescription || acct.short_desc || acct.descriptionShort || acct.description || '',
+                            // Add any other fields that might be needed
+                            logoUrl: acct.logoUrl || '',
+                            phone: acct.phone || acct.companyPhone || '',
+                            annualUsage: acct.annualUsage || '',
+                            electricitySupplier: acct.electricitySupplier || '',
+                            currentRate: acct.currentRate || '',
+                            contractEndDate: acct.contractEndDate || ''
                         };
                         let rate = String(acctEnergy.currentRate || '').trim();
                         if (/^\.\d+$/.test(rate)) rate = '0' + rate;
                         enrichedRecipient.energy = { ...acctEnergy, currentRate: rate };
+                    }
+
+                    // Debug logging for account context
+                    if (enrichedRecipient && enrichedRecipient.account) {
+                        console.log('[AI] Enriched account data:', {
+                            name: enrichedRecipient.account.name,
+                            hasShortDescription: !!enrichedRecipient.account.shortDescription,
+                            shortDescriptionLength: (enrichedRecipient.account.shortDescription || '').length,
+                            industry: enrichedRecipient.account.industry,
+                            accountId: enrichedRecipient.account.id
+                        });
+                    } else {
+                        console.warn('[AI] No account data found for:', enrichedRecipient?.company || 'unknown');
                     }
                 }
             } catch (e) { console.warn('[AI] Could not enrich recipient energy from accounts', e); }
