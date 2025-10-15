@@ -2570,7 +2570,7 @@ class PowerChoosersCRM {
         modal._csvDropdownInitialized = true;
 
         // Toggle dropdown on trigger click
-        trigger.addEventListener('click', (e) => {
+        const handleTriggerClick = (e) => {
             e.stopPropagation();
             const isOpen = !dropdown.hidden;
             
@@ -2581,10 +2581,11 @@ class PowerChoosersCRM {
                 dropdown.hidden = false;
                 trigger.classList.add('open');
             }
-        });
+        };
+        trigger.addEventListener('click', handleTriggerClick);
 
         // Handle list item clicks
-        dropdown.addEventListener('click', (e) => {
+        const handleDropdownClick = (e) => {
             const listItem = e.target.closest('.csv-list-item');
             if (!listItem) return;
 
@@ -2597,7 +2598,8 @@ class PowerChoosersCRM {
             const listId = listItem.dataset.listId || '';
             const listName = listItem.dataset.listName || 'No list assignment';
             this.handleListSelection(modal, listId, listName);
-        });
+        };
+        dropdown.addEventListener('click', handleDropdownClick);
 
         // Close dropdown when clicking outside
         const closeDropdown = (e) => {
@@ -2624,6 +2626,8 @@ class PowerChoosersCRM {
             modal._csvDropdownCleanup = [];
         }
         modal._csvDropdownCleanup.push(() => {
+            trigger.removeEventListener('click', handleTriggerClick);
+            dropdown.removeEventListener('click', handleDropdownClick);
             document.removeEventListener('click', closeDropdown);
             document.removeEventListener('keydown', handleKeydown);
             modal._csvDropdownInitialized = false;

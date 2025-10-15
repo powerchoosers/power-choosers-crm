@@ -7246,47 +7246,6 @@ if (!document._emailGlobalClickBound) {
 }
 
 // Global helper to open compose with a prefilled recipient (sitewide)
-// Usage: window.EmailCompose.openTo('someone@company.com', 'Optional Name')
-;(function(){
-  if (!window.EmailCompose) window.EmailCompose = {};
-  window.EmailCompose.openTo = function(toEmail, name = '') {
-    try { toEmail = String(toEmail || '').trim(); } catch(_) { toEmail = ''; }
-    if (!toEmail || !/@/.test(toEmail)) {
-      window.crm?.showToast && window.crm.showToast('No valid email found');
-      return;
-    }
-    // Open the compose modal in-place without navigating pages
-    // Wait for emailManager to be available, then open compose
-    const start = Date.now();
-    const giveUpAt = start + 6000; // 6s safety
-    (function attempt(){
-      const mgr = window.emailManager;
-      if (mgr) {
-        try {
-          // Ensure compose window opens
-          if (typeof mgr.openComposeWindow === 'function') mgr.openComposeWindow();
-          else if (typeof mgr.composeEmail === 'function') mgr.composeEmail();
-          else document.getElementById('compose-email-btn')?.click();
-          // Wait for the window to actually become visible, then fill
-          let tries = 0;
-          const fill = setInterval(()=>{
-            tries++;
-            const win = document.getElementById('compose-window');
-            const toInput = document.getElementById('compose-to');
-            const opened = !!win && win.classList.contains('open');
-            if (toInput) toInput.value = toEmail;
-            if (opened || tries > 15) {
-              clearInterval(fill);
-              setTimeout(()=>{ document.getElementById('compose-subject')?.focus(); }, 60);
-            }
-          }, 120);
-        } catch (e) { console.warn('[EmailCompose] open failed', e); }
-        return;
-      }
-      if (Date.now() < giveUpAt) { return setTimeout(attempt, 120); }
-      // Last fallback: try to set field if exists
-      try { document.getElementById('compose-to').value = toEmail; } catch(_) {}
-    })();
-  };
-})();
+// REMOVED: This functionality is now handled by email-compose-global.js
+// The EmailCompose functionality is available globally before this page loads
 
