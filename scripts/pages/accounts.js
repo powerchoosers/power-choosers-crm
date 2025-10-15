@@ -79,7 +79,7 @@ var console = {
         const pageSize = 100;
         const neededAccounts = targetPage * pageSize;
         
-        const checkDataAndApply = () => {
+          const checkDataAndApply = () => {
           if (state.data && state.data.length >= neededAccounts) {
             // Page is already rendered correctly by loadDataOnce() - no need to re-render!
             console.log('[Accounts] Restore: Data already loaded for page', targetPage, '- skipping render to prevent flicker');
@@ -101,8 +101,8 @@ var console = {
             }
           } else {
             // No data yet, retry
-            setTimeout(checkDataAndApply, 100);
-          }
+          setTimeout(checkDataAndApply, 100);
+        }
         };
         
         // Start checking immediately
@@ -928,8 +928,8 @@ var console = {
       state.filtered = state.data.slice();
       state.totalCount = state.allAccountsCache.length;
       state.hasMore = false;
-      state.loaded = true;
-      render();
+        state.loaded = true;
+        render();
       return; // Don't reload from Firebase/cache again
     }
     
@@ -1036,7 +1036,7 @@ var console = {
           
           // Only render if not currently restoring from navigation
           if (!window.__restoringAccounts) {
-            applyFilters();
+          applyFilters();
           } else {
             console.log('[Accounts] Skipping render due to active restoration - account update will be applied when restoration completes');
           }
