@@ -2724,7 +2724,16 @@ ${sections.length > 1 ? `
                             name: acct.accountName || '',
                             industry: acct.industry || '',
                             domain: acct.domain || acct.website || '',
-                            shortDescription: acct.shortDescription || acct.short_desc || acct.descriptionShort || ''
+                            city: acct.city || acct.billingCity || acct.locationCity || '',
+                            state: acct.state || acct.billingState || acct.region || '',
+                            shortDescription: acct.shortDescription || acct.short_desc || acct.descriptionShort || acct.description || '',
+                            // Add any other fields that might be needed
+                            logoUrl: acct.logoUrl || '',
+                            phone: acct.phone || acct.companyPhone || '',
+                            annualUsage: acct.annualUsage || '',
+                            electricitySupplier: acct.electricitySupplier || '',
+                            currentRate: acct.currentRate || '',
+                            contractEndDate: acct.contractEndDate || ''
                         };
                         const rE = enrichedRecipient.energy || {};
                         const merged = {
