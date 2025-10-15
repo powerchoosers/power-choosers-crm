@@ -750,9 +750,9 @@ class EmailManager {
                     let acct = null;
                     if (comp) {
                         acct = accounts.find(a => {
-                            // Only use accountName field (the field that actually exists)
-                            const accountName = a.accountName || '';
-                            if (!accountName) return false; // Skip accounts without accountName
+                            // Use accountName or name field (both exist in different data sources)
+                            const accountName = a.accountName || a.name || '';
+                            if (!accountName) return false; // Skip accounts without accountName or name
                             
                             const normalizedAccountName = norm(accountName);
                             return normalizedAccountName === comp || 
@@ -775,7 +775,7 @@ class EmailManager {
                         };
                         enrichedRecipient.account = enrichedRecipient.account || {
                             id: acct.id,
-                            name: acct.accountName || '',
+                            name: acct.accountName || acct.name || '',
                             industry: acct.industry || '',
                             domain: acct.domain || acct.website || '',
                             city: acct.city || acct.billingCity || acct.locationCity || '',
@@ -2696,9 +2696,9 @@ ${sections.length > 1 ? `
                     let acct = null;
                     if (comp) {
                         acct = accounts.find(a => {
-                            // Only use accountName field (the field that actually exists)
-                            const accountName = a.accountName || '';
-                            if (!accountName) return false; // Skip accounts without accountName
+                            // Use accountName or name field (both exist in different data sources)
+                            const accountName = a.accountName || a.name || '';
+                            if (!accountName) return false; // Skip accounts without accountName or name
                             
                             const normalizedAccountName = norm(accountName);
                             return normalizedAccountName === comp || 
@@ -2721,7 +2721,7 @@ ${sections.length > 1 ? `
                         };
                         enrichedRecipient.account = enrichedRecipient.account || {
                             id: acct.id,
-                            name: acct.accountName || '',
+                            name: acct.accountName || acct.name || '',
                             industry: acct.industry || '',
                             domain: acct.domain || acct.website || '',
                             city: acct.city || acct.billingCity || acct.locationCity || '',
@@ -3199,7 +3199,7 @@ ${sections.length > 1 ? `
             if (!account && personCompany) {
                 const cmp = String(personCompany).toLowerCase().trim();
                 account = accounts.find(a => {
-                    const accountName = a.accountName || '';
+                    const accountName = a.accountName || a.name || '';
                     if (!accountName) return false;
                     return String(accountName).toLowerCase().trim() === cmp;
                 }) || null;
@@ -3218,7 +3218,7 @@ ${sections.length > 1 ? `
                 firstName: person.firstName || person.first_name || (name?.split(' ')[0]) || '',
                 lastName: person.lastName || person.last_name || '',
                 fullName: person.fullName || person.full_name || name || '',
-                company: person.company || person.companyName || person.accountName || (account?.accountName) || '',
+                company: person.company || person.companyName || person.accountName || (account?.accountName || account?.name) || '',
                 title: person.title || person.jobTitle || person.role || '',
                 industry: person.industry || person.sector || account?.industry || '',
                 // Use non-specific facility size; exact sqft will not be echoed by AI
@@ -3232,7 +3232,7 @@ ${sections.length > 1 ? `
                 notes: person.notes || person.note || '',
                 account: account ? {
                     id: account.id,
-                    name: account.accountName || '',
+                    name: account.accountName || account.name || '',
                     industry: account.industry || '',
                     domain: account.domain || account.website || '',
                     notes: account.notes || account.note || '',
@@ -3366,7 +3366,7 @@ ${sections.length > 1 ? `
             if (!account && personCompany) {
                 const cmp = String(personCompany).toLowerCase().trim();
                 account = accounts.find(a => {
-                    const accountName = a.accountName || '';
+                    const accountName = a.accountName || a.name || '';
                     if (!accountName) return false;
                     return String(accountName).toLowerCase().trim() === cmp;
                 }) || null;
@@ -3384,7 +3384,7 @@ ${sections.length > 1 ? `
                 firstName: person.firstName || person.first_name || '',
                 lastName: person.lastName || person.last_name || '',
                 email: e,
-                company: person.company || person.companyName || person.accountName || (account?.accountName) || '',
+                company: person.company || person.companyName || person.accountName || (account?.accountName || account?.name) || '',
                 title: person.title || person.jobTitle || person.role || '',
                 industry: person.industry || person.sector || account?.industry || '',
                 energy: {
@@ -3395,7 +3395,7 @@ ${sections.length > 1 ? `
                 },
                 account: account ? {
                     id: account.id,
-                    name: account.accountName || '',
+                    name: account.accountName || account.name || '',
                     industry: account.industry || '',
                     domain: account.domain || account.website || '',
                     city: account.city || account.billingCity || account.locationCity || '',
