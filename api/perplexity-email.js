@@ -98,8 +98,8 @@ function getCTAPattern(recipient) {
     }
   ];
   
-  // Weighted random selection (can be adjusted based on performance data)
-  const weights = [0.3, 0.3, 0.25, 0.15]; // Favor soft approaches
+  // Weighted random selection (favor softer approaches for cold emails)
+  const weights = [0.35, 0.35, 0.20, 0.10]; // Heavily favor soft_ask and value_offer
   const random = Math.random();
   let cumulative = 0;
   
@@ -116,23 +116,23 @@ function getOpeningStyle(recipient) {
   const styles = [
     {
       type: 'industry_insight',
-      prompt: 'Start with industry-specific trend or insight relevant to recipient',
-      example: 'I\'ve been tracking how [industry] companies are responding to the 15-25% energy rate increases...'
+      prompt: 'Start with company-specific observation from account description',
+      example: 'I noticed [company] specializes in [specific detail from description], and wanted to reach out about energy cost management...'
     },
     {
       type: 'market_urgency',
-      prompt: 'Open with urgent market condition affecting their business',
-      example: 'Electricity rates in [region/industry] are spiking 15-25% as suppliers warn of continued increases...'
+      prompt: 'Open with relevant market condition specific to their business',
+      example: 'With the current energy market affecting [industry] businesses, I thought [company] might be interested in...'
     },
     {
       type: 'social_proof',
-      prompt: 'Reference similar companies or recent conversations',
-      example: 'I recently helped a [industry] company similar to [company] reduce energy costs by 20%...'
+      prompt: 'Reference work with similar companies without specifics',
+      example: 'I work with several [industry] companies on energy cost management, and noticed [company]...'
     },
     {
       type: 'direct_problem',
-      prompt: 'Immediately address specific pain point they likely face',
-      example: 'With your contract ending [date], you might be concerned about renewal rates...'
+      prompt: 'Address likely pain point based on their business',
+      example: 'Given [company]\'s [business aspect from description], energy costs are probably a significant concern...'
     }
   ];
   
@@ -304,9 +304,9 @@ const coldEmailSchema = {
           description: "Style used: quick_question, re_prefix, thoughts, industry_specific, or value_prop"
         },
         greeting: { type: "string", description: "Hello {firstName}," },
-        pain_points: { type: "array", items: { type: "string" }, description: "Industry challenges" },
-        solution_intro: { type: "string", description: "How we help" },
-        social_proof: { type: "string", description: "Companies like yours..." },
+        pain_points: { type: "array", items: { type: "string" }, description: "2-3 industry challenges (NO statistics, use natural language)" },
+        solution_intro: { type: "string", description: "How we help (1-2 sentences, reference account description, avoid numbers)" },
+        social_proof: { type: "string", description: "Brief credibility mention (avoid percentages and statistics)" },
         cta_text: { type: "string", description: "Call to action" },
         cta_type: { type: "string", description: "CTA pattern used: soft_ask, value_offer, question_based, or direct_meeting" }
       },
@@ -472,37 +472,47 @@ Generate text for these fields:
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: "Hello ${firstName},"
-- pain_points: Array of 3-4 industry challenges (concise)
-- solution_intro: How Power Choosers solves these (2-3 sentences)
-- social_proof: Reference to similar companies (1-2 sentences)
+- pain_points: Array of 2-3 industry challenges (NATURAL LANGUAGE ONLY - NO statistics, NO percentages)
+- solution_intro: How Power Choosers helps (1-2 sentences). ${accountDescription ? `MUST reference: "${accountDescription}" in a natural way.` : 'Reference their business naturally.'} NO percentages or statistics.
+- social_proof: Brief credibility statement (NO numbers, NO percentages, keep vague like "similar companies" or "other businesses in your industry")
 - cta_text: ${ctaPattern.guidance}. Use this pattern: "${ctaPattern.template}". Customize with specific details from recipient context.
 - cta_type: Return "${ctaPattern.type}" as the CTA pattern used
 
-CTA CUSTOMIZATION RULES:
-- Replace [duration] with "10-minute" or "15-minute"
-- Replace [topic] with specific relevant topic (e.g., "energy cost reduction strategies")
-- Replace [company] with actual company name
-- Replace [specific value/analysis] with concrete offering
-- Replace [specific challenge] with industry-relevant challenge
-- Replace [time1] and [time2] with meeting times if using direct_meeting pattern
+CRITICAL QUALITY RULES:
+- USE ACCOUNT DESCRIPTION: If provided, naturally weave "${accountDescription || 'their business'}" into the email
+- NO STATISTICS: Avoid all percentages (15-25%, 20-30%, etc.) and specific savings numbers
+- NO YEAR RANGES: Don't mention "2025-2026" or specific contract years
+- NATURAL LANGUAGE: Write like a real person, not a template
+- SPECIFIC TO THEM: Reference actual company details, not generic industry statements
+- ONE NUMBER MAX: If you must use a number, only use ONE in the entire email
+
+FORBIDDEN PHRASES:
+- "I've been tracking how [industry] companies..."
+- "Recently helped another [industry] company..."
+- "rising 15-25%"
+- "saving 20-30%"
+- "contracts ending in 2025-2026"
+- "driven by data center demand"
+
+PREFERRED LANGUAGE:
+- "I noticed [company] [specific detail from description]..."
+- "Given [company]'s focus on [business aspect]..."
+- "With the current energy market..."
+- "Any thoughts on how [company] is approaching..."
 
 SUBJECT LINE RULES:
 - Under 50 characters
-- Choose ONE of these proven patterns and customize:
-  * "Quick question about [company]'s energy costs"
-  * "Re: [company] energy rates" 
-  * "[firstName], thoughts on [industry] energy savings?"
-  * "[company] - [specific timely issue]?"
-  * "Following up on [company]'s energy needs"
-- Personalize with actual company name, recipient name, or industry
-- Avoid spam triggers (no "Free", "Act Now", excessive punctuation)
+- Choose ONE pattern and customize naturally:
+  * "Quick question about [company]'s energy strategy"
+  * "Re: [company]'s energy costs" 
+  * "${firstName}, thoughts on energy planning?"
+  * "[company] - energy market question"
+- NO statistics or percentages in subject lines
 - Return the style you chose in subject_style field
 
 OPENING STYLE:
-Use "${openingStyle.type}" approach. ${openingStyle.prompt}. Keep it 1-2 sentences that feel natural and conversational.
-
-OPENING STYLE EXAMPLES:
-${openingStyle.example}`,
+Use "${openingStyle.type}" approach. ${openingStyle.prompt}. Keep it 1-2 sentences, natural and conversational. ${accountDescription ? `Reference: "${accountDescription}"` : 'Focus on their company.'}
+`,
 
       invoice: `
 TEMPLATE: Invoice Request
@@ -568,28 +578,39 @@ DO NOT include closing or sender name - these will be added automatically.`;
     const coldEmailRules = `
 EMAIL TYPE: Cold Email (Never Spoke Before)
 
+CRITICAL QUALITY RULES:
+- NO STATISTICS: Avoid percentages, specific numbers, year ranges
+- USE ACCOUNT DESCRIPTION: ${accountDescription ? `Must naturally reference: "${accountDescription}"` : 'Reference their specific business'}
+- NATURAL LANGUAGE: Write like a real person researching their company
+- ONE PROBLEM FOCUS: Pick one specific challenge, not multiple statistics
+- CONSULTATIVE TONE: Ask for thoughts, don't pitch
+
 OPENING (1-2 sentences):
 Style: ${openingStyle.type}
 ${openingStyle.prompt}
-Example: ${openingStyle.example}
+${accountDescription ? `MUST incorporate: "${accountDescription}" naturally` : ''}
+Example structure: "I noticed ${company} [specific detail]..." or "Given ${company}'s focus on [aspect]..."
 
 BODY (2-3 sentences):
-- Briefly explain Power Choosers value proposition
-- Reference specific context: ${industry ? `industry (${industry})` : 'business type'}, ${contractEndLabel ? `contract ending ${contractEndLabel}` : 'energy costs'}
-- Create urgency with 15-25% rate increases or timing
+- Briefly explain how Power Choosers helps (NO numbers, NO percentages)
+- Reference context: ${industry ? `their industry (${industry})` : 'their business'}, ${accountDescription ? `their description: "${accountDescription}"` : 'their company focus'}
+- Create relevance through their specific situation, NOT market statistics
+- FORBIDDEN: "15-25%", "20-30%", "2025-2026", "data center demand"
 
 CTA:
 Pattern: ${ctaPattern.type}
 ${ctaPattern.guidance}
 Template: "${ctaPattern.template}"
-Customize with specific recipient details.
+Make it consultative - ask for thoughts or offer value, don't just request meetings.
 
 SUBJECT LINE:
 - Under 50 characters
-- Use proven patterns: "Quick question", "Re:", "thoughts on", "[Company] -", "Following up"
-- Personalize with ${firstName ? firstName : 'recipient'} or ${company ? company : 'company'}
+- Natural and specific to them
+- NO numbers or percentages
+- Examples: "Quick question about ${company}'s energy strategy", "${firstName}, thoughts on energy planning?"
 
-TOTAL LENGTH: 80-120 words
+TOTAL LENGTH: 70-100 words (shorter is better for cold emails)
+TONE: Consultative and curious, not sales-heavy
 `;
 
     return [identity, recipientContext, coldEmailRules, outputFormat].join('\n\n');
