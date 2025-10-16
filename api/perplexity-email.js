@@ -640,6 +640,14 @@ FORBIDDEN PHRASES (especially in opening_hook):
 - "data centers drive up demand"
 - "data centers driving electricity rates up"
 - "sharp cost increases"
+- "data center-driven rate hikes"
+- "pushing electricity costs up 15-25%"
+- "rates up 15-25%"
+- "rates up 20-30%"
+- "electricity rates up 15-25%"
+- "electricity rates up 20-30%"
+- "data center demand drives rates up"
+- "data center demand pushing"
 - "Does Tuesday 2-3pm or Thursday 10-11am work for a 15-minute call?"
 - "Would Tuesday [time] or Thursday [time] work"
 - Any meeting time suggestions (Tuesday, Thursday, etc.)
@@ -994,6 +1002,13 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           jsonData.value_proposition = `We help ${industry} companies secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs.`;
         }
         
+        // Validate missing opening_hook for cold emails
+        if (templateType === 'cold_email' && (!jsonData.opening_hook || jsonData.opening_hook.trim() === '')) {
+          console.warn('[Validation] Missing opening_hook detected, adding default...');
+          const company = recipient?.company || 'Companies';
+          jsonData.opening_hook = `${company} are likely facing rising electricity costs with contracts renewing in 2025.`;
+        }
+        
         // Validate for duplicate CTAs in cold emails
         if (templateType === 'cold_email' && jsonData.cta_text) {
           // Check if the CTA contains multiple questions or meeting requests
@@ -1009,15 +1024,21 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         
         // Validate no statistics in opening_hook for cold emails
         if (templateType === 'cold_email' && jsonData.opening_hook) {
-          const hasStatistics = /\d+[-–]\d+%|\d+%|save \$\d+|reduce costs by/i.test(jsonData.opening_hook);
+          const hasStatistics = /\d+[-–]\d+%|\d+%|save \$\d+|reduce costs by|15-25%|20-30%|10-20%|data center.*\d+%|rates up \d+%/i.test(jsonData.opening_hook);
           if (hasStatistics) {
-            console.warn('[Validation] Statistics detected in opening_hook, this should only be in value_proposition');
+            console.warn('[Validation] Statistics detected in opening_hook:', jsonData.opening_hook);
             // Strip out the statistics but keep the sentence structure
             jsonData.opening_hook = jsonData.opening_hook
               .replace(/\d+[-–]\d+%/g, 'significantly')
               .replace(/\b\d+%\b/g, 'considerably')
               .replace(/save \$[\d,]+/g, 'reduce costs')
-              .replace(/reduce costs by \$?[\d,]+/g, 'reduce operational costs');
+              .replace(/reduce costs by \$?[\d,]+/g, 'reduce operational costs')
+              .replace(/data center.*\d+%/gi, 'data center demand')
+              .replace(/rates up \d+%/gi, 'rising rates')
+              .replace(/15-25%/gi, 'significantly')
+              .replace(/20-30%/gi, 'considerably')
+              .replace(/10-20%/gi, 'substantially');
+            console.warn('[Validation] Fixed opening_hook:', jsonData.opening_hook);
           }
         }
         
