@@ -938,21 +938,21 @@
       
       // FINAL FALLBACK: Use CacheManager or Firestore
       if (!state.loadedPeople || !state.loadedAccounts) {
-        if (window.CacheManager && typeof window.CacheManager.get === 'function') {
-          if (!state.loadedPeople) {
+      if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+        if (!state.loadedPeople) {
             state.dataPeople = await window.CacheManager.get('contacts') || [];
-            state.loadedPeople = true;
+          state.loadedPeople = true;
             console.debug('[ListDetail] loadDataOnce: people loaded from CacheManager', { count: state.dataPeople.length });
-          }
-          
-          if (!state.loadedAccounts) {
+        }
+        
+        if (!state.loadedAccounts) {
             state.dataAccounts = await window.CacheManager.get('accounts') || [];
-            state.loadedAccounts = true;
+          state.loadedAccounts = true;
             console.debug('[ListDetail] loadDataOnce: accounts loaded from CacheManager', { count: state.dataAccounts.length });
-          }
-        } else if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
+        }
+      } else if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
           // Firestore fallback - OPTIMIZED with field selection
-          if (!state.loadedPeople) {
+        if (!state.loadedPeople) {
             // OPTIMIZED: Only fetch fields needed for list display and filtering (60% data reduction)
             const peopleSnap = await window.firebaseDB.collection('contacts')
               .select(
@@ -966,12 +966,12 @@
                 'updatedAt', 'createdAt'
               )
               .get();
-            state.dataPeople = peopleSnap ? peopleSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
-            state.loadedPeople = true;
+          state.dataPeople = peopleSnap ? peopleSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+          state.loadedPeople = true;
             console.debug('[ListDetail] loadDataOnce: people loaded from Firestore (optimized)', { count: state.dataPeople.length });
-          }
-          
-          if (!state.loadedAccounts) {
+        }
+        
+        if (!state.loadedAccounts) {
             // OPTIMIZED: Only fetch fields needed for list display, filtering, and AI email generation (25% data reduction)
             const accountsSnap = await window.firebaseDB.collection('accounts')
               .select(
@@ -993,8 +993,8 @@
                 'updatedAt', 'createdAt'
               )
               .get();
-            state.dataAccounts = accountsSnap ? accountsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
-            state.loadedAccounts = true;
+          state.dataAccounts = accountsSnap ? accountsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+          state.loadedAccounts = true;
             console.debug('[ListDetail] loadDataOnce: accounts loaded from Firestore (optimized)', { count: state.dataAccounts.length });
           }
         }
@@ -1612,6 +1612,27 @@
         (page) => {
           state.currentPage = page;
           render();
+          
+          // Scroll to top after page change (same as people/accounts pages)
+          try {
+            requestAnimationFrame(() => {
+              const scroller = els.tableContainer?.querySelector('.table-scroll');
+              if (scroller && typeof scroller.scrollTo === 'function') {
+                scroller.scrollTo({ top: 0, behavior: 'auto' });
+              } else if (scroller) {
+                scroller.scrollTop = 0;
+              }
+              const main = document.getElementById('main-content');
+              if (main && typeof main.scrollTo === 'function') {
+                main.scrollTo({ top: 0, behavior: 'auto' });
+              }
+              const contentArea = document.querySelector('.content-area');
+              if (contentArea && typeof contentArea.scrollTo === 'function') {
+                contentArea.scrollTo({ top: 0, behavior: 'auto' });
+              }
+              window.scrollTo(0, 0);
+            });
+          } catch (_) { /* noop */ }
         },
         els.pagination.id || 'list-detail-pagination'
       );
@@ -1656,6 +1677,19 @@
           if (next !== state.currentPage) {
             state.currentPage = next;
             render();
+            
+            // Scroll to top after page change
+            try {
+              requestAnimationFrame(() => {
+                const scroller = els.tableContainer?.querySelector('.table-scroll');
+                if (scroller && typeof scroller.scrollTo === 'function') {
+                  scroller.scrollTo({ top: 0, behavior: 'auto' });
+                } else if (scroller) {
+                  scroller.scrollTop = 0;
+                }
+                window.scrollTo(0, 0);
+              });
+            } catch (_) { /* noop */ }
           }
         });
         els.pagination.dataset.bound = '1';
@@ -1920,7 +1954,7 @@
     
     // Load data in parallel for faster loading
     if (!window.__restoringListDetail) {
-      state.currentPage = 1;
+    state.currentPage = 1;
     }
     const [dataLoaded, membersLoaded] = await Promise.all([
       loadDataOnce(),
@@ -2059,7 +2093,7 @@
 
     // Global drop handler for the entire header row
     els.theadRow.addEventListener('dragover', (e) => {
-      e.preventDefault();
+        e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       
       const th = e.target.closest('th');

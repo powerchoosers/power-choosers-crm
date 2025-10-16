@@ -209,6 +209,19 @@ class SettingsPage {
                 this.removePhoneNumber(e.target.closest('.phone-number-item'));
             }
         });
+
+        // Algolia reindex buttons (with duplicate listener guards)
+        const reindexAccountsBtn = document.getElementById('algolia-reindex-accounts-btn');
+        if (reindexAccountsBtn && !document._algoliaReindexAccountsBound) {
+            reindexAccountsBtn.addEventListener('click', () => this.reindexAlgoliaAccounts());
+            document._algoliaReindexAccountsBound = true;
+        }
+
+        const reindexContactsBtn = document.getElementById('algolia-reindex-contacts-btn');
+        if (reindexContactsBtn && !document._algoliaReindexContactsBound) {
+            reindexContactsBtn.addEventListener('click', () => this.reindexAlgoliaContacts());
+            document._algoliaReindexContactsBound = true;
+        }
     }
 
     async loadSettings() {
@@ -1033,6 +1046,191 @@ class SettingsPage {
             return '\n\n' + signature.text;
         }
         return '';
+    }
+
+    // Algolia reindex methods
+    showAlgoliaStatus(message, type = 'info') {
+        const statusDiv = document.getElementById('algolia-status');
+        if (!statusDiv) return;
+
+        const colors = {
+            info: { bg: '#d1ecf1', color: '#0c5460', border: '#bee5eb' },
+            success: { bg: '#d4edda', color: '#155724', border: '#c3e6cb' },
+            error: { bg: '#f8d7da', color: '#721c24', border: '#f5c6cb' }
+        };
+
+        const style = colors[type] || colors.info;
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = style.bg;
+        statusDiv.style.color = style.color;
+        statusDiv.style.border = `1px solid ${style.border}`;
+        statusDiv.textContent = message;
+    }
+
+    logAlgolia(message) {
+        const logDiv = document.getElementById('algolia-log');
+        if (!logDiv) return;
+
+        const timestamp = new Date().toLocaleTimeString();
+        logDiv.textContent += `[${timestamp}] ${message}\n`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    clearAlgoliaLog() {
+        const logDiv = document.getElementById('algolia-log');
+        if (logDiv) logDiv.textContent = '';
+    }
+
+    async reindexAlgoliaAccounts() {
+        this.showAlgoliaStatus('Starting accounts reindex...', 'info');
+        this.logAlgolia('🔄 Starting Algolia reindex for all accounts...');
+
+        try {
+            if (!window.firebaseDB) {
+                throw new Error('Firebase not available. Please refresh the page and try again.');
+            }
+
+            const accountsSnapshot = await window.firebaseDB.collection('accounts').get();
+
+            if (accountsSnapshot.empty) {
+                this.logAlgolia('ℹ️ No accounts found in Firebase.');
+                this.showAlgoliaStatus('No accounts found', 'info');
+                return;
+            }
+
+            this.logAlgolia(`📊 Found ${accountsSnapshot.size} accounts to reindex`);
+
+            let processed = 0;
+            let errors = 0;
+
+            for (const doc of accountsSnapshot.docs) {
+                try {
+                    const accountId = doc.id;
+                    const accountData = doc.data();
+
+                    this.logAlgolia(`🔄 Processing account ${processed + 1}/${accountsSnapshot.size}: ${accountData.accountName || accountData.name || accountId}`);
+
+                    await window.firebaseDB.collection('accounts').doc(accountId).update({
+                        updatedAt: new Date().toISOString(),
+                        _algoliaReindexTrigger: Date.now()
+                    });
+
+                    processed++;
+
+                    if (processed % 10 === 0) {
+                        this.logAlgolia(`✅ Processed ${processed}/${accountsSnapshot.size} accounts...`);
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+
+                } catch (error) {
+                    this.logAlgolia(`❌ Error processing account ${doc.id}: ${error.message}`);
+                    errors++;
+                }
+            }
+
+            this.logAlgolia(`🎉 Reindex complete!`);
+            this.logAlgolia(`✅ Successfully processed: ${processed} accounts`);
+            if (errors > 0) {
+                this.logAlgolia(`❌ Errors: ${errors} accounts`);
+            }
+            this.logAlgolia(`📤 All accounts should now be syncing to Algolia...`);
+
+            this.showAlgoliaStatus(`Reindex complete! Processed ${processed} accounts`, 'success');
+
+            // Clean up trigger fields after 5 seconds
+            setTimeout(async () => {
+                try {
+                    for (const doc of accountsSnapshot.docs) {
+                        await window.firebaseDB.collection('accounts').doc(doc.id).update({
+                            _algoliaReindexTrigger: window.firebase.firestore.FieldValue.delete()
+                        });
+                    }
+                    this.logAlgolia('✅ Cleanup complete - trigger fields removed');
+                } catch (error) {
+                    this.logAlgolia('⚠️ Cleanup failed (this is not critical): ' + error.message);
+                }
+            }, 5000);
+
+        } catch (error) {
+            this.logAlgolia(`❌ Fatal error during reindex: ${error.message}`);
+            this.showAlgoliaStatus(`Error: ${error.message}`, 'error');
+        }
+    }
+
+    async reindexAlgoliaContacts() {
+        this.showAlgoliaStatus('Starting contacts reindex...', 'info');
+        this.logAlgolia('🔄 Starting Algolia reindex for all contacts...');
+
+        try {
+            if (!window.firebaseDB) {
+                throw new Error('Firebase not available. Please refresh the page and try again.');
+            }
+
+            const contactsSnapshot = await window.firebaseDB.collection('people').get();
+
+            if (contactsSnapshot.empty) {
+                this.logAlgolia('ℹ️ No contacts found in Firebase.');
+                this.showAlgoliaStatus('No contacts found', 'info');
+                return;
+            }
+
+            this.logAlgolia(`📊 Found ${contactsSnapshot.size} contacts to reindex`);
+
+            let processed = 0;
+            let errors = 0;
+
+            for (const doc of contactsSnapshot.docs) {
+                try {
+                    const contactId = doc.id;
+                    const contactData = doc.data();
+
+                    this.logAlgolia(`🔄 Processing contact ${processed + 1}/${contactsSnapshot.size}: ${contactData.firstName || ''} ${contactData.lastName || ''} (${contactId})`);
+
+                    await window.firebaseDB.collection('people').doc(contactId).update({
+                        updatedAt: new Date().toISOString(),
+                        _algoliaReindexTrigger: Date.now()
+                    });
+
+                    processed++;
+
+                    if (processed % 10 === 0) {
+                        this.logAlgolia(`✅ Processed ${processed}/${contactsSnapshot.size} contacts...`);
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+
+                } catch (error) {
+                    this.logAlgolia(`❌ Error processing contact ${doc.id}: ${error.message}`);
+                    errors++;
+                }
+            }
+
+            this.logAlgolia(`🎉 Reindex complete!`);
+            this.logAlgolia(`✅ Successfully processed: ${processed} contacts`);
+            if (errors > 0) {
+                this.logAlgolia(`❌ Errors: ${errors} contacts`);
+            }
+            this.logAlgolia(`📤 All contacts should now be syncing to Algolia...`);
+
+            this.showAlgoliaStatus(`Reindex complete! Processed ${processed} contacts`, 'success');
+
+            // Clean up trigger fields after 5 seconds
+            setTimeout(async () => {
+                try {
+                    for (const doc of contactsSnapshot.docs) {
+                        await window.firebaseDB.collection('people').doc(doc.id).update({
+                            _algoliaReindexTrigger: window.firebase.firestore.FieldValue.delete()
+                        });
+                    }
+                    this.logAlgolia('✅ Cleanup complete - trigger fields removed');
+                } catch (error) {
+                    this.logAlgolia('⚠️ Cleanup failed (this is not critical): ' + error.message);
+                }
+            }, 5000);
+
+        } catch (error) {
+            this.logAlgolia(`❌ Fatal error during reindex: ${error.message}`);
+            this.showAlgoliaStatus(`Error: ${error.message}`, 'error');
+        }
     }
 }
 

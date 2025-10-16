@@ -406,15 +406,15 @@
     --color-success: var(--green-subtle);
     
     /* Background Colors - Two-tone system */
-    --bg-main: var(--grey-780);   /* Main content slightly lighter than before */
+    --bg-main: var(--grey-790);   /* Main content slightly darker for better contrast */
     --bg-widget: var(--grey-800); /* Widget panel background (slightly darker) */
     --bg-container: var(--grey-775); /* Containers align with card tone for consistent system theme */
-    --bg-card: var(--grey-775);   /* Section/card backgrounds slightly lighter */
+    --bg-card: var(--grey-780);   /* Section/card backgrounds slightly darker */
     --bg-item: var(--grey-700);   /* Inner tiles (list items, action buttons) lighter than card */
     --bg-hover: var(--grey-700);  /* Hover states on dark */
     
     /* Text Colors */
-    --text-primary: var(--grey-100);
+    --text-primary: #f8f9fa;      /* Better readability with pure white-ish */
     --text-secondary: var(--grey-300);
     --text-muted: var(--grey-400);
     --text-inverse: #ffffff;      /* For dark containers */
@@ -437,14 +437,14 @@
     --widget-panel-width: 320px;  /* Widget panel width for 3:1 ratio */
     
     /* Consistent Border Radius */
-    --border-radius: 8px;         /* Consistent rounded corners */
-    --border-radius-sm: 4px;      /* Small radius */
-    --border-radius-lg: 12px;     /* Large radius */
+    --border-radius: 12px;        /* Modern rounded corners (up from 8px) */
+    --border-radius-sm: 6px;      /* Small radius (up from 4px) */
+    --border-radius-lg: 16px;     /* Large radius (up from 12px) */
     
-    /* Shadows - slightly stronger for depth on dark UI */
-    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.18);
-    --shadow-md: 0 6px 12px rgba(0, 0, 0, 0.22);
-    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.28);
+    /* Shadows - softer for modern 2025 aesthetic */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.12);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.20);
     
     /* Elevation System - use these everywhere */
     --elevation-topbar: var(--shadow-md);
@@ -453,8 +453,8 @@
     --elevation-card-hover: var(--shadow-lg);
     
     /* Transitions */
-    --transition-fast: 0.15s ease;
-    --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: 0.2s ease;
+    --transition-smooth: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* CONSISTENT BASE FONT SIZE (align localhost and production)
@@ -859,9 +859,11 @@ tbody.animating tr:nth-child(n+11) { animation-delay: 200ms; }
 /* === DELAY EDIT POPOVER === */
 .delay-popover {
     position: fixed; /* positioned via JS under the Edit delay button */
-    background: var(--bg-card);
+    background: rgba(52, 58, 64, 0.98);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     color: var(--text-primary);
-    border: 1px solid var(--border-light);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: var(--border-radius);
     box-shadow: var(--elevation-card);
     min-width: 300px;
@@ -1555,9 +1557,11 @@ tbody.animating tr:nth-child(n+11) { animation-delay: 200ms; }
 /* === TASK POPOVER (contact detail page) === */
 .task-popover {
     position: fixed; /* positioned via JS under the tasks button */
-    background: var(--bg-card);
+    background: rgba(52, 58, 64, 0.98);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     color: var(--text-primary);
-    border: 1px solid var(--border-light);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: var(--border-radius);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     z-index: 120; /* above other elements */
@@ -3118,12 +3122,13 @@ html, body {
     left: 0;
     right: 0;
     height: var(--topbar-height);
-    background: var(--grey-800);
+    background: linear-gradient(180deg, var(--grey-800) 0%, var(--grey-820) 100%);
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 var(--spacing-base);
-    box-shadow: var(--elevation-topbar);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     z-index: 1000;
 }
 
@@ -3447,32 +3452,37 @@ html, body {
 
 .search-input {
     width: 400px;
-    height: 40px;
-    background: var(--bg-item);
-    border: 2px solid var(--border-light);
-    border-radius: 8px;
-    padding: 0 40px 0 14px;
-    color: var(--text-primary);
+    height: 42px;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 0 44px 0 16px;
+    color: var(--text-inverse);
     font-size: 0.9rem;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .search-input::placeholder {
-    color: var(--text-muted);
+    color: rgba(255, 255, 255, 0.4);
     font-size: 0.85rem;
 }
 
 .search-input:hover {
-    border-color: var(--grey-500);
-    background: var(--bg-widget);
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .search-input:focus {
     outline: none;
-    border-color: var(--orange-subtle);
-    background: var(--bg-widget);
-    box-shadow: 0 0 0 3px rgba(255,145,0,0.1);
-    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 107, 53, 0.5);
+    box-shadow: 
+        inset 0 2px 6px rgba(0, 0, 0, 0.1),
+        0 0 0 3px rgba(255, 107, 53, 0.15);
+    transform: translateY(0);
 }
 
 .search-btn {
@@ -3501,8 +3511,8 @@ html, body {
 }
 
 .call-btn {
-    background: var(--orange-subtle);
-    border: 1px solid var(--orange-subtle);
+    background: linear-gradient(135deg, #ff7a47 0%, #ff6b35 100%);
+    border: none;
     color: var(--text-inverse);
     width: 40px;
     height: 40px;
@@ -3512,15 +3522,15 @@ html, body {
     justify-content: center;
     border-radius: var(--border-radius);
     cursor: pointer;
-    transition: var(--transition-fast);
-    line-height: 0; /* remove inline content vertical offset */
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    line-height: 0;
+    box-shadow: 0 4px 16px rgba(255, 107, 53, 0.35);
 }
 
 .call-btn:hover {
-    background: #e55a2b;
-    border-color: #d9481f;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    background: linear-gradient(135deg, #ff8558 0%, #ff7a47 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(255, 107, 53, 0.45);
 }
 
 /* Ensure the phone icon is centered and sized consistently */
@@ -3853,8 +3863,9 @@ html, body {
 }
 
 .profile-avatar:hover {
-    background: #1e40af;
-    transform: scale(1.05);
+    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 0 4px 12px rgba(30, 64, 175, 0.4);
 }
 
 /* === MAIN LAYOUT === */
@@ -3868,8 +3879,9 @@ html, body {
 /* === SIDEBAR === */
 .sidebar {
     width: var(--sidebar-width);
-    background: var(--grey-800);
-    border-right: 1px solid var(--grey-700);
+    background: linear-gradient(180deg, var(--grey-820) 0%, var(--grey-800) 100%);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 2px 0 16px rgba(0, 0, 0, 0.15);
     transition: width var(--transition-smooth);
     overflow: hidden;
     z-index: 100;
@@ -3916,7 +3928,7 @@ html, body {
 }
 
 .nav-item.active {
-    background: var(--grey-700);
+    background: linear-gradient(90deg, rgba(255, 107, 53, 0.15), transparent);
     color: var(--text-inverse);
     border-left-color: var(--orange-subtle);
 }
@@ -3995,18 +4007,37 @@ html, body {
 }
 
 .stat-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-light);
-    border-radius: var(--border-radius);
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--grey-790) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
     padding: var(--spacing-base);
     text-align: center;
-    box-shadow: var(--elevation-card);
-    transition: var(--transition-fast);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--orange-subtle), var(--blue-subtle));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.stat-card:hover::before {
+    opacity: 1;
 }
 
 .stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--elevation-card-hover);
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+    border-color: rgba(255, 255, 255, 0.12);
 }
 
 .stat-value {
@@ -5027,21 +5058,23 @@ html, body {
 
 /* === BUTTONS === */
 .btn-primary {
-    background: var(--grey-700);
-    border: 1px solid var(--border-light);
+    background: linear-gradient(135deg, var(--grey-700) 0%, var(--grey-750) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--text-inverse);
-    padding: 8px var(--spacing-md);
-    border-radius: var(--border-radius);
+    padding: 10px 20px;
+    border-radius: 10px;
     cursor: pointer;
     font-size: 0.875rem;
-    font-weight: 500;
-    transition: var(--transition-fast);
+    font-weight: 600;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary:hover {
-    background: var(--grey-600);
-    border-color: var(--grey-500);
-    transform: translateY(-1px);
+    background: linear-gradient(135deg, var(--grey-650, #545b62) 0%, var(--grey-700) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.15);
 }
 
 /* Calls table: Add Contact CTA (global so it loads immediately) */
@@ -5226,18 +5259,27 @@ html, body {
     border-right: 1px solid var(--grey-700); /* vertical divider */
 }
 
+/* Rounded corners for table header to match container */
+.data-table thead tr:first-child th:first-child {
+    border-top-left-radius: var(--border-radius);
+}
+
+.data-table thead tr:first-child th:last-child {
+    border-top-right-radius: var(--border-radius);
+}
+
 /* Sticky header within the scroll container: fixed vertically, scrolls horizontally */
 .table-scroll .data-table thead th {
     position: sticky;
     top: 0;
-    z-index: 2;
+    z-index: 10;
     background: var(--grey-800); /* ensure header covers rows when stuck */
 }
 
 .data-table td {
-    padding: var(--spacing-md);
-    border-bottom: 1px solid var(--grey-700);
-    border-right: 1px solid var(--grey-700); /* vertical divider */
+    padding: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
     color: var(--text-inverse);
 }
 
@@ -5247,8 +5289,13 @@ html, body {
     border-right: none;
 }
 
-.data-table tr:hover {
-    background: var(--grey-800);
+.data-table tbody tr {
+    transition: all 0.15s ease;
+}
+
+.data-table tbody tr:hover {
+    background: linear-gradient(90deg, var(--grey-800), var(--grey-790));
+    transform: scale(1.005);
 }
 
 /* Selected row highlight */
@@ -6947,8 +6994,10 @@ html, body {
     width: 760px;
     max-width: calc(100vw - 40px);
     max-height: 78vh;
-    background: var(--bg-card);
-    border: 1px solid var(--border-light);
+    background: rgba(52, 58, 64, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: var(--border-radius);
     box-shadow: var(--elevation-card);
     color: var(--text-inverse);
@@ -14182,6 +14231,335 @@ input.row-select[type="checkbox"]:focus-visible {
     justify-self: center;
     max-width: 500px;
     margin: var(--spacing-lg) 0;
+}
+
+/* === MICRO-INTERACTIONS & ANIMATIONS === */
+
+/* Icon button pulse animation */
+@keyframes iconPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+}
+
+.icon-btn:hover {
+    animation: iconPulse 0.3s ease;
+}
+
+/* Profile avatar hover effect */
+.profile-avatar:hover {
+    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+    transform: scale(1.1) rotate(5deg);
+    box-shadow: 0 4px 12px rgba(30, 64, 175, 0.4);
+}
+
+/* Quick action buttons glow */
+.qa-btn:hover {
+    box-shadow: 0 0 16px rgba(255, 107, 53, 0.3);
+}
+
+/* === DASHBOARD ENTRANCE ANIMATIONS === */
+
+/* Keyframes for entrance animations */
+@keyframes slideDownFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideUpFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideLeftFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideRightFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Top bar entrance animation */
+.top-bar {
+    animation: slideDownFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Sidebar entrance animation */
+.sidebar {
+    animation: slideLeftFadeIn 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.1s forwards;
+    opacity: 0;
+}
+
+/* Widget panel entrance animation */
+.widget-panel {
+    animation: slideRightFadeIn 0.7s cubic-bezier(0.4, 0, 0.2, 1) 0.2s forwards;
+    opacity: 0;
+}
+
+/* Stat cards entrance animation with stagger */
+.stat-cards {
+    animation: slideUpFadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.3s forwards;
+    opacity: 0;
+}
+
+.stat-card:nth-child(1) {
+    animation: slideUpFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.4s forwards;
+    opacity: 0;
+}
+
+.stat-card:nth-child(2) {
+    animation: slideUpFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.5s forwards;
+    opacity: 0;
+}
+
+.stat-card:nth-child(3) {
+    animation: slideUpFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.6s forwards;
+    opacity: 0;
+}
+
+.stat-card:nth-child(4) {
+    animation: slideUpFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.7s forwards;
+    opacity: 0;
+}
+
+/* Dashboard cards entrance animation */
+.dashboard-card {
+    animation: slideUpFadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.8s forwards;
+    opacity: 0;
+}
+
+/* Widget cards entrance animation with stagger */
+.widget-card:nth-child(1) {
+    animation: slideRightFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.9s forwards;
+    opacity: 0;
+}
+
+.widget-card:nth-child(2) {
+    animation: slideRightFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) 1.0s forwards;
+    opacity: 0;
+}
+
+.widget-card:nth-child(3) {
+    animation: slideRightFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) 1.1s forwards;
+    opacity: 0;
+}
+
+.widget-card:nth-child(4) {
+    animation: slideRightFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) 1.2s forwards;
+    opacity: 0;
+}
+
+/* Exclude phone widget from entrance animations - it slides down naturally */
+.phone-card {
+    animation: none !important;
+    opacity: 1 !important;
+}
+
+/* === DYNAMIC CONTENT ANIMATIONS === */
+
+/* Keyframes for content animations */
+@keyframes contentSlideDown {
+    0% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes itemFadeInUp {
+    0% {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Tasks list content animation */
+.tasks-list:not(.animated) {
+    animation: contentSlideDown 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+}
+
+.tasks-list {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tasks-list:not(:empty) {
+    max-height: 2000px;
+}
+
+.tasks-list:not(.animated) .task-item:not(.animated) {
+    animation: itemFadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+}
+
+.tasks-list:not(.animated) .task-item:nth-child(1) { animation-delay: 0.1s; }
+.tasks-list:not(.animated) .task-item:nth-child(2) { animation-delay: 0.2s; }
+.tasks-list:not(.animated) .task-item:nth-child(3) { animation-delay: 0.3s; }
+.tasks-list:not(.animated) .task-item:nth-child(4) { animation-delay: 0.4s; }
+.tasks-list:not(.animated) .task-item:nth-child(5) { animation-delay: 0.5s; }
+
+/* News list content animation */
+.news-list:not(.animated) {
+    animation: contentSlideDown 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+}
+
+.news-list {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.news-list:not(:empty) {
+    max-height: 2000px;
+}
+
+.news-list:not(.animated) .news-item:not(.animated) {
+    animation: itemFadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+}
+
+.news-list:not(.animated) .news-item:nth-child(1) { animation-delay: 0.1s; }
+.news-list:not(.animated) .news-item:nth-child(2) { animation-delay: 0.2s; }
+.news-list:not(.animated) .news-item:nth-child(3) { animation-delay: 0.3s; }
+.news-list:not(.animated) .news-item:nth-child(4) { animation-delay: 0.4s; }
+.news-list:not(.animated) .news-item:nth-child(5) { animation-delay: 0.5s; }
+
+/* Recent Activities content animation */
+.activities-list:not(.animated) {
+    animation: contentSlideDown 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+}
+
+.activities-list {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.activities-list:not(:empty) {
+    max-height: 2000px;
+}
+
+.activities-list:not(.animated) .activity-item:not(.animated) {
+    animation: itemFadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+}
+
+.activities-list:not(.animated) .activity-item:nth-child(1) { animation-delay: 0.1s; }
+.activities-list:not(.animated) .activity-item:nth-child(2) { animation-delay: 0.2s; }
+.activities-list:not(.animated) .activity-item:nth-child(3) { animation-delay: 0.3s; }
+.activities-list:not(.animated) .activity-item:nth-child(4) { animation-delay: 0.4s; }
+.activities-list:not(.animated) .activity-item:nth-child(5) { animation-delay: 0.5s; }
+
+/* Prevent re-animation on content updates - only animate once */
+.activities-list.animated,
+.tasks-list.animated,
+.news-list.animated,
+.quick-actions.animated {
+    animation: none !important;
+    opacity: 1 !important;
+    max-height: none !important;
+}
+
+.activities-list.animated .activity-item,
+.tasks-list.animated .task-item,
+.news-list.animated .news-item,
+.quick-actions.animated .action-btn {
+    animation: none !important;
+    opacity: 1 !important;
+}
+
+/* Also prevent animation on items directly marked as animated */
+.activity-item.animated,
+.task-item.animated,
+.news-item.animated,
+.action-btn.animated {
+    animation: none !important;
+    opacity: 1 !important;
+}
+
+/* Quick actions content animation */
+.quick-actions:not(.animated) {
+    animation: contentSlideDown 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+}
+
+.quick-actions {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.quick-actions:not(:empty) {
+    max-height: 1000px;
+}
+
+.quick-actions:not(.animated) .action-btn:not(.animated) {
+    animation: itemFadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+}
+
+.quick-actions:not(.animated) .action-btn:nth-child(1) { animation-delay: 0.1s; }
+.quick-actions:not(.animated) .action-btn:nth-child(2) { animation-delay: 0.2s; }
+.quick-actions:not(.animated) .action-btn:nth-child(3) { animation-delay: 0.3s; }
+
+/* Disable animations for reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .top-bar,
+    .sidebar,
+    .widget-panel,
+    .stat-cards,
+    .stat-card,
+    .dashboard-card,
+    .widget-card,
+    .tasks-list,
+    .news-list,
+    .activities-list,
+    .quick-actions,
+    .task-item,
+    .news-item,
+    .activity-item,
+    .action-btn {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+        max-height: none !important;
+    }
 }
 
 /* === RESPONSIVE DESIGN === */

@@ -2158,6 +2158,51 @@
                                             </div>
                                         </div>
                                     </div>
+
+                                    <!-- Algolia Reindex Tool Section -->
+                                    <div class="settings-section">
+                                        <h3 class="settings-section-title">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                                            </svg>
+                                            Algolia Reindex Tool
+                                        </h3>
+                                        <div class="settings-content">
+                                            <div class="settings-group">
+                                                <h4 class="settings-group-title">Database Synchronization</h4>
+                                                <p class="settings-hint" style="margin: 0 0 16px 0;">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; margin-right: 4px; vertical-align: middle;">
+                                                        <circle cx="12" cy="12" r="10"></circle>
+                                                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                                                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                                    </svg>
+                                                    Trigger a full reindex of your Firebase data to Algolia. Use this after clearing your Algolia index or if search results are missing records.
+                                                </p>
+                                                
+                                                <div class="settings-field" style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+                                                    <strong>⚠️ Important:</strong> Make sure you have only ONE Algolia Firebase extension instance running to avoid duplicates.
+                                                </div>
+                                                
+                                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                                                    <button class="btn-primary" id="algolia-reindex-accounts-btn" style="width: 100%;">
+                                                        📊 Reindex Accounts
+                                                    </button>
+                                                    <button class="btn-primary" id="algolia-reindex-contacts-btn" style="width: 100%;">
+                                                        👥 Reindex Contacts
+                                                    </button>
+                                                </div>
+                                                
+                                                <div id="algolia-status" style="display: none; padding: 12px; border-radius: 4px; margin-bottom: 12px;"></div>
+                                                
+                                                <div class="settings-field">
+                                                    <label style="font-weight: 600; margin-bottom: 8px; display: block;">Reindex Log</label>
+                                                    <div id="algolia-log" style="background: var(--grey-800); border: 1px solid var(--grey-600); border-radius: 4px; padding: 12px; font-family: 'Courier New', monospace; font-size: 12px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; color: var(--text-primary);"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

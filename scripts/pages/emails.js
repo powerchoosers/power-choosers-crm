@@ -183,8 +183,33 @@ class EmailManager {
                     this.renderConversationThreads(threads);
                 }
             } else {
-                console.warn('[EmailManager] Email tracking manager not available');
-                // Retry with backoff up to ~2s to allow initialization
+                console.warn('[EmailManager] Email tracking manager not available, trying BackgroundEmailsLoader fallback...');
+                
+                // FALLBACK: Try BackgroundEmailsLoader if EmailTrackingManager not available
+                if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.getEmailsData === 'function') {
+                    const allEmails = window.BackgroundEmailsLoader.getEmailsData();
+                    
+                    if (allEmails && allEmails.length > 0) {
+                        console.log('[EmailManager] Using BackgroundEmailsLoader fallback:', allEmails.length, 'emails');
+                        
+                        if (this.currentFolder === 'sent') {
+                            const sentEmails = allEmails.filter(email => 
+                                email.emailType === 'sent' || email.type === 'sent' || email.isSentEmail
+                            );
+                            this.renderEmails(sentEmails);
+                        } else if (this.currentFolder === 'inbox') {
+                            const receivedEmails = allEmails.filter(email => 
+                                email.emailType === 'received' || email.provider === 'sendgrid_inbound'
+                            );
+                            this.renderEmails(receivedEmails);
+                        } else {
+                            this.renderEmails(allEmails);
+                        }
+                        return;
+                    }
+                }
+                
+                // Final fallback: Retry with backoff up to ~2s to allow initialization
                 const start = Date.now();
                 await new Promise((resolve) => {
                     const tick = () => {
@@ -3884,16 +3909,41 @@ ${sections.length > 1 ? `
                 this.hideLoading();
                 }
             } else {
-                console.warn('[EmailManager] Email tracking manager not available');
-                // Retry with exponential backoff up to ~2s
+                console.warn('[EmailManager] Email tracking manager not available, trying BackgroundEmailsLoader fallback...');
+                
+                // FALLBACK: Try BackgroundEmailsLoader if EmailTrackingManager not available
+                if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.getEmailsData === 'function') {
+                    const allEmails = window.BackgroundEmailsLoader.getEmailsData();
+                    
+                    if (allEmails && allEmails.length > 0) {
+                        console.log('[EmailManager] Using BackgroundEmailsLoader fallback:', allEmails.length, 'emails');
+                        
+                        if (this.currentFolder === 'sent') {
+                            const sentEmails = allEmails.filter(email => 
+                                email.emailType === 'sent' || email.type === 'sent' || email.isSentEmail
+                            );
+                            this.renderEmails(sentEmails);
+                        } else if (this.currentFolder === 'inbox') {
+                            const receivedEmails = allEmails.filter(email => 
+                                email.emailType === 'received' || email.provider === 'sendgrid_inbound'
+                            );
+                            this.renderEmails(receivedEmails);
+                        } else {
+                            this.renderEmails(allEmails);
+                        }
+                        return;
+                    }
+                }
+                
+                // Final fallback: Retry with exponential backoff up to ~2s
                 const start = Date.now();
                 const tryLater = async () => {
                     if (window.emailTrackingManager || Date.now() - start > 2000) {
                         if (window.emailTrackingManager) {
                             return this.loadEmails();
                         }
-                this.emails = [];
-                this.showEmptyState();
+                        this.emails = [];
+                        this.showEmptyState();
                         return;
                     }
                     setTimeout(tryLater, 160);
@@ -3938,7 +3988,25 @@ ${sections.length > 1 ? `
                     this.updateFolderCounts();
                 }
             } else {
-                console.warn('[EmailManager] Email tracking manager not available');
+                console.warn('[EmailManager] Email tracking manager not available, trying BackgroundEmailsLoader fallback...');
+                
+                // FALLBACK: Try BackgroundEmailsLoader if EmailTrackingManager not available
+                if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.getEmailsData === 'function') {
+                    const allEmails = window.BackgroundEmailsLoader.getEmailsData();
+                    
+                    if (allEmails && allEmails.length > 0) {
+                        console.log('[EmailManager] Using BackgroundEmailsLoader fallback for sent emails:', allEmails.length, 'emails');
+                        
+                        const sentEmails = allEmails.filter(email => 
+                            email.emailType === 'sent' || email.type === 'sent' || email.isSentEmail
+                        );
+                        this.emails = sentEmails.map(email => this.parseSentEmailData(email));
+                        this.renderEmails();
+                        this.updateFolderCounts();
+                        return;
+                    }
+                }
+                
                 this.emails = [];
                 this.showEmptyState();
             }
