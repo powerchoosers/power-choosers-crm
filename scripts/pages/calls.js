@@ -3369,8 +3369,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     injectCallsBulkStyles(); 
     loadData();
     
-    // Listen for live call duration updates
-    document.addEventListener('pc:live-call-duration', onLiveCallDurationUpdate, false);
+    // Note: Live call duration updates removed - only needed in phone widget
     
     // Optimized cleanup: only clean up if we have many entries to reduce overhead
     setInterval(() => {
@@ -3389,42 +3388,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       } catch(_) {}
     }, 15000); // Clean up every 15 seconds (less frequent)
     
-    function onLiveCallDurationUpdate(e) {
-      try {
-        const { callSid, duration, durationFormatted } = e.detail || {};
-        if (!callSid || !durationFormatted) return;
-        
-        // Store the live duration for this call to prevent overwriting
-        if (!state._liveCallDurations) state._liveCallDurations = new Map();
-        state._liveCallDurations.set(callSid, { duration, durationFormatted, timestamp: Date.now() });
-        
-        // Cache the tbody element to avoid repeated DOM queries
-        if (!state._cachedCallsTableBody) {
-          state._cachedCallsTableBody = document.getElementById('calls-table')?.querySelector('tbody');
-        }
-        const tbody = state._cachedCallsTableBody;
-        if (!tbody) return;
-        
-        // Look for a call row that matches this call SID
-        const rows = tbody.querySelectorAll('tr');
-        for (const row of rows) {
-          const insightsBtn = row.querySelector('.insights-btn');
-          if (insightsBtn) {
-            const rowCallId = insightsBtn.getAttribute('data-id');
-            if (rowCallId === callSid) {
-              // Update the duration display in this row
-              const durationSpan = row.querySelector('.call-duration');
-              if (durationSpan) {
-                durationSpan.textContent = durationFormatted;
-                // Add a visual indicator that this is a live call
-                row.classList.add('live-call');
-              }
-              break;
-            }
-          }
-        }
-      } catch(_) {}
-    } 
+    // onLiveCallDurationUpdate function removed - live duration updates no longer needed 
 
     // Ensure table header has Number and Direction columns (idempotent)
     try {

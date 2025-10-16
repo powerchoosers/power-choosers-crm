@@ -2156,23 +2156,25 @@ class PowerChoosersCRM {
         const removeBtn = modal.querySelector('#csv-remove-file');
         
         // Browse button
-        if (browseBtn) {
+        if (browseBtn && !browseBtn._csvBrowseBound) {
             browseBtn.addEventListener('click', () => {
                 fileInput.click();
             });
+            browseBtn._csvBrowseBound = true;
         }
         
         // File input change
-        if (fileInput) {
+        if (fileInput && !fileInput._csvFileInputBound) {
             fileInput.addEventListener('change', (e) => {
                 if (e.target.files.length > 0) {
                     this.handleFileSelection(modal, e.target.files[0]);
                 }
             });
+            fileInput._csvFileInputBound = true;
         }
         
         // Drag and drop
-        if (dropZone) {
+        if (dropZone && !dropZone._csvDropZoneBound) {
             dropZone.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 dropZone.classList.add('dragover');
@@ -2196,13 +2198,15 @@ class PowerChoosersCRM {
                     }
                 }
             });
+            dropZone._csvDropZoneBound = true;
         }
         
         // Remove file button
-        if (removeBtn) {
+        if (removeBtn && !removeBtn._csvRemoveBound) {
             removeBtn.addEventListener('click', () => {
                 this.removeSelectedFile(modal);
             });
+            removeBtn._csvRemoveBound = true;
         }
     }
 
@@ -2284,13 +2288,14 @@ class PowerChoosersCRM {
         const startBtn = modal.querySelector('#csv-start-import');
         const finishBtn = modal.querySelector('#csv-finish-import');
         
-        if (startBtn) {
+        if (startBtn && !startBtn._csvStartBound) {
             startBtn.addEventListener('click', () => {
                 this.startImport(modal);
             });
+            startBtn._csvStartBound = true;
         }
         
-        if (finishBtn) {
+        if (finishBtn && !finishBtn._csvFinishBound) {
             finishBtn.addEventListener('click', () => {
                 // Start exit animation
                 modal.classList.remove('show');
@@ -2306,6 +2311,7 @@ class PowerChoosersCRM {
                 }
                 }, 300); // Match CSS transition duration
             });
+            finishBtn._csvFinishBound = true;
         }
     }
 
@@ -3609,6 +3615,19 @@ class PowerChoosersCRM {
             }
             
             this.showToast(toastMessage);
+            
+            // Refresh list detail page if we're viewing a list and records were added to lists
+            if ((imported > 0 || enriched > 0) && modal.dataset.selectedListId) {
+                // Refresh list detail page if we're viewing a list
+                if (window.ListDetail && window.ListDetail.refreshListMembership) {
+                    window.ListDetail.refreshListMembership();
+                }
+                
+                // Refresh list overview counts  
+                if (window.ListsOverview && window.ListsOverview.refreshCounts) {
+                    window.ListsOverview.refreshCounts();
+                }
+            }
             
         } catch (error) {
             console.error('Import error:', error);

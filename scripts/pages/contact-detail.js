@@ -2762,7 +2762,6 @@
       
       // Only listen for call completion - no more frequent refreshes during live calls
       document.addEventListener('callEnded', onAnyContactCallActivity, false);
-      document.addEventListener('pc:live-call-duration', onLiveCallDurationUpdate, false);
       
       // Listen for new calls (only when call is actually logged/completed)
       document.addEventListener('pc:call-logged', (event) => {
@@ -2850,42 +2849,7 @@
     }, 1500); // 1.5 second debounce (increased from 1s to prevent freeze)
   }
   
-  function onLiveCallDurationUpdate(e) {
-    try {
-      const { callSid, duration, durationFormatted } = e.detail || {};
-      if (!callSid || !durationFormatted) return;
-      
-      // Store the live duration for this call to prevent overwriting
-      if (!state._liveCallDurations) state._liveCallDurations = new Map();
-      state._liveCallDurations.set(callSid, { duration, durationFormatted, timestamp: Date.now() });
-      
-      // Cache the list element to avoid repeated DOM queries
-      if (!state._cachedRecentCallsList) {
-        state._cachedRecentCallsList = document.getElementById('contact-recent-calls-list');
-      }
-      const list = state._cachedRecentCallsList;
-      if (!list) return;
-      
-      // Look for a call row that matches this call SID
-      const callRows = list.querySelectorAll('.rc-item');
-      for (const row of callRows) {
-        const insightsBtn = row.querySelector('.rc-insights');
-        if (insightsBtn) {
-          const rowCallId = insightsBtn.getAttribute('data-id');
-          if (rowCallId === callSid) {
-            // Update the duration display in this row
-            const durationSpan = row.querySelector('.rc-duration');
-            if (durationSpan) {
-              durationSpan.textContent = durationFormatted;
-              // Add a visual indicator that this is a live call
-              row.classList.add('live-call');
-            }
-            break;
-          }
-        }
-      }
-    } catch(_) {}
-  }
+  // onLiveCallDurationUpdate function removed - live duration updates no longer needed
   function safeReloadContactRecentCallsWithRetries(){
     try{ if (_rcRetryTimer){ clearTimeout(_rcRetryTimer); _rcRetryTimer=null; } }catch(_){ }
     // Skip auto-reload while insights are open to prevent UI thrash/shrink
