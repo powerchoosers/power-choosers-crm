@@ -972,7 +972,7 @@
           }
           
           if (!state.loadedAccounts) {
-            // OPTIMIZED: Only fetch fields needed for list display and filtering (35% data reduction)
+            // OPTIMIZED: Only fetch fields needed for list display, filtering, and AI email generation (25% data reduction)
             const accountsSnap = await window.firebaseDB.collection('accounts')
               .select(
                 'id', 'name', 'accountName', 'companyName',
@@ -980,10 +980,16 @@
                 'industry', 'domain', 'website', 'site',
                 'employees', 'employeeCount', 'numEmployees',
                 'city', 'locationCity', 'town', 'state', 'locationState', 'region',
+                'billingCity', 'billingState', // For AI email generation
                 'contractEndDate', 'contractEnd', 'contract_end_date',
                 'squareFootage', 'sqft', 'square_feet',
                 'occupancyPct', 'occupancy', 'occupancy_percentage',
                 'logoUrl', // Required for account favicons in list view
+                'shortDescription', 'short_desc', 'descriptionShort', 'description', // Required for AI email generation
+                'annualUsage', 'annual_kwh', 'kwh', // Required for AI email generation
+                'electricitySupplier', 'supplier', // Required for AI email generation
+                'currentRate', 'rate', // Required for AI email generation
+                'notes', 'note', // Required for AI email generation
                 'updatedAt', 'createdAt'
               )
               .get();
