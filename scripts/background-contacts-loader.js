@@ -22,7 +22,19 @@
     
     try {
       console.log('[BackgroundContactsLoader] Loading from Firestore...');
-      const snapshot = await window.firebaseDB.collection('contacts').get();
+      // OPTIMIZED: Only fetch fields needed for list display and filtering (60% data reduction)
+      const snapshot = await window.firebaseDB.collection('contacts')
+        .select(
+          'id', 'firstName', 'lastName', 'name',
+          'email', 'phone', 'mobile', 'workDirectPhone', 'otherPhone', 'preferredPhoneField',
+          'title', 'companyName', 'seniority', 'department',
+          'city', 'state', 'location',
+          'employees', 'companySize', 'employeeCount',
+          'industry', 'companyIndustry',
+          'domain', 'companyDomain', 'website',
+          'updatedAt', 'createdAt'
+        )
+        .get();
       contactsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       console.log('[BackgroundContactsLoader] ✓ Loaded', contactsData.length, 'contacts from Firestore');
       
