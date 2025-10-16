@@ -2182,7 +2182,18 @@
                                                 </p>
                                                 
                                                 <div class="settings-field" style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 12px; border-radius: 4px; margin-bottom: 16px;">
-                                                    <strong>⚠️ Important:</strong> Make sure you have only ONE Algolia Firebase extension instance running to avoid duplicates.
+                                                    <strong>⚠️ Important:</strong> This tool uses direct Algolia API calls to bypass Firebase extension issues. You'll need your Algolia Application ID and Admin API Key.
+                                                </div>
+                                                
+                                                <div class="settings-field" style="margin-bottom: 16px;">
+                                                    <label style="font-weight: 600; margin-bottom: 8px; display: block;">Algolia Credentials (Optional - will prompt if not set)</label>
+                                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                                        <input type="text" id="algolia-app-id" class="settings-input" placeholder="Application ID" style="margin-bottom: 0;">
+                                                        <input type="password" id="algolia-api-key" class="settings-input" placeholder="Admin API Key" style="margin-bottom: 0;">
+                                                    </div>
+                                                    <small style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;">
+                                                        These will be stored in localStorage for convenience. You can also set them as environment variables.
+                                                    </small>
                                                 </div>
                                                 
                                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
