@@ -62,13 +62,19 @@ class LiveCallInsights {
 
     bindEvents() {
         // Listen for call events
-        document.addEventListener('callStarted', (e) => {
-            this.startLiveInsights(e.detail.callSid);
-        });
+        if (!document._liveCallInsightsCallStartedBound) {
+            document.addEventListener('callStarted', (e) => {
+                this.startLiveInsights(e.detail.callSid);
+            });
+            document._liveCallInsightsCallStartedBound = true;
+        }
 
-        document.addEventListener('callEnded', () => {
-            this.stopLiveInsights();
-        });
+        if (!document._liveCallInsightsCallEndedBound) {
+            document.addEventListener('callEnded', () => {
+                this.stopLiveInsights();
+            });
+            document._liveCallInsightsCallEndedBound = true;
+        }
 
         // Listen for phone widget events
         const phoneWidget = document.getElementById('phone-widget');

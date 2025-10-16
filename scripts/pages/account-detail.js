@@ -117,7 +117,7 @@ var console = {
       
       // Check if click is on website header button (only on account detail page)
       const websiteBtn = e.target.closest('.website-header-btn');
-      if (websiteBtn && document.getElementById('account-detail-page')) {
+      if (websiteBtn && document.getElementById('account-details-page')) {
         e.preventDefault();
         e.stopPropagation();
         console.log('[AccountDetail] Website button clicked via delegation');
@@ -127,7 +127,7 @@ var console = {
       
       // Check if click is on LinkedIn header button (only on account detail page)
       const linkedInBtn = e.target.closest('.linkedin-header-btn');
-      if (linkedInBtn && document.getElementById('account-detail-page')) {
+      if (linkedInBtn && document.getElementById('account-details-page')) {
         e.preventDefault();
         e.stopPropagation();
         console.log('[AccountDetail] LinkedIn button clicked via delegation');
@@ -137,7 +137,7 @@ var console = {
       
       // Check if click is on edit account button (only on account detail page)
       const editBtn = e.target.closest('.title-edit');
-      if (editBtn && document.getElementById('account-detail-page')) {
+      if (editBtn && document.getElementById('account-details-page')) {
         e.preventDefault();
         e.stopPropagation();
         console.log('[AccountDetail] Edit account button clicked via delegation');
@@ -1590,7 +1590,6 @@ var console = {
       
       // Only listen for call completion - no more frequent refreshes during live calls
       document.addEventListener('callEnded', onAnyAccountCallActivity, false);
-      document.addEventListener('pc:live-call-duration', onLiveCallDurationUpdate, false);
       
       // Listen for new calls (only when call is actually logged/completed)
       document.addEventListener('pc:call-logged', (event) => {
@@ -1687,42 +1686,7 @@ var console = {
     }, 1500); // 1.5 second debounce (increased from 1s to prevent freeze)
   }
   
-  function onLiveCallDurationUpdate(e) {
-    try {
-      const { callSid, duration, durationFormatted } = e.detail || {};
-      if (!callSid || !durationFormatted) return;
-      
-      // Store the live duration for this call to prevent overwriting
-      if (!state._liveCallDurations) state._liveCallDurations = new Map();
-      state._liveCallDurations.set(callSid, { duration, durationFormatted, timestamp: Date.now() });
-      
-      // Cache the list element to avoid repeated DOM queries
-      if (!state._cachedRecentCallsList) {
-        state._cachedRecentCallsList = document.getElementById('account-recent-calls-list');
-      }
-      const list = state._cachedRecentCallsList;
-      if (!list) return;
-      
-      // Look for a call row that matches this call SID
-      const callRows = list.querySelectorAll('.rc-item');
-      for (const row of callRows) {
-        const insightsBtn = row.querySelector('.rc-insights');
-        if (insightsBtn) {
-          const rowCallId = insightsBtn.getAttribute('data-id');
-          if (rowCallId === callSid) {
-            // Update the duration display in this row
-            const durationSpan = row.querySelector('.rc-duration');
-            if (durationSpan) {
-              durationSpan.textContent = durationFormatted;
-              // Add a visual indicator that this is a live call
-              row.classList.add('live-call');
-            }
-            break;
-          }
-        }
-      }
-    } catch(_) {}
-  }
+  // onLiveCallDurationUpdate function removed - live duration updates no longer needed
   function safeReloadAccountRecentCallsWithRetries(){
     try { if (_arcRetryTimer) { clearTimeout(_arcRetryTimer); _arcRetryTimer = null; } } catch(_) {}
     if (state._arcReloadInFlight) { return; }

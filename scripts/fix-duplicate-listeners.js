@@ -147,8 +147,20 @@
     '_mainDocumentFocusoutBound',
     '_mainActionButtonsBound',
     '_mainFilterTabsBound',
+    
+    // NEW: CSV Import listeners (main.js)
+    '_csvBrowseBound',
+    '_csvFileInputBound',
+    '_csvDropZoneBound',
+    '_csvRemoveBound',
+    '_csvStartBound',
+    '_csvFinishBound',
     '_mainPaginationBound',
-    '_mainBulkImportBound'
+    '_mainBulkImportBound',
+    
+    // NEW: Live call insights widget listeners
+    '_liveCallInsightsCallStartedBound',
+    '_liveCallInsightsCallEndedBound'
   ];
   
   guards.forEach(guard => {

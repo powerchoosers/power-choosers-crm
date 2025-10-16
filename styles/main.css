@@ -15129,14 +15129,14 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     width: max-content;
     border-collapse: collapse;
     font-size: 0.875rem;
+    border: 1px solid var(--border-light);
 }
 
 .preview-table th,
 .preview-table td {
-    padding: 6px 8px;
+    padding: 8px 12px;
     text-align: left;
-    border-bottom: 1px solid var(--border-light);
-    border-right: 1px solid var(--border-light);
+    border: 1px solid var(--border-light);
     white-space: nowrap;
     min-width: 100px;
     max-width: 200px;
@@ -15153,6 +15153,7 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     top: 0;
     z-index: 1;
     font-size: 0.85rem;
+    border-bottom: 2px solid var(--border-medium);
 }
 
 .preview-table td {
@@ -15162,6 +15163,7 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     font-size: 0.8rem;
 }
 
+/* Remove right border from last column */
 .preview-table th:last-child,
 .preview-table td:last-child {
     border-right: none;
@@ -15171,7 +15173,7 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 .mapping-list {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-md);
+    gap: 2px;
     max-height: 300px;
     overflow-y: auto;
     padding: var(--spacing-sm);
@@ -15183,11 +15185,22 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 .mapping-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px;
+    gap: 12px;
+    padding: 6px 12px;
     background: var(--bg-item);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: 1px;
+}
+
+.mapping-row:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.mapping-row:hover {
+    background: var(--grey-700);
 }
 
 .mapping-row label {
@@ -15199,13 +15212,24 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 
 .mapping-row select {
     flex: 1;
-    padding: 6px 8px;
+    padding: 8px 12px;
     background: var(--bg-card);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
-    color: var(--text-primary);
+    color: var(--text-primary) !important;
     font-size: 0.875rem;
     min-width: 150px;
+    /* Force visibility */
+    opacity: 1;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    /* Add dropdown arrow */
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
+    padding-right: 32px;
 }
 
 .mapping-row select:focus {
@@ -15272,7 +15296,7 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 
 /* List assignment section styling */
 .list-assignment-section {
-    margin: var(--spacing-lg) 0;
+    margin: var(--spacing-md) 0;
     padding: var(--spacing-md);
     background: var(--bg-item);
     border: 1px solid var(--border-light);
@@ -15304,32 +15328,10 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     font-weight: 600;
 }
 
-.mapping-target {
-    flex: 1;
-}
-
-.mapping-target select {
-    width: 100%;
-    background: var(--bg-card);
-    border: none;
-    color: var(--text-primary);
-    padding: 2px 6px;
-    border-radius: var(--border-radius-sm);
-    height: 22px;
-    font-size: 0.8rem;
-}
-
-.mapping-target select:focus {
-    outline: none;
-    border-color: var(--orange-subtle);
-    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.25);
-}
 
 /* Mapping options */
 .mapping-options {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
+    margin: var(--spacing-md) 0;
     padding: var(--spacing-md);
     background: var(--bg-item);
     border: 1px solid var(--border-light);
@@ -15346,13 +15348,14 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 }
 
 .checkbox-label input[type="checkbox"] {
-    /* Hide native box; we render a custom checkmark square */
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--orange-primary);
+    cursor: pointer;
+    display: inline-block;
+    opacity: 1;
+    visibility: visible;
     margin: 0;
-    pointer-events: none;
 }
 
 /* Review section */
@@ -15400,53 +15403,6 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     font-weight: bold;
 }
 
-.mapping-target {
-    flex: 1;
-}
-
-.mapping-target select {
-    width: 100%;
-    padding: var(--spacing-sm);
-    background: var(--bg-subtle);
-    border: 1px solid var(--border-light);
-    border-radius: var(--border-radius-sm);
-    color: var(--text-primary);
-    font-size: 0.85rem;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    background-image: linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%),
-                      linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%);
-    background-position: calc(100% - 12px) 50%, calc(100% - 6px) 50%;
-    background-size: 6px 6px, 6px 6px;
-    background-repeat: no-repeat;
-    padding-right: 28px;
-}
-
-.mapping-target select option {
-    background: var(--bg-card);
-    color: var(--text-primary);
-    padding: var(--spacing-sm);
-}
-
-/* Ensure select text is visible in all states */
-.mapping-target select,
-.mapping-target select:focus,
-.mapping-target select:active,
-.mapping-target select:disabled {
-    color: var(--text-primary);
-}
-
-/* Safari/WebKit fix: force text color for selected option */
-@supports (-webkit-appearance:none) {
-  .mapping-target select option:checked { color: var(--text-primary); }
-}
-
-.mapping-target select:focus {
-    outline: none;
-    border-color: var(--orange-primary);
-    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.15);
-}
 
 /* Mapping Options */
 .mapping-options {
@@ -15470,7 +15426,11 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 
 /* List Assignment Section */
 .list-assignment-section {
-    margin-bottom: var(--spacing-lg);
+    margin: var(--spacing-md) 0;
+    padding: var(--spacing-md);
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
 }
 
 .list-assignment-section h5 {
@@ -15488,76 +15448,6 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     font-weight: 600;
 }
 
-.csv-list-dropdown-wrap {
-    position: relative;
-}
-
-.csv-list-trigger {
-    width: 100%;
-    padding: var(--spacing-sm);
-    background: var(--bg-item);
-    border: 1px solid var(--border-light);
-    border-radius: var(--border-radius-sm);
-    color: var(--text-primary);
-    font-size: 0.85rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.csv-list-trigger:hover {
-    border-color: var(--border-medium);
-    background: var(--bg-item-hover);
-}
-
-.csv-list-trigger:focus {
-    outline: none;
-    border-color: var(--orange-primary);
-    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.15);
-}
-
-.dropdown-arrow {
-    transition: transform 0.2s ease;
-}
-
-.csv-list-trigger[aria-expanded="true"] .dropdown-arrow {
-    transform: rotate(180deg);
-}
-
-.csv-list-dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: var(--bg-card);
-    border: 1px solid var(--border-light);
-    border-radius: var(--border-radius);
-    box-shadow: var(--elevation-card);
-    z-index: 1000;
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-.csv-list-dropdown[hidden] {
-    display: none;
-}
-
-.csv-list-item {
-    padding: var(--spacing-sm);
-    cursor: pointer;
-    color: var(--text-primary);
-    font-size: 0.85rem;
-    border-bottom: 1px solid var(--border-light);
-}
-
-.csv-list-item:hover {
-    background: var(--bg-item-hover);
-}
-
-.csv-list-item:last-child {
-    border-bottom: none;
-}
 
 .help-text {
     margin-top: var(--spacing-sm);
