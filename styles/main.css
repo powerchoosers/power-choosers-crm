@@ -15120,6 +15120,8 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     max-height: 200px;
     overflow-x: auto;
     overflow-y: auto;
+    /* Ensure scrolling works properly */
+    position: relative;
 }
 
 .preview-table table {
@@ -15182,13 +15184,113 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     display: flex;
     align-items: center;
     gap: 8px;
+    padding: 8px;
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+}
+
+.mapping-row label {
+    flex: 1;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.mapping-row select {
+    flex: 1;
     padding: 6px 8px;
     background: var(--bg-card);
     border: 1px solid var(--border-light);
-    border-radius: var(--border-radius-sm);
+    border-radius: var(--border-radius);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    min-width: 150px;
+}
+
+.mapping-row select:focus {
+    outline: none;
+    border-color: var(--orange-subtle);
+    box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.25);
+}
+
+.mapping-row select option {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    padding: 4px 8px;
+}
+
+/* Checkbox styling for CSV import options */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    padding: 8px 0;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--orange-primary);
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"]:focus {
+    outline: 2px solid var(--orange-subtle);
+    outline-offset: 2px;
+}
+
+/* Step 3 Data Preview - Ensure proper scrolling */
+.review-data .preview-table {
+    max-height: 300px;
+    overflow: auto;
+}
+
+.review-data .preview-table table {
+    min-width: 100%;
+    width: max-content;
+}
+
+/* Mapping options section styling */
+.mapping-options {
+    margin: var(--spacing-lg) 0;
+    padding: var(--spacing-md);
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+}
+
+.mapping-options h5 {
+    margin: 0 0 var(--spacing-sm) 0;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* List assignment section styling */
+.list-assignment-section {
+    margin: var(--spacing-lg) 0;
+    padding: var(--spacing-md);
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+}
+
+.list-assignment-section h5 {
+    margin: 0 0 var(--spacing-sm) 0;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.help-text {
+    margin: var(--spacing-sm) 0 0 0;
     font-size: 0.8rem;
-    min-height: 28px;
-    max-height: 32px;
+    color: var(--text-muted);
+    font-style: italic;
 }
 
 .mapping-source {
@@ -15260,7 +15362,7 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     gap: var(--spacing-base);
 }
 
-/* CSV Preview Table */
+/* CSV Preview Table - Additional styling */
 .csv-preview {
     margin-bottom: var(--spacing-lg);
 }
@@ -15272,41 +15374,7 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     font-weight: 600;
 }
 
-.preview-table {
-    background: var(--bg-item);
-    border: 1px solid var(--border-light);
-    border-radius: var(--border-radius);
-    overflow: hidden;
-}
-
-.preview-table table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8rem;
-}
-
-.preview-table th,
-.preview-table td {
-    padding: var(--spacing-sm);
-    text-align: left;
-    border-bottom: 1px solid var(--border-light);
-    color: var(--text-primary);
-}
-
-.preview-table th {
-    background: var(--bg-subtle);
-    font-weight: 600;
-    color: var(--text-secondary);
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.preview-table tr:last-child td {
-    border-bottom: none;
-}
-
-/* Field Mapping */
+/* Field Mapping - Additional styling */
 .field-mapping {
     margin-bottom: var(--spacing-lg);
 }
@@ -15316,22 +15384,6 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     color: var(--text-primary);
     font-size: 0.9rem;
     font-weight: 600;
-}
-
-.mapping-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-}
-
-.mapping-row {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm);
-    background: var(--bg-item);
-    border: 1px solid var(--border-light);
-    border-radius: var(--border-radius);
 }
 
 .mapping-source {

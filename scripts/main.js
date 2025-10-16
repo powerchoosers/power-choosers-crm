@@ -89,7 +89,7 @@ class PowerChoosersCRM {
             
             requestAnimationFrame(() => {
                 el.style.maxHeight = Math.max(targetHeight, startHeight) + 'px';
-                setTimeout(() => {
+        setTimeout(() => {
                     el.style.maxHeight = '';
                     el.style.overflow = '';
                 }, 600);
@@ -367,9 +367,9 @@ class PowerChoosersCRM {
       
       // Hide modal after animation completes
       setTimeout(() => {
-        modal.setAttribute('hidden', '');
-        dialog.removeEventListener('keydown', handleKeyDown);
-        document.removeEventListener('keydown', handleKeyDown);
+      modal.setAttribute('hidden', '');
+      dialog.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown);
       }, 300); // Match CSS transition duration
     };
 
@@ -676,9 +676,9 @@ class PowerChoosersCRM {
       
       // Hide modal after animation completes
       setTimeout(() => {
-        modal.setAttribute('hidden', '');
-        dialog.removeEventListener('keydown', handleKeyDown);
-        document.removeEventListener('keydown', handleKeyDown);
+      modal.setAttribute('hidden', '');
+      dialog.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown);
       }, 300); // Match CSS transition duration
     };
 
@@ -878,9 +878,9 @@ class PowerChoosersCRM {
 
         navItems.forEach(item => {
             if (!item._navBound) {
-                item.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const targetPage = item.getAttribute('data-page');
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetPage = item.getAttribute('data-page');
                 
                 // No special handling needed for Client Management - it has its own page now
                 
@@ -911,30 +911,30 @@ class PowerChoosersCRM {
         
         // Use View Transitions API for smooth page transitions
         const performNavigation = () => {
-            // Hide all pages
-            document.querySelectorAll('.page').forEach(page => {
-                page.classList.remove('active');
-            });
-            
-            // Remove active class from all nav items
-            document.querySelectorAll('.nav-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            
-            // Show target page
-            const targetPage = document.getElementById(`${pageName}-page`);
-            if (targetPage) {
-                targetPage.classList.add('active');
-            }
-            
-            // Activate corresponding nav item
-            // When on Account Details, keep highlight on Accounts in the sidebar
-            // When on List Detail, keep highlight on Lists in the sidebar
-            const navPageToActivate = (pageName === 'account-details') ? 'accounts' : 
-                                     (pageName === 'list-detail') ? 'lists' : pageName;
-            const targetNav = document.querySelector(`[data-page="${navPageToActivate}"]`);
-            if (targetNav) {
-                targetNav.classList.add('active');
+        // Hide all pages
+        document.querySelectorAll('.page').forEach(page => {
+            page.classList.remove('active');
+        });
+        
+        // Remove active class from all nav items
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        // Show target page
+        const targetPage = document.getElementById(`${pageName}-page`);
+        if (targetPage) {
+            targetPage.classList.add('active');
+        }
+        
+        // Activate corresponding nav item
+        // When on Account Details, keep highlight on Accounts in the sidebar
+        // When on List Detail, keep highlight on Lists in the sidebar
+        const navPageToActivate = (pageName === 'account-details') ? 'accounts' : 
+                                 (pageName === 'list-detail') ? 'lists' : pageName;
+        const targetNav = document.querySelector(`[data-page="${navPageToActivate}"]`);
+        if (targetNav) {
+            targetNav.classList.add('active');
             }
         };
         
@@ -1176,16 +1176,16 @@ class PowerChoosersCRM {
         let hoverTimeout;
 
         if (!sidebar._hoverBound) {
-            sidebar.addEventListener('mouseenter', () => {
-                clearTimeout(hoverTimeout);
-                sidebar.classList.add('expanded');
-            });
+        sidebar.addEventListener('mouseenter', () => {
+            clearTimeout(hoverTimeout);
+            sidebar.classList.add('expanded');
+        });
 
-            sidebar.addEventListener('mouseleave', () => {
-                hoverTimeout = setTimeout(() => {
-                    sidebar.classList.remove('expanded');
-                }, 150);
-            });
+        sidebar.addEventListener('mouseleave', () => {
+            hoverTimeout = setTimeout(() => {
+                sidebar.classList.remove('expanded');
+            }, 150);
+        });
             sidebar._hoverBound = true;
         }
     }
@@ -1196,18 +1196,18 @@ class PowerChoosersCRM {
         const searchBtn = document.querySelector('.search-btn');
 
         if (!searchInput._searchBound) {
-            searchInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    this.performSearch(searchInput.value);
-                }
-            });
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.performSearch(searchInput.value);
+            }
+        });
             searchInput._searchBound = true;
         }
 
         if (!searchBtn._searchBound) {
-            searchBtn.addEventListener('click', () => {
-                this.performSearch(searchInput.value);
-            });
+        searchBtn.addEventListener('click', () => {
+            this.performSearch(searchInput.value);
+        });
             searchBtn._searchBound = true;
         }
 
@@ -1215,9 +1215,9 @@ class PowerChoosersCRM {
         const smallSearchInputs = document.querySelectorAll('.search-input-small');
         smallSearchInputs.forEach(input => {
             if (!input._smallSearchBound) {
-                input.addEventListener('input', (e) => {
-                    this.filterPageContent(e.target.value);
-                });
+            input.addEventListener('input', (e) => {
+                this.filterPageContent(e.target.value);
+            });
                 input._smallSearchBound = true;
             }
         });
@@ -1726,33 +1726,33 @@ class PowerChoosersCRM {
         };
 
         if (!document._tooltipKeydownBound) {
-            document.addEventListener('keydown', onKeyForModality, true);
+        document.addEventListener('keydown', onKeyForModality, true);
             document._tooltipKeydownBound = true;
         }
         if (!document._tooltipMousedownBound) {
-            document.addEventListener('mousedown', onPointerStart, true);
+        document.addEventListener('mousedown', onPointerStart, true);
             document._tooltipMousedownBound = true;
         }
         if (!document._tooltipTouchstartBound) {
-            document.addEventListener('touchstart', onPointerStart, { passive: true, capture: true });
+        document.addEventListener('touchstart', onPointerStart, { passive: true, capture: true });
             document._tooltipTouchstartBound = true;
         }
 
         // Use delegation so dynamically-added nodes are handled automatically
         if (!document._tooltipMouseenterBound) {
-            document.addEventListener('mouseenter', handleEnter, true);
+        document.addEventListener('mouseenter', handleEnter, true);
             document._tooltipMouseenterBound = true;
         }
         if (!document._tooltipFocusinBound) {
-            document.addEventListener('focusin', handleEnter, true);
+        document.addEventListener('focusin', handleEnter, true);
             document._tooltipFocusinBound = true;
         }
         if (!document._tooltipMouseleaveBound) {
-            document.addEventListener('mouseleave', handleLeave, true);
+        document.addEventListener('mouseleave', handleLeave, true);
             document._tooltipMouseleaveBound = true;
         }
         if (!document._tooltipFocusoutBound) {
-            document.addEventListener('focusout', handleLeave, true);
+        document.addEventListener('focusout', handleLeave, true);
             document._tooltipFocusoutBound = true;
         }
     }
@@ -1792,10 +1792,10 @@ class PowerChoosersCRM {
         const quickActionBtns = document.querySelectorAll('.action-btn');
         quickActionBtns.forEach(btn => {
             if (!btn._quickActionBound) {
-                btn.addEventListener('click', () => {
-                    const action = btn.textContent.trim();
-                    this.handleQuickAction(action);
-                });
+            btn.addEventListener('click', () => {
+                const action = btn.textContent.trim();
+                this.handleQuickAction(action);
+            });
                 btn._quickActionBound = true;
             }
         });
@@ -1805,27 +1805,27 @@ class PowerChoosersCRM {
         const filterTabs = tasksPage ? tasksPage.querySelectorAll('.filter-tab') : [];
         filterTabs.forEach(tab => {
             if (!tab._filterTabBound) {
-                tab.addEventListener('click', (e) => {
-                    // Only handle clicks originating inside #tasks-page
-                    if (!tasksPage || !tasksPage.contains(tab)) return;
-                    // Remove active from all tabs within tasks page
-                    filterTabs.forEach(t => t.classList.remove('active'));
-                    // Add active to clicked tab
-                    tab.classList.add('active');
-                    const filter = tab.textContent.trim().split(' ')[0].toLowerCase();
-                    this.filterTasks(filter);
-                });
+            tab.addEventListener('click', (e) => {
+                // Only handle clicks originating inside #tasks-page
+                if (!tasksPage || !tasksPage.contains(tab)) return;
+                // Remove active from all tabs within tasks page
+                filterTabs.forEach(t => t.classList.remove('active'));
+                // Add active to clicked tab
+                tab.classList.add('active');
+                const filter = tab.textContent.trim().split(' ')[0].toLowerCase();
+                this.filterTasks(filter);
+            });
                 tab._filterTabBound = true;
             }
         });
 
         // Action buttons in tables
         if (!document._actionButtonsBound) {
-            document.addEventListener('click', (e) => {
-                // Don't interfere with bulk selection popover
-                if (e.target.closest && e.target.closest('#people-bulk-popover')) {
-                    return;
-                }
+        document.addEventListener('click', (e) => {
+            // Don't interfere with bulk selection popover
+            if (e.target.closest && e.target.closest('#people-bulk-popover')) {
+                return;
+            }
             
             if (e.target.classList.contains('btn-success')) {
                 this.completeTask(e.target);
@@ -2126,9 +2126,9 @@ class PowerChoosersCRM {
                 
                 // Hide modal after animation completes
                 setTimeout(() => {
-                    modal.setAttribute('hidden', '');
-                    // Reset modal to initial state for next import
-                    this.resetBulkImportModal(modal);
+                modal.setAttribute('hidden', '');
+                // Reset modal to initial state for next import
+                this.resetBulkImportModal(modal);
                 }, 300); // Match CSS transition duration
             });
         });
@@ -2297,13 +2297,13 @@ class PowerChoosersCRM {
                 
                 // Hide modal after animation completes
                 setTimeout(() => {
-                    modal.setAttribute('hidden', '');
-                    // Reset modal to initial state for next import
-                    this.resetBulkImportModal(modal);
-                    // Trigger a page refresh if we're on contacts/accounts page
-                    if (this.currentPage === 'people' || this.currentPage === 'accounts') {
-                        window.location.reload();
-                    }
+                modal.setAttribute('hidden', '');
+                // Reset modal to initial state for next import
+                this.resetBulkImportModal(modal);
+                // Trigger a page refresh if we're on contacts/accounts page
+                if (this.currentPage === 'people' || this.currentPage === 'accounts') {
+                    window.location.reload();
+                }
                 }, 300); // Match CSS transition duration
             });
         }
@@ -2537,7 +2537,7 @@ class PowerChoosersCRM {
         modal.querySelectorAll('.csv-step-content').forEach(step => {
             if (step.id !== `csv-step-${stepNumber}`) {
                 step.classList.remove('active');
-                step.hidden = true;
+            step.hidden = true;
             }
         });
         
@@ -3349,8 +3349,18 @@ class PowerChoosersCRM {
                             const raw = row[parseInt(csvIndex)];
                             const value = typeof raw === 'string' ? raw.trim() : raw;
                             if (value) {
-                                // Field-specific normalization (e.g., strip Excel leading apostrophe on phone)
-                                doc[crmField] = this.normalizeForField(crmField, value);
+                                // Special handling for service addresses
+                                if (crmField === 'serviceaddresses') {
+                                    // Split by semicolon and create array of address objects
+                                    const addresses = value.split(';').map((addr, idx) => ({
+                                        address: addr.trim(),
+                                        isPrimary: idx === 0
+                                    })).filter(a => a.address.length > 0);
+                                    doc[crmField] = addresses;
+                                } else {
+                                    // Field-specific normalization (e.g., strip Excel leading apostrophe on phone)
+                                    doc[crmField] = this.normalizeForField(crmField, value);
+                                }
                             }
                         });
 
@@ -3707,13 +3717,10 @@ class PowerChoosersCRM {
             // Normalize service addresses (semicolon-separated)
             if (f === 'serviceaddresses') {
                 let v = String(value == null ? '' : value).trim();
-                if (!v) return [];
-                // Split by semicolon and create array of address objects
-                const addresses = v.split(';').map((addr, idx) => ({
-                    address: addr.trim(),
-                    isPrimary: idx === 0
-                })).filter(a => a.address.length > 0);
-                return addresses;
+                if (!v) return '';
+                // For display purposes, just return the original string
+                // The array conversion happens during actual import
+                return v;
             }
             return value;
         } catch (_) {

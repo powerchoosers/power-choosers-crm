@@ -222,6 +222,9 @@ class SettingsPage {
             reindexContactsBtn.addEventListener('click', () => this.reindexAlgoliaContacts());
             document._algoliaReindexContactsBound = true;
         }
+
+        // Load saved Algolia credentials
+        this.loadAlgoliaCredentials();
     }
 
     async loadSettings() {
@@ -1081,14 +1084,65 @@ class SettingsPage {
         if (logDiv) logDiv.textContent = '';
     }
 
+    loadAlgoliaCredentials() {
+        try {
+            const appId = localStorage.getItem('algolia-app-id');
+            const apiKey = localStorage.getItem('algolia-api-key');
+            
+            const appIdInput = document.getElementById('algolia-app-id');
+            const apiKeyInput = document.getElementById('algolia-api-key');
+            
+            if (appIdInput && appId) appIdInput.value = appId;
+            if (apiKeyInput && apiKey) apiKeyInput.value = apiKey;
+            
+            // Set global variables for reindex functions
+            if (appId) window.ALGOLIA_APP_ID = appId;
+            if (apiKey) window.ALGOLIA_API_KEY = apiKey;
+            
+            // Add input listeners to save credentials
+            if (appIdInput) {
+                appIdInput.addEventListener('input', (e) => {
+                    localStorage.setItem('algolia-app-id', e.target.value);
+                    window.ALGOLIA_APP_ID = e.target.value;
+                });
+            }
+            
+            if (apiKeyInput) {
+                apiKeyInput.addEventListener('input', (e) => {
+                    localStorage.setItem('algolia-api-key', e.target.value);
+                    window.ALGOLIA_API_KEY = e.target.value;
+                });
+            }
+        } catch (error) {
+            console.warn('Failed to load Algolia credentials:', error);
+        }
+    }
+
     async reindexAlgoliaAccounts() {
         this.showAlgoliaStatus('Starting accounts reindex...', 'info');
-        this.logAlgolia('🔄 Starting Algolia reindex for all accounts...');
+        this.logAlgolia('🔄 Starting direct Algolia reindex for all accounts...');
 
         try {
             if (!window.firebaseDB) {
                 throw new Error('Firebase not available. Please refresh the page and try again.');
             }
+
+            // Check if Algolia client is available
+            if (!window.algoliasearch) {
+                throw new Error('Algolia client not loaded. Please refresh the page and try again.');
+            }
+
+            // Get Algolia credentials from environment or prompt user
+            const appId = window.ALGOLIA_APP_ID || prompt('Enter your Algolia Application ID:');
+            const apiKey = window.ALGOLIA_API_KEY || prompt('Enter your Algolia Admin API Key:');
+            
+            if (!appId || !apiKey) {
+                throw new Error('Algolia credentials required. Please set ALGOLIA_APP_ID and ALGOLIA_API_KEY in your environment.');
+            }
+
+            // Initialize Algolia client
+            const client = window.algoliasearch(appId, apiKey);
+            const index = client.initIndex('accounts');
 
             const accountsSnapshot = await window.firebaseDB.collection('accounts').get();
 
@@ -1102,29 +1156,43 @@ class SettingsPage {
 
             let processed = 0;
             let errors = 0;
+            const batchSize = 100; // Algolia batch limit
+            const batches = [];
 
-            for (const doc of accountsSnapshot.docs) {
-                try {
-                    const accountId = doc.id;
+            // Prepare batches
+            for (let i = 0; i < accountsSnapshot.docs.length; i += batchSize) {
+                const batch = accountsSnapshot.docs.slice(i, i + batchSize).map(doc => {
                     const accountData = doc.data();
+                    return {
+                        objectID: doc.id,
+                        ...accountData,
+                        updatedAt: new Date().toISOString()
+                    };
+                });
+                batches.push(batch);
+            }
 
-                    this.logAlgolia(`🔄 Processing account ${processed + 1}/${accountsSnapshot.size}: ${accountData.accountName || accountData.name || accountId}`);
+            this.logAlgolia(`📦 Processing ${batches.length} batches of up to ${batchSize} records each...`);
 
-                    await window.firebaseDB.collection('accounts').doc(accountId).update({
-                        updatedAt: new Date().toISOString(),
-                        _algoliaReindexTrigger: Date.now()
-                    });
+            // Process each batch
+            for (let i = 0; i < batches.length; i++) {
+                try {
+                    const batch = batches[i];
+                    this.logAlgolia(`🔄 Processing batch ${i + 1}/${batches.length} (${batch.length} records)...`);
 
-                    processed++;
+                    const response = await index.saveObjects(batch);
+                    processed += batch.length;
 
-                    if (processed % 10 === 0) {
-                        this.logAlgolia(`✅ Processed ${processed}/${accountsSnapshot.size} accounts...`);
+                    this.logAlgolia(`✅ Batch ${i + 1} complete - ${processed}/${accountsSnapshot.size} total processed (${response.objectIDs.length} records indexed)`);
+
+                    // Small delay between batches to avoid rate limits
+                    if (i < batches.length - 1) {
                         await new Promise(resolve => setTimeout(resolve, 100));
                     }
 
                 } catch (error) {
-                    this.logAlgolia(`❌ Error processing account ${doc.id}: ${error.message}`);
-                    errors++;
+                    this.logAlgolia(`❌ Error processing batch ${i + 1}: ${error.message}`);
+                    errors += batches[i].length;
                 }
             }
 
@@ -1133,23 +1201,18 @@ class SettingsPage {
             if (errors > 0) {
                 this.logAlgolia(`❌ Errors: ${errors} accounts`);
             }
-            this.logAlgolia(`📤 All accounts should now be syncing to Algolia...`);
+            
+            // Verify the index was updated
+            try {
+                const searchResponse = await index.search('');
+                this.logAlgolia(`📊 Verification: ${searchResponse.nbHits} total records now in Algolia index`);
+            } catch (verifyError) {
+                this.logAlgolia(`⚠️ Could not verify index count: ${verifyError.message}`);
+            }
+            
+            this.logAlgolia(`📤 All accounts have been synced directly to Algolia!`);
 
             this.showAlgoliaStatus(`Reindex complete! Processed ${processed} accounts`, 'success');
-
-            // Clean up trigger fields after 5 seconds
-            setTimeout(async () => {
-                try {
-                    for (const doc of accountsSnapshot.docs) {
-                        await window.firebaseDB.collection('accounts').doc(doc.id).update({
-                            _algoliaReindexTrigger: window.firebase.firestore.FieldValue.delete()
-                        });
-                    }
-                    this.logAlgolia('✅ Cleanup complete - trigger fields removed');
-                } catch (error) {
-                    this.logAlgolia('⚠️ Cleanup failed (this is not critical): ' + error.message);
-                }
-            }, 5000);
 
         } catch (error) {
             this.logAlgolia(`❌ Fatal error during reindex: ${error.message}`);
@@ -1159,12 +1222,29 @@ class SettingsPage {
 
     async reindexAlgoliaContacts() {
         this.showAlgoliaStatus('Starting contacts reindex...', 'info');
-        this.logAlgolia('🔄 Starting Algolia reindex for all contacts...');
+        this.logAlgolia('🔄 Starting direct Algolia reindex for all contacts...');
 
         try {
             if (!window.firebaseDB) {
                 throw new Error('Firebase not available. Please refresh the page and try again.');
             }
+
+            // Check if Algolia client is available
+            if (!window.algoliasearch) {
+                throw new Error('Algolia client not loaded. Please refresh the page and try again.');
+            }
+
+            // Get Algolia credentials from environment or prompt user
+            const appId = window.ALGOLIA_APP_ID || prompt('Enter your Algolia Application ID:');
+            const apiKey = window.ALGOLIA_API_KEY || prompt('Enter your Algolia Admin API Key:');
+            
+            if (!appId || !apiKey) {
+                throw new Error('Algolia credentials required. Please set ALGOLIA_APP_ID and ALGOLIA_API_KEY in your environment.');
+            }
+
+            // Initialize Algolia client
+            const client = window.algoliasearch(appId, apiKey);
+            const index = client.initIndex('contacts');
 
             const contactsSnapshot = await window.firebaseDB.collection('people').get();
 
@@ -1178,29 +1258,43 @@ class SettingsPage {
 
             let processed = 0;
             let errors = 0;
+            const batchSize = 100; // Algolia batch limit
+            const batches = [];
 
-            for (const doc of contactsSnapshot.docs) {
-                try {
-                    const contactId = doc.id;
+            // Prepare batches
+            for (let i = 0; i < contactsSnapshot.docs.length; i += batchSize) {
+                const batch = contactsSnapshot.docs.slice(i, i + batchSize).map(doc => {
                     const contactData = doc.data();
+                    return {
+                        objectID: doc.id,
+                        ...contactData,
+                        updatedAt: new Date().toISOString()
+                    };
+                });
+                batches.push(batch);
+            }
 
-                    this.logAlgolia(`🔄 Processing contact ${processed + 1}/${contactsSnapshot.size}: ${contactData.firstName || ''} ${contactData.lastName || ''} (${contactId})`);
+            this.logAlgolia(`📦 Processing ${batches.length} batches of up to ${batchSize} records each...`);
 
-                    await window.firebaseDB.collection('people').doc(contactId).update({
-                        updatedAt: new Date().toISOString(),
-                        _algoliaReindexTrigger: Date.now()
-                    });
+            // Process each batch
+            for (let i = 0; i < batches.length; i++) {
+                try {
+                    const batch = batches[i];
+                    this.logAlgolia(`🔄 Processing batch ${i + 1}/${batches.length} (${batch.length} records)...`);
 
-                    processed++;
+                    const response = await index.saveObjects(batch);
+                    processed += batch.length;
 
-                    if (processed % 10 === 0) {
-                        this.logAlgolia(`✅ Processed ${processed}/${contactsSnapshot.size} contacts...`);
+                    this.logAlgolia(`✅ Batch ${i + 1} complete - ${processed}/${contactsSnapshot.size} total processed (${response.objectIDs.length} records indexed)`);
+
+                    // Small delay between batches to avoid rate limits
+                    if (i < batches.length - 1) {
                         await new Promise(resolve => setTimeout(resolve, 100));
                     }
 
                 } catch (error) {
-                    this.logAlgolia(`❌ Error processing contact ${doc.id}: ${error.message}`);
-                    errors++;
+                    this.logAlgolia(`❌ Error processing batch ${i + 1}: ${error.message}`);
+                    errors += batches[i].length;
                 }
             }
 
@@ -1209,23 +1303,18 @@ class SettingsPage {
             if (errors > 0) {
                 this.logAlgolia(`❌ Errors: ${errors} contacts`);
             }
-            this.logAlgolia(`📤 All contacts should now be syncing to Algolia...`);
+            
+            // Verify the index was updated
+            try {
+                const searchResponse = await index.search('');
+                this.logAlgolia(`📊 Verification: ${searchResponse.nbHits} total records now in Algolia index`);
+            } catch (verifyError) {
+                this.logAlgolia(`⚠️ Could not verify index count: ${verifyError.message}`);
+            }
+            
+            this.logAlgolia(`📤 All contacts have been synced directly to Algolia!`);
 
             this.showAlgoliaStatus(`Reindex complete! Processed ${processed} contacts`, 'success');
-
-            // Clean up trigger fields after 5 seconds
-            setTimeout(async () => {
-                try {
-                    for (const doc of contactsSnapshot.docs) {
-                        await window.firebaseDB.collection('people').doc(doc.id).update({
-                            _algoliaReindexTrigger: window.firebase.firestore.FieldValue.delete()
-                        });
-                    }
-                    this.logAlgolia('✅ Cleanup complete - trigger fields removed');
-                } catch (error) {
-                    this.logAlgolia('⚠️ Cleanup failed (this is not critical): ' + error.message);
-                }
-            }, 5000);
 
         } catch (error) {
             this.logAlgolia(`❌ Fatal error during reindex: ${error.message}`);
