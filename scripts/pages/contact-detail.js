@@ -281,8 +281,27 @@
     style.id='contact-recent-calls-styles';
     style.textContent=`
       /* Base list + rows */
-      #contact-recent-calls .rc-list { position: relative; display:flex; flex-direction:column; gap:8px; transition: height 220ms ease, opacity 220ms ease; }
-      #contact-recent-calls .rc-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-item); }
+      #contact-recent-calls .rc-list { 
+        position: relative; 
+        display:flex; 
+        flex-direction:column; 
+        gap:8px; 
+        transition: opacity 220ms ease; /* Remove height transition to prevent layout shifts */
+        contain: layout; /* Prevent layout shifts during updates */
+        min-height: 0; /* Prevent height jumping */
+      }
+      #contact-recent-calls .rc-item { 
+        display:flex; 
+        align-items:center; 
+        justify-content:space-between; 
+        gap:12px; 
+        padding:10px 12px; 
+        border:1px solid var(--border-light); 
+        border-radius: var(--border-radius); 
+        background: var(--bg-item); 
+        contain: layout; /* Prevent layout shifts during duration updates */
+        min-height: 48px; /* Fixed height to prevent jumping */
+      }
       #contact-recent-calls .rc-item.rc-new { animation: rcNewIn 220ms ease-out both; }
       @keyframes rcNewIn { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       #contact-recent-calls .rc-meta { display:flex; align-items:center; gap:10px; min-width:0; }
@@ -2684,16 +2703,28 @@
   function startRecentCallsLiveHooks(){
     try{
       if (document._rcLiveHooksBound) return;
-      document.addEventListener('callStarted', onAnyContactCallActivity, false);
+      
+      // Only listen for call completion - no more frequent refreshes during live calls
       document.addEventListener('callEnded', onAnyContactCallActivity, false);
-      document.addEventListener('pc:recent-calls-refresh', onAnyContactCallActivity, false);
       document.addEventListener('pc:live-call-duration', onLiveCallDurationUpdate, false);
       
-      // Listen for completed calls to refresh recent calls
-      document.addEventListener('pc:call-completed', (event) => {
+      // Listen for new calls (only when call is actually logged/completed)
+      document.addEventListener('pc:call-logged', (event) => {
         const callData = event.detail;
         if (callData && callData.contactId === state.currentContact?.id) {
-          // Use debounced refresh to prevent freeze
+          console.log('[ContactDetail] Call logged for this contact, refreshing activities');
+          
+          // Immediately refresh recent calls section
+          if (window.ActivityManager && typeof window.ActivityManager.renderActivities === 'function') {
+            window.ActivityManager.renderActivities(
+              'contact-activity-timeline', 
+              'contact', 
+              state.currentContact.id,
+              true // force refresh
+            );
+          }
+          
+          // Also use debounced refresh as backup
           onAnyContactCallActivity();
         }
       });
@@ -2811,7 +2842,7 @@
       if (state._rcOpenIds && state._rcOpenIds.size > 0) { state._rcReloadInFlight=false; return; }
       attempts++;
       try{ loadRecentCallsForContact(); }catch(_){ }
-      if (attempts<10) { _rcRetryTimer = setTimeout(run, 900); }
+      if (attempts<3) { _rcRetryTimer = setTimeout(run, 1500); } // Reduced from 10 to 3 attempts, increased interval
       else { state._rcReloadInFlight=false; }
     };
     run();
