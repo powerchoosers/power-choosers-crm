@@ -40,6 +40,11 @@ class PowerChoosersCRM {
     loadDashboardWidgets() {
         console.log('[CRM] Loading dashboard widgets...');
         
+        // Setup one-time animation handlers to prevent re-animation
+        this.setupOneTimeAnimations();
+        // Observe dashboard containers and animate height once when real content arrives
+        this.setupEntranceObservers();
+        
         // Load home activities
         const loadActivities = () => {
             if (window.ActivityManager && document.getElementById('dashboard-page')?.classList.contains('active')) {
@@ -59,6 +64,116 @@ class PowerChoosersCRM {
         // This ensures calls data is pre-loaded before user clicks calls page
         // BackgroundCallsLoader now starts immediately on module init (like contacts/accounts)
         // No need for delayed start - it loads from cache instantly
+    }
+    
+    // Observe first render of dashboard containers and animate height once
+    setupEntranceObservers() {
+        const widgetConfigs = [
+            { containerSelector: '.tasks-list', itemSelector: '.task-item' },
+            { containerSelector: '.news-list', itemSelector: '.news-item' }
+        ];
+        
+        const activitiesConfig = { containerSelector: '.activities-list', itemSelector: '.activity-item' };
+        
+        const animateHeightOnce = (el) => {
+            if (!el || el.dataset.heightAnimated === '1') return;
+            el.dataset.heightAnimated = '1';
+            
+            const startHeight = el.offsetHeight;
+            const targetHeight = el.scrollHeight;
+            el.style.overflow = 'hidden';
+            el.style.maxHeight = startHeight + 'px';
+            el.style.transition = 'max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+            
+            if (getComputedStyle(el).opacity === '0') el.style.opacity = '1';
+            
+            requestAnimationFrame(() => {
+                el.style.maxHeight = Math.max(targetHeight, startHeight) + 'px';
+                setTimeout(() => {
+                    el.style.maxHeight = '';
+                    el.style.overflow = '';
+                }, 600);
+            });
+        };
+        
+        // Check if BOTH tasks and news are ready before animating either
+        const checkBothWidgetsReady = () => {
+            const tasksContainer = document.querySelector('.tasks-list');
+            const newsContainer = document.querySelector('.news-list');
+            
+            const tasksReady = tasksContainer && tasksContainer.querySelector('.task-item');
+            const newsReady = newsContainer && newsContainer.querySelector('.news-item');
+            
+            // Only animate when BOTH are ready
+            if (tasksReady && newsReady) {
+                console.log('[CRM] Both tasks and news ready - animating together');
+                animateHeightOnce(tasksContainer);
+                animateHeightOnce(newsContainer);
+                return true;
+            }
+            return false;
+        };
+        
+        // Watch both containers and animate together when both have content
+        widgetConfigs.forEach(({ containerSelector }) => {
+            const container = document.querySelector(containerSelector);
+            if (!container) return;
+            if (container.dataset.observerAttached === '1') return;
+            container.dataset.observerAttached = '1';
+            
+            // Check if both are ready on initial load
+            if (checkBothWidgetsReady()) return;
+            
+            // Observe for content arrival
+            const mo = new MutationObserver(() => {
+                if (checkBothWidgetsReady()) {
+                    mo.disconnect();
+                }
+            });
+            mo.observe(container, { childList: true });
+        });
+        
+        // Activities animate independently
+        const activitiesContainer = document.querySelector(activitiesConfig.containerSelector);
+        if (activitiesContainer && !activitiesContainer.dataset.observerAttached) {
+            activitiesContainer.dataset.observerAttached = '1';
+            
+            if (activitiesContainer.querySelector(activitiesConfig.itemSelector)) {
+                animateHeightOnce(activitiesContainer);
+            } else {
+                const mo = new MutationObserver(() => {
+                    if (activitiesContainer.querySelector(activitiesConfig.itemSelector)) {
+                        animateHeightOnce(activitiesContainer);
+                        mo.disconnect();
+                    }
+                });
+                mo.observe(activitiesContainer, { childList: true });
+            }
+        }
+    }
+
+    // Setup one-time animations - prevents re-animation on content updates
+    setupOneTimeAnimations() {
+        const containers = [
+            { selector: '.activities-list', items: '.activity-item' },
+            { selector: '.tasks-list', items: '.task-item' }, 
+            { selector: '.news-list', items: '.news-item' },
+            { selector: '.quick-actions', items: '.action-btn' }
+        ];
+        
+        containers.forEach(({ selector, items }) => {
+            const container = document.querySelector(selector);
+            if (container && !container.classList.contains('animated')) {
+                // Mark container as animated immediately to prevent re-triggers
+                setTimeout(() => {
+                    container.classList.add('animated');
+                    // Also mark all items as animated
+                    container.querySelectorAll(items).forEach(item => {
+                        item.classList.add('animated');
+                    });
+                }, 1500); // After all animations complete
+            }
+        });
     }
 
     // Pre-load essential data for widgets and navigation
@@ -762,14 +877,17 @@ class PowerChoosersCRM {
         const pages = document.querySelectorAll('.page');
 
         navItems.forEach(item => {
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
-                const targetPage = item.getAttribute('data-page');
+            if (!item._navBound) {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const targetPage = item.getAttribute('data-page');
                 
                 // No special handling needed for Client Management - it has its own page now
                 
                 this.navigateToPage(targetPage);
             });
+                item._navBound = true;
+            }
         });
     }
 
@@ -1057,16 +1175,19 @@ class PowerChoosersCRM {
         const sidebar = document.getElementById('sidebar');
         let hoverTimeout;
 
-        sidebar.addEventListener('mouseenter', () => {
-            clearTimeout(hoverTimeout);
-            sidebar.classList.add('expanded');
-        });
+        if (!sidebar._hoverBound) {
+            sidebar.addEventListener('mouseenter', () => {
+                clearTimeout(hoverTimeout);
+                sidebar.classList.add('expanded');
+            });
 
-        sidebar.addEventListener('mouseleave', () => {
-            hoverTimeout = setTimeout(() => {
-                sidebar.classList.remove('expanded');
-            }, 150);
-        });
+            sidebar.addEventListener('mouseleave', () => {
+                hoverTimeout = setTimeout(() => {
+                    sidebar.classList.remove('expanded');
+                }, 150);
+            });
+            sidebar._hoverBound = true;
+        }
     }
 
     // Search Functionality
@@ -1074,22 +1195,31 @@ class PowerChoosersCRM {
         const searchInput = document.querySelector('.search-input');
         const searchBtn = document.querySelector('.search-btn');
 
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.performSearch(searchInput.value);
-            }
-        });
+        if (!searchInput._searchBound) {
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.performSearch(searchInput.value);
+                }
+            });
+            searchInput._searchBound = true;
+        }
 
-        searchBtn.addEventListener('click', () => {
-            this.performSearch(searchInput.value);
-        });
+        if (!searchBtn._searchBound) {
+            searchBtn.addEventListener('click', () => {
+                this.performSearch(searchInput.value);
+            });
+            searchBtn._searchBound = true;
+        }
 
         // Small search inputs in pages
         const smallSearchInputs = document.querySelectorAll('.search-input-small');
         smallSearchInputs.forEach(input => {
-            input.addEventListener('input', (e) => {
-                this.filterPageContent(e.target.value);
-            });
+            if (!input._smallSearchBound) {
+                input.addEventListener('input', (e) => {
+                    this.filterPageContent(e.target.value);
+                });
+                input._smallSearchBound = true;
+            }
         });
     }
 
@@ -1595,15 +1725,36 @@ class PowerChoosersCRM {
             hideTooltip();
         };
 
-        document.addEventListener('keydown', onKeyForModality, true);
-        document.addEventListener('mousedown', onPointerStart, true);
-        document.addEventListener('touchstart', onPointerStart, { passive: true, capture: true });
+        if (!document._tooltipKeydownBound) {
+            document.addEventListener('keydown', onKeyForModality, true);
+            document._tooltipKeydownBound = true;
+        }
+        if (!document._tooltipMousedownBound) {
+            document.addEventListener('mousedown', onPointerStart, true);
+            document._tooltipMousedownBound = true;
+        }
+        if (!document._tooltipTouchstartBound) {
+            document.addEventListener('touchstart', onPointerStart, { passive: true, capture: true });
+            document._tooltipTouchstartBound = true;
+        }
 
         // Use delegation so dynamically-added nodes are handled automatically
-        document.addEventListener('mouseenter', handleEnter, true);
-        document.addEventListener('focusin', handleEnter, true);
-        document.addEventListener('mouseleave', handleLeave, true);
-        document.addEventListener('focusout', handleLeave, true);
+        if (!document._tooltipMouseenterBound) {
+            document.addEventListener('mouseenter', handleEnter, true);
+            document._tooltipMouseenterBound = true;
+        }
+        if (!document._tooltipFocusinBound) {
+            document.addEventListener('focusin', handleEnter, true);
+            document._tooltipFocusinBound = true;
+        }
+        if (!document._tooltipMouseleaveBound) {
+            document.addEventListener('mouseleave', handleLeave, true);
+            document._tooltipMouseleaveBound = true;
+        }
+        if (!document._tooltipFocusoutBound) {
+            document.addEventListener('focusout', handleLeave, true);
+            document._tooltipFocusoutBound = true;
+        }
     }
 
     // Widget Panel Management
@@ -1640,34 +1791,41 @@ class PowerChoosersCRM {
         // Quick Actions
         const quickActionBtns = document.querySelectorAll('.action-btn');
         quickActionBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const action = btn.textContent.trim();
-                this.handleQuickAction(action);
-            });
+            if (!btn._quickActionBound) {
+                btn.addEventListener('click', () => {
+                    const action = btn.textContent.trim();
+                    this.handleQuickAction(action);
+                });
+                btn._quickActionBound = true;
+            }
         });
 
         // Filter tabs (Tasks page only)
         const tasksPage = document.getElementById('tasks-page');
         const filterTabs = tasksPage ? tasksPage.querySelectorAll('.filter-tab') : [];
         filterTabs.forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                // Only handle clicks originating inside #tasks-page
-                if (!tasksPage || !tasksPage.contains(tab)) return;
-                // Remove active from all tabs within tasks page
-                filterTabs.forEach(t => t.classList.remove('active'));
-                // Add active to clicked tab
-                tab.classList.add('active');
-                const filter = tab.textContent.trim().split(' ')[0].toLowerCase();
-                this.filterTasks(filter);
-            });
+            if (!tab._filterTabBound) {
+                tab.addEventListener('click', (e) => {
+                    // Only handle clicks originating inside #tasks-page
+                    if (!tasksPage || !tasksPage.contains(tab)) return;
+                    // Remove active from all tabs within tasks page
+                    filterTabs.forEach(t => t.classList.remove('active'));
+                    // Add active to clicked tab
+                    tab.classList.add('active');
+                    const filter = tab.textContent.trim().split(' ')[0].toLowerCase();
+                    this.filterTasks(filter);
+                });
+                tab._filterTabBound = true;
+            }
         });
 
         // Action buttons in tables
-        document.addEventListener('click', (e) => {
-            // Don't interfere with bulk selection popover
-            if (e.target.closest && e.target.closest('#people-bulk-popover')) {
-                return;
-            }
+        if (!document._actionButtonsBound) {
+            document.addEventListener('click', (e) => {
+                // Don't interfere with bulk selection popover
+                if (e.target.closest && e.target.closest('#people-bulk-popover')) {
+                    return;
+                }
             
             if (e.target.classList.contains('btn-success')) {
                 this.completeTask(e.target);
@@ -1676,10 +1834,12 @@ class PowerChoosersCRM {
                 this.editTask(e.target);
             }
         });
+            document._actionButtonsBound = true;
+        }
 
         // Top bar: Phone button toggle for Phone widget
         const phoneBtn = document.querySelector('.call-btn');
-        if (phoneBtn) {
+        if (phoneBtn && !phoneBtn._phoneBound) {
             phoneBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 const W = window.Widgets || {};
@@ -1691,15 +1851,17 @@ class PowerChoosersCRM {
                     }
                 } catch (_) { /* noop */ }
             });
+            phoneBtn._phoneBound = true;
         }
 
         // Top bar: Scripts button -> navigate to Call Scripts page
         const scriptsBtn = document.getElementById('scripts-btn');
-        if (scriptsBtn) {
+        if (scriptsBtn && !scriptsBtn._scriptsBound) {
             scriptsBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 this.navigateToPage('call-scripts');
             });
+            scriptsBtn._scriptsBound = true;
         }
     }
 
@@ -3720,8 +3882,13 @@ class PowerChoosersCRM {
     // Load Initial Data
     loadInitialData() {
         this.updateLivePrice();
-        this.loadTodaysTasks();
-        this.loadEnergyNews();
+        // Load tasks and news together to prevent re-renders
+        Promise.all([
+            this.loadTodaysTasks(),
+            this.loadEnergyNews()
+        ]).then(() => {
+            console.log('[CRM] Tasks and News loaded together');
+        });
         
         // Update live price every 5 minutes
         setInterval(() => {
@@ -3781,6 +3948,13 @@ class PowerChoosersCRM {
     async loadTodaysTasks(skipFirebase = false) {
         const taskLists = Array.from(document.querySelectorAll('.tasks-list'));
         if (!taskLists.length) return;
+        
+        // Prevent double-rendering - only skip if currently loading
+        if (this._tasksLoading) {
+            console.log('[CRM] Tasks already loading, skipping duplicate call');
+            return;
+        }
+        this._tasksLoading = true;
 
         // Helpers (scoped to this method)
         const parseDateStrict = (dateStr) => {
@@ -4105,14 +4279,19 @@ class PowerChoosersCRM {
                 
                 if (action === 'prev' && this.todaysTasksPagination.currentPage > 1) {
                     this.todaysTasksPagination.currentPage--;
+                    this._tasksLoading = false; // Reset flag before pagination reload
                     this.loadTodaysTasks();
                 } else if (action === 'next' && this.todaysTasksPagination.currentPage < totalPages) {
                     this.todaysTasksPagination.currentPage++;
+                    this._tasksLoading = false; // Reset flag before pagination reload
                     this.loadTodaysTasks();
                 }
             });
             });
         });
+        
+        // Reset loading flag after rendering completes
+        this._tasksLoading = false;
     }
 
     getTaskTimeText(task) {
@@ -4204,6 +4383,13 @@ class PowerChoosersCRM {
     async loadEnergyNews() {
         const newsList = document.querySelector('.news-list');
         const lastRef = document.getElementById('news-last-refreshed');
+        
+        // Prevent double-rendering - only skip if currently loading
+        if (this._newsLoading) {
+            console.log('[CRM] News already loading, skipping duplicate call');
+            return;
+        }
+        this._newsLoading = true;
 
         const escapeHtml = (str) => {
             if (window.escapeHtml) return window.escapeHtml(str);
@@ -4258,6 +4444,9 @@ class PowerChoosersCRM {
                     `;
                 }).join('');
             }
+            
+            // Reset loading flag after successful load
+            this._newsLoading = false;
         } catch (err) {
             console.error('Failed to load energy news', err);
             if (lastRef) lastRef.textContent = 'Last updated: failed to refresh';
@@ -4270,6 +4459,9 @@ class PowerChoosersCRM {
                 `;
             }
             this.showToast('Failed to refresh Energy News');
+            
+            // Reset loading flag after error
+            this._newsLoading = false;
         }
     }
     
@@ -4277,8 +4469,10 @@ class PowerChoosersCRM {
         if (!window.ActivityManager) return;
         
         // Check if we already have activities loaded and don't need to refresh
-        if (!forceRefresh && document.getElementById('home-activity-timeline')?.children.length > 0) {
+        const container = document.getElementById('home-activity-timeline');
+        if (!forceRefresh && container?.children.length > 0 && !container.querySelector('.loading-spinner')) {
             // Activities are already loaded, just setup pagination
+            console.log('[CRM] Activities already loaded, skipping duplicate render');
             this.setupHomeActivityPagination();
             return;
         }
@@ -4780,19 +4974,26 @@ function addSignatureToAIContent(content, isHtmlMode = false) {
 
 // Initialize CRM when DOM is loaded OR immediately if already loaded
 function initializeCRM() {
+    // Prevent multiple initialization
+    if (window.crm) {
+        console.log('[Main] PowerChoosersCRM already initialized, skipping...');
+        return;
+    }
+    
     console.log('[Main] Initializing PowerChoosersCRM...');
     window.crm = new PowerChoosersCRM();
     console.log('[Main] ✓ PowerChoosersCRM initialized');
     
-    // Add compose button listener for signature injection
+    // Add compose button listener for signature injection (with guard)
     const composeBtn = document.getElementById('compose-email-btn');
-    if (composeBtn) {
+    if (composeBtn && !composeBtn._composeBound) {
         composeBtn.addEventListener('click', () => {
             // Wait for compose window to open, then inject signature
             setTimeout(() => {
                 injectEmailSignature();
             }, 100);
         });
+        composeBtn._composeBound = true;
     }
     
     // Watch for compose window visibility changes

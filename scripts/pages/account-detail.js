@@ -39,6 +39,57 @@ var console = {
     state: state  // Expose state for debugging and other modules
   };
 
+  // Define functions BEFORE setupEventDelegation so they're in scope
+  // Forward declarations for functions used in event delegation
+  let handleQuickAction, openEditAccountModal;
+
+  handleQuickAction = function(action) {
+    const a = state.currentAccount;
+    switch (action) {
+      case 'call': {
+        const phone = a?.companyPhone || a?.phone || a?.primaryPhone || a?.mainPhone;
+        if (phone) {
+          try {
+            if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
+              if (typeof window.Widgets.setCallContext === 'function') {
+                // Explicitly clear any previous contact context to avoid misattribution
+                window.Widgets.setCallContext({
+                  accountId: a?.id || null,
+                  accountName: a?.accountName || a?.name || a?.companyName || null,
+                  company: a?.accountName || a?.name || a?.companyName || null,
+                  contactId: null,
+                  contactName: null,
+                  city: a?.city || a?.locationCity || '',
+                  state: a?.state || a?.locationState || '',
+                  domain: a?.domain || a?.website || '',
+                  isCompanyPhone: true
+                });
+              }
+              const name = a?.accountName || a?.name || a?.companyName || 'Account';
+              window.Widgets.callNumber(phone, name, true, 'account-detail');
+            } else {
+              window.open(`tel:${encodeURIComponent(phone)}`);
+            }
+          } catch (e) { /* noop */ }
+        }
+        break;
+      }
+      case 'linkedin': {
+        let url = a?.linkedin || a?.linkedinUrl || a?.linkedin_url || '';
+        const name = a?.accountName || a?.name || a?.companyName || '';
+        if (!url && name) url = `https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(name)}`;
+        if (url) { try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ } }
+        break;
+      }
+      case 'website': {
+        let url = a?.website || a?.site || a?.domain || '';
+        if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
+        if (url) { try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ } }
+        break;
+      }
+    }
+  };
+
   // Set up event delegation for account detail buttons on stable parent
   // This runs once and handles all button clicks regardless of DOM replacement
   function setupEventDelegation() {
@@ -2674,7 +2725,8 @@ var console = {
   }
 
   // Edit Account modal (reuse Add Account modal styles)
-  function openEditAccountModal() {
+  // Assign to variable declared at top for event delegation scope
+  openEditAccountModal = function() {
     const a = state.currentAccount || {};
     const overlay = document.createElement('div');
     overlay.className = 'pc-modal';
@@ -2898,7 +2950,7 @@ var console = {
       try { renderAccountDetail(); } catch (_) {}
       close();
     });
-  }
+  };  // End of openEditAccountModal assignment
 
   function attachAccountDetailEvents() {
     // Listen for activity refresh events
@@ -3865,52 +3917,7 @@ var console = {
     updatePagination();
   }
 
-  function handleQuickAction(action) {
-    const a = state.currentAccount;
-    switch (action) {
-      case 'call': {
-        const phone = a?.companyPhone || a?.phone || a?.primaryPhone || a?.mainPhone;
-        if (phone) {
-          try {
-            if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
-              if (typeof window.Widgets.setCallContext === 'function') {
-                // Explicitly clear any previous contact context to avoid misattribution
-                window.Widgets.setCallContext({
-                  accountId: a?.id || null,
-                  accountName: a?.accountName || a?.name || a?.companyName || null,
-                  company: a?.accountName || a?.name || a?.companyName || null,
-                  contactId: null,
-                  contactName: null,
-                  city: a?.city || a?.locationCity || '',
-                  state: a?.state || a?.locationState || '',
-                  domain: a?.domain || a?.website || '',
-                  isCompanyPhone: true
-                });
-              }
-              const name = a?.accountName || a?.name || a?.companyName || 'Account';
-              window.Widgets.callNumber(phone, name, true, 'account-detail');
-            } else {
-              window.open(`tel:${encodeURIComponent(phone)}`);
-            }
-          } catch (e) { /* noop */ }
-        }
-        break;
-      }
-      case 'linkedin': {
-        let url = a?.linkedin || a?.linkedinUrl || a?.linkedin_url || '';
-        const name = a?.accountName || a?.name || a?.companyName || '';
-        if (!url && name) url = `https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(name)}`;
-        if (url) { try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ } }
-        break;
-      }
-      case 'website': {
-        let url = a?.website || a?.site || a?.domain || '';
-        if (url && !/^https?:\/\//i.test(url)) url = 'https://' + url;
-        if (url) { try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ } }
-        break;
-      }
-    }
-  }
+  // handleQuickAction is now defined at the top of the file (line 43) before setupEventDelegation
 
   function handleWidgetAction(which) {
     const accountId = state.currentAccount?.id;
