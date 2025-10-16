@@ -45,7 +45,12 @@ export default async function handler(req, res) {
       replies: [],
       openCount: 0,
       replyCount: 0,
-      status: 'sent',
+      status: 'queued',  // Start as 'queued' instead of 'sent'
+      type: 'sent',              // Required for email filtering in emails.js
+      emailType: 'sent',         // Alternative field for filtering
+      isSentEmail: true,         // Additional flag for filtering
+      provider: 'sendgrid',      // Identify the email provider
+      sendgridMessageId: null,   // Will be updated when SendGrid responds
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
