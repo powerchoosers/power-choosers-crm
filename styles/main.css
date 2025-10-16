@@ -14374,8 +14374,13 @@ input.row-select[type="checkbox"]:focus-visible {
     opacity: 0;
 }
 
-/* Exclude phone widget from entrance animations - it slides down naturally */
-.phone-card {
+/* Exclude phone widget and account/contact detail widgets from entrance animations - they slide down naturally */
+.phone-card,
+.notes-card,
+.deal-card,
+.health-card,
+.maps-card,
+.lusha-card {
     animation: none !important;
     opacity: 1 !important;
 }
