@@ -810,10 +810,21 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     });
   }
 
-  // Poll /api/calls for this call until transcript and aiInsights are present, then run callback
+  // Firebase real-time listener for call insights (replaces API polling)
   async function callsPollInsightsUntilReady(callSid, onReady){
-    let attempts = 0; const maxAttempts = 40; const delayMs = 3000;
-    const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm.vercel.app';
+    if (!window.firebaseDB) {
+      console.warn('[Calls] Firebase not available for real-time insights');
+      return false;
+    }
+
+    // Guard against duplicate listeners
+    const guardKey = `_callsInsights_${callSid}_Bound`;
+    if (document[guardKey]) {
+      console.log('[Calls] Insights listener already active for call:', callSid);
+      return false;
+    }
+    document[guardKey] = true;
+
     const isReady = (call) => {
       const hasTranscript = !!(call && typeof call.transcript === 'string' && call.transcript.trim());
       const insights = call && call.aiInsights; const hasInsights = !!(insights && typeof insights === 'object' && Object.keys(insights).length > 0);
@@ -822,29 +833,39 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       const ciCompleted = !!(ci && typeof ci.status === 'string' && ci.status.toLowerCase() === 'completed');
       return (hasTranscript && hasInsights) || (hasTranscript && ciCompleted);
     };
-    return await new Promise((resolve)=>{
-      const attempt = ()=>{
-        attempts++;
-        fetch(`${base}/api/calls?callSid=${encodeURIComponent(callSid)}`)
-          .then(r=>r.json()).then(j=>{
-            const call = j && j.ok && Array.isArray(j.calls) && j.calls[0];
-            if (call && isReady(call)) { try{ onReady && onReady(call); }catch(_){} resolve(true); return; }
-            if (attempts < maxAttempts) {
-              // Fallback: if server created transcript but webhook didn’t update yet, poll our CI status endpoint
+
+    return new Promise((resolve) => {
+      // Firebase real-time listener
+      const unsubscribe = window.firebaseDB.collection('calls')
+        .doc(callSid)
+        .onSnapshot((doc) => {
+          if (doc.exists) {
+            const call = { id: doc.id, ...doc.data() };
+            if (isReady(call)) {
               try {
-                const ci = call && call.conversationalIntelligence; const tsid = ci && ci.transcriptSid;
-                if (!isReady(call) && tsid) {
-                  fetch(`${base}/api/twilio/poll-ci-analysis`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ transcriptSid: tsid, callSid }) })
-                    .then(r=>r.json()).then(()=>{ /* no-op; server will upsert when ready */ })
-                    .catch(()=>{});
-                }
-              } catch(_) {}
-              setTimeout(attempt, delayMs);
+                if (onReady) onReady(call);
+              } catch(e) {
+                console.error('[Calls] Error in onReady callback:', e);
+              }
+              unsubscribe(); // Stop listening - saves Firebase costs
+              delete document[guardKey]; // Clear guard
+              console.log('[Calls] Insights ready for call:', callSid);
+              resolve(true);
             }
-            else { resolve(false); }
-          }).catch(()=>{ if (attempts < maxAttempts) { setTimeout(attempt, delayMs); } else { resolve(false); } });
-      };
-      attempt();
+          }
+        }, (error) => {
+          console.error('[Calls] Firebase listener error:', error);
+          delete document[guardKey]; // Clear guard on error
+          resolve(false);
+        });
+
+      // Auto-cleanup after 5 minutes (safety net)
+      setTimeout(() => {
+        unsubscribe();
+        delete document[guardKey];
+        console.log('[Calls] Auto-cleanup: Insights listener stopped for call:', callSid);
+        resolve(false);
+      }, 5 * 60 * 1000);
     });
   }
 

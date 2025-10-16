@@ -2105,12 +2105,21 @@ var console = {
     }
   }
 
-  // Poll /api/calls for this call until transcript and aiInsights are present, then enable insights button (Account Detail)
+  // Firebase real-time listener for call insights (replaces API polling)
   function arcPollInsightsUntilReady(callSid, btn){
-    let attempts = 0;
-    const maxAttempts = 40; // ~2 minutes at 3s
-    const delayMs = 3000;
-    const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm.vercel.app';
+    if (!window.firebaseDB) {
+      console.warn('[AccountDetail] Firebase not available for real-time insights');
+      return;
+    }
+
+    // Guard against duplicate listeners
+    const guardKey = `_accountDetailInsights_${callSid}_Bound`;
+    if (document[guardKey]) {
+      console.log('[AccountDetail] Insights listener already active for call:', callSid);
+      return;
+    }
+    document[guardKey] = true;
+
     const isReady = (call) => {
       const hasTranscript = !!(call && typeof call.transcript === 'string' && call.transcript.trim());
       const insights = call && call.aiInsights;
@@ -2120,6 +2129,7 @@ var console = {
       // Consider it ready if we have a transcript and either insights are present or CI status is completed
       return (hasTranscript && hasInsights) || (hasTranscript && ciCompleted);
     };
+    
     const finalizeReady = (call) => {
       try {
         // Update state cache so future renders show full insights
@@ -2137,33 +2147,31 @@ var console = {
       try { btn.innerHTML = svgEye(); btn.classList.remove('processing', 'not-processed'); btn.disabled = false; btn.title = 'View AI insights'; } catch(_) {}
       try { if (window.ToastManager) { window.ToastManager.showToast({ type: 'success', title: 'Insights Ready', message: 'Click the eye icon to view call insights.' }); } } catch(_) {}
     };
-    const attempt = () => {
-      attempts++;
-      fetch(`${base}/api/calls?callSid=${encodeURIComponent(callSid)}`)
-        .then(r => r.json()).then(j => {
-          const call = j && j.ok && Array.isArray(j.calls) && j.calls[0];
-          if (call && isReady(call)) { finalizeReady(call); return; }
-          // Kick background analyzer if we know a transcript SID but not ready yet
-          try {
-            const ci = call && call.conversationalIntelligence; const tsid = ci && (ci.transcriptSid || ci.transcriptSID);
-            if (tsid) {
-              fetch(`${base}/api/twilio/poll-ci-analysis`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ transcriptSid: tsid, callSid }) })
-                .then(()=>{})
-                .catch(()=>{});
-            }
-          } catch(_) {}
-          if (attempts < maxAttempts) { setTimeout(attempt, delayMs); }
-          else {
-            try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch(_) {}
+
+    // Firebase real-time listener
+    const unsubscribe = window.firebaseDB.collection('calls')
+      .doc(callSid)
+      .onSnapshot((doc) => {
+        if (doc.exists) {
+          const call = { id: doc.id, ...doc.data() };
+          if (isReady(call)) {
+            finalizeReady(call);
+            unsubscribe(); // Stop listening - saves Firebase costs
+            delete document[guardKey]; // Clear guard
+            console.log('[AccountDetail] Insights ready for call:', callSid);
           }
-        }).catch(()=>{
-          if (attempts < maxAttempts) { setTimeout(attempt, delayMs); }
-          else {
-            try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch(_) {}
-          }
-        });
-    };
-    attempt();
+        }
+      }, (error) => {
+        console.error('[AccountDetail] Firebase listener error:', error);
+        delete document[guardKey]; // Clear guard on error
+      });
+
+    // Auto-cleanup after 5 minutes (safety net)
+    setTimeout(() => {
+      unsubscribe();
+      delete document[guardKey];
+      console.log('[AccountDetail] Auto-cleanup: Insights listener stopped for call:', callSid);
+    }, 5 * 60 * 1000);
   }
 
   // Inline expanding details

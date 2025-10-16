@@ -160,7 +160,11 @@
     
     // NEW: Live call insights widget listeners
     '_liveCallInsightsCallStartedBound',
-    '_liveCallInsightsCallEndedBound'
+    '_liveCallInsightsCallEndedBound',
+    
+    // NEW: Firebase real-time insights listeners
+    // Note: Dynamic guards are created as _${page}Insights_${callSid}_Bound
+    // Examples: _contactDetailInsights_call123_Bound, _accountDetailInsights_call456_Bound, _callsInsights_call789_Bound
   ];
   
   guards.forEach(guard => {
