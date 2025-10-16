@@ -792,6 +792,17 @@ class EmailManager {
                         }) || null;
                     }
                     if (acct) {
+                        // Debug: Log the raw account data to see what fields are available
+                        console.log('[AI] Raw account data for', comp, ':', {
+                            id: acct.id,
+                            name: acct.accountName || acct.name,
+                            shortDescription: acct.shortDescription,
+                            short_desc: acct.short_desc,
+                            descriptionShort: acct.descriptionShort,
+                            description: acct.description,
+                            allFields: Object.keys(acct)
+                        });
+                        
                         const acctEnergy = {
                             supplier: acct.electricitySupplier || '',
                             currentRate: acct.currentRate || '',
@@ -868,7 +879,7 @@ class EmailManager {
                 : (g.agentName || 'Power Choosers Team');
             const fromEmail = g.email || settings?.emailDeliverability?.fromEmail || 'info@powerchoosers.com';
             
-            const payload = { 
+            const payload = {
                 prompt, 
                 mode, 
                 recipient: enrichedRecipient, 
@@ -881,6 +892,17 @@ class EmailManager {
                 senderName: senderName,
                 fromEmail: fromEmail
             };
+            
+            // Debug: Log what we're sending to the API
+            console.log('[AI] Sending payload to API:', {
+                prompt: payload.prompt,
+                recipientAccount: enrichedRecipient?.account ? {
+                    name: enrichedRecipient.account.name,
+                    hasShortDescription: !!enrichedRecipient.account.shortDescription,
+                    shortDescriptionLength: (enrichedRecipient.account.shortDescription || '').length,
+                    shortDescriptionPreview: (enrichedRecipient.account.shortDescription || '').substring(0, 100)
+                } : 'No account data'
+            });
             let res;
             try {
                 res = await fetch(genUrl, {
