@@ -1,9 +1,7 @@
 // Cron job endpoint for processing automated email sequences
-import { cors } from '../_cors';
 import SequenceAutomation from './sequence-automation.js';
 
 export default async function handler(req, res) {
-  if (cors(req, res)) return;
   
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
