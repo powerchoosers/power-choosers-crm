@@ -6,7 +6,7 @@ class CacheManager {
     this.dbName = 'PowerChoosersCRM';
     this.dbVersion = 3; // Bumped for emails collection
     this.db = null;
-    this.cacheExpiry = 5 * 60 * 1000; // 5 minutes in milliseconds
+    this.cacheExpiry = 15 * 60 * 1000; // 15 minutes in milliseconds
     this.collections = ['contacts', 'accounts', 'calls', 'calls-raw', 'tasks', 'sequences', 'lists', 'deals', 'settings', 'badge-data', 'emails'];
     this.initPromise = null;
   }

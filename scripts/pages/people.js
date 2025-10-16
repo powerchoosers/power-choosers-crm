@@ -110,6 +110,21 @@
         // Re-render with restored state
         render();
         
+        // Re-initialize drag and drop after restoration
+        setTimeout(() => {
+          try {
+            console.log('[People] Re-initializing drag and drop after restore');
+            if (typeof window !== 'undefined' && typeof window.initContactsColumnDnD === 'function') {
+              try { window.initContactsColumnDnD(); } catch (e) { /* noop */ }
+            } else {
+              initPeopleHeaderDnD();
+            }
+            attachHeaderDnDHooks();
+          } catch (e) {
+            console.warn('[People] Failed to re-initialize drag and drop:', e);
+          }
+        }, 100);
+        
         // Restore scroll position
         const y = parseInt(detail.scroll || 0, 10);
         setTimeout(() => {
@@ -384,8 +399,8 @@
   }
 
   // Helper: find account by domain (preferred) or exact normalized name
-  function findAccountByDomainOrName(domain, name) {
-    const list = (typeof window !== 'undefined' && typeof window.getAccountsData === 'function') ? window.getAccountsData() : [];
+  function findAccountByDomainOrName(domain, name, accountsData = null) {
+    const list = accountsData || ((typeof window !== 'undefined' && typeof window.getAccountsData === 'function') ? window.getAccountsData() : []);
     const normDomain = normalizeDomain(domain);
     if (normDomain) {
       const byDom = list.find((a) => normalizeDomain(a && (a.domain || a.website || a.site)) === normDomain);
@@ -3113,7 +3128,10 @@
           const comp = (companyLink.getAttribute('data-company') || companyLink.textContent || '').trim();
           
           // RETRY MECHANISM: Wait for BackgroundAccountsLoader if needed
-          let accountsData = window.getAccountsData ? window.getAccountsData() : [];
+          let accountsData = window.BackgroundAccountsLoader ? window.BackgroundAccountsLoader.getAccountsData() : [];
+          if (accountsData.length === 0) {
+            accountsData = window.getAccountsData ? window.getAccountsData() : [];
+          }
           if (accountsData.length === 0 && window.BackgroundAccountsLoader) {
             console.log('[People] No accounts yet, waiting for BackgroundAccountsLoader...');
             
@@ -3133,7 +3151,7 @@
             }
           }
           
-          const acct = findAccountByDomainOrName(dom, comp);
+          const acct = findAccountByDomainOrName(dom, comp, accountsData);
           if (acct && acct.id && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
             try { window.AccountDetail.show(acct.id); } catch (_) { /* noop */ }
           } else {
