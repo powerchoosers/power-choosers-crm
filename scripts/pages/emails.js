@@ -2689,7 +2689,25 @@ ${sections.length > 1 ? `
             let enrichedRecipient = recipient ? JSON.parse(JSON.stringify(recipient)) : null;
             try {
                 if (enrichedRecipient && (enrichedRecipient.company || enrichedRecipient.email)) {
-                    const accounts = (typeof window.getAccountsData === 'function') ? (window.getAccountsData() || []) : [];
+                    // PRIORITY: Use BackgroundAccountsLoader first, then fallback to window.getAccountsData
+                    let accounts = [];
+                    
+                    // 1. BackgroundAccountsLoader (most complete, pre-loaded)
+                    if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+                        const bgAccounts = window.BackgroundAccountsLoader.getAccountsData();
+                        if (bgAccounts && bgAccounts.length > 0) {
+                            accounts = bgAccounts;
+                            console.log('[AI] Using BackgroundAccountsLoader for account matching:', accounts.length, 'accounts');
+                        }
+                    }
+                    
+                    // 2. Fallback to window.getAccountsData
+                    if (accounts.length === 0 && typeof window.getAccountsData === 'function') {
+                        accounts = window.getAccountsData() || [];
+                        if (accounts.length > 0) {
+                            console.log('[AI] Using window.getAccountsData for account matching:', accounts.length, 'accounts');
+                        }
+                    }
                     const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g,' ').replace(/\s+/g,' ').trim();
                     const comp = norm(enrichedRecipient.company || '');
                     const domain = (enrichedRecipient.email || '').split('@')[1]?.toLowerCase() || '';
@@ -3188,7 +3206,21 @@ ${sections.length > 1 ? `
             input.value = email || name;
             const person = this._composePeopleById.get(id) || {};
             // Try to find associated account by explicit id or name/domain match
-            const accounts = (typeof window.getAccountsData === 'function') ? (window.getAccountsData() || []) : [];
+            // PRIORITY: Use BackgroundAccountsLoader first, then fallback to window.getAccountsData
+            let accounts = [];
+            
+            // 1. BackgroundAccountsLoader (most complete, pre-loaded)
+            if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+                const bgAccounts = window.BackgroundAccountsLoader.getAccountsData();
+                if (bgAccounts && bgAccounts.length > 0) {
+                    accounts = bgAccounts;
+                }
+            }
+            
+            // 2. Fallback to window.getAccountsData
+            if (accounts.length === 0 && typeof window.getAccountsData === 'function') {
+                accounts = window.getAccountsData() || [];
+            }
             const personAccountId = person.accountId || person.account_id || person.companyId || person.company_id || '';
             const personCompany = person.company || person.companyName || person.accountName || (name?.split(' at ')[1]) || '';
             const personDomain = (email || '').split('@')[1]?.toLowerCase() || '';
@@ -3355,7 +3387,21 @@ ${sections.length > 1 ? `
             const doc = snap.docs[0];
             const person = { id: doc.id, ...(doc.data ? doc.data() : {}) };
             // Attempt to match an account
-            const accounts = (typeof window.getAccountsData === 'function') ? (window.getAccountsData() || []) : [];
+            // PRIORITY: Use BackgroundAccountsLoader first, then fallback to window.getAccountsData
+            let accounts = [];
+            
+            // 1. BackgroundAccountsLoader (most complete, pre-loaded)
+            if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+                const bgAccounts = window.BackgroundAccountsLoader.getAccountsData();
+                if (bgAccounts && bgAccounts.length > 0) {
+                    accounts = bgAccounts;
+                }
+            }
+            
+            // 2. Fallback to window.getAccountsData
+            if (accounts.length === 0 && typeof window.getAccountsData === 'function') {
+                accounts = window.getAccountsData() || [];
+            }
             let account = null;
             const personAccountId = person.accountId || person.account_id || person.companyId || person.company_id || '';
             const personCompany = person.company || person.companyName || person.accountName || '';
