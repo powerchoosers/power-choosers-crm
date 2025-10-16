@@ -2,7 +2,7 @@
 // Searches contacts and accounts by phone number across multiple fields
 
 const { db } = require('./_firebase');
-const cors = require('./_cors');
+import { cors } from './_cors.js';
 
 // Normalize phone to last 10 digits for comparison
 function norm10(v) {

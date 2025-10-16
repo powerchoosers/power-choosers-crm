@@ -1,6 +1,5 @@
 // API endpoint for sending emails via SendGrid (replaces Gmail API)
-// Use default import because ../_cors exports CommonJS (module.exports = cors)
-import cors from '../_cors';
+import { cors } from '../_cors.js';
 import SendGridService from './sendgrid-service.js';
 
 export default async function handler(req, res) {

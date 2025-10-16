@@ -1,5 +1,4 @@
-// Use default import because _cors exports CommonJS (module.exports = cors)
-import cors from './_cors';
+import { cors } from './_cors.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return; // handle OPTIONS
