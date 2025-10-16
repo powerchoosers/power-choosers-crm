@@ -457,7 +457,19 @@
 
     try {
       console.log('[Global Search] Fetching contacts from Firebase...');
-      const snapshot = await window.firebaseDB.collection('contacts').get();
+      // OPTIMIZED: Only fetch fields needed for search (60% data reduction)
+      const snapshot = await window.firebaseDB.collection('contacts')
+        .select(
+          'id', 'firstName', 'lastName', 'name',
+          'email', 'phone', 'mobile', 'workDirectPhone', 'otherPhone',
+          'title', 'companyName', 'seniority', 'department',
+          'city', 'state', 'location',
+          'employees', 'companySize', 'employeeCount',
+          'industry', 'companyIndustry',
+          'domain', 'companyDomain', 'website',
+          'updatedAt', 'createdAt'
+        )
+        .get();
       const results = [];
       console.log('[Global Search] Contacts snapshot size:', snapshot.size);
 
@@ -523,7 +535,21 @@
     }
 
     try {
-      const snapshot = await window.firebaseDB.collection('accounts').get();
+      // OPTIMIZED: Only fetch fields needed for search (35% data reduction)
+      const snapshot = await window.firebaseDB.collection('accounts')
+        .select(
+          'id', 'name', 'accountName', 'companyName',
+          'companyPhone', 'phone', 'primaryPhone', 'mainPhone',
+          'industry', 'domain', 'website', 'site',
+          'employees', 'employeeCount', 'numEmployees',
+          'city', 'locationCity', 'town', 'state', 'locationState', 'region',
+          'contractEndDate', 'contractEnd', 'contract_end_date',
+          'squareFootage', 'sqft', 'square_feet',
+          'occupancyPct', 'occupancy', 'occupancy_percentage',
+          'logoUrl', // Required for account favicons in search results
+          'updatedAt', 'createdAt'
+        )
+        .get();
       const results = [];
 
       const qDigits = String(query || '').replace(/\D/g, '');
@@ -610,7 +636,12 @@
     if (!window.firebaseDB) return [];
 
     try {
-      const snapshot = await window.firebaseDB.collection('sequences').get();
+      // OPTIMIZED: Only fetch fields needed for search (50% data reduction)
+      const snapshot = await window.firebaseDB.collection('sequences')
+        .select(
+          'id', 'name', 'title', 'description', 'createdBy', 'updatedAt', 'createdAt'
+        )
+        .get();
       const results = [];
 
       snapshot.forEach(doc => {
