@@ -2255,14 +2255,19 @@ var console = {
   // Return the FULL dataset (allAccountsCache), not just the paginated view (state.data)
   window.getAccountsData = function () {
     try {
-      // Priority 1: Background loader (always available, loads on app init)
+      // Priority 1: Page state cache (most current)
+      const fullData = state.allAccountsCache || state.data;
+      if (Array.isArray(fullData) && fullData.length > 0) {
+        return fullData;
+      }
+      
+      // Priority 2: Background loader (fallback)
       if (window.BackgroundAccountsLoader) {
         const data = window.BackgroundAccountsLoader.getAccountsData();
         if (data && data.length > 0) return data;
       }
-      // Priority 2: Page state cache
-      const fullData = state.allAccountsCache || state.data;
-      return Array.isArray(fullData) ? fullData : [];
+      
+      return [];
     } catch (_) {
       return [];
     }

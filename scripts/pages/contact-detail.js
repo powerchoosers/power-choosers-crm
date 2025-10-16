@@ -84,6 +84,26 @@
         }
         return;
       }
+      
+      // Website button click delegation (contact detail specific)
+      const websiteBtn = e.target.closest('.website-header-btn');
+      if (websiteBtn && document.getElementById('contact-detail-page')) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[ContactDetail] Website button clicked via delegation');
+        handleQuickAction('website');
+        return;
+      }
+      
+      // LinkedIn button click delegation (contact detail specific)
+      const linkedInBtn = e.target.closest('.linkedin-header-btn');
+      if (linkedInBtn && document.getElementById('contact-detail-page')) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[ContactDetail] LinkedIn button clicked via delegation');
+        handleQuickAction('linkedin');
+        return;
+      }
     };
     
     // Attach to document with capture phase to catch events early
@@ -1797,6 +1817,9 @@
   async function showContactDetail(contactId, tempContact) {
     if (!initDomRefs()) return;
     
+    // Clear previous contact's linked account state to prevent data leakage
+    state._linkedAccountId = null;
+    
     // Find contact in people data, or use provided temporary contact
     let contact = null;
     if (tempContact && typeof tempContact === 'object') {
@@ -2162,20 +2185,20 @@
   async function getAccountsDataSafe() {
     const log = window.console.log.bind(window.console); // Bypass log silencing
     
-    // Priority 1: Background loader (always available, loads on app init)
-    if (window.BackgroundAccountsLoader) {
-      const data = window.BackgroundAccountsLoader.getAccountsData();
-      if (data && data.length > 0) {
-        log('[ContactDetail] Got', data.length, 'accounts from BackgroundAccountsLoader');
-        return data;
-      }
-    }
-    
-    // Priority 2: window.getAccountsData (if accounts.js is loaded)
+    // Priority 1: window.getAccountsData (most current data from accounts.js)
     if (typeof window.getAccountsData === 'function') {
       const data = window.getAccountsData() || [];
       if (data.length > 0) {
         log('[ContactDetail] Got', data.length, 'accounts from window.getAccountsData');
+        return data;
+      }
+    }
+    
+    // Priority 2: Background loader (fallback)
+    if (window.BackgroundAccountsLoader) {
+      const data = window.BackgroundAccountsLoader.getAccountsData();
+      if (data && data.length > 0) {
+        log('[ContactDetail] Got', data.length, 'accounts from BackgroundAccountsLoader');
         return data;
       }
     }
@@ -2200,6 +2223,10 @@
   // Find the associated account for this contact (by id or normalized company name)
   async function findAssociatedAccount(contact, maxRetries = 10) {
     try {
+      console.log('[ContactDetail] findAssociatedAccount called for contact:', contact.name || contact.firstName + ' ' + contact.lastName);
+      console.log('[ContactDetail] Contact company:', contact.companyName || contact.accountName);
+      console.log('[ContactDetail] Contact accountId:', contact.accountId || contact.account_id);
+      
       let accounts = [];
       
       // Try getting accounts with retry logic
@@ -2249,10 +2276,14 @@
       // Prefer explicit accountId
       const accountId = contact.accountId || contact.account_id || '';
       if (accountId) {
+        console.log('[ContactDetail] Looking for account by ID:', accountId);
         const m = accounts.find(a => a.id === accountId);
         if (m) {
           console.log('[ContactDetail] Found account by ID:', m.accountName || m.name);
+          console.log('[ContactDetail] Account website:', m.website || m.domain);
           return m;
+        } else {
+          console.log('[ContactDetail] No account found with ID:', accountId);
         }
       }
       
@@ -2275,11 +2306,16 @@
       const key = norm(contactName);
       
       if (!key) {
-        window.console.log('[ContactDetail] No company name to match');
+        console.log('[ContactDetail] No company name to match');
         return null;
       }
       
-      window.console.log('[ContactDetail] Searching for account matching:', contactName, '(normalized:', key + ')');
+      console.log('[ContactDetail] Searching for account matching:', contactName, '(normalized:', key + ')');
+      console.log('[ContactDetail] Available accounts sample:', accounts.slice(0, 3).map(a => ({
+        id: a.id,
+        name: a.accountName || a.name,
+        website: a.website || a.domain
+      })));
       
       // Try exact match first
       let match = accounts.find(a => {
@@ -2297,13 +2333,18 @@
           const jaccard = inter.length / (new Set([...aTok, ...cTok]).size);
           return inter.length >= 2 || jaccard >= 0.5;
         });
-        if (match) window.console.log('[ContactDetail] Found account by token/Jaccard match:', match.accountName || match.name);
+        if (match) {
+          console.log('[ContactDetail] Found account by token/Jaccard match:', match.accountName || match.name);
+          console.log('[ContactDetail] Matched account website:', match.website || match.domain);
+        }
       } else {
-        window.console.log('[ContactDetail] Found account by exact match:', match.accountName || match.name);
+        console.log('[ContactDetail] Found account by exact match:', match.accountName || match.name);
+        console.log('[ContactDetail] Matched account website:', match.website || match.domain);
       }
       
       if (!match) {
-        window.console.warn('[ContactDetail] No account match for company:', contactName);
+        console.warn('[ContactDetail] No account match for company:', contactName);
+        console.log('[ContactDetail] Searched through', accounts.length, 'accounts');
         // Try one more fuzzy search - look for ANY words in common
         const contactWords = key.split(' ').filter(w => w.length >= 3);
         if (contactWords.length > 0) {
@@ -3610,9 +3651,15 @@
         if (els.page) { els.page.classList.remove('contact-detail-mode'); }
         // Remove contact detail header and view
         const view = document.getElementById('contact-detail-view');
-        if (view && view.parentElement) view.parentElement.removeChild(view);
+        if (view && view.parentElement) {
+          view.classList.remove('contact-detail-ready');
+          view.parentElement.removeChild(view);
+        }
         const header = document.getElementById('contact-detail-header');
-        if (header && header.parentElement) header.parentElement.removeChild(header);
+        if (header && header.parentElement) {
+          header.classList.remove('contact-detail-ready');
+          header.parentElement.removeChild(header);
+        }
         // Unhide the original table/list if present
         if (els.mainContent) {
           const tableContainer = els.mainContent.querySelector('.table-container');
@@ -3727,9 +3774,9 @@
     // Quick action buttons
     const quickActionBtns = document.querySelectorAll('.quick-action-btn');
     quickActionBtns.forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', async (e) => {
         const action = btn.getAttribute('data-action');
-        handleQuickAction(action, btn);
+        await handleQuickAction(action, btn);
       });
     });
 
@@ -6770,7 +6817,7 @@ async function createContactSequenceThenAdd(name) {
     }
   }
 
-  function handleQuickAction(action, btn) {
+  async function handleQuickAction(action, btn) {
     switch (action) {
       case 'call':
         const phone = btn.getAttribute('data-phone');
@@ -6797,17 +6844,37 @@ async function createContactSequenceThenAdd(name) {
       case 'website':
         const contact = state.currentContact;
         if (contact) {
+          console.log('[ContactDetail] Website button clicked for contact:', contact.name || contact.firstName + ' ' + contact.lastName);
+          console.log('[ContactDetail] Contact company:', contact.companyName || contact.accountName);
+          
           // Get website from contact's company or account
           let website = contact.website || contact.companyWebsite || contact.accountWebsite;
+          console.log('[ContactDetail] Contact website fields:', {
+            website: contact.website,
+            companyWebsite: contact.companyWebsite,
+            accountWebsite: contact.accountWebsite,
+            found: website
+          });
           
           // If no website on contact, try to get from linked account
-          if (!website && contact.accountId) {
+          if (!website) {
             try {
-              const linkedAccount = findAssociatedAccount(contact);
+              console.log('[ContactDetail] No website on contact, looking up linked account...');
+              const linkedAccount = await findAssociatedAccount(contact);
               if (linkedAccount) {
                 website = linkedAccount.website || linkedAccount.domain;
+                console.log('[ContactDetail] Found linked account:', linkedAccount.accountName || linkedAccount.name);
+                console.log('[ContactDetail] Account website fields:', {
+                  website: linkedAccount.website,
+                  domain: linkedAccount.domain,
+                  found: website
+                });
+              } else {
+                console.log('[ContactDetail] No linked account found');
               }
-            } catch (e) { /* noop */ }
+            } catch (e) { 
+              console.warn('[ContactDetail] Failed to find linked account for website:', e);
+            }
           }
           
           if (website) {
@@ -6816,8 +6883,10 @@ async function createContactSequenceThenAdd(name) {
             if (!url.startsWith('http://') && !url.startsWith('https://')) {
               url = 'https://' + url;
             }
+            console.log('[ContactDetail] Opening website:', url);
             try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ }
           } else {
+            console.log('[ContactDetail] No website available for contact');
             // Show message if no website available
             if (window.crm && typeof window.crm.showToast === 'function') {
               window.crm.showToast('No website available for this contact');
@@ -6828,15 +6897,20 @@ async function createContactSequenceThenAdd(name) {
       case 'linkedin':
         const contactLinkedIn = state.currentContact;
         if (contactLinkedIn) {
-          // If contact has a LinkedIn URL, use it directly
+          console.log('[ContactDetail] LinkedIn button clicked for contact:', contactLinkedIn.name || contactLinkedIn.firstName + ' ' + contactLinkedIn.lastName);
+          console.log('[ContactDetail] Contact LinkedIn field:', contactLinkedIn.linkedin);
+          
+          // If contact has a LinkedIn URL, use it directly (PERSONAL LinkedIn, not company)
           if (contactLinkedIn.linkedin) {
+            console.log('[ContactDetail] Using contact personal LinkedIn:', contactLinkedIn.linkedin);
             try { window.open(contactLinkedIn.linkedin, '_blank', 'noopener'); } catch (e) { /* noop */ }
           } else {
-            // Fallback to search if no LinkedIn URL
+            // Fallback to search for the PERSON (not company)
             const fullName = [contactLinkedIn.firstName, contactLinkedIn.lastName].filter(Boolean).join(' ') || contactLinkedIn.name;
-            const company = contactLinkedIn.companyName || '';
-            const query = encodeURIComponent([fullName, company].filter(Boolean).join(' '));
+            const query = encodeURIComponent(fullName);
             const url = `https://www.linkedin.com/search/results/people/?keywords=${query}`;
+            console.log('[ContactDetail] No personal LinkedIn, searching for person:', fullName);
+            console.log('[ContactDetail] LinkedIn search URL:', url);
             try { window.open(url, '_blank', 'noopener'); } catch (e) { /* noop */ }
           }
         }
@@ -7133,3 +7207,4 @@ window.testPhoneInput = function(value, cursorPos = 0) {
 };
 
 })();
+
