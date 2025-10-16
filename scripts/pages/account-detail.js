@@ -1420,10 +1420,10 @@ var console = {
     style.textContent = `
       /* Performance: promote and isolate page-content to reduce jank during live updates */
       #account-details-page .page-content {
-        will-change: transform;
+        will-change: auto; /* Remove will-change to prevent unnecessary repaints */
         transform: translateZ(0);
         backface-visibility: hidden;
-        contain: paint layout;
+        contain: layout style; /* Only contain layout and style, not paint */
         overflow-anchor: none;
       }
       .rc-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom: var(--spacing-md); }
@@ -1436,9 +1436,28 @@ var console = {
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       }
       .rc-page-info { min-width: 44px; text-align:center; color: var(--text-secondary); font-size: 12px; }
-      .rc-list { transition: height 220ms ease, opacity 220ms ease; position: relative; display:flex; flex-direction:column; gap:8px; }
+      .rc-list { 
+        transition: opacity 220ms ease; /* Remove height transition to prevent layout shifts */
+        position: relative; 
+        display:flex; 
+        flex-direction:column; 
+        gap:8px; 
+        contain: layout; /* Prevent layout shifts during updates */
+        min-height: 0; /* Prevent height jumping */
+      }
       .rc-empty { color: var(--text-secondary); font-size: 12px; padding: 6px 0; }
-      .rc-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid var(--border-light); border-radius: var(--border-radius); background: var(--bg-item); }
+      .rc-item { 
+        display:flex; 
+        align-items:center; 
+        justify-content:space-between; 
+        gap:12px; 
+        padding:10px 12px; 
+        border:1px solid var(--border-light); 
+        border-radius: var(--border-radius); 
+        background: var(--bg-item); 
+        contain: layout; /* Prevent layout shifts during duration updates */
+        min-height: 48px; /* Fixed height to prevent jumping */
+      }
       .rc-item.rc-new { animation: rcNewIn 220ms ease-out both; }
       @keyframes rcNewIn { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       .rc-meta { display:flex; align-items:center; gap:10px; min-width:0; }
@@ -1507,21 +1526,12 @@ var console = {
   function startAccountRecentCallsLiveHooks(){
     try {
       if (document._arcLiveHooksBound) return;
-      document.addEventListener('callStarted', onAnyAccountCallActivity, false);
+      
+      // Only listen for call completion - no more frequent refreshes during live calls
       document.addEventListener('callEnded', onAnyAccountCallActivity, false);
-      document.addEventListener('pc:recent-calls-refresh', onAnyAccountCallActivity, false);
       document.addEventListener('pc:live-call-duration', onLiveCallDurationUpdate, false);
       
-      // Listen for call updates to refresh recent calls
-      document.addEventListener('pc:call-updated', (event) => {
-        const callData = event.detail;
-        if (callData && callData.accountId === state.currentAccount?.id) {
-          // Use debounced refresh to prevent freeze
-          onAnyAccountCallActivity();
-        }
-      });
-      
-      // Listen for new calls
+      // Listen for new calls (only when call is actually logged/completed)
       document.addEventListener('pc:call-logged', (event) => {
         const callData = event.detail;
         if (callData && (callData.accountId === state.currentAccount?.id || 
@@ -1539,15 +1549,6 @@ var console = {
           }
           
           // Also use debounced refresh as backup
-          onAnyAccountCallActivity();
-        }
-      });
-      
-      // Listen for completed calls to refresh recent calls
-      document.addEventListener('pc:call-completed', (event) => {
-        const callData = event.detail;
-        if (callData && callData.accountId === state.currentAccount?.id) {
-          // Use debounced refresh to prevent freeze
           onAnyAccountCallActivity();
         }
       });
@@ -1669,7 +1670,7 @@ var console = {
     const run = () => {
       attempts++;
       try { loadRecentCallsForAccount(); } catch(_) {}
-      if (attempts < 10) { _arcRetryTimer = setTimeout(run, 900); }
+      if (attempts < 3) { _arcRetryTimer = setTimeout(run, 1500); } // Reduced from 10 to 3 attempts, increased interval
       else { state._arcReloadInFlight = false; }
     };
     run();
@@ -2683,7 +2684,7 @@ var console = {
             </div>
             <div class="form-row">
               <label>Website<input type="text" name="website" class="input-dark" value="${escapeHtml(a.website || a.site || '')}" placeholder="https://example.com" /></label>
-              <label>Phone<input type="text" name="phone" class="input-dark" value="${escapeHtml(a.phone || a.companyPhone || a.primaryPhone || a.mainPhone || '')}" /></label>
+              <label>Company Phone<input type="text" name="companyPhone" class="input-dark" value="${escapeHtml(a.companyPhone || a.phone || a.primaryPhone || a.mainPhone || '')}" /></label>
             </div>
             <div class="form-row">
               <label>City<input type="text" name="city" class="input-dark" value="${escapeHtml(a.city || a.locationCity || '')}" /></label>
@@ -2711,7 +2712,7 @@ var console = {
             </div>
             <div class="form-row">
               <label>LinkedIn URL<input type="url" name="linkedin" class="input-dark" value="${escapeHtml(a.linkedin || a.linkedinUrl || a.linkedin_url || '')}" /></label>
-              <label>Square Footage<input type="number" name="squareFootage" class="input-dark" value="${escapeHtml(String(a.squareFootage ?? a.sqft ?? a.square_feet ?? ''))}" /></label>
+              <label>SQ FT<input type="number" name="squareFootage" class="input-dark" value="${escapeHtml(String(a.squareFootage ?? a.sqft ?? a.square_feet ?? ''))}" /></label>
             </div>
             <div class="form-row">
               <label>Occupancy %<input type="number" name="occupancyPct" class="input-dark" min="0" max="100" value="${escapeHtml(String(a.occupancyPct ?? a.occupancy ?? a.occupancy_percentage ?? ''))}" /></label>
@@ -2838,7 +2839,7 @@ var console = {
         accountName: (fd.get('accountName') || '').toString().trim(),
         industry: (fd.get('industry') || '').toString().trim(),
         website: (fd.get('website') || '').toString().trim(),
-        phone: normalizePhone((fd.get('phone') || '').toString().trim()),
+        companyPhone: normalizePhone((fd.get('companyPhone') || '').toString().trim()),
         city: (fd.get('city') || '').toString().trim(),
         state: (fd.get('state') || '').toString().trim(),
         linkedin: (fd.get('linkedin') || '').toString().trim(),
