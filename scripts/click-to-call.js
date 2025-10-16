@@ -871,6 +871,27 @@
       });
     }
     
+    // Process list-detail table specifically
+    const listDetailTable = document.getElementById('list-detail-table');
+    if (listDetailTable) {
+      const rows = listDetailTable.querySelectorAll('tbody tr');
+      rows.forEach(row => {
+        if (row.dataset.phoneProcessed) return;
+        
+        // Look for phone numbers in any cell with .phone-cell class
+        const phoneCells = row.querySelectorAll('.phone-cell');
+        phoneCells.forEach(phoneCell => {
+          const phoneText = phoneCell.textContent.trim();
+          if (phoneText && phoneText !== '' && phoneText !== 'N/A' && isValidPhoneNumber(phoneText)) {
+            const contactName = findContactName(phoneCell);
+            makePhoneClickable(phoneCell, phoneText, contactName);
+          }
+        });
+        
+        row.dataset.phoneProcessed = 'true';
+      });
+    }
+    
     // Process accounts table
     const accountsTable = document.getElementById('accounts-table');
     if (accountsTable) {
@@ -1036,7 +1057,7 @@
     });
     
     // Only observe table containers
-    const tablesToObserve = ['people-table', 'accounts-table', 'calls-table'];
+    const tablesToObserve = ['people-table', 'accounts-table', 'calls-table', 'list-detail-table'];
     tablesToObserve.forEach(tableId => {
       const table = document.getElementById(tableId);
       if (table) {
@@ -1061,7 +1082,7 @@
 
   // Re-initialize when navigating to pages with tables
   document.addEventListener('pc:page-loaded', function(e) {
-    if (e.detail && ['people', 'accounts', 'calls'].includes(e.detail.page)) {
+    if (e.detail && ['people', 'accounts', 'calls', 'list-detail'].includes(e.detail.page)) {
       setTimeout(() => {
         initClickToCall();
       }, 100);

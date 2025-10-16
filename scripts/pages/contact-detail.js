@@ -2185,20 +2185,20 @@
   async function getAccountsDataSafe() {
     const log = window.console.log.bind(window.console); // Bypass log silencing
     
-    // Priority 1: window.getAccountsData (most current data from accounts.js)
-    if (typeof window.getAccountsData === 'function') {
-      const data = window.getAccountsData() || [];
-      if (data.length > 0) {
-        log('[ContactDetail] Got', data.length, 'accounts from window.getAccountsData');
-        return data;
-      }
-    }
-    
-    // Priority 2: Background loader (fallback)
+    // Priority 1: Background loader (most reliable data)
     if (window.BackgroundAccountsLoader) {
       const data = window.BackgroundAccountsLoader.getAccountsData();
       if (data && data.length > 0) {
         log('[ContactDetail] Got', data.length, 'accounts from BackgroundAccountsLoader');
+        return data;
+      }
+    }
+    
+    // Priority 2: window.getAccountsData (fallback)
+    if (typeof window.getAccountsData === 'function') {
+      const data = window.getAccountsData() || [];
+      if (data.length > 0) {
+        log('[ContactDetail] Got', data.length, 'accounts from window.getAccountsData');
         return data;
       }
     }

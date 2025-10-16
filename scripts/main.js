@@ -57,14 +57,8 @@ class PowerChoosersCRM {
         
         // Start background calls loading immediately
         // This ensures calls data is pre-loaded before user clicks calls page
-        setTimeout(() => {
-            if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.start === 'function') {
-                console.log('[CRM] Starting background calls loading immediately for instant access...');
-                window.BackgroundCallsLoader.start();
-            } else {
-                console.warn('[CRM] BackgroundCallsLoader not available');
-            }
-        }, 100); // Start almost immediately - just wait for scripts to be ready
+        // BackgroundCallsLoader now starts immediately on module init (like contacts/accounts)
+        // No need for delayed start - it loads from cache instantly
     }
 
     // Pre-load essential data for widgets and navigation
@@ -205,8 +199,13 @@ class PowerChoosersCRM {
     const backdrop = modal.querySelector('.pc-modal__backdrop');
     const form = modal.querySelector('#form-add-account');
 
-    // Open modal
+    // Open modal with animation
     modal.removeAttribute('hidden');
+    
+    // Trigger animation after a brief delay to ensure DOM is ready
+    requestAnimationFrame(() => {
+      modal.classList.add('show');
+    });
 
     // Focus management: move focus to Close button if present, else first input
     setTimeout(() => {
@@ -248,10 +247,15 @@ class PowerChoosersCRM {
     };
 
     const close = () => {
-      // Hide modal and cleanup listeners bound for this open session
-      modal.setAttribute('hidden', '');
-      dialog.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('keydown', handleKeyDown);
+      // Start exit animation
+      modal.classList.remove('show');
+      
+      // Hide modal after animation completes
+      setTimeout(() => {
+        modal.setAttribute('hidden', '');
+        dialog.removeEventListener('keydown', handleKeyDown);
+        document.removeEventListener('keydown', handleKeyDown);
+      }, 300); // Match CSS transition duration
     };
 
     // One-time static bindings (click handlers, focus ring, submit)
@@ -512,8 +516,13 @@ class PowerChoosersCRM {
     const backdrop = modal.querySelector('.pc-modal__backdrop');
     const form = modal.querySelector('#form-add-contact');
 
-    // Open modal
+    // Open modal with animation
     modal.removeAttribute('hidden');
+    
+    // Trigger animation after a brief delay to ensure DOM is ready
+    requestAnimationFrame(() => {
+      modal.classList.add('show');
+    });
 
     // Focus management: move focus to Close button if present, else first input
     setTimeout(() => {
@@ -547,10 +556,15 @@ class PowerChoosersCRM {
     };
 
     const close = () => {
-      // Hide modal and cleanup listeners bound for this open session
-      modal.setAttribute('hidden', '');
-      dialog.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('keydown', handleKeyDown);
+      // Start exit animation
+      modal.classList.remove('show');
+      
+      // Hide modal after animation completes
+      setTimeout(() => {
+        modal.setAttribute('hidden', '');
+        dialog.removeEventListener('keydown', handleKeyDown);
+        document.removeEventListener('keydown', handleKeyDown);
+      }, 300); // Match CSS transition duration
     };
 
     // One-time static bindings (click handlers, focus ring, submit)
@@ -1850,8 +1864,13 @@ class PowerChoosersCRM {
         // Reset modal to initial state
         this.resetBulkImportModal(modal);
         
-        // Show modal
+        // Show modal with animation
         modal.removeAttribute('hidden');
+        
+        // Trigger animation after a brief delay to ensure DOM is ready
+        requestAnimationFrame(() => {
+            modal.classList.add('show');
+        });
         
         // Focus management
         setTimeout(() => {
@@ -1867,9 +1886,6 @@ class PowerChoosersCRM {
     }
 
     resetBulkImportModal(modal) {
-        // Reset to step 1
-        this.showCSVStep(modal, 1);
-        
         // Clear file input and info
         const fileInput = modal.querySelector('#csv-file-input');
         const fileInfo = modal.querySelector('#csv-file-info');
@@ -1884,6 +1900,9 @@ class PowerChoosersCRM {
             step.classList.remove('active', 'completed');
         });
         modal.querySelector('.csv-step[data-step="1"]').classList.add('active');
+        
+        // Reset to step 1 and ensure it's visible
+        this.showCSVStep(modal, 1);
         
         // Reset buttons
         const nextBtn1 = modal.querySelector('#csv-next-step-1');
@@ -1940,9 +1959,15 @@ class PowerChoosersCRM {
         // Close button handlers
         modal.querySelectorAll('[data-close="bulk-import"]').forEach(btn => {
             btn.addEventListener('click', () => {
-                modal.setAttribute('hidden', '');
-                // Reset modal to initial state for next import
-                this.resetBulkImportModal(modal);
+                // Start exit animation
+                modal.classList.remove('show');
+                
+                // Hide modal after animation completes
+                setTimeout(() => {
+                    modal.setAttribute('hidden', '');
+                    // Reset modal to initial state for next import
+                    this.resetBulkImportModal(modal);
+                }, 300); // Match CSS transition duration
             });
         });
 
@@ -2048,9 +2073,16 @@ class PowerChoosersCRM {
         const nextBtn1 = modal.querySelector('#csv-next-step-1');
         if (nextBtn1) {
             nextBtn1.addEventListener('click', () => {
+                console.log('Next button clicked, CSV data:', modal._csvData);
+                console.log('CSV headers:', modal._csvHeaders);
+                console.log('CSV rows:', modal._csvRows);
+                
                 if (modal._csvData) {
                     this.generateFieldMapping(modal);
                     this.showCSVStep(modal, 2);
+                } else {
+                    console.error('No CSV data found!');
+                    this.showToast('Please upload a CSV file first');
                 }
             });
         }
@@ -2098,13 +2130,19 @@ class PowerChoosersCRM {
         
         if (finishBtn) {
             finishBtn.addEventListener('click', () => {
-                modal.setAttribute('hidden', '');
-                // Reset modal to initial state for next import
-                this.resetBulkImportModal(modal);
-                // Trigger a page refresh if we're on contacts/accounts page
-                if (this.currentPage === 'people' || this.currentPage === 'accounts') {
-                    window.location.reload();
-                }
+                // Start exit animation
+                modal.classList.remove('show');
+                
+                // Hide modal after animation completes
+                setTimeout(() => {
+                    modal.setAttribute('hidden', '');
+                    // Reset modal to initial state for next import
+                    this.resetBulkImportModal(modal);
+                    // Trigger a page refresh if we're on contacts/accounts page
+                    if (this.currentPage === 'people' || this.currentPage === 'accounts') {
+                        window.location.reload();
+                    }
+                }, 300); // Match CSS transition duration
             });
         }
     }
@@ -2135,6 +2173,11 @@ class PowerChoosersCRM {
             modal._csvData = text;
             modal._csvHeaders = headers;
             modal._csvRows = rows;
+            
+            console.log('CSV data stored successfully:');
+            console.log('Headers:', headers);
+            console.log('Rows count:', rows.length);
+            console.log('First few rows:', rows.slice(0, 2));
             
             // Update UI
             this.displayFileInfo(modal, file, rows.length);
@@ -2326,14 +2369,29 @@ class PowerChoosersCRM {
     }
 
     showCSVStep(modal, stepNumber) {
-        // Hide all steps
+        console.log(`Switching to step ${stepNumber}`);
+        
+        // Hide all steps immediately
         modal.querySelectorAll('.csv-step-content').forEach(step => {
-            step.hidden = true;
+            if (step.id !== `csv-step-${stepNumber}`) {
+                step.classList.remove('active');
+                step.hidden = true;
+            }
         });
         
         // Show target step
         const targetStep = modal.querySelector(`#csv-step-${stepNumber}`);
-        if (targetStep) targetStep.hidden = false;
+        if (targetStep) {
+            console.log(`Found target step: ${targetStep.id}`);
+            targetStep.hidden = false;
+            
+            // Trigger fade-in animation
+            requestAnimationFrame(() => {
+                targetStep.classList.add('active');
+            });
+        } else {
+            console.error(`Target step #csv-step-${stepNumber} not found`);
+        }
         
         // Update step indicator
         modal.querySelectorAll('.csv-step').forEach(step => {
@@ -2349,10 +2407,19 @@ class PowerChoosersCRM {
     }
 
     generateFieldMapping(modal) {
-        if (!modal._csvHeaders) return;
+        console.log('generateFieldMapping called');
+        console.log('CSV headers:', modal._csvHeaders);
+        
+        if (!modal._csvHeaders) {
+            console.error('No CSV headers found!');
+            return;
+        }
         
         const previewTable = modal.querySelector('#csv-preview-table');
         const mappingList = modal.querySelector('#csv-field-mapping');
+        
+        console.log('Preview table element:', previewTable);
+        console.log('Mapping list element:', mappingList);
         
         // Generate preview table
         if (previewTable) {
@@ -2376,11 +2443,15 @@ class PowerChoosersCRM {
             
             tableHTML += '</tbody></table>';
             previewTable.innerHTML = tableHTML;
+            console.log('Preview table HTML generated:', tableHTML.substring(0, 200) + '...');
         }
         
         // Generate field mapping
         if (mappingList) {
-            const crmFields = this.getCRMFields(modal._importType || 'contacts');
+            const importType = modal._importType || 'contacts';
+            console.log('Import type:', importType);
+            const crmFields = this.getCRMFields(importType);
+            console.log('CRM fields:', crmFields);
             let mappingHTML = '';
             
             modal._csvHeaders.forEach((header, index) => {
@@ -2403,6 +2474,7 @@ class PowerChoosersCRM {
             });
             
             mappingList.innerHTML = mappingHTML;
+            console.log('Mapping HTML generated:', mappingHTML.substring(0, 200) + '...');
             // Restore saved mappings if available
             const stored = this.loadFieldMappingFromStorage(modal);
             this.applyStoredFieldMappings(modal, stored);

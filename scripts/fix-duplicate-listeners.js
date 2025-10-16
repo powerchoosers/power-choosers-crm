@@ -10,6 +10,7 @@
   
   // Mark all listener guards as bound to prevent future duplicates
   const guards = [
+    // Original guards (already fixed)
     '_peopleRestoreBound',
     '_peopleCallLoggedBound',
     '_accountsRestoreBound',
@@ -19,7 +20,46 @@
     '_contactDetailCallLoggedBound',
     '_contactDetailLoadedBound',
     '_arcLiveHooksBound',
-    '_tasksRestoreBound'
+    '_tasksRestoreBound',
+    
+    // NEW: Unguarded listeners found in contact-detail.js (lines 2749-2753)
+    '_contactDetailCallEndedBound',
+    '_contactDetailLiveCallDurationBound',
+    '_contactDetailCallLoggedBound2',
+    
+    // NEW: Unguarded listeners found in account-detail.js (lines 1531-1535)
+    '_accountDetailCallEndedBound',
+    '_accountDetailLiveCallDurationBound',
+    '_accountDetailCallLoggedBound2',
+    
+    // NEW: Unguarded listeners found in calls.js (line 3353)
+    '_callsLiveCallDurationBound',
+    
+    // NEW: Unguarded listeners found in other files
+    '_clickToCallPageLoadedBound',
+    '_mainActivitiesRefreshBound',
+    '_taskDetailContactCreatedBound',
+    '_taskDetailContactUpdatedBound',
+    '_taskDetailPageLoadedBound',
+    '_taskDetailRestoreBound',
+    '_tasksAutoTaskBound1',
+    '_tasksAutoTaskBound2',
+    '_phoneEnergyUpdatedBound',
+    '_healthEnergyUpdatedBound',
+    '_listDetailRestoreListenerBound',
+    '_accountDetailContactsListenerBound',
+    '_contactDetailAccountsListenerBound',
+    '_contactDetailActivitiesRefreshBound',
+    '_contactDetailEnergyUpdatedBound',
+    '_contactDetailContactCreatedBound',
+    '_accountDetailActivitiesRefreshBound',
+    '_accountDetailAccountCreatedBound',
+    '_accountDetailContactCreatedBound',
+    '_accountDetailContactUpdatedBound',
+    '_accountDetailEnergyUpdatedBound',
+    '_listsRestoreBound',
+    '_callsRestoreBound',
+    '_widgetsNotesPreloadedBound'
   ];
   
   guards.forEach(guard => {

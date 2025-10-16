@@ -127,6 +127,17 @@ var console = {
           console.log('[Accounts] Restored scroll position to:', y);
         }
 
+        // Re-initialize drag and drop after restoration
+        setTimeout(() => {
+          try {
+            console.log('[Accounts] Re-initializing drag and drop after restore');
+            initAccountsHeaderDnD();
+            attachAccountsHeaderDnDHooks();
+          } catch (e) {
+            console.warn('[Accounts] Failed to re-initialize drag and drop:', e);
+          }
+        }, 100);
+
         // Clear restoring hint flag with longer delay to ensure stability
         try {
           setTimeout(() => { 

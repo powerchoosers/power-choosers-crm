@@ -50,7 +50,20 @@
 
   // Column order for List Detail table headers (draggable)
   const DEFAULT_PEOPLE_COL_ORDER = ['select', 'name', 'title', 'company', 'email', 'phone', 'location', 'actions', 'updated'];
-  const DEFAULT_ACCOUNTS_COL_ORDER = ['select', 'name', 'industry', 'domain', 'phone', 'updated'];
+  const DEFAULT_ACCOUNTS_COL_ORDER = [
+    'select',
+    'name',
+    'industry',
+    'domain',
+    'companyPhone',
+    'contractEnd',
+    'sqft',
+    'occupancy',
+    'employees',
+    'location',
+    'actions',
+    'updated'
+  ];
   
   const PEOPLE_COL_STORAGE_KEY = 'list_detail_people_column_order';
   const ACCOUNTS_COL_STORAGE_KEY = 'list_detail_accounts_column_order';
@@ -99,6 +112,60 @@
     } catch (e) {
       console.warn('Failed to persist column order:', e);
     }
+  }
+
+  // Phone formatting helpers (mirror people.js)
+  function parsePhoneWithExtension(input) {
+    const raw = (input || '').toString().trim();
+    if (!raw) return { number: '', extension: '' };
+    
+    const extensionPatterns = [
+      /ext\.?\s*(\d+)/i,
+      /extension\s*(\d+)/i,
+      /x\.?\s*(\d+)/i,
+      /#\s*(\d+)/i,
+      /\s+(\d{3,6})\s*$/
+    ];
+    
+    let number = raw;
+    let extension = '';
+    
+    for (const pattern of extensionPatterns) {
+      const match = number.match(pattern);
+      if (match) {
+        extension = match[1];
+        number = number.replace(pattern, '').trim();
+        break;
+      }
+    }
+    
+    return { number, extension };
+  }
+
+  function formatPhoneForDisplay(phone) {
+    if (!phone) return '';
+    
+    const parsed = parsePhoneWithExtension(phone);
+    if (!parsed.number) return phone;
+    
+    let formattedNumber = '';
+    const cleaned = parsed.number.replace(/\D/g, '');
+    
+    if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      formattedNumber = `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+    } else if (cleaned.length === 10) {
+      formattedNumber = `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+    } else if (/^\+/.test(String(parsed.number))) {
+      formattedNumber = parsed.number;
+    } else {
+      formattedNumber = parsed.number;
+    }
+    
+    if (parsed.extension) {
+      return `${formattedNumber} ext. ${parsed.extension}`;
+    }
+    
+    return formattedNumber;
   }
 
   function qs(id) { return document.getElementById(id); }
@@ -276,7 +343,7 @@
     // Clickable names and companies - use event delegation
     if (els.tbody) {
       els.tbody.addEventListener('click', (e) => {
-        const anchor = e.target.closest('a, .name-cell, .company-link');
+        const anchor = e.target.closest('a, .name-cell, .company-link, .acct-link');
         if (!anchor) return;
         // Handle contact name clicks
         if (anchor.matches('.name-cell[data-contact-id]')) {
@@ -389,7 +456,7 @@
         }
         
         // Handle account name clicks (for accounts view)
-        if (anchor.matches('.company-link[data-account-id]')) {
+        if (anchor.matches('.company-link[data-account-id]') || anchor.matches('.acct-link[data-account-id]')) {
           e.preventDefault();
           const accountId = anchor.getAttribute('data-account-id');
           const accountName = anchor.getAttribute('data-account-name');
@@ -1148,6 +1215,16 @@
 
     renderPagination();
 
+    // Initialize click-to-call and click-to-email after table is rendered
+    setTimeout(() => {
+      if (window.ClickToCall && typeof window.ClickToCall.init === 'function') {
+        window.ClickToCall.init();
+      }
+      if (window.ClickToEmail && typeof window.ClickToEmail.init === 'function') {
+        window.ClickToEmail.init();
+      }
+    }, 50);
+
     // Bind row selection events (delegate)
     if (!els._tbodyBound) {
       els.tbody.addEventListener('change', (e) => {
@@ -1242,13 +1319,33 @@
     const title = escapeHtml(c.title || '');
     const company = escapeHtml(c.companyName || '');
     const email = escapeHtml(c.email || '');
-    const phone = escapeHtml(c.phone || c.mobile || '');
+    
+    // Phone: prefer user-selected default, then fallback to priority order
+    const preferredKey = String(c.preferredPhoneField || '').trim();
+    let phoneRaw = '';
+    if (preferredKey && (preferredKey === 'workDirectPhone' || preferredKey === 'mobile' || preferredKey === 'otherPhone')) {
+      phoneRaw = c[preferredKey] || '';
+    }
+    if (!phoneRaw) phoneRaw = c.workDirectPhone || c.mobile || c.otherPhone || c.phone || '';
+    const phone = phoneRaw;
+    const phoneFormatted = phone ? formatPhoneForDisplay(phone) : '';
+    
     const locCity = c.city || (c.location && c.location.city) || '';
     const locState = c.state || (c.location && (c.location.state || c.location.region)) || '';
     const location = escapeHtml([locCity, locState].filter(Boolean).join(', '));
     const updatedStr = escapeHtml(formatDateOrNA(c.updatedAt, c.createdAt));
     const checked = state.selectedPeople.has(id) ? ' checked' : '';
     const rowClass = state.selectedPeople.has(id) ? ' class="row-selected"' : '';
+    
+    // Compute initials for avatar (first letter of first and last word)
+    const initials = (() => {
+      const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
+      const chars = parts.length > 1 ? [parts[0][0], parts[parts.length - 1][0]] : (parts[0] ? [parts[0][0]] : []);
+      const str = chars.join('').toUpperCase();
+      if (str) return str;
+      const e = String(c.email || '').trim();
+      return e ? e[0].toUpperCase() : '?';
+    })();
     
     let html = `<tr${rowClass}>`;
     
@@ -1258,7 +1355,7 @@
           html += `<td class="col-select"><input type="checkbox" class="row-select" data-id="${escapeHtml(id)}" aria-label="Select"${checked}></td>`;
           break;
         case 'name':
-          html += `<td><a href="#" class="name-cell" data-contact-id="${escapeHtml(id)}" data-contact-name="${escapeHtml(fullName)}">${fullName}</a></td>`;
+          html += `<td class="name-cell" data-contact-id="${escapeHtml(id)}"><div class="name-cell__wrap"><span class="avatar-initials" aria-hidden="true">${escapeHtml(initials)}</span><span class="name-text">${escapeHtml(fullName)}</span></div></td>`;
           break;
         case 'title':
           html += `<td>${title}</td>`;
@@ -1280,10 +1377,10 @@
           html += `<td><a href="#" class="company-link" data-company-name="${escapeHtml(company)}"><span class="company-cell__wrap">${favDomain ? (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateFaviconHTML === 'function' ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 32) : `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.display='none'" />`) : ''}<span class="company-name">${company}</span></span></a></td>`;
           break;
         case 'email':
-          html += `<td>${email}</td>`;
+          html += `<td class="email-link" data-email="${escapeHtml(email)}" data-name="${escapeHtml(fullName)}">${email}</td>`;
           break;
         case 'phone':
-          html += `<td>${phone}</td>`;
+          html += `<td class="phone-cell" data-phone="${escapeHtml(phone)}" data-contact-id="${escapeHtml(id)}" data-contact-name="${escapeHtml(fullName)}" data-company-name="${escapeHtml(company)}">${phone ? `<span class="phone-link">${escapeHtml(phoneFormatted)}</span>` : ''}</td>`;
           break;
         case 'location':
           html += `<td>${location}</td>`;
@@ -1309,31 +1406,48 @@
   }
 
   function rowHtmlAccount(a) {
-    const id = a.id || '';
-    const acct = escapeHtml(a.accountName || a.name || '');
+    if (!a) return '';
+    const name = escapeHtml(a.accountName || a.name || a.companyName || 'Unknown Account');
     const industry = escapeHtml(a.industry || '');
-    const domain = escapeHtml(a.domain || '');
-    const phone = escapeHtml(a.phone || '');
+    const domain = escapeHtml(a.domain || a.website || a.site || '');
+    const phone = a.companyPhone || a.phone || a.primaryPhone || a.mainPhone || '';
+    const phoneFormatted = phone ? formatPhoneForDisplay(phone) : '';
+    const contractEnd = formatDateOrNA(a.contractEndDate, a.contractEnd, a.contract_end_date);
+    const sqftNum = a.squareFootage ?? a.sqft ?? a.square_feet;
+    const sqft = (typeof sqftNum === 'number' && isFinite(sqftNum)) ? sqftNum.toLocaleString() : escapeHtml(sqftNum || '');
+    const occVal = a.occupancyPct ?? a.occupancy ?? a.occupancy_percentage;
+    const occupancy = (typeof occVal === 'number' && isFinite(occVal)) ? (Math.round(occVal * (occVal > 1 ? 1 : 100)) + '%') : escapeHtml(occVal || '');
+    const employeesNum = a.employees ?? a.employeeCount ?? a.numEmployees;
+    const employees = (typeof employeesNum === 'number' && isFinite(employeesNum)) ? employeesNum.toLocaleString() : escapeHtml(employeesNum || '');
+    const city = escapeHtml(a.city || a.locationCity || a.town || '');
+    const stateVal = escapeHtml(a.state || a.locationState || a.region || '');
+    const location = (city || stateVal) ? `${city}${city && stateVal ? ', ' : ''}${stateVal}` : '';
     const updatedStr = escapeHtml(formatDateOrNA(a.updatedAt, a.createdAt));
-    const checked = state.selectedAccounts.has(id) ? ' checked' : '';
-    const rowClass = state.selectedAccounts.has(id) ? ' class="row-selected"' : '';
+    const checked = state.selectedAccounts.has(a.id) ? ' checked' : '';
+    const rowClass = state.selectedAccounts.has(a.id) ? ' class="row-selected"' : '';
+    const aid = escapeHtml(a.id);
     
-    let html = `<tr${rowClass}>`;
+    // Compute favicon domain (mirror accounts page logic)
+    const favDomain = (() => {
+      let d = String(domain || '').trim();
+      if (/^https?:\/\//i.test(d)) {
+        try { d = new URL(d).hostname; } catch(_) { d = d.replace(/^https?:\/\//i, '').split('/')[0]; }
+      }
+      if (!d && (a.website || a.site)) {
+        try { d = new URL(a.website || a.site).hostname; } catch (_) { d = String(a.website || a.site).replace(/^https?:\/\//i, '').split('/')[0]; }
+      }
+      return d ? d.replace(/^www\./i, '') : '';
+    })();
+    
+    let html = `<tr${rowClass} data-account-id="${aid}">`;
     
     accountsColumnOrder.forEach(col => {
       switch (col) {
         case 'select':
-          html += `<td class="col-select"><input type="checkbox" class="row-select" data-id="${escapeHtml(id)}" aria-label="Select"${checked}></td>`;
+          html += `<td class="col-select"><input type="checkbox" class="row-select" data-id="${aid}" aria-label="Select account"${checked}></td>`;
           break;
         case 'name':
-          const favDomainAccount = a.domain || (()=>{
-            let d = String(a.website || '').trim();
-            if (/^https?:\/\//i.test(d)) {
-              try { d = new URL(d).hostname; } catch(_) { d = d.replace(/^https?:\/\//i, '').split('/')[0]; }
-            }
-            return d ? d.replace(/^www\./i, '') : '';
-          })();
-          html += `<td><a href="#" class="company-link" data-account-id="${escapeHtml(id)}" data-account-name="${escapeHtml(acct)}"><span class="company-cell__wrap">${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: a.logoUrl, domain: favDomainAccount, size: 32 }) : (favDomainAccount ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomainAccount, 32) : '') : '')}<span class="company-name">${acct}</span></span></a></td>`;
+          html += `<td class="name-cell"><a href="#" class="acct-link" data-account-id="${aid}" data-account-name="${escapeHtml(name)}" title="View account details"><span class="company-cell__wrap">${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: a.logoUrl, domain: favDomain, size: 32 }) : (favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 32) : '') : '')}<span class="name-text account-name">${name}</span></span></a></td>`;
           break;
         case 'industry':
           html += `<td>${industry}</td>`;
@@ -1341,8 +1455,32 @@
         case 'domain':
           html += `<td>${domain}</td>`;
           break;
-        case 'phone':
-          html += `<td>${phone}</td>`;
+        case 'companyPhone':
+          html += `<td data-field="companyPhone" class="phone-cell click-to-call" data-phone="${escapeHtml(phone)}" data-account-id="${aid}" data-account-name="${escapeHtml(name)}">${phoneFormatted}</td>`;
+          break;
+        case 'contractEnd':
+          html += `<td>${escapeHtml(contractEnd)}</td>`;
+          break;
+        case 'sqft':
+          html += `<td>${sqft}</td>`;
+          break;
+        case 'occupancy':
+          html += `<td>${occupancy}</td>`;
+          break;
+        case 'employees':
+          html += `<td>${employees}</td>`;
+          break;
+        case 'location':
+          html += `<td>${location}</td>`;
+          break;
+        case 'actions':
+          html += `<td class="qa-cell"><div class="qa-actions">
+            <button type="button" class="qa-btn" data-action="call" data-id="${aid}" data-phone="${escapeHtml(phone)}" aria-label="Call" title="Call"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></button>
+            <button type="button" class="qa-btn" data-action="addlist" data-id="${aid}" aria-label="Add to list" title="Add to list"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M3 12h18"></path><path d="M3 18h18"></path></svg></button>
+            <button type="button" class="qa-btn" data-action="ai" data-id="${aid}" aria-label="Research with AI" title="Research with AI"><span style="font-weight:700">AI</span></button>
+            <button type="button" class="qa-btn" data-action="linkedin" data-id="${aid}" data-linkedin="${escapeHtml(a.linkedin || a.linkedinUrl || a.linkedin_url || '')}" data-name="${escapeHtml(name)}" aria-label="LinkedIn page" title="LinkedIn page"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="currentColor" stroke="none"><path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1s2.48 1.12 2.48 2.5zM0 8h5v16H0V8zm7.5 0h4.8v2.2h.1c.7-1.2 2.4-2.5 4.9-2.5 5.2 0 6.2 3.4 6.2 7.9V24h-5v-7.2c0-1.7 0-3.9-2.4-3.9-2.4 0-2.8 1.9-2.8 3.8V24h-5V8z"></path></svg></button>
+            <button type="button" class="qa-btn" data-action="website" data-id="${aid}" data-website="${escapeHtml(a.website || a.site || '')}" aria-label="Company website" title="Company website"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 1 0-7l2-2a5 5 0 1 1 7 7l-1 1"></path><path d="M14 11a5 5 0 0 1 0 7l-2 2a5 5 0 1 1-7-7l1-1"></path></svg></button>
+          </div></td>`;
           break;
         case 'updated':
           html += `<td>${updatedStr}</td>`;
@@ -1355,7 +1493,7 @@
   }
 
   function emptyHtml() {
-    const cols = state.view === 'people' ? 9 : 6;
+    const cols = state.view === 'people' ? peopleColumnOrder.length : accountsColumnOrder.length;
     return `\n<tr>\n  <td colspan="${cols}" style="opacity:.75">No records found in this list.</td>\n</tr>`;
   }
 
@@ -1384,6 +1522,21 @@
           break;
         case 'phone':
           html += `<th data-col="phone" draggable="true">Phone</th>`;
+          break;
+        case 'companyPhone':
+          html += `<th data-col="companyPhone" draggable="true">Phone</th>`;
+          break;
+        case 'contractEnd':
+          html += `<th data-col="contractEnd" draggable="true">Contract End</th>`;
+          break;
+        case 'sqft':
+          html += `<th data-col="sqft" draggable="true">Sq Ft</th>`;
+          break;
+        case 'occupancy':
+          html += `<th data-col="occupancy" draggable="true">Occupancy</th>`;
+          break;
+        case 'employees':
+          html += `<th data-col="employees" draggable="true">Employees</th>`;
           break;
         case 'location':
           html += `<th data-col="location" draggable="true">Location</th>`;
@@ -1658,6 +1811,17 @@
         // Re-render with restored state
         applyFilters();
         
+        // Re-initialize drag and drop after restoration
+        setTimeout(() => {
+          try {
+            console.log('[ListDetail] Re-initializing drag and drop after restore');
+            initHeaderDragAndDrop();
+            attachListDetailHeaderDnDHooks();
+          } catch (e) {
+            console.warn('[ListDetail] Failed to re-initialize drag and drop:', e);
+          }
+        }, 100);
+        
         // Restore scroll position - use requestAnimationFrame for better timing
         if (scroll !== undefined) {
           requestAnimationFrame(() => {
@@ -1766,7 +1930,20 @@
     setTimeout(() => {
       console.log('[ListDetail] Initializing drag and drop after data load');
       initHeaderDragAndDrop();
+      attachListDetailHeaderDnDHooks();
     }, 100);
+    
+    // Initialize click-to-call and click-to-email after table is rendered
+    setTimeout(() => {
+      console.log('[ListDetail] Initializing click-to-call and click-to-email');
+      if (window.ClickToCall && typeof window.ClickToCall.init === 'function') {
+        window.ClickToCall.init();
+      }
+      if (window.ClickToEmail && typeof window.ClickToEmail.init === 'function') {
+        window.ClickToEmail.init();
+      }
+    }, 150);
+    
     if (console.timeEnd) console.timeEnd('[ListDetail] init');
   }
 
@@ -1790,6 +1967,37 @@
   let dragSrcTh = null;
   let dragOverTh = null;
 
+  // Helper functions for drag and drop (mirror accounts page)
+  function getListDetailHeaderOrderFromDom() {
+    if (!els.theadRow) return (state.view === 'people' ? DEFAULT_PEOPLE_COL_ORDER : DEFAULT_ACCOUNTS_COL_ORDER).slice();
+    return Array.from(els.theadRow.querySelectorAll('th')).map((th) => th.getAttribute('data-col')).filter(Boolean);
+  }
+
+  function attachListDetailHeaderDnDHooks() {
+    if (!els.table || !els.table.querySelector('thead')) return;
+    const thead = els.table.querySelector('thead');
+    const handler = () => {
+      setTimeout(() => {
+        const ord = getListDetailHeaderOrderFromDom();
+        if (ord.length) {
+          const a = ord.join(',');
+          const b = (state.view === 'people' ? peopleColumnOrder : accountsColumnOrder).join(',');
+          if (a !== b) {
+            if (state.view === 'people') {
+              peopleColumnOrder = ord;
+            } else {
+              accountsColumnOrder = ord;
+            }
+            persistColumnOrder();
+            render();
+          }
+        }
+      }, 0);
+    };
+    thead.addEventListener('drop', handler, true);
+    thead.addEventListener('dragend', handler, true);
+  }
+
   function initHeaderDragAndDrop() {
     // Re-resolve header row each time to avoid stale references
     const page = document.getElementById('list-detail-page');
@@ -1799,130 +2007,105 @@
       return;
     }
     
-    // Clean up existing event listeners by cloning the row to remove all listeners
-    const newTheadRow = els.theadRow.cloneNode(true);
-    els.theadRow.parentNode.replaceChild(newTheadRow, els.theadRow);
-    els.theadRow = newTheadRow;
+    let dragSrcTh = null;
+    let dragOverTh = null;
+    let isDragging = false;
+    const ths = Array.from(els.theadRow.querySelectorAll('th'));
     
-    const ths = els.theadRow.querySelectorAll('th[draggable="true"]');
     console.log('[ListDetail] Found', ths.length, 'draggable headers');
-    console.log('[ListDetail] Headers found:', Array.from(ths).map(th => th.textContent.trim()));
+    console.log('[ListDetail] Headers found:', ths.map(th => th.textContent.trim()));
     
-    // Define event handlers
-    const handleDragStart = (e) => {
-      console.log('[ListDetail] Drag start triggered on:', e.target.textContent.trim());
-      dragSrcTh = e.target;
-      e.target.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/html', e.target.outerHTML);
-    };
+    // Helper to commit a move given a source and highlighted target
+    function commitHeaderMove(sourceTh, targetTh) {
+      if (!sourceTh || !targetTh) return false;
+      if (sourceTh === targetTh) return false;
+      // Always populate the highlighted position: insert BEFORE target.
+      // This shifts the target (and everything to the right) one position to the right.
+      els.theadRow.insertBefore(sourceTh, targetTh);
+      return true;
+    }
 
-    const handleDragEnd = (e) => {
-      e.target.classList.remove('dragging');
-      dragSrcTh = null;
-      dragOverTh = null;
-    };
-
-    const handleDragOver = (e) => {
-      if (e.preventDefault) {
-        e.preventDefault();
-      }
+    // Global drop handler for the entire header row
+    els.theadRow.addEventListener('dragover', (e) => {
+      e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      return false;
-    };
-
-    const handleDragEnter = (e) => {
-      e.target.classList.add('drag-over');
-      dragOverTh = e.target;
-    };
-
-    const handleDragLeave = (e) => {
-      e.target.classList.remove('drag-over');
-    };
-
-    const handleDrop = (e) => {
-      if (e.stopPropagation) {
-        e.stopPropagation();
+      
+      const th = e.target.closest('th');
+      if (!th || !th.hasAttribute('draggable')) return;
+      
+      // Remove previous highlight
+      if (dragOverTh && dragOverTh !== th) {
+        dragOverTh.classList.remove('drag-over');
       }
-
-      if (dragSrcTh !== dragOverTh) {
-        console.log('[ListDetail] Dropping', dragSrcTh.textContent.trim(), 'onto', dragOverTh.textContent.trim());
-        commitHeaderMove(dragSrcTh, dragOverTh);
+      
+      // Add highlight to current target
+      if (th !== dragSrcTh) {
+        th.classList.add('drag-over');
+        dragOverTh = th;
       }
+    });
 
-      return false;
-    };
+    els.theadRow.addEventListener('dragleave', (e) => {
+      // Only remove highlight if we're leaving the header row entirely
+      if (!els.theadRow.contains(e.relatedTarget)) {
+        if (dragOverTh) {
+          dragOverTh.classList.remove('drag-over');
+          dragOverTh = null;
+        }
+      }
+    });
 
-    // Attach event listeners to each draggable header
-    ths.forEach(th => {
-      th.addEventListener('dragstart', handleDragStart, false);
-      th.addEventListener('dragend', handleDragEnd, false);
-      th.addEventListener('dragover', handleDragOver, false);
-      th.addEventListener('dragenter', handleDragEnter, false);
-      th.addEventListener('dragleave', handleDragLeave, false);
-      th.addEventListener('drop', handleDrop, false);
+    els.theadRow.addEventListener('drop', (e) => {
+      e.preventDefault();
+      
+      // Remove highlight
+      if (dragOverTh) {
+        dragOverTh.classList.remove('drag-over');
+      }
+      
+      // Commit the move - this will insert the dragged column before the highlighted target
+      if (commitHeaderMove(dragSrcTh, dragOverTh)) {
+        // Update the column order and persist
+        const newOrder = getListDetailHeaderOrderFromDom();
+        if (newOrder.length > 0) {
+          if (state.view === 'people') {
+            peopleColumnOrder = newOrder;
+          } else {
+            accountsColumnOrder = newOrder;
+          }
+          persistColumnOrder();
+          // Re-render to reflect new column order
+          render();
+        }
+      }
+      
+      dragOverTh = null;
+    });
+    
+    // Attach drag start/end to individual headers
+    ths.forEach((th) => {
+      th.setAttribute('draggable', 'true');
+      
+      th.addEventListener('dragstart', (e) => {
+        console.log('[ListDetail] Drag start triggered on:', th.textContent.trim());
+        dragSrcTh = th;
+        th.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/html', th.outerHTML);
+        isDragging = true;
+      });
+
+      th.addEventListener('dragend', (e) => {
+        th.classList.remove('dragging');
+        dragSrcTh = null;
+        dragOverTh = null;
+        isDragging = false;
+      });
     });
 
     console.log('[ListDetail] Drag and drop initialized for', ths.length, 'headers');
   }
 
-  function commitHeaderMove(dragSrcTh, dragOverTh) {
-    if (!dragSrcTh || !dragOverTh || dragSrcTh === dragOverTh) return;
-    
-    console.log('[ListDetail] Committing header move from', dragSrcTh.textContent.trim(), 'to', dragOverTh.textContent.trim());
-    
-    // Get the current order from DOM
-    const currentOrder = getHeaderOrderFromDom();
-    console.log('[ListDetail] Current order:', currentOrder);
-    
-    // Find the source and target column names
-    const srcCol = dragSrcTh.getAttribute('data-col');
-    const targetCol = dragOverTh.getAttribute('data-col');
-    
-    if (!srcCol || !targetCol) {
-      console.warn('[ListDetail] Missing data-col attributes');
-      return;
-    }
-    
-    // Create new order array
-    const newOrder = [...currentOrder];
-    const srcIndex = newOrder.indexOf(srcCol);
-    const targetIndex = newOrder.indexOf(targetCol);
-    
-    if (srcIndex === -1 || targetIndex === -1) {
-      console.warn('[ListDetail] Could not find column indices');
-      return;
-    }
-    
-    // Remove source from its current position
-    newOrder.splice(srcIndex, 1);
-    // Insert source at target position
-    newOrder.splice(targetIndex, 0, srcCol);
-    
-    console.log('[ListDetail] New order:', newOrder);
-    
-    // Save the new order
-    const storageKey = state.view === 'people' ? PEOPLE_COL_STORAGE_KEY : ACCOUNTS_COL_STORAGE_KEY;
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(newOrder));
-    } catch (e) {
-      console.warn('Failed to save column order:', e);
-    }
-    
-    // Re-render the table with new column order
-    renderTableHead();
-    applyFilters();
-    
-    // Update the DOM order
-    dragOverTh.parentNode.insertBefore(dragSrcTh, dragOverTh);
-  }
-
-  function getHeaderOrderFromDom() {
-    if (!els.theadRow) return [];
-    
-    const ths = els.theadRow.querySelectorAll('th[data-col]');
-    return Array.from(ths).map(th => th.getAttribute('data-col')).filter(Boolean);
-  }
 
   window.ListDetail = {
     init: init,
