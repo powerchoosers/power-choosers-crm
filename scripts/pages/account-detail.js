@@ -83,6 +83,16 @@ var console = {
         handleQuickAction('linkedin');
         return;
       }
+      
+      // Check if click is on edit account button (only on account detail page)
+      const editBtn = e.target.closest('.title-edit');
+      if (editBtn && document.getElementById('account-detail-page')) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('[AccountDetail] Edit account button clicked via delegation');
+        openEditAccountModal();
+        return;
+      }
     };
     
     // Attach to document with capture phase to catch events early
@@ -2753,9 +2763,29 @@ var console = {
     const dialog = overlay.querySelector('.pc-modal__dialog');
     const backdrop = overlay.querySelector('.pc-modal__backdrop');
     const form = overlay.querySelector('#form-edit-account');
-    const close = () => { try { overlay.remove(); } catch(_) {} };
+    
+    // Open modal with animation (same as add modals)
+    overlay.removeAttribute('hidden');
+    
+    // Trigger animation after a brief delay to ensure DOM is ready
+    requestAnimationFrame(() => {
+      overlay.classList.add('show');
+    });
+    
+    const close = () => { 
+      try { 
+        // Close with animation
+        overlay.classList.remove('show');
+        setTimeout(() => {
+          overlay.remove();
+        }, 200); // Match animation duration
+      } catch(_) {} 
+    };
+    
     backdrop?.addEventListener('click', close);
     overlay.querySelectorAll('[data-close="edit-account"]').forEach(btn => btn.addEventListener('click', close));
+    
+    // Focus management: move focus to Close button if present, else first input
     setTimeout(() => {
       const closeBtn = overlay.querySelector('.pc-modal__close');
       const firstInput = overlay.querySelector('input,button,select,textarea,[tabindex]:not([tabindex="-1"])');

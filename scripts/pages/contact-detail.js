@@ -544,6 +544,15 @@
   function openEditContactModal() {
     const overlay = createEditContactModal();
     document.body.appendChild(overlay);
+    
+    // Open modal with animation (same as add modals)
+    overlay.removeAttribute('hidden');
+    
+    // Trigger animation after a brief delay to ensure DOM is ready
+    requestAnimationFrame(() => {
+      overlay.classList.add('show');
+    });
+    
     // Focus first input
     setTimeout(() => {
       const first = overlay.querySelector('input, select, textarea, button');
@@ -612,7 +621,13 @@
     const backdrop = overlay.querySelector('.pc-modal__backdrop');
     const form = overlay.querySelector('#form-edit-contact');
 
-    const close = () => { if (overlay.parentElement) overlay.parentElement.removeChild(overlay); };
+    const close = () => { 
+      // Close with animation
+      overlay.classList.remove('show');
+      setTimeout(() => {
+        if (overlay.parentElement) overlay.parentElement.removeChild(overlay);
+      }, 200); // Match animation duration
+    };
 
     // Open (append to DOM)
     document.body.appendChild(overlay);

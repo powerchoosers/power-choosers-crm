@@ -59,7 +59,15 @@
     '_accountDetailEnergyUpdatedBound',
     '_listsRestoreBound',
     '_callsRestoreBound',
-    '_widgetsNotesPreloadedBound'
+    '_widgetsNotesPreloadedBound',
+    
+    // NEW: Account Detail page button handlers
+    '_accountDetailEditAccountBound',
+    '_accountDetailWebsiteButtonBound',
+    '_accountDetailLinkedInButtonBound',
+    
+    // NEW: Contact Detail page edit modal handlers
+    '_contactDetailEditContactBound'
   ];
   
   guards.forEach(guard => {
