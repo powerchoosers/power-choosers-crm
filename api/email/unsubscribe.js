@@ -1,5 +1,5 @@
 const { db } = require('../_firebase');
-const { cors } = require('../_cors');
+import { cors } from '../_cors.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;

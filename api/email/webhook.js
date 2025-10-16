@@ -1,5 +1,5 @@
 // Vercel API endpoint for email webhooks
-import { cors } from '../_cors';
+import { cors } from '../_cors.js';
 import { admin, db } from '../_firebase';
 
 export default async function handler(req, res) {

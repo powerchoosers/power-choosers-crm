@@ -3,7 +3,7 @@
  * Handles signature image uploads and returns hosted URLs
  */
 
-import cors from '../_cors';
+import { cors } from '../_cors.js';
 
 export const config = {
   api: {
