@@ -1120,204 +1120,112 @@ class SettingsPage {
 
     async reindexAlgoliaAccounts() {
         this.showAlgoliaStatus('Starting accounts reindex...', 'info');
-        this.logAlgolia('🔄 Starting direct Algolia reindex for all accounts...');
+        this.logAlgolia('🔄 Starting server-side Algolia reindex for all accounts...');
 
         try {
-            if (!window.firebaseDB) {
-                throw new Error('Firebase not available. Please refresh the page and try again.');
-            }
-
-            // Check if Algolia client is available
-            if (!window.algoliasearch) {
-                throw new Error('Algolia client not loaded. Please refresh the page and try again.');
-            }
-
-            // Get Algolia credentials from environment or prompt user
+            // Get Algolia credentials from localStorage or prompt user
             const appId = window.ALGOLIA_APP_ID || prompt('Enter your Algolia Application ID:');
             const apiKey = window.ALGOLIA_API_KEY || prompt('Enter your Algolia Admin API Key:');
             
             if (!appId || !apiKey) {
-                throw new Error('Algolia credentials required. Please set ALGOLIA_APP_ID and ALGOLIA_API_KEY in your environment.');
+                throw new Error('Algolia credentials required. Please enter your Application ID and Admin API Key.');
             }
 
-            // Initialize Algolia client
-            const client = window.algoliasearch(appId, apiKey);
-            const index = client.initIndex('accounts');
+            this.logAlgolia('📡 Sending reindex request to server...');
 
-            const accountsSnapshot = await window.firebaseDB.collection('accounts').get();
+            // Call server-side API
+            const response = await fetch('/api/algolia/reindex', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    appId: appId,
+                    apiKey: apiKey,
+                    type: 'accounts'
+                })
+            });
 
-            if (accountsSnapshot.empty) {
-                this.logAlgolia('ℹ️ No accounts found in Firebase.');
-                this.showAlgoliaStatus('No accounts found', 'info');
-                return;
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || `Server error: ${response.status}`);
             }
 
-            this.logAlgolia(`📊 Found ${accountsSnapshot.size} accounts to reindex`);
-
-            let processed = 0;
-            let errors = 0;
-            const batchSize = 100; // Algolia batch limit
-            const batches = [];
-
-            // Prepare batches
-            for (let i = 0; i < accountsSnapshot.docs.length; i += batchSize) {
-                const batch = accountsSnapshot.docs.slice(i, i + batchSize).map(doc => {
-                    const accountData = doc.data();
-                    return {
-                        objectID: doc.id,
-                        ...accountData,
-                        updatedAt: new Date().toISOString()
-                    };
-                });
-                batches.push(batch);
-            }
-
-            this.logAlgolia(`📦 Processing ${batches.length} batches of up to ${batchSize} records each...`);
-
-            // Process each batch
-            for (let i = 0; i < batches.length; i++) {
-                try {
-                    const batch = batches[i];
-                    this.logAlgolia(`🔄 Processing batch ${i + 1}/${batches.length} (${batch.length} records)...`);
-
-                    const response = await index.saveObjects(batch);
-                    processed += batch.length;
-
-                    this.logAlgolia(`✅ Batch ${i + 1} complete - ${processed}/${accountsSnapshot.size} total processed (${response.objectIDs.length} records indexed)`);
-
-                    // Small delay between batches to avoid rate limits
-                    if (i < batches.length - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-
-                } catch (error) {
-                    this.logAlgolia(`❌ Error processing batch ${i + 1}: ${error.message}`);
-                    errors += batches[i].length;
+            if (result.success) {
+                this.logAlgolia(`🎉 Reindex complete!`);
+                this.logAlgolia(`✅ Successfully processed: ${result.processed} accounts`);
+                if (result.errors > 0) {
+                    this.logAlgolia(`❌ Errors: ${result.errors} accounts`);
                 }
-            }
+                if (result.verificationCount !== undefined) {
+                    this.logAlgolia(`📊 Verification: ${result.verificationCount} total records now in Algolia index`);
+                }
+                this.logAlgolia(`📤 All accounts have been synced to Algolia via server!`);
 
-            this.logAlgolia(`🎉 Reindex complete!`);
-            this.logAlgolia(`✅ Successfully processed: ${processed} accounts`);
-            if (errors > 0) {
-                this.logAlgolia(`❌ Errors: ${errors} accounts`);
+                this.showAlgoliaStatus(`Reindex complete! Processed ${result.processed} accounts`, 'success');
+            } else {
+                throw new Error(result.error || 'Unknown server error');
             }
-            
-            // Verify the index was updated
-            try {
-                const searchResponse = await index.search('');
-                this.logAlgolia(`📊 Verification: ${searchResponse.nbHits} total records now in Algolia index`);
-            } catch (verifyError) {
-                this.logAlgolia(`⚠️ Could not verify index count: ${verifyError.message}`);
-            }
-            
-            this.logAlgolia(`📤 All accounts have been synced directly to Algolia!`);
-
-            this.showAlgoliaStatus(`Reindex complete! Processed ${processed} accounts`, 'success');
 
         } catch (error) {
-            this.logAlgolia(`❌ Fatal error during reindex: ${error.message}`);
+            this.logAlgolia(`❌ Error during reindex: ${error.message}`);
             this.showAlgoliaStatus(`Error: ${error.message}`, 'error');
         }
     }
 
     async reindexAlgoliaContacts() {
         this.showAlgoliaStatus('Starting contacts reindex...', 'info');
-        this.logAlgolia('🔄 Starting direct Algolia reindex for all contacts...');
+        this.logAlgolia('🔄 Starting server-side Algolia reindex for all contacts...');
 
         try {
-            if (!window.firebaseDB) {
-                throw new Error('Firebase not available. Please refresh the page and try again.');
-            }
-
-            // Check if Algolia client is available
-            if (!window.algoliasearch) {
-                throw new Error('Algolia client not loaded. Please refresh the page and try again.');
-            }
-
-            // Get Algolia credentials from environment or prompt user
+            // Get Algolia credentials from localStorage or prompt user
             const appId = window.ALGOLIA_APP_ID || prompt('Enter your Algolia Application ID:');
             const apiKey = window.ALGOLIA_API_KEY || prompt('Enter your Algolia Admin API Key:');
             
             if (!appId || !apiKey) {
-                throw new Error('Algolia credentials required. Please set ALGOLIA_APP_ID and ALGOLIA_API_KEY in your environment.');
+                throw new Error('Algolia credentials required. Please enter your Application ID and Admin API Key.');
             }
 
-            // Initialize Algolia client
-            const client = window.algoliasearch(appId, apiKey);
-            const index = client.initIndex('contacts');
+            this.logAlgolia('📡 Sending reindex request to server...');
 
-            const contactsSnapshot = await window.firebaseDB.collection('people').get();
+            // Call server-side API
+            const response = await fetch('/api/algolia/reindex', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    appId: appId,
+                    apiKey: apiKey,
+                    type: 'contacts'
+                })
+            });
 
-            if (contactsSnapshot.empty) {
-                this.logAlgolia('ℹ️ No contacts found in Firebase.');
-                this.showAlgoliaStatus('No contacts found', 'info');
-                return;
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || `Server error: ${response.status}`);
             }
 
-            this.logAlgolia(`📊 Found ${contactsSnapshot.size} contacts to reindex`);
-
-            let processed = 0;
-            let errors = 0;
-            const batchSize = 100; // Algolia batch limit
-            const batches = [];
-
-            // Prepare batches
-            for (let i = 0; i < contactsSnapshot.docs.length; i += batchSize) {
-                const batch = contactsSnapshot.docs.slice(i, i + batchSize).map(doc => {
-                    const contactData = doc.data();
-                    return {
-                        objectID: doc.id,
-                        ...contactData,
-                        updatedAt: new Date().toISOString()
-                    };
-                });
-                batches.push(batch);
-            }
-
-            this.logAlgolia(`📦 Processing ${batches.length} batches of up to ${batchSize} records each...`);
-
-            // Process each batch
-            for (let i = 0; i < batches.length; i++) {
-                try {
-                    const batch = batches[i];
-                    this.logAlgolia(`🔄 Processing batch ${i + 1}/${batches.length} (${batch.length} records)...`);
-
-                    const response = await index.saveObjects(batch);
-                    processed += batch.length;
-
-                    this.logAlgolia(`✅ Batch ${i + 1} complete - ${processed}/${contactsSnapshot.size} total processed (${response.objectIDs.length} records indexed)`);
-
-                    // Small delay between batches to avoid rate limits
-                    if (i < batches.length - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-
-                } catch (error) {
-                    this.logAlgolia(`❌ Error processing batch ${i + 1}: ${error.message}`);
-                    errors += batches[i].length;
+            if (result.success) {
+                this.logAlgolia(`🎉 Reindex complete!`);
+                this.logAlgolia(`✅ Successfully processed: ${result.processed} contacts`);
+                if (result.errors > 0) {
+                    this.logAlgolia(`❌ Errors: ${result.errors} contacts`);
                 }
-            }
+                if (result.verificationCount !== undefined) {
+                    this.logAlgolia(`📊 Verification: ${result.verificationCount} total records now in Algolia index`);
+                }
+                this.logAlgolia(`📤 All contacts have been synced to Algolia via server!`);
 
-            this.logAlgolia(`🎉 Reindex complete!`);
-            this.logAlgolia(`✅ Successfully processed: ${processed} contacts`);
-            if (errors > 0) {
-                this.logAlgolia(`❌ Errors: ${errors} contacts`);
+                this.showAlgoliaStatus(`Reindex complete! Processed ${result.processed} contacts`, 'success');
+            } else {
+                throw new Error(result.error || 'Unknown server error');
             }
-            
-            // Verify the index was updated
-            try {
-                const searchResponse = await index.search('');
-                this.logAlgolia(`📊 Verification: ${searchResponse.nbHits} total records now in Algolia index`);
-            } catch (verifyError) {
-                this.logAlgolia(`⚠️ Could not verify index count: ${verifyError.message}`);
-            }
-            
-            this.logAlgolia(`📤 All contacts have been synced directly to Algolia!`);
-
-            this.showAlgoliaStatus(`Reindex complete! Processed ${processed} contacts`, 'success');
 
         } catch (error) {
-            this.logAlgolia(`❌ Fatal error during reindex: ${error.message}`);
+            this.logAlgolia(`❌ Error during reindex: ${error.message}`);
             this.showAlgoliaStatus(`Error: ${error.message}`, 'error');
         }
     }
