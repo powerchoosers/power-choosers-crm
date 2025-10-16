@@ -64,9 +64,9 @@ var console = {
         return;
       }
       
-      // Check if click is on website header button
+      // Check if click is on website header button (only on account detail page)
       const websiteBtn = e.target.closest('.website-header-btn');
-      if (websiteBtn) {
+      if (websiteBtn && document.getElementById('account-detail-page')) {
         e.preventDefault();
         e.stopPropagation();
         console.log('[AccountDetail] Website button clicked via delegation');
@@ -74,9 +74,9 @@ var console = {
         return;
       }
       
-      // Check if click is on LinkedIn header button
+      // Check if click is on LinkedIn header button (only on account detail page)
       const linkedInBtn = e.target.closest('.linkedin-header-btn');
-      if (linkedInBtn) {
+      if (linkedInBtn && document.getElementById('account-detail-page')) {
         e.preventDefault();
         e.stopPropagation();
         console.log('[AccountDetail] LinkedIn button clicked via delegation');

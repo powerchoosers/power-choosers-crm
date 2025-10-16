@@ -859,6 +859,15 @@ class PowerChoosersCRM {
             }, 100);
         }
         
+        // Contact detail page - initialize contact detail functionality
+        if (pageName === 'contact-detail') {
+            setTimeout(() => {
+                if (window.ContactDetail && typeof window.ContactDetail.init === 'function') {
+                    window.ContactDetail.init();
+                }
+            }, 100);
+        }
+        
         // Lists page - ensure overview is shown by default
         if (pageName === 'lists') {
             // Make sure we show the overview, not any detail view
