@@ -13,6 +13,8 @@
 
 (function() {
   let accountsData = [];
+  let lastLoadedDoc = null; // Track last document for pagination
+  let hasMoreData = true; // Flag to indicate if more data exists
   
   async function loadFromFirestore() {
     if (!window.firebaseDB) {
@@ -23,7 +25,8 @@
     try {
       console.log('[BackgroundAccountsLoader] Loading from Firestore...');
       // OPTIMIZED: Only fetch fields needed for list display, filtering, and AI email generation (25% data reduction)
-      const snapshot = await window.firebaseDB.collection('accounts')
+      // COST REDUCTION: Load in batches of 100 (smart lazy loading)
+      let query = window.firebaseDB.collection('accounts')
         .select(
           'id', 'name', 'accountName', 'companyName',
           'companyPhone', 'phone', 'primaryPhone', 'mainPhone',
@@ -42,9 +45,22 @@
           'notes', 'note', // Required for AI email generation
           'updatedAt', 'createdAt'
         )
-        .get();
-      accountsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      console.log('[BackgroundAccountsLoader] ✓ Loaded', accountsData.length, 'accounts from Firestore');
+        .orderBy('updatedAt', 'desc')
+        .limit(100);
+      
+      const snapshot = await query.get();
+      const newAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      accountsData = newAccounts;
+      
+      // Track last document for pagination
+      if (snapshot.docs.length > 0) {
+        lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
+        hasMoreData = snapshot.docs.length === 100; // If we got less than 100, no more data
+      } else {
+        hasMoreData = false;
+      }
+      
+      console.log('[BackgroundAccountsLoader] ✓ Loaded', accountsData.length, 'accounts from Firestore', hasMoreData ? '(more available)' : '(all loaded)');
       
       // Save to cache for future sessions
       if (window.CacheManager && typeof window.CacheManager.set === 'function') {
@@ -103,10 +119,82 @@
     }
   })();
   
+  // Load more accounts (next batch of 100)
+  async function loadMoreAccounts() {
+    if (!hasMoreData) {
+      console.log('[BackgroundAccountsLoader] No more data to load');
+      return { loaded: 0, hasMore: false };
+    }
+    
+    if (!window.firebaseDB) {
+      console.warn('[BackgroundAccountsLoader] firebaseDB not available');
+      return { loaded: 0, hasMore: false };
+    }
+    
+    try {
+      console.log('[BackgroundAccountsLoader] Loading next batch...');
+      let query = window.firebaseDB.collection('accounts')
+        .select(
+          'id', 'name', 'accountName', 'companyName',
+          'companyPhone', 'phone', 'primaryPhone', 'mainPhone',
+          'industry', 'domain', 'website', 'site',
+          'employees', 'employeeCount', 'numEmployees',
+          'city', 'locationCity', 'town', 'state', 'locationState', 'region',
+          'billingCity', 'billingState',
+          'contractEndDate', 'contractEnd', 'contract_end_date',
+          'squareFootage', 'sqft', 'square_feet',
+          'occupancyPct', 'occupancy', 'occupancy_percentage',
+          'logoUrl',
+          'shortDescription', 'short_desc', 'descriptionShort', 'description',
+          'annualUsage', 'annual_kwh', 'kwh',
+          'electricitySupplier', 'supplier',
+          'currentRate', 'rate',
+          'notes', 'note',
+          'updatedAt', 'createdAt'
+        )
+        .orderBy('updatedAt', 'desc')
+        .startAfter(lastLoadedDoc)
+        .limit(100);
+      
+      const snapshot = await query.get();
+      const newAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Append to existing data
+      accountsData = [...accountsData, ...newAccounts];
+      
+      // Update pagination tracking
+      if (snapshot.docs.length > 0) {
+        lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
+        hasMoreData = snapshot.docs.length === 100;
+      } else {
+        hasMoreData = false;
+      }
+      
+      console.log('[BackgroundAccountsLoader] ✓ Loaded', newAccounts.length, 'more accounts. Total:', accountsData.length, hasMoreData ? '(more available)' : '(all loaded)');
+      
+      // Update cache
+      if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+        await window.CacheManager.set('accounts', accountsData);
+      }
+      
+      // Notify listeners
+      document.dispatchEvent(new CustomEvent('pc:accounts-loaded-more', { 
+        detail: { count: newAccounts.length, total: accountsData.length, hasMore: hasMoreData } 
+      }));
+      
+      return { loaded: newAccounts.length, hasMore: hasMoreData };
+    } catch (error) {
+      console.error('[BackgroundAccountsLoader] Failed to load more:', error);
+      return { loaded: 0, hasMore: false };
+    }
+  }
+  
   // Export public API
   window.BackgroundAccountsLoader = {
     getAccountsData: () => accountsData,
     reload: loadFromFirestore,
+    loadMore: loadMoreAccounts,
+    hasMore: () => hasMoreData,
     getCount: () => accountsData.length
   };
   

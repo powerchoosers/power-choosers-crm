@@ -502,7 +502,8 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
   }
 
   function attachEvents() {
-    if (els.toggle && els.panel) els.toggle.addEventListener('click', () => {
+    if (!document._callsToggleBound && els.toggle && els.panel) {
+      els.toggle.addEventListener('click', () => {
       console.log('[Calls Filter Debug] Toggle clicked');
       console.log('[Calls Filter Debug] els.toggle:', els.toggle);
       console.log('[Calls Filter Debug] els.panel:', els.panel);
@@ -547,12 +548,23 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         if (textEl) textEl.textContent = 'Show Filters';
       }
     });
-    if (els.btnClear) els.btnClear.addEventListener('click', () => { clearFilters(); applyFilters(); });
-    if (els.btnApply) els.btnApply.addEventListener('click', applyFilters);
-    if (els.selectAll) els.selectAll.addEventListener('change', () => { if (els.selectAll.checked) openBulkPopover(); else { state.selected.clear(); render(); closeBulkPopover(); hideBulkBar(); } });
+      document._callsToggleBound = true;
+    }
+    if (!document._callsBtnClearBound && els.btnClear) {
+      els.btnClear.addEventListener('click', () => { clearFilters(); applyFilters(); });
+      document._callsBtnClearBound = true;
+    }
+    if (!document._callsBtnApplyBound && els.btnApply) {
+      els.btnApply.addEventListener('click', applyFilters);
+      document._callsBtnApplyBound = true;
+    }
+    if (!document._callsSelectAllBound && els.selectAll) {
+      els.selectAll.addEventListener('change', () => { if (els.selectAll.checked) openBulkPopover(); else { state.selected.clear(); render(); closeBulkPopover(); hideBulkBar(); } });
+      document._callsSelectAllBound = true;
+    }
     chips.forEach(d => setupChip(d));
     // Tab toggle behavior to exactly mirror People
-    if (els.tabs && els.tabs.length && els.grid) {
+    if (!document._callsTabsBound && els.tabs && els.tabs.length && els.grid) {
       els.tabs.forEach(tab => {
         tab.addEventListener('click', () => {
           els.tabs.forEach(t => t.classList.toggle('active', t === tab));
@@ -562,6 +574,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           els.tabs.filter(t => t !== tab).forEach(t => t.setAttribute('aria-selected','false'));
         });
       });
+      document._callsTabsBound = true;
     }
   }
 
@@ -1050,18 +1063,49 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
   async function loadData() {
     // Debug disabled by default for performance; enable by setting localStorage.CRM_DEBUG_CALLS = '1'
     
-    // STEP 1: Try cache first for instant loading
+    // STEP 1: Check BackgroundCallsLoader first for instant loading
+    if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.getCallsData === 'function') {
+      const bgData = window.BackgroundCallsLoader.getCallsData();
+      if (bgData && Array.isArray(bgData) && bgData.length > 0) {
+        console.log('[Calls] ✓ Using data from BackgroundCallsLoader:', bgData.length, 'calls');
+        // Check if data is already enriched (has counterpartyPretty field)
+        const isEnriched = bgData[0] && bgData[0].hasOwnProperty('counterpartyPretty');
+        
+        if (isEnriched) {
+          // Data is enriched - display immediately
+          console.log('[Calls] Data is already enriched, displaying immediately');
+          bgData.sort((a, b) => {
+            const timeA = new Date(a.callTime || 0).getTime();
+            const timeB = new Date(b.callTime || 0).getTime();
+            return timeB - timeA;
+          });
+          state.data = bgData;
+          state.filtered = bgData.slice();
+          chips.forEach(buildPool);
+          render();
+          try {
+            document.dispatchEvent(new CustomEvent('pc:calls-loaded', { detail: { count: bgData.length } }));
+          } catch (e) { /* noop */ }
+          return; // Exit early - data is ready!
+        } else {
+          // Data needs enrichment - continue to enrichment step below
+          console.log('[Calls] Data needs enrichment, continuing...');
+        }
+      }
+    }
+    
+    // STEP 2: Fallback to cache if BackgroundCallsLoader not ready
     if (window.CacheManager && typeof window.CacheManager.get === 'function') {
       try {
         const cached = await window.CacheManager.get('calls');
-        // Validate cached data has required enriched fields
-        const isValidCache = cached && cached.length > 0 && cached[0] && 
-                             cached[0].hasOwnProperty('counterpartyPretty') &&
-                             cached[0].hasOwnProperty('direction');
+        const isValidCache = cached && Array.isArray(cached) && cached.length > 0;
         
         if (isValidCache) {
-          console.log('[Calls] Using cached calls:', cached.length);
-          // Sort cached calls by callTime descending
+          // Check if cached data is enriched
+          const isEnriched = cached[0] && cached[0].hasOwnProperty('counterpartyPretty');
+          
+          if (isEnriched) {
+            console.log('[Calls] Using enriched cached calls:', cached.length);
           cached.sort((a, b) => {
             const timeA = new Date(a.callTime || 0).getTime();
             const timeB = new Date(b.callTime || 0).getTime();
@@ -1071,27 +1115,28 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           state.filtered = cached.slice();
           chips.forEach(buildPool);
           render();
-          // Notify other pages
           try {
             document.dispatchEvent(new CustomEvent('pc:calls-loaded', { detail: { count: cached.length } }));
           } catch (e) { /* noop */ }
-          return;
-        } else if (cached && cached.length > 0) {
-          console.log('[Calls] Cache exists but invalid (missing enriched fields), reloading from API');
+            return; // Exit early
+          } else {
+            console.log('[Calls] Cached data needs enrichment, continuing...');
+          }
         }
       } catch (cacheError) {
         console.warn('[Calls] Cache error:', cacheError);
       }
     }
     
-    // STEP 2: Check background loader before API
+    // STEP 3: Load from API or BackgroundCallsLoader and enrich
     let allCalls = [];
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
     
+    // Try BackgroundCallsLoader again for raw data
     if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.getCallsData === 'function') {
       const bgData = window.BackgroundCallsLoader.getCallsData();
       if (bgData && bgData.length > 0) {
-        console.log('[Calls] Using data from background loader:', bgData.length, 'calls - skipping API load');
+        console.log('[Calls] Using raw data from BackgroundCallsLoader for enrichment');
         allCalls = bgData;
       }
     }
@@ -1141,30 +1186,32 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       try {
         console.log('[Calls] Enriching', allCalls.length, 'calls...');
         
-        // CRITICAL: Wait for accounts and contacts data to be available
-        // This ensures title and company name fields can be populated
+        // OPTIMIZED: Wait max 1 second for accounts and contacts data (reduced from 5 seconds)
+        // This ensures enrichment has the data it needs without blocking the UI for too long
         let retries = 0;
-        while (retries < 50) { // Max 5 seconds
+        const maxRetries = 10; // Max 1 second (10 × 100ms)
+        while (retries < maxRetries) {
           const hasAccounts = typeof window.getAccountsData === 'function' && 
                              (window.getAccountsData()?.length > 0 || window._essentialAccountsData?.length > 0);
           const hasContacts = typeof window.getPeopleData === 'function' && 
                              (window.getPeopleData()?.length > 0 || window._essentialContactsData?.length > 0);
           
           if (hasAccounts && hasContacts) {
-            console.log('[Calls] ✓ Essential data ready - accounts:', window.getAccountsData()?.length, 'contacts:', window.getPeopleData()?.length);
+            console.log('[Calls] ✓ Essential data ready after', retries * 100, 'ms - accounts:', window.getAccountsData()?.length, 'contacts:', window.getPeopleData()?.length);
             break;
           }
           
           if (retries === 0) {
-            console.log('[Calls] Waiting for accounts and contacts data...');
+            console.log('[Calls] Waiting for accounts and contacts data (max 1 second)...');
           }
           
           await new Promise(resolve => setTimeout(resolve, 100));
           retries++;
         }
         
-        if (retries >= 50) {
-          console.warn('[Calls] Timeout waiting for essential data - enrichment may be incomplete');
+        if (retries >= maxRetries) {
+          console.warn('[Calls] ⚠️ Timeout after 1 second waiting for essential data - proceeding with partial enrichment');
+          console.warn('[Calls] Has accounts:', typeof window.getAccountsData === 'function' && window.getAccountsData()?.length, 'Has contacts:', typeof window.getPeopleData === 'function' && window.getPeopleData()?.length);
         }
         
         const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
@@ -2666,7 +2713,10 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         (window.crm && window.crm.showToast) ? window.crm.showToast('Summary copied') : null;
       }catch(_){ /* ignore */ }
     });
+    if (!document._callsInsightsKeydownBound) {
     document.addEventListener('keydown', escClose);
+      document._callsInsightsKeydownBound = true;
+    }
 
     // Persist Energy & Contract fields to Account (supplier, current rate, contract end) once per call
     persistEnergyFromAI(r);
@@ -3123,8 +3173,14 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     function positionPopover(){ if(!els.selectAll) return; const cb=els.selectAll.getBoundingClientRect(); const ct=els.container.getBoundingClientRect(); pop.style.left=(cb.left-ct.left)+'px'; pop.style.top=(cb.bottom-ct.top+8)+'px'; }
     positionPopover();
     const reposition = () => positionPopover();
+    if (!document._callsBulkResizeBound) {
     window.addEventListener('resize', reposition);
+      document._callsBulkResizeBound = true;
+    }
+    if (!document._callsBulkScrollBound) {
     window.addEventListener('scroll', reposition, true);
+      document._callsBulkScrollBound = true;
+    }
     if (els.page) {
       if (els.page._bulkPopoverCleanup) els.page._bulkPopoverCleanup();
       els.page._bulkPopoverCleanup = () => {
@@ -3150,7 +3206,19 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       closeBulkPopover(); render(); showBulkBar();
     });
 
-    setTimeout(()=>{ function outside(e){ if(!pop.contains(e.target) && e.target!==els.selectAll){ document.removeEventListener('mousedown',outside); if(els.selectAll) els.selectAll.checked = state.selected.size>0; closeBulkPopover(); } } document.addEventListener('mousedown',outside); },0);
+    setTimeout(()=>{ 
+      function outside(e){ 
+        if(!pop.contains(e.target) && e.target!==els.selectAll){ 
+          document.removeEventListener('mousedown',outside); 
+          if(els.selectAll) els.selectAll.checked = state.selected.size>0; 
+          closeBulkPopover(); 
+        } 
+      } 
+      if (!document._callsBulkOutsideBound) {
+        document.addEventListener('mousedown',outside); 
+        document._callsBulkOutsideBound = true;
+      }
+    },0);
   }
   function closeBulkPopover(){
     const ex = els.page ? els.page.querySelector('#calls-bulk-popover') : null; if(ex&&ex.parentNode) ex.parentNode.removeChild(ex);
@@ -3290,12 +3358,18 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     _onDelKeydown = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); closeBulkDeleteConfirm(); }
     };
+    if (!document._callsDeleteKeydownBound) {
     document.addEventListener('keydown', _onDelKeydown);
+      document._callsDeleteKeydownBound = true;
+    }
     _onDelOutside = (e) => {
       const t = e.target;
       if (!pop.contains(t)) closeBulkDeleteConfirm();
     };
+    if (!document._callsDeleteMousedownBound) {
     document.addEventListener('mousedown', _onDelOutside, true);
+      document._callsDeleteMousedownBound = true;
+    }
   }
 
   // Delete selected calls from Firestore and local state
@@ -3525,6 +3599,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
   }
   
   // Start auto-refresh when calls page becomes active
+  if (!document._callsVisibilityChangeBound) {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       startAutoRefresh();
@@ -3532,6 +3607,8 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       stopAutoRefresh();
     }
   });
+    document._callsVisibilityChangeBound = true;
+  }
   
   // Buttons removed per request (no-op)
   function addRefreshButton() { /* intentionally empty */ }

@@ -2697,6 +2697,7 @@
             // Core scripts loaded immediately (cache manager MUST be first)
             const coreScripts = [
                 'scripts/cache-manager.js',        // NEW - cache system
+                'scripts/fix-duplicate-listeners.js', // NEW - prevent 60,000+ hidden logs
                 'scripts/badge-loader.js',         // NEW - lightweight badge data loader
                 'scripts/algolia-search.js',       // NEW - Algolia search helper
                 'scripts/supplier-data.js',

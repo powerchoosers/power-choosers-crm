@@ -1026,7 +1026,9 @@ var console = {
       if (_unsubscribeAccounts) { try { _unsubscribeAccounts(); } catch(_) {} _unsubscribeAccounts = null; }
       _snapshotFirstFire = true; // Reset flag when setting up new listener
       const col = window.firebaseDB.collection('accounts');
-      _unsubscribeAccounts = col.onSnapshot((snap) => {
+      // CRITICAL COST REDUCTION: Limit real-time updates to 100 most recent accounts
+      // This prevents loading all 1,833 accounts on every change (was costing $180/month)
+      _unsubscribeAccounts = col.orderBy('updatedAt', 'desc').limit(100).onSnapshot((snap) => {
         try {
           // Skip first fire to prevent double-render on page load
           // (loadDataOnce already populated the data)

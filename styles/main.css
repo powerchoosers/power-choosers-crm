@@ -5,17 +5,31 @@
   navigation: auto;
 }
 
-/* Custom fade transition styles */
-::view-transition-old(root),
-::view-transition-new(root) {
+/* Page container transitions (for most pages - only affects the rounded container with header and content) */
+::view-transition-old(page-container),
+::view-transition-new(page-container) {
   mix-blend-mode: normal;
 }
 
-::view-transition-old(root) {
+::view-transition-old(page-container) {
   animation: fadeOut 0.3s ease-out;
 }
 
-::view-transition-new(root) {
+::view-transition-new(page-container) {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Settings page transitions (whole screen - since settings takes full screen) */
+::view-transition-old(settings-page),
+::view-transition-new(settings-page) {
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(settings-page) {
+  animation: fadeOut 0.3s ease-out;
+}
+
+::view-transition-new(settings-page) {
   animation: fadeIn 0.3s ease-out;
 }
 
@@ -39,8 +53,10 @@
     navigation: none;
   }
   
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
+  ::view-transition-old(page-container),
+  ::view-transition-new(page-container),
+  ::view-transition-old(settings-page),
+  ::view-transition-new(settings-page) {
     animation: none !important;
   }
 }
@@ -4099,6 +4115,8 @@ html, body {
     padding: var(--spacing-base);
     border-bottom: 1px solid var(--border-light);
     background: var(--bg-container);
+    border-top-left-radius: var(--border-radius);
+    border-top-right-radius: var(--border-radius);
 }
 
 /* Sequence Builder header layout: place title right of back arrow */
@@ -5265,6 +5283,15 @@ html, body {
 }
 
 .data-table thead tr:first-child th:last-child {
+    border-top-right-radius: var(--border-radius);
+}
+
+/* Ensure sticky headers also have rounded corners */
+.table-scroll .data-table thead tr:first-child th:first-child {
+    border-top-left-radius: var(--border-radius);
+}
+
+.table-scroll .data-table thead tr:first-child th:last-child {
     border-top-right-radius: var(--border-radius);
 }
 
@@ -7579,6 +7606,8 @@ html, body {
     border-radius: var(--border-radius);
     padding: var(--spacing-md);
     box-shadow: var(--elevation-card);
+    /* Add extra top padding to accommodate hover translateY(-1px) */
+    padding-top: calc(var(--spacing-md) + 4px);
 }
 
 /* === PHONE WIDGET === */
@@ -7757,7 +7786,7 @@ html, body {
 /* Notes-specific padding to give breathing room for header X and footer buttons */
 /* Base padding for all widget cards to keep header/subtitle breathing room */
 .widget-card { 
-    padding: var(--spacing-md) var(--spacing-base) var(--spacing-base) var(--spacing-base); 
+    padding: calc(var(--spacing-md) + 4px) var(--spacing-base) var(--spacing-base) var(--spacing-base); 
 }
 /* Deal Calculator: stronger 25px space on all sides to match Energy Health Check */
 .deal-card.widget-card { padding: var(--spacing-md) var(--spacing-base); }
@@ -7818,12 +7847,14 @@ html, body {
     border-color: var(--accent-color);
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 2;
 }
 
 /* === DASHBOARD WIDGETS === */
 /* Ensure dashboard widgets have proper margins matching Deal Calculator and Energy Health Check */
 .widget-panel .widget-card {
-    padding: var(--spacing-md) var(--spacing-base) var(--spacing-base) var(--spacing-base);
+    padding: calc(var(--spacing-md) + 4px) var(--spacing-base) var(--spacing-base) var(--spacing-base);
 }
 
 /* Override bottom padding specifically for the phone card during live calls
@@ -7837,6 +7868,14 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
+}
+
+/* Add extra top margin to first items in lists to prevent clipping by widget titles */
+.tasks-list .task-item:first-child,
+.news-list .news-item:first-child,
+.activities-list .activity-item:first-child,
+.quick-actions .action-btn:first-child {
+    margin-top: 4px;
 }
 
 /* Today's Tasks Pagination */
@@ -7925,6 +7964,8 @@ html, body {
     border-color: var(--accent-color);
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 2;
 }
 
 .task-name, .news-title, .lead-name {
@@ -14383,6 +14424,19 @@ input.row-select[type="checkbox"]:focus-visible {
 .lusha-card {
     animation: none !important;
     opacity: 1 !important;
+}
+
+/* Account Details & Contact Details Page Animations */
+#account-details-page .page-header,
+#people-page.contact-detail-mode .page-header {
+    animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s forwards;
+    opacity: 0;
+}
+
+#account-details-page .page-content,
+#people-page.contact-detail-mode .page-content {
+    animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.2s forwards;
+    opacity: 0;
 }
 
 /* === DYNAMIC CONTENT ANIMATIONS === */

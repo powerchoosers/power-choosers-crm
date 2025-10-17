@@ -17,7 +17,6 @@ class EmailTrackingManager {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
         this.db = window.firebaseDB;
-        console.log('[EmailTracking] Initialized with Firebase');
         
         // Start polling for tracking events
         this.startTrackingEventPolling();
@@ -27,7 +26,6 @@ class EmailTrackingManager {
         // Only poll the local development server; production uses serverless pixel + Firebase
         const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
         if (!isLocal) {
-            console.log('[EmailTracking] Skipping tracking-events polling in production');
             return;
         }
         // Poll for tracking events every 5 seconds (local dev)
@@ -38,7 +36,6 @@ class EmailTrackingManager {
                 if (response.ok) {
                     const data = await response.json();
                     if (data.events && data.events.length > 0) {
-                        console.log('[EmailTracking] Found tracking events:', data.events.length);
                         for (const event of data.events) {
                             await this.processTrackingEvent(event);
                         }
@@ -93,7 +90,6 @@ class EmailTrackingManager {
             });
             
             if (recentOpen) {
-                console.log('[EmailTracking] Recent open detected, preventing rapid duplicate:', trackingId);
                 return;
             }
 
@@ -104,7 +100,6 @@ class EmailTrackingManager {
                 updatedAt: new Date().toISOString()
             });
 
-            console.log('[EmailTracking] Email open updated:', trackingId);
         } catch (error) {
             // Only log errors that aren't "document not found" errors
             if (!error.message.includes('No document to update') && !error.message.includes('Document not found')) {
@@ -180,19 +175,16 @@ class EmailTrackingManager {
             });
 
             if (!response.ok) {
-                console.warn('[EmailTracking] API call failed, using fallback mode');
                 // Fallback: just return success for testing
                 const result = {
                     success: true,
                     trackingId,
                     message: 'Email sent successfully (fallback mode)'
                 };
-                console.log('[EmailTracking] Email sent successfully (fallback):', result);
                 return result;
             }
 
             const result = await response.json();
-            console.log('[EmailTracking] Email sent successfully:', result);
 
             // Show success notification
             if (window.crm && typeof window.crm.showToast === 'function') {
@@ -236,7 +228,6 @@ class EmailTrackingManager {
                 updatedAt: new Date().toISOString()
             });
 
-            console.log('[EmailTracking] Email open tracked:', trackingId);
 
             // Trigger notification
             this.notifyEmailOpened(trackingId, openEvent);
@@ -272,7 +263,6 @@ class EmailTrackingManager {
                 updatedAt: new Date().toISOString()
             });
 
-            console.log('[EmailTracking] Email reply tracked:', trackingId);
 
             // Trigger notification
             this.notifyEmailReplied(trackingId, replyEvent);
@@ -348,12 +338,10 @@ class EmailTrackingManager {
                                         document.dispatchEvent(new CustomEvent('pc:email-sent', { 
                                             detail: emailData 
                                         }));
-                                        console.log('[EmailTracking] Dispatched pc:email-sent event');
                                     } else {
                                         document.dispatchEvent(new CustomEvent('pc:email-received', { 
                                             detail: emailData 
                                         }));
-                                        console.log('[EmailTracking] Dispatched pc:email-received event');
                                     }
                                 }
                             });
@@ -377,7 +365,6 @@ class EmailTrackingManager {
                             callback(this.getDemoSentEmails());
                         });
                     
-                    console.log('[EmailTracking] Real-time email listener initialized (one-time)');
                 }
                 return this._emailsUnsubscriber;
             }
@@ -438,8 +425,6 @@ class EmailTrackingManager {
                     emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
                 };
                 
-                // Basic debug logging (reduced from excessive logging)
-                console.log('[EmailTracking] Email loaded:', email.id, 'type:', email.emailType, 'provider:', email.provider);
                 
                 emails.push(email);
             });
@@ -692,7 +677,6 @@ class EmailTrackingManager {
             
             // Track unsubscriber
             this._unsubscribers.push(unsubscribe);
-            console.log('[EmailTracking] Email subscription created, total subscriptions:', this._unsubscribers.length);
             
             return unsubscribe; // Allow caller to unsubscribe
 
@@ -794,7 +778,6 @@ class EmailTrackingManager {
     async requestNotificationPermission() {
         if ('Notification' in window && Notification.permission === 'default') {
             const permission = await Notification.requestPermission();
-            console.log('[EmailTracking] Notification permission:', permission);
             return permission === 'granted';
         }
         return Notification.permission === 'granted';
@@ -830,7 +813,6 @@ class EmailTrackingManager {
             if (this.db) {
                 try {
                     await this.db.collection('emails').doc(trackingId).set(testEmail);
-                    console.log('[EmailTracking] Test email saved to Firebase');
                 } catch (error) {
                     console.warn('[EmailTracking] Failed to save to Firebase:', error);
                 }
@@ -842,7 +824,6 @@ class EmailTrackingManager {
                 message: 'Test email created successfully'
             };
 
-            console.log('[EmailTracking] Test email created:', result);
 
             // Simulate email being opened after 2 seconds
             setTimeout(() => {
@@ -867,7 +848,6 @@ class EmailTrackingManager {
      * Simulate email reply for testing
      */
     simulateEmailReply(trackingId) {
-        console.log('[EmailTracking] Simulating email reply:', trackingId);
         
         // Create a mock reply event
         const replyEvent = {
@@ -889,7 +869,6 @@ class EmailTrackingManager {
      */
     updateDemoEmailOpenCount(trackingId) {
         // This would update the demo data in a real implementation
-        console.log('[EmailTracking] Updated open count for:', trackingId);
     }
 
     /**
@@ -897,7 +876,6 @@ class EmailTrackingManager {
      */
     updateDemoEmailReplyCount(trackingId) {
         // This would update the demo data in a real implementation
-        console.log('[EmailTracking] Updated reply count for:', trackingId);
     }
 
     /**
@@ -941,7 +919,6 @@ class EmailTrackingManager {
 
             // Save to Firebase
             await this.db.collection('emails').doc(trackingId).set(emailRecord);
-            console.log(`[EmailTracking] ${emailProvider} email record saved:`, trackingId);
             
             return { success: true, trackingId };
         } catch (error) {
@@ -976,7 +953,6 @@ class EmailTrackingManager {
                 updatedAt: new Date().toISOString()
             });
 
-            console.log('[EmailTracking] Email open simulated:', trackingId);
 
             // Trigger notification
             this.notifyEmailOpened(trackingId, openEvent);
@@ -998,7 +974,6 @@ function initEmailTracking() {
         // Request notification permission
         emailTrackingManager.requestNotificationPermission();
         
-        console.log('[EmailTracking] Manager initialized');
     }
     return emailTrackingManager;
 }
