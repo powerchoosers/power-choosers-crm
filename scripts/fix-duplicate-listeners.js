@@ -165,6 +165,23 @@
     // NEW: Firebase real-time insights listeners
     // Note: Dynamic guards are created as _${page}Insights_${callSid}_Bound
     // Examples: _contactDetailInsights_call123_Bound, _accountDetailInsights_call456_Bound, _callsInsights_call789_Bound
+    
+    // NEW: Calls page unguarded listeners (calls.js)
+    '_callsToggleBound',
+    '_callsBtnClearBound',
+    '_callsBtnApplyBound',
+    '_callsSelectAllBound',
+    '_callsTabsBound',
+    '_callsInsightsKeydownBound',
+    '_callsBulkResizeBound',
+    '_callsBulkScrollBound',
+    '_callsBulkOutsideBound',
+    '_callsDeleteKeydownBound',
+    '_callsDeleteMousedownBound',
+    '_callsVisibilityChangeBound',
+    
+    // NEW: Left navigation sidebar listeners (main.js)
+    '_sidebarHoverBound'
   ];
   
   guards.forEach(guard => {
@@ -197,10 +214,14 @@
     lastLogCheck = now;
   }, 5000); // Check every 5 seconds
   
-  // Hook console to track log rate
+  // Hook console to track log rate (EXCLUDE fix script logs to prevent infinite loop)
   const originalLog = console.log;
   console.log = function(...args) {
-    logCount++;
+    // Don't count logs from the fix script itself to prevent infinite loop
+    const stack = new Error().stack;
+    if (!stack || !stack.includes('fix-duplicate-listeners.js')) {
+      logCount++;
+    }
     return originalLog.apply(console, args);
   };
   

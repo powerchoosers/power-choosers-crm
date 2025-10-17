@@ -818,88 +818,86 @@ var console = {
   async function renderAccountContacts(account, page = 1, pageSize = 4) {
     const log = window.console.log.bind(window.console); // Bypass log silencing
     
-    // Use cached data from window scope (loaded upfront in showAccountDetail)
+    // OPTIMIZED: Query only this account's contacts from Firestore
+    // This fixes the issue where contacts not in "first 100" won't show up
+    // and dramatically reduces reads (5 reads instead of 2,300)
     let allContacts = [];
-    
-    // Try to get contacts from various sources with priority
-    if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
-      allContacts = window.BackgroundContactsLoader.getContactsData() || [];
-      log('[AccountDetail] Got', allContacts.length, 'contacts from BackgroundContactsLoader');
-    } else if (typeof window.getPeopleData === 'function') {
-      allContacts = window.getPeopleData() || [];
-      log('[AccountDetail] Got', allContacts.length, 'contacts from getPeopleData');
-    } else if (window._accountDetailPeopleCache && Array.isArray(window._accountDetailPeopleCache)) {
-      allContacts = window._accountDetailPeopleCache;
-      log('[AccountDetail] Got', allContacts.length, 'contacts from _accountDetailPeopleCache');
-    } else {
-      log('[AccountDetail] NO CONTACTS SOURCE AVAILABLE!');
-    }
-    
-    // RETRY MECHANISM: If no contacts yet, wait for BackgroundContactsLoader
-    if (allContacts.length === 0 && window.BackgroundContactsLoader) {
-      log('[AccountDetail] No contacts yet, waiting for BackgroundContactsLoader...');
-      
-      // Wait up to 3 seconds (30 attempts x 100ms)
-      for (let attempt = 0; attempt < 30; attempt++) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        allContacts = window.BackgroundContactsLoader.getContactsData() || [];
-        
-        if (allContacts.length > 0) {
-          log('[AccountDetail] ✓ BackgroundContactsLoader ready after', (attempt + 1) * 100, 'ms with', allContacts.length, 'contacts');
-          // Update cache for next render
-          window._accountDetailPeopleCache = allContacts;
-          break;
-        }
-      }
-      
-      if (allContacts.length === 0) {
-        log('[AccountDetail] ⚠ Timeout waiting for contacts after 3 seconds');
-      }
-    }
-    
-    log('[AccountDetail] renderAccountContacts called: account=', account?.accountName || account?.name, 'allContacts=', allContacts.length);
     
     if (!account) {
       log('[AccountDetail] ERROR: No account provided to renderAccountContacts');
       return '<div class="contacts-placeholder">No contacts found</div>';
     }
     
-    if (allContacts.length === 0) {
-      log('[AccountDetail] ERROR: No contacts in cache - cannot render');
-      return '<div class="contacts-placeholder">No contacts found (cache empty)</div>';
-    }
-
-    try {
       const accountName = account.accountName || account.name || account.companyName;
-      
-      // Normalize function for fuzzy matching (same as contact-detail.js)
-      const norm = (s) => String(s || '').toLowerCase()
-        .replace(/\(usa\)|\(u\.s\.a\.\)|\(us\)/g, '') // Remove USA/US suffixes
-        .replace(/\b(inc|llc|ltd|corp|corporation|company|co|incorporated)\b/g, '') // Remove common suffixes
-        .replace(/[^a-z0-9]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      
-      const normalizedAccountName = norm(accountName);
-      
-      // Find contacts associated with this account (STRICT)
-      // 1) Prefer explicit accountId match
-      // 2) Fallback: exact normalized company name match only
-      const associatedContacts = allContacts.filter(contact => {
-        if (contact.accountId === account.id || contact.account_id === account.id) return true;
+    const accountId = account.id;
+    
+    // Try to query Firestore directly for this account's contacts
+    if (window.firebaseDB) {
+      try {
+        log('[AccountDetail] Querying Firestore for contacts of account:', accountName);
+        
+        // Query by accountId first (most reliable)
+        let snapshot = await window.firebaseDB.collection('contacts')
+          .where('accountId', '==', accountId)
+          .get();
+        
+        allContacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        log('[AccountDetail] Found', allContacts.length, 'contacts by accountId');
+        
+        // If no results, try by company name (fallback)
+        if (allContacts.length === 0 && accountName) {
+          log('[AccountDetail] No contacts found by accountId, trying companyName:', accountName);
+          snapshot = await window.firebaseDB.collection('contacts')
+            .where('companyName', '==', accountName)
+            .get();
+          
+          allContacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          log('[AccountDetail] Found', allContacts.length, 'contacts by companyName');
+        }
+        
+        // Cache the results for this account
+        if (!window._accountContactsCache) window._accountContactsCache = {};
+        window._accountContactsCache[accountId] = allContacts;
+        
+      } catch (error) {
+        log('[AccountDetail] Error querying contacts:', error);
+        
+        // FALLBACK: Try background loader if Firestore query fails
+        if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+          const allCachedContacts = window.BackgroundContactsLoader.getContactsData() || [];
+          log('[AccountDetail] Fallback: Got', allCachedContacts.length, 'contacts from BackgroundContactsLoader');
+          
+          // Filter client-side as fallback
+          const norm = (s) => String(s || '').toLowerCase()
+            .replace(/\(usa\)|\(u\.s\.a\.\)|\(us\)/g, '')
+            .replace(/\b(inc|llc|ltd|corp|corporation|company|co|incorporated)\b/g, '')
+            .replace(/[^a-z0-9]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          
+          const normalizedAccountName = norm(accountName);
+          allContacts = allCachedContacts.filter(contact => {
+            if (contact.accountId === accountId || contact.account_id === accountId) return true;
         const contactCompany = contact.companyName || contact.accountName || '';
-        return norm(contactCompany) === normalizedAccountName;
-      });
-      
-      log('[AccountDetail] Found', associatedContacts.length, 'contacts for account:', accountName);
-
-      if (associatedContacts.length === 0) {
-        // Debug: Show why no contacts matched
-        log('[AccountDetail] No contacts matched. Normalized account name:', normalizedAccountName);
-        log('[AccountDetail] Sample contact companies (first 5):', 
-          allContacts.slice(0, 5).map(c => c.companyName || c.accountName).join(', '));
+            return norm(contactCompany) === normalizedAccountName;
+          });
+          log('[AccountDetail] Fallback: Filtered to', allContacts.length, 'contacts');
+        }
+      }
+    } else {
+      log('[AccountDetail] ERROR: firebaseDB not available');
+    }
+    
+    log('[AccountDetail] renderAccountContacts: account=', accountName, 'contacts found=', allContacts.length);
+    
+    if (allContacts.length === 0) {
+      log('[AccountDetail] No contacts found for this account');
         return '<div class="contacts-placeholder">No contacts found for this account</div>';
       }
+
+    try {
+      // Contacts are already filtered by account, no need to filter again
+      const associatedContacts = allContacts;
       
       log('[AccountDetail] Rendering', associatedContacts.length, 'contacts');
 

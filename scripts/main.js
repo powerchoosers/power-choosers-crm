@@ -191,8 +191,8 @@ class PowerChoosersCRM {
                     // Lazy-load full data function (loads on demand)
                     window.getAccountsData = (forceFullData = false) => {
                         // If called from a page that needs full data, return full dataset
-                        // FIXED: 'account-details' (with s) for correct page name, added 'dashboard' for task icons
-                        const needsFullData = forceFullData || ['dashboard', 'accounts', 'account-details', 'task-detail'].includes(window.crm?.currentPage);
+                        // FIXED: 'account-details' (with s) for correct page name, added 'dashboard' for task icons, added 'calls' for call enrichment
+                        const needsFullData = forceFullData || ['dashboard', 'accounts', 'account-details', 'task-detail', 'calls'].includes(window.crm?.currentPage);
                         if (needsFullData && accountsData.length > 200) {
                             return accountsData;  // Return full dataset when needed
                         }
@@ -211,8 +211,8 @@ class PowerChoosersCRM {
                     
                     // Lazy-load full data function (loads on demand)
                     window.getPeopleData = (forceFullData = false) => {
-                        // Added 'dashboard' for task rendering with full contact data
-                        const needsFullData = forceFullData || ['dashboard', 'people', 'contact-detail', 'task-detail'].includes(window.crm?.currentPage);
+                        // Added 'dashboard' for task rendering with full contact data, added 'calls' for call enrichment
+                        const needsFullData = forceFullData || ['dashboard', 'people', 'contact-detail', 'task-detail', 'calls'].includes(window.crm?.currentPage);
                         if (needsFullData && contactsData.length > 200) {
                             return contactsData;  // Return full dataset when needed
                         }
@@ -940,7 +940,32 @@ class PowerChoosersCRM {
         
         // Check if View Transitions API is supported
         if (document.startViewTransition) {
-            document.startViewTransition(performNavigation);
+            // Determine transition scope based on page type
+            const isSettingsPage = pageName === 'settings';
+            const isFromSettingsPage = this.currentPage === 'settings';
+            
+            if (isSettingsPage || isFromSettingsPage) {
+                // Settings page: whole screen transition (since it takes up full screen)
+                document.startViewTransition(() => {
+                    // Set view transition name for settings page
+                    document.documentElement.style.viewTransitionName = 'settings-page';
+                    performNavigation();
+                });
+            } else {
+                // Other pages: scoped transition to page container only
+                // This prevents top bar, sidebar, widgets, and surrounding area from fading
+                const pageContainer = document.querySelector('.page-container');
+                if (pageContainer) {
+                    document.startViewTransition(() => {
+                        // Set view transition name for page container
+                        pageContainer.style.viewTransitionName = 'page-container';
+                        performNavigation();
+                    });
+                } else {
+                    // Fallback to whole screen if page container not found
+                    document.startViewTransition(performNavigation);
+                }
+            }
         } else {
             // Fallback for browsers that don't support View Transitions API
             performNavigation();
@@ -1174,18 +1199,44 @@ class PowerChoosersCRM {
     setupSidebarHover() {
         const sidebar = document.getElementById('sidebar');
         let hoverTimeout;
+        let isNavigating = false;
 
         if (!sidebar._hoverBound) {
-        sidebar.addEventListener('mouseenter', () => {
-            clearTimeout(hoverTimeout);
-            sidebar.classList.add('expanded');
-        });
+            sidebar.addEventListener('mouseenter', () => {
+                clearTimeout(hoverTimeout);
+                sidebar.classList.add('expanded');
+                isNavigating = false; // Reset navigation flag
+            });
 
-        sidebar.addEventListener('mouseleave', () => {
-            hoverTimeout = setTimeout(() => {
-                sidebar.classList.remove('expanded');
-            }, 150);
-        });
+            sidebar.addEventListener('mouseleave', () => {
+                // Don't close if we're in the middle of navigation
+                if (!isNavigating) {
+                    hoverTimeout = setTimeout(() => {
+                        sidebar.classList.remove('expanded');
+                    }, 150);
+                }
+            });
+
+            // Add click handler to nav items to prevent sidebar collapse during navigation
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                if (!item._sidebarNavBound) {
+                    item.addEventListener('click', () => {
+                        isNavigating = true;
+                        // Clear any pending timeout
+                        clearTimeout(hoverTimeout);
+                        // Keep sidebar expanded during navigation
+                        sidebar.classList.add('expanded');
+                        
+                        // Reset navigation flag after a short delay
+                        setTimeout(() => {
+                            isNavigating = false;
+                        }, 300);
+                    });
+                    item._sidebarNavBound = true;
+                }
+            });
+
             sidebar._hoverBound = true;
         }
     }
@@ -2898,6 +2949,7 @@ class PowerChoosersCRM {
         // Store selection in modal dataset
         modal.dataset.selectedListId = listId;
         modal.dataset.selectedListName = listName;
+        console.log('List selection saved:', listId, listName);
 
         // Update selected state in dropdown
         const allItems = dropdown.querySelectorAll('.csv-list-item:not(.create-new)');
@@ -3034,7 +3086,11 @@ class PowerChoosersCRM {
     async assignToList(db, recordId, modal) {
         // Get selected list ID from modal dataset (new custom dropdown)
         const listId = modal.dataset.selectedListId;
-        if (!listId) return;
+        if (!listId) {
+            console.log('No list selected, skipping list assignment for record:', recordId);
+            return;
+        }
+        console.log('Assigning record to list:', recordId, 'listId:', listId);
         
         try {
             const importType = modal._importType || 'contacts';
@@ -3579,7 +3635,15 @@ class PowerChoosersCRM {
             if (progressDiv) progressDiv.hidden = true;
             if (resultsDiv) {
                 resultsDiv.hidden = false;
+                resultsDiv.style.display = 'block';
+                resultsDiv.style.visibility = 'visible';
+                resultsDiv.style.opacity = '1';
+                resultsDiv.style.position = 'relative';
+                resultsDiv.style.zIndex = '10';
+                console.log('Results div shown, imported:', imported, 'enriched:', enriched, 'failed:', failed);
+                
                 const summaryDiv = modal.querySelector('#csv-results-summary');
+                console.log('Summary div found:', summaryDiv);
                 if (summaryDiv) {
                     const recordType = modal._importType === 'accounts' ? 'accounts' : 'contacts';
                     let resultMessage = '<strong>Import Complete!</strong><br>';
@@ -3596,6 +3660,23 @@ class PowerChoosersCRM {
                     resultMessage += 'You can now close this dialog.';
                     
                     summaryDiv.innerHTML = resultMessage;
+                    console.log('Results message set:', resultMessage);
+                    
+                    // Force a reflow to ensure the results are visible
+                    setTimeout(() => {
+                        resultsDiv.style.display = 'block';
+                        resultsDiv.style.visibility = 'visible';
+                        resultsDiv.style.opacity = '1';
+                    }, 100);
+                } else {
+                    console.error('Summary div not found!');
+                }
+            } else {
+                console.error('Results div not found!');
+                // Fallback: show results in progress div if results div not found
+                if (progressDiv) {
+                    progressDiv.innerHTML = '<div class="results-summary"><strong>Import Complete!</strong><br>Records processed successfully. You can now close this dialog.</div>';
+                    progressDiv.hidden = false;
                 }
             }
             if (finishBtn) finishBtn.hidden = false;
@@ -3618,6 +3699,7 @@ class PowerChoosersCRM {
             
             // Refresh list detail page if we're viewing a list and records were added to lists
             if ((imported > 0 || enriched > 0) && modal.dataset.selectedListId) {
+                console.log('Refreshing list views after import. Selected list:', modal.dataset.selectedListId);
                 // Refresh list detail page if we're viewing a list
                 if (window.ListDetail && window.ListDetail.refreshListMembership) {
                     window.ListDetail.refreshListMembership();
@@ -3627,15 +3709,24 @@ class PowerChoosersCRM {
                 if (window.ListsOverview && window.ListsOverview.refreshCounts) {
                     window.ListsOverview.refreshCounts();
                 }
+            } else {
+                console.log('No list refresh needed. Imported:', imported, 'Enriched:', enriched, 'Selected list:', modal.dataset.selectedListId);
             }
             
         } catch (error) {
             console.error('Import error:', error);
             this.showToast('Import failed. Please try again.');
             
-            // Reset UI
+            // Reset UI and show error results
             if (progressDiv) progressDiv.hidden = true;
             if (startBtn) startBtn.hidden = false;
+            if (resultsDiv) {
+                resultsDiv.hidden = false;
+                const summaryDiv = modal.querySelector('#csv-results-summary');
+                if (summaryDiv) {
+                    summaryDiv.innerHTML = '<strong>Import Failed!</strong><br>Please try again or check your data.';
+                }
+            }
         }
     }
 

@@ -67,13 +67,13 @@
     document.addEventListener('pc:people-restore', (ev) => {
       try {
         const detail = ev && ev.detail ? ev.detail : {};
-        console.log('[People] RESTORE EVENT RECEIVED from back button:', detail);
-        console.log('[People] Current state before restore:', {
-          currentPage: state.currentPage,
-          searchTerm: els.quickSearch?.value || '',
-          sortColumn: state.sortColumn,
-          sortDirection: state.sortDirection
-        });
+        // console.log('[People] RESTORE EVENT RECEIVED from back button:', detail);
+        // console.log('[People] Current state before restore:', {
+        //   currentPage: state.currentPage,
+        //   searchTerm: els.quickSearch?.value || '',
+        //   sortColumn: state.sortColumn,
+        //   sortDirection: state.sortDirection
+        // });
         
         // Restore pagination
         const targetPage = Math.max(1, parseInt(detail.currentPage || detail.page || state.currentPage || 1, 10));
@@ -113,7 +113,7 @@
         // Re-initialize drag and drop after restoration
         setTimeout(() => {
           try {
-            console.log('[People] Re-initializing drag and drop after restore');
+            // console.log('[People] Re-initializing drag and drop after restore');
             if (typeof window !== 'undefined' && typeof window.initContactsColumnDnD === 'function') {
               try { window.initContactsColumnDnD(); } catch (e) { /* noop */ }
             } else {
@@ -121,7 +121,7 @@
             }
             attachHeaderDnDHooks();
           } catch (e) {
-            console.warn('[People] Failed to re-initialize drag and drop:', e);
+            // console.warn('[People] Failed to re-initialize drag and drop:', e);
           }
         }, 100);
         
@@ -152,13 +152,13 @@
             try { 
               if (window.__restoringPeople) {
                 window.__restoringPeople = false; 
-                console.log('[People] ✓ Cleared restoration flag - navigation complete');
+                // console.log('[People] ✓ Cleared restoration flag - navigation complete');
               }
             } catch(_){} 
           }, 2000); // 2 seconds delay
         } catch (_) {}
         
-        console.log('[People] State restored successfully');
+        // console.log('[People] State restored successfully');
       } catch (e) { 
         console.error('[People] Error restoring state:', e);
       }
@@ -220,8 +220,14 @@
       panel.style.left = `${Math.min(left, maxLeft)}px`;
     };
     _positionListsPanel();
+    if (!document._peopleListsResizeBound) {
     window.addEventListener('resize', _positionListsPanel, true);
+      document._peopleListsResizeBound = true;
+    }
+    if (!document._peopleListsScrollBound) {
     window.addEventListener('scroll', _positionListsPanel, true);
+      document._peopleListsScrollBound = true;
+    }
 
     // Animate in
     requestAnimationFrame(() => { panel.classList.add('--show'); });
@@ -241,7 +247,10 @@
         const el = document.activeElement; handleListChoose(el);
       }
     };
+    if (!document._peopleListsKeydownBound) {
     document.addEventListener('keydown', _onListsKeydown, true);
+      document._peopleListsKeydownBound = true;
+    }
 
     // Click-away
     _onListsOutside = (e) => {
@@ -249,7 +258,10 @@
       const isTrigger = !!(e.target.closest && e.target.closest('#people-bulk-actions'));
       if (!inside && !isTrigger) closeBulkListsPanel();
     };
+    if (!document._peopleListsMousedownBound) {
     document.addEventListener('mousedown', _onListsOutside, true);
+      document._peopleListsMousedownBound = true;
+    }
 
     function handleListChoose(el) {
       const action = el.getAttribute('data-action');
@@ -438,27 +450,10 @@
         ? containerOrChip
         : (containerOrChip ? containerOrChip.querySelector('.chip') : null);
       if (!chip) {
-        console.log('[Filters][DEBUG]', where, 'no chips present');
         return;
       }
       const cs = window.getComputedStyle(chip);
-      console.log('[Filters][DEBUG]', where, 'chip computed styles', {
-        background: cs.backgroundColor,
-        backgroundImage: cs.backgroundImage,
-        borderColor: cs.borderTopColor,
-        color: cs.color,
-        className: chip.className,
-        style: chip.getAttribute('style'),
-        tagName: chip.tagName,
-        parentElement: chip.parentElement?.className
-      });
-      // Also log the CSS variable values
-      console.log('[Filters][DEBUG] CSS variables', {
-        orangePrimary: cs.getPropertyValue('--orange-primary'),
-        textInverse: cs.getPropertyValue('--text-inverse')
-      });
     } catch (e) {
-      console.warn('[Filters][DEBUG] chip style error', e);
     }
   }
 
@@ -472,15 +467,8 @@
         inp.setAttribute('autocorrect', 'off');
         inp.setAttribute('spellcheck', 'false');
         inp.setAttribute('aria-autocomplete', 'list');
-        console.log('[Filters][DEBUG] input attrs', inp.id, {
-          autocomplete: inp.autocomplete,
-          autocapitalize: inp.getAttribute('autocapitalize'),
-          autocorrect: inp.getAttribute('autocorrect'),
-          spellcheck: inp.getAttribute('spellcheck')
-        });
       });
     } catch (e) {
-      console.warn('[Filters][DEBUG] input attr error', e);
     }
   }
 
@@ -498,9 +486,7 @@
         });
       });
       obs.observe(root, { childList: true, subtree: true });
-      console.log('[Filters][DEBUG] chip observer active');
     } catch (e) {
-      console.warn('[Filters][DEBUG] observer error', e);
     }
   }
 
@@ -520,11 +506,11 @@
       if (cityContainer) {
         const resizeObserver = new ResizeObserver((entries) => {
           for (const entry of entries) {
-            console.log('[Flex Debug] Container resized:', {
-              width: entry.contentRect.width,
-              height: entry.contentRect.height,
-              target: entry.target.className
-            });
+            // console.log('[Flex Debug] Container resized:', {
+            //   width: entry.contentRect.width,
+            //   height: entry.contentRect.height,
+            //   target: entry.target.className
+            // });
           }
         });
         resizeObserver.observe(cityContainer);
@@ -568,11 +554,11 @@
               try { console.warn('[Chips][already-removing]', fieldId, { index: i }); } catch(_) {}
               return;
             }
-            try { console.log('[Chips][remove-click]', fieldId, { index: i, tokensBefore: (tokens||[]).slice() }); } catch(_) {}
+            // try { console.log('[Chips][remove-click]', fieldId, { index: i, tokensBefore: (tokens||[]).slice() }); } catch(_) {}
             // Log pre-layout chip rects
             try {
               const rects = Array.from(container.querySelectorAll('.chip')).map((c, idx) => ({ idx, left: c.getBoundingClientRect().left, width: c.offsetWidth, removing: c.classList.contains('chip-removing') }));
-              console.log('[Chips][pre-layout]', fieldId, rects);
+              // console.log('[Chips][pre-layout]', fieldId, rects);
             } catch(_) {}
             // Set explicit starting width so width -> 0 is smooth
             try { chip.style.width = chip.offsetWidth + 'px'; /* force reflow */ void chip.offsetWidth; } catch(_) {}
@@ -589,12 +575,12 @@
               handled = true;
               chip.removeEventListener('transitionend', onTransitionEnd);
               try { tokens.splice(i, 1); } catch (_) {}
-               try { console.log('[Chips][removed]', fieldId, { index: i, tokensAfter: (tokens||[]).slice() }); } catch(_) {}
+               // try { console.log('[Chips][removed]', fieldId, { index: i, tokensAfter: (tokens||[]).slice() }); } catch(_) {}
                // Log post-layout intention (new tokens)
-               try { console.log('[Chips][re-render]', fieldId, { remaining: tokens.slice() }); } catch(_) {}
-               console.log('[Chips][calling-renderFunction]', fieldId, 'about to call renderFunction');
+               // try { console.log('[Chips][re-render]', fieldId, { remaining: tokens.slice() }); } catch(_) {}
+               // console.log('[Chips][calling-renderFunction]', fieldId, 'about to call renderFunction');
                renderFunction();
-               console.log('[Chips][calling-applyFilters]', fieldId, 'about to call applyFilters');
+               // console.log('[Chips][calling-applyFilters]', fieldId, 'about to call applyFilters');
                applyFilters();
             };
             chip.addEventListener('transitionend', onTransitionEnd);
@@ -617,19 +603,19 @@
     const inputRect = inputField ? inputField.getBoundingClientRect() : null;
     const inputStyle = inputField ? window.getComputedStyle(inputField) : null;
     
-    console.log('[Flex Debug] Before adding chip:', {
-      containerWidth: containerRect.width,
-      containerHeight: containerRect.height,
-      containerFlexWrap: containerStyle.flexWrap,
-      containerAlignItems: containerStyle.alignItems,
-      containerAlignContent: containerStyle.alignContent,
-      inputWidth: inputRect ? inputRect.width : 'N/A',
-      inputFlex: inputStyle ? inputStyle.flex : 'N/A',
-      inputFlexShrink: inputStyle ? inputStyle.flexShrink : 'N/A',
-      inputMaxWidth: inputStyle ? inputStyle.maxWidth : 'N/A',
-      existingChips: container.querySelectorAll('.chip').length,
-      token: token
-    });
+    // console.log('[Flex Debug] Before adding chip:', {
+    //   containerWidth: containerRect.width,
+    //   containerHeight: containerRect.height,
+    //   containerFlexWrap: containerStyle.flexWrap,
+    //   containerAlignItems: containerStyle.alignItems,
+    //   containerAlignContent: containerStyle.alignContent,
+    //   inputWidth: inputRect ? inputRect.width : 'N/A',
+    //   inputFlex: inputStyle ? inputStyle.flex : 'N/A',
+    //   inputFlexShrink: inputStyle ? inputStyle.flexShrink : 'N/A',
+    //   inputMaxWidth: inputStyle ? inputStyle.maxWidth : 'N/A',
+    //   existingChips: container.querySelectorAll('.chip').length,
+    //   token: token
+    // });
     
     const chipHTML = `
       <span class="chip chip-new" style="background: var(--orange-primary); border:1px solid var(--orange-primary); color: var(--text-inverse);" data-idx="${tokens.length}">
@@ -651,19 +637,19 @@
       const inputDisplay = inputField ? window.getComputedStyle(inputField).display : 'N/A';
       const inputVisibility = inputField ? window.getComputedStyle(inputField).visibility : 'N/A';
       
-      console.log('[Flex Debug] After adding chip:', {
-        containerWidth: newContainerRect.width,
-        containerHeight: newContainerRect.height,
-        inputWidth: newInputRect ? newInputRect.width : 'N/A',
-        inputTop: newInputRect ? newInputRect.top : 'N/A',
-        chipWidth: chipRect ? chipRect.width : 'N/A',
-        chipTop: chipRect ? chipRect.top : 'N/A',
-        inputBelowChip: newInputRect && chipRect ? newInputRect.top > chipRect.top : 'N/A',
-        totalChips: container.querySelectorAll('.chip').length,
-        inputStillInDOM: inputStillExists,
-        inputDisplay: inputDisplay,
-        inputVisibility: inputVisibility
-      });
+      // console.log('[Flex Debug] After adding chip:', {
+      //   containerWidth: newContainerRect.width,
+      //   containerHeight: newContainerRect.height,
+      //   inputWidth: newInputRect ? newInputRect.width : 'N/A',
+      //   inputTop: newInputRect ? newInputRect.top : 'N/A',
+      //   chipWidth: chipRect ? chipRect.width : 'N/A',
+      //   chipTop: chipRect ? chipRect.top : 'N/A',
+      //   inputBelowChip: newInputRect && chipRect ? newInputRect.top > chipRect.top : 'N/A',
+      //   totalChips: container.querySelectorAll('.chip').length,
+      //   inputStillInDOM: inputStillExists,
+      //   inputDisplay: inputDisplay,
+      //   inputVisibility: inputVisibility
+      // });
     }, 10);
     
     // Add event listener to the new chip
@@ -681,7 +667,7 @@
           
           const chip = removeBtn.closest('.chip');
           if (chip && !chip.classList.contains('chip-removing')) {
-            try { console.log('[Chips][remove-click]', (container && container.id) || '(unknown-field)', { index: i, tokensBefore: (tokens||[]).slice() }); } catch(_) {}
+            // try { console.log('[Chips][remove-click]', (container && container.id) || '(unknown-field)', { index: i, tokensBefore: (tokens||[]).slice() }); } catch(_) {}
             try { chip.style.width = chip.offsetWidth + 'px'; void chip.offsetWidth; } catch(_) {}
             requestAnimationFrame(() => { chip.classList.add('chip-removing'); });
             let handled = false;
@@ -692,7 +678,7 @@
               handled = true;
               chip.removeEventListener('transitionend', onTransitionEnd);
               try { tokens.splice(i, 1); } catch (_) {}
-              try { console.log('[Chips][removed]', (container && container.id) || '(unknown-field)', { index: i, tokensAfter: (tokens||[]).slice() }); } catch(_) {}
+              // try { console.log('[Chips][removed]', (container && container.id) || '(unknown-field)', { index: i, tokensAfter: (tokens||[]).slice() }); } catch(_) {}
               renderFunction();
               applyFilters();
             };
@@ -1271,7 +1257,7 @@
   // Select-all checkbox behavior
   if (els.selectAll) {
     els.selectAll.addEventListener('change', () => {
-      console.log('Select-all checkbox changed, checked:', els.selectAll.checked);
+      // console.log('Select-all checkbox changed, checked:', els.selectAll.checked);
       if (els.selectAll.checked) {
         openBulkSelectPopover();
       } else {
@@ -1304,10 +1290,7 @@
                 el.focus();
                 requestAnimationFrame(() => {
                   if (document.activeElement !== el) {
-                    console.log('[Filters][DEBUG] Refocus retry (title) after Enter');
                     el.focus();
-                  } else {
-                    console.log('[Filters][DEBUG] Focus OK (title) after Enter');
                   }
                 });
               }
@@ -1333,7 +1316,6 @@
         if (!wrapEl || !inputEl) return;
         const setCollapsed = (on) => {
           if (on) wrapEl.classList.add('collapsed'); else wrapEl.classList.remove('collapsed');
-          try { console.log('[Filters][DEBUG] collapse', keyName || wrapEl.id || wrapEl.className, '=>', on); } catch(_) {}
         };
         const update = () => {
           const focused = document.activeElement === inputEl;
@@ -1379,10 +1361,7 @@
             el.focus();
             requestAnimationFrame(() => {
               if (document.activeElement !== el) {
-                console.log('[Filters][DEBUG] Refocus retry (title) after suggestion');
                 el.focus();
-              } else {
-                console.log('[Filters][DEBUG] Focus OK (title) after suggestion');
               }
             });
           }
@@ -1401,18 +1380,17 @@
       } catch (_) {}
       // Brief readonly on focus to block Chrome address overlay
       els.fCity.addEventListener('focus', () => {
-        console.log('[Flex Debug] City input focused');
         try { els.fCity.setAttribute('readonly', ''); setTimeout(() => { els.fCity.removeAttribute('readonly'); }, 40); } catch (_) {}
       });
       
       // Debug: Track input field size changes
       const resizeObserver = new ResizeObserver((entries) => {
         for (const entry of entries) {
-          console.log('[Flex Debug] City input resized:', {
-            width: entry.contentRect.width,
-            height: entry.contentRect.height,
-            target: entry.target.className
-          });
+          // console.log('[Flex Debug] City input resized:', {
+          //   width: entry.contentRect.width,
+          //   height: entry.contentRect.height,
+          //   target: entry.target.className
+          // });
         }
       });
       resizeObserver.observe(els.fCity);
@@ -1435,10 +1413,7 @@
                 el.focus();
                 requestAnimationFrame(() => {
                   if (document.activeElement !== el) {
-                    console.log('[Filters][DEBUG] Refocus retry (company) after Enter');
                     el.focus();
-                  } else {
-                    console.log('[Filters][DEBUG] Focus OK (company) after Enter');
                   }
                 });
               }
@@ -1482,10 +1457,7 @@
             el.focus();
             requestAnimationFrame(() => {
               if (document.activeElement !== el) {
-                console.log('[Filters][DEBUG] Refocus retry (company) after suggestion');
                 el.focus();
-              } else {
-                console.log('[Filters][DEBUG] Focus OK (company) after suggestion');
               }
             });
           }
@@ -1499,7 +1471,7 @@
         const val = (els.fCity.value || '').trim();
         if (e.key === 'Enter' || e.key === ',') {
           if (val) {
-            console.log('[Flex Debug] Enter/Comma pressed, adding city token:', val);
+            // console.log('[Flex Debug] Enter/Comma pressed, adding city token:', val);
             e.preventDefault();
             addCityToken(val);
             els.fCity.value = '';
@@ -1511,10 +1483,7 @@
                 el.focus();
                 requestAnimationFrame(() => {
                   if (document.activeElement !== el) {
-                    console.log('[Filters][DEBUG] Refocus retry (city) after Enter');
                     el.focus();
-                  } else {
-                    console.log('[Filters][DEBUG] Focus OK (city) after Enter');
                   }
                 });
               }
@@ -1532,7 +1501,7 @@
       els.cityClear.addEventListener('click', () => { clearCityTokens(); if (els.fCity) els.fCity.value = ''; hideCitySuggestions(); applyFilters(); els.fCity?.focus(); });
     }
     if (els.citySuggest) {
-      els.citySuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg') || ''; addCityToken(label); if (els.fCity) els.fCity.value = ''; hideCitySuggestions(); applyFilters(); try { const el = els.fCity; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (city) after suggestion'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (city) after suggestion'); } }); } } catch (_) {} });
+      els.citySuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg') || ''; addCityToken(label); if (els.fCity) els.fCity.value = ''; hideCitySuggestions(); applyFilters(); try { const el = els.fCity; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { el.focus(); } }); } } catch (_) {} });
     }
     // Attach collapse/expand behavior for all chip inputs
     _attachChipCollapse(els.titleChipWrap, els.fTitle, 'title');
@@ -1550,7 +1519,7 @@
       els.fState.addEventListener('keydown', (e) => {
         const val = (els.fState.value || '').trim();
         if (e.key === 'Enter' || e.key === ',') {
-          if (val) { e.preventDefault(); addStateToken(val); els.fState.value = ''; hideStateSuggestions(); applyFilters(); try { const el = els.fState; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (state) after Enter'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (state) after Enter'); } }); } } catch (_) {} }
+          if (val) { e.preventDefault(); addStateToken(val); els.fState.value = ''; hideStateSuggestions(); applyFilters(); try { const el = els.fState; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { el.focus(); } }); } } catch (_) {} }
         } else if (e.key === 'Backspace') {
           if (!val && state.stateTokens.length > 0) { e.preventDefault(); removeLastStateToken(); applyFilters(); }
         }
@@ -1558,14 +1527,14 @@
       if (els.stateChipWrap) { els.stateChipWrap.addEventListener('click', (ev) => { if (ev.target === els.stateChipWrap) els.fState.focus(); }); }
     }
     if (els.stateClear) { els.stateClear.addEventListener('click', () => { clearStateTokens(); if (els.fState) els.fState.value=''; hideStateSuggestions(); applyFilters(); els.fState?.focus(); }); }
-    if (els.stateSuggest) { els.stateSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addStateToken(label); if (els.fState) els.fState.value=''; hideStateSuggestions(); applyFilters(); try { const el = els.fState; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (state) after suggestion'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (state) after suggestion'); } }); } } catch (_) {} }); }
+    if (els.stateSuggest) { els.stateSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addStateToken(label); if (els.fState) els.fState.value=''; hideStateSuggestions(); applyFilters(); try { const el = els.fState; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { el.focus(); } }); } } catch (_) {} }); }
     // Employees chip behaviors
     if (els.fEmployees) {
       els.fEmployees.addEventListener('input', () => updateEmployeesSuggestions());
       els.fEmployees.addEventListener('keydown', (e) => {
         const val = (els.fEmployees.value || '').trim();
         if (e.key === 'Enter' || e.key === ',') {
-          if (val) { e.preventDefault(); addEmployeesToken(val); els.fEmployees.value=''; hideEmployeesSuggestions(); applyFilters(); try { const el = els.fEmployees; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (employees) after Enter'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (employees) after Enter'); } }); } } catch (_) {} }
+          if (val) { e.preventDefault(); addEmployeesToken(val); els.fEmployees.value=''; hideEmployeesSuggestions(); applyFilters(); try { const el = els.fEmployees; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { el.focus(); } }); } } catch (_) {} }
         } else if (e.key === 'Backspace') {
           if (!val && state.employeesTokens.length > 0) { e.preventDefault(); removeLastEmployeesToken(); applyFilters(); }
         }
@@ -1573,14 +1542,14 @@
       if (els.employeesChipWrap) { els.employeesChipWrap.addEventListener('click', (ev) => { if (ev.target === els.employeesChipWrap) els.fEmployees.focus(); }); }
     }
     if (els.employeesClear) { els.employeesClear.addEventListener('click', () => { clearEmployeesTokens(); if (els.fEmployees) els.fEmployees.value=''; hideEmployeesSuggestions(); applyFilters(); els.fEmployees?.focus(); }); }
-    if (els.employeesSuggest) { els.employeesSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addEmployeesToken(label); if (els.fEmployees) els.fEmployees.value=''; hideEmployeesSuggestions(); applyFilters(); try { const el = els.fEmployees; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (employees) after suggestion'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (employees) after suggestion'); } }); } } catch (_) {} }); }
+    if (els.employeesSuggest) { els.employeesSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addEmployeesToken(label); if (els.fEmployees) els.fEmployees.value=''; hideEmployeesSuggestions(); applyFilters(); try { const el = els.fEmployees; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { el.focus(); } }); } } catch (_) {} }); }
     // Industry chip behaviors
     if (els.fIndustry) {
       els.fIndustry.addEventListener('input', () => updateIndustrySuggestions());
       els.fIndustry.addEventListener('keydown', (e) => {
         const val = (els.fIndustry.value || '').trim();
         if (e.key === 'Enter' || e.key === ',') {
-          if (val) { e.preventDefault(); addIndustryToken(val); els.fIndustry.value=''; hideIndustrySuggestions(); applyFilters(); try { const el = els.fIndustry; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (industry) after Enter'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (industry) after Enter'); } }); } } catch (_) {} }
+          if (val) { e.preventDefault(); addIndustryToken(val); els.fIndustry.value=''; hideIndustrySuggestions(); applyFilters(); try { const el = els.fIndustry; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { el.focus(); } }); } } catch (_) {} }
         } else if (e.key === 'Backspace') {
           if (!val && state.industryTokens.length > 0) { e.preventDefault(); removeLastIndustryToken(); applyFilters(); }
         }
@@ -1588,14 +1557,14 @@
       if (els.industryChipWrap) { els.industryChipWrap.addEventListener('click', (ev) => { if (ev.target === els.industryChipWrap) els.fIndustry.focus(); }); }
     }
     if (els.industryClear) { els.industryClear.addEventListener('click', () => { clearIndustryTokens(); if (els.fIndustry) els.fIndustry.value=''; hideIndustrySuggestions(); applyFilters(); els.fIndustry?.focus(); }); }
-    if (els.industrySuggest) { els.industrySuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addIndustryToken(label); if (els.fIndustry) els.fIndustry.value=''; hideIndustrySuggestions(); applyFilters(); try { const el = els.fIndustry; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (industry) after suggestion'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (industry) after suggestion'); } }); } } catch (_) {} }); }
+    if (els.industrySuggest) { els.industrySuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addIndustryToken(label); if (els.fIndustry) els.fIndustry.value=''; hideIndustrySuggestions(); applyFilters(); try { const el = els.fIndustry; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { el.focus(); } }); } } catch (_) {} }); }
     // Visitor domain chip behaviors
     if (els.fVisitorDomain) {
       els.fVisitorDomain.addEventListener('input', () => updateVisitorDomainSuggestions());
       els.fVisitorDomain.addEventListener('keydown', (e) => {
         const val = (els.fVisitorDomain.value || '').trim();
         if (e.key === 'Enter' || e.key === ',') {
-          if (val) { e.preventDefault(); addVisitorDomainToken(val); els.fVisitorDomain.value=''; hideVisitorDomainSuggestions(); applyFilters(); try { const el = els.fVisitorDomain; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (visitorDomain) after Enter'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (visitorDomain) after Enter'); } }); } } catch (_) {} }
+          if (val) { e.preventDefault(); addVisitorDomainToken(val); els.fVisitorDomain.value=''; hideVisitorDomainSuggestions(); applyFilters(); try { const el = els.fVisitorDomain; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { el.focus(); } }); } } catch (_) {} }
         } else if (e.key === 'Backspace') {
           if (!val && state.visitorDomainTokens.length > 0) { e.preventDefault(); removeLastVisitorDomainToken(); applyFilters(); }
         }
@@ -1603,35 +1572,35 @@
       if (els.visitorDomainChipWrap) { els.visitorDomainChipWrap.addEventListener('click', (ev) => { if (ev.target === els.visitorDomainChipWrap) els.fVisitorDomain.focus(); }); }
     }
     if (els.visitorDomainClear) { els.visitorDomainClear.addEventListener('click', () => { clearVisitorDomainTokens(); if (els.fVisitorDomain) els.fVisitorDomain.value=''; hideVisitorDomainSuggestions(); applyFilters(); els.fVisitorDomain?.focus(); }); }
-    if (els.visitorDomainSuggest) { els.visitorDomainSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addVisitorDomainToken(label); if (els.fVisitorDomain) els.fVisitorDomain.value=''; hideVisitorDomainSuggestions(); applyFilters(); try { const el = els.fVisitorDomain; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (visitorDomain) after suggestion'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (visitorDomain) after suggestion'); } }); } } catch (_) {} }); }
+    if (els.visitorDomainSuggest) { els.visitorDomainSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addVisitorDomainToken(label); if (els.fVisitorDomain) els.fVisitorDomain.value=''; hideVisitorDomainSuggestions(); applyFilters(); try { const el = els.fVisitorDomain; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { el.focus(); } }); } } catch (_) {} }); }
     // Seniority chip behaviors
     if (els.fSeniority) {
       els.fSeniority.addEventListener('input', () => updateSenioritySuggestions());
       els.fSeniority.addEventListener('keydown', (e) => {
         const val = (els.fSeniority.value || '').trim();
         if (e.key === 'Enter' || e.key === ',') {
-          if (val) { e.preventDefault(); addSeniorityToken(val); els.fSeniority.value=''; hideSenioritySuggestions(); applyFilters(); try { const el = els.fSeniority; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (seniority) after Enter'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (seniority) after Enter'); } }); } } catch (_) {} }
+          if (val) { e.preventDefault(); addSeniorityToken(val); els.fSeniority.value=''; hideSenioritySuggestions(); applyFilters(); try { const el = els.fSeniority; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { el.focus(); } }); } } catch (_) {} }
         } else if (e.key === 'Backspace') {
           if (!val && state.seniorityTokens.length > 0) { e.preventDefault(); removeLastSeniorityToken(); applyFilters(); }
         }
       });
     }
     if (els.seniorityClear) { els.seniorityClear.addEventListener('click', () => { clearSeniorityTokens(); if (els.fSeniority) els.fSeniority.value=''; hideSenioritySuggestions(); applyFilters(); els.fSeniority?.focus(); }); }
-    if (els.senioritySuggest) { els.senioritySuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addSeniorityToken(label); if (els.fSeniority) els.fSeniority.value=''; hideSenioritySuggestions(); applyFilters(); try { const el = els.fSeniority; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (seniority) after suggestion'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (seniority) after suggestion'); } }); } } catch (_) {} }); }
+    if (els.senioritySuggest) { els.senioritySuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addSeniorityToken(label); if (els.fSeniority) els.fSeniority.value=''; hideSenioritySuggestions(); applyFilters(); try { const el = els.fSeniority; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { el.focus(); } }); } } catch (_) {} }); }
     // Department chip behaviors
     if (els.fDepartment) {
       els.fDepartment.addEventListener('input', () => updateDepartmentSuggestions());
       els.fDepartment.addEventListener('keydown', (e) => {
         const val = (els.fDepartment.value || '').trim();
         if (e.key === 'Enter' || e.key === ',') {
-          if (val) { e.preventDefault(); addDepartmentToken(val); els.fDepartment.value=''; hideDepartmentSuggestions(); applyFilters(); try { const el = els.fDepartment; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (department) after Enter'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (department) after Enter'); } }); } } catch (_) {} }
+          if (val) { e.preventDefault(); addDepartmentToken(val); els.fDepartment.value=''; hideDepartmentSuggestions(); applyFilters(); try { const el = els.fDepartment; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { el.focus(); } }); } } catch (_) {} }
         } else if (e.key === 'Backspace') {
           if (!val && state.departmentTokens.length > 0) { e.preventDefault(); removeLastDepartmentToken(); applyFilters(); }
         }
       });
     }
     if (els.departmentClear) { els.departmentClear.addEventListener('click', () => { clearDepartmentTokens(); if (els.fDepartment) els.fDepartment.value=''; hideDepartmentSuggestions(); applyFilters(); els.fDepartment?.focus(); }); }
-    if (els.departmentSuggest) { els.departmentSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addDepartmentToken(label); if (els.fDepartment) els.fDepartment.value=''; hideDepartmentSuggestions(); applyFilters(); try { const el = els.fDepartment; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { console.log('[Filters][DEBUG] Refocus retry (department) after suggestion'); el.focus(); } else { console.log('[Filters][DEBUG] Focus OK (department) after suggestion'); } }); } } catch (_) {} }); }
+    if (els.departmentSuggest) { els.departmentSuggest.addEventListener('mousedown', (e) => { const item = e.target.closest('[data-sugg]'); if (!item) return; const label = item.getAttribute('data-sugg')||''; addDepartmentToken(label); if (els.fDepartment) els.fDepartment.value=''; hideDepartmentSuggestions(); applyFilters(); try { const el = els.fDepartment; if (el) { el.focus(); requestAnimationFrame(() => { if (document.activeElement !== el) { el.focus(); } }); } } catch (_) {} }); }
     [els.fHasEmail, els.fHasPhone].forEach((chk) => {
       if (chk) chk.addEventListener('change', reFilter);
     });
@@ -1748,7 +1717,7 @@
           // SEAMLESS AUTO-LOAD: Check if we need data for this page
           const neededIndex = (next - 1) * state.pageSize + state.pageSize - 1;
           if (neededIndex >= state.data.length && state.hasMore && !state.searchMode) {
-            console.log('[People] Loading more contacts for page', next, '...');
+            // console.log('[People] Loading more contacts for page', next, '...');
             
             // Show brief loading indicator
             if (els.tbody) {
@@ -1784,7 +1753,7 @@
   async function loadDataOnce() {
     // RESTORE: If state is empty but allContactsCache exists, restore it
     if ((!state.data || state.data.length === 0) && state.allContactsCache && state.allContactsCache.length > 0) {
-      console.log('[People] Restoring from allContactsCache:', state.allContactsCache.length, 'contacts');
+      // console.log('[People] Restoring from allContactsCache:', state.allContactsCache.length, 'contacts');
       state.data = state.allContactsCache.slice();
       state.filtered = state.data.slice();
         state.loaded = true;
@@ -1794,13 +1763,13 @@
     
     // Allow reload if data is actually empty (failed or cleared)
     if (state.loaded && state.data && state.data.length > 0) {
-      console.log('[People] Data already loaded:', state.data.length, 'contacts');
+      // console.log('[People] Data already loaded:', state.data.length, 'contacts');
         return;
       }
       
     // If loaded flag is set but data is empty, reset and reload
     if (state.loaded && (!state.data || state.data.length === 0)) {
-      console.log('[People] Loaded flag set but data empty, resetting...');
+      // console.log('[People] Loaded flag set but data empty, resetting...');
       state.loaded = false;
     }
     
@@ -1812,17 +1781,17 @@
       // Get data from background loaders (already loaded on app init)
       if (window.BackgroundContactsLoader) {
         contactsData = window.BackgroundContactsLoader.getContactsData() || [];
-        console.log('[People] Got', contactsData.length, 'contacts from BackgroundContactsLoader');
+        // console.log('[People] Got', contactsData.length, 'contacts from BackgroundContactsLoader');
       }
       
       if (window.BackgroundAccountsLoader) {
         accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
-        console.log('[People] Got', accountsData.length, 'accounts from BackgroundAccountsLoader');
+        // console.log('[People] Got', accountsData.length, 'accounts from BackgroundAccountsLoader');
       }
       
       // If no background loaders, try legacy method
       if (contactsData.length === 0 && window.CacheManager && typeof window.CacheManager.get === 'function') {
-        console.log('[People] Background loader empty, falling back to CacheManager...');
+        // console.log('[People] Background loader empty, falling back to CacheManager...');
         contactsData = await window.CacheManager.get('contacts') || [];
       }
       
@@ -1904,7 +1873,7 @@
       if (window.__restoringPeople && window._peopleReturn) {
         const targetPage = Math.max(1, parseInt(window._peopleReturn.currentPage || window._peopleReturn.page || 1, 10));
         state.currentPage = targetPage;
-        console.log('[People] Restoring to page:', targetPage, 'from back navigation');
+        // console.log('[People] Restoring to page:', targetPage, 'from back navigation');
       } else {
       state.currentPage = 1;
       }
@@ -1914,7 +1883,7 @@
         // Cache the FULL dataset, not just the sliced/paginated data
         const fullData = state.allContactsCache || state.data;
         window.CacheManager.set('contacts', fullData).then(() => {
-          console.log('[People] Saved', fullData.length, 'contacts to cache (full dataset)');
+          // console.log('[People] Saved', fullData.length, 'contacts to cache (full dataset)');
         }).catch((err) => {
           console.error('[People] Failed to cache:', err);
         });
@@ -1926,7 +1895,7 @@
           detail: { count: state.data.length } 
         });
         document.dispatchEvent(event);
-        console.log('[People] Dispatched contacts-loaded event:', state.data.length);
+        // console.log('[People] Dispatched contacts-loaded event:', state.data.length);
       } catch (_) {}
       
       if (typeof buildTitleSuggestionPool === 'function') buildTitleSuggestionPool();
@@ -1969,40 +1938,55 @@
     if (!state.hasMore || state.searchMode) return;
 
     try {
-      console.log('[People] Loading more contacts...');
-      let moreContacts = [];
-
-      // Check if we have cached data first
-      if (state.allContactsCache && state.allContactsCache.length > state.data.length) {
-        const nextBatch = state.allContactsCache.slice(
-          state.data.length,
-          state.data.length + 100
-        );
-        moreContacts = nextBatch;
-        state.hasMore = state.data.length + nextBatch.length < state.allContactsCache.length;
-        console.log(`[People] Loaded ${nextBatch.length} more contacts from cache`);
-      } else if (state.lastDoc) {
-        // Load from Firestore
-        const snapshot = await window.firebaseDB.collection('contacts')
-          .startAfter(state.lastDoc)
-          .limit(100)
-          .get();
-
-        moreContacts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        state.lastDoc = snapshot.docs[snapshot.docs.length - 1];
-        state.hasMore = moreContacts.length === 100;
-        console.log(`[People] Loaded ${moreContacts.length} more contacts from Firestore`);
-      }
-
-      if (moreContacts.length > 0) {
-        state.data = [...state.data, ...moreContacts];
-        applyFilters(); // Re-apply filters with new data
+      // Use BackgroundContactsLoader for seamless pagination
+      if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.loadMore === 'function') {
+        const result = await window.BackgroundContactsLoader.loadMore();
         
-        // DON'T clear cache - we need it for seamless pagination
-        // Memory impact is minimal (~10MB for 2000 contacts)
-        console.log('[People] Loaded more contacts, total:', state.data.length);
+        if (result.loaded > 0) {
+          // Get updated data from loader
+          const allContacts = window.BackgroundContactsLoader.getContactsData();
+          state.data = allContacts;
+          state.hasMore = result.hasMore;
+          
+          // Update accounts data for enrichment
+          if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+            const accountsData = window.BackgroundAccountsLoader.getAccountsData();
+            const accountById = new Map();
+            const accountByName = new Map();
+            
+            for (const acc of accountsData) {
+              if (acc && acc.id) {
+                accountById.set(acc.id, acc);
+                const name = (acc.accountName || acc.name || acc.companyName || '').toString().trim();
+                if (name) accountByName.set(normalize(name), acc);
+              }
+            }
+            
+            // Enrich new contacts with account data
+            state.data = state.data.map((c) => {
+              let acc = null;
+              if (c.accountId && accountById.has(c.accountId)) {
+                acc = accountById.get(c.accountId);
+              } else {
+                const key = (c.accountName || '').toString().trim();
+                if (key) acc = accountByName.get(normalize(key)) || null;
+              }
+              
+              if (acc) {
+                const employeesVal = acc.employees || acc.employeeCount || acc.numEmployees;
+                if (employeesVal != null) c.accountEmployees = employeesVal;
+                if (!c.companyName) c.companyName = acc.accountName || acc.name || acc.companyName || c.accountName || '';
+              }
+              return c;
+            });
+          }
+          
+          applyFilters(); // Re-apply filters with new data
+          console.log('[People] Loaded', result.loaded, 'more contacts. Total:', state.data.length);
+        } else {
+          state.hasMore = false;
+        }
       }
-
     } catch (error) {
       console.error('[People] Failed loading more contacts:', error);
     }
@@ -2206,14 +2190,14 @@
   }
   function renderCityChips() {
     if (!els.cityChips) return;
-    console.log('[Chips][renderCityChips] called with tokens:', state.cityTokens.slice());
+    // console.log('[Chips][renderCityChips] called with tokens:', state.cityTokens.slice());
     const chipHTML = state.cityTokens.map((t, idx) => `
       <span class="chip chip-existing" style="background: var(--orange-primary); border:1px solid var(--orange-primary); color: var(--text-inverse);" data-idx="${idx}">
         <span class="chip-label">${escapeHtml(t)}</span>
         <button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(t)}" data-idx="${idx}">&#215;</button>
       </span>
     `).join('');
-    console.log('[Filters][DEBUG] renderCityChips HTML:', chipHTML);
+    // console.log('[Filters][DEBUG] renderCityChips HTML:', chipHTML);
     els.cityChips.innerHTML = chipHTML;
     // Use the shared transition-based removal to avoid last-chip flicker
     addChipRemoveAnimation(els.cityChips, state.cityTokens, renderCityChips);
@@ -2237,11 +2221,11 @@
     if(!t) return; 
     const exists=state.cityTokens.some((x)=>normalize(x)===normalize(t)); 
     if(!exists){ 
-      console.log('[Flex Debug] Adding city token:', {
-        token: t,
-        currentTokens: state.cityTokens.length,
-        willBeTokens: state.cityTokens.length + 1
-      });
+      // console.log('[Flex Debug] Adding city token:', {
+      //   token: t,
+      //   currentTokens: state.cityTokens.length,
+      //   willBeTokens: state.cityTokens.length + 1
+      // });
       
       state.cityTokens.push(t); 
       addNewChipWithAnimation(els.cityChips, t, state.cityTokens, renderCityChips);
@@ -2264,7 +2248,7 @@
         }
       }
     } else {
-      console.log('[Flex Debug] City token already exists:', t);
+      // console.log('[Flex Debug] City token already exists:', t);
     }
   }
   function removeLastCityToken(){ if(state.cityTokens.length===0) return; state.cityTokens.pop(); renderCityChips(); }
@@ -2865,7 +2849,7 @@
     } else if (window.callsModule && typeof window.callsModule.getCallsData === 'function') {
       callsData = window.callsModule.getCallsData() || [];
     }
-    console.log('[People] Page init - calls data available:', callsData?.length || 0, 'calls');
+    // console.log('[People] Page init - calls data available:', callsData?.length || 0, 'calls');
     
     attachEvents();
     // Ensure styles for bulk popover and actions bar match CRM theme
@@ -3034,13 +3018,15 @@
       if (_unsubscribePeople) { try { _unsubscribePeople(); } catch(_) {} _unsubscribePeople = null; }
       _snapshotFirstFire = true; // Reset flag when setting up new listener
       const col = window.firebaseDB.collection('contacts');
-      _unsubscribePeople = col.onSnapshot((snap) => {
+      // CRITICAL COST REDUCTION: Limit real-time updates to 100 most recent contacts
+      // This prevents loading all 2,300 contacts on every change (was costing $180/month)
+      _unsubscribePeople = col.orderBy('updatedAt', 'desc').limit(100).onSnapshot((snap) => {
         try {
           // Skip first fire to prevent double-render on page load
           // (loadDataOnce already populated the data)
           if (_snapshotFirstFire) {
             _snapshotFirstFire = false;
-            console.log('[People] onSnapshot first fire - skipping render to prevent flicker');
+            // console.log('[People] onSnapshot first fire - skipping render to prevent flicker');
             return;
           }
           
@@ -3057,7 +3043,7 @@
           if (!window.__restoringPeople) {
           applyFilters();
           } else {
-            console.log('[People] Skipping render due to active restoration - contact update will be applied when restoration completes');
+            // console.log('[People] Skipping render due to active restoration - contact update will be applied when restoration completes');
           }
         } catch (_) { /* noop */ }
       }, (err) => {
@@ -3133,7 +3119,7 @@
             accountsData = window.getAccountsData ? window.getAccountsData() : [];
           }
           if (accountsData.length === 0 && window.BackgroundAccountsLoader) {
-            console.log('[People] No accounts yet, waiting for BackgroundAccountsLoader...');
+            // console.log('[People] No accounts yet, waiting for BackgroundAccountsLoader...');
             
             // Wait up to 3 seconds (30 attempts x 100ms)
             for (let attempt = 0; attempt < 30; attempt++) {
@@ -3141,7 +3127,7 @@
               accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
               
               if (accountsData.length > 0) {
-                console.log('[People] ✓ BackgroundAccountsLoader ready after', (attempt + 1) * 100, 'ms with', accountsData.length, 'accounts');
+                // console.log('[People] ✓ BackgroundAccountsLoader ready after', (attempt + 1) * 100, 'ms with', accountsData.length, 'accounts');
                 break;
               }
             }
@@ -3210,7 +3196,7 @@
           // SEAMLESS AUTO-LOAD: Check if we need data for this page
           const neededIndex = (next - 1) * state.pageSize + state.pageSize - 1;
           if (neededIndex >= state.data.length && state.hasMore && !state.searchMode) {
-            console.log('[People] Loading more contacts for page', next, '...');
+            // console.log('[People] Loading more contacts for page', next, '...');
             
             // Show brief loading indicator
             if (els.tbody) {
@@ -3268,31 +3254,31 @@
         let url = btn.getAttribute('data-website') || '';
         const company = btn.getAttribute('data-company') || '';
         
-        console.log('Debug: Website button clicked');
-        console.log('Debug: Contact website URL:', url);
-        console.log('Debug: Company name:', company);
-        console.log('Debug: getAccountsData function available:', typeof window.getAccountsData === 'function');
+        // console.log('Debug: Website button clicked');
+        // console.log('Debug: Contact website URL:', url);
+        // console.log('Debug: Company name:', company);
+        // console.log('Debug: getAccountsData function available:', typeof window.getAccountsData === 'function');
         
         // If no website from contact data, try to get it from account data
         if (!url && company && typeof window.getAccountsData === 'function') {
           try {
             const accounts = window.getAccountsData() || [];
-            console.log('Debug: Looking for company:', company);
-            console.log('Debug: Available accounts:', accounts.map(acc => acc.accountName));
+            // console.log('Debug: Looking for company:', company);
+            // console.log('Debug: Available accounts:', accounts.map(acc => acc.accountName));
             
             // Let's see some sample account names to debug the matching
             const first10Names = accounts.slice(0, 10).map(acc => acc.accountName);
-            console.log('Debug: First 10 account names:', JSON.stringify(first10Names, null, 2));
+            // console.log('Debug: First 10 account names:', JSON.stringify(first10Names, null, 2));
             
             // Let's see the actual structure of the first few account objects
             const first3Accounts = accounts.slice(0, 3);
-            console.log('Debug: First 3 account objects:', JSON.stringify(first3Accounts, null, 2));
+            // console.log('Debug: First 3 account objects:', JSON.stringify(first3Accounts, null, 2));
             
             // Check what properties are available on account objects
             if (accounts.length > 0) {
               const firstAccount = accounts[0];
-              console.log('Debug: First account keys:', Object.keys(firstAccount || {}));
-              console.log('Debug: First account values:', firstAccount);
+              // console.log('Debug: First account keys:', Object.keys(firstAccount || {}));
+              // console.log('Debug: First account values:', firstAccount);
             }
             
             // Check for partial matches using the correct property name
@@ -3300,14 +3286,14 @@
               acc.accountName && acc.accountName.toLowerCase().includes(company.toLowerCase())
             );
             const partialMatchNames = partialMatches.map(acc => acc.accountName);
-            console.log('Debug: Partial matches found:', JSON.stringify(partialMatchNames, null, 2));
+            // console.log('Debug: Partial matches found:', JSON.stringify(partialMatchNames, null, 2));
             
             // Also check for "Integrated Circuit" specifically
             const integratedMatches = accounts.filter(acc => 
               acc.accountName && acc.accountName.toLowerCase().includes('integrated circuit')
             );
             const integratedMatchNames = integratedMatches.map(acc => acc.accountName);
-            console.log('Debug: Integrated Circuit matches:', JSON.stringify(integratedMatchNames, null, 2));
+            // console.log('Debug: Integrated Circuit matches:', JSON.stringify(integratedMatchNames, null, 2));
             
             // Try multiple matching strategies using the correct property name
             const account = accounts.find(acc => {
@@ -3333,18 +3319,18 @@
             });
             
             if (account) {
-              console.log('Debug: Found matching account:', account.name);
-              console.log('Debug: Account website fields:', {
-                website: account.website,
-                site: account.site,
-                domain: account.domain
-              });
+              // console.log('Debug: Found matching account:', account.name);
+              // console.log('Debug: Account website fields:', {
+              //   website: account.website,
+              //   site: account.site,
+              //   domain: account.domain
+              // });
               url = account.website || account.site || account.domain || '';
               if (url && !/^https?:\/\//i.test(url)) {
                 url = 'https://' + url;
               }
             } else {
-              console.log('Debug: No matching account found for company:', company);
+              // console.log('Debug: No matching account found for company:', company);
             }
           } catch (e) {
             console.warn('Error fetching account data:', e);
@@ -3359,7 +3345,7 @@
           // No website available
           try { window.crm?.showToast && window.crm.showToast('No website available'); } catch (_) { /* noop */ }
         }
-        console.log('People: Open website', { id, url, company });
+        // console.log('People: Open website', { id, url, company });
         break;
       }
       default:
@@ -3402,13 +3388,13 @@
 
   // ===== Bulk selection popover (Step 1) =====
   function openBulkSelectPopover() {
-    console.log('openBulkSelectPopover called');
+    // console.log('openBulkSelectPopover called');
     if (!els.tableContainer) return;
     
     // Check if popover already exists
     const existingPopover = document.getElementById('people-bulk-popover');
     if (existingPopover) {
-      console.log('Popover already exists, not creating new one');
+      // console.log('Popover already exists, not creating new one');
       return;
     }
     
@@ -3543,12 +3529,12 @@
     // Wire events
     const cancelBtn = pop.querySelector('#bulk-cancel');
     const applyBtnElement = pop.querySelector('#bulk-apply');
-    console.log('Cancel button found:', cancelBtn);
-    console.log('Apply button found:', applyBtnElement);
+    // console.log('Cancel button found:', cancelBtn);
+    // console.log('Apply button found:', applyBtnElement);
     
     if (cancelBtn) {
       cancelBtn.addEventListener('click', () => {
-        console.log('Cancel button clicked');
+        // console.log('Cancel button clicked');
         els.selectAll.checked = false;
         closeBulkSelectPopover();
       });
@@ -3556,33 +3542,33 @@
     
     // Use event delegation for the Apply button
     pop.addEventListener('click', (e) => {
-      console.log('Pop click detected, target:', e.target, 'target id:', e.target.id);
+      // console.log('Pop click detected, target:', e.target, 'target id:', e.target.id);
       if (e.target && e.target.id === 'bulk-apply') {
-        console.log('Apply button clicked via delegation!', e);
+        // console.log('Apply button clicked via delegation!', e);
         const checkedRadio = pop.querySelector('input[name="bulk-mode"]:checked');
-        console.log('Checked radio:', checkedRadio);
+        // console.log('Checked radio:', checkedRadio);
         const mode = checkedRadio ? checkedRadio.value : 'custom';
-        console.log('Apply clicked, mode:', mode);
+        // console.log('Apply clicked, mode:', mode);
         if (mode === 'custom') {
           const raw = parseInt(pop.querySelector('#bulk-custom-count').value || '0', 10);
           const n = Math.min(totalFiltered, Math.max(1, isNaN(raw) ? 0 : raw));
-          console.log('Selecting first N:', n);
+          // console.log('Selecting first N:', n);
           selectFirstNFiltered(n);
         } else if (mode === 'page') {
-          console.log('Selecting page items');
+          // console.log('Selecting page items');
           const pageItems = getPageItems();
-          console.log('Page items:', pageItems);
+          // console.log('Page items:', pageItems);
           const pageIds = pageItems.map((c) => c.id);
-          console.log('Page IDs:', pageIds);
+          // console.log('Page IDs:', pageIds);
           selectIds(pageIds);
         } else if (mode === 'all') {
-          console.log('Selecting all filtered');
-          console.log('All filtered items:', state.filtered);
+          // console.log('Selecting all filtered');
+          // console.log('All filtered items:', state.filtered);
           const allIds = state.filtered.map((c) => c.id);
-          console.log('All IDs:', allIds);
+          // console.log('All IDs:', allIds);
           selectIds(allIds);
         }
-        console.log('Selected count:', state.selected.size);
+        // console.log('Selected count:', state.selected.size);
         closeBulkSelectPopover();
         // Single render is sufficient; render() already calls updateBulkActionsBar()
         render();
@@ -3723,7 +3709,7 @@
       }
       const id = el.getAttribute('data-id');
       const name = el.getAttribute('data-name') || 'Sequence';
-      console.log('Add selected people to sequence:', { id, name, selected: Array.from(state.selected) });
+      // console.log('Add selected people to sequence:', { id, name, selected: Array.from(state.selected) });
       // TODO: integrate backend action to add people to sequence
       if (window.crm?.showToast) try { window.crm.showToast(`Added to ${name}`, 'success'); } catch(_) {}
       closeBulkSequencePanel();
@@ -3796,17 +3782,17 @@
   }
 
   function selectIds(ids) {
-    console.log('selectIds called with:', ids);
+    // console.log('selectIds called with:', ids);
     state.selected.clear();
     for (const id of ids) if (id) state.selected.add(id);
-    console.log('After selection, state.selected.size:', state.selected.size);
+    // console.log('After selection, state.selected.size:', state.selected.size);
   }
 
   function selectFirstNFiltered(n) {
-    console.log('selectFirstNFiltered called with n:', n);
-    console.log('state.filtered length:', state.filtered.length);
+    // console.log('selectFirstNFiltered called with n:', n);
+    // console.log('state.filtered length:', state.filtered.length);
     const ids = state.filtered.slice(0, n).map((c) => c.id).filter(Boolean);
-    console.log('Generated ids:', ids);
+    // console.log('Generated ids:', ids);
     selectIds(ids);
   }
 

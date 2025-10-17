@@ -2242,6 +2242,58 @@
       console.log('[ContactDetail] Contact company:', contact.companyName || contact.accountName);
       console.log('[ContactDetail] Contact accountId:', contact.accountId || contact.account_id);
       
+      if (!contact) {
+        console.warn('[ContactDetail] No contact provided');
+        return null;
+      }
+      
+      // OPTIMIZED: Query Firestore directly for the specific account
+      // This fixes the issue where accounts not in "first 100" won't be found
+      const accountId = contact.accountId || contact.account_id || '';
+      const companyName = contact.companyName || contact.accountName || '';
+      
+      // Try direct Firestore query first (most reliable)
+      if (window.firebaseDB) {
+        try {
+          // Method 1: Query by accountId (most reliable)
+      if (accountId) {
+            console.log('[ContactDetail] Querying Firestore for account by ID:', accountId);
+            const doc = await window.firebaseDB.collection('accounts').doc(accountId).get();
+            
+            if (doc.exists) {
+              const account = { id: doc.id, ...doc.data() };
+              console.log('[ContactDetail] ✓ Found account by ID:', account.accountName || account.name);
+              return account;
+            } else {
+              console.log('[ContactDetail] Account not found by ID:', accountId);
+            }
+          }
+          
+          // Method 2: Query by company name (fallback)
+          if (companyName) {
+            console.log('[ContactDetail] Querying Firestore for account by name:', companyName);
+            const snapshot = await window.firebaseDB.collection('accounts')
+              .where('accountName', '==', companyName)
+              .limit(1)
+              .get();
+            
+            if (!snapshot.empty) {
+              const account = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+              console.log('[ContactDetail] ✓ Found account by name:', account.accountName || account.name);
+              return account;
+            } else {
+              console.log('[ContactDetail] No account found by name:', companyName);
+            }
+          }
+          
+          console.log('[ContactDetail] No account found via Firestore queries');
+        } catch (error) {
+          console.error('[ContactDetail] Error querying Firestore for account:', error);
+        }
+      }
+      
+      // FALLBACK: Try cached accounts if Firestore query fails
+      console.log('[ContactDetail] Falling back to cached accounts search...');
       let accounts = [];
       
       // Try getting accounts with retry logic
@@ -2261,44 +2313,18 @@
         }
       }
       
-      if (!contact || accounts.length === 0) {
-        console.warn('[ContactDetail] No accounts available after', maxRetries, 'retries, waiting for accounts-loaded event...');
-        
-        // Last resort: wait for accounts-loaded event
-        await new Promise(resolve => {
-          const handler = (e) => {
-            document.removeEventListener('pc:accounts-loaded', handler);
-            resolve();
-          };
-          document.addEventListener('pc:accounts-loaded', handler);
-          
-          // Timeout after 5 seconds
-          setTimeout(() => {
-            document.removeEventListener('pc:accounts-loaded', handler);
-            resolve();
-          }, 5000);
-        });
-        
-        // Try one more time after the event
-        accounts = await getAccountsDataSafe();
-        
-        if (accounts.length === 0) {
-          console.warn('[ContactDetail] Still no accounts available after waiting for event');
-          return null;
-        }
+      if (accounts.length === 0) {
+        console.warn('[ContactDetail] No cached accounts available');
+        return null;
       }
       
-      // Prefer explicit accountId
-      const accountId = contact.accountId || contact.account_id || '';
+      // Search cached accounts by ID
       if (accountId) {
-        console.log('[ContactDetail] Looking for account by ID:', accountId);
+        console.log('[ContactDetail] Searching cached accounts by ID:', accountId);
         const m = accounts.find(a => a.id === accountId);
         if (m) {
-          console.log('[ContactDetail] Found account by ID:', m.accountName || m.name);
-          console.log('[ContactDetail] Account website:', m.website || m.domain);
+          console.log('[ContactDetail] Found account in cache by ID:', m.accountName || m.name);
           return m;
-        } else {
-          console.log('[ContactDetail] No account found with ID:', accountId);
         }
       }
       
@@ -2421,6 +2447,7 @@
     const linkedAccount = await findAssociatedAccount(contact);
     // Cache for saves
     try { state._linkedAccountId = linkedAccount?.id || null; } catch (_) {}
+    const companyPhone = await getCompanyPhone(contact); // Fetch company phone asynchronously
     const electricitySupplier = linkedAccount?.electricitySupplier || '';
     const annualUsage = linkedAccount?.annualUsage || linkedAccount?.annual_usage || '';
     const annualUsageFormatted = annualUsage ? String(annualUsage).replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '';
@@ -2551,7 +2578,7 @@
           <div class="info-grid">
             ${renderEmailRow('EMAIL', 'email', email, contact.emailStatus)}
             ${renderPhoneRow(contact)}
-            ${renderInfoRow('COMPANY PHONE', 'companyPhone', getCompanyPhone(contact))}
+            ${renderInfoRow('COMPANY PHONE', 'companyPhone', companyPhone)}
             ${renderInfoRow('CITY', 'city', city)}
             ${renderInfoRow('STATE', 'state', stateVal)}
             ${renderInfoRow('INDUSTRY', 'industry', industry)}
