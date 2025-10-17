@@ -72,7 +72,6 @@ export default async function handler(req, res) {
         ip
       };
 
-      console.log('[Email] Open event:', openEvent);
       
       // Store the session
       global.emailTrackingSessions.set(sessionKey, {
@@ -90,13 +89,11 @@ export default async function handler(req, res) {
             lastOpened: openEvent.openedAt,
             updatedAt: new Date().toISOString()
           });
-          console.log('[Email] Successfully updated Firebase with open event');
         } catch (firebaseError) {
           console.error('[Email] Firebase update error:', firebaseError);
           // Continue to return pixel even if Firebase fails
         }
       } else {
-        console.warn('[Email] Firebase not available, tracking event not saved');
       }
     }
 

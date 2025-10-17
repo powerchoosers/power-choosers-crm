@@ -44,16 +44,7 @@ export default async function handler(req, res) {
       event // 'sent', 'opened', 'replied', 'bounced'
     } = req.body;
     
-    // Log to console for now (can be enhanced to store in Firebase or analytics service)
-    console.log('[Email Tracking]', {
-      emailId,
-      recipientEmail,
-      subjectStyle,
-      ctaType,
-      openingStyle,
-      event,
-      timestamp
-    });
+    // Store tracking data (can be enhanced to store in Firebase or analytics service)
     
     // TODO: Store in Firebase Firestore for future analysis
     // Example structure:
