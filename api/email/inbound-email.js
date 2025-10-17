@@ -135,13 +135,41 @@ export default async function handler(req, res) {
         }
       }
 
-      // Sanitize HTML with data/image support
-      const sanitizedHtml = html ? sanitizeHtml(html, {
+      // Helper function to decode HTML entities from quoted-printable encoding
+      const decodeHtmlEntities = (html) => {
+        return html
+          .replace(/=3D/gi, '=')
+          .replace(/=22/gi, '"')
+          .replace(/=27/gi, "'")
+          .replace(/href=3D"/gi, 'href="')
+          .replace(/src=3D"/gi, 'src="')
+          .replace(/href="3D/gi, 'href="')
+          .replace(/src="3D/gi, 'src="');
+      };
+
+      // Sanitize HTML with data/image support and entity decoding
+      const sanitizedHtml = html ? sanitizeHtml(decodeHtmlEntities(html), {
         allowedSchemes: ['http', 'https', 'mailto', 'data'],
         allowedAttributes: {
           '*': ['style', 'class', 'id', 'dir', 'align'],
           'a': ['href', 'name', 'target', 'rel'],
           'img': ['src', 'alt', 'width', 'height', 'style']
+        },
+        transformTags: {
+          'a': (tagName, attribs) => {
+            // Ensure href doesn't start with malformed encoding
+            if (attribs.href && attribs.href.startsWith('3D')) {
+              attribs.href = attribs.href.replace(/^3D"?/, '');
+            }
+            return { tagName, attribs };
+          },
+          'img': (tagName, attribs) => {
+            // Ensure src doesn't start with malformed encoding
+            if (attribs.src && attribs.src.startsWith('3D')) {
+              attribs.src = attribs.src.replace(/^3D"?/, '');
+            }
+            return { tagName, attribs };
+          }
         }
       }) : '';
 
@@ -157,9 +185,23 @@ export default async function handler(req, res) {
     } else {
       // If no raw MIME, sanitize any provided HTML and decode text where possible
       if (emailData.html) {
-        emailData.html = sanitizeHtml(emailData.html, {
+        emailData.html = sanitizeHtml(decodeHtmlEntities(emailData.html), {
           allowedSchemes: ['http','https','mailto','data'],
-          allowedAttributes: { '*': ['style','class','id'], 'a': ['href','target','rel'], 'img': ['src','alt','width','height','style'] }
+          allowedAttributes: { '*': ['style','class','id'], 'a': ['href','target','rel'], 'img': ['src','alt','width','height','style'] },
+          transformTags: {
+            'a': (tagName, attribs) => {
+              if (attribs.href && attribs.href.startsWith('3D')) {
+                attribs.href = attribs.href.replace(/^3D"?/, '');
+              }
+              return { tagName, attribs };
+            },
+            'img': (tagName, attribs) => {
+              if (attribs.src && attribs.src.startsWith('3D')) {
+                attribs.src = attribs.src.replace(/^3D"?/, '');
+              }
+              return { tagName, attribs };
+            }
+          }
         });
       }
     }
@@ -275,6 +317,18 @@ export default async function handler(req, res) {
       
       const docRef = await db.collection('emails').add(emailDoc);
       console.log('[InboundEmail] Email saved to Firebase with ID:', docRef.id);
+
+      // Log any suspicious URLs for debugging
+      const urlPattern = /(href|src)=["']([^"']*?)["']/gi;
+      const matches = [...(emailData.html || '').matchAll(urlPattern)];
+      const suspiciousUrls = matches.filter(m => 
+        m[2].includes('3D') || (m[2].includes('=') && !m[2].startsWith('data:'))
+      );
+      if (suspiciousUrls.length > 0) {
+        console.warn('[InboundEmail] Detected potentially malformed URLs:', 
+          suspiciousUrls.map(m => m[2]).slice(0, 5)
+        );
+      }
 
     // Return success response
     return res.status(200).json({ 

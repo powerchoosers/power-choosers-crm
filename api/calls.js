@@ -19,6 +19,32 @@ const { resolveToCallSid, isCallSid } = require('./_twilio-ids');
 // In-memory fallback store (for local/dev when Firestore isn't configured)
 const memoryStore = new Map();
 
+// Derive outcome from call status and duration
+function deriveOutcome(call) {
+  const status = (call.status || '').toLowerCase();
+  const duration = call.durationSec || call.duration || 0;
+  const answeredBy = (call.answeredBy || '').toLowerCase();
+  
+  // If we have an explicit outcome, use it
+  if (call.outcome) return call.outcome;
+  
+  // Derive from status
+  if (status === 'completed') {
+    if (answeredBy === 'machine_start' || answeredBy === 'machine_end_beep' || answeredBy === 'machine_end_silence') {
+      return 'Voicemail';
+    }
+    return duration > 0 ? 'Connected' : 'No Answer';
+  }
+  
+  if (status === 'no-answer' || status === 'no_answer') return 'No Answer';
+  if (status === 'busy') return 'Busy';
+  if (status === 'failed') return 'Failed';
+  if (status === 'canceled' || status === 'cancelled') return 'Canceled';
+  
+  // Default
+  return status ? status.charAt(0).toUpperCase() + status.slice(1) : '';
+}
+
 async function readJson(req) {
   return await new Promise((resolve, reject) => {
     try {
@@ -45,7 +71,7 @@ function normalizeCallForResponse(call) {
     timestamp: call.timestamp || call.callTime || new Date().toISOString(),
     callTime: call.callTime || call.timestamp || new Date().toISOString(),
     durationSec: call.durationSec != null ? call.durationSec : (call.duration || 0),
-    outcome: call.outcome || (call.status === 'completed' ? 'Connected' : ''),
+    outcome: call.outcome || deriveOutcome(call),
     transcript: call.transcript || '',
     formattedTranscript: call.formattedTranscript || call.formatted_transcript || '',
     aiSummary: (call.aiInsights && call.aiInsights.summary) || call.aiSummary || '',
@@ -143,7 +169,7 @@ async function upsertCallInFirestore(payload) {
     durationSec: payload.durationSec != null ? payload.durationSec : (current.durationSec != null ? current.durationSec : (payload.duration || current.duration || 0)),
     timestamp: current.timestamp || payload.callTime || payload.timestamp || nowIso,
     callTime: payload.callTime || current.callTime || current.timestamp || nowIso,
-    outcome: payload.outcome || current.outcome,
+        outcome: payload.outcome || current.outcome || deriveOutcome({...current, ...payload}),
     transcript: payload.transcript != null ? payload.transcript : current.transcript,
     formattedTranscript: payload.formattedTranscript != null ? payload.formattedTranscript : current.formattedTranscript,
     aiInsights: payload.aiInsights != null ? payload.aiInsights : current.aiInsights || null,
@@ -341,7 +367,7 @@ export default async function handler(req, res) {
         durationSec: payload.durationSec != null ? payload.durationSec : (existing.durationSec != null ? existing.durationSec : (payload.duration || existing.duration || 0)),
         timestamp: existing.timestamp || payload.callTime || payload.timestamp || nowIso,
         callTime: payload.callTime || existing.callTime || existing.timestamp || nowIso,
-        outcome: payload.outcome || existing.outcome,
+        outcome: payload.outcome || existing.outcome || deriveOutcome({...existing, ...payload}),
         transcript: payload.transcript != null ? payload.transcript : existing.transcript,
         formattedTranscript: payload.formattedTranscript != null ? payload.formattedTranscript : existing.formattedTranscript,
         aiInsights: payload.aiInsights != null ? payload.aiInsights : existing.aiInsights || null,
