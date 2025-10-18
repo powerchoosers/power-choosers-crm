@@ -1675,6 +1675,14 @@
                 statusTokens: [...state.statusTokens]
               }
             };
+            // Prefetch contact data from cache (FREE)
+            if (window.getPeopleData) {
+              const peopleData = window.getPeopleData();
+              const contact = peopleData.find(c => c.id === contactId);
+              if (contact) {
+                window._prefetchedContactForDetail = contact;
+              }
+            }
             window.ContactDetail.show(contactId);
           }
           return;
@@ -3167,6 +3175,14 @@
                 statusTokens: [...state.statusTokens]
               }
             };
+            // Prefetch contact data from cache (FREE)
+            if (window.getPeopleData) {
+              const peopleData = window.getPeopleData();
+              const contact = peopleData.find(c => c.id === contactId);
+              if (contact) {
+                window._prefetchedContactForDetail = contact;
+              }
+            }
             window.ContactDetail.show(contactId);
           }
           return;

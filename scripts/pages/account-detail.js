@@ -137,7 +137,7 @@ var console = {
       
       // Check if click is on edit account button (only on account detail page)
       const editBtn = e.target.closest('.title-edit');
-      if (editBtn && document.getElementById('account-details-page')) {
+      if (editBtn && document.getElementById('account-details-page') && !document.getElementById('contact-detail-header')) {
         e.preventDefault();
         e.stopPropagation();
         console.log('[AccountDetail] Edit account button clicked via delegation');
