@@ -24,7 +24,7 @@
       console.log('[BackgroundEmailsLoader] Loading from Firestore...');
       const snapshot = await window.firebaseDB.collection('emails')
         .orderBy('createdAt', 'desc')
-        .limit(200)
+        .limit(100)
         .get();
       
       emailsData = snapshot.docs.map(doc => {

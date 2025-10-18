@@ -4599,11 +4599,11 @@
         try {
           // Find the corresponding step to get email content
           const step = sequence.steps.find(s => s.id === emailTask.stepId);
-          if (step && step.emailContent) {
+          if (step && step.data) {
             const emailData = {
               to: contactData.email,
-              subject: step.emailContent.subject || 'Follow up',
-              html: step.emailContent.body || 'Hello, this is a follow up email.',
+              subject: step.data.subject || 'Follow up',
+              content: step.data.body || 'Hello, this is a follow up email.',
               from: 'noreply@powerchoosers.com',
               fromName: (window.SettingsPage?.getSettings?.()?.general?.agentName) || 'Power Choosers',
               contactName: contactData.name,
