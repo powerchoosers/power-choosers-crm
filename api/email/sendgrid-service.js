@@ -233,8 +233,9 @@ export class SendGridService {
                 references: emailData.references || [],
         opens: [],
         replies: [],
+        clicks: [],
         openCount: 0,
-        replyCount: 0,
+        clickCount: 0,
         status: 'sent',
         type: 'sent',              // Required for email filtering in emails.js
         emailType: 'sent',         // Alternative field for filtering

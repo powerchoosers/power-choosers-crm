@@ -1,8 +1,17 @@
-const { db } = require('../_firebase');
+import { db } from '../_firebase.js';
 import { cors } from '../_cors.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
+
+  // Handle GET requests for webhook testing
+  if (req.method === 'GET') {
+    return res.status(200).json({ 
+      status: 'SendGrid Webhook Endpoint Active',
+      timestamp: new Date().toISOString(),
+      url: req.url
+    });
+  }
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -31,9 +40,13 @@ export default async function handler(req, res) {
 }
 
 async function processSendGridEvent(event) {
-  const { event: eventType, email, sg_message_id, timestamp, reason, category } = event;
+  const { event: eventType, email, sg_message_id, timestamp, reason, category, url } = event;
   
-  console.log(`[SendGrid Webhook] Processing ${eventType} for ${email}`);
+  console.log(`[SendGrid Webhook] Processing ${eventType} for ${email}`, {
+    sg_message_id,
+    timestamp,
+    url: url || 'N/A'
+  });
 
   try {
     switch (eventType) {
@@ -98,11 +111,21 @@ async function handleDelivered(email, sgMessageId, timestamp) {
 }
 
 async function handleOpen(email, sgMessageId, timestamp) {
-  // Find and update the email record
-  const emailQuery = await db.collection('emails')
-    .where('to', 'array-contains', email)
+  // Find and update the email record by messageId first, then by email
+  let emailQuery = await db.collection('emails')
+    .where('messageId', '==', sgMessageId)
     .limit(1)
     .get();
+
+  // Fallback: find by email if messageId not found
+  if (emailQuery.empty) {
+    emailQuery = await db.collection('emails')
+      .where('to', 'array-contains', email)
+      .where('type', '==', 'sent')
+      .orderBy('sentAt', 'desc')
+      .limit(1)
+      .get();
+  }
 
   if (!emailQuery.empty) {
     const emailDoc = emailQuery.docs[0];
@@ -118,19 +141,32 @@ async function handleOpen(email, sgMessageId, timestamp) {
     await emailDoc.ref.update({
       opens: [...(emailData.opens || []), openData],
       openCount: (emailData.openCount || 0) + 1,
+      lastOpened: openData.openedAt,
       updatedAt: new Date().toISOString()
     });
     
-    console.log(`[SendGrid Webhook] Recorded open for ${email}`);
+    console.log(`[SendGrid Webhook] Recorded open for ${email} (${emailDoc.id})`);
+  } else {
+    console.log(`[SendGrid Webhook] Email not found for open event: ${email} (${sgMessageId})`);
   }
 }
 
 async function handleClick(email, sgMessageId, timestamp, url) {
-  // Find and update the email record
-  const emailQuery = await db.collection('emails')
-    .where('to', 'array-contains', email)
+  // Find and update the email record by messageId first, then by email
+  let emailQuery = await db.collection('emails')
+    .where('messageId', '==', sgMessageId)
     .limit(1)
     .get();
+
+  // Fallback: find by email if messageId not found
+  if (emailQuery.empty) {
+    emailQuery = await db.collection('emails')
+      .where('to', 'array-contains', email)
+      .where('type', '==', 'sent')
+      .orderBy('sentAt', 'desc')
+      .limit(1)
+      .get();
+  }
 
   if (!emailQuery.empty) {
     const emailDoc = emailQuery.docs[0];
@@ -147,10 +183,13 @@ async function handleClick(email, sgMessageId, timestamp, url) {
     await emailDoc.ref.update({
       clicks: [...(emailData.clicks || []), clickData],
       clickCount: (emailData.clickCount || 0) + 1,
+      lastClicked: clickData.clickedAt,
       updatedAt: new Date().toISOString()
     });
     
-    console.log(`[SendGrid Webhook] Recorded click for ${email}: ${url}`);
+    console.log(`[SendGrid Webhook] Recorded click for ${email} (${emailDoc.id}): ${url}`);
+  } else {
+    console.log(`[SendGrid Webhook] Email not found for click event: ${email} (${sgMessageId})`);
   }
 }
 
