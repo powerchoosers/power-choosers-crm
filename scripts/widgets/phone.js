@@ -138,7 +138,7 @@
           codecPreferences: ['opus', 'pcmu'],
           fakeLocalDTMF: true,
           enableImprovedSignalingErrorPrecision: true,
-          logLevel: 'debug'
+          logLevel: 'warn'
         });
         
         // Set audio constraints for better audio quality

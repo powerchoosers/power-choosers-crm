@@ -38,7 +38,6 @@
     // Only set up once
     if (document._pcContactDetailDelegated) return;
     
-    console.log('[ContactDetail] Setting up event delegation on document');
     
     const delegatedClickHandler = (e) => {
       // Check if click is on "Add to list" button
@@ -46,7 +45,6 @@
       if (addToListBtn) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('[ContactDetail] Add to list clicked via delegation');
         
         // Toggle behavior: close if already open
         if (document.getElementById('contact-lists-panel')) {
@@ -62,7 +60,6 @@
       if (addToSequencesBtn) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('[ContactDetail] Add to sequences clicked via delegation');
         
         // Toggle behavior: close if already open
         if (document.getElementById('contact-sequences-panel')) {
@@ -87,21 +84,28 @@
       
       // Website button click delegation (contact detail specific)
       const websiteBtn = e.target.closest('.website-header-btn');
-      if (websiteBtn && document.getElementById('contact-detail-page')) {
+      if (websiteBtn && document.getElementById('contact-detail-header')) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('[ContactDetail] Website button clicked via delegation');
         handleQuickAction('website');
         return;
       }
       
       // LinkedIn button click delegation (contact detail specific)
       const linkedInBtn = e.target.closest('.linkedin-header-btn');
-      if (linkedInBtn && document.getElementById('contact-detail-page')) {
+      if (linkedInBtn && document.getElementById('contact-detail-header')) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('[ContactDetail] LinkedIn button clicked via delegation');
         handleQuickAction('linkedin');
+        return;
+      }
+      
+      // Edit button click delegation (contact detail specific)
+      const editBtn = e.target.closest('.title-edit');
+      if (editBtn && document.getElementById('contact-detail-header') && !document.getElementById('account-details-page')) {
+        e.preventDefault();
+        e.stopPropagation();
+        openEditContactModal();
         return;
       }
     };
@@ -111,7 +115,6 @@
     eventListeners.push({ type: 'click', handler: delegatedClickHandler, target: document });
     
     document._pcContactDetailDelegated = true;
-    console.log('[ContactDetail] Event delegation set up successfully');
   }
   
   // Initialize event delegation immediately
@@ -120,27 +123,23 @@
   // Listen for accounts data becoming available (ONCE)
   if (!document._contactDetailAccountsListenerBound) {
     document.addEventListener('pc:accounts-loaded', async (e) => {
-      console.log('[ContactDetail] Accounts loaded event received, count:', e.detail?.count);
       
       // Only re-render if we're showing a contact and don't have account data yet
       if (state.currentContact && !state._linkedAccountId) {
-        console.log('[ContactDetail] Re-rendering contact detail with newly loaded account data');
         try {
-          await renderContactDetail();
+          renderContactDetail();
         } catch (error) {
           console.error('[ContactDetail] Error re-rendering after accounts loaded:', error);
         }
       }
     });
     document._contactDetailAccountsListenerBound = true;
-    console.log('[ContactDetail] Registered accounts-loaded listener');
   }
 
   // Save a Contact field from the contact detail page
   async function saveField(field, value) {
     const db = window.firebaseDB;
     const contactId = state.currentContact?.id;
-    console.log('[Contact Detail] saveField called with:', { field, value, contactId, db: !!db });
     
     if (!contactId || !db) {
       console.warn('[Contact Detail] Missing contactId or db:', { contactId, db: !!db });
@@ -152,10 +151,8 @@
         [field]: value,
         updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
       };
-      console.log('[Contact Detail] Saving to Firebase with payload:', payload);
       
       await db.collection('contacts').doc(contactId).update(payload);
-      console.log('[Contact Detail] Firebase save successful');
       
       // Update local state
       try { if (state.currentContact) state.currentContact[field] = value; } catch(_) {}
@@ -168,18 +165,14 @@
 
   // Save an Account field from the contact detail energy section
   async function saveAccountField(field, value) {
-    console.log('[Contact Detail] saveAccountField called:', { field, value });
     const db = window.firebaseDB;
     const accountId = state._linkedAccountId;
-    console.log('[Contact Detail] Linked account ID:', accountId);
     
     if (!accountId) {
-      console.log('[Contact Detail] No linked account ID found');
       return;
     }
     
     const payload = { [field]: value, updatedAt: Date.now() };
-    console.log('[Contact Detail] Payload to save:', payload);
     
     // Update local cache if we have it
     try {
@@ -188,21 +181,17 @@
         const idx = accounts.findIndex(a => a.id === accountId);
         if (idx !== -1) {
           try { accounts[idx][field] = value; } catch(_) {}
-          console.log('[Contact Detail] Updated local cache for account:', accountId);
         }
       }
     } catch(_) {}
     
     if (!db) { 
-      console.log('[Contact Detail] No database, dispatching energy-updated event');
       try { document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: accountId, field, value } })); } catch(_) {} 
       return; 
     }
     
     try { 
-      console.log('[Contact Detail] Saving to Firestore:', { accountId, payload });
       await db.collection('accounts').doc(accountId).update(payload); 
-      console.log('[Contact Detail] Firestore save successful');
       window.crm?.showToast && window.crm.showToast('Saved');
       // Opportunistically update Health widget inputs immediately for better UX
       try {
@@ -223,14 +212,10 @@
           if (endEl) endEl.value = String(value || '').trim();
         }
       } catch (_) {}
-      console.log('[Contact Detail] Dispatching energy-updated event:', { entity: 'account', id: accountId, field, value });
       try { 
         const event = new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: accountId, field, value } });
-        console.log('[Contact Detail] Event created, dispatching...');
         document.dispatchEvent(event);
-        console.log('[Contact Detail] Event dispatched successfully');
       } catch(e) { 
-        console.log('[Contact Detail] Error dispatching event:', e);
       }
     } catch (e) { 
       console.warn('[Contact Detail] Failed to save account field', field, e); 
@@ -275,18 +260,13 @@
     }
     
     try { 
-      console.log('[Contact Detail] Saving to Firestore:', { accountId, payload });
       await db.collection('accounts').doc(accountId).update(payload); 
-      console.log('[Contact Detail] Firestore save successful');
       window.crm?.showToast && window.crm.showToast('Saved');
       console.log('[Contact Detail] Dispatching service-addresses-updated event:', { entity: 'account', id: accountId, addresses });
       try { 
         const event = new CustomEvent('pc:service-addresses-updated', { detail: { entity: 'account', id: accountId, addresses } });
-        console.log('[Contact Detail] Event created, dispatching...');
         document.dispatchEvent(event);
-        console.log('[Contact Detail] Event dispatched successfully');
       } catch(e) { 
-        console.log('[Contact Detail] Error dispatching event:', e);
       }
     } catch (e) { 
       console.warn('[Contact Detail] Failed to save service addresses', e); 
@@ -743,7 +723,7 @@
       } catch (_) { /* noop */ }
       // Feedback and refresh UI
       try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) {}
-      try { await renderContactDetail(); } catch (_) {}
+      try { renderContactDetail(); } catch (_) {}
       close();
     });
 
@@ -1834,35 +1814,21 @@
     
     // Clear previous contact's linked account state to prevent data leakage
     state._linkedAccountId = null;
+    state._preloadedAccount = null;
+    state._preloadedCompanyPhone = null;
+    state._accountCache = null;
+    
+    // Clear AccountDetail global state to prevent other modules from using stale account data
+    if (window.AccountDetail && window.AccountDetail.state) {
+      window.AccountDetail.state.currentAccount = null;
+    }
     
     // Find contact in people data, or use provided temporary contact
     let contact = null;
     if (tempContact && typeof tempContact === 'object') {
       contact = tempContact;
-      console.log('[ContactDetail] Using provided temporary contact:', contact);
-      console.log('[ContactDetail] Contact fields:', {
-        email: contact.email,
-        phone: contact.workDirectPhone || contact.mobile || contact.otherPhone || contact.phone,
-        mobile: contact.mobile,
-        companyName: contact.companyName,
-        title: contact.title,
-        city: contact.city,
-        state: contact.state,
-        industry: contact.industry
-      });
-      console.log('[ContactDetail] Full contact object:', JSON.stringify(contact, null, 2));
     } else {
-      contact = findContactById(contactId);
-      if (!contact) {
-        console.log('[ContactDetail] Contact not found in cache, trying calls data for:', contactId);
-        // Try to get contact from calls data as fallback
-        if (window.callsModule && window.callsModule.getCallContactById) {
-          contact = window.callsModule.getCallContactById(contactId);
-          if (contact) {
-            console.log('[ContactDetail] Found contact in calls data:', contact);
-          }
-        }
-      }
+      contact = await findContactById(contactId);
     }
     
     // Ensure contact has an ID
@@ -1871,46 +1837,32 @@
     }
     
     if (!contact) {
-      console.log('[ContactDetail] Contact not found in cache, trying Firestore for:', contactId);
-      // Try to load from Firestore as final fallback
-      if (window.firebaseDB && contactId && !contactId.startsWith('call_contact_')) {
-        try {
-          window.firebaseDB.collection('contacts').doc(contactId).get().then((doc) => {
-            if (doc.exists) {
-              const data = doc.data();
-              const firestoreContact = {
-                id: contactId,
-                ...data
-              };
-              console.log('[ContactDetail] Loaded contact from Firestore:', firestoreContact);
-              // Show the contact detail with the Firestore data
-              showContactDetail(contactId, firestoreContact);
-            } else {
-              console.error('[ContactDetail] Contact not found in Firestore:', contactId);
-            }
-          }).catch((error) => {
-            console.error('[ContactDetail] Error loading from Firestore:', error);
-          });
-          return; // Exit early, will be handled by the async callback
-        } catch (error) {
-          console.error('[ContactDetail] Error accessing Firestore:', error);
-        }
-      }
       console.error('Contact not found:', contactId);
       return;
     }
 
     // Ensure the new contact has a stable id immediately for downstream actions (lists, notes)
     if (!contact.id && contactId) contact.id = contactId;
+    
+    // PRE-LOAD: Start account data fetch in parallel
+    const accountDataPromise = findAssociatedAccount(contact);
+    const companyPhonePromise = accountDataPromise.then(linkedAccount => getCompanyPhone(contact, linkedAccount));
+    
+    // Store contact immediately
     state.currentContact = contact;
     
-    // Debug logging for contact ID availability
-    console.log('[Contact Detail] Contact loaded:', {
-      contactId: contact.id,
-      contactName: contact.firstName + ' ' + contact.lastName,
-      hasId: !!contact.id,
-      stateContactId: state.currentContact?.id
-    });
+    // Wait for account data to load
+    const [linkedAccount, companyPhone] = await Promise.all([
+      accountDataPromise, 
+      companyPhonePromise
+    ]);
+    
+    // Store pre-loaded data for render
+    state._preloadedAccount = linkedAccount;
+    state._preloadedCompanyPhone = companyPhone;
+    state._linkedAccountId = linkedAccount?.id || null;
+    state.currentContact = contact;
+    
     // Broadcast that contact detail is loaded so dependent widgets can rebind
     try { document.dispatchEvent(new CustomEvent('pc:contact-loaded', { detail: { id: contact.id } })); } catch(_) {}
     
@@ -1922,7 +1874,6 @@
         addToListBtn.removeAttribute('disabled');
         addToListBtn.style.opacity = '1';
         addToListBtn.title = 'Add to list';
-        console.log('[ContactDetail] Add to list button enabled');
       }
     });
     
@@ -2032,7 +1983,6 @@
           
           if (currentContactId && (callData.contactId === currentContactId || 
                                    callData.call?.contactId === currentContactId)) {
-            console.log('[ContactDetail] Call logged for this contact, refreshing activities');
             
             // Immediately refresh recent calls section
             if (window.ActivityManager && typeof window.ActivityManager.renderActivities === 'function') {
@@ -2093,19 +2043,15 @@
     }
   }
 
-  function findContactById(contactId) {
-    console.log('[ContactDetail] findContactById called with:', contactId);
-    console.log('[ContactDetail] Prefetched contact available:', !!window._prefetchedContactForDetail);
+  async function findContactById(contactId) {
     
     // Use prefetched contact if provided by navigation source (avoids extra hops)
     try {
       if (window._prefetchedContactForDetail && window._prefetchedContactForDetail.id === contactId) {
         const c = window._prefetchedContactForDetail;
         window._prefetchedContactForDetail = null; // consume
-        console.log('[ContactDetail] Using prefetched contact data:', c);
         return c;
       } else if (window._prefetchedContactForDetail) {
-        console.log('[ContactDetail] Prefetched contact ID mismatch. Prefetched:', window._prefetchedContactForDetail.id, 'Looking for:', contactId);
       }
     } catch (error) {
       console.error('[ContactDetail] Error with prefetched contact:', error);
@@ -2134,14 +2080,19 @@
       const peopleData = window.getPeopleData();
       // Extract contact name from the call data if possible
       // This is a best-effort fallback for generated contact IDs
-      console.log('[ContactDetail] Generated contact ID detected, trying fallback lookup');
     }
     
     // Final fallback: try to load from Firestore if available
     if (window.firebaseDB && contactId && !contactId.startsWith('call_contact_')) {
-      console.log('[ContactDetail] Trying to load contact from Firestore:', contactId);
-      // This is async, so we'll handle it in the calling function
-      // For now, return null and let the calling function handle the async load
+      try {
+        const doc = await window.firebaseDB.collection('contacts').doc(contactId).get();
+        if (doc.exists) {
+          const contact = { id: contactId, ...doc.data() };
+          return contact;
+        }
+      } catch (error) {
+        console.error('[ContactDetail] Error loading from Firestore:', error);
+      }
     }
     
     return null;
@@ -2167,15 +2118,20 @@
     } catch (_) { /* noop */ }
   }
 
-  function getCompanyPhone(contact) {
+  function getCompanyPhone(contact, linkedAccount = null) {
     if (!contact) return '';
     
-    // First try to get from contact's account data if available
+    // Priority 1: Use the pre-loaded linked account (most reliable)
+    if (linkedAccount && (linkedAccount.companyPhone || linkedAccount.phone)) {
+      return linkedAccount.companyPhone || linkedAccount.phone;
+    }
+    
+    // Priority 2: Try to get from contact's account data if available
     if (contact.account && (contact.account.companyPhone || contact.account.phone)) {
       return contact.account.companyPhone || contact.account.phone;
     }
     
-    // If no direct account data, try to look up the account by company name
+    // Priority 3: Fallback to lookup by company name (least reliable)
     if (contact.companyName && typeof window.getAccountsData === 'function') {
       try {
         const accounts = window.getAccountsData() || [];
@@ -2236,15 +2192,18 @@
   }
 
   // Find the associated account for this contact (by id or normalized company name)
-  async function findAssociatedAccount(contact, maxRetries = 10) {
+  async function findAssociatedAccount(contact, maxRetries = 3) {
     try {
-      console.log('[ContactDetail] findAssociatedAccount called for contact:', contact.name || contact.firstName + ' ' + contact.lastName);
-      console.log('[ContactDetail] Contact company:', contact.companyName || contact.accountName);
-      console.log('[ContactDetail] Contact accountId:', contact.accountId || contact.account_id);
       
       if (!contact) {
         console.warn('[ContactDetail] No contact provided');
         return null;
+      }
+      
+      // Check cache first
+      const cacheKey = contact.accountId || contact.companyName;
+      if (cacheKey && state._accountCache && state._accountCache[cacheKey]) {
+        return state._accountCache[cacheKey];
       }
       
       // OPTIMIZED: Query Firestore directly for the specific account
@@ -2257,21 +2216,22 @@
         try {
           // Method 1: Query by accountId (most reliable)
       if (accountId) {
-            console.log('[ContactDetail] Querying Firestore for account by ID:', accountId);
             const doc = await window.firebaseDB.collection('accounts').doc(accountId).get();
             
             if (doc.exists) {
               const account = { id: doc.id, ...doc.data() };
-              console.log('[ContactDetail] ✓ Found account by ID:', account.accountName || account.name);
+              // Cache the result
+              if (cacheKey) {
+                if (!state._accountCache) state._accountCache = {};
+                state._accountCache[cacheKey] = account;
+              }
               return account;
             } else {
-              console.log('[ContactDetail] Account not found by ID:', accountId);
             }
           }
           
           // Method 2: Query by company name (fallback)
           if (companyName) {
-            console.log('[ContactDetail] Querying Firestore for account by name:', companyName);
             const snapshot = await window.firebaseDB.collection('accounts')
               .where('accountName', '==', companyName)
               .limit(1)
@@ -2279,21 +2239,22 @@
             
             if (!snapshot.empty) {
               const account = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-              console.log('[ContactDetail] ✓ Found account by name:', account.accountName || account.name);
+              // Cache the result
+              if (cacheKey) {
+                if (!state._accountCache) state._accountCache = {};
+                state._accountCache[cacheKey] = account;
+              }
               return account;
             } else {
-              console.log('[ContactDetail] No account found by name:', companyName);
             }
           }
           
-          console.log('[ContactDetail] No account found via Firestore queries');
         } catch (error) {
           console.error('[ContactDetail] Error querying Firestore for account:', error);
         }
       }
       
       // FALLBACK: Try cached accounts if Firestore query fails
-      console.log('[ContactDetail] Falling back to cached accounts search...');
       let accounts = [];
       
       // Try getting accounts with retry logic
@@ -2301,14 +2262,12 @@
         accounts = await getAccountsDataSafe();
         
         if (accounts.length > 0) {
-          console.log('[ContactDetail] Got', accounts.length, 'accounts on attempt', attempt + 1);
           break;
         }
         
         // Wait before retrying (100ms, 200ms, 400ms, 800ms, 1600ms... exponential backoff)
         if (attempt < maxRetries - 1) {
           const delay = 100 * Math.pow(2, attempt);
-          console.log('[ContactDetail] No accounts yet, retrying in', delay, 'ms...');
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
@@ -2320,10 +2279,8 @@
       
       // Search cached accounts by ID
       if (accountId) {
-        console.log('[ContactDetail] Searching cached accounts by ID:', accountId);
         const m = accounts.find(a => a.id === accountId);
         if (m) {
-          console.log('[ContactDetail] Found account in cache by ID:', m.accountName || m.name);
           return m;
         }
       }
@@ -2347,16 +2304,9 @@
       const key = norm(contactName);
       
       if (!key) {
-        console.log('[ContactDetail] No company name to match');
         return null;
       }
       
-      console.log('[ContactDetail] Searching for account matching:', contactName, '(normalized:', key + ')');
-      console.log('[ContactDetail] Available accounts sample:', accounts.slice(0, 3).map(a => ({
-        id: a.id,
-        name: a.accountName || a.name,
-        website: a.website || a.domain
-      })));
       
       // Try exact match first
       let match = accounts.find(a => {
@@ -2375,17 +2325,12 @@
           return inter.length >= 2 || jaccard >= 0.5;
         });
         if (match) {
-          console.log('[ContactDetail] Found account by token/Jaccard match:', match.accountName || match.name);
-          console.log('[ContactDetail] Matched account website:', match.website || match.domain);
         }
       } else {
-        console.log('[ContactDetail] Found account by exact match:', match.accountName || match.name);
-        console.log('[ContactDetail] Matched account website:', match.website || match.domain);
       }
       
       if (!match) {
         console.warn('[ContactDetail] No account match for company:', contactName);
-        console.log('[ContactDetail] Searched through', accounts.length, 'accounts');
         // Try one more fuzzy search - look for ANY words in common
         const contactWords = key.split(' ').filter(w => w.length >= 3);
         if (contactWords.length > 0) {
@@ -2396,19 +2341,22 @@
             return contactWords.some(cw => accountWords.some(aw => aw.includes(cw) || cw.includes(aw)));
           });
           if (match) {
-            window.console.log('[ContactDetail] Found account by word matching:', match.accountName || match.name);
           }
         }
         
         if (!match) {
-          // Log first 10 account names for debugging
-          const sampleNames = accounts.slice(0, 10).map(a => a.accountName || a.name).join(', ');
-          window.console.log('[ContactDetail] Sample account names:', sampleNames, '...');
-          window.console.log('[ContactDetail] Total accounts available:', accounts.length);
         }
       }
       
-      return match || null;
+      const result = match || null;
+      
+      // Cache the result
+      if (result && cacheKey) {
+        if (!state._accountCache) state._accountCache = {};
+        state._accountCache[cacheKey] = result;
+      }
+      
+      return result;
     } catch (err) {
       console.error('[ContactDetail] Error finding account:', err);
       return null;
@@ -2432,7 +2380,7 @@
     document.head.appendChild(style);
   }
 
-  async function renderContactDetail() {
+  function renderContactDetail() {
     if (!state.currentContact || !els.mainContent) return;
 
     const contact = state.currentContact;
@@ -2444,10 +2392,9 @@
     const city = contact.city || contact.locationCity || '';
     const stateVal = contact.state || contact.locationState || '';
     const industry = contact.industry || contact.companyIndustry || '';
-    const linkedAccount = await findAssociatedAccount(contact);
-    // Cache for saves
-    try { state._linkedAccountId = linkedAccount?.id || null; } catch (_) {}
-    const companyPhone = await getCompanyPhone(contact); // Fetch company phone asynchronously
+    // Use pre-loaded data (no await needed)
+    const linkedAccount = state._preloadedAccount || null;
+    const companyPhone = state._preloadedCompanyPhone || '';
     const electricitySupplier = linkedAccount?.electricitySupplier || '';
     const annualUsage = linkedAccount?.annualUsage || linkedAccount?.annual_usage || '';
     const annualUsageFormatted = annualUsage ? String(annualUsage).replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '';
@@ -3920,7 +3867,7 @@
                 const updatedAddresses = linkedAccount.serviceAddresses.filter((_, idx) => idx !== addressIndex);
                 await saveAccountServiceAddresses(updatedAddresses);
                 // Re-render to update the UI
-                await renderContactDetail();
+                renderContactDetail();
                 return;
               }
             }
@@ -3955,7 +3902,7 @@
         await saveAccountServiceAddresses(updatedAddresses);
         
         // Re-render the contact detail to show the new address
-        await renderContactDetail();
+        renderContactDetail();
         
         // Find the newly added address field and start editing it
         setTimeout(() => {
@@ -6868,11 +6815,11 @@ async function createContactSequenceThenAdd(name) {
             found: website
           });
           
-          // If no website on contact, try to get from linked account
+          // If no website on contact, try to get from pre-loaded linked account
           if (!website) {
             try {
-              console.log('[ContactDetail] No website on contact, looking up linked account...');
-              const linkedAccount = await findAssociatedAccount(contact);
+              console.log('[ContactDetail] No website on contact, using pre-loaded linked account...');
+              const linkedAccount = state._preloadedAccount;
               if (linkedAccount) {
                 website = linkedAccount.website || linkedAccount.domain;
                 console.log('[ContactDetail] Found linked account:', linkedAccount.accountName || linkedAccount.name);
@@ -7219,4 +7166,5 @@ window.testPhoneInput = function(value, cursorPos = 0) {
 };
 
 })();
+
 

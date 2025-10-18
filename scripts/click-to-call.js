@@ -4,6 +4,11 @@
   // Click-to-call functionality for the CRM
   // Makes ONLY phone numbers clickable with subtle hover effects
 
+  // Debug flag - set to true to enable debug logging
+  // To enable debug logs: change this to true and refresh the page
+  // To disable debug logs: change this to false and refresh the page
+  const DEBUG_CLICK_TO_CALL = false;
+
   function formatPhoneForDisplay(phone) {
     if (!phone) return '';
     
@@ -68,37 +73,37 @@
 
   function isValidPhoneNumber(text) {
     if (!text || typeof text !== 'string') {
-      console.debug('[ClickToCall] isValidPhoneNumber: Invalid input', text);
+      if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] isValidPhoneNumber: Invalid input', text);
       return false;
     }
     
     // Parse phone number and extension
     const parsed = parsePhoneWithExtension(text);
-    console.debug('[ClickToCall] isValidPhoneNumber: Parsed', { text, parsed });
+    if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] isValidPhoneNumber: Parsed', { text, parsed });
     
     if (!parsed.number) {
-      console.debug('[ClickToCall] isValidPhoneNumber: No number found');
+      if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] isValidPhoneNumber: No number found');
       return false;
     }
     
     // Clean the main number (without extension)
     const cleaned = parsed.number.replace(/\D/g, '');
-    console.debug('[ClickToCall] isValidPhoneNumber: Cleaned number', cleaned);
+    if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] isValidPhoneNumber: Cleaned number', cleaned);
     
     // Must be 10 or 11 digits (US format) or international
     if (cleaned.length < 8 || cleaned.length > 15) {
-      console.debug('[ClickToCall] isValidPhoneNumber: Invalid length', cleaned.length);
+      if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] isValidPhoneNumber: Invalid length', cleaned.length);
       return false;
     }
     if (cleaned.length === 11 && !cleaned.startsWith('1')) {
-      console.debug('[ClickToCall] isValidPhoneNumber: Invalid 11-digit format');
+      if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] isValidPhoneNumber: Invalid 11-digit format');
       return false;
     }
     
     // Check if it looks like a phone number pattern (with or without extension)
     const phonePattern = /^[\+]?[1]?[\-\.\s]?\(?([0-9]{3})\)?[\-\.\s]?([0-9]{3})[\-\.\s]?([0-9]{4})(\s+ext\.?\s*\d+)?$/i;
     const isValid = phonePattern.test(text.trim());
-    console.debug('[ClickToCall] isValidPhoneNumber: Pattern test', { text: text.trim(), isValid });
+    if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] isValidPhoneNumber: Pattern test', { text: text.trim(), isValid });
     return isValid;
   }
 
@@ -206,11 +211,11 @@
           // Set proper call context before making the call
           setCallContextFromCurrentPage(phoneElement, contactName);
         } else {
-          console.debug('[ClickToCall] Skipping context setting - already set by page handler');
+          if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] Skipping context setting - already set by page handler');
         }
         
         // Always auto-trigger for click-to-call, but mark it as a user-initiated click
-        console.debug('[ClickToCall] User clicked phone number - auto-triggering call');
+        if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] User clicked phone number - auto-triggering call');
         window.Widgets.callNumber(cleanPhone, contactName, true, 'click-to-call');
       } else {
         console.warn('Phone widget not available');
@@ -393,7 +398,7 @@
           context.accountId = accountId;
         }
         
-        console.debug('[ClickToCall] Contact phone detected:', { contactId, contactName, companyName });
+        if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] Contact phone detected:', { contactId, contactName, companyName });
       }
       
       // Try to get additional account context from Contact Detail state (only for company phones)
@@ -475,7 +480,7 @@
         } catch(_) {}
       }
       
-      console.log('[ClickToCall] Contact Detail phone context:', context);
+      if (DEBUG_CLICK_TO_CALL) console.log('[ClickToCall] Contact Detail phone context:', context);
       window.Widgets.setCallContext(context);
       
       // Also trigger the phone widget to show the contact display immediately
@@ -843,7 +848,7 @@
     // REMOVED: Contact detail page context lookup
     // This was causing contact company info to leak into account detail phone calls
 
-    console.debug('[ClickToCall] Setting call context:', context);
+    if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] Setting call context:', context);
     window.Widgets.setCallContext(context);
   }
 
@@ -940,7 +945,7 @@
   }
 
   function processSpecificPhoneElements() {
-    console.debug('[ClickToCall] Processing specific phone elements');
+    if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] Processing specific phone elements');
     // Only target very specific phone number containers
     const specificSelectors = [
       'td[data-field="companyPhone"]',
@@ -966,7 +971,7 @@
     
     specificSelectors.forEach(selector => {
       const elements = document.querySelectorAll(selector);
-      console.debug(`[ClickToCall] Found ${elements.length} elements for selector: ${selector}`);
+      if (DEBUG_CLICK_TO_CALL) console.debug(`[ClickToCall] Found ${elements.length} elements for selector: ${selector}`);
       
       elements.forEach(element => {
         // Skip phone widget input field to prevent interference
@@ -975,14 +980,14 @@
         }
 
         const text = (element.textContent || '').trim();
-        console.debug(`[ClickToCall] Checking element with text: "${text}"`);
+        if (DEBUG_CLICK_TO_CALL) console.debug(`[ClickToCall] Checking element with text: "${text}"`);
         
         if (!isValidPhoneNumber(text)) {
-          console.debug(`[ClickToCall] Invalid phone number: "${text}"`);
+          if (DEBUG_CLICK_TO_CALL) console.debug(`[ClickToCall] Invalid phone number: "${text}"`);
           return;
         }
         
-        console.debug(`[ClickToCall] Valid phone number found: "${text}"`);
+        if (DEBUG_CLICK_TO_CALL) console.debug(`[ClickToCall] Valid phone number found: "${text}"`);
 
         // Build tooltip text with strong preference for explicit data attributes
         const displayPhone = formatPhoneForDisplay(text);
@@ -1017,13 +1022,13 @@
 
   // Initialize click-to-call
   function initClickToCall() {
-    console.debug('[ClickToCall] Initializing click-to-call functionality');
+    if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] Initializing click-to-call functionality');
     
     // Process phone numbers in tables and specific elements only
     processTablePhoneNumbers();
     processSpecificPhoneElements();
     
-    console.debug('[ClickToCall] Click-to-call initialized');
+    if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] Click-to-call initialized');
   }
 
   // Set up observer for dynamic content (tables being populated)

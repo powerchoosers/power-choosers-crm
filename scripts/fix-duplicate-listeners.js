@@ -6,7 +6,6 @@
  */
 
 (function() {
-  console.log('[EventListener Fix] Applying emergency fix for duplicate listeners...');
   
   // Mark all listener guards as bound to prevent future duplicates
   const guards = [
@@ -187,13 +186,8 @@
   guards.forEach(guard => {
     if (!document[guard]) {
       document[guard] = true;
-      console.log(`[EventListener Fix] Set guard: ${guard}`);
     }
   });
-  
-  console.log('[EventListener Fix] All listener guards are now active.');
-  console.log('[EventListener Fix] Please refresh the page to clear duplicate listeners.');
-  console.log('[EventListener Fix] After refresh, hidden logs should stop accumulating.');
   
   // Optional: Monitor for rapid log generation
   let logCount = 0;
@@ -207,23 +201,14 @@
     if (logsPerSecond > 10) {
       console.warn(`[EventListener Fix] WARNING: ${Math.round(logsPerSecond)} logs/second detected. Possible runaway listener still active.`);
     } else if (logCount > 0) {
-      console.log(`[EventListener Fix] Log rate: ${Math.round(logsPerSecond)} logs/second (normal)`);
     }
     
     logCount = 0;
     lastLogCheck = now;
   }, 5000); // Check every 5 seconds
   
-  // Hook console to track log rate (EXCLUDE fix script logs to prevent infinite loop)
-  const originalLog = console.log;
-  console.log = function(...args) {
-    // Don't count logs from the fix script itself to prevent infinite loop
-    const stack = new Error().stack;
-    if (!stack || !stack.includes('fix-duplicate-listeners.js')) {
-      logCount++;
-    }
-    return originalLog.apply(console, args);
-  };
+  // Console.log hook removed - logs will now show their true origin
+  // Log rate monitoring disabled to prevent all logs appearing from this file
   
 })();
 
