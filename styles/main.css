@@ -5069,9 +5069,278 @@ html, body {
     overflow-y: auto;
 }
 
-/* Emails page: remove inner padding so the email layout touches container edges */
+/* === EMAILS PAGE TABLE LAYOUT (pin footer to bottom) === */
+#emails-page .page-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0; /* allow children to flex properly */
+    padding-bottom: var(--spacing-base); /* 25px bottom margin from screen edge */
+    overflow: visible; /* allow shadows to render */
+}
+
 #emails-page .page-content {
-    padding: 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: var(--spacing-base); /* 25px padding on all sides */
+    padding-bottom: 0; /* ensure table container touches bottom of page container */
+    overflow: visible; /* allow inner shadows to render */
+}
+
+#emails-page .table-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    /* No extra external margin; page-container padding defines the gap */
+    margin-bottom: 0;
+    /* Allow popovers anchored inside to render rounded corners and shadows */
+    overflow: visible;
+}
+
+#emails-page .table-container .table-footer {
+    margin-top: auto; /* push footer to bottom of table container */
+}
+
+/* Email table specific styles - matching global hover patterns */
+#emails-table tbody tr:hover {
+    background: linear-gradient(90deg, var(--grey-800), var(--grey-790));
+    transform: scale(1.005);
+}
+
+#emails-table .email-sender-cell .sender-cell__wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#emails-table .sender-name {
+    color: var(--grey-400);
+    font-weight: 400;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    text-decoration: none;
+}
+
+#emails-table .sender-name:hover {
+    color: var(--text-inverse);
+    text-decoration: none;
+}
+
+#emails-table .email-subject-cell {
+    color: var(--grey-400);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+#emails-table .email-subject-cell:hover {
+    color: var(--text-inverse);
+}
+
+#emails-table .email-subject.unread {
+    font-weight: 600;
+}
+
+#emails-table .email-date-cell {
+    color: var(--text-secondary);
+}
+
+/* === EMAIL SNIPPET STYLES === */
+.email-subject-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.email-snippet {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.email-subject.unread + .email-snippet {
+    font-weight: 500;
+}
+
+/* === EMAIL TABLE TRACKING ICONS === */
+#emails-table .email-tracking-icons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+#emails-table .tracking-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+#emails-table .tracking-icon.opened {
+  background-color: var(--orange-subtle);
+  color: white;
+}
+
+#emails-table .tracking-icon.not-opened {
+  background-color: var(--grey-400);
+  color: var(--grey-600);
+}
+
+#emails-table .tracking-icon.clicked {
+  background-color: var(--orange-subtle);
+  color: white;
+}
+
+#emails-table .tracking-icon.not-clicked {
+  background-color: var(--grey-400);
+  color: var(--grey-600);
+}
+
+#emails-table .tracking-icon svg {
+  width: 10px;
+  height: 10px;
+}
+
+#emails-table .tracking-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background-color: var(--orange-subtle);
+  color: white;
+  font-size: 9px;
+  font-weight: 600;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border: 1px solid var(--bg-card);
+}
+
+#emails-table .tracking-icon:hover {
+  transform: scale(1.1);
+}
+
+#emails-table .gmail-badge {
+  background-color: #ea4335;
+  color: white;
+  font-size: 8px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Email detail page styles */
+#email-detail-page .email-detail-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+#email-detail-page .email-detail-header {
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+#email-detail-page .email-sender-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+#email-detail-page .sender-avatar {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#email-detail-page .sender-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+#email-detail-page .sender-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+#email-detail-page .sender-email {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+#email-detail-page .email-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+#email-detail-page .email-date {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+#email-detail-page .email-actions {
+    display: flex;
+    gap: 8px;
+}
+
+#email-detail-page .email-detail-body {
+    padding: var(--spacing-lg);
+}
+
+#email-detail-page .email-content {
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+#email-detail-page .email-content img {
+    max-width: 100%;
+    height: auto;
+}
+
+#email-detail-page .email-content a {
+    color: var(--orange-subtle);
+    text-decoration: none;
+}
+
+#email-detail-page .email-content a:hover {
+    color: var(--text-inverse);
+    text-decoration: underline;
+}
+
+/* Star button styling */
+#email-detail-page .btn-icon.starred {
+    color: var(--orange-subtle);
+}
+
+#email-detail-page .btn-icon.starred svg {
+    fill: currentColor;
 }
 
 /* === BUTTONS === */

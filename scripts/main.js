@@ -891,7 +891,7 @@ class PowerChoosersCRM {
         });
     }
 
-    async navigateToPage(pageName) {
+    async navigateToPage(pageName, params = {}) {
         // Clean up previous page memory BEFORE navigating
         if (this.currentPage && this.currentPage !== pageName) {
             this.cleanupPageMemory(this.currentPage);
@@ -899,6 +899,13 @@ class PowerChoosersCRM {
         
         // Update current page tracking
         this.currentPage = pageName;
+        
+        // Handle URL parameters for specific pages
+        if (pageName === 'email-detail' && params.emailId) {
+            const url = new URL(window.location);
+            url.searchParams.set('emailId', params.emailId);
+            window.history.pushState({}, '', url);
+        }
         
         // Lazy load page scripts if needed
         if (window.loadPageScripts && typeof window.loadPageScripts === 'function') {
@@ -1121,6 +1128,31 @@ class PowerChoosersCRM {
                         listKind: 'people'
                     };
                     window.ListDetail.init(context);
+                }
+            }, 50);
+        }
+
+        // Email Detail page - initialize email detail functionality
+        if (pageName === 'email-detail') {
+            setTimeout(() => {
+                if (window.EmailDetail && typeof window.EmailDetail.init === 'function') {
+                    window.EmailDetail.init();
+                }
+                
+                // Check if we have an emailId parameter to show
+                const urlParams = new URLSearchParams(window.location.search);
+                const emailId = urlParams.get('emailId');
+                if (emailId && window.EmailDetail && typeof window.EmailDetail.show === 'function') {
+                    window.EmailDetail.show(emailId);
+                }
+            }, 100);
+        }
+
+        // Emails page - initialize emails functionality
+        if (pageName === 'emails') {
+            setTimeout(() => {
+                if (window.EmailsPage && typeof window.EmailsPage.init === 'function') {
+                    window.EmailsPage.init();
                 }
             }, 50);
         }
