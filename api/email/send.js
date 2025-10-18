@@ -19,18 +19,8 @@ export default async function handler(req, res) {
     // Generate unique tracking ID
     const trackingId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Conditionally inject tracking pixel
-    let emailContent = content;
-    if (_deliverability?.enableTracking) {
-      const baseUrl = process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : req.headers.origin || 'http://localhost:3000';
-      const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
-      const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
-      if (!/\/api\/email\/track\//.test(emailContent)) {
-        emailContent = emailContent + trackingPixel;
-      }
-    }
+    // Use original content without custom tracking pixel (SendGrid native tracking will handle this)
+    const emailContent = content;
 
     // Store email record in database
     const emailRecord = {
