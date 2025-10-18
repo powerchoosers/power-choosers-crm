@@ -880,7 +880,14 @@ async function handleApiSendEmail(req, res) {
       replies: [],
       openCount: 0,
       replyCount: 0,
-      status: 'sent'
+      status: 'queued',  // Start as 'queued' instead of 'sent'
+      type: 'sent',              // Required for email filtering in emails.js
+      emailType: 'sent',         // Alternative field for filtering
+      isSentEmail: true,         // Additional flag for filtering
+      provider: 'sendgrid',      // Identify the email provider
+      sendgridMessageId: null,   // Will be updated when SendGrid responds
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     // Save to Firebase (simulated for now - in production, you'd use Firebase Admin SDK)
@@ -932,7 +939,6 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
 
     // If tracking is disabled, return pixel but don't track
     if (!deliverabilitySettings.enableTracking) {
-      console.log('[Email] Tracking disabled by settings, returning pixel without tracking:', trackingId);
       const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
       res.writeHead(200, {
         'Content-Type': 'image/png',
@@ -967,7 +973,6 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
     
     const existingSession = global.emailTrackingSessions.get(sessionKey);
     if (existingSession && existingSession.lastTracked > windowStart) {
-      console.log('[Email] Session already tracked recently, skipping:', trackingId);
       // Still return the pixel but don't create duplicate events
     } else {
       // Create new tracking event
@@ -998,7 +1003,6 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
         timestamp: new Date().toISOString()
       });
       
-      console.log('[Email] New tracking event created:', trackingId, 'Session:', sessionKey);
     }
 
     // Return a 1x1 transparent pixel with proper headers
