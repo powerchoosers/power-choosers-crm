@@ -135,20 +135,53 @@ export default async function handler(req, res) {
         }
       }
 
-      // Helper function to decode HTML entities from quoted-printable encoding
-      const decodeHtmlEntities = (html) => {
-        return html
-          .replace(/=3D/gi, '=')
-          .replace(/=22/gi, '"')
-          .replace(/=27/gi, "'")
-          .replace(/href=3D"/gi, 'href="')
-          .replace(/src=3D"/gi, 'src="')
-          .replace(/href="3D/gi, 'href="')
-          .replace(/src="3D/gi, 'src="');
+      // Comprehensive quoted-printable decoder (manual implementation)
+      const decodeQuotedPrintable = (html) => {
+        if (!html) return '';
+        
+        try {
+          // First, decode quoted-printable encoding manually
+          let decoded = html
+            // Remove soft line breaks
+            .replace(/=\r?\n/g, '')
+            // Decode quoted-printable hex codes
+            .replace(/=([0-9A-F]{2})/g, (match, hex) => {
+              return String.fromCharCode(parseInt(hex, 16));
+            })
+            // Fix common quoted-printable patterns
+            .replace(/=20/g, ' ')
+            .replace(/=3D/g, '=')
+            .replace(/=22/g, '"')
+            .replace(/=27/g, "'")
+            .replace(/=0A/g, '\n')
+            .replace(/=0D/g, '\r');
+          
+          // Then fix any remaining malformed attributes
+          return decoded
+            .replace(/href=3D"/gi, 'href="')
+            .replace(/src=3D"/gi, 'src="')
+            .replace(/href="3D/gi, 'href="')
+            .replace(/src="3D/gi, 'src="')
+            .replace(/href=3D%22/gi, 'href="')
+            .replace(/src=3D%22/gi, 'src="')
+            .replace(/href="3D%22/gi, 'href="')
+            .replace(/src="3D%22/gi, 'src="');
+        } catch (error) {
+          console.warn('[InboundEmail] Failed to decode quoted-printable:', error);
+          // Fallback to manual regex fixes
+          return html
+            .replace(/href=3D"/gi, 'href="')
+            .replace(/src=3D"/gi, 'src="')
+            .replace(/href="3D/gi, 'href="')
+            .replace(/src="3D/gi, 'src="')
+            .replace(/=3D/gi, '=')
+            .replace(/=22/gi, '"')
+            .replace(/=27/gi, "'");
+        }
       };
 
       // Sanitize HTML with data/image support and entity decoding
-      const sanitizedHtml = html ? sanitizeHtml(decodeHtmlEntities(html), {
+      const sanitizedHtml = html ? sanitizeHtml(decodeQuotedPrintable(html), {
         allowedSchemes: ['http', 'https', 'mailto', 'data'],
         allowedAttributes: {
           '*': ['style', 'class', 'id', 'dir', 'align'],
@@ -185,7 +218,7 @@ export default async function handler(req, res) {
     } else {
       // If no raw MIME, sanitize any provided HTML and decode text where possible
       if (emailData.html) {
-        emailData.html = sanitizeHtml(decodeHtmlEntities(emailData.html), {
+        emailData.html = sanitizeHtml(decodeQuotedPrintable(emailData.html), {
           allowedSchemes: ['http','https','mailto','data'],
           allowedAttributes: { '*': ['style','class','id'], 'a': ['href','target','rel'], 'img': ['src','alt','width','height','style'] },
           transformTags: {
