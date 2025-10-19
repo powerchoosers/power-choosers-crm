@@ -868,9 +868,15 @@ KEY CONTEXT:
 OUTPUT FORMAT:
 Subject: [Your subject line]
 
-[Body as plain text paragraphs]
+Hi ${firstName || 'there'},
 
-DO NOT include closing or sender name - these will be added automatically.`;
+[Opening paragraph with context - 2-3 sentences]
+
+[Main message paragraph - 3-4 sentences about value and next steps]
+
+[Call to action paragraph - clear question or request]
+
+Best regards,`;
 
   // Check if this is a cold email in standard mode
   const isColdEmailStandard = /cold.*email|could.*not.*reach/i.test(String(prompt || ''));
@@ -881,6 +887,12 @@ DO NOT include closing or sender name - these will be added automatically.`;
     
     const coldEmailRules = `
 EMAIL TYPE: Cold Email (Never Spoke Before)
+
+GREETING (MANDATORY - MUST BE FIRST LINE):
+✓ Start with "Hi ${firstName || 'there'},"
+✓ NEVER skip the greeting
+✓ NEVER start with company name or industry information
+✓ Greeting must be on its own line with blank line after
 
 CRITICAL QUALITY RULES:
 - PROBLEM AWARENESS: Lead with industry-specific problem or market condition
@@ -895,6 +907,23 @@ CRITICAL QUALITY RULES:
 - COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
 - SINGLE CTA: Generate exactly ONE call to action per email
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
+
+PARAGRAPH STRUCTURE:
+Paragraph 1 (Opening Hook - 1-2 sentences):
+- Industry-specific problem or market condition
+- Reference ${company} specifically
+- Use qualitative language (rising, increasing, higher) NOT percentages
+- NO statistics in opening hook
+
+Paragraph 2 (Value Proposition - 2-3 sentences):
+- How Power Choosers helps
+- SPECIFIC measurable value: "save 10-20%", "reduce costs by $X"
+- Include both HOW we help AND WHAT results
+
+Paragraph 3 (CTA - 1 sentence):
+- Qualifying question or soft ask
+- Under 12 words
+- Complete sentence with proper punctuation
 
 OPENING (1-2 sentences):
 Style: ${openingStyle.type}
@@ -1006,6 +1035,14 @@ QUALITY REQUIREMENTS:
 ✓ Subject line: Under 50 chars, include ${firstName || 'recipient name'}
 ✓ Closing: "Best regards," on its own line
 ✓ DO NOT include citation markers like [1], [2], [3]
+
+PARAGRAPH STRUCTURE (CRITICAL):
+✓ Paragraph 1: Greeting line - "Hi ${firstName || 'there'},"
+✓ Paragraph 2: Opening context (2-3 sentences) 
+✓ Paragraph 3: Main message and value proposition (3-4 sentences)
+✓ Paragraph 4: Call to action (1-2 sentences)
+✓ Use DOUBLE LINE BREAKS between paragraphs
+✓ Each paragraph must be separated by blank line
 
 PERSONALIZATION REQUIREMENTS:
 ${contractEndLabel ? `✓ MUST reference contract ending ${contractEndLabel} - this is CRITICAL context` : ''}
