@@ -694,6 +694,180 @@ button:hover:not(:disabled),
     transform: translateY(1px);
 }
 
+/* ========== AI GENERATION ANIMATIONS ========== */
+
+/* Skeleton loading bars */
+.ai-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: 4px;
+    height: 16px;
+    margin: 8px 0;
+    opacity: 0.8;
+}
+
+.ai-skeleton.wide { width: 80%; }
+.ai-skeleton.medium { width: 60%; }
+.ai-skeleton.short { width: 40%; }
+
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Orange glow effect for compose window during generation */
+.compose-generating {
+    position: relative;
+    border: 2px solid var(--orange-primary);
+    border-radius: 12px;
+    box-shadow: 
+        0 0 20px rgba(249, 115, 22, 0.3),
+        0 0 40px rgba(249, 115, 22, 0.2),
+        inset 0 0 20px rgba(249, 115, 22, 0.1);
+    animation: compose-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes compose-glow {
+    0% { 
+        box-shadow: 
+            0 0 20px rgba(249, 115, 22, 0.3),
+            0 0 40px rgba(249, 115, 22, 0.2),
+            inset 0 0 20px rgba(249, 115, 22, 0.1);
+    }
+    100% { 
+        box-shadow: 
+            0 0 30px rgba(249, 115, 22, 0.5),
+            0 0 60px rgba(249, 115, 22, 0.3),
+            inset 0 0 30px rgba(249, 115, 22, 0.2);
+    }
+}
+
+/* AI generation overlay */
+#compose-generating-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(2px);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+/* Floating particles */
+.ai-particles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.ai-particle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: var(--orange-primary);
+    border-radius: 50%;
+    animation: float-particle 3s infinite ease-in-out;
+    opacity: 0.6;
+}
+
+@keyframes float-particle {
+    0%, 100% { 
+        transform: translateY(0) scale(1);
+        opacity: 0.3;
+    }
+    50% { 
+        transform: translateY(-20px) scale(1.2);
+        opacity: 0.8;
+    }
+}
+
+/* Skeleton content areas */
+.subject-skeleton {
+    width: 100%;
+    max-width: 400px;
+    margin-bottom: 20px;
+}
+
+.body-skeleton {
+    width: 100%;
+    max-width: 500px;
+    margin-bottom: 20px;
+}
+
+/* AI status during generation */
+.ai-status-generating {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--orange-primary);
+    font-weight: 600;
+    font-size: 16px;
+    margin-top: 20px;
+}
+
+.ai-icon {
+    font-size: 24px;
+    animation: pulse-icon 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-icon {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* Typewriter effect for generated text */
+.typewriter {
+    overflow: hidden;
+    border-right: 2px solid var(--orange-primary);
+    white-space: nowrap;
+    animation: 
+        typing 3s steps(40, end),
+        blink-caret 0.75s step-end infinite;
+}
+
+@keyframes typing {
+    from { width: 0; }
+    to { width: 100%; }
+}
+
+@keyframes blink-caret {
+    from, to { border-color: transparent; }
+    50% { border-color: var(--orange-primary); }
+}
+
+/* Progressive word reveal */
+.word-reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+}
+
+.word-reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Smooth transitions for compose inputs */
+.compose-input-transition {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.compose-input-transition.generating {
+    opacity: 0.3;
+    transform: scale(0.98);
+}
+
 /* === GLOBAL TABLE ROW ANIMATIONS === */
 @keyframes rowFadeZoom {
   0% { 

@@ -2872,6 +2872,38 @@
 
     <!-- Gmail-style Compose Window -->
     <div class="compose-window" id="compose-window" style="display: none;">
+        <!-- AI Generation Overlay -->
+        <div class="compose-generating" id="compose-generating-overlay" style="display: none;">
+            <div class="ai-particles">
+                <div class="ai-particle" style="left: 10%; animation-delay: 0s;"></div>
+                <div class="ai-particle" style="left: 30%; animation-delay: 0.5s;"></div>
+                <div class="ai-particle" style="left: 50%; animation-delay: 1s;"></div>
+                <div class="ai-particle" style="left: 70%; animation-delay: 1.5s;"></div>
+                <div class="ai-particle" style="left: 90%; animation-delay: 2s;"></div>
+            </div>
+            
+            <!-- Subject skeleton -->
+            <div class="subject-skeleton">
+                <div class="ai-skeleton wide"></div>
+                <div class="ai-skeleton medium"></div>
+            </div>
+            
+            <!-- Body skeleton -->
+            <div class="body-skeleton">
+                <div class="ai-skeleton wide"></div>
+                <div class="ai-skeleton medium"></div>
+                <div class="ai-skeleton short"></div>
+                <div class="ai-skeleton wide"></div>
+                <div class="ai-skeleton medium"></div>
+            </div>
+            
+            <!-- AI Status -->
+            <div class="ai-status-generating">
+                <div class="ai-icon">⚡</div>
+                <span>AI is crafting your email...</span>
+            </div>
+        </div>
+        
         <div class="compose-header">
             <div class="compose-title">New Message</div>
             <div class="compose-controls">

@@ -854,6 +854,147 @@
     });
   }
 
+  // ========== AI GENERATION ANIMATION FUNCTIONS ==========
+  
+  function startGeneratingAnimation(composeWindow) {
+    const overlay = document.getElementById('compose-generating-overlay');
+    const subjectInput = composeWindow?.querySelector('#compose-subject');
+    const bodyInput = composeWindow?.querySelector('.body-input');
+    
+    if (!overlay) return;
+    
+    // Add glow effect to compose window
+    composeWindow.classList.add('compose-generating');
+    
+    // Show skeleton overlay
+    overlay.style.display = 'flex';
+    
+    // Add transition classes to inputs
+    if (subjectInput) {
+      subjectInput.classList.add('compose-input-transition', 'generating');
+    }
+    if (bodyInput) {
+      bodyInput.classList.add('compose-input-transition', 'generating');
+    }
+    
+    // Animate skeleton bars with staggered delays
+    animateSkeletonBars();
+    
+    console.log('[AI Animation] Started generating animation');
+  }
+  
+  function stopGeneratingAnimation(composeWindow) {
+    const overlay = document.getElementById('compose-generating-overlay');
+    const subjectInput = composeWindow?.querySelector('#compose-subject');
+    const bodyInput = composeWindow?.querySelector('.body-input');
+    
+    if (!overlay) return;
+    
+    // Remove glow effect
+    composeWindow.classList.remove('compose-generating');
+    
+    // Hide skeleton overlay
+    overlay.style.display = 'none';
+    
+    // Remove transition classes from inputs
+    if (subjectInput) {
+      subjectInput.classList.remove('compose-input-transition', 'generating');
+    }
+    if (bodyInput) {
+      bodyInput.classList.remove('compose-input-transition', 'generating');
+    }
+    
+    console.log('[AI Animation] Stopped generating animation');
+  }
+  
+  function animateSkeletonBars() {
+    const bars = document.querySelectorAll('.ai-skeleton');
+    bars.forEach((bar, index) => {
+      bar.style.animationDelay = `${index * 0.2}s`;
+    });
+  }
+  
+  function typewriterEffect(element, text, speed = 30) {
+    if (!element || !text) return;
+    
+    // Handle both input fields and contentEditable elements
+    const isInput = element.tagName === 'INPUT' || element.tagName === 'TEXTAREA';
+    
+    if (isInput) {
+      // For input fields, use value property
+      element.value = '';
+      element.style.borderRight = '2px solid var(--orange-primary)';
+      
+      let i = 0;
+      const timer = setInterval(() => {
+        if (i < text.length) {
+          element.value += text.charAt(i);
+          i++;
+        } else {
+          clearInterval(timer);
+          element.style.borderRight = 'none';
+        }
+      }, speed);
+    } else {
+      // For contentEditable elements, use innerHTML
+      element.innerHTML = '';
+      element.style.borderRight = '2px solid var(--orange-primary)';
+      element.style.overflow = 'hidden';
+      element.style.whiteSpace = 'nowrap';
+      
+      let i = 0;
+      const timer = setInterval(() => {
+        if (i < text.length) {
+          element.innerHTML += text.charAt(i);
+          i++;
+        } else {
+          clearInterval(timer);
+          element.style.borderRight = 'none';
+          element.style.overflow = 'visible';
+          element.style.whiteSpace = 'normal';
+        }
+      }, speed);
+    }
+  }
+  
+  function progressiveReveal(element, text) {
+    if (!element || !text) return;
+    
+    const words = text.split(' ');
+    element.innerHTML = '';
+    
+    words.forEach((word, index) => {
+      setTimeout(() => {
+        const span = document.createElement('span');
+        span.textContent = word + ' ';
+        span.classList.add('word-reveal');
+        element.appendChild(span);
+        
+        // Animate in
+        setTimeout(() => {
+          span.classList.add('visible');
+        }, 50);
+      }, index * 100);
+    });
+  }
+  
+  function animateTextIntoField(field, text, animationType = 'progressive') {
+    if (!field || !text) return;
+    
+    // Clear field first
+    field.value = '';
+    field.innerHTML = '';
+    
+    // Add temporary styling for animation
+    field.style.position = 'relative';
+    
+    if (animationType === 'typewriter') {
+      typewriterEffect(field, text);
+    } else {
+      progressiveReveal(field, text);
+    }
+  }
+
   // Generate email with AI
   async function generateWithAI(aiBar, mode = 'standard') {
     const compose = document.getElementById('compose-window');
@@ -861,6 +1002,9 @@
     const status = aiBar?.querySelector('.ai-status');
     const prompt = aiBar?.querySelector('.ai-prompt')?.value?.trim() || '';
     const toInput = compose?.querySelector('#compose-to');
+    
+    // Start the generation animation
+    startGeneratingAnimation(compose);
     const subjectInput = compose?.querySelector('#compose-subject');
     
     if (!editor) return;
@@ -951,16 +1095,25 @@
         if (cleanSubject.startsWith('Re: ')) {
           cleanSubject = cleanSubject.substring(4);
         }
-        subjectInput.value = cleanSubject;
+        
+        // Animate subject line with typewriter effect
+        setTimeout(() => {
+          typewriterEffect(subjectInput, cleanSubject, 50);
+        }, 500);
       }
 
       if (html && editor) {
-        editor.innerHTML = html;
+        // Animate body content with progressive reveal
+        setTimeout(() => {
+          progressiveReveal(editor, html);
+        }, 800);
       }
 
-      // Stop generating animation
-      stopGeneratingAnimation(compose);
-      if (status) status.textContent = 'Generated successfully!';
+      // Stop generating animation after content is inserted
+      setTimeout(() => {
+        stopGeneratingAnimation(compose);
+        if (status) status.textContent = 'Generated successfully!';
+      }, 1200);
 
     } catch (error) {
       console.error('[AI] Generation failed:', error);
@@ -972,20 +1125,82 @@
   // Lookup person by email
   async function lookupPersonByEmail(email) {
     try {
-      // Try to get from people data
-      let people = [];
+      const e = String(email || '').trim().toLowerCase();
+      if (!e) return null;
       
-      // Priority 1: BackgroundPeopleLoader
+      // Try Firebase first (like old emails.js)
+      if (window.firebaseDB) {
+        let snap;
+        try {
+          snap = await window.firebaseDB.collection('contacts').where('email', '==', e).limit(1).get();
+        } catch (_) {
+          snap = null;
+        }
+        if (!snap || snap.empty) {
+          try {
+            snap = await window.firebaseDB.collection('people').where('email', '==', e).limit(1).get();
+          } catch (_) {
+            snap = null;
+          }
+        }
+        if (snap && !snap.empty) {
+          const doc = snap.docs[0];
+          const person = { id: doc.id, ...(doc.data ? doc.data() : {}) };
+          
+          // Attempt to match an account (like old emails.js)
+          let account = null;
+          if (window.BackgroundAccountsLoader) {
+            const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+            const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g,' ').replace(/\s+/g,' ').trim();
+            const comp = norm(person.company || '');
+            
+            if (comp) {
+              account = accounts.find(a => {
+                const accountName = a.accountName || a.name || '';
+                if (!accountName) return false;
+                const normalizedAccountName = norm(accountName);
+                return normalizedAccountName === comp || 
+                       normalizedAccountName.includes(comp) || 
+                       comp.includes(normalizedAccountName);
+              }) || null;
+            }
+          }
+          
+          return {
+            id: person.id,
+            email: email,
+            name: person.name || person.fullName || `${person.firstName || ''} ${person.lastName || ''}`.trim() || email.split('@')[0],
+            firstName: person.firstName || (person.name || '').split(' ')[0] || '',
+            lastName: person.lastName || (person.name || '').split(' ').slice(1).join(' ') || '',
+            fullName: person.fullName || person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim(),
+            company: person.company || account?.accountName || account?.name || '',
+            title: person.title || person.job || person.role || '',
+            phone: person.phone || person.mobile || '',
+            account: account ? {
+              id: account.id,
+              name: account.accountName || account.name || '',
+              industry: account.industry || '',
+              domain: account.domain || account.website || '',
+              city: account.city || account.billingCity || account.locationCity || '',
+              state: account.state || account.billingState || account.region || '',
+              shortDescription: account.shortDescription || account.short_desc || account.descriptionShort || account.description || '',
+              logoUrl: account.logoUrl || '',
+              phone: account.phone || account.companyPhone || '',
+              annualUsage: account.annualUsage || '',
+              electricitySupplier: account.electricitySupplier || '',
+              currentRate: account.currentRate || '',
+              contractEndDate: account.contractEndDate || ''
+            } : null
+          };
+        }
+      }
+      
+      // Fallback to cache-based lookup
+      let people = [];
       if (window.BackgroundPeopleLoader && typeof window.BackgroundPeopleLoader.getPeopleData === 'function') {
         people = window.BackgroundPeopleLoader.getPeopleData() || [];
       }
       
-      // Priority 2: CacheManager
-      if (people.length === 0 && window.CacheManager && typeof window.CacheManager.get === 'function') {
-        people = await window.CacheManager.get('people') || [];
-      }
-      
-      // Find person by email
       const person = people.find(p => 
         p.email === email || 
         p.workEmail === email || 
@@ -995,17 +1210,21 @@
       if (person) {
         return {
           email: email,
-          name: person.firstName && person.lastName ? `${person.firstName} ${person.lastName}` : person.name || email.split('@')[0],
+          name: person.name || person.fullName || `${person.firstName || ''} ${person.lastName || ''}`.trim() || email.split('@')[0],
+          firstName: person.firstName || (person.name || '').split(' ')[0] || '',
+          lastName: person.lastName || (person.name || '').split(' ').slice(1).join(' ') || '',
+          fullName: person.fullName || person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim(),
           company: person.company || person.accountName || '',
-          title: person.title || '',
-          phone: person.phone || person.workPhone || ''
+          title: person.title || person.job || person.role || '',
+          phone: person.phone || person.mobile || ''
         };
       }
       
-      // Fallback to basic structure
+      // Final fallback
       return {
         email: email,
         name: email.split('@')[0],
+        firstName: email.split('@')[0],
         company: '',
         title: '',
         phone: ''
@@ -1015,6 +1234,7 @@
       return {
         email: email,
         name: email.split('@')[0],
+        firstName: email.split('@')[0],
         company: '',
         title: '',
         phone: ''
@@ -1053,7 +1273,7 @@
 
   // Enrich recipient with account data
   async function enrichRecipientWithAccountData(recipient) {
-    if (!recipient || !recipient.company) return recipient;
+    if (!recipient) return recipient;
 
     try {
       // Get accounts data
@@ -1069,12 +1289,14 @@
         accounts = await window.CacheManager.get('accounts') || [];
       }
 
-      // Find matching account
+      // Find matching account by company name OR email domain
       const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g,' ').replace(/\s+/g,' ').trim();
       const comp = norm(recipient.company || '');
       const domain = (recipient.email || '').split('@')[1]?.toLowerCase() || '';
       
       let acct = null;
+      
+      // Try company name match first
       if (comp) {
         acct = accounts.find(a => {
           const accountName = a.accountName || a.name || '';
@@ -1086,6 +1308,7 @@
         }) || null;
       }
       
+      // Try domain match if no company match
       if (!acct && domain) {
         acct = accounts.find(a => {
           const d = String(a.domain || a.website || '').toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0];
@@ -1094,6 +1317,11 @@
       }
 
       if (acct) {
+        // Update recipient company if it was missing
+        if (!recipient.company) {
+          recipient.company = acct.accountName || acct.name || '';
+        }
+        
         const acctEnergy = {
           supplier: acct.electricitySupplier || '',
           currentRate: acct.currentRate || '',
@@ -1809,7 +2037,25 @@ ${sections.length > 1 ? `
       const r = recipient || {};
       const contact = r;
       const account = r.account || {};
-      const sender = (window.currentUser && window.currentUser.profile) || {};
+      
+      // Get sender info from settings (like wrapSonarHtmlWithBranding does)
+      const settings = (window.SettingsPage?.getSettings?.()) || {};
+      const g = settings?.general || {};
+      const senderFirstName = g.firstName || '';
+      const senderLastName = g.lastName || '';
+      const senderName = (senderFirstName && senderLastName) 
+          ? `${senderFirstName} ${senderLastName}`.trim()
+          : (g.agentName || 'Power Choosers Team');
+      
+      const sender = {
+        first_name: senderFirstName,
+        last_name: senderLastName,
+        full_name: senderName,
+        email: g.email || '',
+        phone: g.phone || '',
+        title: g.jobTitle || 'Energy Strategist',
+        company: g.companyName || 'Power Choosers'
+      };
 
       const get = (obj, key) => {
         const k = String(key || '').trim();
