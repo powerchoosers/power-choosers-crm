@@ -570,7 +570,6 @@ button:hover:not(:disabled),
     margin-bottom: 10px; /* ensure content below does not overlap */
     pointer-events: auto; /* Ensure the bar itself doesn't block clicks */
 }
-.ai-inner { display: flex; flex-direction: column; gap: 10px; max-height: none; overflow: visible; }
 .ai-row { 
     display: flex; 
     gap: 8px; 
@@ -7573,6 +7572,17 @@ html, body {
 
 .pagination-current-container {
     position: relative;
+    display: inline-block;
+    /* Override flex centering for picker positioning */
+    flex: none;
+    align-self: flex-start;
+}
+
+/* Ensure pagination containers allow overflow for the picker on all pages */
+.pagination-current-container,
+.table-pagination,
+.unified-pagination {
+    overflow: visible !important;
 }
 
 .pagination-current {
@@ -7603,12 +7613,16 @@ html, body {
     bottom: 100%;
     left: 50%;
     transform: translateX(-50%);
-    margin-bottom: 8px;
+    margin-bottom: 0;
     display: none;
     z-index: 1000;
     /* Much larger hover zone for better responsiveness */
-    padding: 20px;
-    margin: -20px -20px 8px -20px;
+    padding: 20px 20px 0 20px;
+    /* Fix: Use separate margin properties to avoid overriding centering */
+    margin-top: -20px;
+    margin-left: 0;
+    margin-right: -20px;
+    margin-bottom: 0;
 }
 
 /* Add invisible bridge to the trigger button for better hover continuity */
@@ -7627,14 +7641,14 @@ html, body {
 .pagination-picker::after {
     content: '';
     position: absolute;
-    bottom: -6px;
+    bottom: 2px;
     left: 50%;
     transform: translateX(-50%);
     width: 0;
     height: 0;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-top: 6px solid var(--bg-card);
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid var(--bg-card);
     /* Add subtle border/shadow to match container border */
     filter: drop-shadow(0 1px 0 var(--border-light));
     pointer-events: none;
@@ -7659,6 +7673,8 @@ html, body {
     z-index: 1;
     /* Add slight delay for smoother interaction */
     transition: opacity 0.15s ease, transform 0.15s ease;
+    /* Move content down to connect with arrow */
+    margin-bottom: 6px;
 }
 
 .pagination-picker-header {
@@ -17497,4 +17513,48 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 .assigned-you {
     color: var(--orange-primary);
     font-weight: 500;
+}
+
+
+.ai-row {
+    margin-bottom: 12px;
+}
+
+.ai-row:last-child {
+    margin-bottom: 0;
+}
+
+.ai-prompt {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+    transition: border-color 0.2s ease;
+}
+
+.ai-prompt:focus {
+    outline: none;
+    border-color: var(--orange-primary);
+    box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.1);
+}
+
+
+
+.ai-row.actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+
+.ai-status {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-style: italic;
 }

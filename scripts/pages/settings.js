@@ -9,6 +9,15 @@ class SettingsPage {
                     text: '',
                     image: null
                 },
+                aiTemplates: {
+                    warm_intro: '',
+                    follow_up: '',
+                    energy_health: '',
+                    proposal: '',
+                    cold_email: '',
+                    invoice: '',
+                    who_we_are: ''
+                },
                 emailDeliverability: {
                     // SendGrid Settings
                     enableTracking: true,
@@ -27,11 +36,6 @@ class SettingsPage {
                     includePhysicalAddress: true,
                     gdprCompliant: true,
                     spamScoreCheck: false
-                },
-                geminiPrompts: {
-                    greeting: '',
-                    body: '',
-                    subject: ''
                 },
                 twilioNumbers: [],
                 general: {
@@ -105,13 +109,16 @@ class SettingsPage {
             convertBtn.addEventListener('click', async () => await this.convertDataUrlSignature());
         }
 
-        // Gemini prompts
-        const promptFields = [
-            'email-greeting-prompt',
-            'email-body-prompt', 
-            'email-subject-prompt'
+        // AI Template fields
+        const templateFields = [
+            'template-warm-intro',
+            'template-follow-up',
+            'template-energy-health',
+            'template-proposal',
+            'template-cold-email',
+            'template-invoice'
         ];
-        promptFields.forEach(fieldId => {
+        templateFields.forEach(fieldId => {
             const field = document.getElementById(fieldId);
             if (field) {
                 field.addEventListener('input', () => this.markDirty());
@@ -319,6 +326,18 @@ class SettingsPage {
 
     async saveSettings() {
         try {
+            // Before saving, capture AI template values
+            const aiTemplateFields = {
+                warm_intro: document.getElementById('template-warm-intro')?.value || '',
+                follow_up: document.getElementById('template-follow-up')?.value || '',
+                energy_health: document.getElementById('template-energy-health')?.value || '',
+                proposal: document.getElementById('template-proposal')?.value || '',
+                cold_email: document.getElementById('template-cold-email')?.value || '',
+                invoice: document.getElementById('template-invoice')?.value || '',
+                who_we_are: document.getElementById('who-we-are')?.value || ''
+            };
+            this.state.settings.aiTemplates = aiTemplateFields;
+
             // Save to Firebase first
             if (window.firebaseDB) {
                 await window.firebaseDB.collection('settings').doc('user-settings').set({
@@ -409,21 +428,29 @@ class SettingsPage {
         // Render email signature section (text + image preview + controls)
         this.renderSignatureSection();
 
-        // Render Gemini prompts
-        const greetingPrompt = document.getElementById('email-greeting-prompt');
-        if (greetingPrompt) {
-            greetingPrompt.value = this.state.settings.geminiPrompts.greeting || '';
-        }
+        // Render AI Templates
+        const aiTemplates = this.state.settings.aiTemplates || {};
 
-        const bodyPrompt = document.getElementById('email-body-prompt');
-        if (bodyPrompt) {
-            bodyPrompt.value = this.state.settings.geminiPrompts.body || '';
-        }
+        const warmIntro = document.getElementById('template-warm-intro');
+        if (warmIntro) warmIntro.value = aiTemplates.warm_intro || '';
 
-        const subjectPrompt = document.getElementById('email-subject-prompt');
-        if (subjectPrompt) {
-            subjectPrompt.value = this.state.settings.geminiPrompts.subject || '';
-        }
+        const followUp = document.getElementById('template-follow-up');
+        if (followUp) followUp.value = aiTemplates.follow_up || '';
+
+        const energyHealth = document.getElementById('template-energy-health');
+        if (energyHealth) energyHealth.value = aiTemplates.energy_health || '';
+
+        const proposal = document.getElementById('template-proposal');
+        if (proposal) proposal.value = aiTemplates.proposal || '';
+
+        const coldEmail = document.getElementById('template-cold-email');
+        if (coldEmail) coldEmail.value = aiTemplates.cold_email || '';
+
+        const invoice = document.getElementById('template-invoice');
+        if (invoice) invoice.value = aiTemplates.invoice || '';
+
+        const whoWeAre = document.getElementById('who-we-are');
+        if (whoWeAre) whoWeAre.value = aiTemplates.who_we_are || '';
 
         // Render Twilio phone numbers
         this.renderPhoneNumbers();

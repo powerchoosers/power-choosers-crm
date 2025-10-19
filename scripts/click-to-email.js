@@ -64,11 +64,19 @@
     (function wait(){
       if (window.emailManager){
         try {
-          if (typeof window.emailManager.openCompose === 'function'){
-            window.emailManager.openCompose({ to: addr });
+          if (typeof window.emailManager.openComposeWindow === 'function'){
+            window.emailManager.openComposeWindow();
+            setTimeout(()=>{ 
+              const to = document.getElementById('compose-to'); 
+              if (to) to.value = addr;
+              document.getElementById('compose-subject')?.focus();
+            }, 300);
           } else {
             document.getElementById('compose-email-btn')?.click();
-            setTimeout(()=>{ const to = document.getElementById('compose-to'); if (to) to.value = addr; }, 120);
+            setTimeout(()=>{ 
+              const to = document.getElementById('compose-to'); 
+              if (to) to.value = addr; 
+            }, 300);
           }
           setTimeout(()=>{ document.getElementById('compose-subject')?.focus(); }, 200);
         } catch(e){ console.warn('[ClickToEmail] compose open failed', e); }

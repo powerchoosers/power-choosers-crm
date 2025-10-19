@@ -183,6 +183,7 @@ class EmailManager {
                     this.renderConversationThreads(threads);
                 }
             } else {
+                console.warn('[EmailManager] Email tracking manager not available, trying BackgroundEmailsLoader fallback...');
                 
                 // FALLBACK: Try BackgroundEmailsLoader if EmailTrackingManager not available
                 if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.getEmailsData === 'function') {
@@ -445,6 +446,7 @@ class EmailManager {
         if (window.crm && window.crm.showToast) {
             window.crm.showToast('Email tracking test initiated. Check console for details.', 'info');
         }
+        console.log('[EmailManager] Email tracking test - this is a placeholder for testing email tracking functionality');
     }
 
     renderAIBar(aiBar) {
@@ -3929,6 +3931,7 @@ ${sections.length > 1 ? `
                 this.hideLoading();
                 }
             } else {
+                console.warn('[EmailManager] Email tracking manager not available, trying BackgroundEmailsLoader fallback...');
                 
                 // FALLBACK: Try BackgroundEmailsLoader if EmailTrackingManager not available
                 if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.getEmailsData === 'function') {
@@ -4007,6 +4010,7 @@ ${sections.length > 1 ? `
                     this.updateFolderCounts();
                 }
             } else {
+                console.warn('[EmailManager] Email tracking manager not available, trying BackgroundEmailsLoader fallback...');
                 
                 // FALLBACK: Try BackgroundEmailsLoader if EmailTrackingManager not available
                 if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.getEmailsData === 'function') {
@@ -6580,29 +6584,10 @@ ${sections.length > 1 ? `
 			// Remove meta, script, link, base tags anywhere
 			html = html.replace(/<\s*(meta|script|link|base)[^>]*>[\s\S]*?<\/\s*\1\s*>/gi, '');
 			html = html.replace(/<\s*(meta|script|link|base)[^>]*>/gi, '');
-			
-			// AGGRESSIVE quoted-printable cleanup
-			html = html.replace(/href=3D"/gi, 'href="');
-			html = html.replace(/src=3D"/gi, 'src="');
-			html = html.replace(/href="3D"/gi, 'href="');
-			html = html.replace(/src="3D"/gi, 'src="');
-			html = html.replace(/=3D/gi, '=');
-			
-			// Fix the specific pattern we're seeing: 3D%22
-			html = html.replace(/href=3D%22/gi, 'href="');
-			html = html.replace(/src=3D%22/gi, 'src="');
-			html = html.replace(/href="3D%22/gi, 'href="');
-			html = html.replace(/src="3D%22/gi, 'src="');
-			
-			// Fix malformed URLs that start with encoding artifacts
-			html = html.replace(/(href|src)="3D"?([^"]*)/gi, '$1="$2');
-			html = html.replace(/(href|src)=3D%22([^"]*)/gi, '$1="$2');
-			
 			// Upgrade insecure src/href to https
 			html = html.replace(/(\s(?:src|href)=")http:\/\//gi, '$1https://');
 			// Prevent navigation JS URLs
 			html = html.replace(/href="javascript:[^"]*"/gi, 'href="#"');
-			
 			return html;
 		} catch (e) {
 			console.warn('[EmailSanitize] Failed to sanitize HTML', e);
@@ -6913,6 +6898,7 @@ ${sections.length > 1 ? `
         });
         
         document._emailTrackingListenersBound = true;
+        console.log('[EmailManager] Email tracking listeners bound (one-time)');
     }
 
     handleEmailOpened(notification) {
