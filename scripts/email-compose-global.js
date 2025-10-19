@@ -71,10 +71,10 @@
         if (subjectInput && subjectInput.value.includes('Re:')) {
           console.log('[EmailCompose] Clearing Re: prefix from subject');
           subjectInput.value = '';
-        }
-        
-        // Focus the To input
-        setTimeout(() => toInput.focus(), 100);
+          }
+          
+          // Focus the To input
+          setTimeout(() => toInput.focus(), 100);
       }, 200);
     } else {
       console.warn('[EmailCompose] emailManager.openComposeWindow not available');
@@ -730,6 +730,12 @@
         // For HTML content, render it directly with a simple fade-in
         setTimeout(() => {
           editor.innerHTML = html;
+          // Mark editor mode for proper signature handling
+          if (templateType) {
+            editor.setAttribute('data-mode', 'html');
+          } else {
+            editor.removeAttribute('data-mode');
+          }
           editor.style.opacity = '0';
           editor.style.transform = 'translateY(10px)';
           editor.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
@@ -763,7 +769,7 @@
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <p>Hi ${firstName},</p>
         
         <p>${data.call_reference || 'Thank you for taking the time to speak with me today.'}</p>
@@ -791,7 +797,7 @@
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <p>Hi ${firstName},</p>
         
         <p>${data.progress_update || 'I wanted to follow up on our previous conversation about optimizing your energy costs.'}</p>
@@ -824,7 +830,7 @@
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <p>Hi ${firstName},</p>
         
         <p>I'd like to offer ${company} a complimentary Energy Health Check to ensure you're getting the best value from your current energy setup.</p>
@@ -859,7 +865,7 @@
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <p>Hi ${firstName},</p>
         
         <p>${data.proposal_summary || 'I\'m pleased to present our proposal for optimizing your energy procurement strategy.'}</p>
@@ -885,7 +891,7 @@
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <p>Hi ${firstName},</p>
         
         <p>${data.opening_hook || `${company} likely faces the same energy cost challenges as other businesses in your industry.`}</p>
@@ -922,7 +928,7 @@
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <p>Hi ${firstName},</p>
         
         <p>${data.intro_paragraph || `As we discussed, I'll conduct a comprehensive energy analysis for ${company} to identify potential cost savings and optimization opportunities.`}</p>
@@ -959,7 +965,7 @@
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <p>Hi ${firstName},</p>
         
         <p>${data.list_header || 'How We Can Help:'}</p>
@@ -993,11 +999,11 @@
     const senderLocation = g.location || '';
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto;">
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto;">
         ${sonarGeneratedHtml}
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-          <p style="margin: 0; font-size: 14px; color: #666;">
+          <p style="margin: 0; font-size: 14px;">
             <strong>${senderName}</strong><br>
             ${senderTitle}<br>
             Power Choosers<br>
@@ -1222,10 +1228,236 @@
     });
   }
 
+  // ========== EMAIL SENDING FUNCTIONS ==========
+  
+  async function sendEmailViaSendGrid(emailData) {
+    try {
+      const { to, subject, content, _deliverability, threadId, inReplyTo, references, trackingMetadata } = emailData;
+      
+      // Generate unique tracking ID for this email
+      const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Prepare email data for SendGrid
+      const emailPayload = {
+        to: to,
+        subject: subject,
+        content: content,
+        trackingId: trackingId,
+        threadId: threadId,
+        inReplyTo: inReplyTo,
+        references: references,
+        _deliverability: _deliverability
+      };
+      
+      // Send via SendGrid API
+      const response = await fetch(`${window.API_BASE_URL}/api/email/sendgrid-send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(emailPayload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send email via SendGrid');
+      }
+
+      const result = await response.json();
+      console.log('[SendGrid] Email sent successfully:', result);
+      
+      // Store email record for tracking
+      if (window.emailTrackingManager && result.trackingId) {
+        const trackingEmailData = {
+          id: result.trackingId,
+          to: emailData.to,
+          subject: emailData.subject,
+          content: content,
+          from: 'Lewis Patterson <noreply@powerchoosers.com>',
+          provider: 'sendgrid',
+          sentVia: 'sendgrid',
+          sendgridMessageId: result.messageId, // SendGrid's x-message-id
+          sentAt: new Date().toISOString(),
+          threadId: threadId || null,
+          inReplyTo: inReplyTo || null,
+          references: Array.isArray(references) ? references : (references ? [references] : []),
+          trackingMetadata: trackingMetadata || null
+        };
+        
+        try {
+          await window.emailTrackingManager.saveEmailRecord(trackingEmailData);
+          console.log('[SendGrid] Email record saved to tracking system');
+        } catch (trackingError) {
+          console.warn('[SendGrid] Failed to save email record:', trackingError);
+        }
+      }
+      
+      return {
+        success: true,
+        trackingId: result.trackingId,
+        messageId: result.trackingId,
+        message: 'Email sent successfully via SendGrid'
+      };
+
+    } catch (error) {
+      console.error('[SendGrid] Send error:', error);
+      throw error;
+    }
+  }
+
+  async function sendEmail() {
+    const toInput = document.getElementById('compose-to');
+    const subjectInput = document.getElementById('compose-subject');
+    const bodyInput = document.querySelector('.body-input');
+    
+    const to = toInput?.value?.trim() || '';
+    const subject = subjectInput?.value?.trim() || '';
+    
+    // Detect HTML mode and extract content appropriately
+    const isHtmlMode = bodyInput?.getAttribute('data-mode') === 'html';
+    const body = isHtmlMode ? 
+      (bodyInput?.textContent || '') :  // HTML mode: get raw HTML code
+      (bodyInput?.innerHTML || '');     // Text mode: get rendered HTML
+    
+    console.log('[EmailCompose] Email mode:', isHtmlMode ? 'HTML' : 'Text');
+    console.log('[EmailCompose] Content preview:', body.substring(0, 100) + '...');
+    
+    if (!to) {
+      window.crm?.showToast('Please enter recipients');
+      toInput?.focus();
+      return;
+    }
+    
+    if (!subject) {
+      window.crm?.showToast('Please enter a subject');
+      subjectInput?.focus();
+      return;
+    }
+    
+    if (!body) {
+      window.crm?.showToast('Please enter email content');
+      bodyInput?.focus();
+      return;
+    }
+
+    try {
+      // Get deliverability settings from settings.js
+      const settings = (window.SettingsPage && window.SettingsPage.getSettings) ? window.SettingsPage.getSettings() : (JSON.parse(localStorage.getItem('crm-settings')||'{}'));
+      const deliver = settings?.emailDeliverability || {};
+      
+      // Show sending state
+      const sendButton = document.querySelector('#compose-send');
+      if (sendButton) {
+        sendButton.disabled = true;
+        sendButton.textContent = 'Sending...';
+      }
+
+      // Optionally remove signature image if disabled
+      let preparedBody = body;
+      if (deliver.signatureImageEnabled === false) {
+        preparedBody = preparedBody.replace(/<img[^>]*alt=\"Signature\"[\s\S]*?>/gi, '');
+      }
+
+      // Check if signature is already in the body (prevent duplication)
+      const signature = window.getEmailSignature ? window.getEmailSignature() : '';
+      const hasSignature = preparedBody.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;');
+
+      // Only add signature for standard mode (non-HTML AI emails)
+      // HTML templates have their own hardcoded signatures via wrapSonarHtmlWithBranding
+      let contentWithSignature = preparedBody;
+      if (!isHtmlMode && !hasSignature && signature) {
+        contentWithSignature = preparedBody + signature;
+      }
+
+      const emailData = {
+        to: to.split(',').map(email => email.trim()),
+        subject,
+        content: contentWithSignature,
+        trackingMetadata: window._lastGeneratedMetadata || null
+      };
+
+      // Send via SendGrid
+      let result;
+      try {
+        console.log('[EmailCompose] Sending via SendGrid...');
+        result = await sendEmailViaSendGrid({ ...emailData, _deliverability: deliver });
+        console.log('[EmailCompose] Email sent via SendGrid');
+        
+        // Track email performance if metadata is available
+        if (window._lastGeneratedMetadata) {
+          const trackingData = {
+            emailId: result.trackingId || `email_${Date.now()}`,
+            recipientEmail: to,
+            subjectStyle: window._lastGeneratedMetadata.subject_style,
+            ctaType: window._lastGeneratedMetadata.cta_type,
+            openingStyle: window._lastGeneratedMetadata.opening_style,
+            timestamp: new Date().toISOString(),
+            event: 'sent'
+          };
+          
+          // Send to tracking endpoint
+          fetch('/api/track-email-performance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(trackingData)
+          }).catch(err => console.warn('[Tracking] Failed to log send event:', err));
+          
+          // Clear metadata after tracking
+          window._lastGeneratedMetadata = null;
+        }
+      } catch (sendGridError) {
+        console.error('[EmailCompose] SendGrid failed:', sendGridError);
+        throw new Error(`Failed to send email: ${sendGridError.message}`);
+      }
+      
+      // Close compose window on success
+      closeComposeWindow();
+      
+      // Show success message
+      window.crm?.showToast('Email sent successfully!');
+
+    } catch (error) {
+      console.error('[EmailCompose] Send email error:', error);
+      window.crm?.showToast('Failed to send email: ' + error.message);
+    } finally {
+      // Reset send button
+      const sendButton = document.querySelector('#compose-send');
+      if (sendButton) {
+        sendButton.disabled = false;
+        sendButton.textContent = 'Send';
+      }
+    }
+  }
+
+  function closeComposeWindow() {
+    const composeWindow = document.getElementById('compose-window');
+    if (composeWindow) {
+      composeWindow.classList.remove('open');
+      setTimeout(() => {
+        composeWindow.style.display = 'none';
+      }, 300);
+    }
+  }
+
+  function setupSendButtonHandler() {
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('#compose-send')) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        console.log('[EmailCompose] Send button clicked');
+        sendEmail();
+      }
+    });
+  }
+
   // ========== INITIALIZATION ==========
   
   // Setup AI functionality
   setupAIButtonHandler();
+  
+  // Setup send button functionality
+  setupSendButtonHandler();
 
-  console.log('[EmailCompose] Global module with AI initialized');
+  console.log('[EmailCompose] Global module with AI and send functionality initialized');
 })();
