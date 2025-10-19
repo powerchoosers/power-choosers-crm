@@ -32,6 +32,8 @@ function cors(req, res) {
 
 // Company research cache (session-level)
 const companyResearchCache = new Map();
+const linkedinResearchCache = new Map();
+const websiteResearchCache = new Map();
 
 async function researchCompanyInfo(companyName, industry) {
   if (!companyName) return null;
@@ -104,6 +106,121 @@ async function saveAccountDescription(accountId, description) {
   } catch (error) {
     console.error('[Research] Failed to save description:', error);
     return false;
+  }
+}
+
+async function researchLinkedInCompany(linkedinUrl, companyName) {
+  // Graceful handling: return null if no LinkedIn URL
+  if (!linkedinUrl) {
+    console.log(`[LinkedIn] No LinkedIn URL for ${companyName}`);
+    return null;
+  }
+  
+  const cacheKey = linkedinUrl;
+  if (linkedinResearchCache.has(cacheKey)) {
+    console.log(`[LinkedIn] Using cached data for ${companyName}`);
+    return linkedinResearchCache.get(cacheKey);
+  }
+  
+  try {
+    // Use Perplexity to research the LinkedIn profile
+    const linkedinPrompt = `Research the LinkedIn company page at ${linkedinUrl}. Extract: 
+    - Company size (employee count)
+    - Recent posts or announcements
+    - Industry focus and specialties
+    - Any energy-related initiatives or sustainability programs
+    Provide a concise 2-3 sentence summary focusing on operational details relevant to energy discussions.`;
+    
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'sonar',
+        messages: [{ role: 'user', content: linkedinPrompt }],
+        max_tokens: 200,
+        temperature: 0.3
+      })
+    });
+    
+    if (!response.ok) {
+      console.error(`[LinkedIn] API error: ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    const linkedinData = data.choices?.[0]?.message?.content || null;
+    
+    if (linkedinData) {
+      console.log(`[LinkedIn] Found data for ${companyName}`);
+      linkedinResearchCache.set(cacheKey, linkedinData);
+    }
+    
+    return linkedinData;
+  } catch (error) {
+    console.error('[LinkedIn] Research failed:', error);
+    return null; // Graceful failure
+  }
+}
+
+async function scrapeCompanyWebsite(domain, companyName) {
+  // Graceful handling: return null if no domain
+  if (!domain) {
+    console.log(`[Web Scrape] No domain for ${companyName}`);
+    return null;
+  }
+  
+  try {
+    // Clean domain
+    const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    
+    const cacheKey = cleanDomain;
+    if (websiteResearchCache.has(cacheKey)) {
+      console.log(`[Web Scrape] Using cached data for ${companyName}`);
+      return websiteResearchCache.get(cacheKey);
+    }
+    
+    // Use Perplexity to analyze the website
+    const websitePrompt = `Analyze the company website ${cleanDomain}. Extract:
+    - What the company does (1 sentence)
+    - Recent news or announcements from their site
+    - Information about facilities, locations, or operations
+    - Any mentions of energy usage, sustainability, or operational scale
+    Provide a concise 2-3 sentence summary focusing on energy-relevant operational details.`;
+    
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'sonar',
+        messages: [{ role: 'user', content: websitePrompt }],
+        max_tokens: 200,
+        temperature: 0.3
+      })
+    });
+    
+    if (!response.ok) {
+      console.error(`[Web Scrape] API error: ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    const websiteData = data.choices?.[0]?.message?.content || null;
+    
+    if (websiteData) {
+      console.log(`[Web Scrape] Found data for ${companyName}`);
+      websiteResearchCache.set(cacheKey, websiteData);
+    }
+    
+    return websiteData;
+  } catch (error) {
+    console.error('[Web Scrape] Website analysis failed:', error);
+    return null; // Graceful failure
   }
 }
 
@@ -462,7 +579,7 @@ function getTemplateSchema(templateType) {
   return schemas[templateType] || generalSchema;
 }
 
-async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre }) {
+async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, marketContext }) {
   // Extract recipient data
   const r = recipient || {};
   const name = r.fullName || r.full_name || r.name || '';
@@ -488,13 +605,33 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
     .replace(/\s+/g, ' ') // Normalize whitespace
     .trim();
 
-  // If no description and we have company name, research it
+  // If no description and we have company name, do enhanced research
   let researchData = null;
+  let linkedinContext = null;
+  let websiteContext = null;
+
   if (!accountDescription && company) {
-    console.log(`[Research] No description for ${company}, researching...`);
-    accountDescription = await researchCompanyInfo(company, industry);
+    console.log(`[Research] No description for ${company}, starting enhanced research...`);
     
-    // Save to Firestore if we found something and have account ID
+    // Get LinkedIn URL from account or recipient
+    const linkedinUrl = r.account?.linkedin || r.account?.linkedinUrl || r.linkedin || null;
+    
+    // Get domain from account
+    const domain = r.account?.domain || r.account?.website || null;
+    
+    // Run all research in parallel for speed
+    const [basicResearch, linkedinResearch, websiteResearch] = await Promise.all([
+      researchCompanyInfo(company, industry),
+      researchLinkedInCompany(linkedinUrl, company),
+      scrapeCompanyWebsite(domain, company)
+    ]);
+    
+    // Use basic research as primary description
+    accountDescription = basicResearch;
+    linkedinContext = linkedinResearch;
+    websiteContext = websiteResearch;
+    
+    // Save basic description to Firestore if we found something
     if (accountDescription && r.account?.id) {
       researchData = await saveAccountDescription(r.account.id, accountDescription);
     }
@@ -531,6 +668,8 @@ RECIPIENT INFORMATION:
 ${job ? `- Role: ${job}` : ''}
 ${industry ? `- Industry: ${industry}` : ''}
 ${accountDescription ? `- Company Description: ${accountDescription}` : ''}
+${linkedinContext ? `- LinkedIn Insights: ${linkedinContext}` : ''}
+${websiteContext ? `- Company Website Info: ${websiteContext}` : ''}
 ${energy.supplier ? `- Current Supplier: ${energy.supplier}` : ''}
 ${energy.currentRate ? `- Current Rate: ${energy.currentRate}/kWh` : ''}
 ${contractEndLabel ? `- Contract Ends: ${contractEndLabel}` : ''}
@@ -602,7 +741,7 @@ TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: "Hello ${firstName},"
 - opening_hook: Start with problem awareness or market condition (1-2 sentences). ${accountDescription ? `Reference: "${accountDescription}".` : 'Reference their business.'} Examples: "Companies in ${industry || 'your industry'} are facing rising electricity costs", "${company} likely sees energy as a significant operational expense", "With contracts renewing in 2025, ${company} may be facing higher energy rates" IMPORTANT: Always reference ${company} specifically. Use qualitative language (rising, increasing, higher) NOT percentages (15-25%, 20-30%). Keep it natural and conversational.
-- value_proposition: How Power Choosers helps (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save 10-20%", "reduce costs by $X annually", "helped similar companies achieve Y". Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK. Statistics ARE allowed here (value prop only), just not in opening_hook.
+- value_proposition: How Power Choosers helps (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X annually", "helped similar companies achieve Y". Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK. Statistics ARE allowed here (value prop only), just not in opening_hook.
 - social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional)
 - cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
 - cta_type: Return "${ctaPattern.type}"
@@ -610,7 +749,7 @@ Generate text for these fields:
 CRITICAL QUALITY RULES:
 - PROBLEM AWARENESS: Lead with industry-specific problem or market condition
 - SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
-- MEASURABLE CLAIMS: "save 10-20%" or "$X annually" NOT "significant savings"
+- MEASURABLE CLAIMS: "save ${marketContext?.typicalClientSavings || '10-20%'}" or "$X annually" NOT "significant savings"
 - COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
 - QUALIFYING CTAs: Prefer questions over meeting requests for cold emails
 - SOCIAL PROOF: Use real outcomes when mentioning similar companies
@@ -623,7 +762,7 @@ CRITICAL QUALITY RULES:
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
 - EMAIL LENGTH: Keep total email body under 100 words
 - CTA LENGTH: CTAs should be 10-12 words maximum
-- VALUE PROP MUST: Include HOW we help AND WHAT results (e.g., "We help [industry] companies secure better rates before contracts expire. Clients typically save 10-20%.")
+- VALUE PROP MUST: Include HOW we help AND WHAT results (e.g., "We help [industry] companies secure better rates before contracts expire. Clients typically save ${marketContext?.typicalClientSavings || '10-20%'}.")
 
 FORBIDDEN PHRASES (especially in opening_hook):
 - "I've been tracking how [industry] companies..."
@@ -719,10 +858,11 @@ ${job ? `- Acknowledge their role as ${job}` : ''}
 - Personalize based on their industry and current situation
 - Make it feel like you just spoke with them
 
+${marketContext?.enabled ? `
 KEY CONTEXT:
-- Electricity rates rising 15-25% due to data center demand
-- Companies with contracts ending 2025-2026 face higher renewal rates
-- Early renewals save 20-30% vs. waiting`;
+- Electricity rates rising ${marketContext.rateIncrease || '15-25%'} ${marketContext.marketInsights || 'due to data center demand'}
+- Companies with contracts ending ${marketContext.renewalYears || '2025-2026'} face higher renewal rates
+- Early renewals save ${marketContext.earlyRenewalSavings || '20-30%'} vs. waiting` : ''}`;
 
   const outputFormat = `
 OUTPUT FORMAT:
@@ -745,7 +885,7 @@ EMAIL TYPE: Cold Email (Never Spoke Before)
 CRITICAL QUALITY RULES:
 - PROBLEM AWARENESS: Lead with industry-specific problem or market condition
 - SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
-- MEASURABLE CLAIMS: "save 10-20%" or "$X annually" NOT "significant savings"
+- MEASURABLE CLAIMS: "save ${marketContext?.typicalClientSavings || '10-20%'}" or "$X annually" NOT "significant savings"
 - COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
 - QUALIFYING CTAs: Prefer questions over meeting requests for cold emails
 - SOCIAL PROOF: Use real outcomes when mentioning similar companies
@@ -768,10 +908,10 @@ IMPORTANT: Always reference ${company} specifically, not other companies.
 
 VALUE PROPOSITION (1-2 sentences MINIMUM):
 - Explain how Power Choosers helps with SPECIFIC MEASURABLE VALUE
-- MUST include: (1) What we do, (2) Concrete numbers: "save 10-20%", "reduce costs by $X", "clients typically see Y"
+- MUST include: (1) What we do, (2) Concrete numbers: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X", "clients typically see Y"
 - Reference: ${accountDescription ? `"${accountDescription}"` : 'their business type'}
 - Add social proof if relevant: "helped similar companies achieve [specific result]"
-- Example: "We help ${industry || 'businesses'} secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs."
+- Example: "We help ${industry || 'businesses'} secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs."
 - NEVER end with incomplete phrases or "within [company name]"
 - ALWAYS include a complete value proposition - never skip this field
 - THIS FIELD IS MANDATORY - NEVER LEAVE BLANK
@@ -901,7 +1041,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Missing API key' });
     }
 
-    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre } = req.body || {};
+    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext } = req.body || {};
     
     // Detect template type for both HTML and standard modes
     const templateType = getTemplateType(prompt);
@@ -931,7 +1071,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    const { prompt: systemPrompt, researchData } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre });
+    const { prompt: systemPrompt, researchData } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext });
     const fullSystemPrompt = dateContext + systemPrompt;
     
     // Call Perplexity API
@@ -981,7 +1121,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
             console.warn('[Validation] Incomplete value prop detected, fixing...');
             jsonData.value_proposition = jsonData.value_proposition.replace(
               /\b(within|like|such as|including)\s+[A-Z][^.!?]*$/i,
-              'secure better energy rates before contracts expire. Clients typically save 10-20% on annual costs.'
+              `secure better energy rates before contracts expire. Clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual costs.`
             );
           }
         }
@@ -999,7 +1139,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         if (templateType === 'cold_email' && (!jsonData.value_proposition || jsonData.value_proposition.trim() === '')) {
           console.warn('[Validation] Missing value proposition detected, adding default...');
           const industry = recipient?.industry || 'businesses';
-          jsonData.value_proposition = `We help ${industry} companies secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs.`;
+          jsonData.value_proposition = `We help ${industry} companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs.`;
         }
         
         // Validate missing opening_hook for cold emails
