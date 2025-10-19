@@ -1717,18 +1717,48 @@
                                             </div>
                                             
                                             <div class="settings-group">
-                                                <h4 class="settings-group-title">Gemini AI Prompts</h4>
+                                                <h4 class="settings-group-title">AI Email Templates</h4>
+                                                <p class="settings-hint">Customize the AI instructions for each email template type. These control how Perplexity Sonar generates email content. Leave blank to use default instructions.</p>
+                                                
+                                                <!-- Template 1: Warm Intro -->
                                                 <div class="settings-field">
-                                                    <label for="email-greeting-prompt">Email Greeting Prompt</label>
-                                                    <textarea id="email-greeting-prompt" class="settings-textarea" placeholder="Enter the prompt for generating email greetings..." rows="3"></textarea>
+                                                    <label for="template-warm-intro">1. Warm Introduction After Call</label>
+                                                    <textarea id="template-warm-intro" class="settings-textarea" placeholder="Default: Instructions for warm introduction emails after speaking with a prospect..." rows="6"></textarea>
                                                 </div>
+                                                
+                                                <!-- Template 2: Follow-up -->
                                                 <div class="settings-field">
-                                                    <label for="email-body-prompt">Email Body Prompt</label>
-                                                    <textarea id="email-body-prompt" class="settings-textarea" placeholder="Enter the prompt for generating email body content..." rows="4"></textarea>
+                                                    <label for="template-follow-up">2. Follow-up with Value Props</label>
+                                                    <textarea id="template-follow-up" class="settings-textarea" placeholder="Default: Instructions for follow-up emails with value propositions..." rows="6"></textarea>
                                                 </div>
+                                                
+                                                <!-- Template 3: Energy Health Check -->
                                                 <div class="settings-field">
-                                                    <label for="email-subject-prompt">Email Subject Prompt</label>
-                                                    <textarea id="email-subject-prompt" class="settings-textarea" placeholder="Enter the prompt for generating email subjects..." rows="3"></textarea>
+                                                    <label for="template-energy-health">3. Energy Health Check</label>
+                                                    <textarea id="template-energy-health" class="settings-textarea" placeholder="Default: Instructions for energy health check invitation emails..." rows="6"></textarea>
+                                                </div>
+                                                
+                                                <!-- Template 4: Proposal Delivery -->
+                                                <div class="settings-field">
+                                                    <label for="template-proposal">4. Proposal Delivery</label>
+                                                    <textarea id="template-proposal" class="settings-textarea" placeholder="Default: Instructions for proposal delivery emails..." rows="6"></textarea>
+                                                </div>
+                                                
+                                                <!-- Template 5: Cold Email -->
+                                                <div class="settings-field">
+                                                    <label for="template-cold-email">5. Cold Email Outreach</label>
+                                                    <textarea id="template-cold-email" class="settings-textarea" placeholder="Default: Instructions for cold email outreach to prospects..." rows="6"></textarea>
+                                                </div>
+                                                
+                                                <!-- Template 6: Invoice Request -->
+                                                <div class="settings-field">
+                                                    <label for="template-invoice">6. Invoice Request</label>
+                                                    <textarea id="template-invoice" class="settings-textarea" placeholder="Default: Instructions for invoice request emails..." rows="6"></textarea>
+                                                </div>
+                                                
+                                                <div class="settings-field">
+                                                    <label for="who-we-are">7. Who We Are (Company Description)</label>
+                                                    <textarea id="who-we-are" class="settings-textarea" placeholder="Default: You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates..." rows="4"></textarea>
                                                 </div>
                                             </div>
                                         </div>
@@ -2888,6 +2918,7 @@
                 <input type="text" class="subject-input" id="compose-subject" placeholder="Subject">
             </div>
             
+            
             <div class="compose-editor">
                 <div class="editor-toolbar" role="toolbar" aria-label="Email editor actions">
                     <button class="toolbar-btn toolbar-ai" type="button" data-action="ai" aria-label="Write with AI" title="Write with AI">
@@ -3049,25 +3080,27 @@
                 <!-- Variables toolbar: slides down similar to link/formatting bars -->
                 <div class="variables-bar" aria-hidden="true"></div>
                 
-                <!-- AI toolbar: slides down similar to link/formatting and variables -->
-                <div class="ai-bar" aria-hidden="true"></div>
+                <!-- AI Bar: slides down from underneath the toolbar -->
+                <div class="ai-bar" aria-hidden="true" role="region" aria-label="AI email generation">
+                    <!-- Content filled by renderAIBar() -->
+                </div>
                 
                 <div class="compose-body">
                     <div class="body-input" contenteditable="true" role="textbox" aria-multiline="true" data-editor="rich" placeholder="Compose email..."></div>
                     <div class="compose-preview" hidden></div>
                 </div>
             </div>
-            
-            <div class="compose-footer">
-                <div class="compose-actions">
-                    <button class="compose-send-btn" id="compose-send">
-                        <span style="font-weight: bold;">Send</span>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="22" y1="2" x2="11" y2="13"/>
-                            <polygon points="22,2 15,22 11,13 2,9 22,2"/>
-                        </svg>
-                    </button>
-                </div>
+        </div>
+        
+        <div class="compose-footer">
+            <div class="compose-actions">
+                <button class="compose-send-btn" id="compose-send">
+                    <span style="font-weight: bold;">Send</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"/>
+                        <polygon points="22,2 15,22 11,13 2,9 22,2"/>
+                    </svg>
+                </button>
             </div>
         </div>
     </div>

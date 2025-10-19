@@ -38,21 +38,12 @@
       return;
     }
     
-    // Initialize email manager if not already available
-    if (!window.emailManager && window.EmailManager) {
-      console.log('[EmailCompose] Initializing EmailManager...');
-      window.emailManager = new window.EmailManager();
-      
-      // Wait for EmailManager to be fully initialized
-      setTimeout(() => {
-        openComposeWithManager(toEmail, name);
-      }, 300);
-    } else if (window.emailManager) {
-      // EmailManager already exists, use it directly
+    // Use the new emails-redesigned.js approach
+    if (window.emailManager && typeof window.emailManager.openComposeWindow === 'function') {
+      console.log('[EmailCompose] Using emails-redesigned.js compose function...');
       openComposeWithManager(toEmail, name);
     } else {
-      // This should rarely happen now since emails.js loads early
-      console.warn('[EmailCompose] EmailManager not available - emails.js may not have loaded');
+      console.warn('[EmailCompose] emailManager not available - emails-redesigned.js may not have loaded');
       window.crm?.showToast && window.crm.showToast('Email compose not available');
     }
   }
@@ -61,31 +52,32 @@
     const emailManager = window.emailManager;
     
     if (emailManager && typeof emailManager.openComposeWindow === 'function') {
-      console.log('[EmailCompose] Opening compose with EmailManager...');
-      emailManager.openComposeWindow();
+      console.log('[EmailCompose] Opening compose with emails-redesigned.js...');
+      // Call openComposeWindow with null to ensure it's treated as a new email
+      emailManager.openComposeWindow(null);
       
       // Wait for compose window to be ready, then prefill
       setTimeout(() => {
         const toInput = document.getElementById('compose-to');
+        const subjectInput = document.getElementById('compose-subject');
+        
+        console.log('[EmailCompose] Subject field value after opening:', subjectInput?.value);
+        
         if (toInput) {
           toInput.value = toEmail;
-          
-          // Set selected recipient if emailManager is available
-          if (emailManager && name) {
-            emailManager._selectedRecipient = {
-              email: toEmail,
-              name: name,
-              fullName: name,
-              full_name: name
-            };
-          }
-          
-          // Focus the To input
-          setTimeout(() => toInput.focus(), 100);
         }
+        
+        // Ensure subject is empty for new emails
+        if (subjectInput && subjectInput.value.includes('Re:')) {
+          console.log('[EmailCompose] Clearing Re: prefix from subject');
+          subjectInput.value = '';
+        }
+        
+        // Focus the To input
+        setTimeout(() => toInput.focus(), 100);
       }, 200);
     } else {
-      console.warn('[EmailCompose] EmailManager.openComposeWindow not available');
+      console.warn('[EmailCompose] emailManager.openComposeWindow not available');
       window.crm?.showToast && window.crm.showToast('Email compose not available');
     }
   }
