@@ -716,30 +716,30 @@ button:hover:not(:disabled),
     100% { background-position: -200% 0; }
 }
 
-/* Orange glow effect for compose window during generation */
+/* Orange glow effect for specific compose inputs during generation */
 .compose-generating {
     position: relative;
     border: 2px solid var(--orange-primary);
-    border-radius: 12px;
+    border-radius: 8px;
     box-shadow: 
-        0 0 20px rgba(249, 115, 22, 0.3),
-        0 0 40px rgba(249, 115, 22, 0.2),
-        inset 0 0 20px rgba(249, 115, 22, 0.1);
+        0 0 15px rgba(249, 115, 22, 0.3),
+        0 0 30px rgba(249, 115, 22, 0.2),
+        inset 0 0 15px rgba(249, 115, 22, 0.1);
     animation: compose-glow 2s ease-in-out infinite alternate;
 }
 
 @keyframes compose-glow {
     0% { 
         box-shadow: 
-            0 0 20px rgba(249, 115, 22, 0.3),
-            0 0 40px rgba(249, 115, 22, 0.2),
-            inset 0 0 20px rgba(249, 115, 22, 0.1);
+            0 0 15px rgba(249, 115, 22, 0.3),
+            0 0 30px rgba(249, 115, 22, 0.2),
+            inset 0 0 15px rgba(249, 115, 22, 0.1);
     }
     100% { 
         box-shadow: 
-            0 0 30px rgba(249, 115, 22, 0.5),
-            0 0 60px rgba(249, 115, 22, 0.3),
-            inset 0 0 30px rgba(249, 115, 22, 0.2);
+            0 0 25px rgba(249, 115, 22, 0.5),
+            0 0 50px rgba(249, 115, 22, 0.3),
+            inset 0 0 25px rgba(249, 115, 22, 0.2);
     }
 }
 
@@ -750,7 +750,7 @@ button:hover:not(:disabled),
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(255, 255, 255, 0.95);
+    background: transparent;
     backdrop-filter: blur(2px);
     z-index: 100;
     display: flex;
@@ -16254,6 +16254,29 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 
 #settings-page .settings-content {
     padding: var(--spacing-lg);
+}
+
+/* Market Context Toggle */
+.market-context-fields {
+    margin-top: 16px;
+    padding: 20px;
+    background: var(--bg-primary);
+    border-radius: 8px;
+    border: 1px solid var(--border-light);
+    transition: opacity 0.3s ease;
+}
+
+.market-context-fields.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.market-context-fields .settings-field {
+    margin-bottom: 16px;
+}
+
+.market-context-fields .settings-field:last-child {
+    margin-bottom: 0;
 }
 
 #settings-page .section-desc {

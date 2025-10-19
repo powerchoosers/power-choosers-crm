@@ -165,18 +165,15 @@
     
     if (!overlay) return;
     
-    // Add glow effect to compose window
-    composeWindow.classList.add('compose-generating');
-    
     // Show skeleton overlay
     overlay.style.display = 'flex';
     
-    // Add transition classes to inputs
+    // Add glow effect only to subject and body inputs (not entire window)
     if (subjectInput) {
-      subjectInput.classList.add('compose-input-transition', 'generating');
+      subjectInput.classList.add('compose-input-transition', 'generating', 'compose-generating');
     }
     if (bodyInput) {
-      bodyInput.classList.add('compose-input-transition', 'generating');
+      bodyInput.classList.add('compose-input-transition', 'generating', 'compose-generating');
     }
     
     // Animate skeleton bars with staggered delays
@@ -192,18 +189,15 @@
     
     if (!overlay) return;
     
-    // Remove glow effect
-    composeWindow.classList.remove('compose-generating');
-    
     // Hide skeleton overlay
     overlay.style.display = 'none';
     
-    // Remove transition classes from inputs
+    // Remove glow effect from specific inputs
     if (subjectInput) {
-      subjectInput.classList.remove('compose-input-transition', 'generating');
+      subjectInput.classList.remove('compose-input-transition', 'generating', 'compose-generating');
     }
     if (bodyInput) {
-      bodyInput.classList.remove('compose-input-transition', 'generating');
+      bodyInput.classList.remove('compose-input-transition', 'generating', 'compose-generating');
     }
     
     console.log('[AI Animation] Stopped generating animation');
@@ -391,7 +385,17 @@
         energy_health: aiTemplates.energy_health || 'Schedule an Energy Health Check',
         proposal: aiTemplates.proposal || 'Proposal delivery with next steps',
         cold_email: aiTemplates.cold_email || 'Cold email to a lead I could not reach by phone',
-        invoice: aiTemplates.invoice || 'Standard Invoice Request'
+        invoice: aiTemplates.invoice || 'Standard Invoice Request',
+        who_we_are: aiTemplates.who_we_are || 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.',
+        // NEW: Market Context
+        marketContext: aiTemplates.marketContext || {
+          enabled: true,
+          rateIncrease: '15-25%',
+          renewalYears: '2025-2026',
+          earlyRenewalSavings: '20-30%',
+          typicalClientSavings: '10-20%',
+          marketInsights: 'due to data center demand'
+        }
       };
     } catch (error) {
       console.warn('[AI] Error getting templates from settings:', error);
@@ -401,7 +405,16 @@
         energy_health: 'Schedule an Energy Health Check',
         proposal: 'Proposal delivery with next steps',
         cold_email: 'Cold email to a lead I could not reach by phone',
-        invoice: 'Standard Invoice Request'
+        invoice: 'Standard Invoice Request',
+        who_we_are: 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.',
+        marketContext: {
+          enabled: true,
+          rateIncrease: '15-25%',
+          renewalYears: '2025-2026',
+          earlyRenewalSavings: '20-30%',
+          typicalClientSavings: '10-20%',
+          marketInsights: 'due to data center demand'
+        }
       };
     }
   }
@@ -682,7 +695,9 @@
           recipient: recipient,
           mode: mode,
           senderName: senderName,
-          whoWeAre: whoWeAre
+          whoWeAre: whoWeAre,
+          // NEW: Pass market context
+          marketContext: aiTemplates.marketContext
         })
       });
 
@@ -1162,13 +1177,22 @@
         .replace(/^/, '<p>')
         .replace(/$/, '</p>');
       
-      // Wrap with branding
-      const fullHtml = wrapSonarHtmlWithBranding(htmlBody, recipient, subject);
-      
-      return {
-        subject: improveSubject(subject, recipient),
-        html: fullHtml
-      };
+      // Check mode: HTML uses profile branding, standard uses signature settings
+      if (mode === 'html') {
+        // HTML mode: Wrap with branding for profile-based signature
+        const fullHtml = wrapSonarHtmlWithBranding(htmlBody, recipient, subject);
+        
+        return {
+          subject: improveSubject(subject, recipient),
+          html: fullHtml
+        };
+      } else {
+        // Standard mode: Return content without branding so sendEmail() can append signature settings
+        return {
+          subject: improveSubject(subject, recipient),
+          html: htmlBody
+        };
+      }
     } catch (error) {
       console.error('[AI] Error formatting generated email:', error);
       return {

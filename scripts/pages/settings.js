@@ -16,7 +16,16 @@ class SettingsPage {
                     proposal: '',
                     cold_email: '',
                     invoice: '',
-                    who_we_are: ''
+                    who_we_are: '',
+                    // NEW: Market Context Settings
+                    marketContext: {
+                        enabled: true,
+                        rateIncrease: '15-25%',
+                        renewalYears: '2025-2026',
+                        earlyRenewalSavings: '20-30%',
+                        typicalClientSavings: '10-20%',
+                        marketInsights: 'due to data center demand'
+                    }
                 },
                 emailDeliverability: {
                     // SendGrid Settings
@@ -116,7 +125,8 @@ class SettingsPage {
             'template-energy-health',
             'template-proposal',
             'template-cold-email',
-            'template-invoice'
+            'template-invoice',
+            'who-we-are'
         ];
         templateFields.forEach(fieldId => {
             const field = document.getElementById(fieldId);
@@ -124,6 +134,30 @@ class SettingsPage {
                 field.addEventListener('input', () => this.markDirty());
             }
         });
+
+        // Market Context Toggle
+        const marketContextCheckbox = document.getElementById('market-context-enabled');
+        const marketContextFields = document.getElementById('market-context-fields');
+
+        if (marketContextCheckbox && marketContextFields) {
+            marketContextCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    marketContextFields.classList.remove('disabled');
+                } else {
+                    marketContextFields.classList.add('disabled');
+                }
+                this.markDirty();
+            }.bind(this));
+            
+            // Add input listeners for market context fields
+            ['market-rate-increase', 'market-renewal-years', 'market-early-renewal', 
+             'market-client-savings', 'market-insights'].forEach(id => {
+                const field = document.getElementById(id);
+                if (field) {
+                    field.addEventListener('input', () => this.markDirty());
+                }
+            });
+        }
 
         // Twilio phone numbers
         const addPhoneBtn = document.getElementById('add-phone-number');
@@ -334,7 +368,16 @@ class SettingsPage {
                 proposal: document.getElementById('template-proposal')?.value || '',
                 cold_email: document.getElementById('template-cold-email')?.value || '',
                 invoice: document.getElementById('template-invoice')?.value || '',
-                who_we_are: document.getElementById('who-we-are')?.value || ''
+                who_we_are: document.getElementById('who-we-are')?.value || '',
+                // NEW: Market Context
+                marketContext: {
+                    enabled: document.getElementById('market-context-enabled')?.checked ?? true,
+                    rateIncrease: document.getElementById('market-rate-increase')?.value || '15-25%',
+                    renewalYears: document.getElementById('market-renewal-years')?.value || '2025-2026',
+                    earlyRenewalSavings: document.getElementById('market-early-renewal')?.value || '20-30%',
+                    typicalClientSavings: document.getElementById('market-client-savings')?.value || '10-20%',
+                    marketInsights: document.getElementById('market-insights')?.value || 'due to data center demand'
+                }
             };
             this.state.settings.aiTemplates = aiTemplateFields;
 
@@ -451,6 +494,27 @@ class SettingsPage {
 
         const whoWeAre = document.getElementById('who-we-are');
         if (whoWeAre) whoWeAre.value = aiTemplates.who_we_are || '';
+
+        // NEW: Render Market Context
+        const marketContext = aiTemplates.marketContext || {};
+
+        const marketEnabled = document.getElementById('market-context-enabled');
+        if (marketEnabled) marketEnabled.checked = marketContext.enabled !== false;
+
+        const rateIncrease = document.getElementById('market-rate-increase');
+        if (rateIncrease) rateIncrease.value = marketContext.rateIncrease || '15-25%';
+
+        const renewalYears = document.getElementById('market-renewal-years');
+        if (renewalYears) renewalYears.value = marketContext.renewalYears || '2025-2026';
+
+        const earlyRenewal = document.getElementById('market-early-renewal');
+        if (earlyRenewal) earlyRenewal.value = marketContext.earlyRenewalSavings || '20-30%';
+
+        const clientSavings = document.getElementById('market-client-savings');
+        if (clientSavings) clientSavings.value = marketContext.typicalClientSavings || '10-20%';
+
+        const marketInsights = document.getElementById('market-insights');
+        if (marketInsights) marketInsights.value = marketContext.marketInsights || 'due to data center demand';
 
         // Render Twilio phone numbers
         this.renderPhoneNumbers();
