@@ -462,7 +462,7 @@ function getTemplateSchema(templateType) {
   return schemas[templateType] || generalSchema;
 }
 
-async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType }) {
+async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre }) {
   // Extract recipient data
   const r = recipient || {};
   const name = r.fullName || r.full_name || r.name || '';
@@ -550,7 +550,7 @@ ${notes ? `- Additional Notes: ${notes}` : ''}
   // For HTML mode, return text-only prompts based on template type
   if (mode === 'html') {
     
-    const basePrompt = `You are generating TEXT CONTENT ONLY for Power Choosers email templates.
+    const basePrompt = `${whoWeAre || 'You are generating TEXT CONTENT ONLY for Power Choosers email templates.'}
 
 SENDER: ${senderName}
 IMPORTANT: Return PLAIN TEXT only in JSON fields. NO HTML tags, NO styling, NO formatting.
@@ -710,7 +710,7 @@ CRITICAL RULES:
   }
 
   // Standard text mode (existing logic)
-  const identity = `You are ${senderName}, an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.
+  const identity = whoWeAre || `You are ${senderName}, an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.
 
 CONTEXT USAGE RULES:
 ${contractEndLabel ? `- The recipient's contract ends ${contractEndLabel} - YOU MUST REFERENCE THIS` : ''}
@@ -901,7 +901,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Missing API key' });
     }
 
-    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson' } = req.body || {};
+    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre } = req.body || {};
     
     // Detect template type for both HTML and standard modes
     const templateType = getTemplateType(prompt);
@@ -931,7 +931,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    const { prompt: systemPrompt, researchData } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType });
+    const { prompt: systemPrompt, researchData } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre });
     const fullSystemPrompt = dateContext + systemPrompt;
     
     // Call Perplexity API
