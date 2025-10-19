@@ -38,13 +38,13 @@
       return;
     }
     
-    // Use the new emails-redesigned.js approach
+    // Try emails-redesigned.js first, but fallback to direct DOM manipulation
     if (window.emailManager && typeof window.emailManager.openComposeWindow === 'function') {
       console.log('[EmailCompose] Using emails-redesigned.js compose function...');
       openComposeWithManager(toEmail, name);
     } else {
-      console.warn('[EmailCompose] emailManager not available - emails-redesigned.js may not have loaded');
-      window.crm?.showToast && window.crm.showToast('Email compose not available');
+      console.log('[EmailCompose] emailManager not available, using direct DOM approach...');
+      openComposeDirectly(toEmail, name);
     }
   }
   
@@ -79,6 +79,72 @@
     } else {
       console.warn('[EmailCompose] emailManager.openComposeWindow not available');
       window.crm?.showToast && window.crm.showToast('Email compose not available');
+    }
+  }
+  
+  function openComposeDirectly(toEmail, name) {
+    const composeWindow = document.getElementById('compose-window');
+    
+    if (!composeWindow) {
+      console.warn('[EmailCompose] Compose window not found');
+      return;
+    }
+    
+    // Reset compose window fields
+    const toInput = document.getElementById('compose-to');
+    const subjectInput = document.getElementById('compose-subject');
+    const ccInput = document.getElementById('compose-cc');
+    const bccInput = document.getElementById('compose-bcc');
+    const bodyInput = document.querySelector('.body-input');
+    
+    // Clear all fields
+    if (toInput) toInput.value = '';
+    if (subjectInput) subjectInput.value = '';
+    if (ccInput) ccInput.value = '';
+    if (bccInput) bccInput.value = '';
+    if (bodyInput) bodyInput.innerHTML = '';
+    
+    // Show compose window
+    composeWindow.style.display = 'flex';
+    setTimeout(() => {
+      composeWindow.classList.add('open');
+    }, 10);
+    
+    // Prefill the To field
+    setTimeout(() => {
+      if (toInput) {
+        toInput.value = toEmail;
+        toInput.focus();
+      }
+    }, 100);
+    
+    // Setup close button functionality if not already set up
+    setupComposeCloseButton();
+    
+    console.log('[EmailCompose] Opened compose window directly for:', toEmail);
+  }
+  
+  function setupComposeCloseButton() {
+    const closeBtn = document.getElementById('compose-close');
+    const composeWindow = document.getElementById('compose-window');
+    
+    if (closeBtn && !closeBtn.dataset.listenerAdded) {
+      closeBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Close compose window
+        if (composeWindow) {
+          composeWindow.classList.remove('open');
+          setTimeout(() => {
+            composeWindow.style.display = 'none';
+          }, 300);
+        }
+        
+        console.log('[EmailCompose] Compose window closed');
+      });
+      
+      closeBtn.dataset.listenerAdded = 'true';
     }
   }
   

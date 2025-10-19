@@ -54,13 +54,29 @@
   }
 
   function openInternalCompose(addr, name, onFail){
-    // Try direct helper first
+    // Try direct helper first (this should always work now)
     if (window.EmailCompose && typeof window.EmailCompose.openTo === 'function'){
-      try { window.EmailCompose.openTo(addr, name||''); return; } catch(_){}
+      try { 
+        window.EmailCompose.openTo(addr, name||''); 
+        return; 
+      } catch(e){ 
+        console.warn('[ClickToEmail] EmailCompose.openTo failed:', e);
+      }
     }
-    // Navigate to Emails page and try to open compose
-    try { if (window.crm && typeof window.crm.navigateToPage === 'function') window.crm.navigateToPage('emails'); } catch(_){ }
-    const start = Date.now(); const giveUp = start + 4000;
+    
+    // Fallback: Navigate to Emails page and try to open compose
+    console.log('[ClickToEmail] EmailCompose not available, trying emails page fallback...');
+    try { 
+      if (window.crm && typeof window.crm.navigateToPage === 'function') {
+        window.crm.navigateToPage('emails'); 
+      }
+    } catch(e){ 
+      console.warn('[ClickToEmail] Navigation failed:', e);
+    }
+    
+    const start = Date.now(); 
+    const giveUp = start + 4000;
+    
     (function wait(){
       if (window.emailManager){
         try {
