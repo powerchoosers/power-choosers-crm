@@ -1170,12 +1170,17 @@
         subject = 'Energy Solutions';
       }
       
-      // Convert body to HTML
+      // Convert body to HTML with proper paragraph spacing
       const htmlBody = body
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/\n/g, '<br>')
-        .replace(/^/, '<p>')
-        .replace(/$/, '</p>');
+        .trim()
+        .split('\n\n')  // Split on double newlines first
+        .filter(para => para.trim())  // Remove empty paragraphs
+        .map(para => {
+          // Convert single newlines within paragraphs to <br>
+          const formatted = para.replace(/\n/g, '<br>');
+          return `<p style="margin-bottom: 16px;">${formatted}</p>`;
+        })
+        .join('');  // Join without extra spacing since <p> tags provide it
       
       // Check mode: HTML uses profile branding, standard uses signature settings
       if (mode === 'html') {
@@ -1386,11 +1391,45 @@
       const signature = window.getEmailSignature ? window.getEmailSignature() : '';
       const hasSignature = preparedBody.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;');
 
+      // Debug signature retrieval
+      console.log('[Signature Debug] Signature retrieved:', signature ? 'YES' : 'NO', 'Length:', signature.length);
+      console.log('[Signature Debug] isHtmlMode:', isHtmlMode);
+      console.log('[Signature Debug] hasSignature:', hasSignature);
+      console.log('[Signature Debug] preparedBody length:', preparedBody.length);
+
       // Only add signature for standard mode (non-HTML AI emails)
       // HTML templates have their own hardcoded signatures via wrapSonarHtmlWithBranding
       let contentWithSignature = preparedBody;
-      if (!isHtmlMode && !hasSignature && signature) {
-        contentWithSignature = preparedBody + signature;
+      if (!isHtmlMode && !hasSignature) {
+        let sig = signature;
+        
+        // If no signature from settings, build basic one
+        if (!sig) {
+          const settings = window.SettingsPage?.getSettings?.() || {};
+          const general = settings.general || {};
+          const name = (general.firstName && general.lastName) 
+            ? `${general.firstName} ${general.lastName}`.trim()
+            : (general.agentName || 'Power Choosers Team');
+          
+          sig = `<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+            <p style="margin: 0; color: #666;">${name}</p>
+            <p style="margin: 5px 0 0 0; color: #999; font-size: 14px;">Energy Strategist</p>
+          </div>`;
+          
+          console.log('[Signature Debug] Using fallback signature');
+        }
+        
+        if (sig) {
+          console.log('[Signature Debug] Adding signature to email');
+          contentWithSignature = preparedBody + sig;
+        }
+      } else {
+        console.log('[Signature Debug] NOT adding signature. Reasons:', {
+          isHtmlMode,
+          hasSignature,
+          hasSignatureFunction: !!window.getEmailSignature,
+          signatureEmpty: !signature
+        });
       }
 
       const emailData = {
