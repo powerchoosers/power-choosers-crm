@@ -716,8 +716,9 @@ button:hover:not(:disabled),
     100% { background-position: -200% 0; }
 }
 
-/* Orange glow effect for specific compose inputs during generation */
-.compose-generating {
+/* Apply glow only to input fields during generation */
+#compose-subject.compose-generating,
+.body-input.compose-generating {
     position: relative;
     border: 2px solid var(--orange-primary);
     border-radius: 8px;
