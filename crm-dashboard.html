@@ -1761,6 +1761,53 @@
                                                     <textarea id="who-we-are" class="settings-textarea" placeholder="Default: You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates..." rows="4"></textarea>
                                                 </div>
                                             </div>
+                                            
+                                            <!-- NEW: Market Context Section -->
+                                            <div class="settings-group" style="margin-top: 24px;">
+                                                <h4 class="settings-group-title">Market Context Settings</h4>
+                                                <p class="settings-hint">Configure market statistics and insights used in AI-generated emails. These values replace hardcoded market data throughout the system.</p>
+                                                
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="market-context-enabled">
+                                                        <span class="checkmark"></span>
+                                                        <span>Enable Market Context in AI Emails</span>
+                                                    </label>
+                                                    <p class="settings-hint">When enabled, AI emails will include current market conditions and statistics. Disable to use generic messaging.</p>
+                                                </div>
+                                                
+                                                <div class="market-context-fields" id="market-context-fields">
+                                                    <div class="settings-field">
+                                                        <label for="market-rate-increase">Rate Increase</label>
+                                                        <input type="text" id="market-rate-increase" class="settings-input" placeholder="15-25%" value="15-25%">
+                                                        <p class="settings-hint">Current electricity rate increases (e.g., "15-25%", "20-30%")</p>
+                                                    </div>
+                                                    
+                                                    <div class="settings-field">
+                                                        <label for="market-renewal-years">Renewal Years</label>
+                                                        <input type="text" id="market-renewal-years" class="settings-input" placeholder="2025-2026" value="2025-2026">
+                                                        <p class="settings-hint">Contract renewal years (e.g., "2025-2026", "2025")</p>
+                                                    </div>
+                                                    
+                                                    <div class="settings-field">
+                                                        <label for="market-early-renewal">Early Renewal Savings</label>
+                                                        <input type="text" id="market-early-renewal" class="settings-input" placeholder="20-30%" value="20-30%">
+                                                        <p class="settings-hint">Savings from early renewals (e.g., "20-30%", "15-25%")</p>
+                                                    </div>
+                                                    
+                                                    <div class="settings-field">
+                                                        <label for="market-client-savings">Typical Client Savings</label>
+                                                        <input type="text" id="market-client-savings" class="settings-input" placeholder="10-20%" value="10-20%">
+                                                        <p class="settings-hint">Typical savings for clients (e.g., "10-20%", "15-25%")</p>
+                                                    </div>
+                                                    
+                                                    <div class="settings-field">
+                                                        <label for="market-insights">Market Insights</label>
+                                                        <input type="text" id="market-insights" class="settings-input" placeholder="due to data center demand" value="due to data center demand">
+                                                        <p class="settings-hint">Market driving factors (e.g., "due to data center demand", "due to grid modernization", "driven by renewable energy transition")</p>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
