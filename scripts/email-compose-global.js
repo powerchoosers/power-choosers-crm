@@ -436,7 +436,7 @@
         follow_up: aiTemplates.follow_up || 'Follow-up with tailored value props',
         energy_health: aiTemplates.energy_health || 'Schedule an Energy Health Check',
         proposal: aiTemplates.proposal || 'Proposal delivery with next steps',
-        cold_email: aiTemplates.cold_email || 'Cold email to a lead I could not reach by phone',
+        cold_email: aiTemplates.cold_email || 'Cold email outreach to energy procurement decision maker',
         invoice: aiTemplates.invoice || 'Standard Invoice Request',
         who_we_are: aiTemplates.who_we_are || 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.',
         // NEW: Market Context
@@ -447,6 +447,15 @@
           earlyRenewalSavings: '20-30%',
           typicalClientSavings: '10-20%',
           marketInsights: 'due to data center demand'
+        },
+        // NEW: Meeting Preferences
+        meetingPreferences: aiTemplates.meetingPreferences || {
+          enabled: true,
+          useHardcodedTimes: true,
+          slot1Time: '2-3pm',
+          slot2Time: '10-11am',
+          callDuration: '15-minute',
+          timeZone: 'EST'
         }
       };
     } catch (error) {
@@ -466,6 +475,14 @@
           earlyRenewalSavings: '20-30%',
           typicalClientSavings: '10-20%',
           marketInsights: 'due to data center demand'
+        },
+        meetingPreferences: {
+          enabled: true,
+          useHardcodedTimes: true,
+          slot1Time: '2-3pm',
+          slot2Time: '10-11am',
+          callDuration: '15-minute',
+          timeZone: 'EST'
         }
       };
     }
@@ -749,7 +766,9 @@
           senderName: senderName,
           whoWeAre: whoWeAre,
           // NEW: Pass market context
-          marketContext: aiTemplates.marketContext
+          marketContext: aiTemplates.marketContext,
+          // NEW: Pass meeting preferences
+          meetingPreferences: aiTemplates.meetingPreferences
         })
       });
 

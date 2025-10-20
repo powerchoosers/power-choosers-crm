@@ -1747,7 +1747,7 @@
                                                 <!-- Template 5: Cold Email -->
                                                 <div class="settings-field">
                                                     <label for="template-cold-email">5. Cold Email Outreach</label>
-                                                    <textarea id="template-cold-email" class="settings-textarea" placeholder="Default: Instructions for cold email outreach to prospects..." rows="6"></textarea>
+                                                    <textarea id="template-cold-email" class="settings-textarea" placeholder="Default: Cold email outreach to energy procurement decision maker" rows="6"></textarea>
                                                 </div>
                                                 
                                                 <!-- Template 6: Invoice Request -->
@@ -1806,6 +1806,62 @@
                                                         <input type="text" id="market-insights" class="settings-input" placeholder="due to data center demand" value="due to data center demand">
                                                         <p class="settings-hint">Market driving factors (e.g., "due to data center demand", "due to grid modernization", "driven by renewable energy transition")</p>
                                                     </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Meeting Preferences Section -->
+                                    <div class="settings-section">
+                                        <h3 class="settings-section-title">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M8 2v4"/>
+                                                <path d="M16 2v4"/>
+                                                <rect width="18" height="18" x="3" y="4" rx="2"/>
+                                                <path d="M3 10h18"/>
+                                            </svg>
+                                            Meeting Preferences
+                                        </h3>
+                                        <div class="settings-content">
+                                            <div class="settings-field">
+                                                <label class="settings-checkbox-label">
+                                                    <input type="checkbox" id="meeting-preferences-enabled" class="settings-checkbox" checked>
+                                                    <span class="settings-checkbox-text">Enable Meeting Preferences</span>
+                                                </label>
+                                                <p class="settings-hint">Configure meeting time preferences for all email templates</p>
+                                            </div>
+                                            
+                                            <div class="meeting-preferences-fields">
+                                                <div class="settings-field">
+                                                    <label class="settings-checkbox-label">
+                                                        <input type="checkbox" id="meeting-use-hardcoded" class="settings-checkbox" checked>
+                                                        <span class="settings-checkbox-text">Use Hardcoded Meeting Times</span>
+                                                    </label>
+                                                    <p class="settings-hint">When enabled, uses specific time slots. When disabled, AI generates custom CTAs.</p>
+                                                </div>
+                                                
+                                                <div class="settings-field">
+                                                    <label for="meeting-slot1-time">First Time Slot</label>
+                                                    <input type="text" id="meeting-slot1-time" class="settings-input" placeholder="2-3pm" value="2-3pm">
+                                                    <p class="settings-hint">First available time slot (e.g., "2-3pm", "Tuesday 2-3pm")</p>
+                                                </div>
+                                                
+                                                <div class="settings-field">
+                                                    <label for="meeting-slot2-time">Second Time Slot</label>
+                                                    <input type="text" id="meeting-slot2-time" class="settings-input" placeholder="10-11am" value="10-11am">
+                                                    <p class="settings-hint">Second available time slot (e.g., "10-11am", "Thursday 10-11am")</p>
+                                                </div>
+                                                
+                                                <div class="settings-field">
+                                                    <label for="meeting-call-duration">Call Duration</label>
+                                                    <input type="text" id="meeting-call-duration" class="settings-input" placeholder="15-minute" value="15-minute">
+                                                    <p class="settings-hint">Meeting duration (e.g., "15-minute", "30-minute", "brief")</p>
+                                                </div>
+                                                
+                                                <div class="settings-field">
+                                                    <label for="meeting-timezone">Time Zone</label>
+                                                    <input type="text" id="meeting-timezone" class="settings-input" placeholder="EST" value="EST">
+                                                    <p class="settings-hint">Time zone for meetings (e.g., "EST", "PST", "CST")</p>
                                                 </div>
                                             </div>
                                         </div>

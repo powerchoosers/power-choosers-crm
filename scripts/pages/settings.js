@@ -25,6 +25,15 @@ class SettingsPage {
                         earlyRenewalSavings: '20-30%',
                         typicalClientSavings: '10-20%',
                         marketInsights: 'due to data center demand'
+                    },
+                    // NEW: Meeting Preferences Settings
+                    meetingPreferences: {
+                        enabled: true,
+                        useHardcodedTimes: true,
+                        slot1Time: '2-3pm',
+                        slot2Time: '10-11am',
+                        callDuration: '15-minute',
+                        timeZone: 'EST'
                     }
                 },
                 emailDeliverability: {
@@ -155,6 +164,31 @@ class SettingsPage {
                 const field = document.getElementById(id);
                 if (field) {
                     field.addEventListener('input', () => this.markDirty());
+                }
+            });
+        }
+
+        // NEW: Meeting Preferences Event Listeners
+        const meetingPreferencesCheckbox = document.getElementById('meeting-preferences-enabled');
+        const meetingPreferencesFields = document.querySelector('.meeting-preferences-fields');
+
+        if (meetingPreferencesCheckbox && meetingPreferencesFields) {
+            meetingPreferencesCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    meetingPreferencesFields.classList.remove('disabled');
+                } else {
+                    meetingPreferencesFields.classList.add('disabled');
+                }
+                this.markDirty();
+            }.bind(this));
+            
+            // Add input listeners for meeting preferences fields
+            ['meeting-use-hardcoded', 'meeting-slot1-time', 'meeting-slot2-time', 
+             'meeting-call-duration', 'meeting-timezone'].forEach(id => {
+                const field = document.getElementById(id);
+                if (field) {
+                    field.addEventListener('input', () => this.markDirty());
+                    field.addEventListener('change', () => this.markDirty());
                 }
             });
         }
@@ -377,6 +411,15 @@ class SettingsPage {
                     earlyRenewalSavings: document.getElementById('market-early-renewal')?.value || '20-30%',
                     typicalClientSavings: document.getElementById('market-client-savings')?.value || '10-20%',
                     marketInsights: document.getElementById('market-insights')?.value || 'due to data center demand'
+                },
+                // NEW: Meeting Preferences
+                meetingPreferences: {
+                    enabled: document.getElementById('meeting-preferences-enabled')?.checked ?? true,
+                    useHardcodedTimes: document.getElementById('meeting-use-hardcoded')?.checked ?? true,
+                    slot1Time: document.getElementById('meeting-slot1-time')?.value || '2-3pm',
+                    slot2Time: document.getElementById('meeting-slot2-time')?.value || '10-11am',
+                    callDuration: document.getElementById('meeting-call-duration')?.value || '15-minute',
+                    timeZone: document.getElementById('meeting-timezone')?.value || 'EST'
                 }
             };
             this.state.settings.aiTemplates = aiTemplateFields;
@@ -515,6 +558,27 @@ class SettingsPage {
 
         const marketInsights = document.getElementById('market-insights');
         if (marketInsights) marketInsights.value = marketContext.marketInsights || 'due to data center demand';
+
+        // NEW: Render Meeting Preferences
+        const meetingPreferences = aiTemplates.meetingPreferences || {};
+
+        const meetingEnabled = document.getElementById('meeting-preferences-enabled');
+        if (meetingEnabled) meetingEnabled.checked = meetingPreferences.enabled !== false;
+
+        const useHardcoded = document.getElementById('meeting-use-hardcoded');
+        if (useHardcoded) useHardcoded.checked = meetingPreferences.useHardcodedTimes !== false;
+
+        const slot1Time = document.getElementById('meeting-slot1-time');
+        if (slot1Time) slot1Time.value = meetingPreferences.slot1Time || '2-3pm';
+
+        const slot2Time = document.getElementById('meeting-slot2-time');
+        if (slot2Time) slot2Time.value = meetingPreferences.slot2Time || '10-11am';
+
+        const callDuration = document.getElementById('meeting-call-duration');
+        if (callDuration) callDuration.value = meetingPreferences.callDuration || '15-minute';
+
+        const timeZone = document.getElementById('meeting-timezone');
+        if (timeZone) timeZone.value = meetingPreferences.timeZone || 'EST';
 
         // Render Twilio phone numbers
         this.renderPhoneNumbers();
