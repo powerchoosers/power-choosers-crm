@@ -26,7 +26,7 @@ var console = {
     filtered: [],
     loaded: false,
     selected: new Set(), // ids of selected accounts
-    pageSize: 50,
+    pageSize: 50, // UI pagination size - consistent throughout
     currentPage: 1,
     errorMsg: '',
     searchMode: false, // NEW - Algolia search active
@@ -76,8 +76,7 @@ var console = {
         
         // Re-render with restored state - wait for sufficient data
         // targetPage is already declared above at line 55
-        const pageSize = 100;
-        const neededAccounts = targetPage * pageSize;
+        const neededAccounts = targetPage * state.pageSize;
         
           const checkDataAndApply = () => {
           if (state.data && state.data.length >= neededAccounts) {
@@ -310,7 +309,7 @@ var console = {
 
     // fields
     els.fName = qs('filter-acct-name');
-    els.fIndustry = qs('filter-industry');
+    els.fIndustry = qs('accounts-filter-industry');
     els.fDomain = qs('filter-domain');
     els.fHasPhone = qs('filter-acct-has-phone');
 
@@ -894,22 +893,35 @@ var console = {
       if (state.allAccountsCache && state.allAccountsCache.length > state.data.length) {
         const nextBatch = state.allAccountsCache.slice(
           state.data.length,
-          state.data.length + 100
+          state.data.length + 100 // Load next 100 records from cache
         );
         moreAccounts = nextBatch;
         state.hasMore = state.data.length + nextBatch.length < state.allAccountsCache.length;
         console.log(`[Accounts] Loaded ${nextBatch.length} more accounts from cache`);
       } else if (state.lastDoc) {
-        // Load from Firestore
-        const snapshot = await window.firebaseDB.collection('accounts')
-          .startAfter(state.lastDoc)
-          .limit(100)
-          .get();
+        // Load from Firestore using background loader
+        if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.loadMore === 'function') {
+          const result = await window.BackgroundAccountsLoader.loadMore();
+          if (result.loaded > 0) {
+            const allAccounts = window.BackgroundAccountsLoader.getAccountsData();
+            state.data = allAccounts;
+            state.hasMore = result.hasMore;
+            console.log(`[Accounts] Loaded ${result.loaded} more accounts from background loader. Total: ${state.data.length}`);
+          } else {
+            state.hasMore = false;
+          }
+        } else {
+          // Fallback to direct Firestore query
+          const snapshot = await window.firebaseDB.collection('accounts')
+            .startAfter(state.lastDoc)
+            .limit(100)
+            .get();
 
-        moreAccounts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        state.lastDoc = snapshot.docs[snapshot.docs.length - 1];
-        state.hasMore = moreAccounts.length === 100;
-        console.log(`[Accounts] Loaded ${moreAccounts.length} more accounts from Firestore`);
+          moreAccounts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          state.lastDoc = snapshot.docs[snapshot.docs.length - 1];
+          state.hasMore = moreAccounts.length === 100;
+          console.log(`[Accounts] Loaded ${moreAccounts.length} more accounts from Firestore`);
+        }
       }
 
       if (moreAccounts.length > 0) {
@@ -963,10 +975,19 @@ var console = {
       
       // Store full dataset for pagination
       state.allAccountsCache = accountsData;
-      state.totalCount = accountsData.length;
       
-      // For UI pagination, determine how many accounts to load
-      const pageSize = 100;
+      // Get total count from Firestore for proper pagination display
+      if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getTotalCount === 'function') {
+        try {
+          state.totalCount = await window.BackgroundAccountsLoader.getTotalCount();
+          console.log('[Accounts] Total accounts in database:', state.totalCount);
+        } catch (error) {
+          console.warn('[Accounts] Failed to get total count, using loaded count:', error);
+          state.totalCount = accountsData.length;
+        }
+      } else {
+        state.totalCount = accountsData.length;
+      }
       
       // Check if we're restoring from back navigation
       let targetPage = 1;
@@ -975,10 +996,11 @@ var console = {
         console.log('[Accounts] Restoring to page:', targetPage, 'from back navigation');
       }
       
-      // Load ALL accounts for proper pagination (getPageItems handles slicing)
-      state.data = accountsData; // Full dataset
-      state.filtered = state.data.slice(); // Full dataset
-      state.hasMore = false; // All data is loaded
+      // TRUE LAZY LOADING: Only load initial batch of 100 records
+      const initialBatchSize = 100; // Load only what's needed initially
+      state.data = accountsData.slice(0, initialBatchSize);
+      state.filtered = state.data.slice();
+      state.hasMore = accountsData.length > initialBatchSize;
       
       state.loaded = true;
       state.errorMsg = '';
@@ -993,6 +1015,12 @@ var console = {
         try { window.__restoringAccounts = false; window.__restoringAccountsUntil = 0; } catch(_) {}
       }
       render();
+      
+      // Update call status for badges (async, non-blocking)
+      updateAccountCallStatus().then(() => {
+        // Re-render to show updated badges
+        render();
+      });
       
       // Immediately scan for cached favicon images and mark them loaded (no flicker)
       requestAnimationFrame(() => {
@@ -1436,8 +1464,11 @@ var console = {
     return String(phone || '').replace(/\D/g, '').slice(-10);
   }
 
-  // Generate status badges for an account
-  function generateStatusBadgesForAccount(account) {
+  // Call status cache for accounts
+  let accountCallStatusCache = new Map();
+  
+  // Generate status badges for an account (async version)
+  async function generateStatusBadgesForAccount(account) {
     const badges = [];
     
     // Check if account is new (created within 24 hours)
@@ -1453,8 +1484,8 @@ var console = {
       }
     })();
     
-    // Check if account has any calls logged
-    const hasNoCalls = (() => {
+    // Check if account has any calls logged (async)
+    const hasNoCalls = await (async () => {
       try {
         // Get the company phone number
         const companyPhone = account.companyPhone || account.phone || account.primaryPhone || account.mainPhone;
@@ -1463,36 +1494,21 @@ var console = {
         const phone = normalizePhone(companyPhone);
         if (phone.length !== 10) return false; // Invalid phone number
         
-        // Get calls data - check background loader first, then callsModule
-        let callsData = [];
-        if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.getCallsData === 'function') {
-          callsData = window.BackgroundCallsLoader.getCallsData() || [];
+        // Check cache first
+        if (accountCallStatusCache.has(phone)) {
+          return !accountCallStatusCache.get(phone);
         }
-        // Fallback to callsModule if available (when calls page has been visited)
-        if (callsData.length === 0 && window.callsModule && typeof window.callsModule.getCallsData === 'function') {
-          callsData = window.callsModule.getCallsData() || [];
+        if (accountCallStatusCache.has(account.id)) {
+          return !accountCallStatusCache.get(account.id);
         }
         
-        if (!callsData || callsData.length === 0) return true; // No calls in system, show badge
+        // Get call status from API (lightweight)
+        if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.getCallStatus === 'function') {
+          const callStatus = await window.BackgroundCallsLoader.getCallStatus([phone], [account.id]);
+          return !callStatus[phone] && !callStatus[account.id];
+        }
         
-        // Check if any call matches the account's phone number
-        const hasCall = callsData.some(call => {
-          // Check counterparty field (already normalized to 10 digits)
-          const counterparty = String(call.counterparty || '').replace(/\D/g, '').slice(-10);
-          // Also check contactPhone and other potential fields
-          const contactPhone = normalizePhone(call.contactPhone);
-          const callTo = normalizePhone(call.to);
-          const callFrom = normalizePhone(call.from);
-          const callTarget = normalizePhone(call.targetPhone);
-          
-          return (phone === counterparty && counterparty.length === 10) ||
-                 (phone === contactPhone && contactPhone.length === 10) ||
-                 (phone === callTo && callTo.length === 10) || 
-                 (phone === callFrom && callFrom.length === 10) || 
-                 (phone === callTarget && callTarget.length === 10);
-        });
-        
-        return !hasCall; // Show badge if no calls found
+        return false;
       } catch (e) {
         return false;
       }
@@ -1509,6 +1525,101 @@ var console = {
     }
     
     return badges.join('');
+  }
+  
+  // Synchronous version for rendering (uses cache)
+  function generateStatusBadgesForAccountSync(account) {
+    const badges = [];
+    
+    // Check if account is new (created within 24 hours)
+    const isNew = (() => {
+      try {
+        const created = coerceDate(account.createdAt);
+        if (!created) return false;
+        const now = new Date();
+        const hoursDiff = (now - created) / (1000 * 60 * 60);
+        return hoursDiff < 24;
+      } catch (e) {
+        return false;
+      }
+    })();
+    
+    // Check if account has any calls logged (using cache)
+    const hasNoCalls = (() => {
+      try {
+        // Get the company phone number
+        const companyPhone = account.companyPhone || account.phone || account.primaryPhone || account.mainPhone;
+        if (!companyPhone) return false; // No phone number, don't show badge
+        
+        const phone = normalizePhone(companyPhone);
+        if (phone.length !== 10) return false; // Invalid phone number
+        
+        // Check cache first
+        if (accountCallStatusCache.has(phone)) {
+          return !accountCallStatusCache.get(phone);
+        }
+        if (accountCallStatusCache.has(account.id)) {
+          return !accountCallStatusCache.get(account.id);
+        }
+        
+        // If not in cache, don't show badge (will be updated when cache is populated)
+        return false;
+      } catch (e) {
+        return false;
+      }
+    })();
+    
+    // Add "New" badge (green)
+    if (isNew) {
+      badges.push('<span class="status-badge status-badge-new">New</span>');
+    }
+    
+    // Add "No Calls" badge (grey) - only if not new (to avoid clutter)
+    if (!isNew && hasNoCalls) {
+      badges.push('<span class="status-badge status-badge-no-calls">No Calls</span>');
+    }
+    
+    return badges.join('');
+  }
+  
+  // Batch update call status for all visible accounts
+  async function updateAccountCallStatus() {
+    if (!window.BackgroundCallsLoader || typeof window.BackgroundCallsLoader.getCallStatus !== 'function') {
+      return;
+    }
+    
+    try {
+      const phones = [];
+      const accountIds = [];
+      
+      // Collect all phone numbers and account IDs from current page
+      state.data.forEach(account => {
+        const companyPhone = account.companyPhone || account.phone || account.primaryPhone || account.mainPhone;
+        if (companyPhone) {
+          const phone = normalizePhone(companyPhone);
+          if (phone.length === 10) {
+            phones.push(phone);
+          }
+        }
+        if (account.id) {
+          accountIds.push(account.id);
+        }
+      });
+      
+      if (phones.length === 0 && accountIds.length === 0) return;
+      
+      // Single API call for all badges
+      const callStatus = await window.BackgroundCallsLoader.getCallStatus(phones, accountIds);
+      
+      // Update cache
+      Object.entries(callStatus).forEach(([key, value]) => {
+        accountCallStatusCache.set(key, value);
+      });
+      
+      console.log('[Accounts] Updated call status for', Object.keys(callStatus).length, 'items');
+    } catch (error) {
+      console.error('[Accounts] Failed to update call status:', error);
+    }
   }
 
   function rowHtml(a) {
@@ -1554,8 +1665,8 @@ var console = {
     const benefits = safe(a.benefits || '');
     const painPoints = safe(a.painPoints || '');
 
-    // Generate status badges
-    const badges = generateStatusBadgesForAccount(a);
+    // Generate status badges (synchronous version using cache)
+    const badges = generateStatusBadgesForAccountSync(a);
 
     const cells = {
       select: `<td class="col-select"><input type="checkbox" class="row-select" data-id="${aid}" aria-label="Select account"${checked}></td>`,
@@ -2333,6 +2444,24 @@ var console = {
     document.addEventListener('pc:call-logged', (event) => {
       const { call, targetPhone, accountId, contactId } = event.detail || {};
       console.log('[Accounts] Call logged event received:', { targetPhone, accountId, contactId });
+      
+      // 0. Invalidate call status cache for affected items
+      const keysToInvalidate = [];
+      if (targetPhone) {
+        const normalizedPhone = String(targetPhone).replace(/\D/g, '').slice(-10);
+        if (normalizedPhone.length === 10) {
+          keysToInvalidate.push(normalizedPhone);
+        }
+      }
+      if (accountId) keysToInvalidate.push(accountId);
+      
+      keysToInvalidate.forEach(key => {
+        accountCallStatusCache.delete(key);
+      });
+      
+      if (keysToInvalidate.length > 0) {
+        console.log('[Accounts] Invalidated call status cache for:', keysToInvalidate);
+      }
       
       // 1. Add call to in-memory cache if available
       if (call && window.callsModule && window.callsModule.state && Array.isArray(window.callsModule.state.data)) {

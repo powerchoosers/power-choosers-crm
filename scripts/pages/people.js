@@ -1809,7 +1809,25 @@
       
       // Store full dataset for pagination
       state.allContactsCache = contactsData;
-      state.totalCount = contactsData.length;
+      
+      // Get total count from Firestore for proper pagination display
+      if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getTotalCount === 'function') {
+        try {
+          state.totalCount = await window.BackgroundContactsLoader.getTotalCount();
+          console.log('[People] Total contacts in database:', state.totalCount);
+        } catch (error) {
+          console.warn('[People] Failed to get total count, using loaded count:', error);
+          state.totalCount = contactsData.length;
+        }
+      } else {
+        state.totalCount = contactsData.length;
+      }
+      
+      // TRUE LAZY LOADING: Only load initial batch of 100 records
+      const initialBatchSize = 100; // Load only what's needed initially
+      state.data = contactsData.slice(0, initialBatchSize);
+      state.filtered = state.data.slice();
+      state.hasMore = contactsData.length > initialBatchSize;
       
       // Build quick lookups for accounts → employees
       const accountById = new Map();
@@ -1922,6 +1940,12 @@
       }
       
       render();
+      
+      // Update call status for badges (async, non-blocking)
+      updatePeopleCallStatus().then(() => {
+        // Re-render to show updated badges
+        render();
+      });
     } catch (e) {
       console.error('Failed loading contacts:', e);
       state.data = [];
@@ -1946,8 +1970,19 @@
     if (!state.hasMore || state.searchMode) return;
 
     try {
-      // Use BackgroundContactsLoader for seamless pagination
-      if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.loadMore === 'function') {
+      let moreContacts = [];
+
+      // Check if we have cached data first
+      if (state.allContactsCache && state.allContactsCache.length > state.data.length) {
+        const nextBatch = state.allContactsCache.slice(
+          state.data.length,
+          state.data.length + 100 // Load next 100 records from cache
+        );
+        moreContacts = nextBatch;
+        state.hasMore = state.data.length + nextBatch.length < state.allContactsCache.length;
+        console.log(`[People] Loaded ${nextBatch.length} more contacts from cache`);
+      } else if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.loadMore === 'function') {
+        // Use BackgroundContactsLoader for seamless pagination
         const result = await window.BackgroundContactsLoader.loadMore();
         
         if (result.loaded > 0) {
@@ -1993,6 +2028,17 @@
           console.log('[People] Loaded', result.loaded, 'more contacts. Total:', state.data.length);
         } else {
           state.hasMore = false;
+        }
+      }
+
+      if (moreContacts.length > 0) {
+        state.data = [...state.data, ...moreContacts];
+        applyFilters(); // Re-apply filters with new data
+        
+        // Clear full cache to save memory if we have 500+ records loaded
+        if (state.data.length > 500 && state.allContactsCache) {
+          state.allContactsCache = null;
+          console.log('[People] Cleared full cache to save memory (keeping', state.data.length, 'loaded records)');
         }
       }
     } catch (error) {
@@ -2585,8 +2631,11 @@
     return String(phone || '').replace(/\D/g, '').slice(-10);
   }
 
-  // Generate status badges for a contact
-  function generateStatusBadges(contact) {
+  // Call status cache for people
+  let peopleCallStatusCache = new Map();
+  
+  // Generate status badges for a contact (async version)
+  async function generateStatusBadges(contact) {
     const badges = [];
     
     // Check if contact is new (created within 24 hours)
@@ -2602,7 +2651,106 @@
       }
     })();
     
-    // Check if contact has any calls logged
+    // Check if contact has any calls logged (async)
+    const hasNoCalls = await (async () => {
+      try {
+        // Collect all phone numbers for this contact
+        const phoneNumbers = new Set();
+        
+        // Add contact's direct phone numbers
+        if (contact.workDirectPhone) phoneNumbers.add(normalizePhone(contact.workDirectPhone));
+        if (contact.mobile) phoneNumbers.add(normalizePhone(contact.mobile));
+        if (contact.otherPhone) phoneNumbers.add(normalizePhone(contact.otherPhone));
+        
+        // Also add company phone from linked account
+        try {
+          const accounts = (typeof window.getAccountsData === 'function') ? window.getAccountsData() : [];
+          let linkedAccount = null;
+          
+          // Try to find by accountId first
+          if (contact.accountId) {
+            linkedAccount = accounts.find(a => a.id === contact.accountId);
+          }
+          
+          // Fallback to company name match
+          if (!linkedAccount && contact.companyName) {
+            const normName = String(contact.companyName).toLowerCase().trim();
+            linkedAccount = accounts.find(a => {
+              const accName = String(a.accountName || a.name || '').toLowerCase().trim();
+              return accName === normName;
+            });
+          }
+          
+          // Add company phone if found
+          if (linkedAccount) {
+            const companyPhone = linkedAccount.companyPhone || linkedAccount.phone;
+            if (companyPhone) {
+              phoneNumbers.add(normalizePhone(companyPhone));
+            }
+          }
+        } catch (e) {
+          // Silently continue if account lookup fails
+        }
+        
+        // Convert to array and filter out empty strings
+        const phones = Array.from(phoneNumbers).filter(p => p.length === 10);
+        
+        if (phones.length === 0) {
+          return false; // No phone numbers, don't show badge
+        }
+        
+        // Check cache first
+        const hasCachedCall = phones.some(phone => peopleCallStatusCache.has(phone));
+        if (hasCachedCall) {
+          return !phones.some(phone => peopleCallStatusCache.get(phone));
+        }
+        if (peopleCallStatusCache.has(contact.id)) {
+          return !peopleCallStatusCache.get(contact.id);
+        }
+        
+        // Get call status from API (lightweight)
+        if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.getCallStatus === 'function') {
+          const callStatus = await window.BackgroundCallsLoader.getCallStatus(phones, [], [contact.id]);
+          return !phones.some(phone => callStatus[phone]) && !callStatus[contact.id];
+        }
+        
+        return false;
+      } catch (e) {
+        return false;
+      }
+    })();
+    
+    // Add "New" badge (green)
+    if (isNew) {
+      badges.push('<span class="status-badge status-badge-new">New</span>');
+    }
+    
+    // Add "No Calls" badge (grey) - only if not new (to avoid clutter)
+    if (!isNew && hasNoCalls) {
+      badges.push('<span class="status-badge status-badge-no-calls">No Calls</span>');
+    }
+    
+    return badges.join('');
+  }
+  
+  // Synchronous version for rendering (uses cache)
+  function generateStatusBadgesSync(contact) {
+    const badges = [];
+    
+    // Check if contact is new (created within 24 hours)
+    const isNew = (() => {
+      try {
+        const created = coerceDate(contact.createdAt);
+        if (!created) return false;
+        const now = new Date();
+        const hoursDiff = (now - created) / (1000 * 60 * 60);
+        return hoursDiff < 24;
+      } catch (e) {
+        return false;
+      }
+    })();
+    
+    // Check if contact has any calls logged (using cache)
     const hasNoCalls = (() => {
       try {
         // Collect all phone numbers for this contact
@@ -2646,76 +2794,21 @@
         // Convert to array and filter out empty strings
         const phones = Array.from(phoneNumbers).filter(p => p.length === 10);
         
-        // DEBUG: Store debug info on window for manual inspection
-        if (!window._badgeDebug) window._badgeDebug = [];
-        const debugInfo = {
-          contactName: `${contact.firstName} ${contact.lastName}`,
-          contactPhones: phones,
-          callsModuleExists: !!(window.callsModule && window.callsModule.getCallsData),
-          callsDataLength: 0,
-          hasCall: false
-        };
-        
         if (phones.length === 0) {
-          debugInfo.result = 'no-phones';
-          window._badgeDebug.push(debugInfo);
           return false; // No phone numbers, don't show badge
         }
         
-        // Get calls data - check background loader first, then callsModule
-        let callsData = [];
-        if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.getCallsData === 'function') {
-          callsData = window.BackgroundCallsLoader.getCallsData() || [];
+        // Check cache first
+        const hasCachedCall = phones.some(phone => peopleCallStatusCache.has(phone));
+        if (hasCachedCall) {
+          return !phones.some(phone => peopleCallStatusCache.get(phone));
         }
-        // Fallback to callsModule if available (when calls page has been visited)
-        if (callsData.length === 0 && window.callsModule && typeof window.callsModule.getCallsData === 'function') {
-          callsData = window.callsModule.getCallsData() || [];
-        }
-        
-        debugInfo.callsDataLength = callsData ? callsData.length : 0;
-
-        if (!callsData || callsData.length === 0) {
-          debugInfo.result = 'no-calls-in-system';
-          window._badgeDebug.push(debugInfo);
-          return true; // No calls in system, show badge
+        if (peopleCallStatusCache.has(contact.id)) {
+          return !peopleCallStatusCache.get(contact.id);
         }
         
-        // Sample first 3 call phone numbers for debugging
-        debugInfo.sampleCallPhones = callsData.slice(0, 3).map(call => String(call.counterparty || '').replace(/\D/g, '').slice(-10));
-        
-        // Check if any call matches any of the contact's phone numbers
-        let matchedPhones = [];
-        const hasCall = callsData.some(call => {
-          // Check counterparty field (already normalized to 10 digits)
-          const counterparty = String(call.counterparty || '').replace(/\D/g, '').slice(-10);
-          // Also check contactPhone and other potential fields
-          const contactPhone = normalizePhone(call.contactPhone);
-          const callTo = normalizePhone(call.to);
-          const callFrom = normalizePhone(call.from);
-          const callTarget = normalizePhone(call.targetPhone);
-          
-          const isMatch = phones.some(p => {
-            const matches = (p === counterparty && counterparty.length === 10) ||
-                           (p === contactPhone && contactPhone.length === 10) ||
-                           (p === callTo && callTo.length === 10) || 
-                           (p === callFrom && callFrom.length === 10) || 
-                           (p === callTarget && callTarget.length === 10);
-            if (matches) {
-              matchedPhones.push({ contactPhone: p, callPhone: counterparty || contactPhone || callTo || callFrom || callTarget });
-            }
-            return matches;
-          });
-          
-          return isMatch;
-        });
-        
-        debugInfo.matchedPhones = matchedPhones;
-        
-        debugInfo.hasCall = hasCall;
-        debugInfo.result = hasCall ? 'has-calls' : 'no-calls';
-        window._badgeDebug.push(debugInfo);
-        
-        return !hasCall; // Show badge if no calls found
+        // If not in cache, don't show badge (will be updated when cache is populated)
+        return false;
       } catch (e) {
         return false;
       }
@@ -2732,6 +2825,81 @@
     }
     
     return badges.join('');
+  }
+  
+  // Batch update call status for all visible contacts
+  async function updatePeopleCallStatus() {
+    if (!window.BackgroundCallsLoader || typeof window.BackgroundCallsLoader.getCallStatus !== 'function') {
+      return;
+    }
+    
+    try {
+      const phones = [];
+      const contactIds = [];
+      
+      // Collect all phone numbers and contact IDs from current page
+      state.data.forEach(contact => {
+        // Add contact's direct phone numbers
+        if (contact.workDirectPhone) {
+          const phone = normalizePhone(contact.workDirectPhone);
+          if (phone.length === 10) phones.push(phone);
+        }
+        if (contact.mobile) {
+          const phone = normalizePhone(contact.mobile);
+          if (phone.length === 10) phones.push(phone);
+        }
+        if (contact.otherPhone) {
+          const phone = normalizePhone(contact.otherPhone);
+          if (phone.length === 10) phones.push(phone);
+        }
+        
+        // Add company phone from linked account
+        try {
+          const accounts = (typeof window.getAccountsData === 'function') ? window.getAccountsData() : [];
+          let linkedAccount = null;
+          
+          if (contact.accountId) {
+            linkedAccount = accounts.find(a => a.id === contact.accountId);
+          }
+          
+          if (!linkedAccount && contact.companyName) {
+            const normName = String(contact.companyName).toLowerCase().trim();
+            linkedAccount = accounts.find(a => {
+              const accName = String(a.accountName || a.name || '').toLowerCase().trim();
+              return accName === normName;
+            });
+          }
+          
+          if (linkedAccount) {
+            const companyPhone = linkedAccount.companyPhone || linkedAccount.phone;
+            if (companyPhone) {
+              const phone = normalizePhone(companyPhone);
+              if (phone.length === 10) phones.push(phone);
+            }
+          }
+        } catch (e) {
+          // Silently continue if account lookup fails
+        }
+        
+        if (contact.id) {
+          contactIds.push(contact.id);
+        }
+      });
+      
+      if (phones.length === 0 && contactIds.length === 0) return;
+      
+      // Single API call for all badges
+      const callStatus = await window.BackgroundCallsLoader.getCallStatus(phones, [], contactIds);
+      
+      // Update cache
+      Object.entries(callStatus).forEach(([key, value]) => {
+        peopleCallStatusCache.set(key, value);
+      });
+      
+      console.log('[People] Updated call status for', Object.keys(callStatus).length, 'items');
+    } catch (error) {
+      console.error('[People] Failed to update call status:', error);
+    }
   }
 
   function rowHtml(c) {
@@ -2779,8 +2947,8 @@
       return d ? d.replace(/^www\./i, '') : '';
     })();
 
-    // Generate status badges
-    const badges = generateStatusBadges(c);
+    // Generate status badges (synchronous version using cache)
+    const badges = generateStatusBadgesSync(c);
 
     const cells = {
       select: `<td class="col-select"><input type="checkbox" class="row-select" data-id="${escapeHtml(c.id)}" aria-label="Select contact"${checked}></td>`,
@@ -2949,6 +3117,24 @@
     document.addEventListener('pc:call-logged', (event) => {
       const { call, targetPhone, accountId, contactId } = event.detail || {};
       console.log('[People] Call logged event received:', { targetPhone, accountId, contactId });
+      
+      // 0. Invalidate call status cache for affected items
+      const keysToInvalidate = [];
+      if (targetPhone) {
+        const normalizedPhone = String(targetPhone).replace(/\D/g, '').slice(-10);
+        if (normalizedPhone.length === 10) {
+          keysToInvalidate.push(normalizedPhone);
+        }
+      }
+      if (contactId) keysToInvalidate.push(contactId);
+      
+      keysToInvalidate.forEach(key => {
+        peopleCallStatusCache.delete(key);
+      });
+      
+      if (keysToInvalidate.length > 0) {
+        console.log('[People] Invalidated call status cache for:', keysToInvalidate);
+      }
       
       // 1. Add call to in-memory cache if available
       if (call && window.callsModule && window.callsModule.state && Array.isArray(window.callsModule.state.data)) {

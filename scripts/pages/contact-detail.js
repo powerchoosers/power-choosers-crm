@@ -2057,7 +2057,17 @@
       console.error('[ContactDetail] Error with prefetched contact:', error);
     }
     
-    // Access people.js data if available
+    // Check BackgroundContactsLoader first (cache-first)
+    if (window.BackgroundContactsLoader) {
+      const contactsData = window.BackgroundContactsLoader.getContactsData() || [];
+      const found = contactsData.find(c => c.id === contactId);
+      if (found) {
+        console.log('[ContactDetail] ✓ Found contact in BackgroundContactsLoader cache:', found.name || found.firstName + ' ' + found.lastName);
+        return found;
+      }
+    }
+    
+    // Access people.js data if available (legacy cache)
     if (window.getPeopleData) {
       const peopleData = window.getPeopleData();
       const found = peopleData.find(c => c.id === contactId);
@@ -2206,12 +2216,26 @@
         return state._accountCache[cacheKey];
       }
       
-      // OPTIMIZED: Query Firestore directly for the specific account
-      // This fixes the issue where accounts not in "first 100" won't be found
+      // OPTIMIZED: Check BackgroundAccountsLoader first, then Firestore fallback
       const accountId = contact.accountId || contact.account_id || '';
       const companyName = contact.companyName || contact.accountName || '';
       
-      // Try direct Firestore query first (most reliable)
+      // Check BackgroundAccountsLoader first (cache-first)
+      if (window.BackgroundAccountsLoader && accountId) {
+        const accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
+        const found = accountsData.find(a => a.id === accountId);
+        if (found) {
+          console.log('[ContactDetail] ✓ Found linked account in BackgroundAccountsLoader cache:', found.name || found.accountName);
+          // Cache the result
+          if (cacheKey) {
+            state._accountCache = state._accountCache || {};
+            state._accountCache[cacheKey] = found;
+          }
+          return found;
+        }
+      }
+      
+      // Try direct Firestore query as fallback
       if (window.firebaseDB) {
         try {
           // Method 1: Query by accountId (most reliable)
@@ -4787,60 +4811,15 @@
     // Loading recent calls for contact
     
     try {
-      const r = await fetch(`${base}/api/calls`);
+      // Use new targeted API endpoint for much better performance
+      const r = await fetch(`${base}/api/calls/contact/${contactId}?limit=50`);
       const j = await r.json().catch(()=>({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
       
-      // Raw calls loaded from API
+      console.log(`[Contact Detail] Loaded ${calls.length} targeted calls for contact ${contactId}`);
       
-      const nums = collectContactPhones(state.currentContact).map(n=>n.replace(/\D/g,'').slice(-10)).filter(Boolean);
-      // De-duplicate numbers (mobile equals company, etc.)
-      const uniq = Array.from(new Set(nums));
-      
-      // Contact phone numbers collected for filtering
-      
-      // Include calls that match by explicit contactId OR any of the contact/company numbers
-      let filtered = calls.filter(c => {
-        const matchByContactId = c.contactId && c.contactId === contactId;
-        const to10 = String(c.to||'').replace(/\D/g,'').slice(-10);
-        const from10 = String(c.from||'').replace(/\D/g,'').slice(-10);
-        const matchByPhone = uniq.includes(to10) || uniq.includes(from10);
-        
-        // Additional matching: check targetPhone field
-        const targetPhone = String(c.targetPhone||'').replace(/\D/g,'').slice(-10);
-        const matchByTargetPhone = targetPhone && uniq.includes(targetPhone);
-        
-        const shouldInclude = matchByContactId || matchByPhone || matchByTargetPhone;
-        
-        // Debug logging for troubleshooting
-        if (shouldInclude) {
-          console.log('[Contact Detail] Recent call included:', {
-            callSid: c.callSid || c.id,
-            contactId: c.contactId,
-            contactName: c.contactName,
-            accountId: c.accountId,
-            accountName: c.accountName,
-            to: c.to,
-            from: c.from,
-            targetPhone: c.targetPhone,
-            matches: {
-              byContactId: matchByContactId,
-              byPhone: matchByPhone,
-              byTargetPhone: matchByTargetPhone
-            }
-          });
-        }
-        
-        return shouldInclude;
-      });
-      // Sort newest first by available timestamp field
-      filtered.sort((a,b)=>{
-        const at = new Date(a.callTime || a.timestamp || 0).getTime();
-        const bt = new Date(b.callTime || b.timestamp || 0).getTime();
-        return bt - at;
-      });
-      
-      // Final filtered calls ready for display
+      // Calls are already filtered and sorted by the API
+      const filtered = calls;
       
       // Save to state and initialize pagination
       try { state._rcCalls = filtered; } catch(_) {}

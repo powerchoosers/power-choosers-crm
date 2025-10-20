@@ -4,7 +4,7 @@
 class CacheManager {
   constructor() {
     this.dbName = 'PowerChoosersCRM';
-    this.dbVersion = 3; // Bumped for emails collection
+    this.dbVersion = 4; // Bumped for tasks, sequences, lists collections
     this.db = null;
     this.cacheExpiry = 15 * 60 * 1000; // 15 minutes in milliseconds
     this.collections = ['contacts', 'accounts', 'calls', 'calls-raw', 'tasks', 'sequences', 'lists', 'deals', 'settings', 'badge-data', 'emails'];
@@ -120,6 +120,29 @@ class CacheManager {
     } catch (error) {
       console.error('[CacheManager] Error getting cached list members:', error);
       return null;
+    }
+  }
+
+  // Invalidate list members cache for a specific list
+  async invalidateListCache(listId) {
+    try {
+      await this.init();
+      const cacheKey = `list-members-${listId}`;
+      const tx = this.db.transaction(['lists'], 'readwrite');
+      const store = tx.objectStore('lists');
+      
+      // Delete the cached data
+      store.delete(cacheKey);
+      
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = () => {
+          console.log(`[CacheManager] ✓ Invalidated list members cache for ${listId}`);
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (error) {
+      console.error(`[CacheManager] Error invalidating list cache:`, error);
     }
   }
 

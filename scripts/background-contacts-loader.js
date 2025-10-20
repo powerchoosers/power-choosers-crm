@@ -173,13 +173,27 @@
     }
   }
   
+  // Get total count from Firestore without loading all records
+  async function getTotalCount() {
+    if (!window.firebaseDB) return 0;
+    
+    try {
+      const snapshot = await window.firebaseDB.collection('contacts').get();
+      return snapshot.size;
+    } catch (error) {
+      console.error('[BackgroundContactsLoader] Failed to get total count:', error);
+      return contactsData.length; // Fallback to loaded count
+    }
+  }
+
   // Export public API
   window.BackgroundContactsLoader = {
     getContactsData: () => contactsData,
     reload: loadFromFirestore,
     loadMore: loadMoreContacts,
     hasMore: () => hasMoreData,
-    getCount: () => contactsData.length
+    getCount: () => contactsData.length,
+    getTotalCount: getTotalCount
   };
   
   console.log('[BackgroundContactsLoader] Module initialized');

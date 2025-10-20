@@ -26,6 +26,21 @@ var console = {
     loaded: false
   };
 
+  // Batch update system for individual field edits
+  let updateBatch = {};
+  let updateTimeout = null;
+
+  // Force immediate save of any pending batch updates
+  async function forceSaveBatch() {
+    if (updateTimeout) {
+      clearTimeout(updateTimeout);
+      updateTimeout = null;
+    }
+    if (Object.keys(updateBatch).length > 0) {
+      await processBatchUpdate();
+    }
+  }
+
   const els = {};
   
   // Track event listeners for cleanup
@@ -376,7 +391,17 @@ var console = {
       }
     } catch (_) {}
 
-    // Try getting from cache first
+    // Check BackgroundAccountsLoader first (cache-first)
+    if (window.BackgroundAccountsLoader) {
+      const accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
+      const found = accountsData.find(a => a.id === accountId);
+      if (found) {
+        console.log('[AccountDetail] ✓ Found account in BackgroundAccountsLoader cache:', found.name || found.accountName);
+        return found;
+      }
+    }
+
+    // Try getting from legacy cache
     if (window.getAccountsData) {
       // Force full data when searching for specific account (timing-safe)
       const accounts = window.getAccountsData(true);
@@ -868,19 +893,19 @@ var console = {
           log('[AccountDetail] Fallback: Got', allCachedContacts.length, 'contacts from BackgroundContactsLoader');
           
           // Filter client-side as fallback
-          const norm = (s) => String(s || '').toLowerCase()
+      const norm = (s) => String(s || '').toLowerCase()
             .replace(/\(usa\)|\(u\.s\.a\.\)|\(us\)/g, '')
             .replace(/\b(inc|llc|ltd|corp|corporation|company|co|incorporated)\b/g, '')
-            .replace(/[^a-z0-9]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-          
-          const normalizedAccountName = norm(accountName);
+        .replace(/[^a-z0-9]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      const normalizedAccountName = norm(accountName);
           allContacts = allCachedContacts.filter(contact => {
             if (contact.accountId === accountId || contact.account_id === accountId) return true;
         const contactCompany = contact.companyName || contact.accountName || '';
-            return norm(contactCompany) === normalizedAccountName;
-          });
+        return norm(contactCompany) === normalizedAccountName;
+      });
           log('[AccountDetail] Fallback: Filtered to', allContacts.length, 'contacts');
         }
       }
@@ -1439,11 +1464,13 @@ var console = {
     startPeriodicRefresh();
     
     // Cleanup interval when page is unloaded
-    window.addEventListener('beforeunload', () => {
+    window.addEventListener('beforeunload', async () => {
       if (refreshInterval) {
         clearInterval(refreshInterval);
         refreshInterval = null;
       }
+      // Force save any pending batch updates before page unloads
+      await forceSaveBatch();
     });
     
     try { window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); } catch (_) { /* noop */ }
@@ -1730,64 +1757,15 @@ var console = {
     }
     
     try {
-      const r = await fetch(`${base}/api/calls`);
+      // Use new targeted API endpoint for much better performance
+      const r = await fetch(`${base}/api/calls/account/${accountId}?limit=50`);
       const j = await r.json().catch(()=>({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
       
-      // Raw calls loaded from API
+      console.log(`[Account Detail] Loaded ${calls.length} targeted calls for account ${accountId}`);
       
-      // Build contact set and all known numbers for this account (contacts + company)
-      const norm10 = (s) => String(s||'').replace(/\D/g,'').slice(-10);
-      const contactIds = new Set();
-      const accountNumbers = new Set();
-      if (accountPhone10) accountNumbers.add(accountPhone10);
-      try {
-        if (typeof window.getPeopleData === 'function') {
-          const all = window.getPeopleData() || [];
-          const acc = state.currentAccount || {};
-          const accName = String(acc.accountName || acc.name || acc.companyName || '').toLowerCase().trim();
-          const normalized = (s) => String(s||'').toLowerCase().trim();
-          const related = all.filter(p => (
-            (p.accountId && String(p.accountId) === String(accountId)) ||
-            (normalized(p.companyName || p.accountName) === accName)
-          ));
-          related.forEach(p => {
-            if (p.id) contactIds.add(String(p.id));
-            [p.mobile, p.workDirectPhone, p.otherPhone].forEach(n => { const d = norm10(n); if (d) accountNumbers.add(d); });
-          });
-        }
-      } catch(_) {}
-
-      // Account phone numbers and contact IDs collected for filtering
-
-      let filtered = calls.filter(c => {
-        const matchByAccountId = c.accountId && String(c.accountId) === String(accountId);
-        const matchByContactId = c.contactId && contactIds.has(String(c.contactId));
-        const to10 = norm10(c.to);
-        const from10 = norm10(c.from);
-        const matchByToPhone = to10 && accountNumbers.has(to10);
-        const matchByFromPhone = from10 && accountNumbers.has(from10);
-        const callAcc = String(c.accountName||'').toLowerCase().trim();
-        const thisAcc = String(state.currentAccount?.accountName || state.currentAccount?.name || '').toLowerCase().trim();
-        const matchByAccountName = thisAcc && callAcc && callAcc === thisAcc;
-        
-        // Additional matching: check if call was made to/from company phone even if not explicitly linked
-        const targetPhone = norm10(c.targetPhone);
-        const matchByTargetPhone = targetPhone && accountNumbers.has(targetPhone);
-        
-        const shouldInclude = matchByAccountId || matchByContactId || matchByToPhone || matchByFromPhone || matchByAccountName || matchByTargetPhone;
-        
-        
-        return shouldInclude;
-      });
-      // Sort newest first and paginate later
-      filtered.sort((a,b)=>{
-        const at = new Date(a.callTime || a.timestamp || 0).getTime();
-        const bt = new Date(b.callTime || b.timestamp || 0).getTime();
-        return bt - at;
-      });
-      
-      // Final filtered calls ready for display
+      // Calls are already filtered and sorted by the API
+      const filtered = calls;
       
       if (!filtered.length){ arcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); return; }
 
@@ -3099,7 +3077,10 @@ var console = {
 
     const backBtn = document.getElementById('back-to-accounts');
     if (backBtn) {
-      backBtn.addEventListener('click', () => {
+      backBtn.addEventListener('click', async () => {
+        // Force save any pending batch updates before navigating away
+        await forceSaveBatch();
+        
         // Check if we came from health widget (call scripts page)
         const healthReturnPage = sessionStorage.getItem('health-widget-return-page');
         if (healthReturnPage) {
@@ -4625,81 +4606,111 @@ var console = {
     ensureDefaultActions(wrap);
   }
   
-  // Save field value to Firestore
-  async function saveField(field, value) {
+  // Batch update function for efficient Firebase writes
+  async function processBatchUpdate() {
+    if (Object.keys(updateBatch).length === 0) return;
+    
     const accountId = state.currentAccount?.id;
     if (!accountId) return;
     
     try {
       const db = window.firebaseDB;
       if (db && typeof db.collection === 'function') {
+        // Single Firebase write for all pending changes
         await db.collection('accounts').doc(accountId).update({
-          [field]: value,
+          ...updateBatch,
           updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
         });
         
-        // Update local state
+        // Update local state for all batched fields
         if (state.currentAccount) {
-          state.currentAccount[field] = value;
+          Object.assign(state.currentAccount, updateBatch);
         }
         
-        // Also update the global accounts cache to ensure click-to-call uses fresh data
+        // Update global accounts cache for all batched fields
         try {
           if (typeof window.getAccountsData === 'function' && accountId) {
             const accounts = window.getAccountsData();
             const idx = accounts.findIndex(a => a.id === accountId);
             if (idx !== -1) {
-              accounts[idx][field] = value;
+              Object.assign(accounts[idx], updateBatch);
               accounts[idx].updatedAt = new Date();
-              console.log('[Account Detail] Updated global accounts cache:', field, '=', value);
+              console.log('[Account Detail] Batch updated global accounts cache:', Object.keys(updateBatch));
             }
           }
         } catch (_) { /* noop */ }
         
+        // Notify other pages about the batch update
+        try {
+          const ev = new CustomEvent('pc:account-updated', { 
+            detail: { 
+              id: accountId, 
+              changes: { ...updateBatch, updatedAt: new Date() } 
+            } 
+          });
+          document.dispatchEvent(ev);
+        } catch (_) { /* noop */ }
+        
+        // Show success message
         window.crm?.showToast && window.crm.showToast('Saved');
+        
+        // Clear the batch
+        updateBatch = {};
       }
     } catch (err) {
-      console.warn('Save field failed', err);
+      console.warn('Batch update failed', err);
       window.crm?.showToast && window.crm.showToast('Failed to save');
     }
   }
 
-  // Save service addresses array to Firestore
+  // Save field value to Firestore (now uses batch updates)
+  async function saveField(field, value) {
+    const accountId = state.currentAccount?.id;
+    if (!accountId) return;
+    
+    // Add to batch instead of immediate write
+    updateBatch[field] = value;
+    
+    // Update local state immediately for instant UI feedback
+    if (state.currentAccount) {
+      state.currentAccount[field] = value;
+    }
+    
+    // Clear existing timeout
+    if (updateTimeout) clearTimeout(updateTimeout);
+    
+    // Set new timeout for batch update (2 seconds after last edit)
+    updateTimeout = setTimeout(async () => {
+      await processBatchUpdate();
+    }, 2000);
+    
+    // Show immediate feedback
+    window.crm?.showToast && window.crm.showToast('Saving...');
+  }
+
+  // Save service addresses array to Firestore (now uses batch updates)
   async function saveServiceAddresses(addresses) {
     const accountId = state.currentAccount?.id;
     if (!accountId) return;
     
-    try {
-      const db = window.firebaseDB;
-      if (db && typeof db.collection === 'function') {
-        await db.collection('accounts').doc(accountId).update({
-          serviceAddresses: addresses,
-          updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
-        });
-        
-        // Update local state
-        if (state.currentAccount) {
-          state.currentAccount.serviceAddresses = addresses;
-        }
-        
-        // Also update the global accounts cache
-        try {
-          if (typeof window.getAccountsData === 'function' && accountId) {
-            const accounts = window.getAccountsData();
-            const idx = accounts.findIndex(a => a.id === accountId);
-            if (idx !== -1) {
-              accounts[idx].serviceAddresses = addresses;
-              accounts[idx].updatedAt = new Date();
-            }
-          }
-        } catch (_) { /* noop */ }
-        
-        window.crm?.showToast && window.crm.showToast('Saved');
-      }
-    } catch (err) {
-      console.warn('Save service addresses failed', err);
-      window.crm?.showToast && window.crm.showToast('Failed to save');
+    // Add to batch instead of immediate write
+    updateBatch.serviceAddresses = addresses;
+    
+    // Update local state immediately for instant UI feedback
+    if (state.currentAccount) {
+      state.currentAccount.serviceAddresses = addresses;
     }
+    
+    // Clear existing timeout
+    if (updateTimeout) clearTimeout(updateTimeout);
+    
+    // Set new timeout for batch update (2 seconds after last edit)
+    updateTimeout = setTimeout(async () => {
+      await processBatchUpdate();
+    }, 2000);
+    
+    // Show immediate feedback
+    window.crm?.showToast && window.crm.showToast('Saving...');
   }
   
   // Update field text in UI
@@ -6137,4 +6148,6 @@ var console = {
   // Backward-compat global alias used by some modules
   try { window.showAccountDetail = showAccountDetail; } catch (_) {}
 })();
+
+
 

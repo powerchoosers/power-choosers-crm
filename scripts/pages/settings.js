@@ -304,13 +304,38 @@ class SettingsPage {
 
     async loadSettings() {
         try {
-            // First try to load from Firebase
+            // First try to load from CacheManager (cache-first)
+            if (window.CacheManager) {
+                try {
+                    const cachedSettings = await window.CacheManager.get('settings');
+                    if (cachedSettings && cachedSettings.length > 0) {
+                        const settingsData = cachedSettings[0];
+                        this.state.settings = { ...this.state.settings, ...settingsData };
+                        console.log('[Settings] Loaded from CacheManager cache');
+                        return;
+                    }
+                } catch (error) {
+                    console.warn('[Settings] CacheManager load failed:', error);
+                }
+            }
+            
+            // Fallback to Firebase if cache miss
             if (window.firebaseDB) {
                 const settingsDoc = await window.firebaseDB.collection('settings').doc('user-settings').get();
                 if (settingsDoc.exists) {
                     const firebaseSettings = settingsDoc.data();
                     this.state.settings = { ...this.state.settings, ...firebaseSettings };
                     console.log('[Settings] Loaded from Firebase');
+                    
+                    // Cache the settings for future use
+                    if (window.CacheManager) {
+                        try {
+                            await window.CacheManager.set('settings', [{ id: 'user-settings', ...firebaseSettings }]);
+                            console.log('[Settings] Cached settings for future use');
+                        } catch (error) {
+                            console.warn('[Settings] Failed to cache settings:', error);
+                        }
+                    }
                 }
             }
             

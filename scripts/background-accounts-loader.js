@@ -189,13 +189,27 @@
     }
   }
   
+  // Get total count from Firestore without loading all records
+  async function getTotalCount() {
+    if (!window.firebaseDB) return 0;
+    
+    try {
+      const snapshot = await window.firebaseDB.collection('accounts').get();
+      return snapshot.size;
+    } catch (error) {
+      console.error('[BackgroundAccountsLoader] Failed to get total count:', error);
+      return accountsData.length; // Fallback to loaded count
+    }
+  }
+
   // Export public API
   window.BackgroundAccountsLoader = {
     getAccountsData: () => accountsData,
     reload: loadFromFirestore,
     loadMore: loadMoreAccounts,
     hasMore: () => hasMoreData,
-    getCount: () => accountsData.length
+    getCount: () => accountsData.length,
+    getTotalCount: getTotalCount
   };
   
   console.log('[BackgroundAccountsLoader] Module initialized');
