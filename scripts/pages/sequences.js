@@ -7,7 +7,8 @@
     filtered: [],
     loaded: false,
     pageSize: 10,
-    currentPage: 1
+    currentPage: 1,
+    hasMore: false
   };
 
   const els = {};
@@ -30,6 +31,18 @@
   let unsubscribe = null;
 
   async function loadFromFirestore() {
+    // Use BackgroundSequencesLoader (cache-first)
+    if (window.BackgroundSequencesLoader) {
+      const sequencesData = window.BackgroundSequencesLoader.getSequencesData() || [];
+      state.data = sequencesData;
+      state.filtered = sequencesData.slice();
+      state.hasMore = window.BackgroundSequencesLoader.hasMore();
+      state.loaded = true;
+      console.log('[Sequences] Loaded', sequencesData.length, 'sequences from BackgroundSequencesLoader');
+      return;
+    }
+    
+    // Fallback to direct Firestore query
     if (!sequencesCol) return;
     const snap = await sequencesCol.get();
     const items = [];
@@ -42,6 +55,29 @@
     state.data = items;
     state.filtered = items.slice();
     state.loaded = true;
+  }
+
+  // Load more sequences from background loader
+  async function loadMoreSequences() {
+    if (!state.hasMore || !window.BackgroundSequencesLoader) {
+      return;
+    }
+
+    try {
+      console.log('[Sequences] Loading more sequences...');
+      const result = await window.BackgroundSequencesLoader.loadMore();
+      
+      if (result.loaded > 0) {
+        // Reload data to get updated sequences
+        await loadFromFirestore();
+        render();
+        console.log('[Sequences] Loaded', result.loaded, 'more sequences');
+      } else {
+        state.hasMore = false;
+      }
+    } catch (error) {
+      console.error('[Sequences] Failed to load more sequences:', error);
+    }
   }
 
   function subscribeToFirestore() {
@@ -476,8 +512,19 @@
   async function init() {
     if (!initDomRefs()) return;
     attachEvents();
+    
+    // Listen for background sequences loader events
+    document.addEventListener('pc:sequences-loaded', async () => {
+      console.log('[Sequences] Background sequences loaded, refreshing data...');
+      await loadFromFirestore();
+      applyFilters();
+    });
+    
     try {
-      if (sequencesCol && sequencesCol.onSnapshot && subscribeToFirestore()) {
+      // Use background loader if available, otherwise fall back to direct Firestore
+      if (window.BackgroundSequencesLoader) {
+        await loadFromFirestore();
+      } else if (sequencesCol && sequencesCol.onSnapshot && subscribeToFirestore()) {
         // live updates enabled
       } else if (sequencesCol) {
         await loadFromFirestore();
@@ -492,6 +539,13 @@
     }
     applyFilters();
   }
+
+  // Expose public API
+  try {
+    window.Sequences = window.Sequences || {};
+    window.Sequences.loadMoreSequences = loadMoreSequences;
+    window.Sequences.loadFromFirestore = loadFromFirestore;
+  } catch(_) {}
 
   // Initialize immediately since this script is loaded after DOM
   init();

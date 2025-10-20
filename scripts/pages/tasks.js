@@ -6,7 +6,8 @@
     selected: new Set(),
     currentPage: 1,
     pageSize: 25,
-    filterMode: 'all'
+    filterMode: 'all',
+    hasMore: false
   };
   const els = {};
 
@@ -220,7 +221,7 @@
   }
 
   async function loadData(){
-    // Build from real sources: Firebase tasks + localStorage tasks + LinkedIn sequence tasks
+    // Build from real sources: BackgroundTasksLoader + localStorage tasks + LinkedIn sequence tasks
     const linkedInTasks = getLinkedInTasksFromSequences();
     let userTasks = [];
     let firebaseTasks = [];
@@ -232,27 +233,34 @@
       userTasks = []; 
     }
     
-    // Load from Firebase
+    // Load from BackgroundTasksLoader (cache-first)
     try {
-      if (window.firebaseDB) {
-        const snapshot = await window.firebaseDB.collection('tasks')
-          .orderBy('timestamp', 'desc')
-          .limit(100)
-          .get();
-        firebaseTasks = snapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id, 
-            ...data,
-            // Ensure we have the required fields with proper fallbacks
-            createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
-            // Ensure status is set
+      if (window.BackgroundTasksLoader) {
+        firebaseTasks = window.BackgroundTasksLoader.getTasksData() || [];
+        state.hasMore = window.BackgroundTasksLoader.hasMore();
+        console.log('[Tasks] Loaded', firebaseTasks.length, 'tasks from BackgroundTasksLoader');
+      } else {
+        // Fallback to direct Firestore query if background loader not available
+        if (window.firebaseDB) {
+          const snapshot = await window.firebaseDB.collection('tasks')
+            .orderBy('timestamp', 'desc')
+            .limit(100)
+            .get();
+          firebaseTasks = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id, 
+              ...data,
+              // Ensure we have the required fields with proper fallbacks
+              createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
+              // Ensure status is set
             status: data.status || 'pending'
           };
         });
+        }
       }
     } catch (error) {
-      console.warn('Could not load tasks from Firebase:', error);
+      console.warn('Could not load tasks from BackgroundTasksLoader:', error);
     }
     
     // Debug logging
@@ -276,6 +284,28 @@
     state.filtered = sortTasksChronologically(rows);
     console.log(`[Tasks] Total tasks loaded: ${rows.length}`);
     render();
+  }
+
+  // Load more tasks from background loader
+  async function loadMoreTasks() {
+    if (!state.hasMore || !window.BackgroundTasksLoader) {
+      return;
+    }
+
+    try {
+      console.log('[Tasks] Loading more tasks...');
+      const result = await window.BackgroundTasksLoader.loadMore();
+      
+      if (result.loaded > 0) {
+        // Reload data to get updated tasks
+        await loadData();
+        console.log('[Tasks] Loaded', result.loaded, 'more tasks');
+      } else {
+        state.hasMore = false;
+      }
+    } catch (error) {
+      console.error('[Tasks] Failed to load more tasks:', error);
+    }
   }
 
   function getLinkedInTasksFromSequences() {
@@ -853,6 +883,12 @@
       await loadData();
     });
     
+    // Listen for background tasks loader events
+    document.addEventListener('pc:tasks-loaded', async () => {
+      console.log('[Tasks] Background tasks loaded, refreshing data...');
+      await loadData();
+    });
+    
     // Listen for auto-task events from other pages
     window.addEventListener('pc:auto-task', async (event) => {
       const { title, type, contact, account, dueDate, dueTime, notes } = event.detail;
@@ -864,6 +900,7 @@
   try {
     window.Tasks = window.Tasks || {};
     window.Tasks.createTask = createTask;
+    window.Tasks.loadMoreTasks = loadMoreTasks;
     window.createTask = window.createTask || createTask;
     window.addEventListener('pc:auto-task', async (e) => {
       try {

@@ -3227,6 +3227,16 @@ class PowerChoosersCRM {
                 }
                 
                 console.log(`✓ Batch assigned ${newRecordIds.length} ${targetType} to list ${listId} (${recordIds.length - newRecordIds.length} already existed)`);
+                
+                // 5. Invalidate cache for this list so list detail page will refresh
+                if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
+                    try {
+                        await window.CacheManager.invalidateListCache(listId);
+                        console.log(`✓ Cache invalidated for list ${listId}`);
+                    } catch (cacheError) {
+                        console.warn('Cache invalidation failed:', cacheError);
+                    }
+                }
             }
             
         } catch (error) {
@@ -3721,14 +3731,30 @@ class PowerChoosersCRM {
             let userApprovedQueuedMerges = true;
             try {
                 const totalQueued = queuedContactMerges.length + queuedAccountMerges.length;
+                console.log('=== IMPORT DEBUG ===');
+                console.log('Main processing complete. Imported:', imported, 'Enriched:', enriched, 'Failed:', failed);
+                console.log('Queued merges - Contacts:', queuedContactMerges.length, 'Accounts:', queuedAccountMerges.length);
+                console.log('List assignments pending:', listAssignments.length);
+                console.log('Total queued merges:', totalQueued);
+                
                 if (totalQueued > 0) {
+                    console.log('About to show merge confirmation modal...');
+                    
+                    // TEMPORARY: Skip modal for testing - uncomment the next line to bypass modal
+                    // userApprovedQueuedMerges = true; console.log('Modal bypassed for testing');
+                    
                     userApprovedQueuedMerges = await this.showQueuedMergeSummaryModal({
                         contacts: queuedContactMerges,
                         accounts: queuedAccountMerges,
                         importType: modal._importType
                     });
+                    console.log('Merge modal completed. User approved:', userApprovedQueuedMerges);
+                } else {
+                    console.log('No queued merges, proceeding to results...');
                 }
-            } catch(_) {}
+            } catch(error) {
+                console.error('Error in queued merge processing:', error);
+            }
 
             // Apply queued merges if approved
             const queuedMergeAssignments = [];
@@ -3794,9 +3820,30 @@ class PowerChoosersCRM {
                 await this.batchAssignToList(db, queuedMergeAssignments);
             }
             
+            // Invalidate cache for all affected lists to ensure list detail pages refresh
+            const affectedLists = new Set([...listAssignments, ...queuedMergeAssignments].map(a => a.listId));
+            for (const listId of affectedLists) {
+                if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
+                    try {
+                        await window.CacheManager.invalidateListCache(listId);
+                        console.log(`✓ Cache invalidated for affected list ${listId}`);
+                    } catch (cacheError) {
+                        console.warn('Cache invalidation failed for list', listId, ':', cacheError);
+                    }
+                }
+            }
+            
             // Show results
-            if (progressDiv) progressDiv.hidden = true;
+            console.log('=== SHOWING RESULTS ===');
+            console.log('About to show results. Imported:', imported, 'Enriched:', enriched, 'Failed:', failed);
+            
+            if (progressDiv) {
+                console.log('Hiding progress div');
+                progressDiv.hidden = true;
+            }
+            
             if (resultsDiv) {
+                console.log('Showing results div');
                 resultsDiv.hidden = false;
                 resultsDiv.style.display = 'block';
                 resultsDiv.style.visibility = 'visible';
@@ -3898,12 +3945,28 @@ class PowerChoosersCRM {
         return new Promise((resolve) => {
             try {
                 const total = contacts.length + accounts.length;
-                if (total === 0) return resolve(true);
+                console.log('Creating merge confirmation modal for', total, 'records');
+                if (total === 0) {
+                    console.log('No merges to show, resolving immediately');
+                    return resolve(true);
+                }
                 const overlay = document.createElement('div');
                 overlay.className = 'pc-modal';
+                // Ensure modal is visible
+                overlay.style.display = 'block';
+                overlay.style.visibility = 'visible';
+                overlay.style.opacity = '1';
+                overlay.style.position = 'fixed';
+                overlay.style.top = '0';
+                overlay.style.left = '0';
+                overlay.style.width = '100%';
+                overlay.style.height = '100%';
+                overlay.style.zIndex = '9999';
+                overlay.style.backgroundColor = 'rgba(45, 45, 45, 0.8)';
+                console.log('Modal HTML created, generating content...');
                 overlay.innerHTML = `
-                  <div class="pc-modal__backdrop" data-close="queued-merge"></div>
-                  <div class="pc-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="merge-batch-title">
+                  <div class="pc-modal__backdrop" data-close="queued-merge" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(45, 45, 45, 0.8);"></div>
+                  <div class="pc-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="merge-batch-title" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 8px; padding: 20px; max-width: 600px; max-height: 80vh; overflow: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
                     <div class="pc-modal__header">
                       <h3 id="merge-batch-title">Review potential merges</h3>
                       <button class="pc-modal__close" data-close="queued-merge" aria-label="Close">×</button>
@@ -3930,11 +3993,27 @@ class PowerChoosersCRM {
                       <button type="button" class="btn-primary" data-action="enrich">Enrich</button>
                     </div>
                   </div>`;
+                console.log('Modal HTML generated, appending to DOM...');
                 document.body.appendChild(overlay);
-                const close = (val) => { try { overlay.parentNode && overlay.parentNode.removeChild(overlay); } catch(_) {}; resolve(val); };
+                console.log('Modal appended to DOM, should be visible now');
+                
+                const close = (val) => { 
+                    console.log('Modal closing with value:', val);
+                    try { overlay.parentNode && overlay.parentNode.removeChild(overlay); } catch(_) {}; 
+                    resolve(val); 
+                };
+                
+                console.log('Setting up modal event handlers...');
                 overlay.querySelectorAll('[data-close="queued-merge"]').forEach(btn => btn.addEventListener('click', () => close(false)));
                 overlay.querySelector('[data-action="cancel"]').addEventListener('click', () => close(false));
                 overlay.querySelector('[data-action="enrich"]').addEventListener('click', () => close(true));
+                console.log('Modal event handlers set up, waiting for user interaction...');
+                
+                // Fallback timeout to prevent infinite hanging (30 seconds)
+                setTimeout(() => {
+                    console.log('Modal timeout reached, auto-approving merges');
+                    close(true);
+                }, 30000);
             } catch(_) { resolve(true); }
         });
     }

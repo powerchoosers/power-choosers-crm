@@ -383,7 +383,7 @@
                   if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
                     console.log('[List Detail] Showing contact detail:', contactId);
                     try {
-                      window.ContactDetail.show(contactId);
+                          window.ContactDetail.show(contactId);
                     } catch (error) {
                       console.error('[List Detail] Error showing contact detail:', error);
                     }
@@ -397,7 +397,7 @@
                       attempts++;
                       if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
                         console.log('[List Detail] ContactDetail ready after', attempts, 'attempts');
-                        window.ContactDetail.show(contactId);
+                          window.ContactDetail.show(contactId);
                       } else if (attempts < maxAttempts) {
                         setTimeout(retry, retryInterval);
                       } else {
@@ -938,21 +938,21 @@
       
       // FINAL FALLBACK: Use CacheManager or Firestore
       if (!state.loadedPeople || !state.loadedAccounts) {
-      if (window.CacheManager && typeof window.CacheManager.get === 'function') {
-        if (!state.loadedPeople) {
+        if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+          if (!state.loadedPeople) {
             state.dataPeople = await window.CacheManager.get('contacts') || [];
-          state.loadedPeople = true;
+            state.loadedPeople = true;
             console.debug('[ListDetail] loadDataOnce: people loaded from CacheManager', { count: state.dataPeople.length });
-        }
-        
-        if (!state.loadedAccounts) {
+          }
+          
+          if (!state.loadedAccounts) {
             state.dataAccounts = await window.CacheManager.get('accounts') || [];
-          state.loadedAccounts = true;
+            state.loadedAccounts = true;
             console.debug('[ListDetail] loadDataOnce: accounts loaded from CacheManager', { count: state.dataAccounts.length });
-        }
-      } else if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
+          }
+        } else if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
           // Firestore fallback - OPTIMIZED with field selection
-        if (!state.loadedPeople) {
+          if (!state.loadedPeople) {
             // OPTIMIZED: Only fetch fields needed for list display and filtering (60% data reduction)
             const peopleSnap = await window.firebaseDB.collection('contacts')
               .select(
@@ -966,12 +966,12 @@
                 'updatedAt', 'createdAt'
               )
               .get();
-          state.dataPeople = peopleSnap ? peopleSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
-          state.loadedPeople = true;
+            state.dataPeople = peopleSnap ? peopleSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+            state.loadedPeople = true;
             console.debug('[ListDetail] loadDataOnce: people loaded from Firestore (optimized)', { count: state.dataPeople.length });
-        }
-        
-        if (!state.loadedAccounts) {
+          }
+          
+          if (!state.loadedAccounts) {
             // OPTIMIZED: Only fetch fields needed for list display, filtering, and AI email generation (25% data reduction)
             const accountsSnap = await window.firebaseDB.collection('accounts')
               .select(
@@ -993,8 +993,8 @@
                 'updatedAt', 'createdAt'
               )
               .get();
-          state.dataAccounts = accountsSnap ? accountsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
-          state.loadedAccounts = true;
+            state.dataAccounts = accountsSnap ? accountsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+            state.loadedAccounts = true;
             console.debug('[ListDetail] loadDataOnce: accounts loaded from Firestore (optimized)', { count: state.dataAccounts.length });
           }
         }
@@ -1025,7 +1025,7 @@
     state.membersAccounts = new Set();
     if (!listId) return;
     
-    if (console.time) console.time(`[ListDetail] fetchMembers ${listId}`);
+      if (console.time) console.time(`[ListDetail] fetchMembers ${listId}`);
     
     // 1) Check IndexedDB cache first (10-minute expiry)
     try {
@@ -1034,18 +1034,18 @@
         state.membersPeople = cached.people;
         state.membersAccounts = cached.accounts;
         console.log(`[ListDetail] Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from cache`);
-        if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
+          if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
         return;
-      }
+        }
     } catch (e) {
       console.warn('[ListDetail] Cache read failed:', e);
-    }
-    
+      }
+
     // 2) Cache miss - fetch from Firebase
     console.log('[ListDetail] Cache miss, fetching from Firebase...');
     try {
       if (!window.firebaseDB || typeof window.firebaseDB.collection !== 'function') return;
-      
+
       let gotAny = false;
       
       // Try subcollection first: lists/{id}/members
@@ -1060,17 +1060,17 @@
           else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
         });
       }
-      
+
       // Fallback to top-level listMembers collection
       if (!gotAny) {
-        const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).limit(5000).get();
-        lmSnap?.docs?.forEach(d => {
-          const m = d.data() || {};
-          const t = (m.targetType || m.type || '').toLowerCase();
-          const id = m.targetId || m.id || d.id;
-          if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
-          else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
-        });
+          const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).limit(5000).get();
+          lmSnap?.docs?.forEach(d => {
+            const m = d.data() || {};
+            const t = (m.targetType || m.type || '').toLowerCase();
+            const id = m.targetId || m.id || d.id;
+            if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
+            else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
+          });
       }
       
       // 3) Cache the results for next time
@@ -1079,12 +1079,12 @@
       console.log(`[ListDetail] Fetched from Firebase: ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts`);
       
       // 4) Update legacy in-memory cache for backward compatibility
-      window.listMembersCache = window.listMembersCache || {};
-      window.listMembersCache[listId] = {
-        people: new Set(state.membersPeople),
-        accounts: new Set(state.membersAccounts),
-        loaded: true
-      };
+        window.listMembersCache = window.listMembersCache || {};
+        window.listMembersCache[listId] = {
+          people: new Set(state.membersPeople),
+          accounts: new Set(state.membersAccounts),
+          loaded: true
+        };
       
     } catch (err) {
       console.error('[ListDetail] Failed to fetch list members:', err);
@@ -1936,7 +1936,7 @@
     
     // Load data in parallel for faster loading
     if (!window.__restoringListDetail) {
-    state.currentPage = 1;
+      state.currentPage = 1;
     }
     const [dataLoaded, membersLoaded] = await Promise.all([
       loadDataOnce(),

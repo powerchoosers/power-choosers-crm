@@ -311,9 +311,52 @@
   }
 
   async function loadLists(kind) {
-    // Try to load from Firestore if available, otherwise keep empty
+    // Try to load from BackgroundListsLoader first, then Firestore fallback
     try {
       if (console.time) console.time(`[ListsOverview] loadLists ${kind}`);
+      
+      // Use BackgroundListsLoader (cache-first)
+      if (window.BackgroundListsLoader) {
+        const listsData = window.BackgroundListsLoader.getListsData() || [];
+        // Filter by kind client-side
+        const filteredLists = listsData.filter(list => {
+          const listKind = (list.kind || list.type || list.listType || '').toLowerCase();
+          if (kind === 'people') {
+            return listKind === 'people' || listKind === 'person' || listKind === 'contacts' || listKind === 'contact';
+          } else {
+            return listKind === 'accounts' || listKind === 'account' || listKind === 'companies' || listKind === 'company';
+          }
+        });
+        
+        console.log('[ListsOverview] Loaded', filteredLists.length, 'lists from BackgroundListsLoader for kind:', kind);
+        
+        // Ensure global cache exists
+        try { window.listMembersCache = window.listMembersCache || {}; } catch (_) {}
+
+        // Preload members for all lists in this kind and compute counts
+        if (typeof window.__preloadListMembers === 'function') {
+          await window.__preloadListMembers(filteredLists);
+        } else {
+          // Fallback: load members individually
+          for (const list of filteredLists) {
+            await loadListMembers(list.id);
+          }
+        }
+
+        if (kind === 'people') {
+          state.peopleLists = filteredLists;
+          state.loadedPeople = true;
+        } else {
+          state.accountLists = filteredLists;
+          state.loadedAccounts = true;
+        }
+        
+        if (console.timeEnd) console.timeEnd(`[ListsOverview] loadLists ${kind}`);
+        render();
+        return;
+      }
+      
+      // Fallback to direct Firestore query
       if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
         // Primary query: filter by kind on server if available
         let query = window.firebaseDB.collection('lists');
@@ -1063,6 +1106,15 @@
     refreshCounts: refreshCounts,
     getCurrentState: getCurrentState
   };
+
+  // Listen for background lists loader events
+  document.addEventListener('pc:lists-loaded', async () => {
+    console.log('[ListsOverview] Background lists loaded, refreshing data...');
+    // Reload both kinds
+    state.loadedPeople = false;
+    state.loadedAccounts = false;
+    await ensureLoadedThenRender();
+  });
 
   // Initialize
   if (!initDom()) return;

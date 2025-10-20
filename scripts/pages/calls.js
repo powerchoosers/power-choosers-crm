@@ -284,7 +284,7 @@ var console = {
 
 function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console, arguments); } catch(_) {} }
 (function () {
-  const state = { data: [], filtered: [], selected: new Set(), currentPage: 1, pageSize: 25, hasAnimated: false, tokens: { city: [], title: [], company: [], state: [], employees: [], industry: [], visitorDomain: [], seniority: [], department: [] }, virtual: { enabled: true, rowHeight: 0, headerH: 0, overscan: 4, first: 0, count: 0, rows: [] } };
+  const state = { data: [], filtered: [], selected: new Set(), currentPage: 1, pageSize: 25, hasAnimated: false, hasMore: false, tokens: { city: [], title: [], company: [], state: [], employees: [], industry: [], visitorDomain: [], seniority: [], department: [] }, virtual: { enabled: true, rowHeight: 0, headerH: 0, overscan: 4, first: 0, count: 0, rows: [] } };
   const els = {};
   const chips = [
     { k: 'city', i: 'calls-filter-city', c: 'calls-filter-city-chips', x: 'calls-filter-city-clear', s: 'calls-filter-city-suggest', acc: r => r.contactCity || '' },
@@ -1060,6 +1060,35 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     updateFilterCount();
   }
 
+  // Load more calls (pagination)
+  async function loadMoreCalls() {
+    if (!state.hasMore) return;
+
+    try {
+      console.log('[Calls] Loading more calls...');
+      
+      if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.loadMore === 'function') {
+        const result = await window.BackgroundCallsLoader.loadMore();
+        
+        if (result.loaded > 0) {
+          // Get updated data from loader
+          const allCalls = window.BackgroundCallsLoader.getCallsData();
+          state.data = allCalls;
+          state.hasMore = result.hasMore;
+          
+          // Enrich the new data
+          enrichCallsData();
+          
+          console.log('[Calls] Loaded', result.loaded, 'more calls. Total:', state.data.length);
+        } else {
+          state.hasMore = false;
+        }
+      }
+    } catch (error) {
+      console.error('[Calls] Failed loading more calls:', error);
+    }
+  }
+
   async function loadData() {
     // Debug disabled by default for performance; enable by setting localStorage.CRM_DEBUG_CALLS = '1'
     
@@ -1081,6 +1110,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           });
           state.data = bgData;
           state.filtered = bgData.slice();
+          state.hasMore = window.BackgroundCallsLoader.hasMore();
           chips.forEach(buildPool);
           render();
           try {
@@ -1885,8 +1915,16 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     
     // Use unified pagination component
     if (window.crm && window.crm.createPagination) {
-      window.crm.createPagination(state.currentPage, pages, (page) => {
+      window.crm.createPagination(state.currentPage, pages, async (page) => {
         state.currentPage = page;
+        
+        // Check if we need to load more data for this page
+        const neededIndex = (page - 1) * state.pageSize;
+        if (neededIndex >= state.data.length && state.hasMore) {
+          console.log('[Calls] Page', page, 'needs more data, loading...');
+          await loadMoreCalls();
+        }
+        
         render();
       }, els.pag.id);
     } else {
@@ -1896,7 +1934,15 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>
         </button>
         <div class="pagination-current">${state.currentPage}</div>
-        <button class="pagination-arrow" ${state.currentPage >= pages ? 'disabled' : ''} onclick="if(${state.currentPage} < ${pages}) { state.currentPage = ${state.currentPage + 1}; render(); }">
+        <button class="pagination-arrow" ${state.currentPage >= pages ? 'disabled' : ''} onclick="if(${state.currentPage} < ${pages}) { 
+          state.currentPage = ${state.currentPage + 1}; 
+          const neededIndex = (state.currentPage - 1) * state.pageSize;
+          if (neededIndex >= state.data.length && state.hasMore) {
+            loadMoreCalls().then(() => render());
+          } else {
+            render();
+          }
+        }">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg>
         </button>
       </div>`;
@@ -3743,6 +3789,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
   // Expose loadData and controls for external use
   window.callsModule = { 
     loadData, 
+    loadMoreCalls,
     startAutoRefresh, 
     stopAutoRefresh,
     getCallContactById,

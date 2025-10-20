@@ -1030,8 +1030,8 @@
                                             <input type="text" id="filter-acct-name" class="input-dark" placeholder="e.g., Acme Corp" />
                                         </div>
                                         <div class="filter-field">
-                                            <label for="filter-industry">Industry</label>
-                                            <input type="text" id="filter-industry" class="input-dark" placeholder="e.g., Industrial, Retail" />
+                                            <label for="accounts-filter-industry">Industry</label>
+                                            <input type="text" id="accounts-filter-industry" class="input-dark" placeholder="e.g., Industrial, Retail" />
                                         </div>
                                         <div class="filter-field">
                                             <label for="filter-domain">Domain</label>
@@ -2246,16 +2246,18 @@
                                                     <strong>⚠️ Important:</strong> This tool uses direct Algolia API calls to bypass Firebase extension issues. You'll need your Algolia Application ID and Admin API Key.
                                                 </div>
                                                 
-                                                <div class="settings-field" style="margin-bottom: 16px;">
-                                                    <label style="font-weight: 600; margin-bottom: 8px; display: block;">Algolia Credentials (Optional - will prompt if not set)</label>
-                                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                                                        <input type="text" id="algolia-app-id" class="settings-input" placeholder="Application ID" style="margin-bottom: 0;">
-                                                        <input type="password" id="algolia-api-key" class="settings-input" placeholder="Admin API Key" style="margin-bottom: 0;">
+                                                <form id="algolia-credentials-form">
+                                                    <div class="settings-field" style="margin-bottom: 16px;">
+                                                        <label style="font-weight: 600; margin-bottom: 8px; display: block;">Algolia Credentials (Optional - will prompt if not set)</label>
+                                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                                            <input type="text" id="algolia-app-id" class="settings-input" placeholder="Application ID" style="margin-bottom: 0;">
+                                                            <input type="password" id="algolia-api-key" class="settings-input" placeholder="Admin API Key" style="margin-bottom: 0;">
+                                                        </div>
+                                                        <small style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;">
+                                                            These will be stored in localStorage for convenience. You can also set them as environment variables.
+                                                        </small>
                                                     </div>
-                                                    <small style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;">
-                                                        These will be stored in localStorage for convenience. You can also set them as environment variables.
-                                                    </small>
-                                                </div>
+                                                </form>
                                                 
                                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
                                                     <button class="btn-primary" id="algolia-reindex-accounts-btn" style="width: 100%;">
@@ -2786,6 +2788,9 @@
                 'scripts/background-contacts-loader.js', // NEW - background contacts loading for instant access
                 'scripts/background-accounts-loader.js', // NEW - background accounts loading for instant access
                 'scripts/background-emails-loader.js', // NEW - background emails loading for instant access
+                'scripts/background-tasks-loader.js', // NEW - background tasks loading for instant access
+                'scripts/background-sequences-loader.js', // NEW - background sequences loading for instant access
+                'scripts/background-lists-loader.js', // NEW - background lists loading for instant access
                 'scripts/email-compose-global.js', // NEW - Global email compose functionality
                 // 'scripts/pages/emails.js',         // REMOVED - replaced with emails-redesigned.js
                 'scripts/contact-merger.js',

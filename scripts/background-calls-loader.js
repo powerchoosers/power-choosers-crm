@@ -14,12 +14,15 @@
 
 (function() {
   let callsData = [];
+  let callStatusCache = new Map(); // Cache for call status lookups
+  let lastLoadedOffset = 0; // Track pagination offset
+  let hasMoreData = true; // Track if more data is available
   
   async function loadFromAPI() {
     try {
       console.log('[BackgroundCallsLoader] Loading from API...');
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-      const url = `${base}/api/calls?limit=1000`; // Load more at once for better performance
+      const url = `${base}/api/calls?limit=100`; // Load 100 calls for efficiency
       
       const response = await fetch(url);
       if (!response.ok) {
@@ -31,7 +34,9 @@
       
       if (data.ok && Array.isArray(data.calls) && data.calls.length > 0) {
         callsData = data.calls;
-        console.log('[BackgroundCallsLoader] ✓ Loaded', callsData.length, 'calls from API');
+        lastLoadedOffset = data.calls.length;
+        hasMoreData = data.calls.length === 100; // If we got less than 100, no more data
+        console.log('[BackgroundCallsLoader] ✓ Loaded', callsData.length, 'calls from API', hasMoreData ? '(more available)' : '(all loaded)');
         
         // Save to cache for future sessions (use standard 'calls' key)
         if (window.CacheManager && typeof window.CacheManager.set === 'function') {
@@ -93,11 +98,121 @@
     }
   })();
   
+  // Load more calls (pagination)
+  async function loadMoreCalls() {
+    if (!hasMoreData) {
+      console.log('[BackgroundCallsLoader] No more data to load');
+      return { loaded: 0, hasMore: false };
+    }
+    
+    try {
+      console.log('[BackgroundCallsLoader] Loading next batch...');
+      const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+      const url = `${base}/api/calls?limit=100&offset=${lastLoadedOffset}`;
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.warn('[BackgroundCallsLoader] API request failed:', response.status);
+        return { loaded: 0, hasMore: false };
+      }
+      
+      const data = await response.json();
+      
+      if (data.ok && Array.isArray(data.calls) && data.calls.length > 0) {
+        // Append to existing data
+        callsData = [...callsData, ...data.calls];
+        lastLoadedOffset += data.calls.length;
+        hasMoreData = data.calls.length === 100;
+        
+        console.log('[BackgroundCallsLoader] ✓ Loaded', data.calls.length, 'more calls. Total:', callsData.length, hasMoreData ? '(more available)' : '(all loaded)');
+        
+        // Update cache
+        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+          await window.CacheManager.set('calls', callsData);
+        }
+        
+        // Notify listeners
+        document.dispatchEvent(new CustomEvent('pc:calls-loaded-more', { 
+          detail: { count: data.calls.length, total: callsData.length, hasMore: hasMoreData } 
+        }));
+        
+        return { loaded: data.calls.length, hasMore: hasMoreData };
+      } else {
+        hasMoreData = false;
+        return { loaded: 0, hasMore: false };
+      }
+    } catch (error) {
+      console.error('[BackgroundCallsLoader] Failed to load more:', error);
+      return { loaded: 0, hasMore: false };
+    }
+  }
+  
+  // Get call status for phones, account IDs, and contact IDs
+  async function getCallStatus(phones = [], accountIds = [], contactIds = []) {
+    try {
+      const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+      const params = new URLSearchParams();
+      
+      if (phones.length) params.append('phones', phones.join(','));
+      if (accountIds.length) params.append('accountIds', accountIds.join(','));
+      if (contactIds.length) params.append('contactIds', contactIds.join(','));
+      
+      const url = `${base}/api/call-status?${params}`;
+      const response = await fetch(url);
+      
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Cache the results
+        Object.entries(result).forEach(([key, value]) => {
+          callStatusCache.set(key, value);
+        });
+        
+        return result;
+      }
+      return {};
+    } catch (error) {
+      console.error('[BackgroundCallsLoader] Failed to get call status:', error);
+      return {};
+    }
+  }
+  
+  // Invalidate cache entries for specific keys
+  function invalidateCallStatusCache(keys) {
+    keys.forEach(key => {
+      callStatusCache.delete(key);
+    });
+  }
+  
+  // Listen for call completion to invalidate cache
+  document.addEventListener('pc:call-logged', (event) => {
+    const { targetPhone, accountId, contactId } = event.detail || {};
+    const keysToInvalidate = [];
+    
+    if (targetPhone) {
+      const normalizedPhone = String(targetPhone).replace(/\D/g, '').slice(-10);
+      if (normalizedPhone.length === 10) {
+        keysToInvalidate.push(normalizedPhone);
+      }
+    }
+    if (accountId) keysToInvalidate.push(accountId);
+    if (contactId) keysToInvalidate.push(contactId);
+    
+    if (keysToInvalidate.length > 0) {
+      invalidateCallStatusCache(keysToInvalidate);
+      console.log('[BackgroundCallsLoader] Invalidated cache for:', keysToInvalidate);
+    }
+  });
+  
   // Export public API (same pattern as contacts/accounts)
   window.BackgroundCallsLoader = {
     getCallsData: () => callsData,
     reload: loadFromAPI,
-    getCount: () => callsData.length
+    loadMore: loadMoreCalls,
+    hasMore: () => hasMoreData,
+    getCount: () => callsData.length,
+    getCallStatus: getCallStatus,
+    invalidateCache: invalidateCallStatusCache
   };
   
   console.log('[BackgroundCallsLoader] Module initialized');
