@@ -876,7 +876,8 @@ Hi ${firstName || 'there'},
 
 [Call to action paragraph - clear question or request]
 
-Best regards,`;
+Best regards,
+${senderName ? senderName.split(' ')[0] : 'Lewis'}`;
 
   // Check if this is a cold email in standard mode
   const isColdEmailStandard = /cold.*email|could.*not.*reach/i.test(String(prompt || ''));
