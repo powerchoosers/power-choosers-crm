@@ -1274,26 +1274,65 @@
   function formatGeneratedEmail(result, recipient, mode) {
     try {
       console.log('[AI] Formatting generated email, mode:', mode);
+      console.log('[AI] Raw result:', result);
       
-      // Parse the result to extract subject and body
-      const lines = result.split('\n');
       let subject = '';
       let body = '';
-      let inBody = false;
       
-      for (const line of lines) {
-        if (line.startsWith('Subject:')) {
-          subject = line.replace('Subject:', '').trim();
-        } else if (line.trim() === '') {
-          inBody = true;
-        } else if (inBody) {
-          body += line + '\n';
+      // Try to parse as JSON first
+      try {
+        const jsonData = JSON.parse(result);
+        console.log('[AI] Parsed JSON successfully:', jsonData);
+        
+        subject = jsonData.subject || 'Energy Solutions';
+        
+        // Build body from JSON fields with proper paragraph structure
+        const paragraphs = [];
+        
+        if (jsonData.greeting) {
+          paragraphs.push(jsonData.greeting);
         }
-      }
-      
-      // If no subject found, use a default
-      if (!subject) {
-        subject = 'Energy Solutions';
+        
+        if (jsonData.paragraph1) {
+          paragraphs.push(jsonData.paragraph1);
+        }
+        
+        if (jsonData.paragraph2) {
+          paragraphs.push(jsonData.paragraph2);
+        }
+        
+        if (jsonData.paragraph3) {
+          paragraphs.push(jsonData.paragraph3);
+        }
+        
+        if (jsonData.closing) {
+          paragraphs.push(jsonData.closing);
+        }
+        
+        body = paragraphs.join('\n\n');
+        console.log('[AI] Built body from JSON:', body);
+        
+      } catch (jsonError) {
+        console.log('[AI] Not JSON, falling back to text parsing');
+        
+        // Fallback to original text parsing
+        const lines = result.split('\n');
+        let inBody = false;
+        
+        for (const line of lines) {
+          if (line.startsWith('Subject:')) {
+            subject = line.replace('Subject:', '').trim();
+          } else if (line.trim() === '') {
+            inBody = true;
+          } else if (inBody) {
+            body += line + '\n';
+          }
+        }
+        
+        // If no subject found, use a default
+        if (!subject) {
+          subject = 'Energy Solutions';
+        }
       }
       
       // Convert body to HTML with proper paragraph spacing (emails.js approach)
