@@ -16,6 +16,7 @@ console.log('[Server] Environment check:', {
   hasSendGridApiKey: !!process.env.SENDGRID_API_KEY,
   hasTwilioAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
   hasTwilioAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
+  hasPerplexityApiKey: !!process.env.PERPLEXITY_API_KEY,
   nodeEnv: process.env.NODE_ENV || 'development',
   port: process.env.PORT || 3000
 });
@@ -41,8 +42,97 @@ const mimeTypes = {
 // Configuration
 const PORT = process.env.PORT || 3000;
 const LOCAL_DEV_MODE = process.env.NODE_ENV !== 'production';
-const API_BASE_URL = process.env.API_BASE_URL || 'https://power-choosers-crm.vercel.app';
+const API_BASE_URL = process.env.API_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
 // Email sending now handled by Gmail API via frontend
+
+// ---------------- Perplexity API endpoint for localhost development ----------------
+
+async function handleApiPerplexityEmail(req, res) {
+  if (req.method === 'OPTIONS') { 
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://powerchoosers.com',
+      'https://www.powerchoosers.com',
+      'https://power-choosers-crm-792458658491.us-south1.run.app'
+    ];
+    
+    const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': allowedOrigin,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+      'Access-Control-Allow-Credentials': 'true',
+      'Vary': 'Origin'
+    }); 
+    res.end(); 
+    return; 
+  }
+  
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+  
+  try {
+    // Import the Vercel function logic
+    const { default: perplexityHandler } = await import('./api/perplexity-email.js');
+    
+    // Create a mock request/response that matches Vercel's format
+    const mockReq = {
+      method: req.method,
+      headers: req.headers,
+      body: req.body
+    };
+    
+    const mockRes = {
+      status: (code) => ({
+        json: (data) => {
+          const origin = req.headers.origin;
+          const allowedOrigins = [
+            'http://localhost:3000',
+            'http://127.0.0.1:3000',
+            'https://powerchoosers.com',
+            'https://www.powerchoosers.com',
+            'https://power-choosers-crm-792458658491.us-south1.run.app'
+          ];
+          
+          const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+          
+          res.writeHead(code, { 
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': allowedOrigin,
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+            'Access-Control-Allow-Credentials': 'true',
+            'Vary': 'Origin'
+          });
+          res.end(JSON.stringify(data));
+        }
+      }),
+      setHeader: (key, value) => {
+        res.setHeader(key, value);
+      },
+      end: (data) => {
+        res.end(data);
+      }
+    };
+    
+    // Call the Vercel function
+    await perplexityHandler(mockReq, mockRes);
+    
+  } catch (error) {
+    console.error('[Server] Perplexity API error:', error);
+    res.writeHead(500, { 
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    });
+    res.end(JSON.stringify({ error: 'Internal server error', message: error.message }));
+  }
+}
 
 // ---------------- Gemini API endpoints now proxied to Vercel ----------------
 
@@ -416,6 +506,23 @@ async function handleApiCalls(req, res) {
   }
 }
 
+async function handleApiCallsAccount(req, res, parsedUrl) {
+  // Handle /api/calls/account/[accountId] routes
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] API calls account error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
 // ---------------- Gemini API endpoints now proxied to Vercel ----------------
 
 async function handleApiTxPrice(req, res, parsedUrl) {
@@ -499,6 +606,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/twilio/voice' ||
     pathname === '/api/twilio/caller-lookup' ||
     pathname === '/api/calls' ||
+    pathname.startsWith('/api/calls/account/') ||
     pathname === '/api/twilio/language-webhook' ||
     pathname === '/api/twilio/conversational-intelligence' ||
     pathname === '/api/twilio/conversational-intelligence-webhook' ||
@@ -510,6 +618,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/search' ||
     pathname === '/api/tx-price' ||
     pathname === '/api/gemini-email' ||
+    pathname === '/api/perplexity-email' ||
     pathname === '/api/email/send' ||
     pathname === '/api/email/sendgrid-send' ||
     pathname.startsWith('/api/email/track/') ||
@@ -564,6 +673,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/calls') {
     return handleApiCalls(req, res);
   }
+  if (pathname.startsWith('/api/calls/account/')) {
+    return handleApiCallsAccount(req, res, parsedUrl);
+  }
   if (pathname === '/api/recording') {
     return handleApiRecording(req, res, parsedUrl);
   }
@@ -578,6 +690,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/gemini-email') {
     return handleApiGeminiEmail(req, res);
+  }
+  if (pathname === '/api/perplexity-email') {
+    return handleApiPerplexityEmail(req, res);
   }
   
   // Email tracking routes
