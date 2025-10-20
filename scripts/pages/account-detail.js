@@ -2021,7 +2021,7 @@ var console = {
       // Call the CI request endpoint using resolved API base
       let base = (window.crm && typeof window.crm.getApiBaseUrl === 'function')
         ? window.crm.getApiBaseUrl()
-        : (window.PUBLIC_BASE_URL || window.API_BASE_URL || 'https://power-choosers-crm.vercel.app');
+        : (window.PUBLIC_BASE_URL || window.API_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app');
       base = String(base).replace(/\/$/, '');
       const response = await fetch(`${base}/api/twilio/ci-request`, {
         method: 'POST',
@@ -2367,7 +2367,7 @@ var console = {
       if (String(rec).includes('/api/recording?url=')) proxied = rec;
       else {
         const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-        const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm.vercel.app' : base;
+        const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm-792458658491.us-south1.run.app' : base;
         proxied = `${playbackBase}/api/recording?url=${encodeURIComponent(rec)}`;
       }
     }

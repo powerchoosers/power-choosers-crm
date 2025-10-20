@@ -414,7 +414,7 @@
           // No cache found and cachedOnly requested → run a minimal, unbilled prospecting search (try small sizes)
           try {
             let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-            if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
+            if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
 
             // Try both domain and name includes to improve match rate (still unbilled)
             const includeAttempts = [];
@@ -466,7 +466,7 @@
         } else if (options.openLiveIfUncached) {
           // Open-time flow: only run live search if we don't have company data in cache
           let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-          if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
+          if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
 
           // Check if we have company data in cache first
           let hasCompanyData = false;
@@ -539,7 +539,7 @@
 
       // 2) Live company + contacts search (explicit user action)
       let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-      if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
+      if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
 
       const params = new URLSearchParams();
       if (domain) params.append('domain', domain);
@@ -775,7 +775,7 @@
     try{
       let base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (!base || /localhost|127\.0\.0\.1/i.test(base)) {
-        base = 'https://power-choosers-crm.vercel.app';
+        base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
       }
       
       // Build request body with correct Lusha API structure
@@ -1643,7 +1643,7 @@
         console.log('[Lusha Enrich] No cached data, calling API for fresh enrichment');
         
         let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-        if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
+        if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
         const requestId = window.__lushaLastRequestId;
         const id = contact.id || contact.contactId;
         
@@ -1860,7 +1860,7 @@
     try {
       lushaLog('Revealing', which, 'for contact:', contact);
       let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-      if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
+      if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
       const requestId = window.__lushaOpenedFromCache ? null : window.__lushaLastRequestId; // force live when opened from cache
       const id = contact.id || contact.contactId;
       
@@ -3705,7 +3705,7 @@ async function renderUsageBar(){
     } catch(_) {}
 
     let base = (window.API_BASE_URL || '').replace(/\/$/, '');
-    if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm.vercel.app';
+        if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
     const resp = await fetch(`${base}/api/lusha/usage`, { method: 'GET' });
     if (!resp.ok) {
       console.log('[Lusha Usage] API request failed:', resp.status, resp.statusText);

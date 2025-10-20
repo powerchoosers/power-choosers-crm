@@ -912,7 +912,7 @@ class EmailManager {
                 });
             } catch (netErr) {
                 console.warn('[AI] Primary endpoint failed, trying Vercel fallback', netErr);
-                const prodUrl = 'https://power-choosers-crm.vercel.app/api/perplexity-email';
+                const prodUrl = 'https://power-choosers-crm-792458658491.us-south1.run.app/api/perplexity-email';
                 res = await fetch(prodUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -923,7 +923,7 @@ class EmailManager {
             try { data = await res.json(); } catch (_) { data = null; }
             if (!res.ok) {
                 // Retry once directly against Vercel if not already
-                const prodUrl = 'https://power-choosers-crm.vercel.app/api/perplexity-email';
+                const prodUrl = 'https://power-choosers-crm-792458658491.us-south1.run.app/api/perplexity-email';
                 if (!genUrl.startsWith(prodUrl)) {
                     const res2 = await fetch(prodUrl, {
                         method: 'POST',

@@ -20,7 +20,7 @@ export default function handler(req, res) {
         const callerId = process.env.TWILIO_PHONE_NUMBER || '+18176630380';
         
         // Ensure absolute base URL for Twilio callbacks
-        const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
+        const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm-792458658491.us-south1.run.app';
 
         // Create TwiML response
         const twiml = new VoiceResponse();

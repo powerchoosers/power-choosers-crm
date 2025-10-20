@@ -2779,7 +2779,7 @@ async function handleDeleteConfirm(ids, view) {
     let completed = 0;
 
     // Use production API for delete operations
-    const base = 'https://power-choosers-crm.vercel.app';
+    const base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
     const url = `${base}/api/${view === 'people' ? 'contacts' : 'accounts'}`;
     
     console.log(`[Bulk Delete] Deleting ${ids.length} ${view} items from list-detail page`);
