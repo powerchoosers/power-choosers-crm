@@ -16289,6 +16289,22 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     box-shadow: 0 0 0 2px var(--orange-muted);
 }
 
+/* Meeting Preferences Fields */
+#settings-page .meeting-preferences-fields {
+    margin-top: 20px;
+    padding: 20px;
+    background: var(--grey-100);
+    border-radius: 8px;
+    border: 1px solid var(--grey-200);
+    transition: var(--transition-fast);
+}
+
+#settings-page .meeting-preferences-fields.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    background: var(--grey-50);
+}
+
 #settings-page .settings-select {
     width: 100%;
     padding: var(--spacing-sm);
