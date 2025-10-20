@@ -1,19 +1,11 @@
 // Temporary Debug Health Endpoint
 // Path: /api/debug/health
 
+import { cors } from '../_cors.js';
 const { db } = require('../_firebase');
 
-function cors(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
-
-module.exports = async function handler(req, res) {
-  cors(req, res);
-  if (req.method === 'OPTIONS') {
-    res.statusCode = 200; return res.end();
-  }
+export default async function handler(req, res) {
+  if (cors(req, res)) return; // handle OPTIONS
   if (req.method !== 'GET') {
     res.statusCode = 405; return res.end(JSON.stringify({ error: 'Method not allowed' }));
   }

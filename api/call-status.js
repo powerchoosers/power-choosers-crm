@@ -1,17 +1,7 @@
 // Call Status API - Efficient endpoint for checking if phone numbers, account IDs, or contact IDs have associated calls
 // Returns lightweight boolean status without loading full call objects
 
-function corsMiddleware(req, res, next) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
-    return;
-  }
-  next();
-}
+import { cors } from './_cors.js';
 
 const { db } = require('./_firebase');
 
@@ -114,8 +104,8 @@ async function hasCallsForContact(contactId, db) {
   }
 }
 
-module.exports = async (req, res) => {
-  corsMiddleware(req, res, async () => {
+export default async function handler(req, res) {
+  if (cors(req, res)) return; // handle OPTIONS
     try {
       if (req.method !== 'GET') {
         res.writeHead(405, { 'Content-Type': 'application/json' });
@@ -153,10 +143,10 @@ module.exports = async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(result));
 
-    } catch (error) {
-      console.error('[CallStatus] API error:', error);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
-  });
-};
+  } catch (error) {
+    console.error('[CallStatus] Error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+

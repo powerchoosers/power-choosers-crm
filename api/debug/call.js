@@ -2,17 +2,11 @@
 // Usage (GET): /api/debug/call?to=%2B19728342317&agent_phone=%2B19728342317
 // Also accepts POST with JSON body { to, agent_phone }
 
+import { cors } from '../_cors.js';
 const twilio = require('twilio');
 
-function cors(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
-
-module.exports = async function handler(req, res) {
-  cors(req, res);
-  if (req.method === 'OPTIONS') { res.statusCode = 200; return res.end(); }
+export default async function handler(req, res) {
+  if (cors(req, res)) return; // handle OPTIONS
 
   try {
     const src = req.method === 'GET' ? (req.query || {}) : (req.body || {});
