@@ -396,6 +396,29 @@ function readJsonBody(req) {
 
 // Twilio API endpoints (proxy to Vercel for production APIs)
 async function handleApiTwilioToken(req, res, parsedUrl) {
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://powerchoosers.com',
+      'https://www.powerchoosers.com',
+      'https://power-choosers-crm-792458658491.us-south1.run.app'
+    ];
+    
+    const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': allowedOrigin,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+      'Access-Control-Allow-Credentials': 'true',
+      'Vary': 'Origin'
+    });
+    res.end();
+    return;
+  }
+
   if (req.method !== 'GET') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
@@ -413,7 +436,26 @@ async function handleApiTwilioToken(req, res, parsedUrl) {
     } catch (_) {
       payload = { error: 'Upstream responded with non-JSON', body: raw };
     }
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://powerchoosers.com',
+      'https://www.powerchoosers.com',
+      'https://power-choosers-crm-792458658491.us-south1.run.app'
+    ];
+    
+    const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    
+    res.writeHead(response.status, { 
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': allowedOrigin,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+      'Access-Control-Allow-Credentials': 'true',
+      'Vary': 'Origin'
+    });
     res.end(JSON.stringify(payload));
   } catch (error) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -523,11 +565,86 @@ async function handleApiCallsAccount(req, res, parsedUrl) {
   }
 }
 
+async function handleApiCallStatus(req, res, parsedUrl) {
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://powerchoosers.com',
+      'https://www.powerchoosers.com',
+      'https://power-choosers-crm-792458658491.us-south1.run.app'
+    ];
+    
+    const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': allowedOrigin,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+      'Access-Control-Allow-Credentials': 'true',
+      'Vary': 'Origin'
+    });
+    res.end();
+    return;
+  }
+  
+  // Handle /api/call-status routes
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://powerchoosers.com',
+      'https://www.powerchoosers.com',
+      'https://power-choosers-crm-792458658491.us-south1.run.app'
+    ];
+    
+    const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    
+    res.writeHead(response.status, { 
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': allowedOrigin,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+      'Access-Control-Allow-Credentials': 'true',
+      'Vary': 'Origin'
+    });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] API call status error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
 // ---------------- Gemini API endpoints now proxied to Vercel ----------------
 
 async function handleApiTxPrice(req, res, parsedUrl) {
   if (req.method === 'OPTIONS') {
-    res.writeHead(204);
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://powerchoosers.com',
+      'https://www.powerchoosers.com',
+      'https://power-choosers-crm-792458658491.us-south1.run.app'
+    ];
+    
+    const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': allowedOrigin,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+      'Access-Control-Allow-Credentials': 'true',
+      'Vary': 'Origin'
+    });
     res.end();
     return;
   }
@@ -539,7 +656,25 @@ async function handleApiTxPrice(req, res, parsedUrl) {
     const response = await fetch(proxyUrl);
     const data = await response.json();
     
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://powerchoosers.com',
+      'https://www.powerchoosers.com',
+      'https://power-choosers-crm-792458658491.us-south1.run.app'
+    ];
+    
+    const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    
+    res.writeHead(response.status, { 
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': allowedOrigin,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+      'Access-Control-Allow-Credentials': 'true',
+      'Vary': 'Origin'
+    });
     res.end(JSON.stringify(data));
   } catch (error) {
     console.error('[TX Price] Proxy error:', error);
@@ -607,6 +742,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/twilio/caller-lookup' ||
     pathname === '/api/calls' ||
     pathname.startsWith('/api/calls/account/') ||
+    pathname === '/api/call-status' ||
     pathname === '/api/twilio/language-webhook' ||
     pathname === '/api/twilio/conversational-intelligence' ||
     pathname === '/api/twilio/conversational-intelligence-webhook' ||
@@ -675,6 +811,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname.startsWith('/api/calls/account/')) {
     return handleApiCallsAccount(req, res, parsedUrl);
+  }
+  if (pathname === '/api/call-status') {
+    return handleApiCallStatus(req, res, parsedUrl);
   }
   if (pathname === '/api/recording') {
     return handleApiRecording(req, res, parsedUrl);
