@@ -76,6 +76,14 @@
           // Focus the To input
           setTimeout(() => toInput.focus(), 100);
       }, 200);
+      
+      // Setup toolbar event listeners after compose window is ready
+      setTimeout(() => {
+        const composeWindow = document.getElementById('compose-window');
+        if (composeWindow) {
+          setupToolbarEventListeners(composeWindow);
+        }
+      }, 300);
     } else {
       console.warn('[EmailCompose] emailManager.openComposeWindow not available');
       window.crm?.showToast && window.crm.showToast('Email compose not available');
@@ -121,6 +129,9 @@
     // Setup close button functionality if not already set up
     setupComposeCloseButton();
     
+    // Setup toolbar event listeners
+    setupToolbarEventListeners(composeWindow);
+    
     // Initialize AI bar if present
     const aiBar = composeWindow.querySelector('.ai-bar');
     if (aiBar && !aiBar.dataset.rendered) {
@@ -156,6 +167,881 @@
     }
   }
   
+  // ========== TOOLBAR FUNCTIONS (from emails.js) ==========
+  
+  // Main toolbar action dispatcher
+  function handleToolbarAction(action, btn, editor, formattingBar, linkBar) {
+    try {
+      const composeWindow = editor?.closest?.('#compose-window') || document.getElementById('compose-window');
+      const variablesBar = composeWindow?.querySelector('.variables-bar');
+      const aiBar = composeWindow?.querySelector('.ai-bar');
+      console.log('[Toolbar] handleToolbarAction:', action, { editor, formattingBar, linkBar, variablesBar });
+      
+      // Helper function to close all toolbars
+      const closeAllToolbars = () => {
+        formattingBar?.classList.remove('open');
+        formattingBar?.setAttribute('aria-hidden', 'true');
+        linkBar?.classList.remove('open');
+        linkBar?.setAttribute('aria-hidden', 'true');
+        variablesBar?.classList.remove('open');
+        variablesBar?.setAttribute('aria-hidden', 'true');
+        aiBar?.classList.remove('open');
+        aiBar?.setAttribute('aria-hidden', 'true');
+        
+        // Also close any formatting popovers
+        composeWindow?.querySelectorAll('.format-popover').forEach(p => p.classList.remove('open'));
+        
+        // Reset button states
+        composeWindow?.querySelectorAll('.toolbar-btn[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+      };
+      
+      switch (action) {
+        case 'formatting': {
+          closeAllToolbars();
+          const isOpen = formattingBar?.classList.toggle('open');
+          formattingBar?.setAttribute('aria-hidden', String(!isOpen));
+          btn.setAttribute('aria-expanded', String(isOpen));
+          break;
+        }
+        case 'link': {
+          closeAllToolbars();
+          const isOpen = linkBar?.classList.toggle('open');
+          linkBar?.setAttribute('aria-hidden', String(!isOpen));
+          btn.setAttribute('aria-expanded', String(isOpen));
+          // Prefill link text from selection
+          try {
+            const sel = window.getSelection();
+            const hasText = sel && sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed && sel.toString();
+            const textInput = linkBar?.querySelector('[data-link-text]');
+            if (textInput && hasText) textInput.value = sel.toString();
+            (linkBar?.querySelector('[data-link-url]') || textInput)?.focus();
+          } catch (_) {}
+          break;
+        }
+        case 'variables': {
+          closeAllToolbars();
+          if (variablesBar && !variablesBar.classList.contains('open')) {
+            renderVariablesBar(variablesBar);
+          }
+          const isOpen = variablesBar?.classList.toggle('open');
+          variablesBar?.setAttribute('aria-hidden', String(!isOpen));
+          btn.setAttribute('aria-expanded', String(isOpen));
+          break;
+        }
+        case 'ai': {
+          // AI bar handling (already exists in global compose)
+          break;
+        }
+        case 'image': {
+          handleImageUpload(editor);
+          break;
+        }
+        case 'attach': {
+          window.crm?.showToast('File attachment coming soon');
+          break;
+        }
+        case 'code': {
+          toggleHtmlMode(composeWindow);
+          break;
+        }
+        default: {
+          console.log('[Toolbar] Unknown action:', action);
+        }
+      }
+    } catch (e) {
+      console.error('handleToolbarAction failed:', e);
+    }
+  }
+
+  // Formatting handler for text formatting operations
+  function handleFormatting(format, btn, editor, formattingBar, restoreSelection) {
+    if (!editor) return;
+
+    console.log('handleFormatting called with format:', format);
+
+    // Handle popover toggles
+    if (format === 'font' || format === 'size' || format === 'color' || format === 'highlight') {
+      const popover = btn.nextElementSibling;
+      console.log('Popover found:', popover);
+      
+      if (popover) {
+        const isOpen = popover.classList.toggle('open');
+        console.log('Popover isOpen:', isOpen);
+        btn.setAttribute('aria-expanded', String(isOpen));
+        
+        // Close other popovers
+        formattingBar.querySelectorAll('.format-popover').forEach(p => {
+          if (p !== popover) {
+            p.classList.remove('open');
+          }
+        });
+        formattingBar.querySelectorAll('.fmt-btn').forEach(b => {
+          if (b !== btn) {
+            b.setAttribute('aria-expanded', 'false');
+          }
+        });
+      }
+      return;
+    }
+
+    // Handle text formatting
+    if (format === 'bold' || format === 'italic' || format === 'underline') {
+      console.log('🎨 Applying format:', format);
+      
+      // Ensure we have a selection and focus
+      ensureSelection();
+      editor.focus();
+      
+      // Check current state using queryCommandState for accuracy
+      const isCurrentlyActive = document.queryCommandState(format);
+      console.log('🎨 Current state from queryCommandState:', isCurrentlyActive);
+      
+      // Apply the formatting
+      const result = document.execCommand(format, false, null);
+      console.log('🎨 execCommand result:', result);
+      
+      // Update button state based on actual command state
+      const newState = document.queryCommandState(format);
+      console.log('🎨 New state after execCommand:', newState);
+      btn.setAttribute('aria-pressed', String(newState));
+      
+      // Update persistent formatting state
+      setFormattingState(format, newState);
+      console.log('🎨 Updated persistent formatting state for:', format, '=', newState);
+      
+    } else if (format === 'insertOrderedList' || format === 'insertUnorderedList') {
+      console.log('📝 Applying list format:', format);
+      ensureSelection();
+      editor.focus();
+      const result = document.execCommand(format, false, null);
+      console.log('📝 List execCommand result:', result);
+    }
+  }
+
+  // Insert link functionality
+  function insertLink(editor, linkBar) {
+    const textInput = linkBar.querySelector('[data-link-text]');
+    const urlInput = linkBar.querySelector('[data-link-url]');
+    
+    const text = textInput?.value?.trim() || '';
+    const url = urlInput?.value?.trim() || '';
+    
+    if (!url) {
+      window.crm?.showToast('Please enter a URL');
+      return;
+    }
+
+    const linkText = text || url;
+    const linkHtml = `<a href="${url}" target="_blank" rel="noopener noreferrer">${linkText}</a>`;
+    
+    // Restore saved selection at editor before inserting
+    restoreSavedSelection();
+    ensureSelection();
+    document.execCommand('insertHTML', false, linkHtml);
+    
+    // Clear inputs and close bar
+    textInput.value = '';
+    urlInput.value = '';
+    linkBar.classList.remove('open');
+    linkBar.setAttribute('aria-hidden', 'true');
+  }
+
+  // Insert variable chip functionality
+  function insertVariableChip(editor, scope, key, label) {
+    if (!editor || !scope || !key) return;
+    // Restore caret
+    restoreSavedSelection();
+    ensureSelection();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    // Build token chip
+    const token = `{{${scope}.${key}}}`;
+    const span = document.createElement('span');
+    span.className = 'var-chip';
+    span.setAttribute('data-var', `${scope}.${key}`);
+    span.setAttribute('data-token', token);
+    const friendly = (label || key).replace(/_/g, ' ').toLowerCase();
+    span.setAttribute('contenteditable', 'false');
+    span.textContent = friendly;
+    // Insert chip and a trailing space
+    range.insertNode(document.createTextNode(' '));
+    range.insertNode(span);
+    // Move caret after the chip+space
+    const after = document.createRange();
+    after.setStartAfter(span.nextSibling || span);
+    after.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(after);
+  }
+
+  // Render variables bar with people/account/sender variables
+  function renderVariablesBar(variablesBar) {
+    if (!variablesBar) return;
+    const people = [
+      { key: 'first_name', label: 'First name' },
+      { key: 'last_name', label: 'Last name' },
+      { key: 'full_name', label: 'Full name' },
+      { key: 'title', label: 'Title' },
+      { key: 'email', label: 'Email' },
+      { key: 'phone', label: 'Phone' }
+    ];
+    const account = [
+      { key: 'name', label: 'Company name' },
+      { key: 'website', label: 'Website' },
+      { key: 'industry', label: 'Industry' },
+      { key: 'size', label: 'Company size' },
+      { key: 'city', label: 'City' },
+      { key: 'state', label: 'State/Region' },
+      { key: 'country', label: 'Country' }
+    ];
+    const sender = [
+      { key: 'first_name', label: 'Sender first name' },
+      { key: 'last_name', label: 'Sender last name' },
+      { key: 'full_name', label: 'Sender full name' },
+      { key: 'title', label: 'Sender title' },
+      { key: 'email', label: 'Sender email' }
+    ];
+    const renderList = (items, scope) => items.map(i => `
+      <button class="var-item" data-scope="${scope}" data-key="${i.key}" role="menuitem">
+        <span class="var-item-label">${i.label}</span>
+      </button>
+    `).join('');
+    variablesBar.innerHTML = `
+      <div class="vars-tabs" role="tablist">
+        <button class="vars-tab active" role="tab" aria-selected="true" data-tab="people">People</button>
+        <button class="vars-tab" role="tab" aria-selected="false" data-tab="account">Account</button>
+        <button class="vars-tab" role="tab" aria-selected="false" data-tab="sender">Sender</button>
+        <span class="spacer"></span>
+        <button class="fmt-btn" type="button" data-vars-close>Close</button>
+      </div>
+      <div class="vars-panels">
+        <div class="vars-panel" data-tab="people" role="tabpanel">
+          <div class="var-list" role="menu">${renderList(people, 'contact')}</div>
+        </div>
+        <div class="vars-panel hidden" data-tab="account" role="tabpanel" aria-hidden="true">
+          <div class="var-list" role="menu">${renderList(account, 'account')}</div>
+        </div>
+        <div class="vars-panel hidden" data-tab="sender" role="tabpanel" aria-hidden="true">
+          <div class="var-list" role="menu">${renderList(sender, 'sender')}</div>
+        </div>
+      </div>`;
+  }
+
+  // ========== UTILITY FUNCTIONS ==========
+
+  // Ensure editor has valid selection
+  function ensureSelection() {
+    console.log('🎯 ensureSelection called');
+    const editor = document.querySelector('.body-input[contenteditable="true"]');
+    console.log('🎯 Editor element:', editor);
+    
+    if (!editor) {
+      console.log('🎯 No editor found, returning');
+      return;
+    }
+    
+    // Focus the editor
+    editor.focus();
+    console.log('🎯 Editor focused');
+    
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) {
+      console.log('🎯 No selection, creating one');
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false); // to end
+      sel.removeAllRanges();
+      sel.addRange(range);
+      console.log('🎯 Selection created');
+    } else {
+      console.log('🎯 Valid selection exists');
+    }
+  }
+
+  // Apply CSS style to selection
+  function applyStyleToSelection(editor, cssText) {
+    console.log('🔧 applyStyleToSelection called with:', cssText);
+    const selection = window.getSelection();
+    
+    if (!selection || selection.rangeCount === 0) {
+      console.log('🔧 No selection, ensuring selection first');
+      ensureSelection();
+    }
+    
+    const range = selection.getRangeAt(0);
+    if (range.collapsed) {
+      console.log('🔧 Collapsed range, creating span for future typing');
+      const span = document.createElement('span');
+      span.style.cssText = cssText;
+      span.innerHTML = '\u200C'; // Zero-width non-joiner
+      range.insertNode(span);
+      range.setStartAfter(span);
+      range.setEndAfter(span);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } else {
+      console.log('🔧 Non-collapsed range, applying style to selection');
+      const span = document.createElement('span');
+      span.style.cssText = cssText;
+      range.surroundContents(span);
+    }
+  }
+
+  // Set formatting state
+  function setFormattingState(property, value) {
+    console.log('🎨 Setting formatting state:', property, '=', value);
+    if (!window._currentFormatting) window._currentFormatting = {};
+    window._currentFormatting[property] = value;
+    console.log('🎨 Current formatting state:', window._currentFormatting);
+  }
+
+  // Get formatting state
+  function getFormattingState(property) {
+    return window._currentFormatting?.[property];
+  }
+
+  // Clean up zero-width spans
+  function cleanZeroWidthSpans(editor) {
+    if (!editor) return;
+    const spans = editor.querySelectorAll('span');
+    spans.forEach(span => {
+      // Never unwrap variable chips or any non-editable spans
+      if (span.classList?.contains('var-chip') || span.hasAttribute('data-var') || span.getAttribute('contenteditable') === 'false') {
+        return;
+      }
+      const text = span.textContent || '';
+      const onlyZWNJ = text.replace(/\u200C/g, '') === '';
+      const styleAttr = span.getAttribute('style');
+      const hasNoStyle = !styleAttr || styleAttr.trim() === '';
+      const trivialStyle = styleAttr && /^(?:\s*(background-color:\s*transparent;)?\s*(color:\s*var\(--text-primary\);)?\s*)$/i.test(styleAttr.trim());
+      
+      // Unwrap spans that are empty or style-less to prevent caret/backspace issues
+      if ((onlyZWNJ && span.childNodes.length <= 1) || hasNoStyle || trivialStyle) {
+        const parent = span.parentNode;
+        if (!parent) return;
+        while (span.firstChild) parent.insertBefore(span.firstChild, span);
+        parent.removeChild(span);
+      }
+    });
+  }
+
+  // Apply color to selection
+  function applyColorToSelection(color) {
+    console.log('🎨 [NEW] applyColorToSelection called with:', color);
+    
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      console.log('🎨 [NEW] No selection found');
+      return;
+    }
+    
+    const range = selection.getRangeAt(0);
+    console.log('🎨 [NEW] Range collapsed:', range.collapsed);
+    console.log('🎨 [NEW] Selected text:', range.toString());
+    
+    if (color === 'transparent' || color === null) {
+      // Only affect future typing; preserve existing content.
+      if (!range.collapsed) {
+        console.log('🎨 [NEW] Collapsing selection to end without altering existing color');
+        range.collapse(false); // move caret to end of selection
+        selection.removeAllRanges();
+        selection.addRange(range);
+      } else {
+        console.log('🎨 [NEW] Collapsed caret - will only affect future typing');
+      }
+    } else {
+      // Apply color
+      console.log('🎨 [NEW] Applying color:', color);
+      const success = document.execCommand('foreColor', false, color);
+      console.log('🎨 [NEW] foreColor success:', success);
+    }
+    
+    // Update formatting state
+    setFormattingState('color', color);
+    console.log('🎨 [NEW] Updated formatting state');
+
+    // If turning off color, ensure caret is not inside a colored span
+    if (color === null) {
+      const ed = document.querySelector('.body-input[contenteditable="true"]');
+      if (ed) {
+        // Move caret out of any colored span so new typing uses default
+        moveCursorOutsideColoredSpans(ed);
+        // Create a neutral span at caret to guarantee future typing is plain
+        ensurePlainTypingContext(ed, 'color');
+        cleanZeroWidthSpans(ed);
+      }
+    }
+  }
+
+  // Apply highlight to selection
+  function applyHighlightToSelection(color) {
+    console.log('🖍️ [NEW] applyHighlightToSelection called with:', color);
+    
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      console.log('🖍️ [NEW] No selection found');
+      return;
+    }
+    
+    const range = selection.getRangeAt(0);
+    console.log('🖍️ [NEW] Range collapsed:', range.collapsed);
+    console.log('🖍️ [NEW] Selected text:', range.toString());
+    
+    if (color === 'transparent' || color === null) {
+      // Only affect future typing; preserve existing content.
+      if (!range.collapsed) {
+        console.log('🖍️ [NEW] Collapsing selection to end without altering existing highlight');
+        range.collapse(false); // move caret to end of selection
+        selection.removeAllRanges();
+        selection.addRange(range);
+      } else {
+        console.log('🖍️ [NEW] Collapsed caret - will only affect future typing');
+      }
+    } else {
+      // Apply highlight
+      console.log('🖍️ [NEW] Applying highlight:', color);
+      const success = document.execCommand('hiliteColor', false, color);
+      console.log('🖍️ [NEW] hiliteColor success:', success);
+    }
+    
+    // Update formatting state
+    setFormattingState('backgroundColor', color);
+    console.log('🖍️ [NEW] Updated formatting state');
+
+    // If turning off highlight, ensure caret is not inside a highlighted span
+    if (color === null) {
+      const ed = document.querySelector('.body-input[contenteditable="true"]');
+      if (ed) {
+        // Move caret out of any highlighted span so new typing uses default
+        moveCursorOutsideHighlightedSpans(ed);
+        // Explicitly clear the pending highlight typing style at the caret
+        try { document.execCommand('styleWithCSS', true); } catch (_) {}
+        const r1 = document.execCommand('hiliteColor', false, 'transparent');
+        const r2 = document.execCommand('backColor', false, 'transparent');
+        console.log('🖍️ Cleared caret typing style: hiliteColor ->', r1, ' backColor ->', r2);
+        // Create a neutral span at caret to guarantee future typing is plain
+        ensurePlainTypingContext(ed, 'highlight');
+        cleanZeroWidthSpans(ed);
+      }
+    }
+  }
+
+  // Restore saved selection
+  function restoreSavedSelection() {
+    try {
+      const sel = window.getSelection();
+      if (window._editorSelection && sel) {
+        sel.removeAllRanges();
+        sel.addRange(window._editorSelection);
+      }
+    } catch (_) {}
+  }
+
+  // Move cursor outside colored spans
+  function moveCursorOutsideColoredSpans(editor) {
+    console.log('🎨 Moving cursor outside colored spans');
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      console.log('🎨 No selection found');
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    if (!range.collapsed) {
+      console.log('🎨 Range is not collapsed, skipping');
+      return; // Only work with collapsed ranges (cursor position)
+    }
+
+    console.log('🎨 Current range:', range);
+    console.log('🎨 Range start container:', range.startContainer);
+    console.log('🎨 Range start offset:', range.startOffset);
+
+    // Find the current node
+    let node = range.startContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+
+    // Identify the highest ancestor span that still has a text color
+    let coloredAncestor = null;
+    let walker = node;
+    while (walker && walker !== editor) {
+      if (walker.tagName === 'SPAN' && walker.style && walker.style.color &&
+        walker.style.color !== '' && walker.style.color !== 'var(--text-primary)' && walker.style.color !== 'rgb(0, 0, 0)' && walker.style.color !== 'black') {
+        coloredAncestor = walker; // keep walking to find the highest one
+      }
+      walker = walker.parentNode;
+    }
+
+    if (coloredAncestor) {
+      const newRange = document.createRange();
+      newRange.setStartAfter(coloredAncestor);
+      newRange.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(newRange);
+      console.log('🎨 Moved cursor after highest colored span');
+      return;
+    }
+    
+    console.log('🎨 No colored span found, cursor position unchanged');
+  }
+
+  // Move cursor outside highlighted spans
+  function moveCursorOutsideHighlightedSpans(editor) {
+    console.log('🖍️ Moving cursor outside highlighted spans');
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      console.log('🖍️ No selection found');
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    if (!range.collapsed) {
+      console.log('🖍️ Range is not collapsed, skipping');
+      return; // Only work with collapsed ranges (cursor position)
+    }
+
+    console.log('🖍️ Current range:', range);
+    console.log('🖍️ Range start container:', range.startContainer);
+    console.log('🖍️ Range start offset:', range.startOffset);
+
+    // Find the current node
+    let node = range.startContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+
+    // Identify the highest ancestor span that still has a highlight
+    let highlightedAncestor = null;
+    let walker = node;
+    while (walker && walker !== editor) {
+      if (walker.tagName === 'SPAN' && walker.style && walker.style.backgroundColor &&
+        walker.style.backgroundColor !== 'transparent' && walker.style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+        highlightedAncestor = walker; // keep walking to find the highest one
+      }
+      walker = walker.parentNode;
+    }
+
+    if (highlightedAncestor) {
+      const newRange = document.createRange();
+      newRange.setStartAfter(highlightedAncestor);
+      newRange.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(newRange);
+      console.log('🖍️ Moved cursor after highest highlighted span');
+      return;
+    }
+    
+    console.log('🖍️ No highlighted span found, cursor position unchanged');
+  }
+
+  // Ensure plain typing context
+  function ensurePlainTypingContext(editor, type) {
+    console.log(`🎨 Ensuring plain typing context for ${type}`);
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    
+    const range = selection.getRangeAt(0);
+    if (!range.collapsed) return;
+    
+    // Create a neutral span at caret
+    const span = document.createElement('span');
+    span.innerHTML = '\u200C'; // Zero-width non-joiner
+    range.insertNode(span);
+    range.setStartAfter(span);
+    range.setEndAfter(span);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  // Handle image upload
+  function handleImageUpload(editor) {
+    window.crm?.showToast('Image upload coming soon');
+  }
+
+  // Toggle HTML mode
+  function toggleHtmlMode(composeWindow) {
+    const editor = composeWindow.querySelector('.body-input');
+    if (!editor) return;
+    
+    const isHtmlMode = editor.getAttribute('data-mode') === 'html';
+    if (isHtmlMode) {
+      // Switch to text mode
+      editor.setAttribute('data-mode', 'text');
+      editor.setAttribute('contenteditable', 'true');
+      editor.innerHTML = editor.textContent || '';
+    } else {
+      // Switch to HTML mode
+      editor.setAttribute('data-mode', 'html');
+      editor.setAttribute('contenteditable', 'true');
+      const htmlContent = editor.innerHTML;
+      editor.textContent = htmlContent;
+    }
+  }
+
+  // ========== EVENT LISTENERS SETUP ==========
+
+  // Setup all toolbar event listeners
+  function setupToolbarEventListeners(composeWindow) {
+    const editor = composeWindow.querySelector('.body-input');
+    const toolbar = composeWindow.querySelector('.editor-toolbar');
+    const formattingBar = composeWindow.querySelector('.formatting-bar');
+    const linkBar = composeWindow.querySelector('.link-bar');
+    const variablesBar = composeWindow.querySelector('.variables-bar');
+    
+    // Save selection on editor events
+    const saveSelection = () => {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        window._editorSelection = sel.getRangeAt(0).cloneRange();
+      }
+    };
+    
+    const restoreSelection = () => {
+      if (!window._editorSelection) return;
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(window._editorSelection);
+    };
+    
+    // Editor selection events
+    editor?.addEventListener('keyup', saveSelection);
+    editor?.addEventListener('mouseup', saveSelection);
+    editor?.addEventListener('blur', saveSelection);
+    
+    // Toolbar button clicks
+    toolbar?.addEventListener('click', (e) => {
+      const btn = e.target.closest('.toolbar-btn');
+      if (!btn) return;
+      
+      const action = btn.getAttribute('data-action');
+      console.log('🔧 Toolbar action:', action);
+      
+      if (typeof handleToolbarAction === 'function') {
+        handleToolbarAction(action, btn, editor, formattingBar, linkBar);
+      }
+    });
+    
+    // Formatting button clicks
+    formattingBar?.addEventListener('click', (e) => {
+      const btn = e.target.closest('.fmt-btn');
+      if (!btn) return;
+      
+      const format = btn.getAttribute('data-fmt');
+      console.log('🎨 Formatting format:', format);
+      saveSelection();
+      ensureSelection();
+      handleFormatting(format, btn, editor, formattingBar, restoreSelection);
+    });
+    
+    // Popover item interactions
+    formattingBar?.addEventListener('click', (e) => {
+      const popoverItem = e.target.closest('.popover-item');
+      const colorSwatch = e.target.closest('.color-swatch');
+      
+      if (!popoverItem && !colorSwatch) return;
+      
+      e.stopPropagation();
+      restoreSelection();
+      
+      // Handle font selection
+      if (popoverItem && popoverItem.classList.contains('font-item')) {
+        const fontFamily = popoverItem.getAttribute('data-font');
+        const fontLabel = popoverItem.textContent;
+        
+        // Update the font button label
+        const fontBtn = formattingBar.querySelector('[data-fmt="font"]');
+        if (fontBtn) {
+          const label = fontBtn.querySelector('[data-current-font]');
+          if (label) label.textContent = fontLabel;
+        }
+        
+        // Apply font to editor
+        document.execCommand('fontName', false, fontFamily);
+        
+        // Close popover
+        const popover = popoverItem.closest('.format-popover');
+        if (popover) {
+          popover.classList.remove('open');
+          const btn = formattingBar.querySelector('[data-fmt="font"]');
+          if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+      }
+      
+      // Handle size selection
+      if (popoverItem && popoverItem.classList.contains('size-item')) {
+        const fontSize = popoverItem.getAttribute('data-size');
+        
+        // Update the size button label
+        const sizeBtn = formattingBar.querySelector('[data-fmt="size"]');
+        if (sizeBtn) {
+          const label = sizeBtn.querySelector('[data-current-size]');
+          if (label) label.textContent = fontSize;
+        }
+        
+        ensureSelection();
+        
+        // Apply size using direct CSS styling
+        applyStyleToSelection(editor, `font-size:${fontSize}px;`);
+        
+        // Close popover
+        const popover = popoverItem.closest('.format-popover');
+        if (popover) {
+          popover.classList.remove('open');
+          const btn = formattingBar.querySelector('[data-fmt="size"]');
+          if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
+      }
+
+      // Handle text color
+      if (colorSwatch && colorSwatch.closest('.color-popover')) {
+        const color = colorSwatch.getAttribute('data-color');
+        
+        ensureSelection();
+        
+        // Use the new simple color application method
+        applyColorToSelection(color === 'transparent' ? null : color);
+        
+        const pop = colorSwatch.closest('.format-popover');
+        pop?.classList.remove('open');
+        
+        const colorBtn = formattingBar.querySelector('[data-fmt="color"]');
+        colorBtn?.setAttribute('aria-expanded','false');
+      }
+
+      // Handle highlight color
+      if (colorSwatch && colorSwatch.closest('.highlight-popover')) {
+        const color = colorSwatch.getAttribute('data-color');
+        
+        ensureSelection();
+        
+        // Use the new simple highlight application method
+        applyHighlightToSelection(color === 'transparent' ? null : color);
+        
+        const pop = colorSwatch.closest('.format-popover');
+        pop?.classList.remove('open');
+        
+        const highlightBtn = formattingBar.querySelector('[data-fmt="highlight"]');
+        highlightBtn?.setAttribute('aria-expanded','false');
+      }
+    });
+    
+    // Link bar interactions
+    linkBar?.addEventListener('click', (e) => {
+      if (e.target.matches('[data-link-insert]')) {
+        insertLink(editor, linkBar);
+      } else if (e.target.matches('[data-link-cancel]')) {
+        linkBar.classList.remove('open');
+        linkBar.setAttribute('aria-hidden', 'true');
+      }
+    });
+    
+    // Variables bar interactions
+    variablesBar?.addEventListener('click', (e) => {
+      if (e.target.matches('[data-vars-close]')) {
+        variablesBar.classList.remove('open');
+        variablesBar.setAttribute('aria-hidden', 'true');
+      } else if (e.target.matches('.var-item')) {
+        const scope = e.target.getAttribute('data-scope');
+        const key = e.target.getAttribute('data-key');
+        const label = e.target.querySelector('.var-item-label')?.textContent;
+        insertVariableChip(editor, scope, key, label);
+      } else if (e.target.matches('.vars-tab')) {
+        // Handle tab switching
+        const tab = e.target.getAttribute('data-tab');
+        variablesBar.querySelectorAll('.vars-tab').forEach(t => {
+          t.classList.remove('active');
+          t.setAttribute('aria-selected', 'false');
+        });
+        variablesBar.querySelectorAll('.vars-panel').forEach(p => {
+          p.classList.add('hidden');
+          p.setAttribute('aria-hidden', 'true');
+        });
+        e.target.classList.add('active');
+        e.target.setAttribute('aria-selected', 'true');
+        const panel = variablesBar.querySelector(`[data-tab="${tab}"]`);
+        if (panel) {
+          panel.classList.remove('hidden');
+          panel.setAttribute('aria-hidden', 'false');
+        }
+      }
+    });
+  }
+
+  // ========== ENTER KEY HANDLER FOR SINGLE SPACING ==========
+  
+  function setupComposeEnterKeyHandler() {
+    if (document._emailComposeEnterHandlerBound) return;
+    
+    // Use event delegation to handle dynamically created compose windows
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const editor = document.querySelector('.body-input');
+        if (editor && editor.contains(e.target)) {
+          console.log('[Enter] Enter key pressed in email editor');
+          e.preventDefault();
+          
+          // Check if cursor is at or near signature boundary
+          const selection = window.getSelection();
+          if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const isNearSignature = isCursorNearSignature(editor, range);
+            if (isNearSignature) {
+              console.log('[Enter] Cursor near signature - preventing edit');
+              return;
+            }
+          }
+          
+          // Simple approach: just insert a line break
+          try {
+            document.execCommand('insertHTML', false, '<br>');
+            console.log('[Enter] Line break inserted via execCommand');
+          } catch (error) {
+            console.error('[Enter] execCommand failed:', error);
+            // Try alternative approach
+            try {
+              const br = document.createElement('br');
+              const selection = window.getSelection();
+              const range = selection.getRangeAt(0);
+              range.deleteContents();
+              range.insertNode(br);
+              range.setStartAfter(br);
+              range.collapse(true);
+              selection.removeAllRanges();
+              selection.addRange(range);
+              console.log('[Enter] Line break inserted via DOM manipulation');
+            } catch (fallbackError) {
+              console.error('[Enter] DOM manipulation also failed:', fallbackError);
+            }
+          }
+        }
+      }
+    });
+    
+    document._emailComposeEnterHandlerBound = true;
+  }
+  
+  // Helper function to check if cursor is near signature
+  function isCursorNearSignature(editor, range) {
+    // Check if cursor is near signature boundary to prevent editing into signature area
+    const signatureElements = editor.querySelectorAll('[data-signature], .signature, .email-signature');
+    if (signatureElements.length === 0) return false;
+    
+    for (const signature of signatureElements) {
+      const signatureRange = document.createRange();
+      signatureRange.selectNode(signature);
+      
+      // Check if cursor is within 50px of signature
+      const cursorRect = range.getBoundingClientRect();
+      const signatureRect = signatureRange.getBoundingClientRect();
+      
+      if (Math.abs(cursorRect.top - signatureRect.top) < 50) {
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  // Initialize the Enter key handler
+  setupComposeEnterKeyHandler();
+
   // ========== AI GENERATION ANIMATION FUNCTIONS ==========
   
   function startGeneratingAnimation(composeWindow) {
