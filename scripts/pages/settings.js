@@ -392,7 +392,7 @@ class SettingsPage {
         
         try {
             // Send Google URL to server to download and re-host
-            const apiBase = 'https://power-choosers-crm.vercel.app';
+            const apiBase = 'https://power-choosers-crm-792458658491.us-south1.run.app';
             const uploadResponse = await fetch(`${apiBase}/api/upload/host-google-avatar`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -872,7 +872,7 @@ class SettingsPage {
             });
 
             // Always use Vercel endpoint (works locally and deployed)
-            const apiBase = 'https://power-choosers-crm.vercel.app';
+            const apiBase = 'https://power-choosers-crm-792458658491.us-south1.run.app';
             const response = await fetch(`${apiBase}/api/upload/signature-image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -905,7 +905,7 @@ class SettingsPage {
     async uploadSignatureImage(file) {
         try {
             // Always use Vercel endpoint for uploads (works locally and deployed)
-            const apiBase = 'https://power-choosers-crm.vercel.app';
+            const apiBase = 'https://power-choosers-crm-792458658491.us-south1.run.app';
             
             // Convert file to base64
             const base64 = await new Promise((resolve, reject) => {

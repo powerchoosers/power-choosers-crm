@@ -186,6 +186,33 @@
     }
   }
 
+  // Add new contact to cache
+  function addContactToCache(contactData) {
+    if (!contactData || !contactData.id) {
+      console.warn('[BackgroundContactsLoader] Invalid contact data provided to addContactToCache');
+      return;
+    }
+    
+    // Check if contact already exists
+    const existingIndex = contactsData.findIndex(c => c.id === contactData.id);
+    if (existingIndex >= 0) {
+      // Update existing contact
+      contactsData[existingIndex] = { ...contactsData[existingIndex], ...contactData };
+      console.log('[BackgroundContactsLoader] Updated contact in cache:', contactData.id);
+    } else {
+      // Add new contact to the beginning of the array (most recent first)
+      contactsData.unshift(contactData);
+      console.log('[BackgroundContactsLoader] Added new contact to cache:', contactData.id);
+    }
+    
+    // Update the cache in IndexedDB
+    if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+      window.CacheManager.set('contacts', contactsData).catch(error => {
+        console.warn('[BackgroundContactsLoader] Failed to update cache:', error);
+      });
+    }
+  }
+
   // Export public API
   window.BackgroundContactsLoader = {
     getContactsData: () => contactsData,
@@ -193,7 +220,8 @@
     loadMore: loadMoreContacts,
     hasMore: () => hasMoreData,
     getCount: () => contactsData.length,
-    getTotalCount: getTotalCount
+    getTotalCount: getTotalCount,
+    addContact: addContactToCache
   };
   
   console.log('[BackgroundContactsLoader] Module initialized');

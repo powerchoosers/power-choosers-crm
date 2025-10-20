@@ -60,7 +60,7 @@ export default async function handler(req, res) {
 
             // Upsert into central /api/calls so the UI can see the recording immediately
             try {
-                const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
+                const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm-792458658491.us-south1.run.app';
                 await fetch(`${base}/api/calls`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -141,7 +141,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid) {
             callStore.set(callSid, callData);
         }
         try {
-            const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm.vercel.app';
+            const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
             await fetch(`${base}/api/calls`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

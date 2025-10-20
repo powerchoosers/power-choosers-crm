@@ -35,9 +35,9 @@ const handler = async function handler(req, res) {
         const call = await client.calls.create({
             from: twilioPhone,
             to: agentPhone, // Call your phone first
-            url: `${req.headers.host ? `https://${req.headers.host}` : 'https://power-choosers-crm.vercel.app'}/api/twilio/bridge?target=${encodeURIComponent(to)}`,
+            url: `${req.headers.host ? `https://${req.headers.host}` : 'https://power-choosers-crm-792458658491.us-south1.run.app'}/api/twilio/bridge?target=${encodeURIComponent(to)}`,
             method: 'POST',
-            statusCallback: `${req.headers.host ? `https://${req.headers.host}` : 'https://power-choosers-crm.vercel.app'}/api/twilio/status`,
+            statusCallback: `${req.headers.host ? `https://${req.headers.host}` : 'https://power-choosers-crm-792458658491.us-south1.run.app'}/api/twilio/status`,
             statusCallbackMethod: 'POST',
             // Add timeout to prevent hanging calls
             timeout: 30,

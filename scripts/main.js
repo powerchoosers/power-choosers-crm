@@ -615,9 +615,9 @@ class PowerChoosersCRM {
     try {
       if (typeof API_BASE_URL !== 'undefined' && API_BASE_URL) return String(API_BASE_URL).replace(/\/$/, '');
     } catch(_) {}
-    const vercel = 'https://power-choosers-crm.vercel.app';
-    if (/^https?:\/\//i.test(vercel)) return vercel;
-    try { return (window.location && window.location.origin) ? window.location.origin.replace(/\/$/, '') : vercel; } catch(_) { return vercel; }
+    const cloudRun = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+    if (/^https?:\/\//i.test(cloudRun)) return cloudRun;
+    try { return (window.location && window.location.origin) ? window.location.origin.replace(/\/$/, '') : cloudRun; } catch(_) { return cloudRun; }
   }
 
   createAddContactModal() {
@@ -4764,7 +4764,7 @@ class PowerChoosersCRM {
             const base = (window.API_BASE_URL || '').replace(/\/$/, '');
             const urls = [`${base}/api/energy-news`];
             if (!base || base.includes('localhost') || base.includes('127.0.0.1')) {
-                urls.push('https://power-choosers-crm.vercel.app/api/energy-news');
+                urls.push('https://power-choosers-crm-792458658491.us-south1.run.app/api/energy-news');
             }
 
             let data = null;

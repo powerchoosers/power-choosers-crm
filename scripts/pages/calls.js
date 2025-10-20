@@ -1253,7 +1253,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
 
           console.log('[Calls] Found', j.calls.length, 'real calls from API');
           console.log('[Calls] Sample call data from API:', j.calls[0]);
-          const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm.vercel.app' : base;
+          const playbackBase = /localhost|127\.0\.0\.1/.test(base) ? 'https://power-choosers-crm-792458658491.us-south1.run.app' : base;
           // Helper: pick the most active contact for an account based on historical calls
           const callsRaw = Array.isArray(j.calls) ? j.calls : [];
           function pickMostActiveContactForAccountLocal(accountId){
@@ -3433,7 +3433,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     let completed = 0;
 
     // Always use production API for calls (critical data operations)
-    const base = 'https://power-choosers-crm.vercel.app';
+    const base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
     const url = `${base}/api/calls`;
     console.log('[Bulk Delete] Using endpoint:', url);
     
@@ -3797,7 +3797,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     getCallsData: () => state.data,
     // Debug functions
     testApiEndpoint: async function() {
-      const base = 'https://power-choosers-crm.vercel.app';
+      const base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
       console.log('Testing API endpoint:', `${base}/api/calls`);
       try {
         const response = await fetch(`${base}/api/calls`);
@@ -3810,7 +3810,7 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       }
     },
     deleteTestCall: async function(callId) {
-      const base = 'https://power-choosers-crm.vercel.app';
+      const base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
       console.log('Testing DELETE for call:', callId);
       try {
         const response = await fetch(`${base}/api/calls`, {

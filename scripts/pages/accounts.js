@@ -375,6 +375,12 @@ var console = {
             state.totalCount = state.allAccountsCache.length;
           }
           
+          // Also update BackgroundAccountsLoader cache
+          if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.addAccount === 'function') {
+            window.BackgroundAccountsLoader.addAccount({ id, ...doc });
+            console.log('[Accounts] Updated BackgroundAccountsLoader cache with new account:', id);
+          }
+          
           applyFilters();
         } catch (_) { /* noop */ }
       };

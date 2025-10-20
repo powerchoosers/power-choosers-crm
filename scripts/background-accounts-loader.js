@@ -202,6 +202,33 @@
     }
   }
 
+  // Add new account to cache
+  function addAccountToCache(accountData) {
+    if (!accountData || !accountData.id) {
+      console.warn('[BackgroundAccountsLoader] Invalid account data provided to addAccountToCache');
+      return;
+    }
+    
+    // Check if account already exists
+    const existingIndex = accountsData.findIndex(a => a.id === accountData.id);
+    if (existingIndex >= 0) {
+      // Update existing account
+      accountsData[existingIndex] = { ...accountsData[existingIndex], ...accountData };
+      console.log('[BackgroundAccountsLoader] Updated account in cache:', accountData.id);
+    } else {
+      // Add new account to the beginning of the array (most recent first)
+      accountsData.unshift(accountData);
+      console.log('[BackgroundAccountsLoader] Added new account to cache:', accountData.id);
+    }
+    
+    // Update the cache in IndexedDB
+    if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+      window.CacheManager.set('accounts', accountsData).catch(error => {
+        console.warn('[BackgroundAccountsLoader] Failed to update cache:', error);
+      });
+    }
+  }
+
   // Export public API
   window.BackgroundAccountsLoader = {
     getAccountsData: () => accountsData,
@@ -209,7 +236,8 @@
     loadMore: loadMoreAccounts,
     hasMore: () => hasMoreData,
     getCount: () => accountsData.length,
-    getTotalCount: getTotalCount
+    getTotalCount: getTotalCount,
+    addAccount: addAccountToCache
   };
   
   console.log('[BackgroundAccountsLoader] Module initialized');

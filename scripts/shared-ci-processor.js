@@ -54,7 +54,7 @@ window.SharedCIProcessor = (function() {
             // Get API base URL
             let base = (window.crm && typeof window.crm.getApiBaseUrl === 'function')
                 ? window.crm.getApiBaseUrl()
-                : (window.PUBLIC_BASE_URL || window.API_BASE_URL || 'https://power-choosers-crm.vercel.app');
+                : (window.PUBLIC_BASE_URL || window.API_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app');
             base = String(base).replace(/\/$/, '');
 
             // Make CI request
@@ -163,7 +163,7 @@ window.SharedCIProcessor = (function() {
         let attempts = 0;
         const maxAttempts = 40; // ~2 minutes at 3s intervals
         const delayMs = 3000;
-        const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm.vercel.app';
+        const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm-792458658491.us-south1.run.app';
 
         const isReady = (call) => {
             const hasTranscript = !!(call && typeof call.transcript === 'string' && call.transcript.trim());
@@ -255,7 +255,7 @@ window.SharedCIProcessor = (function() {
 
         // First try to trigger background processing
         try {
-            const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm.vercel.app';
+            const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm-792458658491.us-south1.run.app';
             
             await fetch(`${base}/api/twilio/poll-ci-analysis`, {
                 method: 'POST',

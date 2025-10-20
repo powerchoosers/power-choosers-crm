@@ -2889,10 +2889,10 @@
             window.API_BASE_URL = window.location.origin;
             console.log('API_BASE_URL (Local server):', window.API_BASE_URL);
           } else {
-            // Use Vercel deployment for Twilio serverless functions when deployed
-            const vercelUrl = 'https://power-choosers-crm.vercel.app';
-            window.API_BASE_URL = vercelUrl;
-            console.log('API_BASE_URL (Vercel backend):', window.API_BASE_URL);
+            // Use Cloud Run deployment for Twilio serverless functions when deployed
+            const cloudRunUrl = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+            window.API_BASE_URL = cloudRunUrl;
+            console.log('API_BASE_URL (Cloud Run backend):', window.API_BASE_URL);
           }
         } catch (e) {
           console.warn('API_BASE_URL init error:', e);
