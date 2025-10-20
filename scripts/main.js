@@ -3164,6 +3164,76 @@ class PowerChoosersCRM {
         }
     }
 
+    async batchAssignToList(db, assignments) {
+        if (!assignments || assignments.length === 0) return;
+        
+        try {
+            // Group assignments by listId and targetType
+            const grouped = {};
+            assignments.forEach(assignment => {
+                const key = `${assignment.listId}-${assignment.targetType}`;
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        listId: assignment.listId,
+                        targetType: assignment.targetType,
+                        recordIds: []
+                    };
+                }
+                grouped[key].recordIds.push(assignment.recordId);
+            });
+            
+            // Process each group
+            for (const [key, group] of Object.entries(grouped)) {
+                const { listId, targetType, recordIds } = group;
+                
+                // 1. Get all existing members in one query
+                const existingQuery = await db.collection('listMembers')
+                    .where('listId', '==', listId)
+                    .where('targetType', '==', targetType)
+                    .get();
+                
+                const existingIds = new Set(existingQuery.docs.map(doc => doc.data().targetId));
+                
+                // 2. Filter out records already in list
+                const newRecordIds = recordIds.filter(id => !existingIds.has(id));
+                
+                if (newRecordIds.length === 0) {
+                    console.log(`All ${recordIds.length} ${targetType} already in list ${listId}`);
+                    continue;
+                }
+                
+                // 3. Batch write all new assignments
+                const batch = db.batch();
+                newRecordIds.forEach(recordId => {
+                    const docRef = db.collection('listMembers').doc();
+                    batch.set(docRef, {
+                        listId: listId,
+                        targetId: recordId,
+                        targetType: targetType,
+                        addedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
+                    });
+                });
+                
+                await batch.commit();
+                
+                // 4. Update list count once
+                const increment = window.firebase?.firestore?.FieldValue?.increment?.(newRecordIds.length);
+                if (increment) {
+                    await db.collection('lists').doc(listId).update({
+                        count: increment,
+                        recordCount: increment,
+                        updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
+                    });
+                }
+                
+                console.log(`✓ Batch assigned ${newRecordIds.length} ${targetType} to list ${listId} (${recordIds.length - newRecordIds.length} already existed)`);
+            }
+            
+        } catch (error) {
+            console.error('Batch list assignment failed:', error);
+        }
+    }
+
     getCRMFields(importType) {
         if (importType === 'accounts') {
             return [
@@ -3441,12 +3511,21 @@ class PowerChoosersCRM {
                 console.log(`Loaded ${existingContacts.length} existing contacts for comparison`);
             }
             
+            // Initialize batch list assignment collection
+            const listAssignments = [];
+            
             // Process in batches
             const batchSize = 10;
             for (let i = 0; i < modal._csvRows.length; i += batchSize) {
                 const batch = modal._csvRows.slice(i, i + batchSize);
                 
-                await Promise.all(batch.map(async (row) => {
+                // Add timeout protection to prevent hanging
+                const batchPromises = batch.map(async (row) => {
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Row processing timeout')), 30000)
+                    );
+                    
+                    const rowPromise = (async () => {
                     try {
                         const doc = {};
                         
@@ -3548,8 +3627,14 @@ class PowerChoosersCRM {
                             await existingRecord.ref.update(updateData);
                             enriched++;
 
-                            // Assign to list if selected
-                            await this.assignToList(db, existingRecord.id, modal);
+                            // Collect for batch list assignment
+                            if (modal.dataset.selectedListId) {
+                                listAssignments.push({
+                                    listId: modal.dataset.selectedListId,
+                                    recordId: existingRecord.id,
+                                    targetType: modal._importType === 'accounts' ? 'accounts' : 'people'
+                                });
+                            }
 
                             // Live update tables (use UI-friendly timestamps)
                             try {
@@ -3578,8 +3663,14 @@ class PowerChoosersCRM {
                             const ref = await db.collection(collection).add(doc);
                             imported++;
 
-                            // Assign to list if selected
-                            await this.assignToList(db, ref.id, modal);
+                            // Collect for batch list assignment
+                            if (modal.dataset.selectedListId) {
+                                listAssignments.push({
+                                    listId: modal.dataset.selectedListId,
+                                    recordId: ref.id,
+                                    targetType: modal._importType === 'accounts' ? 'accounts' : 'people'
+                                });
+                            }
 
                             // Live update tables (use UI-friendly timestamps so lists don't show N/A)
                             try {
@@ -3595,7 +3686,17 @@ class PowerChoosersCRM {
                         console.error('Error importing row:', error);
                         failed++;
                     }
-                }));
+                    })();
+                    
+                    try {
+                        await Promise.race([rowPromise, timeoutPromise]);
+                    } catch (error) {
+                        console.error('Error importing row (with timeout):', error);
+                        failed++;
+                    }
+                });
+                
+                await Promise.all(batchPromises);
                 
                 // Update progress
                 const processed = Math.min(i + batchSize, total);
@@ -3608,6 +3709,12 @@ class PowerChoosersCRM {
                 
                 // Small delay to show progress
                 await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            // Process batch list assignments (much more efficient than individual assignments)
+            if (listAssignments.length > 0) {
+                console.log(`Processing batch list assignments for ${listAssignments.length} records...`);
+                await this.batchAssignToList(db, listAssignments);
             }
             
             // If we queued merges, present a summary and ask once to proceed
@@ -3624,6 +3731,7 @@ class PowerChoosersCRM {
             } catch(_) {}
 
             // Apply queued merges if approved
+            const queuedMergeAssignments = [];
             if (userApprovedQueuedMerges) {
                 for (const item of queuedAccountMerges) {
                     try {
@@ -3638,8 +3746,14 @@ class PowerChoosersCRM {
                         await item.existingRecord.ref.update(updateData);
                         enriched++;
                         
-                        // Assign to list if selected
-                        await this.assignToList(db, item.existingRecord.id, modal);
+                        // Collect for batch list assignment
+                        if (modal.dataset.selectedListId) {
+                            queuedMergeAssignments.push({
+                                listId: modal.dataset.selectedListId,
+                                recordId: item.existingRecord.id,
+                                targetType: 'accounts'
+                            });
+                        }
                         
                         // Notify UI
                         try {
@@ -3656,8 +3770,14 @@ class PowerChoosersCRM {
                         await item.existingRecord.ref.update(updateData);
                         enriched++;
                         
-                        // Assign to list if selected
-                        await this.assignToList(db, item.existingRecord.id, modal);
+                        // Collect for batch list assignment
+                        if (modal.dataset.selectedListId) {
+                            queuedMergeAssignments.push({
+                                listId: modal.dataset.selectedListId,
+                                recordId: item.existingRecord.id,
+                                targetType: 'people'
+                            });
+                        }
                         
                         // Notify UI
                         try {
@@ -3666,6 +3786,12 @@ class PowerChoosersCRM {
                         } catch(_) {}
                     } catch(e) { failed++; }
                 }
+            }
+            
+            // Process queued merge list assignments
+            if (queuedMergeAssignments.length > 0) {
+                console.log(`Processing queued merge list assignments for ${queuedMergeAssignments.length} records...`);
+                await this.batchAssignToList(db, queuedMergeAssignments);
             }
             
             // Show results
