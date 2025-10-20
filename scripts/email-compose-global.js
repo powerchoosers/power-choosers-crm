@@ -2221,12 +2221,12 @@
           paragraphs.push(jsonData.paragraph3);
         }
 
-        // Join paragraphs with double spacing, but handle closing specially
+        // Join paragraphs with double spacing
         body = paragraphs.join('\n\n');
 
-        // Add closing with single line break (not double spacing)
+        // Add closing as its OWN paragraph so it renders separately
         if (jsonData.closing) {
-          body += '\n' + jsonData.closing;
+          body += '\n\n' + jsonData.closing;
         }
         console.log('[AI] Built body from JSON:', body);
 
@@ -2294,7 +2294,9 @@
             return `${header}${list}`;
           } else {
             // Regular paragraph
-            return `<p style="margin: 0 0 16px 0;">${p}</p>`;
+            // Preserve single newlines inside a paragraph (e.g., closing: Best regards,\nLewis)
+            const withLineBreaks = p.replace(/\n/g, '<br>');
+            return `<p style="margin: 0 0 16px 0;">${withLineBreaks}</p>`;
           }
         })
         .join('');
