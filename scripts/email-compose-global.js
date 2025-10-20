@@ -751,6 +751,9 @@
           } else {
             editor.removeAttribute('data-mode');
           }
+          
+          // Preserve signature after AI content insertion (hybrid approach)
+          preserveEmailSignature(editor);
           editor.style.opacity = '0';
           editor.style.transform = 'translateY(10px)';
           editor.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
@@ -1145,6 +1148,34 @@
     }
   }
 
+  /**
+   * Preserve and restore signature after AI content insertion
+   * Simplified version from old emails.js sanitizeGeneratedEditor
+   */
+  function preserveEmailSignature(editor) {
+    if (!editor) return;
+    
+    try {
+      // Find signature div by data attribute or style pattern
+      const signatureDiv = editor.querySelector('[data-signature="true"]') || 
+        Array.from(editor.querySelectorAll('div')).find(div => 
+          div.style.marginTop === '20px' && 
+          div.style.paddingTop === '20px' &&
+          (div.style.borderTop && div.style.borderTop.includes('1px solid'))
+        );
+      
+      if (signatureDiv) {
+        console.log('[Signature] Found signature, moving to end');
+        // Ensure signature is at the very end
+        editor.appendChild(signatureDiv);
+      } else {
+        console.log('[Signature] No signature found in editor');
+      }
+    } catch (e) {
+      console.warn('[Signature] Failed to preserve signature:', e);
+    }
+  }
+
   function formatGeneratedEmail(result, recipient, mode) {
     try {
       console.log('[AI] Formatting generated email, mode:', mode);
@@ -1173,12 +1204,12 @@
       // Convert body to HTML with proper paragraph spacing
       const htmlBody = body
         .trim()
-        .split('\n\n')  // Split on double newlines first
+        .split(/\n{2,}/)  // Split on 2+ newlines (like old emails.js system)
         .filter(para => para.trim())  // Remove empty paragraphs
         .map(para => {
           // Convert single newlines within paragraphs to <br>
           const formatted = para.replace(/\n/g, '<br>');
-          return `<p style="margin-bottom: 16px;">${formatted}</p>`;
+          return `<p style="margin: 0 0 16px 0;">${formatted}</p>`;
         })
         .join('');  // Join without extra spacing since <p> tags provide it
       
