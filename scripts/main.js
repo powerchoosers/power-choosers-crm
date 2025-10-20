@@ -3429,6 +3429,18 @@ class PowerChoosersCRM {
             
             const collection = modal._importType === 'accounts' ? 'accounts' : 'contacts';
             
+            // Pre-fetch existing contacts for duplicate detection (once, not per row)
+            let existingContacts = [];
+            if (updateExisting && modal._importType === 'contacts' && window.ContactMerger) {
+                console.log('Fetching existing contacts for duplicate detection...');
+                const allContactsQuery = await db.collection('contacts').get();
+                existingContacts = allContactsQuery.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                console.log(`Loaded ${existingContacts.length} existing contacts for comparison`);
+            }
+            
             // Process in batches
             const batchSize = 10;
             for (let i = 0; i < modal._csvRows.length; i += batchSize) {
@@ -3481,15 +3493,8 @@ class PowerChoosersCRM {
                         let mergeAction = 'create'; // 'create', 'merge', 'skip'
                         
                         if (updateExisting && modal._importType === 'contacts') {
-                            // For contacts, use intelligent duplicate detection
-                            if (window.ContactMerger) {
-                                // Get all existing contacts for comparison
-                                const allContactsQuery = await db.collection('contacts').get();
-                                const existingContacts = allContactsQuery.docs.map(doc => ({
-                                    id: doc.id,
-                                    ...doc.data()
-                                }));
-                                
+                            // For contacts, use intelligent duplicate detection with pre-fetched contacts
+                            if (window.ContactMerger && existingContacts.length > 0) {
                                 const duplicates = await window.ContactMerger.findDuplicates(doc, existingContacts);
                                 
                                 if (duplicates.length > 0) {
