@@ -45,4 +45,4 @@ export default async function handler(req, res) {
   } catch (error) {
     res.statusCode = 500; res.end(JSON.stringify({ ok: false, error: error?.message || String(error) }));
   }
-};
+}

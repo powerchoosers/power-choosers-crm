@@ -2,8 +2,7 @@
 // Returns lightweight boolean status without loading full call objects
 
 import { cors } from './_cors.js';
-
-const { db } = require('./_firebase');
+import { db } from './_firebase.js';
 
 // In-memory fallback store (for local/dev when Firestore isn't configured)
 const memoryStore = new Map();
@@ -106,42 +105,43 @@ async function hasCallsForContact(contactId, db) {
 
 export default async function handler(req, res) {
   if (cors(req, res)) return; // handle OPTIONS
-    try {
-      if (req.method !== 'GET') {
-        res.writeHead(405, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Method not allowed' }));
-        return;
-      }
+  
+  try {
+    if (req.method !== 'GET') {
+      res.writeHead(405, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
+    }
 
-      const url = new URL(req.url, `http://${req.headers.host}`);
-      const phones = url.searchParams.get('phones') || '';
-      const accountIds = url.searchParams.get('accountIds') || '';
-      const contactIds = url.searchParams.get('contactIds') || '';
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const phones = url.searchParams.get('phones') || '';
+    const accountIds = url.searchParams.get('accountIds') || '';
+    const contactIds = url.searchParams.get('contactIds') || '';
 
-      // Parse comma-separated values
-      const phoneList = phones ? phones.split(',').map(p => normalizePhone(p.trim())).filter(p => p.length === 10) : [];
-      const accountIdList = accountIds ? accountIds.split(',').map(id => id.trim()).filter(Boolean) : [];
-      const contactIdList = contactIds ? contactIds.split(',').map(id => id.trim()).filter(Boolean) : [];
+    // Parse comma-separated values
+    const phoneList = phones ? phones.split(',').map(p => normalizePhone(p.trim())).filter(p => p.length === 10) : [];
+    const accountIdList = accountIds ? accountIds.split(',').map(id => id.trim()).filter(Boolean) : [];
+    const contactIdList = contactIds ? contactIds.split(',').map(id => id.trim()).filter(Boolean) : [];
 
-      const result = {};
+    const result = {};
 
-      // Check phone numbers
-      for (const phone of phoneList) {
-        result[phone] = await hasCallsForPhone(phone, db);
-      }
+    // Check phone numbers
+    for (const phone of phoneList) {
+      result[phone] = await hasCallsForPhone(phone, db);
+    }
 
-      // Check account IDs
-      for (const accountId of accountIdList) {
-        result[accountId] = await hasCallsForAccount(accountId, db);
-      }
+    // Check account IDs
+    for (const accountId of accountIdList) {
+      result[accountId] = await hasCallsForAccount(accountId, db);
+    }
 
-      // Check contact IDs
-      for (const contactId of contactIdList) {
-        result[contactId] = await hasCallsForContact(contactId, db);
-      }
+    // Check contact IDs
+    for (const contactId of contactIdList) {
+      result[contactId] = await hasCallsForContact(contactId, db);
+    }
 
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(result));
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
 
   } catch (error) {
     console.error('[CallStatus] Error:', error);
