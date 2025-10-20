@@ -2186,39 +2186,50 @@
       
       // Try to parse as JSON first
       try {
-        const jsonData = JSON.parse(result);
+        // 1) Strip code fences if present (```json ... ``` or ``` ... ```)
+        let jsonText = String(result || '').trim()
+          .replace(/^\s*```json\s*/i, '')
+          .replace(/^\s*```\s*/i, '')
+          .replace(/\s*```\s*$/i, '');
+
+        // 2) Extract the first JSON object only (ignore any trailing notes)
+        const match = jsonText.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('No JSON object found in response');
+        jsonText = match[0];
+
+        const jsonData = JSON.parse(jsonText);
         console.log('[AI] Parsed JSON successfully:', jsonData);
-        
+
         subject = jsonData.subject || 'Energy Solutions';
-        
+
         // Build body from JSON fields with proper paragraph structure
         const paragraphs = [];
-        
+
         if (jsonData.greeting) {
           paragraphs.push(jsonData.greeting);
         }
-        
+
         if (jsonData.paragraph1) {
           paragraphs.push(jsonData.paragraph1);
         }
-        
+
         if (jsonData.paragraph2) {
           paragraphs.push(jsonData.paragraph2);
         }
-        
+
         if (jsonData.paragraph3) {
           paragraphs.push(jsonData.paragraph3);
         }
-        
+
         // Join paragraphs with double spacing, but handle closing specially
         body = paragraphs.join('\n\n');
-        
+
         // Add closing with single line break (not double spacing)
         if (jsonData.closing) {
           body += '\n' + jsonData.closing;
         }
         console.log('[AI] Built body from JSON:', body);
-        
+
       } catch (jsonError) {
         console.log('[AI] Not JSON, falling back to text parsing');
         
