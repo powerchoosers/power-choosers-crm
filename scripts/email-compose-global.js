@@ -159,115 +159,167 @@
   // ========== AI GENERATION ANIMATION FUNCTIONS ==========
   
   function startGeneratingAnimation(composeWindow) {
-    const overlay = document.getElementById('compose-generating-overlay');
     const subjectInput = composeWindow?.querySelector('#compose-subject');
     const bodyInput = composeWindow?.querySelector('.body-input');
     
-    if (!overlay) return;
-    
-    // Show skeleton overlay
-    overlay.style.display = 'flex';
-    
-    // Add glow effect only to subject and body inputs (not entire window)
+    // Add glow effect and skeleton to subject input
     if (subjectInput) {
-      subjectInput.classList.add('compose-input-transition', 'generating', 'compose-generating');
+      subjectInput.classList.add('compose-generating');
+      createSkeletonInField(subjectInput, 'subject');
     }
+    
+    // Add glow effect and skeleton to body input
     if (bodyInput) {
-      bodyInput.classList.add('compose-input-transition', 'generating', 'compose-generating');
+      bodyInput.classList.add('compose-generating');
+      createSkeletonInField(bodyInput, 'body');
     }
     
-    // Animate skeleton bars with staggered delays
-    animateSkeletonBars();
-    
-    console.log('[AI Animation] Started generating animation');
+    console.log('[AI Animation] Started generating animation in input fields');
   }
   
   function stopGeneratingAnimation(composeWindow) {
-    const overlay = document.getElementById('compose-generating-overlay');
     const subjectInput = composeWindow?.querySelector('#compose-subject');
     const bodyInput = composeWindow?.querySelector('.body-input');
     
-    if (!overlay) return;
-    
-    // Hide skeleton overlay
-    overlay.style.display = 'none';
-    
-    // Remove glow effect from specific inputs
+    // Remove glow effect and skeleton from subject input
     if (subjectInput) {
-      subjectInput.classList.remove('compose-input-transition', 'generating', 'compose-generating');
+      subjectInput.classList.remove('compose-generating');
+      removeSkeletonFromField(subjectInput);
     }
+    
+    // Remove glow effect and skeleton from body input
     if (bodyInput) {
-      bodyInput.classList.remove('compose-input-transition', 'generating', 'compose-generating');
+      bodyInput.classList.remove('compose-generating');
+      removeSkeletonFromField(bodyInput);
     }
     
     console.log('[AI Animation] Stopped generating animation');
   }
   
-  function animateSkeletonBars() {
-    const bars = document.querySelectorAll('.ai-skeleton');
-    bars.forEach((bar, index) => {
-      bar.style.animationDelay = `${index * 0.2}s`;
-    });
+  function createSkeletonInField(inputField, type) {
+    // Clear any existing content
+    inputField.innerHTML = '';
+    
+    // Create skeleton container
+    const skeletonContainer = document.createElement('div');
+    skeletonContainer.className = 'field-skeleton-container';
+    
+    if (type === 'subject') {
+      // Subject skeleton: 2 short bars
+      skeletonContainer.innerHTML = `
+        <div class="skeleton-bar skeleton-subject-1"></div>
+        <div class="skeleton-bar skeleton-subject-2"></div>
+      `;
+    } else if (type === 'body') {
+      // Body skeleton: 4-5 bars of varying lengths
+      skeletonContainer.innerHTML = `
+        <div class="skeleton-bar skeleton-body-1"></div>
+        <div class="skeleton-bar skeleton-body-2"></div>
+        <div class="skeleton-bar skeleton-body-3"></div>
+        <div class="skeleton-bar skeleton-body-4"></div>
+        <div class="skeleton-bar skeleton-body-5"></div>
+      `;
+    }
+    
+    // Add skeleton to input field
+    inputField.appendChild(skeletonContainer);
+    
+    // Start skeleton animation
+    setTimeout(() => {
+      const bars = skeletonContainer.querySelectorAll('.skeleton-bar');
+      bars.forEach((bar, index) => {
+        bar.style.animationDelay = `${index * 0.15}s`;
+        bar.classList.add('skeleton-animate');
+      });
+    }, 50);
+  }
+  
+  function removeSkeletonFromField(inputField) {
+    const skeletonContainer = inputField.querySelector('.field-skeleton-container');
+    if (skeletonContainer) {
+      // Fade out skeleton
+      skeletonContainer.style.opacity = '0';
+      skeletonContainer.style.transition = 'opacity 0.3s ease';
+      
+      // Remove after fade
+      setTimeout(() => {
+        if (skeletonContainer.parentNode) {
+          skeletonContainer.remove();
+        }
+      }, 300);
+    }
   }
   
   function typewriterEffect(element, text, speed = 30) {
     if (!element || !text) return;
     
-    // Handle both input fields and contentEditable elements
-    const isInput = element.tagName === 'INPUT' || element.tagName === 'TEXTAREA';
+    // Remove skeleton first
+    removeSkeletonFromField(element);
     
-    if (isInput) {
-      // For input fields, use value property
-      element.value = '';
-      element.style.borderRight = '2px solid var(--orange-primary)';
+    // Wait for skeleton to fade out, then start typewriter
+    setTimeout(() => {
+      // Handle both input fields and contentEditable elements
+      const isInput = element.tagName === 'INPUT' || element.tagName === 'TEXTAREA';
       
-      let i = 0;
-      const timer = setInterval(() => {
-        if (i < text.length) {
-          element.value += text.charAt(i);
-          i++;
-        } else {
-          clearInterval(timer);
-          element.style.borderRight = 'none';
-        }
-      }, speed);
-    } else {
-      // For contentEditable elements, use innerHTML
-      element.innerHTML = '';
-      element.style.borderRight = '2px solid var(--orange-primary)';
-      element.style.overflow = 'hidden';
-      element.style.whiteSpace = 'nowrap';
-      
-      let i = 0;
-      const timer = setInterval(() => {
-        if (i < text.length) {
-          element.innerHTML += text.charAt(i);
-          i++;
-        } else {
-          clearInterval(timer);
-          element.style.borderRight = 'none';
-          element.style.overflow = 'visible';
-          element.style.whiteSpace = 'normal';
-        }
-      }, speed);
-    }
+      if (isInput) {
+        // For input fields, use value property
+        element.value = '';
+        element.style.borderRight = '2px solid var(--orange-primary)';
+        
+        let i = 0;
+        const timer = setInterval(() => {
+          if (i < text.length) {
+            element.value += text.charAt(i);
+            i++;
+          } else {
+            clearInterval(timer);
+            element.style.borderRight = 'none';
+          }
+        }, speed);
+      } else {
+        // For contentEditable elements, use innerHTML
+        element.innerHTML = '';
+        element.style.borderRight = '2px solid var(--orange-primary)';
+        element.style.overflow = 'hidden';
+        element.style.whiteSpace = 'nowrap';
+        
+        let i = 0;
+        const timer = setInterval(() => {
+          if (i < text.length) {
+            element.innerHTML += text.charAt(i);
+            i++;
+          } else {
+            clearInterval(timer);
+            element.style.borderRight = 'none';
+            element.style.overflow = 'visible';
+            element.style.whiteSpace = 'normal';
+          }
+        }, speed);
+      }
+    }, 350); // Wait for skeleton fade out
   }
   
   function progressiveReveal(element, html) {
     if (!element || !html) return;
     
-    // For HTML content, we need to render it properly
-    // First, set the HTML content
-    element.innerHTML = html;
+    // Remove skeleton first
+    removeSkeletonFromField(element);
     
-    // Then animate the paragraphs in
-    const paragraphs = element.querySelectorAll('p');
-    paragraphs.forEach((p, index) => {
-      p.classList.add('word-reveal');
-      setTimeout(() => {
-        p.classList.add('visible');
-      }, index * 200);
-    });
+    // Wait for skeleton to fade out, then reveal content
+    setTimeout(() => {
+      // For HTML content, we need to render it properly
+      // First, set the HTML content
+      element.innerHTML = html;
+      
+      // Then animate the paragraphs in
+      const paragraphs = element.querySelectorAll('p');
+      paragraphs.forEach((p, index) => {
+        p.classList.add('word-reveal');
+        setTimeout(() => {
+          p.classList.add('visible');
+        }, index * 200);
+      });
+    }, 350); // Wait for skeleton fade out
   }
   
   function animateTextIntoField(field, content, animationType = 'progressive') {
@@ -744,16 +796,16 @@
       if (html && editor) {
         // For HTML content, render it directly with a simple fade-in
         setTimeout(() => {
-          editor.innerHTML = html;
+          // Preserve signature before AI content insertion (emails.js approach)
+          const contentWithSignature = preserveSignatureAfterAI(editor, html);
+          
+          editor.innerHTML = contentWithSignature;
           // Mark editor mode for proper signature handling
           if (templateType) {
             editor.setAttribute('data-mode', 'html');
           } else {
             editor.removeAttribute('data-mode');
           }
-          
-          // Preserve signature after AI content insertion (hybrid approach)
-          preserveEmailSignature(editor);
           editor.style.opacity = '0';
           editor.style.transform = 'translateY(10px)';
           editor.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
@@ -1149,30 +1201,73 @@
   }
 
   /**
-   * Preserve and restore signature after AI content insertion
-   * Simplified version from old emails.js sanitizeGeneratedEditor
+   * Extract signature from HTML using DOM parser (more reliable than regex)
+   * Ported from emails.js lines 3077-3093
    */
-  function preserveEmailSignature(editor) {
-    if (!editor) return;
+  function extractSignature(html) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      // Look for signature div by data attribute or style pattern
+      const sigDiv = doc.querySelector('[data-signature="true"]') || 
+                    Array.from(doc.querySelectorAll('div')).find(div => 
+                      div.style.marginTop === '20px' && 
+                      div.style.paddingTop === '20px' && 
+                      (div.style.borderTop && div.style.borderTop.includes('1px solid'))
+                    );
+      return sigDiv ? sigDiv.outerHTML : null;
+    } catch (e) {
+      console.warn('[Email] extractSignature failed:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Preserve and restore signature after AI content insertion
+   * Enhanced version from old emails.js lines 1120-1147
+   */
+  function preserveSignatureAfterAI(editor, aiContent) {
+    if (!editor) return aiContent;
     
     try {
-      // Find signature div by data attribute or style pattern
-      const signatureDiv = editor.querySelector('[data-signature="true"]') || 
-        Array.from(editor.querySelectorAll('div')).find(div => 
-          div.style.marginTop === '20px' && 
-          div.style.paddingTop === '20px' &&
-          (div.style.borderTop && div.style.borderTop.includes('1px solid'))
-        );
+      // Extract existing signature BEFORE modifications
+      const currentContent = editor.innerHTML;
+      const signature = extractSignature(currentContent);
       
-      if (signatureDiv) {
-        console.log('[Signature] Found signature, moving to end');
-        // Ensure signature is at the very end
-        editor.appendChild(signatureDiv);
-      } else {
-        console.log('[Signature] No signature found in editor');
+      console.log('[Signature] Current signature found:', signature ? 'YES' : 'NO');
+      
+      // Remove any existing signature from AI content using DOM parser
+      let cleanHtml = aiContent;
+      const aiSig = extractSignature(aiContent);
+      if (aiSig) {
+        console.log('[Signature] Removing signature from AI content');
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(aiContent, 'text/html');
+        const sigDiv = doc.querySelector('[data-signature="true"]') || 
+                      Array.from(doc.querySelectorAll('div')).find(div => 
+                        div.style.marginTop === '20px' && 
+                        div.style.paddingTop === '20px'
+                      );
+        if (sigDiv) {
+          sigDiv.remove();
+          cleanHtml = doc.body.innerHTML;
+        }
       }
+      
+      // Place signature after the AI content's closing
+      let finalContent = cleanHtml;
+      if (signature) {
+        console.log('[Signature] Appending signature to AI content');
+        // Always place signature at the very end, after any existing content
+        finalContent = cleanHtml + signature;
+      } else {
+        console.log('[Signature] No signature to append');
+      }
+      
+      return finalContent;
     } catch (e) {
       console.warn('[Signature] Failed to preserve signature:', e);
+      return aiContent;
     }
   }
 
@@ -1201,17 +1296,51 @@
         subject = 'Energy Solutions';
       }
       
-      // Convert body to HTML with proper paragraph spacing
-      const htmlBody = body
+      // Convert body to HTML with proper paragraph spacing (emails.js approach)
+      // Rebuild body and normalize paragraphs: ensure blank line between paragraphs
+      const normalizedBody = body
         .trim()
-        .split(/\n{2,}/)  // Split on 2+ newlines (like old emails.js system)
-        .filter(para => para.trim())  // Remove empty paragraphs
-        .map(para => {
-          // Convert single newlines within paragraphs to <br>
-          const formatted = para.replace(/\n/g, '<br>');
-          return `<p style="margin: 0 0 16px 0;">${formatted}</p>`;
+        .split(/\n{2,}/)  // Split on 2+ newlines
+        .map(p => {
+          // Preserve bullet lists within a paragraph (lines starting with - or •)
+          if (/^(\s*[•\-]\s+)/m.test(p)) {
+            return String(p).replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim();
+          }
+          return p.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
         })
-        .join('');  // Join without extra spacing since <p> tags provide it
+        .filter(Boolean)
+        .join('\n\n');
+
+      // Build HTML paragraphs from normalized body
+      const htmlBody = normalizedBody
+        .split(/\n\n/)
+        .map(p => p.trim())
+        .filter(Boolean)
+        .map(p => {
+          // Check if it's a bullet paragraph
+          if (/^(\s*[•\-]\s+)/m.test(p)) {
+            // Build a list: optional header + bullet items
+            const lines = String(p).replace(/\r/g, '').split(/\n+/).map(l => l.trim()).filter(Boolean);
+            const items = [];
+            const nonBullets = [];
+            for (const l of lines) {
+              if (/^(\s*[•\-]\s+)/.test(l)) {
+                items.push(l.replace(/^(\s*[•\-]\s+)/, ''));
+              } else {
+                nonBullets.push(l);
+              }
+            }
+            const header = nonBullets.length ? `<p style="margin: 0 0 8px 0;">${nonBullets.join(' ')}</p>` : '';
+            const list = items.length
+              ? `<ul style="margin: 0 0 16px 18px; padding: 0;">${items.map(i => `<li>${i}</li>`).join('')}</ul>`
+              : '';
+            return `${header}${list}`;
+          } else {
+            // Regular paragraph
+            return `<p style="margin: 0 0 16px 0;">${p}</p>`;
+          }
+        })
+        .join('');
       
       // Check mode: HTML uses profile branding, standard uses signature settings
       if (mode === 'html') {
