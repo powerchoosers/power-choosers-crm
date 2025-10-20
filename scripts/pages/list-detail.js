@@ -1025,33 +1025,30 @@
     state.membersAccounts = new Set();
     if (!listId) return;
     
-    // 1) Try preloaded cache for instant availability
+    if (console.time) console.time(`[ListDetail] fetchMembers ${listId}`);
+    
+    // 1) Check IndexedDB cache first (10-minute expiry)
     try {
-      if (console.time) console.time(`[ListDetail] fetchMembers ${listId}`);
-      let cacheHit = false; let cacheLoaded = false;
-      const cache = (window.listMembersCache && window.listMembersCache[listId]) || null;
-      if (cache && (cache.loaded || cache.people || cache.accounts)) {
-        try {
-          const ppl = cache.people instanceof Set ? Array.from(cache.people) : (cache.people || []);
-          const accts = cache.accounts instanceof Set ? Array.from(cache.accounts) : (cache.accounts || []);
-          state.membersPeople = new Set(ppl);
-          state.membersAccounts = new Set(accts);
-        } catch (_) {}
-        cacheHit = true; cacheLoaded = !!cache.loaded;
-        console.debug('[ListDetail] fetchMembers: cache', { listId, cacheLoaded, people: state.membersPeople.size, accounts: state.membersAccounts.size });
-        if (cache.loaded) {
-          if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
-          return; // Use cached result immediately
-        }
+      const cached = await window.CacheManager.getCachedListMembers(listId);
+      if (cached) {
+        state.membersPeople = cached.people;
+        state.membersAccounts = cached.accounts;
+        console.log(`[ListDetail] Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from cache`);
+        if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
+        return;
       }
-    } catch (_) {}
-
-    // 2) Fallback: fetch from Firestore
+    } catch (e) {
+      console.warn('[ListDetail] Cache read failed:', e);
+    }
+    
+    // 2) Cache miss - fetch from Firebase
+    console.log('[ListDetail] Cache miss, fetching from Firebase...');
     try {
       if (!window.firebaseDB || typeof window.firebaseDB.collection !== 'function') return;
-
+      
       let gotAny = false;
-      // Prefer subcollection lists/{id}/members
+      
+      // Try subcollection first: lists/{id}/members
       const subSnap = await window.firebaseDB.collection('lists').doc(listId).collection('members').get();
       if (subSnap && subSnap.docs && subSnap.docs.length) {
         gotAny = true;
@@ -1062,53 +1059,38 @@
           if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
           else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
         });
-        console.debug('[ListDetail] fetchMembers: subcollection fetched', { listId, docs: subSnap.docs.length, people: state.membersPeople.size, accounts: state.membersAccounts.size });
       }
-
-      // Fallback to top-level listMembers if subcollection empty
-      if (!gotAny) {
-        try {
-          const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).limit(5000).get();
-          console.log('[ListDetail] fetchMembers: top-level query result', { 
-            listId, 
-            docs: lmSnap?.docs?.length || 0,
-            rawDocs: lmSnap?.docs?.map(d => ({ id: d.id, data: d.data() })) || []
-          });
-          lmSnap?.docs?.forEach(d => {
-            const m = d.data() || {};
-            const t = (m.targetType || m.type || '').toLowerCase();
-            const id = m.targetId || m.id || d.id;
-            console.log('[ListDetail] fetchMembers: processing member', { docId: d.id, targetType: t, targetId: id });
-            if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
-            else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
-          });
-          console.debug('[ListDetail] fetchMembers: top-level fetched', { listId, docs: lmSnap?.docs?.length || 0, people: state.membersPeople.size, accounts: state.membersAccounts.size });
-        } catch (e) {
-          console.error('[ListDetail] fetchMembers: top-level query failed', e);
-        }
-      }
-
-      // Update global cache with fetched result for reuse
-      try {
-        window.listMembersCache = window.listMembersCache || {};
-        window.listMembersCache[listId] = {
-          people: new Set(state.membersPeople),
-          accounts: new Set(state.membersAccounts),
-          loaded: true
-        };
-        console.debug('[ListDetail] fetchMembers: cache updated', { listId, people: state.membersPeople.size, accounts: state.membersAccounts.size });
-      } catch (_) {}
-      if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
       
-      // Debug: Log the actual member IDs
-      console.log('[ListDetail] fetchMembers result:', {
-        listId,
-        peopleMembers: Array.from(state.membersPeople),
-        accountsMembers: Array.from(state.membersAccounts)
-      });
+      // Fallback to top-level listMembers collection
+      if (!gotAny) {
+        const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).limit(5000).get();
+        lmSnap?.docs?.forEach(d => {
+          const m = d.data() || {};
+          const t = (m.targetType || m.type || '').toLowerCase();
+          const id = m.targetId || m.id || d.id;
+          if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
+          else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
+        });
+      }
+      
+      // 3) Cache the results for next time
+      await window.CacheManager.cacheListMembers(listId, state.membersPeople, state.membersAccounts);
+      
+      console.log(`[ListDetail] Fetched from Firebase: ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts`);
+      
+      // 4) Update legacy in-memory cache for backward compatibility
+      window.listMembersCache = window.listMembersCache || {};
+      window.listMembersCache[listId] = {
+        people: new Set(state.membersPeople),
+        accounts: new Set(state.membersAccounts),
+        loaded: true
+      };
+      
     } catch (err) {
-      console.warn('Failed to load list members', err);
+      console.error('[ListDetail] Failed to fetch list members:', err);
     }
+    
+    if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
   }
 
   function applyFilters() {

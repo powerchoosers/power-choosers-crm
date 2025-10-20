@@ -8,6 +8,7 @@ class CacheManager {
     this.db = null;
     this.cacheExpiry = 15 * 60 * 1000; // 15 minutes in milliseconds
     this.collections = ['contacts', 'accounts', 'calls', 'calls-raw', 'tasks', 'sequences', 'lists', 'deals', 'settings', 'badge-data', 'emails'];
+    this.listMembersExpiry = 10 * 60 * 1000; // 10 minutes for list members
     this.initPromise = null;
   }
 
@@ -50,6 +51,76 @@ class CacheManager {
     });
 
     return this.initPromise;
+  }
+
+  // Cache list members by list ID
+  async cacheListMembers(listId, peopleIds, accountIds) {
+    const cacheKey = `list-members-${listId}`;
+    const data = [{
+      id: listId,
+      people: Array.from(peopleIds || []),
+      accounts: Array.from(accountIds || []),
+      timestamp: Date.now()
+    }];
+    
+    try {
+      await this.init();
+      const tx = this.db.transaction(['lists'], 'readwrite');
+      const store = tx.objectStore('lists');
+      
+      // Store with special key format
+      store.put({ id: cacheKey, ...data[0] });
+      
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = () => {
+          console.log(`[CacheManager] ✓ Cached list members for ${listId}: ${data[0].people.length} people, ${data[0].accounts.length} accounts`);
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (error) {
+      console.error(`[CacheManager] Error caching list members:`, error);
+    }
+  }
+
+  // Get cached list members
+  async getCachedListMembers(listId) {
+    try {
+      await this.init();
+      const cacheKey = `list-members-${listId}`;
+      const tx = this.db.transaction(['lists'], 'readonly');
+      const store = tx.objectStore('lists');
+      const request = store.get(cacheKey);
+      
+      return new Promise((resolve) => {
+        request.onsuccess = () => {
+          const cached = request.result;
+          if (!cached || !cached.timestamp) {
+            resolve(null);
+            return;
+          }
+          
+          const age = Date.now() - cached.timestamp;
+          const fresh = age < this.listMembersExpiry;
+          
+          if (fresh) {
+            console.log(`[CacheManager] ✓ List members cache HIT for ${listId} (${Math.round(age / 1000)}s old)`);
+            resolve({
+              people: new Set(cached.people || []),
+              accounts: new Set(cached.accounts || [])
+            });
+          } else {
+            console.log(`[CacheManager] List members cache EXPIRED for ${listId} (${Math.round(age / 1000)}s old)`);
+            resolve(null);
+          }
+        };
+        
+        request.onerror = () => resolve(null);
+      });
+    } catch (error) {
+      console.error('[CacheManager] Error getting cached list members:', error);
+      return null;
+    }
   }
 
   // Check if cache data is fresh (less than 5 minutes old)
