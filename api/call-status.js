@@ -107,21 +107,38 @@ export default async function handler(req, res) {
   if (cors(req, res)) return; // handle OPTIONS
   
   try {
-    if (req.method !== 'GET') {
+    if (req.method !== 'GET' && req.method !== 'POST') {
       res.writeHead(405, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Method not allowed' }));
       return;
     }
 
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const phones = url.searchParams.get('phones') || '';
-    const accountIds = url.searchParams.get('accountIds') || '';
-    const contactIds = url.searchParams.get('contactIds') || '';
+    let phoneList = [];
+    let accountIdList = [];
+    let contactIdList = [];
 
-    // Parse comma-separated values
-    const phoneList = phones ? phones.split(',').map(p => normalizePhone(p.trim())).filter(p => p.length === 10) : [];
-    const accountIdList = accountIds ? accountIds.split(',').map(id => id.trim()).filter(Boolean) : [];
-    const contactIdList = contactIds ? contactIds.split(',').map(id => id.trim()).filter(Boolean) : [];
+    if (req.method === 'POST') {
+      // Handle POST request with data in body
+      const body = req.body || {};
+      const phones = body.phones || [];
+      const accountIds = body.accountIds || [];
+      const contactIds = body.contactIds || [];
+      
+      phoneList = Array.isArray(phones) ? phones.map(p => normalizePhone(String(p).trim())).filter(p => p.length === 10) : [];
+      accountIdList = Array.isArray(accountIds) ? accountIds.map(id => String(id).trim()).filter(Boolean) : [];
+      contactIdList = Array.isArray(contactIds) ? contactIds.map(id => String(id).trim()).filter(Boolean) : [];
+    } else {
+      // Handle GET request with query parameters (for backward compatibility)
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const phones = url.searchParams.get('phones') || '';
+      const accountIds = url.searchParams.get('accountIds') || '';
+      const contactIds = url.searchParams.get('contactIds') || '';
+
+      // Parse comma-separated values
+      phoneList = phones ? phones.split(',').map(p => normalizePhone(p.trim())).filter(p => p.length === 10) : [];
+      accountIdList = accountIds ? accountIds.split(',').map(id => id.trim()).filter(Boolean) : [];
+      contactIdList = contactIds ? contactIds.split(',').map(id => id.trim()).filter(Boolean) : [];
+    }
 
     const result = {};
 
