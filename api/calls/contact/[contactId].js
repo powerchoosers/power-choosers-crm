@@ -1,19 +1,8 @@
 // Contact-specific calls API - Returns only calls relevant to a specific contact
 // Much more efficient than loading all calls and filtering client-side
 
-function corsMiddleware(req, res, next) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
-    return;
-  }
-  next();
-}
-
-const { db } = require('../_firebase');
+import { cors } from '../../_cors.js';
+import { db } from '../../_firebase.js';
 
 // In-memory fallback store (for local/dev when Firestore isn't configured)
 const memoryStore = new Map();
@@ -88,7 +77,7 @@ function normalizeCallForResponse(call) {
 }
 
 export default async function handler(req, res) {
-  corsMiddleware(req, res, async () => {
+  if (cors(req, res)) return; // handle OPTIONS
     try {
       if (req.method !== 'GET') {
         res.writeHead(405, { 'Content-Type': 'application/json' });
@@ -239,11 +228,10 @@ export default async function handler(req, res) {
         contactId: contactId
       }));
 
-    } catch (error) {
-      console.error('[Contact Calls API] Error:', error);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Internal server error' }));
-    }
-  });
-};
+  } catch (error) {
+    console.error('[Contact Calls API] Error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
 
