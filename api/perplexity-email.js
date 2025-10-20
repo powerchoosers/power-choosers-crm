@@ -268,43 +268,57 @@ function getTemplateType(prompt) {
 }
 
 // CTA Pattern System (Hybrid Approach)
-function getCTAPattern(recipient) {
+function getCTAPattern(recipient, meetingPreferences = null) {
+  // If hardcoded times are enabled, use meeting-based CTAs
+  if (meetingPreferences?.enabled && meetingPreferences?.useHardcodedTimes) {
+    const slot1 = meetingPreferences.slot1Time || '2-3pm';
+    const slot2 = meetingPreferences.slot2Time || '10-11am';
+    const duration = meetingPreferences.callDuration || '15-minute';
+    const timezone = meetingPreferences.timeZone || 'EST';
+    
+    return {
+      type: 'meeting_request',
+      template: `Would you be available for a ${duration} call ${slot1} or ${slot2} ${timezone}?`,
+      guidance: 'Direct meeting request with specific time slots'
+    };
+  }
+  
+  // Otherwise, use AI-generated CTAs
   const patterns = [
     {
-      type: 'qualifying_question',
-      template: 'When does your current energy contract expire?',
-      guidance: 'Qualifying question, low pressure, gets useful info'
+      type: 'contract_timing',
+      template: 'When does your current electricity contract expire?',
+      guidance: 'Qualifying question that reveals urgency and timeline'
     },
     {
-      type: 'soft_ask_with_context',
-      template: 'Would you be open to discussing your current energy setup?',
-      guidance: 'Soft ask focused on their situation, not meeting'
+      type: 'budget_qualification',
+      template: 'What\'s your annual electricity spend?',
+      guidance: 'Budget qualification for lead scoring'
     },
     {
-      type: 'value_question',
-      template: 'Would it make sense to have a brief conversation about your energy strategy?',
-      guidance: 'Consultative, positions as strategic discussion'
+      type: 'decision_maker',
+      template: 'Are you the right person to discuss energy procurement?',
+      guidance: 'Decision maker identification'
     },
     {
-      type: 'timing_question',
-      template: 'If your contract is in the next 12 months, would you be interested in what we\'re seeing in the market?',
-      guidance: 'Conditional offer, provides value'
+      type: 'pain_point',
+      template: 'Are rising electricity costs affecting your budget?',
+      guidance: 'Pain point qualification'
+    },
+    {
+      type: 'timing_urgency',
+      template: 'Is your energy contract renewal on your radar for 2025?',
+      guidance: 'Timing and urgency qualification'
     },
     {
       type: 'industry_specific',
       template: `How is ${recipient?.company || 'your company'} approaching energy cost management for 2025?`,
       guidance: 'Company-specific strategic question'
-    },
-    {
-      type: 'problem_aware_question',
-      template: 'Are rising electricity costs affecting your operational budget?',
-      guidance: 'Problem-aware qualifying question'
     }
-    // REMOVED: direct_meeting pattern - only for warm follow-ups
   ];
   
-  // Updated weights without direct_meeting
-  const weights = [0.30, 0.30, 0.20, 0.15, 0.04, 0.01];
+  // Updated weights for new qualifying-focused patterns
+  const weights = [0.25, 0.20, 0.15, 0.15, 0.15, 0.10];
   const random = Math.random();
   let cumulative = 0;
   
@@ -318,6 +332,8 @@ function getCTAPattern(recipient) {
 
 // Opening Style Variations
 function getOpeningStyle(recipient) {
+  const roleContext = recipient?.job ? getRoleSpecificLanguage(recipient.job) : null;
+  
   const styles = [
     {
       type: 'problem_aware',
@@ -325,19 +341,24 @@ function getOpeningStyle(recipient) {
       example: '[Industry] operations are facing [specific challenge]. [Company] is likely seeing [specific impact]...'
     },
     {
+      type: 'role_specific',
+      prompt: `Focus on ${roleContext?.language || 'operational'} challenges specific to their role`,
+      example: `As a ${recipient?.job || 'business professional'}, you're likely dealing with [role-specific challenge]. [Company]...`
+    },
+    {
       type: 'timing_urgency',
       prompt: 'Open with timing-related urgency relevant to their situation',
       example: 'Companies renewing electricity contracts in 2025 are facing significantly higher rates. [Company]...'
     },
     {
-      type: 'social_proof',
-      prompt: 'Reference work with similar companies without revealing specifics',
-      example: 'We work with several [industry] companies on energy cost management. Given [company]\'s [business aspect]...'
+      type: 'budget_pressure',
+      prompt: 'Lead with budget or cost pressure relevant to their role',
+      example: 'Rising electricity costs are putting pressure on operational budgets. [Company]...'
     },
     {
-      type: 'insight_based',
-      prompt: 'Lead with valuable industry insight specific to their business',
-      example: '[Industry] companies are proactively addressing energy costs before contracts renew. [Company]...'
+      type: 'compliance_risk',
+      prompt: 'Reference regulatory or compliance considerations',
+      example: 'Energy procurement regulations are evolving. [Company] may need to consider...'
     }
   ];
   
@@ -371,7 +392,18 @@ function formatDeadline(days = 3) {
 }
 
 // Calculate appropriate meeting times (2+ business days out)
-function getSuggestedMeetingTimes() {
+function getSuggestedMeetingTimes(meetingPreferences = null) {
+  // If hardcoded times are enabled, use those instead
+  if (meetingPreferences?.enabled && meetingPreferences?.useHardcodedTimes) {
+    return {
+      slot1: 'Tuesday',
+      slot1Time: meetingPreferences.slot1Time || '2-3pm',
+      slot2: 'Thursday', 
+      slot2Time: meetingPreferences.slot2Time || '10-11am'
+    };
+  }
+  
+  // Otherwise, calculate dynamic times
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
   
@@ -579,7 +611,38 @@ function getTemplateSchema(templateType) {
   return schemas[templateType] || generalSchema;
 }
 
-async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, marketContext }) {
+// Role-specific language for better personalization
+function getRoleSpecificLanguage(role) {
+  const roleMap = {
+    'CFO': {
+      painPoints: ['budget pressure', 'cost predictability', 'financial risk management'],
+      benefits: ['budget optimization', 'cost reduction', 'risk mitigation'],
+      language: 'financial impact and budget optimization'
+    },
+    'Facilities Manager': {
+      painPoints: ['operational efficiency', 'maintenance costs', 'facility performance'],
+      benefits: ['operational efficiency', 'maintenance cost reduction', 'facility optimization'],
+      language: 'operational efficiency and facility performance'
+    },
+    'Procurement Manager': {
+      painPoints: ['vendor management', 'contract complexity', 'supplier relationships'],
+      benefits: ['vendor optimization', 'contract simplification', 'supplier management'],
+      language: 'procurement optimization and vendor management'
+    },
+    'Operations Manager': {
+      painPoints: ['cost control', 'operational efficiency', 'resource optimization'],
+      benefits: ['cost control', 'efficiency improvements', 'resource optimization'],
+      language: 'operational efficiency and cost control'
+    }
+  };
+  return roleMap[role] || {
+    painPoints: ['energy costs', 'operational efficiency'],
+    benefits: ['cost reduction', 'efficiency improvements'],
+    language: 'business operations'
+  };
+}
+
+async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, marketContext, meetingPreferences }) {
   // Extract recipient data
   const r = recipient || {};
   const name = r.fullName || r.full_name || r.name || '';
@@ -659,13 +722,16 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const contractEndLabel = toMonthYear(energy.contractEnd || '');
   
   // Get dynamic patterns for cold emails (needed for both HTML and standard modes)
-  const ctaPattern = templateType === 'cold_email' ? getCTAPattern(recipient) : null;
+  const ctaPattern = templateType === 'cold_email' ? getCTAPattern(recipient, meetingPreferences) : null;
   const openingStyle = templateType === 'cold_email' ? getOpeningStyle(recipient) : null;
+  
+  // Get role-specific context
+  const roleContext = job ? getRoleSpecificLanguage(job) : null;
   
   const recipientContext = `
 RECIPIENT INFORMATION:
 - Name: ${firstName || 'there'} ${company ? `at ${company}` : ''}
-${job ? `- Role: ${job}` : ''}
+${job ? `- Role: ${job} (focus on ${roleContext?.language || 'business operations'})` : ''}
 ${industry ? `- Industry: ${industry}` : ''}
 ${accountDescription ? `- Company Description: ${accountDescription}` : ''}
 ${linkedinContext ? `- LinkedIn Insights: ${linkedinContext}` : ''}
@@ -675,6 +741,7 @@ ${energy.currentRate ? `- Current Rate: ${energy.currentRate}/kWh` : ''}
 ${contractEndLabel ? `- Contract Ends: ${contractEndLabel}` : ''}
 ${transcript ? `- Call Notes: ${transcript}` : ''}
 ${notes ? `- Additional Notes: ${notes}` : ''}
+${roleContext ? `- Role-Specific Focus: ${roleContext.painPoints.join(', ')}` : ''}
 `;
 
   // Debug log for recipient context
@@ -740,8 +807,20 @@ Generate text for these fields:
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: "Hello ${firstName},"
-- opening_hook: Start with problem awareness or market condition (1-2 sentences). ${accountDescription ? `Reference: "${accountDescription}".` : 'Reference their business.'} Examples: "Companies in ${industry || 'your industry'} are facing rising electricity costs", "${company} likely sees energy as a significant operational expense", "With contracts renewing in 2025, ${company} may be facing higher energy rates" IMPORTANT: Always reference ${company} specifically. Use qualitative language (rising, increasing, higher) NOT percentages (15-25%, 20-30%). Keep it natural and conversational.
-- value_proposition: How Power Choosers helps (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X annually", "helped similar companies achieve Y". Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK. Statistics ARE allowed here (value prop only), just not in opening_hook.
+- opening_hook: Start with problem awareness or market condition (1-2 sentences). ${accountDescription ? `Reference: "${accountDescription}".` : 'Reference their business.'} Focus on specific energy challenges:
+  * Contract renewal timing and rate increases
+  * Budget pressure from rising electricity costs  
+  * Operational efficiency concerns
+  * Regulatory compliance requirements
+  * Energy procurement complexity
+  * Risk management for energy costs
+Examples: "Companies in ${industry || 'your industry'} are facing rising electricity costs", "${company} likely sees energy as a significant operational expense", "With contracts renewing in 2025, ${company} may be facing higher energy rates", "Energy procurement is becoming increasingly complex for ${industry || 'your industry'} companies" IMPORTANT: Always reference ${company} specifically. Use qualitative language (rising, increasing, higher) NOT percentages (15-25%, 20-30%). Keep it natural and conversational.
+- value_proposition: How Power Choosers helps (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X annually", "helped similar companies achieve Y". Include role-specific benefits:
+  * CFOs: Budget predictability, cost reduction, risk mitigation
+  * Facilities Managers: Operational efficiency, maintenance cost reduction
+  * Procurement Managers: Vendor management, contract optimization
+  * Operations Managers: Cost control, efficiency improvements
+Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs while reducing procurement complexity." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK. Statistics ARE allowed here (value prop only), just not in opening_hook.
 - social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional)
 - cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
 - cta_type: Return "${ctaPattern.type}"
@@ -803,10 +882,16 @@ PREFERRED LANGUAGE:
 SUBJECT LINE RULES:
 - Under 50 characters
 - Choose ONE pattern and customize naturally:
-  * "Quick question about [company]'s energy strategy"
-  * "Re: [company]'s energy costs" 
-  * "${firstName}, thoughts on energy planning?"
-  * "[company] - energy market question"
+  * "Quick question about [company]'s energy costs?"
+  * "Re: [company]'s electricity contract renewal"
+  * "[firstName], thoughts on your energy strategy?"
+  * "[company] - 2025 energy planning question"
+  * "Energy procurement question for [company]"
+  * "[company]'s electricity rate question"
+  * "Re: [company]'s energy procurement"
+  * "[firstName], energy contract timing?"
+- Use question marks to increase curiosity
+- Include company name for personalization
 - NO statistics or percentages in subject lines
 - Return the style you chose in subject_style field
 
@@ -881,7 +966,7 @@ CRITICAL: Return ONLY valid JSON. Each paragraph should be a separate field. Do 
   const isColdEmailStandard = /cold.*email|could.*not.*reach/i.test(String(prompt || ''));
   
   if (isColdEmailStandard) {
-    const ctaPattern = getCTAPattern(recipient);
+    const ctaPattern = getCTAPattern(recipient, meetingPreferences);
     const openingStyle = getOpeningStyle(recipient);
     
     const coldEmailRules = `
@@ -1078,7 +1163,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Missing API key' });
     }
 
-    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext } = req.body || {};
+    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext, meetingPreferences } = req.body || {};
     
     // Detect template type for both HTML and standard modes
     const templateType = getTemplateType(prompt);
@@ -1094,7 +1179,7 @@ export default async function handler(req, res) {
       day: 'numeric' 
     });
     
-    const meetingTimes = getSuggestedMeetingTimes();
+    const meetingTimes = getSuggestedMeetingTimes(meetingPreferences);
     
     const dateContext = `TODAY'S DATE: ${todayLabel}
 
@@ -1108,7 +1193,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    const { prompt: systemPrompt, researchData } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext });
+    const { prompt: systemPrompt, researchData } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences });
     const fullSystemPrompt = dateContext + systemPrompt;
     
     // Call Perplexity API
