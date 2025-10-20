@@ -50,7 +50,7 @@ export default async function handler(req, res) {
     const index = client.initIndex(type);
 
     // Get data from Firebase
-    const collectionName = type;
+    const collectionName = type === 'contacts' ? 'people' : type; // Map 'contacts' to 'people' collection
     const snapshot = await getDocs(collection(db, collectionName));
     
     if (snapshot.empty) {
