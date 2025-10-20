@@ -1305,11 +1305,13 @@
           paragraphs.push(jsonData.paragraph3);
         }
         
-        if (jsonData.closing) {
-          paragraphs.push(jsonData.closing);
-        }
-        
+        // Join paragraphs with double spacing, but handle closing specially
         body = paragraphs.join('\n\n');
+        
+        // Add closing with single line break (not double spacing)
+        if (jsonData.closing) {
+          body += '\n' + jsonData.closing;
+        }
         console.log('[AI] Built body from JSON:', body);
         
       } catch (jsonError) {
