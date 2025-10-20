@@ -865,25 +865,17 @@ KEY CONTEXT:
 - Early renewals save ${marketContext.earlyRenewalSavings || '20-30%'} vs. waiting` : ''}`;
 
   const outputFormat = `
-OUTPUT FORMAT:
-Subject: [Your subject line]
+OUTPUT FORMAT (JSON):
+{
+  "subject": "[Your subject line]",
+  "greeting": "Hi ${firstName || 'there'},",
+  "paragraph1": "[Opening paragraph with context - 2-3 sentences]",
+  "paragraph2": "[Main message paragraph - 3-4 sentences about value and next steps]",
+  "paragraph3": "[Call to action paragraph - clear question or request]",
+  "closing": "Best regards,\\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
+}
 
-Hi ${firstName || 'there'},
-
-[Opening paragraph with context - 2-3 sentences]
-
-[Main message paragraph - 3-4 sentences about value and next steps]
-
-[Call to action paragraph - clear question or request]
-
-Best regards,
-${senderName ? senderName.split(' ')[0] : 'Lewis'}
-
-CRITICAL FORMATTING RULES:
-- Use EXACTLY TWO line breaks between paragraphs (blank line)
-- Each paragraph must be separated by a blank line
-- Do NOT combine paragraphs into single blocks
-- Ensure proper spacing for readability`;
+CRITICAL: Return ONLY valid JSON. Each paragraph should be a separate field. Do not include any text outside the JSON structure.`;
 
   // Check if this is a cold email in standard mode
   const isColdEmailStandard = /cold.*email|could.*not.*reach/i.test(String(prompt || ''));
@@ -1015,22 +1007,17 @@ CRITICAL RULES:
 ✓ DO NOT include closing or sender name - these will be added automatically`;
 
     const invoiceOutputFormat = `
-OUTPUT FORMAT:
-Subject: [Invoice request subject with ${firstName || 'recipient name'}]
+OUTPUT FORMAT (JSON):
+{
+  "subject": "[Invoice request subject with ${firstName || 'recipient name'}]",
+  "greeting": "Hi ${firstName || 'there'},",
+  "paragraph1": "[Context about energy analysis - 2-3 sentences]",
+  "paragraph2": "What we'll review from your invoice:\\n• Invoice date and service address\\n• Billing period (start and end dates)\\n• Detailed charge breakdown (including kWh rate, demand charges, fees)\\n• Payment details and service address",
+  "paragraph3": "Will you be able to send over the invoice by end of day so me and my team can get started?",
+  "closing": "Best regards,\\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
+}
 
-Hi ${firstName || 'there'},
-
-[Paragraph 1: Context about energy analysis - 2-3 sentences]
-
-What we'll review from your invoice:
-• Invoice date and service address
-• Billing period (start and end dates)
-• Detailed charge breakdown (including kWh rate, demand charges, fees)
-• Payment details and service address
-
-Will you be able to send over the invoice by end of day so me and my team can get started?
-
-DO NOT include closing or sender name - these will be added automatically.`;
+CRITICAL: Return ONLY valid JSON. Each paragraph should be a separate field. Do not include any text outside the JSON structure.`;
 
     return { 
       prompt: [identity, recipientContext, invoiceRules, invoiceOutputFormat].join('\n'),
