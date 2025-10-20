@@ -32,7 +32,7 @@ module.exports = async function handler(req, res) {
     }
 
     const client = twilio(accountSid, authToken);
-    const baseUrl = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm.vercel.app';
+    const baseUrl = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
 
     // Call agent first, then bridge to target via /api/twilio/bridge
     const call = await client.calls.create({

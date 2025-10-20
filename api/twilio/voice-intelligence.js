@@ -126,7 +126,7 @@ async function handler(req, res) {
         
         // Update the call data in the central store
         try {
-            const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
+            const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm-792458658491.us-south1.run.app';
             await fetch(`${base}/api/calls`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
