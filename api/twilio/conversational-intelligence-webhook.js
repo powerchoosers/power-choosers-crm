@@ -257,7 +257,7 @@ export default async function handler(req, res) {
 
         // Defer heavy work: queue background fetch and ACK fast to avoid webhook retries/timeouts
         try {
-            const base = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app');
+            const base = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm-792458658491.us-south1.run.app');
             const payload = { transcriptSid: TranscriptSid, callSid: isCallSid(CallSid) ? CallSid : '' };
             // Fire-and-forget; do not await
             fetch(`${base}/api/twilio/poll-ci-analysis`, {
@@ -494,7 +494,7 @@ export default async function handler(req, res) {
             
             // Update the call data in the central store (ensure we use a real Call SID to avoid duplicates)
             try {
-                const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
+                const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm-792458658491.us-south1.run.app';
                 const resolved = await resolveToCallSid({ callSid: CallSid, recordingSid: RecordingSid, transcriptSid: TranscriptSid });
                 const finalCallSid = resolved || (isCallSid(CallSid) ? CallSid : null);
 

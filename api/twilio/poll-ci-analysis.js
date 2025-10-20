@@ -180,7 +180,7 @@ export default async function handler(req, res) {
               .map(s => `${s.speaker}: ${s.text.trim()}`)
               .join('\n\n');
             if (transcriptText || sentences.length > 0) {
-                const base = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app');
+                const base = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm-792458658491.us-south1.run.app');
                 const ai = {
                     summary: `Analysis of ${transcriptText.split(/\s+/).filter(Boolean).length}-word conversation.`,
                     sentiment: 'Neutral',

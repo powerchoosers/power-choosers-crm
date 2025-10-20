@@ -53,7 +53,7 @@ export default async function handler(req, res) {
                 if (!accountSid || !authToken) { console.warn('[Status] Missing Twilio creds; cannot start recording'); return; }
                 const twilio = require('twilio');
                 const client = twilio(accountSid, authToken);
-                const baseUrl = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app');
+                const baseUrl = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm-792458658491.us-south1.run.app');
 
                 // Build candidate list with PSTN priority similar to /api/twilio/dial-status
                 // PSTN legs = non-client endpoints with direction outbound-dial
@@ -176,7 +176,7 @@ export default async function handler(req, res) {
         // Now only writes once when call completes = ~1 write per call (88% reduction)
         try {
             if (CallStatus === 'completed') {
-                const base = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app');
+                const base = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm-792458658491.us-south1.run.app');
                 // Derive targetPhone and businessPhone for better UI mapping
                 const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
                 const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
@@ -259,7 +259,7 @@ export default async function handler(req, res) {
                     } catch(_) {}
                 }
                 if (foundUrl) {
-                    const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm.vercel.app';
+                    const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm-792458658491.us-south1.run.app';
                     await fetch(`${base}/api/calls`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },

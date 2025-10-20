@@ -5,7 +5,7 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1:3000',
   'https://powerchoosers.com',
   'https://www.powerchoosers.com',
-  'https://power-choosers-crm.vercel.app'
+  'https://power-choosers-crm-792458658491.us-south1.run.app'
 ];
 
 function cors(req, res) {

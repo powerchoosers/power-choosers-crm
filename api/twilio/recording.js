@@ -191,7 +191,7 @@ export default async function handler(req, res) {
             const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
             const host = req.headers['x-forwarded-host'] || req.headers.host;
             const envBase = process.env.PUBLIC_BASE_URL || process.env.API_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
-            const baseUrl = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm.vercel.app');
+            const baseUrl = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm-792458658491.us-south1.run.app');
 
             // Upsert into central /api/calls so the UI can see the recording immediately
             try {
@@ -324,7 +324,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                 console.log('[Recording] CI auto-processing disabled; skipping transcription/AI until eye button request.');
                 // Persist minimal metadata so UI knows recording is ready but not processed
                 try {
-                    const base = baseUrl || process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') || 'https://power-choosers-crm.vercel.app';
+                    const base = baseUrl || process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') || 'https://power-choosers-crm-792458658491.us-south1.run.app';
                     await fetch(`${base}/api/calls`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -891,7 +891,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
         
         // Also upsert transcript and insights into /api/calls for the UI
         try {
-            const base = baseUrl || process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') || 'https://power-choosers-crm.vercel.app';
+            const base = baseUrl || process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') || 'https://power-choosers-crm-792458658491.us-south1.run.app';
             await fetch(`${base}/api/calls`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
