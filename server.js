@@ -740,8 +740,19 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/twilio/call' ||
     pathname === '/api/twilio/voice' ||
     pathname === '/api/twilio/caller-lookup' ||
+    pathname === '/api/twilio/status' ||
+    pathname === '/api/twilio/dial-status' ||
+    pathname === '/api/twilio/hangup' ||
+    pathname === '/api/twilio/caller-id' ||
+    pathname === '/api/twilio/check-transcript-status' ||
+    pathname === '/api/twilio/dial-complete' ||
+    pathname === '/api/twilio/process-existing-transcripts' ||
+    pathname === '/api/twilio/transcribe' ||
+    pathname === '/api/twilio/bridge' ||
+    pathname === '/api/twilio/operator-webhook' ||
     pathname === '/api/calls' ||
     pathname.startsWith('/api/calls/account/') ||
+    pathname.startsWith('/api/calls/contact/') ||
     pathname === '/api/call-status' ||
     pathname === '/api/twilio/language-webhook' ||
     pathname === '/api/twilio/conversational-intelligence' ||
@@ -755,6 +766,19 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/tx-price' ||
     pathname === '/api/gemini-email' ||
     pathname === '/api/perplexity-email' ||
+    pathname === '/api/process-call' ||
+    pathname === '/api/track-email-performance' ||
+    pathname === '/api/lusha/company' ||
+    pathname === '/api/lusha/contacts' ||
+    pathname === '/api/lusha/enrich' ||
+    pathname === '/api/lusha/search' ||
+    pathname === '/api/lusha/usage' ||
+    pathname === '/api/upload/host-google-avatar' ||
+    pathname === '/api/upload/signature-image' ||
+    pathname === '/api/algolia/reindex' ||
+    pathname === '/api/maps/config' ||
+    pathname === '/api/debug/call' ||
+    pathname === '/api/debug/health' ||
     pathname === '/api/email/send' ||
     pathname === '/api/email/sendgrid-send' ||
     pathname.startsWith('/api/email/track/') ||
@@ -762,6 +786,12 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/email/sendgrid-webhook' ||
     pathname === '/api/email/inbound-email' ||
     pathname === '/api/email/stats' ||
+    pathname === '/api/email/automation-cron' ||
+    pathname === '/api/email/backfill-threads' ||
+    pathname === '/api/email/sequence-automation' ||
+    pathname === '/api/email/sequence-status' ||
+    pathname === '/api/email/start-sequence' ||
+    pathname === '/api/email/unsubscribe' ||
     pathname === '/api/recording'
   )) {
     res.writeHead(204);
@@ -864,6 +894,96 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/email/stats') {
     return handleApiEmailStats(req, res, parsedUrl);
+  }
+  if (pathname === '/api/email/automation-cron') {
+    return handleApiEmailAutomationCron(req, res);
+  }
+  if (pathname === '/api/email/backfill-threads') {
+    return handleApiEmailBackfillThreads(req, res);
+  }
+  if (pathname === '/api/email/sequence-automation') {
+    return handleApiEmailSequenceAutomation(req, res);
+  }
+  if (pathname === '/api/email/sequence-status') {
+    return handleApiEmailSequenceStatus(req, res);
+  }
+  if (pathname === '/api/email/start-sequence') {
+    return handleApiEmailStartSequence(req, res);
+  }
+  if (pathname === '/api/email/unsubscribe') {
+    return handleApiEmailUnsubscribe(req, res);
+  }
+  if (pathname === '/api/process-call') {
+    return handleApiProcessCall(req, res);
+  }
+  if (pathname === '/api/track-email-performance') {
+    return handleApiTrackEmailPerformance(req, res);
+  }
+  if (pathname === '/api/lusha/company') {
+    return handleApiLushaCompany(req, res, parsedUrl);
+  }
+  if (pathname === '/api/lusha/contacts') {
+    return handleApiLushaContacts(req, res, parsedUrl);
+  }
+  if (pathname === '/api/lusha/enrich') {
+    return handleApiLushaEnrich(req, res, parsedUrl);
+  }
+  if (pathname === '/api/lusha/search') {
+    return handleApiLushaSearch(req, res, parsedUrl);
+  }
+  if (pathname === '/api/lusha/usage') {
+    return handleApiLushaUsage(req, res, parsedUrl);
+  }
+  if (pathname === '/api/upload/host-google-avatar') {
+    return handleApiUploadHostGoogleAvatar(req, res);
+  }
+  if (pathname === '/api/upload/signature-image') {
+    return handleApiUploadSignatureImage(req, res);
+  }
+  if (pathname === '/api/algolia/reindex') {
+    return handleApiAlgoliaReindex(req, res);
+  }
+  if (pathname === '/api/maps/config') {
+    return handleApiMapsConfig(req, res);
+  }
+  if (pathname === '/api/debug/call') {
+    return handleApiDebugCall(req, res);
+  }
+  if (pathname === '/api/debug/health') {
+    return handleApiDebugHealth(req, res);
+  }
+  if (pathname.startsWith('/api/calls/contact/')) {
+    return handleApiCallsContact(req, res, parsedUrl);
+  }
+  if (pathname === '/api/twilio/status') {
+    return handleApiTwilioStatus(req, res);
+  }
+  if (pathname === '/api/twilio/dial-status') {
+    return handleApiTwilioDialStatus(req, res);
+  }
+  if (pathname === '/api/twilio/hangup') {
+    return handleApiTwilioHangup(req, res);
+  }
+  if (pathname === '/api/twilio/caller-id') {
+    return handleApiTwilioCallerId(req, res);
+  }
+  if (pathname === '/api/twilio/check-transcript-status') {
+    return handleApiTwilioCheckTranscriptStatus(req, res);
+  }
+  if (pathname === '/api/twilio/dial-complete') {
+    return handleApiTwilioDialComplete(req, res);
+  }
+  if (pathname === '/api/twilio/process-existing-transcripts') {
+    return handleApiTwilioProcessExistingTranscripts(req, res);
+  }
+  if (pathname === '/api/twilio/transcribe') {
+    return handleApiTwilioTranscribe(req, res);
+  }
+  if (pathname === '/api/twilio/bridge') {
+    return handleApiTwilioBridge(req, res);
+  }
+  if (pathname === '/api/twilio/operator-webhook') {
+    return handleApiTwilioOperatorWebhook(req, res);
   }
 
   // Default to crm-dashboard.html for root requests
@@ -977,6 +1097,436 @@ const server = http.createServer(async (req, res) => {
     });
   });
 });
+
+// ---------------- Additional API Handler Functions ----------------
+
+// Email automation handlers
+async function handleApiEmailAutomationCron(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Email automation cron error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiEmailBackfillThreads(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Email backfill threads error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiEmailSequenceAutomation(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Email sequence automation error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiEmailSequenceStatus(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Email sequence status error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiEmailStartSequence(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Email start sequence error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiEmailUnsubscribe(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Email unsubscribe error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+// Process call and track email performance
+async function handleApiProcessCall(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Process call error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiTrackEmailPerformance(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Track email performance error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+// Lusha API handlers
+async function handleApiLushaCompany(req, res, parsedUrl) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Lusha company error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiLushaContacts(req, res, parsedUrl) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Lusha contacts error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiLushaEnrich(req, res, parsedUrl) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Lusha enrich error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiLushaSearch(req, res, parsedUrl) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Lusha search error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiLushaUsage(req, res, parsedUrl) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Lusha usage error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+// Upload handlers
+async function handleApiUploadHostGoogleAvatar(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Upload host google avatar error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiUploadSignatureImage(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Upload signature image error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+// Algolia and Maps handlers
+async function handleApiAlgoliaReindex(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Algolia reindex error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiMapsConfig(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Maps config error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+// Debug handlers
+async function handleApiDebugCall(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Debug call error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiDebugHealth(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Debug health error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+// Calls contact handler
+async function handleApiCallsContact(req, res, parsedUrl) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] API calls contact error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+// Additional Twilio handlers
+async function handleApiTwilioStatus(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Twilio status error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiTwilioDialStatus(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Twilio dial status error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiTwilioHangup(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Twilio hangup error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiTwilioCallerId(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Twilio caller ID error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiTwilioCheckTranscriptStatus(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Twilio check transcript status error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiTwilioDialComplete(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Twilio dial complete error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiTwilioProcessExistingTranscripts(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Twilio process existing transcripts error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiTwilioTranscribe(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Twilio transcribe error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiTwilioBridge(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Twilio bridge error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
+
+async function handleApiTwilioOperatorWebhook(req, res) {
+  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  try {
+    const response = await fetch(proxyUrl);
+    const data = await response.json();
+    res.writeHead(response.status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  } catch (error) {
+    console.error('[Server] Twilio operator webhook error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+  }
+}
 
 // Start the server
 server.listen(PORT, () => {

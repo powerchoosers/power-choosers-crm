@@ -1,32 +1,9 @@
+import { cors } from '../_cors.js';
 const twilio = require('twilio');
 
 // Vercel serverless handler with proper CORS and error handling
 export default async (req, res) => {
-  // CORS headers - set for ALL responses
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'https://powerchoosers.com',
-    'https://www.powerchoosers.com',
-    'https://power-choosers-crm-792458658491.us-south1.run.app'
-  ];
-  
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
-  
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Vary', 'Origin');
-
-  // Handle preflight OPTIONS request
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
+  if (cors(req, res)) return; // handle OPTIONS
   
   // Only allow GET requests
   if (req.method !== 'GET') {

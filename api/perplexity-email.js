@@ -2,33 +2,7 @@
 // 7 Preset HTML Templates - AI provides text only, we control styling
 // Expects POST { prompt, mode: 'standard'|'html', recipient, to, senderName, fromEmail }
 
-function cors(req, res) {
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'https://powerchoosers.com',
-    'https://www.powerchoosers.com',
-    'https://power-choosers-crm-792458658491.us-south1.run.app'
-  ];
-  
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
-  
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Vary', 'Origin');
-  
-  if (req.method === 'OPTIONS') {
-    res.status(204).end();
-    return true;
-  }
-  return false;
-}
+import { cors } from './_cors.js';
 
 // Company research cache (session-level)
 const companyResearchCache = new Map();
