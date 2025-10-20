@@ -877,7 +877,13 @@ Hi ${firstName || 'there'},
 [Call to action paragraph - clear question or request]
 
 Best regards,
-${senderName ? senderName.split(' ')[0] : 'Lewis'}`;
+${senderName ? senderName.split(' ')[0] : 'Lewis'}
+
+CRITICAL FORMATTING RULES:
+- Use EXACTLY TWO line breaks between paragraphs (blank line)
+- Each paragraph must be separated by a blank line
+- Do NOT combine paragraphs into single blocks
+- Ensure proper spacing for readability`;
 
   // Check if this is a cold email in standard mode
   const isColdEmailStandard = /cold.*email|could.*not.*reach/i.test(String(prompt || ''));
@@ -909,7 +915,7 @@ CRITICAL QUALITY RULES:
 - SINGLE CTA: Generate exactly ONE call to action per email
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
 
-PARAGRAPH STRUCTURE:
+PARAGRAPH STRUCTURE (CRITICAL):
 Paragraph 1 (Opening Hook - 1-2 sentences):
 - Industry-specific problem or market condition
 - Reference ${company} specifically
@@ -925,6 +931,12 @@ Paragraph 3 (CTA - 1 sentence):
 - Qualifying question or soft ask
 - Under 12 words
 - Complete sentence with proper punctuation
+
+FORMATTING REQUIREMENTS:
+- Use EXACTLY TWO line breaks between each paragraph
+- Each paragraph must be separated by a blank line
+- Do NOT combine paragraphs into single blocks
+- Ensure proper spacing for readability
 
 OPENING (1-2 sentences):
 Style: ${openingStyle.type}
