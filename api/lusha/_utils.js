@@ -58,7 +58,7 @@ function getApiKey() {
   return key;
 }
 
-module.exports = {
+export {
   cors,
   fetchWithRetry,
   normalizeDomain,
