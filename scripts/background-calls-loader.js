@@ -151,14 +151,37 @@
   async function getCallStatus(phones = [], accountIds = [], contactIds = []) {
     try {
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-      const params = new URLSearchParams();
       
-      if (phones.length) params.append('phones', phones.join(','));
-      if (accountIds.length) params.append('accountIds', accountIds.join(','));
-      if (contactIds.length) params.append('contactIds', contactIds.join(','));
+      // Use POST for large requests to avoid URL length limits
+      const totalItems = phones.length + accountIds.length + contactIds.length;
+      const usePost = totalItems > 50; // Use POST if more than 50 items
       
-      const url = `${base}/api/call-status?${params}`;
-      const response = await fetch(url);
+      let response;
+      
+      if (usePost) {
+        // Use POST with JSON body for large requests
+        response = await fetch(`${base}/api/call-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            phones: phones,
+            accountIds: accountIds,
+            contactIds: contactIds
+          })
+        });
+      } else {
+        // Use GET with query parameters for small requests
+        const params = new URLSearchParams();
+        
+        if (phones.length) params.append('phones', phones.join(','));
+        if (accountIds.length) params.append('accountIds', accountIds.join(','));
+        if (contactIds.length) params.append('contactIds', contactIds.join(','));
+        
+        const url = `${base}/api/call-status?${params}`;
+        response = await fetch(url);
+      }
       
       if (response.ok) {
         const result = await response.json();
