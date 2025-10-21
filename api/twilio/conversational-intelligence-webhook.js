@@ -1,5 +1,5 @@
-const { URLSearchParams } = require('url');
-const { resolveToCallSid, isCallSid } = require('../_twilio-ids');
+import { URLSearchParams } from 'url';
+import { resolveToCallSid, isCallSid } from '../_twilio-ids.js';
 
 function cors(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -138,8 +138,8 @@ function buildSpeakerTurnsFromSentences(sentences, agentChannelStr){
   return turns;
 }
 
-const twilio = require('twilio');
-const { db } = require('../_firebase.js');
+import twilio from 'twilio';
+import { db } from '../_firebase.js';
 
 // CORS middleware
 function corsMiddleware(req, res, next) {

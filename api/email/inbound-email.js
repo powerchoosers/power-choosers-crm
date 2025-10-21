@@ -3,9 +3,9 @@
  * FIXED VERSION - Parses multipart data and saves to Firebase
  */
 
-import { admin, db } from '../_firebase';
+import { admin, db } from '../_firebase.js';
 import crypto from 'crypto';
-const formidable = require('formidable');
+import formidable from 'formidable';
 import { simpleParser } from 'mailparser';
 import sanitizeHtml from 'sanitize-html';
 

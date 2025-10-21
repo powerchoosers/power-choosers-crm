@@ -1,5 +1,5 @@
 import { cors } from '../_cors.js';
-const twilio = require('twilio');
+import twilio from 'twilio';
 
 // Vercel serverless handler with proper CORS and error handling
 export default async (req, res) => {

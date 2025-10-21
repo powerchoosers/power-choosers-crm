@@ -2,7 +2,7 @@
 // Path: /api/debug/health
 
 import { cors } from '../_cors.js';
-const { db } = require('../_firebase');
+import { db } from '../_firebase.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return; // handle OPTIONS

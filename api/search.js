@@ -1,7 +1,7 @@
 // CRM phone number search endpoint
 // Searches contacts and accounts by phone number across multiple fields
 
-const { db } = require('./_firebase');
+import { db } from './_firebase.js';
 import { cors } from './_cors.js';
 
 // Normalize phone to last 10 digits for comparison

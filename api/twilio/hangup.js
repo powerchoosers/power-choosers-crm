@@ -1,6 +1,8 @@
 // Twilio Call Hangup API
 // Terminates an active Twilio call by CallSid
 
+import twilio from 'twilio';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -21,12 +23,12 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Server configuration error' });
     }
 
-    const twilio = require('twilio')(accountSid, authToken);
+    const twilioClient = twilio(accountSid, authToken);
 
     console.log('[Hangup] Terminating call:', callSid);
 
     // Update the call to 'completed' status to terminate it
-    const call = await twilio.calls(callSid).update({
+    const call = await twilioClient.calls(callSid).update({
       status: 'completed'
     });
 

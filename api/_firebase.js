@@ -4,11 +4,11 @@
 // - FIREBASE_CLIENT_EMAIL
 // - FIREBASE_PRIVATE_KEY (use \n escapes for newlines)
 
-let admin;
+import admin from 'firebase-admin';
+
 let db;
 
 try {
-  admin = require('firebase-admin');
 
   if (!admin.apps || !admin.apps.length) {
     const projectId = process.env.FIREBASE_PROJECT_ID;

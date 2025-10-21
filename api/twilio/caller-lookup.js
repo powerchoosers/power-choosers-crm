@@ -1,4 +1,4 @@
-const twilio = require('twilio');
+import twilio from 'twilio';
 import { cors } from '../_cors.js';
 
 module.exports = async function handler(req, res) {

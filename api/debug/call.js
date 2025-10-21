@@ -3,7 +3,7 @@
 // Also accepts POST with JSON body { to, agent_phone }
 
 import { cors } from '../_cors.js';
-const twilio = require('twilio');
+import twilio from 'twilio';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return; // handle OPTIONS

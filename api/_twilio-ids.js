@@ -23,8 +23,8 @@ async function resolveToCallSid({ callSid, recordingSid, transcriptSid }) {
       return isCallSid(callSid) ? callSid.trim() : null;
     }
 
-    const twilio = require('twilio');
-    const client = twilio(accountSid, authToken);
+    const twilio = await import('twilio');
+    const client = twilio.default(accountSid, authToken);
 
     // If we have a Recording SID, fetch it and read callSid
     if (isRecordingSid(recordingSid)) {
@@ -56,4 +56,4 @@ async function resolveToCallSid({ callSid, recordingSid, transcriptSid }) {
   }
 }
 
-module.exports = { isCallSid, isRecordingSid, resolveToCallSid };
+export { isCallSid, isRecordingSid, resolveToCallSid };

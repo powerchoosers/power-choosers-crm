@@ -13,8 +13,8 @@ function corsMiddleware(req, res, next) {
   next();
 }
 
-const { db } = require('./_firebase');
-const { resolveToCallSid, isCallSid } = require('./_twilio-ids');
+import { db } from './_firebase.js';
+import { resolveToCallSid, isCallSid } from './_twilio-ids.js';
 
 // In-memory fallback store (for local/dev when Firestore isn't configured)
 const memoryStore = new Map();

@@ -1,6 +1,6 @@
-const twilio = require('twilio');
-const { admin, db } = require('../_firebase');
-const { resolveToCallSid, isCallSid } = require('../_twilio-ids');
+import twilio from 'twilio';
+import { admin, db } from '../_firebase.js';
+import { resolveToCallSid, isCallSid } from '../_twilio-ids.js';
 
 // CORS middleware
 function corsMiddleware(req, res, next) {

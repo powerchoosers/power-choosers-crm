@@ -1,5 +1,5 @@
-const twilio = require('twilio');
-const { resolveToCallSid, isCallSid } = require('../_twilio-ids');
+import twilio from 'twilio';
+import { resolveToCallSid, isCallSid } from '../_twilio-ids.js';
 
 // CORS middleware
 function corsMiddleware(req, res, next) {
@@ -989,7 +989,7 @@ async function generateTwilioAIInsights(transcript) {
 
 async function generateGeminiAIInsights(transcript) {
     // Uses @google/generative-ai with GEMINI_API_KEY
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error('Missing GEMINI_API_KEY');
     const genAI = new GoogleGenerativeAI(apiKey);

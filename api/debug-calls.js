@@ -1,4 +1,4 @@
-const { admin, db } = require('./_firebase');
+import { admin, db } from './_firebase.js';
 
 // CORS middleware
 function corsMiddleware(req, res, next) {

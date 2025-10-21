@@ -1,6 +1,6 @@
-const { cors } = require('./_utils');
+import { cors } from './_utils.js';
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   cors(req, res);
   if (req.method === 'OPTIONS') {
     return; // CORS preflight already handled

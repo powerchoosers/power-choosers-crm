@@ -1,4 +1,4 @@
-const { URLSearchParams } = require('url');
+import { URLSearchParams } from 'url';
 
 function cors(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

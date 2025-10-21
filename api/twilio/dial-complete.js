@@ -1,7 +1,7 @@
 // Twilio Dial Complete Handler
 // Handles when a bridged call completes to prevent automatic retry
 
-const twilio = require('twilio');
+import twilio from 'twilio';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 export default async function handler(req, res) {

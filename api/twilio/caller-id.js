@@ -1,4 +1,4 @@
-const twilio = require('twilio');
+import twilio from 'twilio';
 
 // CORS middleware
 function corsMiddleware(req, res, next) {

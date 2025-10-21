@@ -1,4 +1,4 @@
-const twilio = require('twilio');
+import twilio from 'twilio';
 
 const handler = async function handler(req, res) {
     // Only allow POST requests
