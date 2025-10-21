@@ -1,11 +1,36 @@
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const url = require('url');
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import url from 'url';
+
+// Import API handlers to avoid infinite loop
+import callStatusHandler from './api/call-status.js';
+import accountCallsHandler from './api/calls/account/[accountId].js';
+import contactCallsHandler from './api/calls/contact/[contactId].js';
+import twilioTokenHandler from './api/twilio/token.js';
+import twilioCallHandler from './api/twilio/call.js';
+import twilioVoiceHandler from './api/twilio/voice.js';
+import searchHandler from './api/search.js';
+import callsHandler from './api/calls.js';
+
+// NEW IMPORTS FOR REMAINING ENDPOINTS
+import perplexityEmailHandler from './api/perplexity-email.js';
+import twilioRecordingHandler from './api/twilio/recording.js';
+import twilioConversationalIntelligenceHandler from './api/twilio/conversational-intelligence.js';
+import twilioCiRequestHandler from './api/twilio/ci-request.js';
+import twilioConversationalIntelligenceWebhookHandler from './api/twilio/conversational-intelligence-webhook.js';
+import twilioLanguageWebhookHandler from './api/twilio/language-webhook.js';
+import twilioVoiceIntelligenceHandler from './api/twilio/voice-intelligence.js';
+import twilioAiInsightsHandler from './api/twilio/ai-insights.js';
+import txPriceHandler from './api/tx-price.js';
+import twilioPollCiAnalysisHandler from './api/twilio/poll-ci-analysis.js';
+import twilioCallerLookupHandler from './api/twilio/caller-lookup.js';
+import sendgridWebhookHandler from './api/email/sendgrid-webhook.js';
+import inboundEmailHandler from './api/email/inbound-email.js';
 
 // Load environment variables from .env file for localhost development
 try {
-  require('dotenv').config();
+  await import('dotenv/config');
   console.log('[Server] dotenv loaded successfully');
 } catch (error) {
   console.log('[Server] dotenv not available, using system environment variables');
@@ -43,6 +68,7 @@ const mimeTypes = {
 const PORT = process.env.PORT || 3000;
 const LOCAL_DEV_MODE = process.env.NODE_ENV !== 'production';
 const API_BASE_URL = process.env.API_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
+// Only used for external webhooks, not internal API routing
 // Email sending now handled by Gmail API via frontend
 
 // ---------------- Perplexity API endpoint for localhost development ----------------
@@ -136,43 +162,6 @@ async function handleApiPerplexityEmail(req, res) {
 
 // ---------------- Gemini API endpoints now proxied to Vercel ----------------
 
-async function handleApiGeminiEmail(req, res) {
-  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
-  if (req.method !== 'POST') { res.writeHead(405, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Method not allowed' })); return; }
-  
-  // Proxy to Vercel deployment
-  try {
-    const body = await readJsonBody(req);
-    const proxyUrl = `${API_BASE_URL}/api/gemini-email`;
-    
-    console.log('[Gemini Email] Proxying to:', proxyUrl);
-    
-    const response = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    
-    // Attempt to parse JSON; if not JSON, forward raw text body
-    const raw = await response.text();
-    let payload;
-    try {
-      payload = raw ? JSON.parse(raw) : {};
-    } catch (_) {
-      payload = { error: 'Upstream responded with non-JSON', body: raw };
-    }
-    
-    console.log('[Gemini Email] Response status:', response.status);
-    
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(payload));
-  } catch (error) {
-    console.error('[Gemini Email] Proxy error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Failed to proxy Gemini email request', message: error.message }));
-  }
-}
-
 // Helper to read raw request body without JSON parsing (for Twilio webhooks)
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -189,191 +178,68 @@ function readRawBody(req) {
   });
 }
 
-// Proxy Twilio Voice webhook (returns TwiML XML)
+// Twilio Voice webhook (returns TwiML XML)
 async function handleApiTwilioVoice(req, res, parsedUrl) {
-  try {
-    const proxyUrl = `${API_BASE_URL}/api/twilio/voice${parsedUrl.search || ''}`;
-    if (req.method === 'GET') {
-      const upstream = await fetch(proxyUrl);
-      const text = await upstream.text();
-      res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'text/xml' });
-      res.end(text);
-      return;
-    }
-    if (req.method === 'POST') {
-      const raw = await readRawBody(req);
-      const contentType = req.headers['content-type'] || 'application/x-www-form-urlencoded';
-      const upstream = await fetch(proxyUrl, { method: 'POST', headers: { 'Content-Type': contentType }, body: raw });
-      const text = await upstream.text();
-      res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'text/xml' });
-      res.end(text);
-      return;
-    }
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-  } catch (error) {
-    console.error('[Twilio Voice] Proxy error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+  if (req.method === 'POST') {
+    const raw = await readRawBody(req);
+    req.rawBody = raw;
   }
+  req.query = { ...parsedUrl.query };
+  return await twilioVoiceHandler(req, res);
 }
 
-// Proxy Twilio Recording status webhook
+// Twilio Recording status webhook
 async function handleApiTwilioRecording(req, res) {
-  try {
-    const proxyUrl = `${API_BASE_URL}/api/twilio/recording`;
-    if (req.method !== 'POST') {
-      res.writeHead(405, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Method not allowed' }));
-      return;
-    }
+  if (req.method === 'POST') {
     const raw = await readRawBody(req);
-    const contentType = req.headers['content-type'] || 'application/x-www-form-urlencoded';
-    const upstream = await fetch(proxyUrl, { method: 'POST', headers: { 'Content-Type': contentType }, body: raw });
-    const text = await upstream.text();
-    // Twilio expects 200 JSON typically from our API
-    res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'application/json' });
-    res.end(text);
-  } catch (error) {
-    console.error('[Twilio Recording] Proxy error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+    req.rawBody = raw;
   }
+  return await twilioRecordingHandler(req, res);
 }
 
-// Proxy Twilio Conversational Intelligence processing endpoint
+// Twilio Conversational Intelligence processing endpoint
 async function handleApiTwilioConversationalIntelligence(req, res) {
-  try {
-    if (req.method !== 'POST') {
-      res.writeHead(405, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Method not allowed' }));
-      return;
-    }
+  if (req.method === 'POST') {
     const body = await readJsonBody(req);
-    const upstream = await fetch(`${API_BASE_URL}/api/twilio/conversational-intelligence`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const text = await upstream.text();
-    let payload;
-    try { payload = text ? JSON.parse(text) : {}; } catch (_) { payload = { ok: false, body: text }; }
-    res.writeHead(upstream.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(payload));
-  } catch (error) {
-    console.error('[Twilio CI] Proxy error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+    req.body = JSON.parse(body);
   }
+  return await twilioConversationalIntelligenceHandler(req, res);
 }
 
-// Proxy Twilio CI request (starts transcript processing) to Vercel
+// Twilio CI request (starts transcript processing)
 async function handleApiTwilioCIRequest(req, res) {
-  try {
-    if (req.method !== 'POST') {
-      res.writeHead(405, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Method not allowed' }));
-      return;
-    }
+  if (req.method === 'POST') {
     const body = await readJsonBody(req);
-    const upstream = await fetch(`${API_BASE_URL}/api/twilio/ci-request`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const text = await upstream.text();
-    let payload; try { payload = text ? JSON.parse(text) : {}; } catch(_) { payload = { ok: false, body: text }; }
-    res.writeHead(upstream.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(payload));
-  } catch (error) {
-    console.error('[Twilio CI Request] Proxy error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+    req.body = JSON.parse(body);
   }
+  return await twilioCiRequestHandler(req, res);
 }
 
-// Proxy Twilio Conversational Intelligence webhook (Twilio -> our API)
+// Twilio Conversational Intelligence webhook (Twilio -> our API)
 async function handleApiTwilioConversationalIntelligenceWebhook(req, res) {
-  try {
-    if (req.method !== 'POST') {
-      res.writeHead(405, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Method not allowed' }));
-      return;
-    }
-    // Twilio may send urlencoded or JSON; forward as-is
-    const raw = await readRawBody(req);
-    const contentType = req.headers['content-type'] || 'application/x-www-form-urlencoded';
-    const upstream = await fetch(`${API_BASE_URL}/api/twilio/conversational-intelligence-webhook`, {
-      method: 'POST',
-      headers: { 'Content-Type': contentType },
-      body: raw
-    });
-    const text = await upstream.text();
-    // Our upstream returns JSON
-    res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') || 'application/json' });
-    res.end(text);
-  } catch (error) {
-    console.error('[Twilio CI Webhook] Proxy error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
-  }
+  const raw = await readRawBody(req);
+  req.rawBody = raw;
+  return await twilioConversationalIntelligenceWebhookHandler(req, res);
 }
 
 async function handleApiTwilioLanguageWebhook(req, res) {
-  try {
-    const parsedUrl = url.parse(req.url, true);
-    const proxyUrl = `${API_BASE_URL}/api/twilio/language-webhook${parsedUrl.search || ''}`;
-    if (req.method === 'GET') {
-      const response = await fetch(proxyUrl);
-      const raw = await response.text();
-      // Twilio may not require a particular response body for GET callbacks; echo upstream
-      res.writeHead(response.status, { 'Content-Type': response.headers.get('content-type') || 'application/json' });
-      res.end(raw);
-      return;
-    }
-    if (req.method === 'POST') {
-      const body = await readJsonBody(req);
-      const response = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      const raw = await response.text();
-      let payload;
-      try { payload = raw ? JSON.parse(raw) : {}; } catch (_) { payload = { ok: true, body: raw }; }
-      res.writeHead(response.status, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(payload));
-      return;
-    }
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-  } catch (error) {
-    console.error('[Twilio Language Webhook] Proxy error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
+  const parsedUrl = url.parse(req.url, true);
+  req.query = { ...parsedUrl.query };
+  return await twilioLanguageWebhookHandler(req, res);
 }
 
 async function handleApiTwilioVoiceIntelligence(req, res) {
-  try {
-    const parsedUrl = url.parse(req.url, true);
-    const proxyUrl = `${API_BASE_URL}/api/twilio/voice-intelligence${parsedUrl.search || ''}`;
-    
+  if (req.method === 'POST') {
     const body = await readJsonBody(req);
-    const response = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Twilio Voice Intelligence] Proxy error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+    req.body = JSON.parse(body);
   }
+  const parsedUrl = url.parse(req.url, true);
+  req.query = { ...parsedUrl.query };
+  return await twilioVoiceIntelligenceHandler(req, res);
 }
 
 // Helper function for reading request body
@@ -396,316 +262,81 @@ function readJsonBody(req) {
 
 // Twilio API endpoints (proxy to Vercel for production APIs)
 async function handleApiTwilioToken(req, res, parsedUrl) {
-  if (req.method === 'OPTIONS') {
-    const origin = req.headers.origin;
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'https://powerchoosers.com',
-      'https://www.powerchoosers.com',
-      'https://power-choosers-crm-792458658491.us-south1.run.app'
-    ];
-    
-    const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-    
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': allowedOrigin,
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-      'Access-Control-Allow-Credentials': 'true',
-      'Vary': 'Origin'
-    });
-    res.end();
-    return;
-  }
-
-  if (req.method !== 'GET') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-    return;
-  }
-
-  const proxyUrl = `${API_BASE_URL}/api/twilio/token${parsedUrl.search || ''}`;
-  
-  try {
-    const response = await fetch(proxyUrl);
-    const raw = await response.text();
-    let payload;
-    try {
-      payload = raw ? JSON.parse(raw) : {};
-    } catch (_) {
-      payload = { error: 'Upstream responded with non-JSON', body: raw };
-    }
-    
-    const origin = req.headers.origin;
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'https://powerchoosers.com',
-      'https://www.powerchoosers.com',
-      'https://power-choosers-crm-792458658491.us-south1.run.app'
-    ];
-    
-    const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-    
-    res.writeHead(response.status, { 
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': allowedOrigin,
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-      'Access-Control-Allow-Credentials': 'true',
-      'Vary': 'Origin'
-    });
-    res.end(JSON.stringify(payload));
-  } catch (error) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
-  }
+  // Call handler directly (no proxy)
+  return await twilioTokenHandler(req, res);
 }
 
 async function handleApiTwilioCall(req, res) {
-  if (req.method !== 'POST') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-    return;
-  }
-
-  try {
+  // Parse body for POST requests
+  if (req.method === 'POST') {
     const body = await readJsonBody(req);
-    const proxyUrl = `${API_BASE_URL}/api/twilio/call`;
-    
-    const response = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    
-    const data = await response.json();
-    
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+    req.body = JSON.parse(body);
   }
+  
+  // Call handler directly (no proxy)
+  return await twilioCallHandler(req, res);
 }
 
 async function handleApiTwilioAIInsights(req, res) {
-  if (req.method !== 'POST') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-    return;
-  }
-  try {
+  if (req.method === 'POST') {
     const body = await readJsonBody(req);
-    const proxyUrl = `${API_BASE_URL}/api/twilio/ai-insights`;
-    const response = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const raw = await response.text();
-    let payload;
-    try { payload = raw ? JSON.parse(raw) : {}; } catch (_) { payload = { error: 'Upstream responded with non-JSON', body: raw }; }
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(payload));
-  } catch (error) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+    req.body = JSON.parse(body);
   }
+  return await twilioAiInsightsHandler(req, res);
 }
 
 async function handleApiCalls(req, res) {
-  // Preserve query params when proxying to Vercel (e.g., ?callSid=...)
-  const parsed = url.parse(req.url, true);
-  const proxyBase = `${API_BASE_URL}/api/calls`;
-  const proxyUrlGet = `${proxyBase}${parsed.search || ''}`;
-  
-  try {
-    if (req.method === 'POST') {
-      // Handle POST requests (logging calls)
-      const body = await readJsonBody(req);
-      const response = await fetch(proxyBase, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      const data = await response.json();
-      
-      res.writeHead(response.status, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(data));
-    } else {
-      // Handle GET requests (fetching calls) with query passthrough
-      const response = await fetch(proxyUrlGet);
-      const data = await response.json();
-      
-      res.writeHead(response.status, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(data));
-    }
-  } catch (error) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+  // Parse body for POST requests
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
+  
+  // Add query parameters to req.query for handler
+  const parsed = url.parse(req.url, true);
+  req.query = { ...parsed.query };
+  
+  // Call handler directly (no proxy)
+  return await callsHandler(req, res);
 }
 
 async function handleApiCallsAccount(req, res, parsedUrl) {
-  // Handle /api/calls/account/[accountId] routes
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  // Extract accountId from URL path: /api/calls/account/[accountId]
+  const pathParts = parsedUrl.pathname.split('/');
+  const accountId = pathParts[pathParts.length - 1];
   
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] API calls account error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
-  }
+  // Add accountId to req.query for handler
+  req.query = { accountId, ...parsedUrl.query };
+  
+  // Call handler directly (no proxy)
+  return await accountCallsHandler(req, res);
 }
 
 async function handleApiCallStatus(req, res, parsedUrl) {
-  if (req.method === 'OPTIONS') {
-    const origin = req.headers.origin;
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'https://powerchoosers.com',
-      'https://www.powerchoosers.com',
-      'https://power-choosers-crm-792458658491.us-south1.run.app'
-    ];
-    
-    const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-    
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': allowedOrigin,
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-      'Access-Control-Allow-Credentials': 'true',
-      'Vary': 'Origin'
-    });
-    res.end();
-    return;
+  // Parse body for POST requests
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
   
-  // Handle /api/call-status routes
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    
-    const origin = req.headers.origin;
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'https://powerchoosers.com',
-      'https://www.powerchoosers.com',
-      'https://power-choosers-crm-792458658491.us-south1.run.app'
-    ];
-    
-    const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-    
-    res.writeHead(response.status, { 
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': allowedOrigin,
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-      'Access-Control-Allow-Credentials': 'true',
-      'Vary': 'Origin'
-    });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] API call status error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
-  }
+  // Call handler directly (no proxy)
+  return await callStatusHandler(req, res);
 }
 
 // ---------------- Gemini API endpoints now proxied to Vercel ----------------
 
 async function handleApiTxPrice(req, res, parsedUrl) {
-  if (req.method === 'OPTIONS') {
-    const origin = req.headers.origin;
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'https://powerchoosers.com',
-      'https://www.powerchoosers.com',
-      'https://power-choosers-crm-792458658491.us-south1.run.app'
-    ];
-    
-    const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-    
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': allowedOrigin,
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-      'Access-Control-Allow-Credentials': 'true',
-      'Vary': 'Origin'
-    });
-    res.end();
-    return;
-  }
-  
-  // Proxy to Vercel deployment since local server doesn't have API key
-  try {
-    const proxyUrl = `${API_BASE_URL}/api/tx-price${parsedUrl.search || ''}`;
-    
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    
-    const origin = req.headers.origin;
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'https://powerchoosers.com',
-      'https://www.powerchoosers.com',
-      'https://power-choosers-crm-792458658491.us-south1.run.app'
-    ];
-    
-    const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-    
-    res.writeHead(response.status, { 
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': allowedOrigin,
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-      'Access-Control-Allow-Credentials': 'true',
-      'Vary': 'Origin'
-    });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[TX Price] Proxy error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Failed to proxy TX price request', message: error.message }));
-  }
+  req.query = { ...parsedUrl.query };
+  return await txPriceHandler(req, res);
 }
 
-// Proxy Twilio Poll CI Analysis (background analyzer)
+// Twilio Poll CI Analysis (background analyzer)
 async function handleApiTwilioPollCIAnalysis(req, res) {
-  try {
-    if (req.method !== 'POST') {
-      res.writeHead(405, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Method not allowed' }));
-      return;
-    }
+  if (req.method === 'POST') {
     const body = await readJsonBody(req);
-    const upstream = await fetch(`${API_BASE_URL}/api/twilio/poll-ci-analysis`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const text = await upstream.text();
-    let payload; try { payload = text ? JSON.parse(text) : {}; } catch(_) { payload = { ok: false, body: text }; }
-    res.writeHead(upstream.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(payload));
-  } catch (error) {
-    console.error('[Twilio Poll CI] Proxy error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+    req.body = JSON.parse(body);
   }
+  return await twilioPollCiAnalysisHandler(req, res);
 }
 
 // Create HTTP server
@@ -764,7 +395,6 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/energy-news' ||
     pathname === '/api/search' ||
     pathname === '/api/tx-price' ||
-    pathname === '/api/gemini-email' ||
     pathname === '/api/perplexity-email' ||
     pathname === '/api/process-call' ||
     pathname === '/api/track-email-performance' ||
@@ -856,9 +486,6 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/tx-price') {
     return handleApiTxPrice(req, res, parsedUrl);
-  }
-  if (pathname === '/api/gemini-email') {
-    return handleApiGeminiEmail(req, res);
   }
   if (pathname === '/api/perplexity-email') {
     return handleApiPerplexityEmail(req, res);
@@ -1374,17 +1001,15 @@ async function handleApiDebugHealth(req, res) {
 
 // Calls contact handler
 async function handleApiCallsContact(req, res, parsedUrl) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] API calls contact error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
-  }
+  // Extract contactId from URL path: /api/calls/contact/[contactId]
+  const pathParts = parsedUrl.pathname.split('/');
+  const contactId = pathParts[pathParts.length - 1];
+  
+  // Add contactId to req.query for handler
+  req.query = { contactId, ...parsedUrl.query };
+  
+  // Call handler directly (no proxy)
+  return await contactCallsHandler(req, res);
 }
 
 // Additional Twilio handlers
@@ -1544,55 +1169,20 @@ server.on('error', (err) => {
 
 // Search endpoint: proxy to production for phone number lookups
 async function handleApiSearch(req, res, parsedUrl) {
-  if (req.method !== 'GET') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-    return;
-  }
-
-  const proxyUrl = `${API_BASE_URL}/api/search${parsedUrl.search || ''}`;
+  // Add query parameters to req.query for handler
+  req.query = { ...parsedUrl.query };
   
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
-  }
+  // Call handler directly (no proxy)
+  return await searchHandler(req, res);
 }
 
-// Twilio Caller ID lookup: proxy to production; accepts POST { phoneNumber }
+// Twilio Caller ID lookup: accepts POST { phoneNumber }
 async function handleApiTwilioCallerLookup(req, res) {
-  if (req.method !== 'POST') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: false, error: 'Method not allowed' }));
-    return;
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
-
-  try {
-    let body = '';
-    req.on('data', (chunk) => { body += chunk; });
-    await new Promise((resolve) => req.on('end', resolve));
-    let payload = {};
-    try { payload = body ? JSON.parse(body) : {}; } catch (_) { payload = {}; }
-
-    const proxyUrl = `${API_BASE_URL}/api/twilio/caller-lookup`;
-    const response = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await response.json().catch(() => ({ success: false }));
-    res.writeHead(response.status || 200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: false, error: 'Proxy error', message: error.message }));
-  }
+  return await twilioCallerLookupHandler(req, res);
 }
 
 // Energy News endpoint: fetch Google News RSS for Texas energy topics, parse minimal fields
@@ -2192,66 +1782,19 @@ async function handleApiRecording(req, res, parsedUrl) {
 
 // SendGrid webhook handler
 async function handleApiSendGridWebhook(req, res) {
-  if (req.method !== 'POST') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-    return;
-  }
-
-  try {
-    // Proxy to Vercel deployment
+  if (req.method === 'POST') {
     const body = await readJsonBody(req);
-    const response = await fetch(`${API_BASE_URL}/api/email/sendgrid-webhook`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    
-    const result = await response.text();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(result);
-  } catch (error) {
-    console.error('[SendGrid Webhook] Proxy error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+    req.body = JSON.parse(body);
   }
+  return await sendgridWebhookHandler(req, res);
 }
 
 // SendGrid inbound email handler
 async function handleApiInboundEmail(req, res) {
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Allow-Credentials': 'true'
-    });
-    res.end();
-    return;
-  }
-
-  if (req.method !== 'POST') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-    return;
-  }
-
-  try {
-    // Proxy to Vercel deployment
+  if (req.method === 'POST') {
     const body = await readJsonBody(req);
-    const response = await fetch(`${API_BASE_URL}/api/email/inbound-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    
-    const result = await response.text();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(result);
-  } catch (error) {
-    console.error('[Inbound Email] Proxy error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Proxy error', message: error.message }));
+    req.body = JSON.parse(body);
   }
+  return await inboundEmailHandler(req, res);
 }
 
