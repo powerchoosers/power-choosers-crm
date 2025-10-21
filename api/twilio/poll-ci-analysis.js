@@ -1,8 +1,6 @@
 import twilio from 'twilio';
 import { corsMiddleware } from '../_cors.js';
 
-const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-
 export default async function handler(req, res) {
     corsMiddleware(req, res, () => {});
     
@@ -20,6 +18,9 @@ export default async function handler(req, res) {
         }
         
         console.log('[Poll CI Analysis] Checking analysis status for:', { transcriptSid, callSid: callSidInput });
+        
+        // Create Twilio client
+        const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
         
         // Get transcript details
         const transcript = await client.intelligence.v2.transcripts(transcriptSid).fetch();

@@ -1,3 +1,5 @@
+import twilio from 'twilio';
+
 export default async function handler(req, res) {
     // Accept GET for quick verification; Twilio will POST status updates
     if (req.method === 'GET') {
@@ -51,7 +53,6 @@ export default async function handler(req, res) {
                 const accountSid = process.env.TWILIO_ACCOUNT_SID;
                 const authToken = process.env.TWILIO_AUTH_TOKEN;
                 if (!accountSid || !authToken) { console.warn('[Status] Missing Twilio creds; cannot start recording'); return; }
-                import twilio from 'twilio';
                 const client = twilio(accountSid, authToken);
                 const baseUrl = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm-792458658491.us-south1.run.app');
 
@@ -187,36 +188,39 @@ export default async function handler(req, res) {
                 const businessPhone = isBiz(to10) ? To : (isBiz(from10) ? From : (envBiz[0] || ''));
                 const targetPhone = isBiz(to10) && !isBiz(from10) ? from10 : (isBiz(from10) && !isBiz(to10) ? to10 : (to10 || from10));
 
-                const body = {
-                    callSid: CallSid,
-                    to: To,
-                    from: From,
-                    status: CallStatus,
-                    duration: parseInt((Duration || CallDuration || '0'), 10),
-                    targetPhone: targetPhone || undefined,
-                    businessPhone: businessPhone || undefined
-                };
-                if (RecordingUrl) {
-                    body.recordingUrl = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
-                }
-                await fetch(`${base}/api/calls`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                }).catch(() => {});
-            }
-                
-                // Auto-trigger transcription for completed calls with recordings
-                if (RecordingUrl) {
-                    console.log(`[Status] Auto-triggering transcription for completed call: ${CallSid}`);
-                    // Trigger transcription in background (don't wait for response)
-                    fetch(`${base}/api/process-call`, {
+                try {
+                    const body = {
+                        callSid: CallSid,
+                        to: To,
+                        from: From,
+                        status: CallStatus,
+                        duration: parseInt((Duration || CallDuration || '0'), 10),
+                        targetPhone: targetPhone || undefined,
+                        businessPhone: businessPhone || undefined
+                    };
+                    if (RecordingUrl) {
+                        body.recordingUrl = RecordingUrl.endsWith('.mp3') ? RecordingUrl : `${RecordingUrl}.mp3`;
+                    }
+                    await fetch(`${base}/api/calls`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ callSid: CallSid })
-                    }).catch(err => {
-                        console.warn(`[Status] Failed to trigger transcription for ${CallSid}:`, err?.message);
-                    });
+                        body: JSON.stringify(body)
+                    }).catch(() => {});
+                    
+                    // Auto-trigger transcription for completed calls with recordings
+                    if (RecordingUrl) {
+                        console.log(`[Status] Auto-triggering transcription for completed call: ${CallSid}`);
+                        // Trigger transcription in background (don't wait for response)
+                        fetch(`${base}/api/process-call`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ callSid: CallSid })
+                        }).catch(err => {
+                            console.warn(`[Status] Failed to trigger transcription for ${CallSid}:`, err?.message);
+                        });
+                    }
+                } catch (innerError) {
+                    console.warn('[Status] Failed posting to /api/calls (inner):', innerError?.message);
                 }
             }
         } catch (e) {
