@@ -1,7 +1,7 @@
 import twilio from 'twilio';
 import { cors } from '../_cors.js';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
     cors(req, res);
     
     if (req.method !== 'POST') {

@@ -13,7 +13,7 @@ function norm10(v) {
   }
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   cors(req, res);
   
   if (req.method !== 'GET') {
