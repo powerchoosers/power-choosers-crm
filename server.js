@@ -318,7 +318,22 @@ function readJsonBody(req) {
       }
     });
     req.on('end', () => {
-      try { resolve(data ? JSON.parse(data) : {}); } catch (e) { reject(e); }
+      try { 
+        resolve(data ? JSON.parse(data) : {}); 
+      } catch (e) { 
+        console.error('[Server] JSON Parse Error:', {
+          error: e.message,
+          data: data ? data.substring(0, 100) : 'null', // Log first 100 chars
+          dataLength: data ? data.length : 0,
+          url: req.url,
+          method: req.method,
+          headers: {
+            'content-type': req.headers['content-type'],
+            'content-length': req.headers['content-length']
+          }
+        });
+        reject(e); 
+      }
     });
     req.on('error', reject);
   });
@@ -333,8 +348,14 @@ async function handleApiTwilioToken(req, res, parsedUrl) {
 async function handleApiTwilioCall(req, res) {
   // Parse body for POST requests
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    try {
+      req.body = await readJsonBody(req);
+    } catch (error) {
+      console.error('[Server] Twilio Call API - JSON Parse Error:', error.message);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid JSON in request body' }));
+      return;
+    }
   }
   
   // Call handler directly (no proxy)
@@ -343,17 +364,29 @@ async function handleApiTwilioCall(req, res) {
 
 async function handleApiTwilioAIInsights(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    try {
+      req.body = await readJsonBody(req);
+    } catch (error) {
+      console.error('[Server] Twilio AI Insights API - JSON Parse Error:', error.message);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid JSON in request body' }));
+      return;
+    }
   }
   return await twilioAiInsightsHandler(req, res);
 }
 
 async function handleApiCalls(req, res) {
   // Parse body for POST requests
-    if (req.method === 'POST') {
-      const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+  if (req.method === 'POST') {
+    try {
+      req.body = await readJsonBody(req);
+    } catch (error) {
+      console.error('[Server] Calls API - JSON Parse Error:', error.message);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid JSON in request body' }));
+      return;
+    }
   }
   
   // Add query parameters to req.query for handler
