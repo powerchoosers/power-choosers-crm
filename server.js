@@ -33,7 +33,8 @@ try {
   await import('dotenv/config');
   console.log('[Server] dotenv loaded successfully');
 } catch (error) {
-  console.log('[Server] dotenv not available, using system environment variables');
+  console.log('[Server] dotenv not available or failed to load:', error.message);
+  // Continue with system environment variables
 }
 
 // Log environment variable status at startup (as recommended by Twilio AI)
@@ -1153,10 +1154,15 @@ async function handleApiTwilioOperatorWebhook(req, res) {
   }
 }
 
-// Start the server
-server.listen(PORT, () => {
-  console.log(`[Server] Power Choosers CRM server running at http://localhost:${PORT}`);
-});
+// Start the server with error handling
+try {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`[Server] Power Choosers CRM server running on port ${PORT}`);
+  });
+} catch (error) {
+  console.error(`[Server] Failed to start server: ${error.message}`);
+  process.exit(1);
+}
 
 // Handle server errors
 server.on('error', (err) => {
@@ -1165,6 +1171,15 @@ server.on('error', (err) => {
   } else {
     console.error('[Server] Server error:', err);
   }
+});
+
+// Add global error handlers for better debugging
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Server] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[Server] Uncaught Exception:', error);
 });
 
 // Search endpoint: proxy to production for phone number lookups
