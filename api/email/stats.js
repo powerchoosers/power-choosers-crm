@@ -1,6 +1,6 @@
 // Vercel API endpoint for email statistics
 import { cors } from '../_cors.js';
-import { admin, db } from '../_firebase';
+import { admin, db } from '../_firebase.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;

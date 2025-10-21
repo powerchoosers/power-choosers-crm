@@ -1,6 +1,6 @@
 // SendGrid email service for automated email sending
 import sgMail from '@sendgrid/mail';
-import { admin, db } from '../_firebase';
+import { admin, db } from '../_firebase.js';
 
 // Initialize SendGrid
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);

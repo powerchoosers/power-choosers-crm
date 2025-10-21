@@ -1,5 +1,5 @@
 // Sequence automation engine for automated email sequences
-import { admin, db } from '../_firebase';
+import { admin, db } from '../_firebase.js';
 import SendGridService from './sendgrid-service.js';
 
 export class SequenceAutomation {

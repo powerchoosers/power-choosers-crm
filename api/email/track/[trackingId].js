@@ -1,6 +1,6 @@
 // Vercel API endpoint for email tracking pixels
 import { cors } from '../../_cors.js';
-import { admin, db } from '../../_firebase';
+import { admin, db } from '../../_firebase.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
