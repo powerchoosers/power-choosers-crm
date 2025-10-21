@@ -2,6 +2,27 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import url from 'url';
+import { fileURLToPath } from 'url';
+
+// Define __filename and __dirname equivalent once at the top level
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Define getContentType function
+function getContentType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  switch (ext) {
+    case '.html': return 'text/html';
+    case '.css': return 'text/css';
+    case '.js': return 'application/javascript';
+    case '.json': return 'application/json';
+    case '.png': return 'image/png';
+    case '.jpg': case '.jpeg': return 'image/jpeg';
+    case '.gif': return 'image/gif';
+    case '.svg': return 'image/svg+xml';
+    default: return 'application/octet-stream';
+  }
+}
 
 // Import API handlers to avoid infinite loop
 import callStatusHandler from './api/call-status.js';
@@ -27,6 +48,37 @@ import twilioPollCiAnalysisHandler from './api/twilio/poll-ci-analysis.js';
 import twilioCallerLookupHandler from './api/twilio/caller-lookup.js';
 import sendgridWebhookHandler from './api/email/sendgrid-webhook.js';
 import inboundEmailHandler from './api/email/inbound-email.js';
+
+// ADDITIONAL IMPORTS FOR REMAINING PROXY FUNCTIONS
+import emailAutomationCronHandler from './api/email/automation-cron.js';
+import emailBackfillThreadsHandler from './api/email/backfill-threads.js';
+import emailSequenceAutomationHandler from './api/email/sequence-automation.js';
+import emailSequenceStatusHandler from './api/email/sequence-status.js';
+import emailStartSequenceHandler from './api/email/start-sequence.js';
+import emailUnsubscribeHandler from './api/email/unsubscribe.js';
+import processCallHandler from './api/process-call.js';
+import trackEmailPerformanceHandler from './api/track-email-performance.js';
+import lushaCompanyHandler from './api/lusha/company.js';
+import lushaContactsHandler from './api/lusha/contacts.js';
+import lushaEnrichHandler from './api/lusha/enrich.js';
+import lushaSearchHandler from './api/lusha/search.js';
+import lushaUsageHandler from './api/lusha/usage.js';
+import uploadHostGoogleAvatarHandler from './api/upload/host-google-avatar.js';
+import uploadSignatureImageHandler from './api/upload/signature-image.js';
+import algoliaReindexHandler from './api/algolia/reindex.js';
+import mapsConfigHandler from './api/maps/config.js';
+import debugCallHandler from './api/debug/call.js';
+import debugHealthHandler from './api/debug/health.js';
+import twilioStatusHandler from './api/twilio/status.js';
+import twilioDialStatusHandler from './api/twilio/dial-status.js';
+import twilioHangupHandler from './api/twilio/hangup.js';
+import twilioCallerIdHandler from './api/twilio/caller-id.js';
+import twilioCheckTranscriptStatusHandler from './api/twilio/check-transcript-status.js';
+import twilioTranscribeHandler from './api/twilio/transcribe.js';
+import twilioDialCompleteHandler from './api/twilio/dial-complete.js';
+import twilioProcessExistingTranscriptsHandler from './api/twilio/process-existing-transcripts.js';
+import energyNewsHandler from './api/energy-news.js';
+import recordingHandler from './api/recording.js';
 
 // Load environment variables from .env file for localhost development
 try {
@@ -192,8 +244,8 @@ function readRawBody(req) {
 
 // Twilio Voice webhook (returns TwiML XML)
 async function handleApiTwilioVoice(req, res, parsedUrl) {
-  if (req.method === 'POST') {
-    const raw = await readRawBody(req);
+    if (req.method === 'POST') {
+      const raw = await readRawBody(req);
     req.rawBody = raw;
   }
   req.query = { ...parsedUrl.query };
@@ -229,14 +281,14 @@ async function handleApiTwilioCIRequest(req, res) {
 
 // Twilio Conversational Intelligence webhook (Twilio -> our API)
 async function handleApiTwilioConversationalIntelligenceWebhook(req, res) {
-  const raw = await readRawBody(req);
+    const raw = await readRawBody(req);
   req.rawBody = raw;
   return await twilioConversationalIntelligenceWebhookHandler(req, res);
 }
 
 async function handleApiTwilioLanguageWebhook(req, res) {
-  if (req.method === 'POST') {
-    const body = await readJsonBody(req);
+    if (req.method === 'POST') {
+      const body = await readJsonBody(req);
     req.body = JSON.parse(body);
   }
   const parsedUrl = url.parse(req.url, true);
@@ -299,8 +351,8 @@ async function handleApiTwilioAIInsights(req, res) {
 
 async function handleApiCalls(req, res) {
   // Parse body for POST requests
-  if (req.method === 'POST') {
-    const body = await readJsonBody(req);
+    if (req.method === 'POST') {
+      const body = await readJsonBody(req);
     req.body = JSON.parse(body);
   }
   
@@ -631,385 +683,205 @@ const server = http.createServer(async (req, res) => {
     pathname = '/crm-dashboard.html';
   }
   
-  // Construct file path
+  // Construct file path using the robust __dirname equivalent
   const filePath = path.join(__dirname, pathname);
   
-  // Get file extension
-  const ext = path.extname(filePath).toLowerCase();
+  console.log(`[Server] Attempting to serve static file: ${filePath}`); // Debug log
   
-  // Set default content type
-  const contentType = mimeTypes[ext] || 'application/octet-stream';
-  
-  // Check if file exists
-  fs.access(filePath, fs.constants.F_OK, (err) => {
-    if (err) {
-      // File not found
-      res.writeHead(404, { 'Content-Type': 'text/html' });
-      res.end(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>404 - Not Found</title>
+  // Check if file exists first
+  if (!fs.existsSync(filePath)) {
+    console.error(`[Server] File not found at constructed path: ${filePath}`);
+    res.writeHead(404, { 'Content-Type': 'text/html' });
+    res.end(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>404 - File Not Found</title>
           <style>
-            body { 
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              height: 100vh;
-              margin: 0;
-              background: #f8f9fa;
-              color: #343a40;
-            }
-            .error-container {
-              text-align: center;
-              padding: 2rem;
-              background: white;
-              border-radius: 8px;
-              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            }
-            h1 { color: #ff6b35; margin-bottom: 1rem; }
-            p { margin-bottom: 1rem; }
-            a { color: #ff6b35; text-decoration: none; }
-            a:hover { text-decoration: underline; }
-          </style>
-        </head>
-        <body>
-          <div class="error-container">
-            <h1>404 - File Not Found</h1>
-            <p>The requested file <code>${pathname}</code> was not found.</p>
-            <p><a href="/">← Back to Power Choosers CRM</a></p>
-          </div>
-        </body>
-        </html>
-      `);
-      return;
-    }
-    
-    // Read and serve the file
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.writeHead(500, { 'Content-Type': 'text/html' });
-        res.end(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>500 - Server Error</title>
-            <style>
-              body { 
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-                margin: 0;
-                background: #f8f9fa;
-                color: #343a40;
-              }
-              .error-container {
-                text-align: center;
-                padding: 2rem;
-                background: white;
-                border-radius: 8px;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-              }
-              h1 { color: #ff6b35; margin-bottom: 1rem; }
-              p { margin-bottom: 1rem; }
-              a { color: #ff6b35; text-decoration: none; }
+              body { font-family: Arial, sans-serif; background-color: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+              .container { background-color: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); text-align: center; }
+              h1 { color: #ff5722; font-size: 2.5em; margin-bottom: 10px; }
+              p { color: #555; font-size: 1.1em; margin-bottom: 20px; }
+              a { color: #ff5722; text-decoration: none; font-weight: bold; }
               a:hover { text-decoration: underline; }
-            </style>
-          </head>
-          <body>
-            <div class="error-container">
-              <h1>500 - Server Error</h1>
-              <p>An error occurred while reading the file.</p>
-              <p><a href="/">← Back to Power Choosers CRM</a></p>
-            </div>
-          </body>
-          </html>
-        `);
-        return;
-      }
-      
-      // Serve the file
-      res.writeHead(200, { 'Content-Type': contentType });
-      res.end(data);
-    });
-  });
+          </style>
+      </head>
+      <body>
+          <div class="container">
+              <h1>404 - File Not Found</h1>
+              <p>The requested file ${pathname} was not found.</p>
+              <p><a href="/">Back to Power Choosers CRM</a></p>
+          </div>
+      </body>
+      </html>
+    `);
+    return;
+  }
+  
+  try {
+    const data = await fs.promises.readFile(filePath);
+    const contentType = getContentType(filePath);
+    console.log(`[Server] Successfully served: ${filePath} (Content-Type: ${contentType})`);
+    res.writeHead(200, { 'Content-Type': contentType });
+    res.end(data);
+  } catch (error) {
+    console.error(`[Server] Error reading file ${filePath}:`, error.message);
+    res.writeHead(500, { 'Content-Type': 'text/html' });
+    res.end(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>500 - Internal Server Error</title>
+      </head>
+      <body>
+          <h1>500 - Internal Server Error</h1>
+          <p>An unexpected error occurred while reading the file.</p>
+          <p>Error details: ${error.message}</p>
+      </body>
+      </html>
+    `);
+  }
 });
 
 // ---------------- Additional API Handler Functions ----------------
 
 // Email automation handlers
 async function handleApiEmailAutomationCron(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Email automation cron error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
+  return await emailAutomationCronHandler(req, res);
 }
 
 async function handleApiEmailBackfillThreads(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Email backfill threads error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
+  return await emailBackfillThreadsHandler(req, res);
 }
 
 async function handleApiEmailSequenceAutomation(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Email sequence automation error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
+  return await emailSequenceAutomationHandler(req, res);
 }
 
 async function handleApiEmailSequenceStatus(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Email sequence status error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
+  return await emailSequenceStatusHandler(req, res);
 }
 
 async function handleApiEmailStartSequence(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Email start sequence error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
+  return await emailStartSequenceHandler(req, res);
 }
 
 async function handleApiEmailUnsubscribe(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Email unsubscribe error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
+  return await emailUnsubscribeHandler(req, res);
 }
 
 // Process call and track email performance
 async function handleApiProcessCall(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Process call error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
+  return await processCallHandler(req, res);
 }
 
 async function handleApiTrackEmailPerformance(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Track email performance error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
+  return await trackEmailPerformanceHandler(req, res);
 }
 
 // Lusha API handlers
 async function handleApiLushaCompany(req, res, parsedUrl) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Lusha company error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
-  }
+  req.query = { ...parsedUrl.query };
+  return await lushaCompanyHandler(req, res);
 }
 
 async function handleApiLushaContacts(req, res, parsedUrl) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Lusha contacts error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
-  }
+  req.query = { ...parsedUrl.query };
+  return await lushaContactsHandler(req, res);
 }
 
 async function handleApiLushaEnrich(req, res, parsedUrl) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Lusha enrich error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
-  }
+  req.query = { ...parsedUrl.query };
+  return await lushaEnrichHandler(req, res);
 }
 
 async function handleApiLushaSearch(req, res, parsedUrl) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Lusha search error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
-  }
+  req.query = { ...parsedUrl.query };
+  return await lushaSearchHandler(req, res);
 }
 
 async function handleApiLushaUsage(req, res, parsedUrl) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Lusha usage error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
-  }
+  req.query = { ...parsedUrl.query };
+  return await lushaUsageHandler(req, res);
 }
 
 // Upload handlers
 async function handleApiUploadHostGoogleAvatar(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Upload host google avatar error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
+  return await uploadHostGoogleAvatarHandler(req, res);
 }
 
 async function handleApiUploadSignatureImage(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Upload signature image error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
+  return await uploadSignatureImageHandler(req, res);
 }
 
 // Algolia and Maps handlers
 async function handleApiAlgoliaReindex(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Algolia reindex error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
+  return await algoliaReindexHandler(req, res);
 }
 
 async function handleApiMapsConfig(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Maps config error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
-  }
+  return await mapsConfigHandler(req, res);
 }
 
 // Debug handlers
 async function handleApiDebugCall(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Debug call error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req);
+    req.body = JSON.parse(body);
   }
+  return await debugCallHandler(req, res);
 }
 
 async function handleApiDebugHealth(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Debug health error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
-  }
+  return await debugHealthHandler(req, res);
 }
 
 // Calls contact handler
@@ -1027,59 +899,19 @@ async function handleApiCallsContact(req, res, parsedUrl) {
 
 // Additional Twilio handlers
 async function handleApiTwilioStatus(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Twilio status error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
-  }
+  return await twilioStatusHandler(req, res);
 }
 
 async function handleApiTwilioDialStatus(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Twilio dial status error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
-  }
+  return await twilioDialStatusHandler(req, res);
 }
 
 async function handleApiTwilioHangup(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Twilio hangup error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
-  }
+  return await twilioHangupHandler(req, res);
 }
 
 async function handleApiTwilioCallerId(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  } catch (error) {
-    console.error('[Server] Twilio caller ID error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
-  }
+  return await twilioCallerIdHandler(req, res);
 }
 
 async function handleApiTwilioCheckTranscriptStatus(req, res) {
