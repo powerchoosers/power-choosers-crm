@@ -1,6 +1,7 @@
 {
   "name": "power-choosers-crm",
   "version": "1.0.0",
+  "type": "module",
   "description": "Power Choosers CRM with automated email sequences",
   "main": "server.js",
   "scripts": {
