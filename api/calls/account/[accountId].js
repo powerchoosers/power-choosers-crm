@@ -248,9 +248,15 @@ export default async function handler(req, res) {
       }));
 
   } catch (error) {
-    console.error('[Account Calls API] Error:', error);
+    console.error('[Account Calls API] Caught unhandled error:', error);
+    if (error instanceof Error) { // Ensure it's an Error object
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+    res.end(JSON.stringify({ error: 'Internal server error', details: error.message })); // Expose message to client for debugging
+    // REMEMBER TO REMOVE `details` IN PRODUCTION!
   }
 }
 
