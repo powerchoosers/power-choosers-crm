@@ -1,5 +1,5 @@
-const twilio = require('twilio');
-const { isCallSid } = require('./_twilio-ids');
+import twilio from 'twilio';
+import { isCallSid } from './_twilio-ids.js';
 
 // CORS middleware
 function corsMiddleware(req, res, next) {

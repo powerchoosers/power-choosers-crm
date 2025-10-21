@@ -1,5 +1,5 @@
 // Dial status callback: start dual-channel recording on the bridged child leg
-const twilio = require('twilio');
+import twilio from 'twilio';
 
 export default async function handler(req, res) {
   // Twilio posts x-www-form-urlencoded data for dial status callbacks

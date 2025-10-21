@@ -1,7 +1,8 @@
 // Backfill threadId and threads collection for existing emails
 // Safe to run multiple times; dedupes and upserts threads
 
-import { admin, db } from '../_firebase';
+import { admin, db } from '../_firebase.js';
+import crypto from 'crypto';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -39,7 +40,7 @@ export default async function handler(req, res) {
       if (Array.isArray(references) && references.length) computedThreadId = references[0];
       else if (inReplyTo) computedThreadId = inReplyTo;
       else if (messageId) computedThreadId = messageId;
-      else computedThreadId = 'thr_' + require('crypto').createHash('sha1').update(subjectNorm + '|' + participants.join(','), 'utf8').digest('hex');
+      else computedThreadId = 'thr_' + crypto.createHash('sha1').update(subjectNorm + '|' + participants.join(','), 'utf8').digest('hex');
 
       const snippetSource = text || stripHtml(html || '');
       const snippet = snippetSource ? (snippetSource.length > 140 ? snippetSource.slice(0,140)+'…' : snippetSource) : '';

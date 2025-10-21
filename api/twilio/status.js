@@ -51,7 +51,7 @@ export default async function handler(req, res) {
                 const accountSid = process.env.TWILIO_ACCOUNT_SID;
                 const authToken = process.env.TWILIO_AUTH_TOKEN;
                 if (!accountSid || !authToken) { console.warn('[Status] Missing Twilio creds; cannot start recording'); return; }
-                const twilio = require('twilio');
+                import twilio from 'twilio';
                 const client = twilio(accountSid, authToken);
                 const baseUrl = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm-792458658491.us-south1.run.app');
 
@@ -226,7 +226,7 @@ export default async function handler(req, res) {
         // If call completed and RecordingUrl not provided, try to fetch the recording via Twilio API
         try {
             if (CallStatus === 'completed' && !RecordingUrl && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-                const client = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
                 let foundUrl = '';
                 let foundRecSid = '';
                 // 1) Try parent CallSid first

@@ -1,4 +1,4 @@
-const twilio = require('twilio');
+import twilio from 'twilio';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 export default async function handler(req, res) {

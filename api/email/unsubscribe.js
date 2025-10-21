@@ -1,4 +1,4 @@
-const { db } = require('../_firebase');
+import { db } from '../_firebase.js';
 import { cors } from '../_cors.js';
 
 export default async function handler(req, res) {
