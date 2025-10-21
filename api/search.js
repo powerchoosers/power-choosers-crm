@@ -129,43 +129,53 @@ export default async function handler(req, res) {
       // Return results
       if (contactResult) {
         console.log('[Search] Returning contact result');
-        return res.status(200).json({
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
           success: true,
           contact: contactResult,
           account: accountResult || null
-        });
+        }));
+        return;
       }
       
       if (accountResult) {
         console.log('[Search] Returning account result');
-        return res.status(200).json({
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
           success: true,
           contact: null,
           account: accountResult
-        });
+        }));
+        return;
       }
       
       console.log('[Search] No results found - returning 404');
-      return res.status(404).json({
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
         success: false,
         error: 'Phone number not found in CRM'
-      });
+      }));
+      return;
     }
     
     // No Firestore - return not found
     console.log('[Search] Firestore not available - returning 404');
-    return res.status(404).json({
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       success: false,
       error: 'Phone number not found in CRM'
-    });
+    }));
+    return;
     
   } catch (error) {
     console.error('[Search] Error:', error);
     console.error('[Search] Error stack:', error.stack);
-    return res.status(500).json({ 
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
       error: 'Search failed',
       details: error.message 
-    });
+    }));
+    return;
   }
 }
 
