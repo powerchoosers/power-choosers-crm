@@ -644,6 +644,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/debug/health') {
     return handleApiDebugHealth(req, res);
   }
+  if (pathname === '/api/debug/firestore') {
+    return handleApiDebugFirestore(req, res);
+  }
   if (pathname.startsWith('/api/calls/contact/')) {
     return handleApiCallsContact(req, res, parsedUrl);
   }
@@ -882,6 +885,32 @@ async function handleApiDebugCall(req, res) {
 
 async function handleApiDebugHealth(req, res) {
   return await debugHealthHandler(req, res);
+}
+
+async function handleApiDebugFirestore(req, res) {
+  try {
+    console.log('[Debug] Testing Firestore connection...');
+    
+    // Test basic Firestore access
+    const testDoc = await db.collection('debug').doc('test').get();
+    
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      success: true, 
+      message: 'Firestore access working',
+      timestamp: new Date().toISOString(),
+      docExists: testDoc.exists
+    }));
+  } catch (error) {
+    console.error('[Debug] Firestore error:', error);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      success: false, 
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    }));
+  }
 }
 
 // Calls contact handler
