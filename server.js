@@ -38,6 +38,7 @@ try {
 }
 
 // Log environment variable status at startup (as recommended by Twilio AI)
+console.log('[Server] Starting Power Choosers CRM server...');
 console.log('[Server] Environment check:', {
   hasSendGridApiKey: !!process.env.SENDGRID_API_KEY,
   hasTwilioAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
@@ -46,6 +47,16 @@ console.log('[Server] Environment check:', {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: process.env.PORT || 3000
 });
+
+console.log('[Server] PORT environment variable:', process.env.PORT);
+console.log('[Server] NODE_ENV:', process.env.NODE_ENV);
+console.log('[Server] API_BASE_URL:', process.env.API_BASE_URL);
+console.log('[Server] PUBLIC_BASE_URL:', process.env.PUBLIC_BASE_URL);
+
+console.log('[Server] dotenv processing complete.');
+console.log('[Server] Initializing Firebase connection...');
+console.log('[Server] Setting up Twilio client...');
+console.log('[Server] Loading API handlers...');
 
 // MIME types for different file extensions
 const mimeTypes = {
@@ -341,6 +352,7 @@ async function handleApiTwilioPollCIAnalysis(req, res) {
 }
 
 // Create HTTP server
+console.log('[Server] Creating HTTP server...');
 const server = http.createServer(async (req, res) => {
   // CORS headers
   const origin = req.headers.origin;
@@ -1155,12 +1167,15 @@ async function handleApiTwilioOperatorWebhook(req, res) {
 }
 
 // Start the server with error handling
+console.log(`[Server] About to start server on port ${PORT} binding to 0.0.0.0`);
 try {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`[Server] Power Choosers CRM server running on port ${PORT}`);
+    console.log(`[Server] Server successfully bound to 0.0.0.0:${PORT}`);
   });
 } catch (error) {
   console.error(`[Server] Failed to start server: ${error.message}`);
+  console.error(`[Server] Error details:`, error);
   process.exit(1);
 }
 
