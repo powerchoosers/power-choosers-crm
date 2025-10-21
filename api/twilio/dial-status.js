@@ -62,7 +62,7 @@ export default async function handler(req, res) {
         // Compute absolute base URL from request headers first; fallback to env
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host || '';
-        const envBase = (process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : ''));
+        const envBase = process.env.PUBLIC_BASE_URL || '';
         const baseUrl = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm-792458658491.us-south1.run.app');
         
         if (accountSid && authToken) {

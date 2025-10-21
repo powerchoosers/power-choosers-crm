@@ -20,7 +20,7 @@ export default async function handler(req, res) {
         // Ensure absolute base URL for Twilio callbacks (prefer headers)
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host || '';
-        const envBase = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+        const envBase = process.env.PUBLIC_BASE_URL || '';
         const base = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm-792458658491.us-south1.run.app');
 
         const digits = (s) => (s || '').toString().replace(/\D/g, '');

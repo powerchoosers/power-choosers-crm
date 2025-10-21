@@ -109,7 +109,7 @@ export default async function handler(req, res){
     };
 
     // Post into central calls store
-    const base = process.env.PUBLIC_BASE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://power-choosers-crm-792458658491.us-south1.run.app');
+    const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
     await fetch(`${base}/api/calls`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
