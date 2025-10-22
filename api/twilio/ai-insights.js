@@ -10,7 +10,9 @@ function corsMiddleware(req, res, next) {
         res.writeHead(200);
         res.writeHead(200);
 res.writeHead(200);
+res.writeHead(200);
 res.end();
+return;
 return;
 return;
         return;
