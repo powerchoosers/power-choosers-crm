@@ -49,13 +49,11 @@ return;
       minuteUsage: resp.headers.get('x-minute-usage') || null
     };
 
-    return res.writeHead(200, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ usage: usage || {}, headers }));
-return;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ usage: usage || {}, headers }));
   } catch (e) {
-    return res.writeHead(500, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Server error', details: e.message }));
-return;
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ error: 'Server error', details: e.message }));
   }
 };
 

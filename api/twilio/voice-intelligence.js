@@ -162,7 +162,7 @@ async function handler(req, res) {
             success: true,
             callSid: CallSid,
             insights: insights
-        });
+        }));
         
     } catch (error) {
         console.error('[Voice Intelligence] Error:', error);

@@ -181,15 +181,13 @@ return;
         })
       : [];
 
-    return res.writeHead(200, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ 
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ 
       contacts: enrichedContacts,
       requestId: data.requestId 
     }));
-return;
   } catch (e) {
-    return res.writeHead(500, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Server error', details: e.message }));
-return;
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ error: 'Server error', details: e.message }));
   }
 };

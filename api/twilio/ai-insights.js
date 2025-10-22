@@ -208,7 +208,7 @@ export default async function handler(req, res) {
             callSid,
             transcript,
             aiInsights
-        });
+        }));
         
     } catch (error) {
         console.error('[Twilio AI] Error:', error);
