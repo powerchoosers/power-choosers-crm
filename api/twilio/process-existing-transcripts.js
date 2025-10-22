@@ -9,7 +9,9 @@ function corsMiddleware(req, res, next) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        res.writeHead(200);
+        res.end();
+        return;
     }
     
     next();
@@ -19,7 +21,9 @@ export default async function handler(req, res) {
     corsMiddleware(req, res, () => {});
     
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
     }
     
     try {
@@ -30,10 +34,12 @@ export default async function handler(req, res) {
         const serviceSid = process.env.TWILIO_INTELLIGENCE_SERVICE_SID;
         
         if (!serviceSid) {
-            return res.status(500).json({ 
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ 
                 error: 'Conversational Intelligence Service not configured',
                 message: 'Please set TWILIO_INTELLIGENCE_SERVICE_SID environment variable'
-            });
+            }));
+            return;
         }
         
         // Get all completed transcripts from the service
@@ -285,7 +291,8 @@ export default async function handler(req, res) {
         
         console.log(`[Process Existing Transcripts] Completed processing ${results.length} transcripts`);
         
-        return res.status(200).json({
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
             success: true,
             message: `Processed ${results.length} transcripts`,
             results: results
@@ -293,10 +300,12 @@ export default async function handler(req, res) {
         
     } catch (error) {
         console.error('[Process Existing Transcripts] Error:', error);
-        return res.status(500).json({ 
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
             error: 'Failed to process existing transcripts',
             details: error.message 
-        });
+        }));
+        return;
     }
 }
 

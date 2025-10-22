@@ -17,7 +17,9 @@ export default async function handler(req, res) {
   cors(req, res);
   
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
   
   try {
@@ -27,13 +29,17 @@ export default async function handler(req, res) {
     console.log('[Search] Incoming request for phone:', phoneNumber);
     
     if (!phoneNumber) {
-      return res.status(400).json({ error: 'Phone number required' });
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Phone number required' }));
+      return;
     }
     
     const searchDigits = norm10(phoneNumber);
     
     if (!searchDigits || searchDigits.length < 10) {
-      return res.status(400).json({ error: 'Invalid phone number' });
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid phone number' }));
+      return;
     }
     
     console.log('[Search] Normalized search digits:', searchDigits);
@@ -41,7 +47,8 @@ export default async function handler(req, res) {
     // Search in Firestore if available
     if (!db) {
       console.error('[Search] Firestore not initialized - check Firebase credentials');
-      return res.status(500).json({ 
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
         error: 'Database not available',
         details: 'Firestore not initialized - check FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY'
       });

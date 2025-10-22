@@ -6,7 +6,9 @@ export default async function handler(req, res) {
   if (cors(req, res)) return;
   
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   try {
@@ -37,7 +39,9 @@ export default async function handler(req, res) {
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
       res.setHeader('X-Content-Type-Options', 'nosniff');
-      return res.status(200).send(pixel);
+      res.writeHead(200, { 'Content-Type': 'image/gif' });
+      res.end(pixel);
+      return;
     }
 
     // Detect common image proxy user agents
@@ -116,10 +120,14 @@ export default async function handler(req, res) {
       res.setHeader('Expires', '0');
     }
     
-    return res.status(200).send(pixel);
+    res.writeHead(200, { 'Content-Type': 'image/gif' });
+    res.end(pixel);
+    return;
 
   } catch (error) {
     console.error('[Email] Track error:', error);
-    return res.status(500).json({ error: 'Failed to track email', message: error.message });
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to track email', message: error.message }));
+    return;
   }
 }

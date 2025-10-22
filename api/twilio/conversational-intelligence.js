@@ -7,7 +7,9 @@ function corsMiddleware(req, res, next) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        res.writeHead(200);
+        res.end();
+        return;
     }
     
     next();
@@ -17,14 +19,18 @@ export default async function handler(req, res) {
     corsMiddleware(req, res, () => {});
     
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
     }
     
     try {
         const { callSid, recordingSid } = req.body;
         
         if (!callSid && !recordingSid) {
-            return res.status(400).json({ error: 'Either callSid or recordingSid is required' });
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Either callSid or recordingSid is required' }));
+            return;
         }
         
         console.log('[Conversational Intelligence] Processing for:', { callSid, recordingSid });
@@ -38,7 +44,9 @@ export default async function handler(req, res) {
         if (callSid && !recordingSid) {
             const recordings = await client.recordings.list({ callSid: callSid, limit: 1 });
             if (recordings.length === 0) {
-                return res.status(404).json({ error: 'No recording found for this call' });
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'No recording found for this call' }));
+                return;
             }
             recording = recordings[0];
         } else if (recordingSid) {
@@ -46,7 +54,9 @@ export default async function handler(req, res) {
         }
         
         if (!recording) {
-            return res.status(404).json({ error: 'Recording not found' });
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Recording not found' }));
+            return;
         }
         
         console.log('[Conversational Intelligence] Found recording:', recording.sid);
@@ -54,10 +64,12 @@ export default async function handler(req, res) {
         // Check if Conversational Intelligence service is configured
         const serviceSid = process.env.TWILIO_INTELLIGENCE_SERVICE_SID;
         if (!serviceSid) {
-            return res.status(500).json({ 
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ 
                 error: 'Conversational Intelligence Service not configured',
                 message: 'Please set TWILIO_INTELLIGENCE_SERVICE_SID environment variable'
-            });
+            }));
+            return;
         }
         
         // Check if transcript already exists
@@ -106,7 +118,9 @@ export default async function handler(req, res) {
         const shouldAutoProcess = autoProcess === '1' || autoProcess === 'true' || autoProcess === 'yes';
         if (!shouldAutoProcess && !req.query?.trigger && !req.body?.trigger) {
             console.log('[CI Manual] CI auto-processing disabled and no trigger flag provided; skipping transcript creation');
-            return res.status(202).json({ ok: true, pending: true, reason: 'CI not requested' });
+            res.writeHead(202, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: true, pending: true, reason: 'CI not requested' }));
+            return;
         }
 
         if (existingTranscript) {
@@ -335,7 +349,8 @@ export default async function handler(req, res) {
         
         console.log('[Conversational Intelligence] Processing completed');
         
-        return res.status(200).json({
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
             success: true,
             callSid: callSid || recording.callSid,
             transcriptSid: transcript.sid,
@@ -348,10 +363,12 @@ export default async function handler(req, res) {
         
     } catch (error) {
         console.error('[Conversational Intelligence] Error:', error);
-        return res.status(500).json({ 
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
             error: 'Failed to process with Conversational Intelligence',
             details: error.message 
-        });
+        }));
+        return;
     }
 }
 

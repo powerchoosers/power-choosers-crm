@@ -8,7 +8,9 @@ function corsMiddleware(req, res, next) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        res.writeHead(200);
+        res.end();
+        return;
     }
     
     next();
@@ -18,14 +20,18 @@ export default async function handler(req, res) {
     corsMiddleware(req, res, () => {});
     
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
     }
     
     try {
         const { callSid, recordingUrl } = req.body;
         
         if (!callSid || !isCallSid(callSid)) {
-            return res.status(400).json({ error: 'Valid CallSid is required' });
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Valid CallSid is required' }));
+            return;
         }
         
         console.log('[Process Call] Starting AI processing for:', callSid);
@@ -41,18 +47,23 @@ export default async function handler(req, res) {
                     finalRecordingUrl = recordings[0].uri;
                     console.log('[Process Call] Found recording URL:', finalRecordingUrl);
                 } else {
-                    return res.status(404).json({ error: 'No recording found for this call' });
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'No recording found for this call' }));
+                    return;
                 }
             } catch (error) {
                 console.error('[Process Call] Error fetching recording:', error);
-                return res.status(500).json({ error: 'Failed to fetch recording from Twilio' });
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to fetch recording from Twilio' }));
+                return;
             }
         }
         
         // Process the recording using Twilio native services
         const result = await processRecordingWithTwilio(finalRecordingUrl, callSid);
         
-        return res.status(200).json({
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
             success: true,
             callSid,
             transcript: result.transcript,
@@ -61,7 +72,8 @@ export default async function handler(req, res) {
         
     } catch (error) {
         console.error('[Process Call] Error:', error);
-        return res.status(500).json({ 
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
             error: 'Failed to process call',
             details: error.message 
         });

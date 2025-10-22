@@ -5,7 +5,9 @@ export default async function handler(req, res) {
     corsMiddleware(req, res, () => {});
     
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
     }
     
     try {
@@ -14,7 +16,9 @@ export default async function handler(req, res) {
         try { console.log('[Poll CI Analysis] Start', { transcriptSid, callSid: callSidInput, ts: new Date().toISOString() }); } catch(_) {}
         
         if (!transcriptSid) {
-            return res.status(400).json({ error: 'transcriptSid is required' });
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'transcriptSid is required' }));
+            return;
         }
         
         console.log('[Poll CI Analysis] Checking analysis status for:', { transcriptSid, callSid: callSidInput });
@@ -74,7 +78,8 @@ export default async function handler(req, res) {
                 ciStatus: transcript.ciStatus,
                 processingStatus: transcript.processingStatus
             });
-            return res.status(200).json({
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
                 success: true,
                 analysisComplete: false,
                 analysisFailed: true,
@@ -89,7 +94,8 @@ export default async function handler(req, res) {
         }
         
         if (!isAnalysisComplete) {
-            return res.status(200).json({
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
                 success: true,
                 analysisComplete: false,
                 status: {
@@ -214,7 +220,8 @@ export default async function handler(req, res) {
 
         const elapsed = Date.now() - _start;
         try { console.log('[Poll CI Analysis] Done', { transcriptSid, callSid, elapsedMs: elapsed, sentenceCount: sentences.length }); } catch(_) {}
-        return res.status(200).json({
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
             success: true,
             analysisComplete: true,
             callSid: resolvedCallSid || callSidInput || '',
@@ -232,9 +239,11 @@ export default async function handler(req, res) {
         
     } catch (error) {
         console.error('[Poll CI Analysis] Error:', error);
-        return res.status(500).json({ 
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
             error: 'Failed to poll CI analysis',
             details: error.message 
-        });
+        }));
+        return;
     }
 }

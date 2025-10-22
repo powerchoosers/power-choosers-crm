@@ -4,7 +4,9 @@ export default async function handler(req, res) {
   if (cors(req, res)) return; // handle OPTIONS
   
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   try {
@@ -24,13 +26,17 @@ export default async function handler(req, res) {
 
     console.log(`[TX Price] Returning pricing data${refresh ? ' (refreshed)' : ''}:`, texasPricingData);
 
-    return res.status(200).json(texasPricingData);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(texasPricingData));
+    return;
     
   } catch (error) {
     console.error('[TX Price] Error:', error);
-    return res.status(500).json({ 
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
       error: 'Failed to fetch Texas electricity pricing', 
       message: error.message 
-    });
+    }));
+    return;
   }
 }

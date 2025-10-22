@@ -191,10 +191,14 @@ export default async function handler(req, res) {
       console.warn('[Dial-Status] No DialCallSid available for recording - Dial may not be configured properly');
     }
 
-    res.status(200).send('OK');
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OK');
+    return;
   } catch (e) {
     console.error('[Dial-Status] Error:', e);
-    res.status(200).send('OK');
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OK');
+    return;
   }
 }
 

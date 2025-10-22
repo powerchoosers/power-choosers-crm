@@ -5,23 +5,29 @@ export default async function handler(req, res) {
     cors(req, res);
     
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
     }
     
     try {
         const { phoneNumber } = req.body;
         
         if (!phoneNumber) {
-            return res.status(400).json({ error: 'Phone number required' });
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Phone number required' }));
+            return;
         }
         
         // Check for Twilio credentials
         if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
             console.error('[Caller Lookup] Missing Twilio credentials');
-            return res.status(500).json({ 
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ 
                 error: 'Twilio credentials not configured',
                 details: 'TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN missing'
-            });
+            }));
+            return;
         }
         
         const client = twilio(
@@ -47,31 +53,38 @@ export default async function handler(req, res) {
             nationalFormat: lookup.nationalFormat || null
         };
         
-        res.status(200).json({
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
             success: true,
             data: result
-        });
+        }));
+        return;
         
     } catch (error) {
         console.error('[Caller Lookup] Error:', error);
         
         // Handle specific Twilio errors
         if (error.code === 20404) {
-            return res.status(404).json({ 
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ 
                 error: 'Phone number not found',
                 code: 'NOT_FOUND'
-            });
+            }));
+            return;
         }
         
         if (error.code === 20003) {
-            return res.status(401).json({ 
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ 
                 error: 'Authentication failed',
                 code: 'AUTH_ERROR',
                 details: 'Check TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN'
-            });
+            }));
+            return;
         }
         
-        res.status(500).json({ 
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
             error: 'Failed to lookup caller information',
             details: error.message,
             code: error.code || 'UNKNOWN'

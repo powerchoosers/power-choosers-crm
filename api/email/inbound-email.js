@@ -42,13 +42,17 @@ export default async function handler(req, res) {
   console.log('[InboundEmail] Is from SendGrid:', isFromSendGrid);
   
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   // Enhanced security checks
   if (!isFromSendGrid) {
     console.log('[InboundEmail] Rejecting request - not from SendGrid');
-    return res.status(403).json({ error: 'Forbidden - not from SendGrid' });
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Forbidden - not from SendGrid' }));
+    return;
   }
 
   // SendGrid signature verification (if webhook secret is configured)
@@ -58,7 +62,9 @@ export default async function handler(req, res) {
     
     if (!signature || !timestamp) {
       console.log('[InboundEmail] Missing signature or timestamp headers');
-      return res.status(403).json({ error: 'Missing signature headers' });
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing signature headers' }));
+      return;
     }
     
     // Note: For signature verification, we need the raw body
@@ -253,7 +259,9 @@ export default async function handler(req, res) {
         .get();
       if (!snap.empty) {
         console.log('[InboundEmail] Duplicate messageId detected, skipping save:', emailData.messageId);
-        return res.status(200).json({ success: true, deduped: true, message: 'Duplicate Message-ID ignored' });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, deduped: true, message: 'Duplicate Message-ID ignored' }));
+        return;
       }
     }
 
@@ -334,7 +342,9 @@ export default async function handler(req, res) {
     // Validate required fields (relax subject requirement if missing but body present)
     if (!emailData.from || !emailData.to || (!emailData.subject && !emailData.text && !emailData.html)) {
       console.error('[InboundEmail] Missing required fields:', { from: emailData.from, to: emailData.to, subject: emailData.subject });
-      return res.status(400).json({ error: 'Missing required email fields' });
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing required email fields' }));
+      return;
     }
 
     console.log('[InboundEmail] Extracted email data:', emailData);
@@ -364,25 +374,31 @@ export default async function handler(req, res) {
       }
 
     // Return success response
-    return res.status(200).json({ 
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
       success: true, 
         emailId: docRef.id,
       message: 'Email processed successfully' 
-    });
+    }));
+    return;
     } catch (firebaseError) {
       console.error('[InboundEmail] Error saving to Firestore:', firebaseError);
-      return res.status(500).json({ 
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
         success: false, 
         error: 'Failed to save email to database',
         message: firebaseError.message 
-      });
+      }));
+      return;
     }
 
   } catch (error) {
     console.error('[InboundEmail] Error processing webhook:', error);
-    return res.status(500).json({ 
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
       error: 'Internal server error',
       message: error.message 
-    });
+    }));
+    return;
   }
 }

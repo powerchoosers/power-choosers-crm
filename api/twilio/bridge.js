@@ -2,9 +2,14 @@ import twilio from 'twilio';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 export default async function handler(req, res) {
+    const startTime = Date.now();
+    console.log(`[Bridge] Request started at ${new Date().toISOString()}`);
+    
     // Only allow POST requests
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
     }
     
     try {
@@ -24,12 +29,15 @@ export default async function handler(req, res) {
             const twiml = new VoiceResponse();
             twiml.say('Hello from Power Choosers CRM. No target specified.');
             
+            const xml = twiml.toString();
             res.setHeader('Content-Type', 'text/xml');
-            res.status(200).send(twiml.toString());
+            res.writeHead(200);
+            res.end(xml);
             return;
         }
         
         // Seed the Calls API with correct phone context for this CallSid
+        const apiCallStart = Date.now();
         try {
             const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
             const twilioBiz = process.env.TWILIO_PHONE_NUMBER || '+18176630380';
@@ -49,9 +57,13 @@ export default async function handler(req, res) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             }).catch(()=>{});
-        } catch(_) {}
+            console.log(`[Bridge] API call completed in ${Date.now() - apiCallStart}ms`);
+        } catch(_) {
+            console.log(`[Bridge] API call failed in ${Date.now() - apiCallStart}ms`);
+        }
 
         // Create TwiML to bridge the call
+        const twimlStart = Date.now();
         const twiml = new VoiceResponse();
         // Outbound PSTN leg: enable TwiML dual-channel recording on the Dialed number
         
@@ -78,22 +90,31 @@ export default async function handler(req, res) {
         
         // action already set in Dial options
         
-        console.log(`[Bridge] TwiML generated to connect to ${target}`);
+        console.log(`[Bridge] TwiML generated to connect to ${target} in ${Date.now() - twimlStart}ms`);
         
         // Send TwiML response (log for verification)
         const xml = twiml.toString();
         try { console.log('[Bridge TwiML]', xml); } catch(_) {}
         res.setHeader('Content-Type', 'text/xml');
-        res.status(200).send(xml);
+        res.writeHead(200);
+        res.end(xml);
+        return;
+        
+        const totalTime = Date.now() - startTime;
+        console.log(`[Bridge] Total processing time: ${totalTime}ms`);
         
     } catch (error) {
-        console.error('Bridge webhook error:', error);
+        const errorTime = Date.now() - startTime;
+        console.error(`[Bridge] Error after ${errorTime}ms:`, error);
         
         // Return error TwiML
         const twiml = new VoiceResponse();
         twiml.say('Sorry, there was an error connecting your call.');
         
+        const xml = twiml.toString();
         res.setHeader('Content-Type', 'text/xml');
-        res.status(500).send(twiml.toString());
+        res.writeHead(500);
+        res.end(xml);
+        return;
     }
 }

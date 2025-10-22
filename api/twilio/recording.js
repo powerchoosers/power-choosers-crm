@@ -1,18 +1,6 @@
 import twilio from 'twilio';
 import { resolveToCallSid, isCallSid } from '../_twilio-ids.js';
-
-// CORS middleware
-function corsMiddleware(req, res, next) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-    
-    next();
-}
+import { cors } from '../_cors.js';
 
 function normalizeBody(req) {
     // Supports: JS object, JSON string, x-www-form-urlencoded string
@@ -38,10 +26,12 @@ function normalizeBody(req) {
 const callStore = new Map();
 
 export default async function handler(req, res) {
-    corsMiddleware(req, res, () => {});
+    if (cors(req, res)) return; // handle OPTIONS
     
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
     }
     
     try {
@@ -115,7 +105,9 @@ export default async function handler(req, res) {
             
             if (RecordingStatus === 'completed' && src === 'dialverb' && !isDual) {
                 console.log('[Recording] Ignoring mono DialVerb completion (will rely on REST dual):', { RecordingSid, CallSid, RecordingChannels: body.RecordingChannels, RecordingSource: body.RecordingSource });
-                return res.status(200).json({ success: true, ignored: true, reason: 'mono_dialverb' });
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, ignored: true, reason: 'mono_dialverb' }));
+                return;
             }
         } catch(_) {}
 
@@ -301,14 +293,18 @@ export default async function handler(req, res) {
             }
         }
         
-        res.status(200).json({ success: true });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+        return;
         
     } catch (error) {
         console.error('[Recording] Webhook error:', error);
-        res.status(500).json({ 
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
             error: 'Failed to process recording webhook',
             details: error.message 
-        });
+        }));
+        return;
     }
 }
 

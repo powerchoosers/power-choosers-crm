@@ -5,13 +5,17 @@ import twilio from 'twilio';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   const { callSid } = req.body;
 
   if (!callSid) {
-    return res.status(400).json({ error: 'Missing callSid parameter' });
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Missing callSid parameter' }));
+    return;
   }
 
   try {
@@ -20,7 +24,9 @@ export default async function handler(req, res) {
 
     if (!accountSid || !authToken) {
       console.error('[Hangup] Missing Twilio credentials');
-      return res.status(500).json({ error: 'Server configuration error' });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Server configuration error' }));
+      return;
     }
 
     const twilioClient = twilio(accountSid, authToken);
@@ -38,7 +44,8 @@ export default async function handler(req, res) {
       endTime: call.endTime
     });
 
-    res.status(200).json({
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       success: true,
       callSid: call.sid,
       status: call.status,
@@ -50,22 +57,28 @@ export default async function handler(req, res) {
     
     // Handle specific Twilio errors
     if (error.code === 20404) {
-      return res.status(404).json({ 
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
         error: 'Call not found',
         message: 'The specified call does not exist or has already ended'
-      });
+      }));
+      return;
     }
     
     if (error.code === 20003) {
-      return res.status(403).json({ 
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
         error: 'Authentication failed',
         message: 'Invalid Twilio credentials'
-      });
+      }));
+      return;
     }
 
-    res.status(500).json({ 
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
       error: 'Failed to terminate call',
       message: error.message || 'Unknown error'
-    });
+    }));
+    return;
   }
 }
