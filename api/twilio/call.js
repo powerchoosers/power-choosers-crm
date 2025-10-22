@@ -12,6 +12,15 @@ const handler = async function handler(req, res) {
     
     try {
         const { to, from, agent_phone } = req.body;
+
+        console.log('[Call Debug] Incoming call request:', {
+          to,
+          from,
+          agent_phone,
+          body: req.body,
+          headers: req.headers,
+          timestamp: new Date().toISOString()
+        });
         
         if (!to) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
