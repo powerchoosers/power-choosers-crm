@@ -1284,8 +1284,8 @@ return;
           }
         }
         
-        return res.writeHead(200, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ 
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ 
           ok: true, 
           output: jsonData,
           templateType: templateType,
@@ -1295,31 +1295,27 @@ res.end(JSON.stringify({
             subject_style: jsonData.subject_style,
             cta_type: jsonData.cta_type,
             opening_style: templateType === 'cold_email' ? openingStyle?.type : null,
-            generated_at: new Date());
-return;.toISOString()
+            generated_at: new Date().toISOString()
           }
-        });
+        }));
       } catch (e) {
         console.error('[Perplexity] Failed to parse JSON:', e);
-        return res.writeHead(500, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Failed to parse AI response' }));
-return;
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'Failed to parse AI response' }));
       }
     }
     
     // Standard mode
-    return res.writeHead(200, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ 
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ 
       ok: true, 
       output: content,
       citations: citations
     }));
-return;
     
   } catch (e) {
     console.error('[Perplexity] Handler error:', e);
-    return res.writeHead(500, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Failed to generate email', message: e.message }));
-return;
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ error: 'Failed to generate email', message: e.message }));
   }
 }

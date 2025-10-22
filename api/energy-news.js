@@ -60,15 +60,13 @@ return;
       items.push({ title, url: link, publishedAt });
     }
 
-    return res.writeHead(200, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({
-      lastRefreshed: new Date());
-return;.toISOString(),
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({
+      lastRefreshed: new Date().toISOString(),
       items
-    });
+    }));
   } catch (error) {
-    return res.writeHead(500, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Failed to fetch energy news', message: error.message }));
-return;
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ error: 'Failed to fetch energy news', message: error.message }));
   }
 }
