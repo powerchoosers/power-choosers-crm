@@ -44,7 +44,7 @@ export default async function handler(req, res) {
         opens: [],
         replies: [],
         trackingDisabled: true
-      });
+      }));
     }
 
     // Fetch email stats from Firebase if available

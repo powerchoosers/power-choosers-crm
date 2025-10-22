@@ -82,7 +82,7 @@ export default async function handler(req, res) {
       message: 'Successfully unsubscribed',
       email: email,
       pausedSequences: pausedSequences
-    });
+    }));
 
   } catch (error) {
     console.error('[Unsubscribe] Error:', error);
