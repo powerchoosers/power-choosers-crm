@@ -51,9 +51,8 @@ return;
       } else if (companyName) {
         body.filters.companies.include.names = [companyName];
       } else {
-        return res.writeHead(400, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Missing company identifier (domain, companyId, or companyName));
-return;' });
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'Missing company identifier (domain, companyId, or companyName)' }));
       }
     }
 

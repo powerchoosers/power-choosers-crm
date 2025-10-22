@@ -82,7 +82,7 @@ export default async function handler(req, res) {
             callSid,
             transcript: result.transcript,
             aiInsights: result.aiInsights
-        });
+        }));
         
     } catch (error) {
         console.error('[Process Call] Error:', error);
