@@ -2,7 +2,9 @@ import { cors, fetchWithRetry, normalizeDomain, getApiKey, LUSHA_BASE_URL } from
 
 export default async function handler(req, res) {
   cors(req, res);
-  if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
+  if (req.method !== 'POST') { return res.writeHead(405, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Method not allowed' }));
+return; }
   try {
     const requestBody = req.body || {};
     let body;
@@ -18,7 +20,9 @@ export default async function handler(req, res) {
       const hasCompanyName = body.filters.companies.include?.names?.length > 0;
       
       if (!hasCompanyId && !hasDomain && !hasCompanyName) {
-        return res.status(400).json({ error: 'Missing company identifier in filters.companies.include' });
+        return res.writeHead(400, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Missing company identifier in filters.companies.include' }));
+return;
       }
       
       // Normalize domains if present
@@ -47,7 +51,9 @@ export default async function handler(req, res) {
       } else if (companyName) {
         body.filters.companies.include.names = [companyName];
       } else {
-        return res.status(400).json({ error: 'Missing company identifier (domain, companyId, or companyName)' });
+        return res.writeHead(400, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Missing company identifier (domain, companyId, or companyName));
+return;' });
       }
     }
 
@@ -66,26 +72,34 @@ export default async function handler(req, res) {
       
       // Handle specific error cases
       if (resp.status === 429) {
-        return res.status(429).json({ 
+        return res.writeHead(429, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ 
           error: 'Rate limit exceeded', 
           message: 'Too many requests. Please try again later.',
           details: text 
-        });
+        }));
+return;
       } else if (resp.status === 401) {
-        return res.status(401).json({ 
+        return res.writeHead(401, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ 
           error: 'Authentication failed', 
           message: 'Invalid API key. Please check your Lusha API configuration.',
           details: text 
-        });
+        }));
+return;
       } else if (resp.status === 403) {
-        return res.status(403).json({ 
+        return res.writeHead(403, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ 
           error: 'Access forbidden', 
           message: 'Your account may not be active or may not have access to this feature.',
           details: text 
-        });
+        }));
+return;
       }
       
-      return res.status(resp.status).json({ error: 'Lusha contacts error', details: text });
+      return res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Lusha contacts error', details: text }));
+return;
     }
     const data = await resp.json();
     console.log('Raw Lusha API response:', JSON.stringify(data, null, 2));
@@ -267,8 +281,12 @@ export default async function handler(req, res) {
       payload.raw = data;
     }
 
-    return res.status(200).json(payload);
+    return res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify(payload));
+return;
   } catch (e) {
-    return res.status(500).json({ error: 'Server error', details: e.message });
+    return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Server error', details: e.message }));
+return;
   }
 };

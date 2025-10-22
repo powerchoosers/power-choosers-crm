@@ -1128,13 +1128,17 @@ CRITICAL RULES:
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') return res.writeHead(405, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Method not allowed' }));
+return;
   
   try {
     const apiKey = process.env.PERPLEXITY_API_KEY;
     if (!apiKey) {
       console.error('[Perplexity] Missing PERPLEXITY_API_KEY');
-      return res.status(500).json({ error: 'Missing API key' });
+      return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Missing API key' }));
+return;
     }
 
     const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext, meetingPreferences } = req.body || {};
@@ -1196,7 +1200,9 @@ CRITICAL: Use these EXACT meeting times in your CTA.
     if (!response.ok) {
       const msg = data?.error?.message || data?.detail || 'API error';
       console.error('[Perplexity] API error:', msg);
-      return res.status(response.status).json({ error: msg });
+      return res.writeHead(response.status, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: msg }));
+return;
     }
 
     let content = data?.choices?.[0]?.message?.content || '';
@@ -1278,7 +1284,8 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           }
         }
         
-        return res.status(200).json({ 
+        return res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ 
           ok: true, 
           output: jsonData,
           templateType: templateType,
@@ -1288,24 +1295,31 @@ CRITICAL: Use these EXACT meeting times in your CTA.
             subject_style: jsonData.subject_style,
             cta_type: jsonData.cta_type,
             opening_style: templateType === 'cold_email' ? openingStyle?.type : null,
-            generated_at: new Date().toISOString()
+            generated_at: new Date());
+return;.toISOString()
           }
         });
       } catch (e) {
         console.error('[Perplexity] Failed to parse JSON:', e);
-        return res.status(500).json({ error: 'Failed to parse AI response' });
+        return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Failed to parse AI response' }));
+return;
       }
     }
     
     // Standard mode
-    return res.status(200).json({ 
+    return res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ 
       ok: true, 
       output: content,
       citations: citations
-    });
+    }));
+return;
     
   } catch (e) {
     console.error('[Perplexity] Handler error:', e);
-    return res.status(500).json({ error: 'Failed to generate email', message: e.message });
+    return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Failed to generate email', message: e.message }));
+return;
   }
 }

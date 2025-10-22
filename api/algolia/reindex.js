@@ -21,22 +21,28 @@ export default async function handler(req, res) {
   if (cors(req, res)) return; // handle OPTIONS
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.writeHead(405, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Method not allowed' }));
+return;
   }
 
   try {
     const { appId, apiKey, type } = req.body;
     
     if (!appId || !apiKey || !type) {
-      return res.status(400).json({ 
+      return res.writeHead(400, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ 
         error: 'Missing required parameters: appId, apiKey, and type' 
-      });
+      }));
+return;
     }
 
     if (!['accounts', 'contacts'].includes(type)) {
-      return res.status(400).json({ 
+      return res.writeHead(400, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ 
         error: 'Type must be either "accounts" or "contacts"' 
-      });
+      }));
+return;
     }
 
     // Initialize Algolia client (server-side)
@@ -48,12 +54,14 @@ export default async function handler(req, res) {
     const snapshot = await getDocs(collection(db, collectionName));
     
     if (snapshot.empty) {
-      return res.status(200).json({ 
+      return res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ 
         success: true, 
         processed: 0,
         total: 0,
         message: `No ${type} found in Firebase`
-      });
+      }));
+return;
     }
 
     // Prepare records for Algolia
@@ -99,20 +107,24 @@ export default async function handler(req, res) {
       console.warn('Could not verify index count:', verifyError.message);
     }
 
-    res.status(200).json({ 
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ 
       success: true, 
       processed,
       errors,
       total: records.length,
       verificationCount,
       message: `Reindex complete! Processed ${processed} ${type}, ${errors} errors`
-    });
+    }));
+return;
 
   } catch (error) {
     console.error('Reindex error:', error);
-    res.status(500).json({ 
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ 
       error: error.message,
       details: 'Check server logs for more information'
-    });
+    }));
+return;
   }
 }

@@ -7,7 +7,13 @@ function corsMiddleware(req, res, next) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        return res.writeHead(200);
+res.writeHead(200);
+res.writeHead(200);
+res.end();
+return;
+return;
+return;
     }
     
     next();
@@ -17,14 +23,18 @@ export default async function handler(req, res) {
     corsMiddleware(req, res, () => {});
     
     if (req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        return res.writeHead(405, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Method not allowed' }));
+return;
     }
     
     try {
         console.log('[Debug Calls] Fetching all calls from Firestore...');
         
         if (!db) {
-            return res.status(500).json({ error: 'Firestore not available' });
+            return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Firestore not available' }));
+return;
         }
         
         // Get all calls from Firestore
@@ -54,18 +64,22 @@ export default async function handler(req, res) {
         
         console.log(`[Debug Calls] Source breakdown:`, sourceCounts);
         
-        return res.status(200).json({
+        return res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({
             success: true,
             totalCalls: calls.length,
             calls: calls,
             sourceCounts: sourceCounts
-        });
+        }));
+return;
         
     } catch (error) {
         console.error('[Debug Calls] Error:', error);
-        return res.status(500).json({ 
+        return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ 
             error: 'Failed to fetch calls',
             details: error.message 
-        });
+        }));
+return;
     }
 }

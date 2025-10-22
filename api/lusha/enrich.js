@@ -2,7 +2,9 @@ import { cors, fetchWithRetry, getApiKey, LUSHA_BASE_URL } from './_utils.js';
 
 export default async function handler(req, res) {
   cors(req, res);
-  if (req.method !== 'POST') { return res.status(405).json({ error: 'Method not allowed' }); }
+  if (req.method !== 'POST') { return res.writeHead(405, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Method not allowed' }));
+return; }
   
   try {
     const { requestId, contactIds, company, name, title, revealEmails, revealPhones } = req.body || {};
@@ -27,7 +29,9 @@ export default async function handler(req, res) {
         else if (company?.id) include.ids = [company.id];
         else if (company?.name) include.names = [company.name];
         if (!Object.keys(include).length) {
-          return res.status(400).json({ error: 'Missing requestId and insufficient company context for search' });
+          return res.writeHead(400, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Missing requestId and insufficient company context for search' }));
+return;
         }
         // Minimal, progressive pre-search to obtain requestId while limiting search requests
         const attemptSizes = [10, 40];
@@ -44,7 +48,9 @@ export default async function handler(req, res) {
           if (!searchResp.ok) {
             const text = await searchResp.text();
             // If the first attempt fails hard, bubble up; otherwise try next size
-            if (size === attemptSizes[0]) return res.status(searchResp.status).json({ error: 'Search before enrich failed', details: text });
+            if (size === attemptSizes[0]) return res.writeHead(searchResp.status, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Search before enrich failed', details: text }));
+return;
             continue;
           }
           const searchData = await searchResp.json();
@@ -71,7 +77,9 @@ export default async function handler(req, res) {
           }
         }
       } catch (e) {
-        return res.status(500).json({ error: 'Failed to initiate search before enrich', details: e.message });
+        return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Failed to initiate search before enrich', details: e.message }));
+return;
       }
     }
     
@@ -97,7 +105,9 @@ export default async function handler(req, res) {
     }
     
     if (!effectiveRequestId || idsToEnrich.length === 0) {
-      return res.status(400).json({ error: 'Missing requestId or unable to resolve contactId for enrich' });
+      return res.writeHead(400, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Missing requestId or unable to resolve contactId for enrich' }));
+return;
     }
 
     const requestBody = {
@@ -119,13 +129,17 @@ export default async function handler(req, res) {
     if (!resp.ok) {
       const text = await resp.text();
       if (resp.status === 403) {
-        return res.status(403).json({
+        return res.writeHead(403, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({
           error: 'Access forbidden',
-          message: 'Your current Lusha plan may not allow individual data point reveals (emails/phones).',
+          message: 'Your current Lusha plan may not allow individual data point reveals (emails/phones));
+return;.',
           details: text
         });
       }
-      return res.status(resp.status).json({ error: 'Lusha enrich error', details: text });
+      return res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Lusha enrich error', details: text }));
+return;
     }
 
     const data = await resp.json();
@@ -169,11 +183,15 @@ export default async function handler(req, res) {
         })
       : [];
 
-    return res.status(200).json({ 
+    return res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ 
       contacts: enrichedContacts,
       requestId: data.requestId 
-    });
+    }));
+return;
   } catch (e) {
-    return res.status(500).json({ error: 'Server error', details: e.message });
+    return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Server error', details: e.message }));
+return;
   }
 };

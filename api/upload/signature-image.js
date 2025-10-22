@@ -17,7 +17,9 @@ export default async function handler(req, res) {
   if (cors(req, res)) return;
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.writeHead(405, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Method not allowed' }));
+return;
   }
 
   try {
@@ -25,11 +27,15 @@ export default async function handler(req, res) {
     const { image, type } = req.body || {};
 
     if (!image) {
-      return res.status(400).json({ error: 'No image provided' });
+      return res.writeHead(400, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'No image provided' }));
+return;
     }
 
     if (type !== 'signature') {
-      return res.status(400).json({ error: 'Invalid upload type' });
+      return res.writeHead(400, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Invalid upload type' }));
+return;
     }
 
     // Upload to Imgur
@@ -44,30 +50,38 @@ export default async function handler(req, res) {
 
     if (!imgurResponse.ok) {
       console.error('[SignatureUpload] Imgur upload failed:', await imgurResponse.text());
-      return res.status(500).json({ error: 'Failed to upload image to hosting service' });
+      return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Failed to upload image to hosting service' }));
+return;
     }
 
     const imgurResult = await imgurResponse.json();
     
     if (!imgurResult.success) {
       console.error('[SignatureUpload] Imgur API error:', imgurResult.data.error);
-      return res.status(500).json({ error: 'Image hosting service error' });
+      return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Image hosting service error' }));
+return;
     }
 
     const imageUrl = imgurResult.data.link;
     console.log('[SignatureUpload] Image uploaded successfully:', imageUrl);
 
-    return res.status(200).json({
+    return res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({
       success: true,
       imageUrl: imageUrl,
       message: 'Signature image uploaded successfully'
-    });
+    }));
+return;
 
   } catch (error) {
     console.error('[SignatureUpload] Upload error:', error);
-    return res.status(500).json({ 
+    return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ 
       error: 'Internal server error', 
       message: error.message 
-    });
+    }));
+return;
   }
 }
