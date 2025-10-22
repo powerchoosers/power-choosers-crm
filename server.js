@@ -79,6 +79,8 @@ import twilioDialCompleteHandler from './api/twilio/dial-complete.js';
 import twilioProcessExistingTranscriptsHandler from './api/twilio/process-existing-transcripts.js';
 import energyNewsHandler from './api/energy-news.js';
 import recordingHandler from './api/recording.js';
+import twilioBridgeHandler from './api/twilio/bridge.js';
+import twilioOperatorWebhookHandler from './api/twilio/operator-webhook.js';
 
 // Import body parsers
 import { readFormUrlEncodedBody } from './api/_form-parser.js';
@@ -137,6 +139,13 @@ const LOCAL_DEV_MODE = process.env.NODE_ENV !== 'production';
 const API_BASE_URL = process.env.API_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
 // Only used for external webhooks, not internal API routing
 // Email sending now handled by Gmail API via frontend
+
+// Helper function to generate correlation IDs for request tracing
+function getCorrelationId(req) {
+  return req.headers['x-request-id'] || 
+    req.headers['x-correlation-id'] ||
+    `req-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
 
 // ---------------- Perplexity API endpoint for localhost development ----------------
 
@@ -247,33 +256,64 @@ function readRawBody(req) {
 
 // Twilio Voice webhook (returns TwiML XML)
 async function handleApiTwilioVoice(req, res, parsedUrl) {
+  const correlationId = getCorrelationId(req);
+  console.log(`[${correlationId}] Processing Twilio Voice webhook for ${req.url}`);
+  
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
-      console.error('[Server] Twilio Voice webhook - Body Parse Error:', error.message);
+      console.error(`[${correlationId}] [Server] Twilio Voice webhook - Body Parse Error:`, error.message, error.stack);
       res.writeHead(400, { 'Content-Type': 'text/xml' });
       res.end('<Response><Say>Error processing request</Say></Response>');
       return;
     }
   }
   req.query = { ...parsedUrl.query };
-  return await twilioVoiceHandler(req, res);
+  
+  try {
+    await twilioVoiceHandler(req, res);
+  } catch (error) {
+    console.error(`[${correlationId}] [Server] Twilio Voice handler unhandled error:`, error.name, error.message, error.stack);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'text/xml' });
+      res.end('<Response><Say>Internal server error</Say></Response>');
+    }
+  }
 }
 
 // Twilio Recording status webhook
 async function handleApiTwilioRecording(req, res) {
+  const correlationId = getCorrelationId(req);
+  console.log(`[${correlationId}] Processing Twilio Recording webhook for ${req.url}`);
+  
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
-      console.error('[Server] Twilio Recording webhook - Body Parse Error:', error.message);
+      console.error(`[${correlationId}] [Server] Twilio Recording webhook - Body Parse Error:`, error.message, error.stack);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Invalid request body' }));
+      res.end(JSON.stringify({ 
+        error: 'Invalid request body format',
+        details: error.message,
+        correlationId 
+      }));
       return;
     }
   }
-  return await twilioRecordingHandler(req, res);
+  
+  try {
+    await twilioRecordingHandler(req, res);
+  } catch (error) {
+    console.error(`[${correlationId}] [Server] Twilio Recording handler unhandled error:`, error.name, error.message, error.stack);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Internal server error',
+        correlationId 
+      }));
+    }
+  }
 }
 
 // Twilio Conversational Intelligence processing endpoint
@@ -995,102 +1035,332 @@ async function handleApiCallsContact(req, res, parsedUrl) {
 
 // Additional Twilio handlers
 async function handleApiTwilioStatus(req, res) {
-  return await twilioStatusHandler(req, res);
+  const correlationId = getCorrelationId(req);
+  console.log(`[${correlationId}] Processing Twilio Status webhook for ${req.url}`);
+  
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error(`[${correlationId}] [Server] Twilio Status webhook - Body Parse Error:`, error.message, error.stack);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Invalid request body format',
+        details: error.message,
+        correlationId 
+      }));
+      return;
+    }
+  }
+  
+  try {
+    await twilioStatusHandler(req, res);
+  } catch (error) {
+    console.error(`[${correlationId}] [Server] Twilio Status handler unhandled error:`, error.name, error.message, error.stack);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Internal server error',
+        correlationId 
+      }));
+    }
+  }
 }
 
 async function handleApiTwilioDialStatus(req, res) {
-  return await twilioDialStatusHandler(req, res);
+  const correlationId = getCorrelationId(req);
+  console.log(`[${correlationId}] Processing Twilio Dial Status webhook for ${req.url}`);
+  
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error(`[${correlationId}] [Server] Twilio Dial Status webhook - Body Parse Error:`, error.message, error.stack);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Invalid request body format',
+        details: error.message,
+        correlationId 
+      }));
+      return;
+    }
+  }
+  
+  try {
+    await twilioDialStatusHandler(req, res);
+  } catch (error) {
+    console.error(`[${correlationId}] [Server] Twilio Dial Status handler unhandled error:`, error.name, error.message, error.stack);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Internal server error',
+        correlationId 
+      }));
+    }
+  }
 }
 
 async function handleApiTwilioHangup(req, res) {
-  return await twilioHangupHandler(req, res);
+  const correlationId = getCorrelationId(req);
+  console.log(`[${correlationId}] Processing Twilio Hangup webhook for ${req.url}`);
+  
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error(`[${correlationId}] [Server] Twilio Hangup webhook - Body Parse Error:`, error.message, error.stack);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Invalid request body format',
+        details: error.message,
+        correlationId 
+      }));
+      return;
+    }
+  }
+  
+  try {
+    await twilioHangupHandler(req, res);
+  } catch (error) {
+    console.error(`[${correlationId}] [Server] Twilio Hangup handler unhandled error:`, error.name, error.message, error.stack);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Internal server error',
+        correlationId 
+      }));
+    }
+  }
 }
 
 async function handleApiTwilioCallerId(req, res) {
-  return await twilioCallerIdHandler(req, res);
+  const correlationId = getCorrelationId(req);
+  console.log(`[${correlationId}] Processing Twilio Caller ID webhook for ${req.url}`);
+  
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error(`[${correlationId}] [Server] Twilio Caller ID webhook - Body Parse Error:`, error.message, error.stack);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Invalid request body format',
+        details: error.message,
+        correlationId 
+      }));
+      return;
+    }
+  }
+  
+  try {
+    await twilioCallerIdHandler(req, res);
+  } catch (error) {
+    console.error(`[${correlationId}] [Server] Twilio Caller ID handler unhandled error:`, error.name, error.message, error.stack);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Internal server error',
+        correlationId 
+      }));
+    }
+  }
 }
 
 async function handleApiTwilioCheckTranscriptStatus(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  const correlationId = getCorrelationId(req);
+  console.log(`[${correlationId}] Processing Twilio Check Transcript Status for ${req.url}`);
+  
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error(`[${correlationId}] [Server] Twilio Check Transcript Status - Body Parse Error:`, error.message, error.stack);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Invalid request body format',
+        details: error.message,
+        correlationId 
+      }));
+      return;
+    }
+  }
+  
   try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
+    await twilioCheckTranscriptStatusHandler(req, res);
   } catch (error) {
-    console.error('[Server] Twilio check transcript status error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+    console.error(`[${correlationId}] [Server] Twilio Check Transcript Status handler unhandled error:`, error.name, error.message, error.stack);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Internal server error',
+        correlationId 
+      }));
+    }
   }
 }
 
 async function handleApiTwilioDialComplete(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  const correlationId = getCorrelationId(req);
+  console.log(`[${correlationId}] Processing Twilio Dial Complete for ${req.url}`);
+  
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error(`[${correlationId}] [Server] Twilio Dial Complete - Body Parse Error:`, error.message, error.stack);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Invalid request body format',
+        details: error.message,
+        correlationId 
+      }));
+      return;
+    }
+  }
+  
   try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
+    await twilioDialCompleteHandler(req, res);
   } catch (error) {
-    console.error('[Server] Twilio dial complete error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+    console.error(`[${correlationId}] [Server] Twilio Dial Complete handler unhandled error:`, error.name, error.message, error.stack);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Internal server error',
+        correlationId 
+      }));
+    }
   }
 }
 
 async function handleApiTwilioProcessExistingTranscripts(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  const correlationId = getCorrelationId(req);
+  console.log(`[${correlationId}] Processing Twilio Process Existing Transcripts for ${req.url}`);
+  
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error(`[${correlationId}] [Server] Twilio Process Existing Transcripts - Body Parse Error:`, error.message, error.stack);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Invalid request body format',
+        details: error.message,
+        correlationId 
+      }));
+      return;
+    }
+  }
+  
   try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
+    await twilioProcessExistingTranscriptsHandler(req, res);
   } catch (error) {
-    console.error('[Server] Twilio process existing transcripts error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+    console.error(`[${correlationId}] [Server] Twilio Process Existing Transcripts handler unhandled error:`, error.name, error.message, error.stack);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Internal server error',
+        correlationId 
+      }));
+    }
   }
 }
 
 async function handleApiTwilioTranscribe(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  const correlationId = getCorrelationId(req);
+  console.log(`[${correlationId}] Processing Twilio Transcribe for ${req.url}`);
+  
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error(`[${correlationId}] [Server] Twilio Transcribe - Body Parse Error:`, error.message, error.stack);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Invalid request body format',
+        details: error.message,
+        correlationId 
+      }));
+      return;
+    }
+  }
+  
   try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
+    await twilioTranscribeHandler(req, res);
   } catch (error) {
-    console.error('[Server] Twilio transcribe error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+    console.error(`[${correlationId}] [Server] Twilio Transcribe handler unhandled error:`, error.name, error.message, error.stack);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Internal server error',
+        correlationId 
+      }));
+    }
   }
 }
 
 async function handleApiTwilioBridge(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  const correlationId = getCorrelationId(req);
+  console.log(`[${correlationId}] Processing Twilio Bridge webhook for ${req.url}`);
+  
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error(`[${correlationId}] [Server] Twilio Bridge - Body Parse Error:`, error.message, error.stack);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Invalid request body format',
+        details: error.message,
+        correlationId 
+      }));
+      return;
+    }
+  }
+  
   try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
+    await twilioBridgeHandler(req, res);
   } catch (error) {
-    console.error('[Server] Twilio bridge error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+    console.error(`[${correlationId}] [Server] Twilio Bridge handler unhandled error:`, error.name, error.message, error.stack);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Internal server error',
+        correlationId 
+      }));
+    }
   }
 }
 
 async function handleApiTwilioOperatorWebhook(req, res) {
-  const proxyUrl = `${API_BASE_URL}${req.url}`;
+  const correlationId = getCorrelationId(req);
+  console.log(`[${correlationId}] Processing Twilio Operator Webhook for ${req.url}`);
+  
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error(`[${correlationId}] [Server] Twilio Operator Webhook - Body Parse Error:`, error.message, error.stack);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Invalid request body format',
+        details: error.message,
+        correlationId 
+      }));
+      return;
+    }
+  }
+  
   try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    res.writeHead(response.status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
+    await twilioOperatorWebhookHandler(req, res);
   } catch (error) {
-    console.error('[Server] Twilio operator webhook error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Internal server error' }));
+    console.error(`[${correlationId}] [Server] Twilio Operator Webhook handler unhandled error:`, error.name, error.message, error.stack);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Internal server error',
+        correlationId 
+      }));
+    }
   }
 }
 
@@ -1752,4 +2022,3 @@ async function handleApiInboundEmail(req, res) {
   }
   return await inboundEmailHandler(req, res);
 }
-
