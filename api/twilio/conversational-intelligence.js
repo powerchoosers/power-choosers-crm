@@ -359,7 +359,7 @@ export default async function handler(req, res) {
             sentences: sentences,
             operatorResults: operatorResults,
             aiInsights: aiInsights
-        });
+        }));
         
     } catch (error) {
         console.error('[Conversational Intelligence] Error:', error);
