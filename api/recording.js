@@ -7,7 +7,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
-    res.end();
+    res.writeHead(200);
+res.end();
+return;
     return;
   }
 
@@ -42,9 +44,9 @@ export default async function handler(req, res) {
     const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
     const twilioResp = await fetch(url, { headers: { Authorization: authHeader } });
     if (!twilioResp.ok) {
-      return res.writeHead(twilioResp.status, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: `Failed to fetch recording (${twilioResp.status})` }));
-return;
+      res.writeHead(twilioResp.status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: `Failed to fetch recording (${twilioResp.status})` }));
+      return;
     }
 
     // Stream through with original content-type to avoid any quality loss
@@ -70,8 +72,8 @@ return;
 
     return new Response(stream).arrayBuffer().then(buf => {
       res.writeHead(200);
-res.end(Buffer.from(buf);
-return;);
+      res.end(Buffer.from(buf));
+      return;
     });
   } catch (err) {
     console.error('[Recording Proxy] Error:', err);
