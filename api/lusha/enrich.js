@@ -129,17 +129,15 @@ return;
     if (!resp.ok) {
       const text = await resp.text();
       if (resp.status === 403) {
-        return res.writeHead(403, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({
           error: 'Access forbidden',
-          message: 'Your current Lusha plan may not allow individual data point reveals (emails/phones));
-return;.',
+          message: 'Your current Lusha plan may not allow individual data point reveals (emails/phones).',
           details: text
-        });
+        }));
       }
-      return res.writeHead(resp.status, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Lusha enrich error', details: text }));
-return;
+      res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'Lusha enrich error', details: text }));
     }
 
     const data = await resp.json();
