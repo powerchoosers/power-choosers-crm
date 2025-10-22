@@ -185,7 +185,15 @@ const allowCors = fn => async (req, res) => {
         res.writeHead(200);
 res.writeHead(200);
 res.writeHead(200);
+res.writeHead(200);
+res.writeHead(200);
+res.writeHead(200);
+res.writeHead(200);
 res.end();
+return;
+return;
+return;
+return;
 return;
 return;
 return;

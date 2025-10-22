@@ -1,19 +1,41 @@
 import { cors } from '../_cors.js';
 import twilio from 'twilio';
 
-// Vercel serverless handler with proper CORS and error handling
-export default async (req, res) => {
+// Helper function to parse query parameters from URL
+function parseQueryParams(url) {
+  const queryString = url.split('?')[1];
+  if (!queryString) return {};
+
+  return queryString.split('&').reduce((params, param) => {
+    const [key, value] = param.split('=');
+    params[decodeURIComponent(key)] = decodeURIComponent(value || '');
+    return params;
+  }, {});
+}
+
+export default async function handler(req, res) {
   if (cors(req, res)) return; // handle OPTIONS
-  
+
   // Only allow GET requests
   if (req.method !== 'GET') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
-  
+
   try {
-    const identity = req.query.identity || 'agent';
+    // Parse query parameters manually (Node.js HTTP doesn't have req.query)
+    const queryParams = parseQueryParams(req.url || '');
+    const identity = queryParams.identity || 'agent';
+
+    console.log('[Token Debug] Request details:', {
+      url: req.url,
+      method: req.method,
+      headers: req.headers,
+      queryParams,
+      identity,
+      timestamp: new Date().toISOString()
+    });
     
     // Twilio credentials from environment variables
     const accountSid = process.env.TWILIO_ACCOUNT_SID;

@@ -103,9 +103,21 @@ async function hasCallsForContact(contactId, db) {
   }
 }
 
+// Helper function to parse query parameters from URL
+function parseQueryParams(url) {
+  const queryString = url.split('?')[1];
+  if (!queryString) return {};
+
+  return queryString.split('&').reduce((params, param) => {
+    const [key, value] = param.split('=');
+    params[decodeURIComponent(key)] = decodeURIComponent(value || '');
+    return params;
+  }, {});
+}
+
 export default async function handler(req, res) {
   if (cors(req, res)) return; // handle OPTIONS
-  
+
   try {
     if (req.method !== 'GET' && req.method !== 'POST') {
       res.writeHead(405, { 'Content-Type': 'application/json' });
@@ -123,16 +135,16 @@ export default async function handler(req, res) {
       const phones = body.phones || [];
       const accountIds = body.accountIds || [];
       const contactIds = body.contactIds || [];
-      
+
       phoneList = Array.isArray(phones) ? phones.map(p => normalizePhone(String(p).trim())).filter(p => p.length === 10) : [];
       accountIdList = Array.isArray(accountIds) ? accountIds.map(id => String(id).trim()).filter(Boolean) : [];
       contactIdList = Array.isArray(contactIds) ? contactIds.map(id => String(id).trim()).filter(Boolean) : [];
     } else {
-      // Handle GET request with query parameters (for backward compatibility)
-      const url = new URL(req.url, `http://${req.headers.host}`);
-      const phones = url.searchParams.get('phones') || '';
-      const accountIds = url.searchParams.get('accountIds') || '';
-      const contactIds = url.searchParams.get('contactIds') || '';
+      // Handle GET request with query parameters (Node.js HTTP doesn't have req.query)
+      const queryParams = parseQueryParams(req.url || '');
+      const phones = queryParams.phones || '';
+      const accountIds = queryParams.accountIds || '';
+      const contactIds = queryParams.contactIds || '';
 
       // Parse comma-separated values
       phoneList = phones ? phones.split(',').map(p => normalizePhone(p.trim())).filter(p => p.length === 10) : [];
