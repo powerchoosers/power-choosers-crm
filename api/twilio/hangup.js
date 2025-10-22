@@ -50,7 +50,7 @@ export default async function handler(req, res) {
       callSid: call.sid,
       status: call.status,
       message: 'Call terminated successfully'
-    });
+    }));
 
   } catch (error) {
     console.error('[Hangup] Error terminating call:', error);

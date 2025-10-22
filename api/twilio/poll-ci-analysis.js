@@ -90,7 +90,8 @@ export default async function handler(req, res) {
                     processingStatus: transcript.processingStatus
                 },
                 message: 'CI analysis failed - manual review needed'
-            });
+            }));
+            return;
         }
         
         if (!isAnalysisComplete) {
@@ -105,7 +106,8 @@ export default async function handler(req, res) {
                     processingStatus: transcript.processingStatus
                 },
                 message: 'Analysis still in progress'
-            });
+            }));
+            return;
         }
         
         // Compute agent/customer channel mapping (align with webhook)
@@ -235,7 +237,7 @@ export default async function handler(req, res) {
             sentenceCount: sentences.length,
             updated: true,
             message: 'Analysis completed (background)'
-        });
+        }));
         
     } catch (error) {
         console.error('[Poll CI Analysis] Error:', error);

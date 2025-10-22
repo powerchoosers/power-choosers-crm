@@ -88,6 +88,6 @@ export default async function handler(req, res) {
             error: 'Failed to lookup caller information',
             details: error.message,
             code: error.code || 'UNKNOWN'
-        });
+        }));
     }
 };

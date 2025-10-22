@@ -65,7 +65,7 @@ export default async function handler(req, res) {
             success: true,
             validationCode: callerIdValidation.validationCode,
             message: 'Caller ID validation initiated'
-        });
+        }));
         
     } catch (error) {
         console.error('[Caller ID] Error:', error);

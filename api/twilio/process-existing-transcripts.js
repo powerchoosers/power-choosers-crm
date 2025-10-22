@@ -310,7 +310,7 @@ export default async function handler(req, res) {
             success: true,
             message: `Processed ${results.length} transcripts`,
             results: results
-        });
+        }));
         
     } catch (error) {
         console.error('[Process Existing Transcripts] Error:', error);

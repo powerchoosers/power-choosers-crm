@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       success: true, 
       executionId,
       message: 'Sequence started successfully'
-    });
+    }));
 
   } catch (error) {
     console.error('[StartSequence] Error:', error);

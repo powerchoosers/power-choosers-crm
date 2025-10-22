@@ -62,7 +62,7 @@ export default async function handler(req, res) {
       trackingId: result.trackingId,
       messageId: result.messageId,
       message: 'Email sent successfully via SendGrid'
-    });
+    }));
 
   } catch (error) {
     console.error('[SendGrid] Send error:', error);
