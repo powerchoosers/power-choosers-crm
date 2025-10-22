@@ -80,6 +80,9 @@ import twilioProcessExistingTranscriptsHandler from './api/twilio/process-existi
 import energyNewsHandler from './api/energy-news.js';
 import recordingHandler from './api/recording.js';
 
+// Import body parsers
+import { readFormUrlEncodedBody } from './api/_form-parser.js';
+
 // Load environment variables from .env file for localhost development
 try {
   await import('dotenv/config');
@@ -244,9 +247,15 @@ function readRawBody(req) {
 
 // Twilio Voice webhook (returns TwiML XML)
 async function handleApiTwilioVoice(req, res, parsedUrl) {
-    if (req.method === 'POST') {
-      const raw = await readRawBody(req);
-    req.rawBody = raw;
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error('[Server] Twilio Voice webhook - Body Parse Error:', error.message);
+      res.writeHead(400, { 'Content-Type': 'text/xml' });
+      res.end('<Response><Say>Error processing request</Say></Response>');
+      return;
+    }
   }
   req.query = { ...parsedUrl.query };
   return await twilioVoiceHandler(req, res);
@@ -255,8 +264,14 @@ async function handleApiTwilioVoice(req, res, parsedUrl) {
 // Twilio Recording status webhook
 async function handleApiTwilioRecording(req, res) {
   if (req.method === 'POST') {
-    const raw = await readRawBody(req);
-    req.rawBody = raw;
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error('[Server] Twilio Recording webhook - Body Parse Error:', error.message);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid request body' }));
+      return;
+    }
   }
   return await twilioRecordingHandler(req, res);
 }
@@ -264,7 +279,7 @@ async function handleApiTwilioRecording(req, res) {
 // Twilio Conversational Intelligence processing endpoint
 async function handleApiTwilioConversationalIntelligence(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await twilioConversationalIntelligenceHandler(req, res);
 }
@@ -272,21 +287,29 @@ async function handleApiTwilioConversationalIntelligence(req, res) {
 // Twilio CI request (starts transcript processing)
 async function handleApiTwilioCIRequest(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await twilioCiRequestHandler(req, res);
 }
 
 // Twilio Conversational Intelligence webhook (Twilio -> our API)
 async function handleApiTwilioConversationalIntelligenceWebhook(req, res) {
-    const raw = await readRawBody(req);
-  req.rawBody = raw;
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error('[Server] Twilio CI webhook - Body Parse Error:', error.message);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid request body' }));
+      return;
+    }
+  }
   return await twilioConversationalIntelligenceWebhookHandler(req, res);
 }
 
 async function handleApiTwilioLanguageWebhook(req, res) {
     if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   const parsedUrl = url.parse(req.url, true);
   req.query = { ...parsedUrl.query };
@@ -295,7 +318,7 @@ async function handleApiTwilioLanguageWebhook(req, res) {
 
 async function handleApiTwilioVoiceIntelligence(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   const parsedUrl = url.parse(req.url, true);
   req.query = { ...parsedUrl.query };
@@ -335,6 +358,21 @@ function readJsonBody(req) {
   });
 }
 
+// Centralized body parser with content-type detection
+async function parseRequestBody(req) {
+  const contentType = (req.headers['content-type'] || '').toLowerCase();
+
+  if (contentType.includes('application/json')) {
+    return readJsonBody(req);
+  } else if (contentType.includes('application/x-www-form-urlencoded')) {
+    return readFormUrlEncodedBody(req);
+  } else {
+    // Default to form-urlencoded for Twilio webhooks that may not specify content-type
+    console.warn(`[Server] Unspecified or unknown Content-Type: ${contentType} for URL: ${req.url} - attempting form-urlencoded parse`);
+    return readFormUrlEncodedBody(req);
+  }
+}
+
 // Twilio API endpoints (proxy to Vercel for production APIs)
 async function handleApiTwilioToken(req, res, parsedUrl) {
   // Call handler directly (no proxy)
@@ -345,11 +383,11 @@ async function handleApiTwilioCall(req, res) {
   // Parse body for POST requests
   if (req.method === 'POST') {
     try {
-      req.body = await readJsonBody(req);
+      req.body = await parseRequestBody(req);
     } catch (error) {
-      console.error('[Server] Twilio Call API - JSON Parse Error:', error.message);
+      console.error('[Server] Twilio Call API - Body Parse Error:', error.message);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Invalid JSON in request body' }));
+      res.end(JSON.stringify({ error: 'Invalid request body' }));
       return;
     }
   }
@@ -361,11 +399,11 @@ async function handleApiTwilioCall(req, res) {
 async function handleApiTwilioAIInsights(req, res) {
   if (req.method === 'POST') {
     try {
-      req.body = await readJsonBody(req);
+      req.body = await parseRequestBody(req);
     } catch (error) {
-      console.error('[Server] Twilio AI Insights API - JSON Parse Error:', error.message);
+      console.error('[Server] Twilio AI Insights API - Body Parse Error:', error.message);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Invalid JSON in request body' }));
+      res.end(JSON.stringify({ error: 'Invalid request body' }));
       return;
     }
   }
@@ -376,11 +414,11 @@ async function handleApiCalls(req, res) {
   // Parse body for POST requests
   if (req.method === 'POST') {
     try {
-      req.body = await readJsonBody(req);
+      req.body = await parseRequestBody(req);
     } catch (error) {
-      console.error('[Server] Calls API - JSON Parse Error:', error.message);
+      console.error('[Server] Calls API - Body Parse Error:', error.message);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Invalid JSON in request body' }));
+      res.end(JSON.stringify({ error: 'Invalid request body' }));
       return;
     }
   }
@@ -408,7 +446,14 @@ async function handleApiCallsAccount(req, res, parsedUrl) {
 async function handleApiCallStatus(req, res, parsedUrl) {
   // Parse body for POST requests
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error('[Server] Call Status API - Body Parse Error:', error.message);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid request body' }));
+      return;
+    }
   }
   
   // Call handler directly (no proxy)
@@ -425,7 +470,14 @@ async function handleApiTxPrice(req, res, parsedUrl) {
 // Twilio Poll CI Analysis (background analyzer)
 async function handleApiTwilioPollCIAnalysis(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error('[Server] Twilio Poll CI Analysis API - Body Parse Error:', error.message);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid request body' }));
+      return;
+    }
   }
   return await twilioPollCiAnalysisHandler(req, res);
 }
@@ -782,42 +834,42 @@ const server = http.createServer(async (req, res) => {
 // Email automation handlers
 async function handleApiEmailAutomationCron(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await emailAutomationCronHandler(req, res);
 }
 
 async function handleApiEmailBackfillThreads(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await emailBackfillThreadsHandler(req, res);
 }
 
 async function handleApiEmailSequenceAutomation(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await emailSequenceAutomationHandler(req, res);
 }
 
 async function handleApiEmailSequenceStatus(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await emailSequenceStatusHandler(req, res);
 }
 
 async function handleApiEmailStartSequence(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await emailStartSequenceHandler(req, res);
 }
 
 async function handleApiEmailUnsubscribe(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await emailUnsubscribeHandler(req, res);
 }
@@ -825,14 +877,14 @@ async function handleApiEmailUnsubscribe(req, res) {
 // Process call and track email performance
 async function handleApiProcessCall(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await processCallHandler(req, res);
 }
 
 async function handleApiTrackEmailPerformance(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await trackEmailPerformanceHandler(req, res);
 }
@@ -866,14 +918,14 @@ async function handleApiLushaUsage(req, res, parsedUrl) {
 // Upload handlers
 async function handleApiUploadHostGoogleAvatar(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await uploadHostGoogleAvatarHandler(req, res);
 }
 
 async function handleApiUploadSignatureImage(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await uploadSignatureImageHandler(req, res);
 }
@@ -881,7 +933,7 @@ async function handleApiUploadSignatureImage(req, res) {
 // Algolia and Maps handlers
 async function handleApiAlgoliaReindex(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await algoliaReindexHandler(req, res);
 }
@@ -893,7 +945,7 @@ async function handleApiMapsConfig(req, res) {
 // Debug handlers
 async function handleApiDebugCall(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await debugCallHandler(req, res);
 }
@@ -1085,7 +1137,7 @@ async function handleApiSearch(req, res, parsedUrl) {
 // Twilio Caller ID lookup: accepts POST { phoneNumber }
 async function handleApiTwilioCallerLookup(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await twilioCallerLookupHandler(req, res);
 }
@@ -1146,7 +1198,7 @@ async function handleApiSendEmail(req, res) {
   }
 
   try {
-    const body = await readJsonBody(req);
+    const body = await parseRequestBody(req);
     const { to, subject, content, from } = body;
 
     if (!to || !subject || !content) {
@@ -1340,7 +1392,7 @@ async function handleApiEmailUpdateTracking(req, res) {
   }
 
   try {
-    const body = await readJsonBody(req);
+    const body = await parseRequestBody(req);
     const { trackingId, type, data } = body;
 
     if (!trackingId || !type) {
@@ -1416,7 +1468,7 @@ async function handleApiEmailWebhook(req, res) {
   }
 
   try {
-    const body = await readJsonBody(req);
+    const body = await parseRequestBody(req);
     const { event, trackingId, data } = body;
 
     // Handle different webhook events
@@ -1507,7 +1559,7 @@ async function handleApiSendGridSend(req, res) {
   });
 
   try {
-    const body = await readJsonBody(req);
+    const body = await parseRequestBody(req);
     const { to, subject, content, from, _deliverability } = body;
 
     if (!to || !subject || !content) {
@@ -1688,7 +1740,7 @@ async function handleApiRecording(req, res, parsedUrl) {
 // SendGrid webhook handler
 async function handleApiSendGridWebhook(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await sendgridWebhookHandler(req, res);
 }
@@ -1696,7 +1748,7 @@ async function handleApiSendGridWebhook(req, res) {
 // SendGrid inbound email handler
 async function handleApiInboundEmail(req, res) {
   if (req.method === 'POST') {
-    req.body = await readJsonBody(req);
+    req.body = await parseRequestBody(req);
   }
   return await inboundEmailHandler(req, res);
 }
