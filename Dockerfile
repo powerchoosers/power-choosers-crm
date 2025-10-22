@@ -4,14 +4,14 @@ FROM node:22-alpine
 # Set working directory
 WORKDIR /app
 
-# Copy application code
-COPY . .
-
 # Copy package files
 COPY package*.json ./
 
 # Install dependencies
 RUN npm install --only=production
+
+# Copy application code
+COPY . .
 
 # Expose port (Cloud Run uses PORT environment variable)
 EXPOSE 8080
