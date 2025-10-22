@@ -2,13 +2,17 @@ import { cors, fetchWithRetry, normalizeDomain, getApiKey, LUSHA_BASE_URL } from
 
 export default async function handler(req, res) {
   cors(req, res);
-  if (req.method !== 'GET') { return res.status(405).json({ error: 'Method not allowed' }); }
+  if (req.method !== 'GET') { return res.writeHead(405, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Method not allowed' }));
+return; }
   
   try {
     const { domain, company, companyId } = req.query || {};
     
     if (!domain && !company && !companyId) {
-      return res.status(400).json({ error: 'Missing required parameter: domain, company, or companyId' });
+      return res.writeHead(400, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Missing required parameter: domain, company, or companyId' }));
+return;
     }
 
     // Build query parameters
@@ -26,7 +30,9 @@ export default async function handler(req, res) {
 
     if (!resp.ok) {
       const text = await resp.text();
-      return res.status(resp.status).json({ error: 'Lusha company error', details: text });
+      return res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Lusha company error', details: text }));
+return;
     }
 
     const raw = await resp.json();
@@ -82,8 +88,12 @@ export default async function handler(req, res) {
     // Debug logging to see the mapped response
     console.log('[Lusha Company API] Mapped company data:', JSON.stringify(companyData, null, 2));
 
-    return res.status(200).json(companyData);
+    return res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify(companyData));
+return;
   } catch (e) {
-    return res.status(500).json({ error: 'Server error', details: e.message });
+    return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Server error', details: e.message }));
+return;
   }
 };

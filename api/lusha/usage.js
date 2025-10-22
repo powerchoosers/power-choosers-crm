@@ -2,7 +2,9 @@ import { cors, fetchWithRetry, getApiKey, LUSHA_BASE_URL } from './_utils.js';
 
 export default async function handler(req, res) {
   cors(req, res);
-  if (req.method !== 'GET') { return res.status(405).json({ error: 'Method not allowed' }); }
+  if (req.method !== 'GET') { return res.writeHead(405, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Method not allowed' }));
+return; }
 
   try {
     const LUSHA_API_KEY = getApiKey();
@@ -14,7 +16,9 @@ export default async function handler(req, res) {
     // Note: This endpoint is rate-limited to ~5 requests/min (per docs). Handle non-200s gracefully.
     if (!resp.ok) {
       const text = await resp.text();
-      return res.status(resp.status).json({ error: 'Lusha usage error', details: text });
+      return res.writeHead(resp.status, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Lusha usage error', details: text }));
+return;
     }
 
     const raw = await resp.json();
@@ -45,9 +49,13 @@ export default async function handler(req, res) {
       minuteUsage: resp.headers.get('x-minute-usage') || null
     };
 
-    return res.status(200).json({ usage: usage || {}, headers });
+    return res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ usage: usage || {}, headers }));
+return;
   } catch (e) {
-    return res.status(500).json({ error: 'Server error', details: e.message });
+    return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Server error', details: e.message }));
+return;
   }
 };
 

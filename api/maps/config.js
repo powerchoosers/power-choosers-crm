@@ -5,7 +5,9 @@ export default async function handler(req, res) {
   if (cors(req, res)) return;
 
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.writeHead(405, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Method not allowed' }));
+return;
   }
 
   try {
@@ -14,14 +16,20 @@ export default async function handler(req, res) {
     const mapId = process.env.GOOGLE_MAP_ID || '';
 
     if (!apiKey) {
-      return res.status(200).json({ apiKey: '', mapId });
+      return res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ apiKey: '', mapId }));
+return;
     }
 
     // Never cache API key in CDN/browser
     res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).json({ apiKey, mapId });
+    return res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ apiKey, mapId }));
+return;
   } catch (e) {
-    return res.status(200).json({ apiKey: '', mapId: '' });
+    return res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ apiKey: '', mapId: '' }));
+return;
   }
 };
 

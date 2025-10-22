@@ -19,7 +19,13 @@ function cors(req, res) {
   res.setHeader('Vary', 'Origin');
 
   if (req.method === 'OPTIONS') {
-    res.status(204).end();
+    res.writeHead(204);
+res.writeHead(200);
+res.writeHead(200);
+res.end();
+return;
+return;
+return;
     return true;
   }
   return false;

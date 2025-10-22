@@ -17,19 +17,25 @@ export default async function handler(req, res) {
   if (cors(req, res)) return;
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.writeHead(405, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Method not allowed' }));
+return;
   }
 
   try {
     const { googlePhotoURL } = req.body || {};
 
     if (!googlePhotoURL) {
-      return res.status(400).json({ error: 'No Google photo URL provided' });
+      return res.writeHead(400, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'No Google photo URL provided' }));
+return;
     }
 
     // Validate it's a Google URL
     if (!googlePhotoURL.includes('googleusercontent.com') && !googlePhotoURL.includes('ggpht.com')) {
-      return res.status(400).json({ error: 'Invalid Google photo URL' });
+      return res.writeHead(400, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Invalid Google photo URL' }));
+return;
     }
 
     // Download the image from Google (server-side, no CORS issues)
@@ -38,7 +44,9 @@ export default async function handler(req, res) {
     
     if (!googleResponse.ok) {
       console.error('[GoogleAvatar] Failed to download from Google:', googleResponse.status);
-      return res.status(500).json({ error: 'Failed to download Google photo' });
+      return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Failed to download Google photo' }));
+return;
     }
 
     // Convert to base64
@@ -58,31 +66,39 @@ export default async function handler(req, res) {
 
     if (!imgurResponse.ok) {
       console.error('[GoogleAvatar] Imgur upload failed:', await imgurResponse.text());
-      return res.status(500).json({ error: 'Failed to upload to hosting service' });
+      return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Failed to upload to hosting service' }));
+return;
     }
 
     const imgurResult = await imgurResponse.json();
     
     if (!imgurResult.success) {
       console.error('[GoogleAvatar] Imgur API error:', imgurResult.data.error);
-      return res.status(500).json({ error: 'Image hosting service error' });
+      return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Image hosting service error' }));
+return;
     }
 
     const imageUrl = imgurResult.data.link;
     console.log('[GoogleAvatar] Avatar hosted successfully:', imageUrl);
 
-    return res.status(200).json({
+    return res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({
       success: true,
       imageUrl: imageUrl,
       message: 'Google avatar hosted successfully'
-    });
+    }));
+return;
 
   } catch (error) {
     console.error('[GoogleAvatar] Error:', error);
-    return res.status(500).json({ 
+    return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ 
       error: 'Internal server error', 
       message: error.message 
-    });
+    }));
+return;
   }
 }
 

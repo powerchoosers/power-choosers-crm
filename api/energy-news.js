@@ -6,7 +6,13 @@ function cors(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
+    res.writeHead(200);
+res.writeHead(200);
+res.writeHead(200);
+res.end();
+return;
+return;
+return;
     return true;
   }
   return false;
@@ -15,7 +21,9 @@ function cors(req, res) {
 export default async function handler(req, res) {
   if (cors(req, res)) return; // handle OPTIONS
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.writeHead(405, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Method not allowed' }));
+return;
   }
 
   try {
@@ -42,11 +50,15 @@ export default async function handler(req, res) {
       items.push({ title, url: link, publishedAt });
     }
 
-    return res.status(200).json({
-      lastRefreshed: new Date().toISOString(),
+    return res.writeHead(200, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({
+      lastRefreshed: new Date());
+return;.toISOString(),
       items
     });
   } catch (error) {
-    return res.status(500).json({ error: 'Failed to fetch energy news', message: error.message });
+    return res.writeHead(500, { 'Content-Type': 'application/json' });
+res.end(JSON.stringify({ error: 'Failed to fetch energy news', message: error.message }));
+return;
   }
 }

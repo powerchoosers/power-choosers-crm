@@ -23,7 +23,11 @@ export function cors(req, res) {
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
-    res.end();
+    res.writeHead(200);
+res.writeHead(200);
+res.end();
+return;
+return;
     return true;
   }
   
