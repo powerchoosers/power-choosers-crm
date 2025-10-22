@@ -264,8 +264,7 @@ async function handleApiTwilioRecording(req, res) {
 // Twilio Conversational Intelligence processing endpoint
 async function handleApiTwilioConversationalIntelligence(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await twilioConversationalIntelligenceHandler(req, res);
 }
@@ -273,8 +272,7 @@ async function handleApiTwilioConversationalIntelligence(req, res) {
 // Twilio CI request (starts transcript processing)
 async function handleApiTwilioCIRequest(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await twilioCiRequestHandler(req, res);
 }
@@ -288,8 +286,7 @@ async function handleApiTwilioConversationalIntelligenceWebhook(req, res) {
 
 async function handleApiTwilioLanguageWebhook(req, res) {
     if (req.method === 'POST') {
-      const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   const parsedUrl = url.parse(req.url, true);
   req.query = { ...parsedUrl.query };
@@ -298,8 +295,7 @@ async function handleApiTwilioLanguageWebhook(req, res) {
 
 async function handleApiTwilioVoiceIntelligence(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   const parsedUrl = url.parse(req.url, true);
   req.query = { ...parsedUrl.query };
@@ -412,8 +408,7 @@ async function handleApiCallsAccount(req, res, parsedUrl) {
 async function handleApiCallStatus(req, res, parsedUrl) {
   // Parse body for POST requests
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   
   // Call handler directly (no proxy)
@@ -430,8 +425,7 @@ async function handleApiTxPrice(req, res, parsedUrl) {
 // Twilio Poll CI Analysis (background analyzer)
 async function handleApiTwilioPollCIAnalysis(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await twilioPollCiAnalysisHandler(req, res);
 }
@@ -788,48 +782,42 @@ const server = http.createServer(async (req, res) => {
 // Email automation handlers
 async function handleApiEmailAutomationCron(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await emailAutomationCronHandler(req, res);
 }
 
 async function handleApiEmailBackfillThreads(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await emailBackfillThreadsHandler(req, res);
 }
 
 async function handleApiEmailSequenceAutomation(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await emailSequenceAutomationHandler(req, res);
 }
 
 async function handleApiEmailSequenceStatus(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await emailSequenceStatusHandler(req, res);
 }
 
 async function handleApiEmailStartSequence(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await emailStartSequenceHandler(req, res);
 }
 
 async function handleApiEmailUnsubscribe(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await emailUnsubscribeHandler(req, res);
 }
@@ -837,16 +825,14 @@ async function handleApiEmailUnsubscribe(req, res) {
 // Process call and track email performance
 async function handleApiProcessCall(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await processCallHandler(req, res);
 }
 
 async function handleApiTrackEmailPerformance(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await trackEmailPerformanceHandler(req, res);
 }
@@ -880,16 +866,14 @@ async function handleApiLushaUsage(req, res, parsedUrl) {
 // Upload handlers
 async function handleApiUploadHostGoogleAvatar(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await uploadHostGoogleAvatarHandler(req, res);
 }
 
 async function handleApiUploadSignatureImage(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await uploadSignatureImageHandler(req, res);
 }
@@ -897,8 +881,7 @@ async function handleApiUploadSignatureImage(req, res) {
 // Algolia and Maps handlers
 async function handleApiAlgoliaReindex(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await algoliaReindexHandler(req, res);
 }
@@ -910,8 +893,7 @@ async function handleApiMapsConfig(req, res) {
 // Debug handlers
 async function handleApiDebugCall(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await debugCallHandler(req, res);
 }
@@ -1103,8 +1085,7 @@ async function handleApiSearch(req, res, parsedUrl) {
 // Twilio Caller ID lookup: accepts POST { phoneNumber }
 async function handleApiTwilioCallerLookup(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await twilioCallerLookupHandler(req, res);
 }
@@ -1707,8 +1688,7 @@ async function handleApiRecording(req, res, parsedUrl) {
 // SendGrid webhook handler
 async function handleApiSendGridWebhook(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await sendgridWebhookHandler(req, res);
 }
@@ -1716,8 +1696,7 @@ async function handleApiSendGridWebhook(req, res) {
 // SendGrid inbound email handler
 async function handleApiInboundEmail(req, res) {
   if (req.method === 'POST') {
-    const body = await readJsonBody(req);
-    req.body = JSON.parse(body);
+    req.body = await readJsonBody(req);
   }
   return await inboundEmailHandler(req, res);
 }
