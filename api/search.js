@@ -51,7 +51,8 @@ export default async function handler(req, res) {
       res.end(JSON.stringify({ 
         error: 'Database not available',
         details: 'Firestore not initialized - check FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY'
-      });
+      }));
+      return;
     }
     
     if (db) {
