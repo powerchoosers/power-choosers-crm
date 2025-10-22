@@ -6,15 +6,19 @@ export default async function handler(req, res) {
 
   // Handle GET requests for webhook testing
   if (req.method === 'GET') {
-    return res.status(200).json({ 
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
       status: 'SendGrid Webhook Endpoint Active',
       timestamp: new Date().toISOString(),
       url: req.url
-    });
+    }));
+    return;
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   try {
@@ -22,7 +26,9 @@ export default async function handler(req, res) {
     
     // SendGrid sends an array of events
     if (!Array.isArray(events)) {
-      return res.status(400).json({ error: 'Invalid webhook payload' });
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid webhook payload' }));
+      return;
     }
 
     console.log(`[SendGrid Webhook] Processing ${events.length} events`);
@@ -31,11 +37,15 @@ export default async function handler(req, res) {
       await processSendGridEvent(event);
     }
 
-    return res.status(200).json({ success: true, processed: events.length });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, processed: events.length }));
+    return;
 
   } catch (error) {
     console.error('[SendGrid Webhook] Error:', error);
-    return res.status(500).json({ error: 'Failed to process webhook' });
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to process webhook' }));
+    return;
   }
 }
 

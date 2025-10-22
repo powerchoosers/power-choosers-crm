@@ -6,11 +6,17 @@ import crypto from 'crypto';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   try {
-    if (!db) return res.status(500).json({ error: 'Firestore not initialized' });
+    if (!db) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Firestore not initialized' }));
+      return;
+    }
 
     const batchSize = Math.min(Number(req.query.limit || 500), 1000);
     const startAfterId = req.query.startAfter || null;
@@ -19,7 +25,11 @@ export default async function handler(req, res) {
     if (startAfterId) q = q.startAfter(startAfterId);
 
     const snap = await q.get();
-    if (snap.empty) return res.status(200).json({ success: true, processed: 0, message: 'No emails to backfill' });
+    if (snap.empty) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, processed: 0, message: 'No emails to backfill' }));
+      return;
+    }
 
     const toUpdate = [];
 
@@ -66,10 +76,14 @@ export default async function handler(req, res) {
 
     await batch.commit();
 
-    return res.status(200).json({ success: true, processed: toUpdate.length, lastId: snap.docs[snap.docs.length-1].id });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, processed: toUpdate.length, lastId: snap.docs[snap.docs.length-1].id }));
+    return;
   } catch (err) {
     console.error('[BackfillThreads] Error:', err);
-    return res.status(500).json({ error: 'Backfill failed', message: err.message });
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Backfill failed', message: err.message }));
+    return;
   }
 }
 

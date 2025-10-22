@@ -6,10 +6,14 @@ export default async function handler(req, res) {
         try {
             console.log('[Status GET] Host:', req.headers.host, 'Query:', req.query || {});
         } catch (_) {}
-        return res.status(200).send('OK');
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('OK');
+        return;
     }
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
     }
     
     try {
@@ -278,10 +282,14 @@ export default async function handler(req, res) {
         }
         
         // Always respond with 200 OK
-        res.status(200).send('OK');
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('OK');
+        return;
         
     } catch (error) {
         console.error('Status callback error:', error);
-        res.status(500).send('Error processing status callback');
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Error processing status callback');
+        return;
     }
 }

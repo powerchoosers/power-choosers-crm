@@ -4,7 +4,9 @@ const VoiceResponse = twilio.twiml.VoiceResponse;
 export default async function handler(req, res) {
     // Allow GET or POST (Twilio Console may be configured for either)
     if (req.method !== 'POST' && req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
     }
     
     try {
@@ -110,7 +112,9 @@ export default async function handler(req, res) {
         const xml = twiml.toString();
         try { console.log('[Voice TwiML]', xml); } catch(_) {}
         res.setHeader('Content-Type', 'text/xml');
-        res.status(200).send(xml);
+        res.writeHead(200);
+        res.end(xml);
+        return;
         
     } catch (error) {
         console.error('Voice webhook error:', error);
@@ -120,6 +124,8 @@ export default async function handler(req, res) {
         twiml.say('Sorry, there was an error processing your call.');
         
         res.setHeader('Content-Type', 'text/xml');
-        res.status(500).send(twiml.toString());
+        res.writeHead(500);
+        res.end(twiml.toString());
+        return;
     }
 }

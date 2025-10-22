@@ -7,7 +7,9 @@ export default async (req, res) => {
   
   // Only allow GET requests
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
   
   try {
@@ -22,17 +24,21 @@ export default async (req, res) => {
     // Validate required environment variables
     if (!accountSid || !apiKeySid || !apiKeySecret) {
       console.error('[Token] Missing Twilio credentials');
-      return res.status(500).json({ 
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
         error: 'Missing Twilio credentials',
         message: 'Please configure TWILIO_ACCOUNT_SID, TWILIO_API_KEY_SID, and TWILIO_API_KEY_SECRET environment variables'
-      });
+      }));
+      return;
     }
     if (!appSid) {
       console.error('[Token] Missing TwiML App SID');
-      return res.status(500).json({
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
         error: 'Missing TwiML App SID',
         message: 'Please configure TWILIO_TWIML_APP_SID in your environment to match the TwiML App with the correct Voice URL.'
-      });
+      }));
+      return;
     }
     
     // Create access token
@@ -57,17 +63,21 @@ export default async (req, res) => {
     console.log(`[Token] Generated for identity: ${identity}`);
     
     // Always return JSON
-    return res.status(200).json({
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       token: token.toJwt(),
       identity: identity
-    });
+    }));
+    return;
     
   } catch (error) {
     console.error('[Token] Generation error:', error);
     // Always return JSON, even on error
-    return res.status(500).json({ 
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
       error: 'Failed to generate token',
       message: error.message 
-    });
+    }));
+    return;
   }
 }

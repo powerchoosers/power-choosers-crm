@@ -6,14 +6,18 @@ export default async function handler(req, res) {
   if (cors(req, res)) return;
   
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   try {
     const { trackingId, _deliverability } = req.query;
     
     if (!trackingId) {
-      return res.status(400).json({ error: 'Missing trackingId parameter' });
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing trackingId parameter' }));
+      return;
     }
 
     // Get deliverability settings (default to enabled if not provided)
@@ -30,7 +34,8 @@ export default async function handler(req, res) {
     // If tracking is disabled, return empty stats
     if (!deliverabilitySettings.enableTracking) {
       console.log('[Email] Tracking disabled by settings, returning empty stats:', trackingId);
-      return res.status(200).json({
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
         trackingId,
         openCount: 0,
         replyCount: 0,
@@ -82,10 +87,14 @@ export default async function handler(req, res) {
       console.warn('[Email] Firebase not available, returning default stats');
     }
 
-    return res.status(200).json(stats);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(stats));
+    return;
 
   } catch (error) {
     console.error('[Email] Stats error:', error);
-    return res.status(500).json({ error: 'Failed to fetch email stats', message: error.message });
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to fetch email stats', message: error.message }));
+    return;
   }
 }

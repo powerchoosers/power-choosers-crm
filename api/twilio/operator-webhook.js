@@ -4,7 +4,11 @@ function cors(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') { res.status(200).end(); return true; }
+  if (req.method === 'OPTIONS') { 
+    res.writeHead(200);
+    res.end();
+    return true; 
+  }
   return false;
 }
 
@@ -57,7 +61,11 @@ function canonicalizeSupplierName(s){
 
 export default async function handler(req, res){
   if (cors(req, res)) return;
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
 
   try {
     const body = parseBody(req) || {};
@@ -67,7 +75,9 @@ export default async function handler(req, res){
     // Attempt to identify callSid from multiple places
     const callSid = pick(body, ['CallSid','callSid','call_sid','customerKey','customer_key','customer_key_sid']) || pick(op, ['CallSid','callSid','call_sid','customerKey']);
     if (!callSid) {
-      return res.status(400).json({ error: 'Missing callSid' });
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing callSid' }));
+      return;
     }
 
     // Build aiInsights by normalizing snake_case to camelCase
@@ -116,10 +126,14 @@ export default async function handler(req, res){
       body: JSON.stringify({ callSid, aiInsights })
     }).catch(()=>{});
 
-    return res.status(200).json({ ok: true });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true }));
+    return;
   } catch (e) {
     console.error('[Operator Webhook] Error:', e);
-    return res.status(500).json({ error: 'Failed to process operator webhook', details: e?.message });
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to process operator webhook', details: e?.message }));
+    return;
   }
 }
 

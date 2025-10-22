@@ -7,7 +7,9 @@ function corsMiddleware(req, res, next) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        res.writeHead(200);
+        res.end();
+        return;
     }
     
     next();
@@ -61,14 +63,18 @@ export default async function handler(req, res) {
     corsMiddleware(req, res, () => {});
     
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
     }
     
     try {
         const { callSid } = req.body;
         
         if (!callSid) {
-            return res.status(400).json({ error: 'CallSid is required' });
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'CallSid is required' }));
+            return;
         }
         
         console.log('[Twilio AI] Processing call insights for:', callSid);
@@ -81,7 +87,9 @@ export default async function handler(req, res) {
         const recordings = await client.recordings.list({ callSid: callSid, limit: 1 });
         
         if (recordings.length === 0) {
-            return res.status(404).json({ error: 'No recording found for this call' });
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'No recording found for this call' }));
+            return;
         }
         
         const recording = recordings[0];
@@ -180,7 +188,8 @@ export default async function handler(req, res) {
         
         console.log('[Twilio AI] Processing completed for:', callSid);
         
-        return res.status(200).json({
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
             success: true,
             callSid,
             transcript,
@@ -189,10 +198,12 @@ export default async function handler(req, res) {
         
     } catch (error) {
         console.error('[Twilio AI] Error:', error);
-        return res.status(500).json({ 
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
             error: 'Failed to process call with Twilio AI',
             details: error.message 
-        });
+        }));
+        return;
     }
 }
 

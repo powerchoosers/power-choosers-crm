@@ -96,7 +96,9 @@ function generateLiveTips(insights) {
 async function handler(req, res) {
     // Only allow POST requests
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
     }
     
     try {
@@ -106,7 +108,9 @@ async function handler(req, res) {
         console.log(`[Voice Intelligence] Insights:`, JSON.stringify(VoiceIntelligenceInsights, null, 2));
         
         if (!CallSid || !VoiceIntelligenceInsights) {
-            return res.status(400).json({ error: 'Missing required parameters' });
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing required parameters' }));
+            return;
         }
         
         // Extract insights data
@@ -153,7 +157,8 @@ async function handler(req, res) {
         
         console.log(`[Voice Intelligence] Processing completed for call: ${CallSid}`);
         
-        return res.status(200).json({
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
             success: true,
             callSid: CallSid,
             insights: insights
@@ -161,10 +166,12 @@ async function handler(req, res) {
         
     } catch (error) {
         console.error('[Voice Intelligence] Error:', error);
-        return res.status(500).json({
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
             error: 'Internal server error',
             message: error.message
-        });
+        }));
+        return;
     }
 }
 
@@ -173,7 +180,11 @@ const allowCors = fn => async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-    if (req.method === 'OPTIONS') return res.status(200).end()
+    if (req.method === 'OPTIONS') {
+        res.writeHead(200);
+        res.end();
+        return;
+    }
     return await fn(req, res)
 }
 

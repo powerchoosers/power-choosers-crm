@@ -6,7 +6,9 @@ const VoiceResponse = twilio.twiml.VoiceResponse;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   try {
@@ -66,8 +68,11 @@ export default async function handler(req, res) {
     }
 
     // Send TwiML response
+    const xml = twiml.toString();
     res.setHeader('Content-Type', 'text/xml');
-    res.status(200).send(twiml.toString());
+    res.writeHead(200);
+    res.end(xml);
+    return;
     
   } catch (error) {
     console.error('[DialComplete] Error:', error);
@@ -76,7 +81,10 @@ export default async function handler(req, res) {
     const twiml = new VoiceResponse();
     twiml.hangup();
     
+    const xml = twiml.toString();
     res.setHeader('Content-Type', 'text/xml');
-    res.status(500).send(twiml.toString());
+    res.writeHead(500);
+    res.end(xml);
+    return;
   }
 }

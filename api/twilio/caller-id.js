@@ -7,7 +7,9 @@ function corsMiddleware(req, res, next) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        res.writeHead(200);
+        res.end();
+        return;
     }
     
     next();
@@ -17,14 +19,18 @@ export default async function handler(req, res) {
     corsMiddleware(req, res, () => {});
     
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
     }
     
     try {
         const { phoneNumber } = req.body;
         
         if (!phoneNumber) {
-            return res.status(400).json({ error: 'Phone number required' });
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Phone number required' }));
+            return;
         }
         
         const client = twilio(
@@ -40,7 +46,8 @@ export default async function handler(req, res) {
         
         console.log('[Caller ID] Validation request created:', callerIdValidation.sid);
         
-        res.status(200).json({
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
             success: true,
             validationCode: callerIdValidation.validationCode,
             message: 'Caller ID validation initiated'
@@ -48,9 +55,11 @@ export default async function handler(req, res) {
         
     } catch (error) {
         console.error('[Caller ID] Error:', error);
-        res.status(500).json({ 
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
             error: 'Failed to initiate caller ID validation',
             details: error.message 
-        });
+        }));
+        return;
     }
 }

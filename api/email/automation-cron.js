@@ -4,7 +4,9 @@ import SequenceAutomation from './sequence-automation.js';
 export default async function handler(req, res) {
   
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   try {
@@ -13,7 +15,9 @@ export default async function handler(req, res) {
     const expectedToken = process.env.CRON_SECRET || 'your-secret-token';
     
     if (authHeader !== `Bearer ${expectedToken}`) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
     }
 
     console.log('[Cron] Starting sequence automation processing...');
@@ -23,17 +27,21 @@ export default async function handler(req, res) {
     
     console.log('[Cron] Sequence automation processing completed');
     
-    return res.status(200).json({ 
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
       success: true, 
       message: 'Sequence automation processed successfully',
       timestamp: new Date().toISOString()
-    });
+    }));
+    return;
 
   } catch (error) {
     console.error('[Cron] Sequence automation error:', error);
-    return res.status(500).json({ 
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
       error: 'Failed to process sequence automation', 
       message: error.message 
-    });
+    }));
+    return;
   }
 }

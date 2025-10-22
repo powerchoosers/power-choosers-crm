@@ -1,16 +1,22 @@
 import twilio from 'twilio';
+import { cors } from '../_cors.js';
 
 const handler = async function handler(req, res) {
+    if (cors(req, res)) return; // handle OPTIONS
     // Only allow POST requests
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
     }
     
     try {
         const { to, from, agent_phone } = req.body;
         
         if (!to) {
-            return res.status(400).json({ error: 'Missing "to" parameter' });
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing "to" parameter' }));
+            return;
         }
         
         console.log(`[Call API] Server call request: ${to}`);
@@ -22,10 +28,12 @@ const handler = async function handler(req, res) {
         const agentPhone = agent_phone || '+19728342317'; // Your personal phone
         
         if (!accountSid || !authToken) {
-            return res.status(500).json({ 
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ 
                 error: 'Missing Twilio credentials',
                 message: 'Configure TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN'
-            });
+            }));
+            return;
         }
         
         const client = twilio(accountSid, authToken);
@@ -50,28 +58,23 @@ const handler = async function handler(req, res) {
         
         console.log(`[Call API] Call initiated: ${call.sid}`);
         
-        res.json({
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
             success: true,
             callSid: call.sid,
             message: 'Call initiated - your phone will ring first'
-        });
+        }));
+        return;
         
     } catch (error) {
         console.error('Server call error:', error);
-        res.status(500).json({
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
             error: 'Failed to initiate call',
             message: error.message
-        });
+        }));
+        return;
     }
 }
 
-const allowCors = fn => async (req, res) => {
-  res.setHeader('Access-Control-Allow-Credentials', true)
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-  if (req.method === 'OPTIONS') return res.status(200).end()
-  return await fn(req, res)
-}
-
-export default allowCors(handler)
+export default handler

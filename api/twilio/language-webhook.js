@@ -61,9 +61,14 @@ async function resolveCallSidFromRecordingSid(recordingSid) {
 
 export default async function handler(req, res) {
   cors(req, res);
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (req.method === 'OPTIONS') { 
+    res.writeHead(200);
+    res.end();
+    return; 
+  }
   if (req.method !== 'POST' && req.method !== 'GET') {
-    res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
 
@@ -104,7 +109,8 @@ export default async function handler(req, res) {
     }
 
     if (!finalCallSid && !transcript) {
-      res.status(200).json({ ok: true, note: 'No callSid/recordingSid or transcript found' });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, note: 'No callSid/recordingSid or transcript found' }));
       return;
     }
 
@@ -129,9 +135,13 @@ export default async function handler(req, res) {
       console.warn('[LanguageWebhook] Failed to post to /api/calls:', e?.message);
     }
 
-    res.status(200).json({ ok: true });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true }));
+    return;
   } catch (e) {
     console.error('[LanguageWebhook] error:', e);
-    res.status(500).json({ error: 'Failed to handle language webhook', message: e?.message });
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Failed to handle language webhook', message: e?.message }));
+    return;
   }
 }

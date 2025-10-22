@@ -5,7 +5,11 @@ function cors(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') { res.status(200).end(); return true; }
+  if (req.method === 'OPTIONS') { 
+    res.writeHead(200);
+    res.end();
+    return true; 
+  }
   return false;
 }
 
@@ -148,7 +152,9 @@ function corsMiddleware(req, res, next) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
     if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+        res.writeHead(200);
+        res.end();
+        return;
     }
     
     next();
@@ -158,7 +164,9 @@ export default async function handler(req, res) {
     corsMiddleware(req, res, () => {});
     
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
     }
     
     try {
@@ -181,7 +189,9 @@ export default async function handler(req, res) {
         
         if (!TranscriptSid || !ServiceSid) {
             console.log('[Conversational Intelligence Webhook] Missing required fields');
-            return res.status(400).json({ error: 'Missing required fields' });
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing required fields' }));
+            return;
         }
         
         // Log full webhook payload for debugging
@@ -209,7 +219,9 @@ export default async function handler(req, res) {
                 analysisStatus,
                 message: 'Waiting for analysis_completed event'
             });
-            return res.status(200).json({ success: true, message: 'Not analysis completion event' });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, message: 'Not analysis completion event' }));
+            return;
         }
         
         // Validate analysis status
@@ -219,7 +231,9 @@ export default async function handler(req, res) {
                 analysisStatus,
                 message: 'Analysis still in progress'
             });
-            return res.status(200).json({ success: true, message: 'Analysis in progress' });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true, message: 'Analysis in progress' }));
+            return;
         }
         
         // Initialize Twilio client
@@ -250,7 +264,9 @@ export default async function handler(req, res) {
                 }
                 if (!allowed) {
                     console.log('[CI Webhook] CI auto-process disabled; ignoring transcript not explicitly requested', { TranscriptSid, callSidFromCustomerKey });
-                    return res.status(202).json({ success: true, gated: true });
+                    res.writeHead(202, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, gated: true }));
+                    return;
                 }
             }
         } catch(_) {}
@@ -267,7 +283,9 @@ export default async function handler(req, res) {
         } catch (e) { try { console.warn('[CI Webhook] Queue error:', e?.message||e); } catch(_) {} }
         const _elapsed = Date.now() - _start;
         try { console.log('[CI Webhook] ACK 200 queued in', _elapsed + 'ms', 'for', TranscriptSid); } catch(_) {}
-        return res.status(200).json({ success: true, queued: true, transcriptSid: TranscriptSid, elapsedMs: _elapsed });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, queued: true, transcriptSid: TranscriptSid, elapsedMs: _elapsed }));
+        return;
         
         try {
             // Get the transcript details and validate CI analysis status
@@ -292,7 +310,9 @@ export default async function handler(req, res) {
                         processingStatus: transcript.processingStatus,
                         message: 'CI analysis failed - manual review needed'
                     });
-                    return res.status(200).json({ success: true, message: 'CI analysis failed' });
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, message: 'CI analysis failed' }));
+                    return;
                 }
                 
                 console.log('[Conversational Intelligence Webhook] CI analysis not completed yet:', {
@@ -302,7 +322,9 @@ export default async function handler(req, res) {
                     processingStatus: transcript.processingStatus,
                     message: 'Waiting for CI analysis to complete'
                 });
-                return res.status(200).json({ success: true, message: 'CI analysis in progress' });
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: 'CI analysis in progress' }));
+                return;
             }
             
             // Compute channel to role mapping for this call (agent vs customer)
@@ -362,7 +384,9 @@ export default async function handler(req, res) {
                 // Validate we have proper sentence segmentation (per Twilio guidance)
                 if (sentencesResponse.length === 0) {
                     console.warn('[Conversational Intelligence Webhook] No sentences returned - CI analysis may not be complete');
-                    return res.status(200).json({ success: true, message: 'No sentences available yet' });
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, message: 'No sentences available yet' }));
+                    return;
                 }
                 
                 // Check for segmentation failure indicators (per Twilio guidance: 5-20+ sentences expected for 1-2 min calls)
@@ -544,17 +568,21 @@ export default async function handler(req, res) {
         
         console.log('[Conversational Intelligence Webhook] Processing completed');
         
-        return res.status(200).json({
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
             success: true,
             message: 'Transcript processed successfully'
-        });
+        }));
+        return;
         
     } catch (error) {
         console.error('[Conversational Intelligence Webhook] Error:', error);
-        return res.status(500).json({ 
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
             error: 'Failed to process webhook',
             details: error.message 
-        });
+        }));
+        return;
     }
 }
 

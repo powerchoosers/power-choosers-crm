@@ -5,20 +5,26 @@ export default async function handler(req, res) {
   if (cors(req, res)) return;
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   try {
     const { email } = req.body;
     
     if (!email) {
-      return res.status(400).json({ error: 'Email address is required' });
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Email address is required' }));
+      return;
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: 'Invalid email address' });
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid email address' }));
+      return;
     }
 
     console.log(`[Unsubscribe] Processing unsubscribe for: ${email}`);
@@ -70,7 +76,8 @@ export default async function handler(req, res) {
 
     console.log(`[Unsubscribe] Successfully unsubscribed ${email}, paused ${pausedSequences} sequences`);
 
-    return res.status(200).json({
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       success: true,
       message: 'Successfully unsubscribed',
       email: email,
@@ -79,9 +86,11 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('[Unsubscribe] Error:', error);
-    return res.status(500).json({ 
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
       error: 'Failed to process unsubscribe request',
       message: error.message 
-    });
+    }));
+    return;
   }
 }
