@@ -61,9 +61,8 @@ export default async function handler(req, res) {
   // We rely on Basic Auth + content-type checks. Avoid IP allowlists without LB due to spoofing risk.
 
   try {
-    // Parse multipart/form-data using formidable
-    const form = new formidable.IncomingForm();
-    
+    // Parse multipart/form-data using formidable (v3+)
+    const form = formidable({ multiples: true });
     const [fields, files] = await new Promise((resolve, reject) => {
       form.parse(req, (err, fields, files) => {
         if (err) {
