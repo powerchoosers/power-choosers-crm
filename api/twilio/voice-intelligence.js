@@ -1,4 +1,5 @@
 import twilio from 'twilio';
+import { cors } from '../_cors.js';
 
 // Generate AI-powered live tips for energy sales calls
 function generateLiveTips(insights) {
@@ -130,7 +131,10 @@ async function handler(req, res) {
         
         // Update the call data in the central store
         try {
-            const base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+            const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
+            const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+            const envBase = process.env.PUBLIC_BASE_URL || '';
+            const base = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm-792458658491.us-south1.run.app');
             await fetch(`${base}/api/calls`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -175,31 +179,7 @@ async function handler(req, res) {
     }
 }
 
-const allowCors = fn => async (req, res) => {
-    res.setHeader('Access-Control-Allow-Credentials', true)
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-    if (req.method === 'OPTIONS') {
-        res.writeHead(200);
-        res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.end();
-return;
-return;
-return;
-return;
-return;
-return;
-return;
-        return;
-    }
-    return await fn(req, res)
+export default async function wrapped(req, res) {
+    if (cors(req, res)) return;
+    return await handler(req, res);
 }
-
-export default allowCors(handler)

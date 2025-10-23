@@ -63,21 +63,7 @@ export default async function handler(req, res) {
   cors(req, res);
   if (req.method === 'OPTIONS') { 
     res.writeHead(200);
-    res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.end();
-return;
-return;
-return;
-return;
-return;
-return;
-return;
+    res.end();
     return; 
   }
   if (req.method !== 'POST' && req.method !== 'GET') {

@@ -6,21 +6,7 @@ function cors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') { 
     res.writeHead(200);
-    res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.end();
-return;
-return;
-return;
-return;
-return;
-return;
-return;
+    res.end();
     return true; 
   }
   return false;
