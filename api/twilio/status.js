@@ -47,6 +47,22 @@ export default async function handler(req, res) {
         console.log(`  From: ${From} → To: ${To}`);
         console.log('  Raw body:', JSON.stringify(body).slice(0, 800));
 
+        // Compute absolute base URL once
+        const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
+        const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+        const envBase = process.env.PUBLIC_BASE_URL || process.env.API_BASE_URL || '';
+        const base = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm-792458658491.us-south1.run.app');
+
+        // Precompute targetPhone/businessPhone for early visibility on UI
+        const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+        const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
+          .split(',').map(norm).filter(Boolean);
+        const to10 = norm(To);
+        const from10 = norm(From);
+        const isBiz = (p) => !!p && envBiz.includes(p);
+        const businessPhone = isBiz(to10) ? To : (isBiz(from10) ? From : (envBiz[0] || ''));
+        const targetPhone = isBiz(to10) && !isBiz(from10) ? from10 : (isBiz(from10) && !isBiz(to10) ? to10 : (to10 || from10));
+
         // Fallback: attempt to start a dual-channel recording when the call is answered/in-progress
         // This complements the /api/twilio/dial-status path and covers cases where Dial callbacks are missed
         async function startDualIfNeeded() {
@@ -149,9 +165,39 @@ export default async function handler(req, res) {
         switch (CallStatus) {
             case 'ringing':
                 console.log(`  📞 Call is ringing...`);
+                // Early upsert for badge visibility (minimal fields)
+                try {
+                    await fetch(`${base}/api/calls`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            callSid: CallSid,
+                            to: To,
+                            from: From,
+                            status: CallStatus,
+                            targetPhone: targetPhone || undefined,
+                            businessPhone: businessPhone || undefined
+                        })
+                    }).catch(()=>{});
+                } catch(_) {}
                 break;
             case 'in-progress':
                 console.log(`  📞 Call answered and in progress`);
+                // Early upsert for badge visibility (minimal fields)
+                try {
+                    await fetch(`${base}/api/calls`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            callSid: CallSid,
+                            to: To,
+                            from: From,
+                            status: CallStatus,
+                            targetPhone: targetPhone || undefined,
+                            businessPhone: businessPhone || undefined
+                        })
+                    }).catch(()=>{});
+                } catch(_) {}
                 break;
             case 'completed':
                 const duration = Duration || CallDuration || '0';
@@ -176,21 +222,12 @@ export default async function handler(req, res) {
                 console.log(`  ℹ️ Status: ${CallStatus}`);
         }
         
-        // Upsert into central /api/calls ONLY on completed status to reduce Firestore writes
+        // Upsert into central /api/calls on completed status with full fields
         // Previously wrote on every status change (initiated, ringing, in-progress, etc.) = ~8-10 writes per call
         // Now only writes once when call completes = ~1 write per call (88% reduction)
         try {
             if (CallStatus === 'completed') {
-                const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
-                // Derive targetPhone and businessPhone for better UI mapping
-                const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
-                const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
-                  .split(',').map(norm).filter(Boolean);
-                const to10 = norm(To);
-                const from10 = norm(From);
-                const isBiz = (p) => !!p && envBiz.includes(p);
-                const businessPhone = isBiz(to10) ? To : (isBiz(from10) ? From : (envBiz[0] || ''));
-                const targetPhone = isBiz(to10) && !isBiz(from10) ? from10 : (isBiz(from10) && !isBiz(to10) ? to10 : (to10 || from10));
+                // targetPhone/businessPhone precomputed above
 
                 try {
                     const body = {
@@ -267,7 +304,6 @@ export default async function handler(req, res) {
                     } catch(_) {}
                 }
                 if (foundUrl) {
-                    const base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
                     await fetch(`${base}/api/calls`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
