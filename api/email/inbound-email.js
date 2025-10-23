@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import formidable from 'formidable';
 import { simpleParser } from 'mailparser';
 import sanitizeHtml from 'sanitize-html';
+import fs from 'fs';
 
 // Optional Basic Auth for Inbound Parse (no-cost hardening)
 function checkBasicAuth(req) {
@@ -17,6 +18,41 @@ function checkBasicAuth(req) {
   const hdr = req.headers['authorization'] || '';
   const expected = 'Basic ' + Buffer.from(`${u}:${p}`).toString('base64');
   return hdr === expected;
+}
+
+// Quoted-printable decoder reused across parsing branches
+function decodeQuotedPrintable(html) {
+  if (!html) return '';
+  try {
+    let decoded = html
+      .replace(/=\r?\n/g, '')
+      .replace(/=([0-9A-F]{2})/g, (match, hex) => String.fromCharCode(parseInt(hex, 16)))
+      .replace(/=20/g, ' ')
+      .replace(/=3D/g, '=')
+      .replace(/=22/g, '"')
+      .replace(/=27/g, "'")
+      .replace(/=0A/g, '\n')
+      .replace(/=0D/g, '\r');
+    return decoded
+      .replace(/href=3D"/gi, 'href="')
+      .replace(/src=3D"/gi, 'src="')
+      .replace(/href="3D/gi, 'href="')
+      .replace(/src="3D/gi, 'src="')
+      .replace(/href=3D%22/gi, 'href="')
+      .replace(/src=3D%22/gi, 'src="')
+      .replace(/href="3D%22/gi, 'href="')
+      .replace(/src="3D%22/gi, 'src="');
+  } catch (error) {
+    console.warn('[InboundEmail] Failed to decode quoted-printable:', error);
+    return html
+      .replace(/href=3D"/gi, 'href="')
+      .replace(/src=3D"/gi, 'src="')
+      .replace(/href="3D/gi, 'href="')
+      .replace(/src="3D/gi, 'src="')
+      .replace(/=3D/gi, '=')
+      .replace(/=22/gi, '"')
+      .replace(/=27/gi, "'");
+  }
 }
 
 export const config = { api: { bodyParser: false } };
@@ -98,114 +134,93 @@ export default async function handler(req, res) {
     };
 
     // Prefer parsing the raw RFC822 when provided by SendGrid
-    const rawMime = first(fields.email);
+    let rawMime = first(fields.email);
+    // Some SendGrid configurations may send the raw MIME as a file part named 'email'
+    if (!rawMime && files && files.email) {
+      const emailFile = Array.isArray(files.email) ? files.email[0] : files.email;
+      try {
+        if (emailFile && emailFile.filepath) {
+          console.log('[InboundEmail] Reading raw MIME from uploaded file part (files.email)');
+          const buf = await fs.promises.readFile(emailFile.filepath);
+          rawMime = buf.toString('utf8');
+        }
+      } catch (fileErr) {
+        console.warn('[InboundEmail] Failed to read raw MIME file:', fileErr?.message || fileErr);
+      }
+    }
+
     if (rawMime) {
       console.log('[InboundEmail] Parsing raw MIME with mailparser');
-      const parsed = await simpleParser(rawMime);
-
-      // Addresses and subject
-      emailData.subject = parsed.subject || emailData.subject || '';
-      emailData.from = (parsed.from && parsed.from.text) || emailData.from || '';
-      emailData.to = (parsed.to && parsed.to.text) || emailData.to || '';
-      if (parsed.cc && parsed.cc.text) emailData.cc = parsed.cc.text;
-
-      // Body selection: prefer HTML, else text
-      let html = parsed.html || '';
-      let text = parsed.text || '';
-
-      // Inline images: replace cid: with data URLs from attachments (safe fallback)
-      if (html && parsed.attachments && parsed.attachments.length) {
-        for (const att of parsed.attachments) {
-          if (att.contentId && att.content) {
-            const dataUrl = `data:${att.contentType};base64,${att.content.toString('base64')}`;
-            const cidPatterns = [
-              new RegExp(`cid:${att.contentId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'),
-            ];
-            for (const rx of cidPatterns) html = html.replace(rx, dataUrl);
-          }
-        }
+      let parsed;
+      try {
+        parsed = await simpleParser(rawMime);
+      } catch (parseErr) {
+        console.warn('[InboundEmail] simpleParser failed, falling back to field-level values:', parseErr?.message || parseErr);
+        parsed = null;
       }
 
-      // Comprehensive quoted-printable decoder (manual implementation)
-      const decodeQuotedPrintable = (html) => {
-        if (!html) return '';
-        
-        try {
-          // First, decode quoted-printable encoding manually
-          let decoded = html
-            // Remove soft line breaks
-            .replace(/=\r?\n/g, '')
-            // Decode quoted-printable hex codes
-            .replace(/=([0-9A-F]{2})/g, (match, hex) => {
-              return String.fromCharCode(parseInt(hex, 16));
-            })
-            // Fix common quoted-printable patterns
-            .replace(/=20/g, ' ')
-            .replace(/=3D/g, '=')
-            .replace(/=22/g, '"')
-            .replace(/=27/g, "'")
-            .replace(/=0A/g, '\n')
-            .replace(/=0D/g, '\r');
-          
-          // Then fix any remaining malformed attributes
-          return decoded
-            .replace(/href=3D"/gi, 'href="')
-            .replace(/src=3D"/gi, 'src="')
-            .replace(/href="3D/gi, 'href="')
-            .replace(/src="3D/gi, 'src="')
-            .replace(/href=3D%22/gi, 'href="')
-            .replace(/src=3D%22/gi, 'src="')
-            .replace(/href="3D%22/gi, 'href="')
-            .replace(/src="3D%22/gi, 'src="');
-        } catch (error) {
-          console.warn('[InboundEmail] Failed to decode quoted-printable:', error);
-          // Fallback to manual regex fixes
-          return html
-            .replace(/href=3D"/gi, 'href="')
-            .replace(/src=3D"/gi, 'src="')
-            .replace(/href="3D/gi, 'href="')
-            .replace(/src="3D/gi, 'src="')
-            .replace(/=3D/gi, '=')
-            .replace(/=22/gi, '"')
-            .replace(/=27/gi, "'");
-        }
-      };
+      if (parsed) {
+        // Addresses and subject
+        emailData.subject = parsed.subject || emailData.subject || '';
+        emailData.from = (parsed.from && parsed.from.text) || emailData.from || '';
+        emailData.to = (parsed.to && parsed.to.text) || emailData.to || '';
+        if (parsed.cc && parsed.cc.text) emailData.cc = parsed.cc.text;
 
-      // Sanitize HTML with data/image support and entity decoding
-      const sanitizedHtml = html ? sanitizeHtml(decodeQuotedPrintable(html), {
-        allowedSchemes: ['http', 'https', 'mailto', 'data'],
-        allowedAttributes: {
-          '*': ['style', 'class', 'id', 'dir', 'align'],
-          'a': ['href', 'name', 'target', 'rel'],
-          'img': ['src', 'alt', 'width', 'height', 'style']
-        },
-        transformTags: {
-          'a': (tagName, attribs) => {
-            // Ensure href doesn't start with malformed encoding
-            if (attribs.href && attribs.href.startsWith('3D')) {
-              attribs.href = attribs.href.replace(/^3D"?/, '');
+        // Body selection: prefer HTML, else text
+        let html = parsed.html || '';
+        let text = parsed.text || '';
+
+        // Inline images: replace cid: with data URLs from attachments (safe fallback)
+        if (html && parsed.attachments && parsed.attachments.length) {
+          for (const att of parsed.attachments) {
+            if (att.contentId && att.content) {
+              const dataUrl = `data:${att.contentType};base64,${att.content.toString('base64')}`;
+              const cidPatterns = [
+                new RegExp(`cid:${att.contentId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'),
+              ];
+              for (const rx of cidPatterns) html = html.replace(rx, dataUrl);
             }
-            return { tagName, attribs };
-          },
-          'img': (tagName, attribs) => {
-            // Ensure src doesn't start with malformed encoding
-            if (attribs.src && attribs.src.startsWith('3D')) {
-              attribs.src = attribs.src.replace(/^3D"?/, '');
-            }
-            return { tagName, attribs };
           }
         }
-      }) : '';
 
-      emailData.html = sanitizedHtml || emailData.html || '';
-      emailData.text = text || emailData.text || '';
+        // decodeQuotedPrintable is now a shared helper (see top)
 
-      // Threading headers
-      emailData.messageId = parsed.messageId || emailData.messageId || '';
-      emailData.inReplyTo = parsed.inReplyTo || '';
-      emailData.references = Array.isArray(parsed.references) ? parsed.references : (parsed.references ? [parsed.references] : []);
-      emailData.date = parsed.date ? new Date(parsed.date).toISOString() : emailData.receivedAt;
-      emailData.headers = Object.fromEntries(parsed.headerLines?.map(h => [h.key, h.line]) || []);
+        // Sanitize HTML with data/image support and entity decoding
+        const sanitizedHtml = html ? sanitizeHtml(decodeQuotedPrintable(html), {
+          allowedSchemes: ['http', 'https', 'mailto', 'data'],
+          allowedAttributes: {
+            '*': ['style', 'class', 'id', 'dir', 'align'],
+            'a': ['href', 'name', 'target', 'rel'],
+            'img': ['src', 'alt', 'width', 'height', 'style']
+          },
+          transformTags: {
+            'a': (tagName, attribs) => {
+              // Ensure href doesn't start with malformed encoding
+              if (attribs.href && attribs.href.startsWith('3D')) {
+                attribs.href = attribs.href.replace(/^3D"?/, '');
+              }
+              return { tagName, attribs };
+            },
+            'img': (tagName, attribs) => {
+              // Ensure src doesn't start with malformed encoding
+              if (attribs.src && attribs.src.startsWith('3D')) {
+                attribs.src = attribs.src.replace(/^3D"?/, '');
+              }
+              return { tagName, attribs };
+            }
+          }
+        }) : '';
+
+        emailData.html = sanitizedHtml || emailData.html || '';
+        emailData.text = text || emailData.text || '';
+
+        // Threading headers
+        emailData.messageId = parsed.messageId || emailData.messageId || '';
+        emailData.inReplyTo = parsed.inReplyTo || '';
+        emailData.references = Array.isArray(parsed.references) ? parsed.references : (parsed.references ? [parsed.references] : []);
+        emailData.date = parsed.date ? new Date(parsed.date).toISOString() : emailData.receivedAt;
+        emailData.headers = Object.fromEntries(parsed.headerLines?.map(h => [h.key, h.line]) || []);
+      }
     } else {
       // If no raw MIME, sanitize any provided HTML and decode text where possible
       if (emailData.html) {

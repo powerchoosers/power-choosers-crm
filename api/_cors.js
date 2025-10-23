@@ -10,13 +10,14 @@ export function cors(req, res) {
     'https://power-choosers-crm-792458658491.us-south1.run.app'
   ];
 
-  // When credentials are included, we cannot use '*'
-  const allowed = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-  res.setHeader('Access-Control-Allow-Origin', allowed);
+  // Only echo specific origins we trust. Do NOT fall back to localhost in production.
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
 
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Vary', 'Origin');
 
   // Handle preflight requests
