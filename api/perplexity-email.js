@@ -1128,17 +1128,19 @@ CRITICAL RULES:
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
-  if (req.method !== 'POST') return res.writeHead(405, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Method not allowed' }));
-return;
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
   
   try {
     const apiKey = process.env.PERPLEXITY_API_KEY;
     if (!apiKey) {
       console.error('[Perplexity] Missing PERPLEXITY_API_KEY');
-      return res.writeHead(500, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Missing API key' }));
-return;
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing API key' }));
+      return;
     }
 
     const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext, meetingPreferences } = req.body || {};

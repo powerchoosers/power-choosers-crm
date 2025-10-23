@@ -201,6 +201,11 @@ async function handleApiPerplexityEmail(req, res) {
     };
     
     const mockRes = {
+      writeHead: (code, headers = {}) => {
+        // Mirror headers and status to the actual response
+        try { Object.entries(headers).forEach(([k,v]) => res.setHeader(k, v)); } catch(_) {}
+        res.statusCode = code;
+      },
       status: (code) => ({
         json: (data) => {
           const origin = req.headers.origin;
@@ -229,6 +234,7 @@ async function handleApiPerplexityEmail(req, res) {
         res.setHeader(key, value);
       },
       end: (data) => {
+        // If handler didn't set status, default to 200
         res.end(data);
       }
     };
@@ -2128,8 +2134,6 @@ async function handleApiSendGridWebhook(req, res) {
 
 // SendGrid inbound email handler
 async function handleApiInboundEmail(req, res) {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
-  }
+  // Do NOT pre-parse the body, formidable in the handler needs the raw stream
   return await inboundEmailHandler(req, res);
 }
