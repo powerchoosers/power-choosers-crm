@@ -141,6 +141,7 @@ export default async function handler(req, res) {
 
         // Query 2: Calls to/from company phone
         if (companyPhone && companyPhone.length === 10) {
+          contactPhones.add(companyPhone);
           const companyCallsSnapshot = await db.collection('calls')
             .where('to', '==', companyPhone)
             .orderBy('timestamp', 'desc')
@@ -205,6 +206,15 @@ export default async function handler(req, res) {
               .get();
 
             contactPhoneCallsFromSnapshot.forEach(doc => {
+              allCalls.push({ id: doc.id, ...doc.data() });
+            });
+            const targetPhoneCallsSnapshot = await db.collection('calls')
+              .where('targetPhone', 'in', batch)
+              .orderBy('timestamp', 'desc')
+              .limit(limit)
+              .get();
+
+            targetPhoneCallsSnapshot.forEach(doc => {
               allCalls.push({ id: doc.id, ...doc.data() });
             });
           }
