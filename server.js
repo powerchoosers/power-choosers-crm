@@ -179,6 +179,16 @@ async function handleApiPerplexityEmail(req, res) {
     return;
   }
   
+  // Ensure body is parsed for POST requests so downstream handler receives req.body
+  try {
+    req.body = await parseRequestBody(req);
+  } catch (error) {
+    console.error('[Server] Perplexity API - Body Parse Error:', error.message);
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Invalid request body' }));
+    return;
+  }
+
   try {
     // Import the Vercel function logic
     const { default: perplexityHandler } = await import('./api/perplexity-email.js');
@@ -583,31 +593,25 @@ async function handleApiTwilioPollCIAnalysis(req, res) {
 // Create HTTP server
 console.log('[Server] Creating HTTP server...');
 const server = http.createServer(async (req, res) => {
-  // Determine path early so we can conditionally skip CORS for webhooks
-  const pathOnly = (req.url && req.url.split('?')[0]) || '';
-  const skipCorsForWebhooks = pathOnly === '/api/email/sendgrid-webhook' || pathOnly === '/api/email/inbound-email';
-
-  // CORS headers (skip for server-to-server webhooks)
-  if (!skipCorsForWebhooks) {
-    const origin = req.headers.origin;
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      'https://powerchoosers.com',
-      'https://www.powerchoosers.com'
-    ];
-    
-    if (allowedOrigins.includes(origin) || LOCAL_DEV_MODE) {
-      res.setHeader('Access-Control-Allow-Origin', origin || '*');
-    } else {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-    }
-    
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Vary', 'Origin');
+  // CORS headers
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://powerchoosers.com',
+    'https://www.powerchoosers.com'
+  ];
+  
+  if (allowedOrigins.includes(origin) || LOCAL_DEV_MODE) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
   }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Vary', 'Origin');
 
   // Parse the URL
   const parsedUrl = url.parse(req.url, true);
@@ -2124,6 +2128,8 @@ async function handleApiSendGridWebhook(req, res) {
 
 // SendGrid inbound email handler
 async function handleApiInboundEmail(req, res) {
-  // Do NOT pre-parse the body for multipart/form-data; let the handler (formidable) read the raw stream.
+  if (req.method === 'POST') {
+    req.body = await parseRequestBody(req);
+  }
   return await inboundEmailHandler(req, res);
 }
