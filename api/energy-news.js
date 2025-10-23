@@ -1,35 +1,8 @@
-// Energy News (Serverless) - Vercel function
-
-// Simple CORS middleware (public)
-function cors(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.end();
-return;
-return;
-return;
-return;
-return;
-return;
-return;
-return;
-    return true;
-  }
-  return false;
-}
+// Energy News (Serverless)
+import { cors } from './_cors.js';
 
 export default async function handler(req, res) {
-  if (cors(req, res)) return; // handle OPTIONS
+  if (cors(req, res)) return; // handle OPTIONS centrally
   if (req.method !== 'GET') {
     return res.writeHead(405, { 'Content-Type': 'application/json' });
 res.end(JSON.stringify({ error: 'Method not allowed' }));

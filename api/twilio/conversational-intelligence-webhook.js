@@ -1,17 +1,7 @@
 import { URLSearchParams } from 'url';
 import { resolveToCallSid, isCallSid } from '../_twilio-ids.js';
 
-function cors(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
-    return true;
-  }
-  return false;
-}
+// Twilio webhook: no CORS needed (server-to-server)
 
 function parseBody(req) {
   const ct = (req.headers['content-type'] || '').toLowerCase();
@@ -145,24 +135,13 @@ function buildSpeakerTurnsFromSentences(sentences, agentChannelStr){
 import twilio from 'twilio';
 import { db } from '../_firebase.js';
 
-// CORS middleware
-function corsMiddleware(req, res, next) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
-    if (req.method === 'OPTIONS') {
-        res.writeHead(200);
-        res.end();
-        return;
-    }
-    
-    next();
-}
-
 export default async function handler(req, res) {
-    corsMiddleware(req, res, () => {});
-    
+    // Compute absolute base URL once for internal posts
+    const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
+    const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+    const envBase = process.env.PUBLIC_BASE_URL || process.env.API_BASE_URL || '';
+    const base = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm-792458658491.us-south1.run.app');
+
     if (req.method !== 'POST') {
         res.writeHead(405, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Method not allowed' }));
@@ -273,7 +252,6 @@ export default async function handler(req, res) {
 
         // Defer heavy work: queue background fetch and ACK fast to avoid webhook retries/timeouts
         try {
-            const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
             const payload = { transcriptSid: TranscriptSid, callSid: isCallSid(CallSid) ? CallSid : '' };
             // Fire-and-forget; do not await
             fetch(`${base}/api/twilio/poll-ci-analysis`, {
@@ -518,7 +496,6 @@ export default async function handler(req, res) {
             
             // Update the call data in the central store (ensure we use a real Call SID to avoid duplicates)
             try {
-                const base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
                 const resolved = await resolveToCallSid({ callSid: CallSid, recordingSid: RecordingSid, transcriptSid: TranscriptSid });
                 const finalCallSid = resolved || (isCallSid(CallSid) ? CallSid : null);
 

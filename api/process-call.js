@@ -1,37 +1,9 @@
 import twilio from 'twilio';
 import { isCallSid } from './_twilio-ids.js';
-
-// CORS middleware
-function corsMiddleware(req, res, next) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
-    if (req.method === 'OPTIONS') {
-        res.writeHead(200);
-        res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.end();
-return;
-return;
-return;
-return;
-return;
-return;
-return;
-        return;
-    }
-    
-    next();
-}
+import { cors } from './_cors.js';
 
 export default async function handler(req, res) {
-    corsMiddleware(req, res, () => {});
+    if (cors(req, res)) return; // handle OPTIONS centrally
     
     if (req.method !== 'POST') {
         res.writeHead(405, { 'Content-Type': 'application/json' });
@@ -164,7 +136,10 @@ async function processRecordingWithTwilio(recordingUrl, callSid) {
         
         // Update the call data in the central store
         try {
-            const base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+            const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
+            const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+            const envBase = process.env.PUBLIC_BASE_URL || process.env.API_BASE_URL || '';
+            const base = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm-792458658491.us-south1.run.app');
             await fetch(`${base}/api/calls`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
