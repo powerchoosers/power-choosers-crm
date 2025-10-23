@@ -19,21 +19,29 @@ async function hasCallsForPhone(phone, db) {
   
   try {
     if (db && db.collection) {
-      // Query calls collection for this phone number
-      const snapshot = await db.collection('calls')
+      // Prefer checking normalized targetPhone (stores last-10-digit number)
+      const targetSnap = await db.collection('calls')
+        .where('targetPhone', '==', phone)
+        .limit(1)
+        .get();
+
+      if (!targetSnap.empty) return true;
+
+      // Fallbacks for legacy records that may not have targetPhone set
+      // Some older records may store 10-digit values in 'to'/'from'
+      const toSnap = await db.collection('calls')
         .where('to', '==', phone)
         .limit(1)
         .get();
-      
-      if (!snapshot.empty) return true;
-      
-      // Also check 'from' field
-      const snapshot2 = await db.collection('calls')
+
+      if (!toSnap.empty) return true;
+
+      const fromSnap = await db.collection('calls')
         .where('from', '==', phone)
         .limit(1)
         .get();
-      
-      return !snapshot2.empty;
+
+      return !fromSnap.empty;
     } else {
       // Fallback to memory store
       for (const [_, call] of memoryStore) {

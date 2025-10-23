@@ -1,8 +1,15 @@
 import { db } from '../_firebase.js';
-import { cors } from '../_cors.js';
+import { createPublicKey, verify as cryptoVerify } from 'crypto';
+
+// Build KeyObject from SendGrid Signed Events public key stored in Cloud Run env
+// Env contains base64-encoded Ed25519 public key (SPKI/DER as shown in SendGrid UI)
+function getSendGridPublicKey() {
+  const keyB64 = process.env.SENDGRID_WEBHOOK_SECRET || '';
+  if (!keyB64) throw new Error('SENDGRID_WEBHOOK_SECRET env is missing');
+  return createPublicKey({ key: Buffer.from(keyB64, 'base64'), format: 'der', type: 'spki' });
+}
 
 export default async function handler(req, res) {
-  if (cors(req, res)) return;
 
   // Handle GET requests for webhook testing
   if (req.method === 'GET') {
@@ -22,7 +29,49 @@ export default async function handler(req, res) {
   }
 
   try {
-    const events = req.body;
+    // Require JSON payload
+    const contentType = (req.headers['content-type'] || '').toLowerCase();
+    if (!contentType.includes('application/json')) {
+      res.writeHead(415, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unsupported Media Type: expected application/json' }));
+      return;
+    }
+
+    // Verify SendGrid Signed Event Webhook (Ed25519)
+    const sig = req.headers['x-twilio-email-event-webhook-signature'];
+    const ts = req.headers['x-twilio-email-event-webhook-timestamp'];
+    const raw = typeof req.rawBody === 'string' ? req.rawBody : '';
+
+    if (!sig || !ts || !raw) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing signature headers or raw body' }));
+      return;
+    }
+
+    let verified = false;
+    try {
+      const msg = Buffer.from(ts + raw, 'utf8');
+      const key = getSendGridPublicKey();
+      // For Ed25519, pass algorithm null
+      verified = cryptoVerify(null, msg, key, Buffer.from(sig, 'base64'));
+    } catch (e) {
+      console.error('[SendGrid Webhook] Signature verification error:', e);
+      verified = false;
+    }
+
+    if (!verified) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Signature verification failed' }));
+      return;
+    }
+
+    // Use verified raw body for parsing
+    let events;
+    try {
+      events = JSON.parse(raw);
+    } catch (_) {
+      events = req.body;
+    }
     
     // SendGrid sends an array of events
     if (!Array.isArray(events)) {
@@ -51,25 +100,27 @@ export default async function handler(req, res) {
 
 async function processSendGridEvent(event) {
   const { event: eventType, email, sg_message_id, timestamp, reason, category, url } = event;
+  const trackingId = (event.custom_args && (event.custom_args.trackingId || event.custom_args.trackingID)) || null;
   
   console.log(`[SendGrid Webhook] Processing ${eventType} for ${email}`, {
     sg_message_id,
     timestamp,
-    url: url || 'N/A'
+    url: url || 'N/A',
+    trackingId
   });
 
   try {
     switch (eventType) {
       case 'delivered':
-        await handleDelivered(email, sg_message_id, timestamp);
+        await handleDelivered(email, sg_message_id, timestamp, trackingId);
         break;
         
       case 'open':
-        await handleOpen(email, sg_message_id, timestamp);
+        await handleOpen(email, sg_message_id, timestamp, trackingId);
         break;
         
       case 'click':
-        await handleClick(email, sg_message_id, timestamp, event.url);
+        await handleClick(email, sg_message_id, timestamp, event.url, trackingId);
         break;
         
       case 'bounce':
@@ -100,8 +151,28 @@ async function processSendGridEvent(event) {
   }
 }
 
-async function handleDelivered(email, sgMessageId, timestamp) {
+async function handleDelivered(email, sgMessageId, timestamp, trackingId) {
   // Update email record with delivery confirmation
+  const deliveredAtIso = new Date(timestamp * 1000).toISOString();
+
+  // Prefer direct ID mapping via custom_args.trackingId
+  if (trackingId) {
+    try {
+      const ref = db.collection('emails').doc(trackingId);
+      const snap = await ref.get();
+      if (snap.exists) {
+        await ref.update({
+          status: 'delivered',
+          deliveredAt: deliveredAtIso,
+          sgMessageId: sgMessageId,
+          updatedAt: new Date().toISOString()
+        });
+        console.log(`[SendGrid Webhook] Marked email as delivered by trackingId: ${trackingId}`);
+        return;
+      }
+    } catch(_) { /* continue to fallbacks */ }
+  }
+
   const emailQuery = await db.collection('emails')
     .where('to', 'array-contains', email)
     .where('status', '==', 'sent')
@@ -112,16 +183,41 @@ async function handleDelivered(email, sgMessageId, timestamp) {
     const emailDoc = emailQuery.docs[0];
     await emailDoc.ref.update({
       status: 'delivered',
-      deliveredAt: new Date(timestamp * 1000).toISOString(),
+      deliveredAt: deliveredAtIso,
       sgMessageId: sgMessageId,
       updatedAt: new Date().toISOString()
     });
-    console.log(`[SendGrid Webhook] Marked email as delivered: ${email}`);
+    console.log(`[SendGrid Webhook] Marked email as delivered (fallback): ${email}`);
   }
 }
 
-async function handleOpen(email, sgMessageId, timestamp) {
+async function handleOpen(email, sgMessageId, timestamp, trackingId) {
   // Find and update the email record by messageId first, then by email
+  // Prefer direct ID mapping via custom_args.trackingId
+  if (trackingId) {
+    try {
+      const ref = db.collection('emails').doc(trackingId);
+      const snap = await ref.get();
+      if (snap.exists) {
+        const emailData = snap.data();
+        const openData = {
+          openedAt: new Date(timestamp * 1000).toISOString(),
+          sgMessageId: sgMessageId,
+          userAgent: 'SendGrid Webhook',
+          ip: 'SendGrid Server'
+        };
+        await ref.update({
+          opens: [...(emailData.opens || []), openData],
+          openCount: (emailData.openCount || 0) + 1,
+          lastOpened: openData.openedAt,
+          updatedAt: new Date().toISOString()
+        });
+        console.log(`[SendGrid Webhook] Recorded open by trackingId: ${trackingId}`);
+        return;
+      }
+    } catch(_) { /* continue to fallbacks */ }
+  }
+
   let emailQuery = await db.collection('emails')
     .where('messageId', '==', sgMessageId)
     .limit(1)
@@ -161,8 +257,34 @@ async function handleOpen(email, sgMessageId, timestamp) {
   }
 }
 
-async function handleClick(email, sgMessageId, timestamp, url) {
+async function handleClick(email, sgMessageId, timestamp, url, trackingId) {
   // Find and update the email record by messageId first, then by email
+  // Prefer direct ID mapping via custom_args.trackingId
+  if (trackingId) {
+    try {
+      const ref = db.collection('emails').doc(trackingId);
+      const snap = await ref.get();
+      if (snap.exists) {
+        const emailData = snap.data();
+        const clickData = {
+          clickedAt: new Date(timestamp * 1000).toISOString(),
+          sgMessageId: sgMessageId,
+          url: url,
+          userAgent: 'SendGrid Webhook',
+          ip: 'SendGrid Server'
+        };
+        await ref.update({
+          clicks: [...(emailData.clicks || []), clickData],
+          clickCount: (emailData.clickCount || 0) + 1,
+          lastClicked: clickData.clickedAt,
+          updatedAt: new Date().toISOString()
+        });
+        console.log(`[SendGrid Webhook] Recorded click by trackingId: ${trackingId}`);
+        return;
+      }
+    } catch(_) { /* continue to fallbacks */ }
+  }
+
   let emailQuery = await db.collection('emails')
     .where('messageId', '==', sgMessageId)
     .limit(1)
