@@ -78,9 +78,9 @@ import twilioTranscribeHandler from './api/twilio/transcribe.js';
 import twilioDialCompleteHandler from './api/twilio/dial-complete.js';
 import twilioProcessExistingTranscriptsHandler from './api/twilio/process-existing-transcripts.js';
 import energyNewsHandler from './api/energy-news.js';
-import recordingHandler from './api/recording.js';
 import twilioBridgeHandler from './api/twilio/bridge.js';
 import twilioOperatorWebhookHandler from './api/twilio/operator-webhook.js';
+import twilio from 'twilio';
 
 // Import body parsers
 import { readFormUrlEncodedBody } from './api/_form-parser.js';
@@ -265,10 +265,19 @@ async function handleApiTwilioVoice(req, res, parsedUrl) {
     } catch (error) {
       console.error(`[${correlationId}] [Server] Twilio Voice webhook - Body Parse Error:`, error.message, error.stack);
       res.writeHead(400, { 'Content-Type': 'text/xml' });
-      res.end('<Response><Say>Error processing request</Say></Response>');
+      res.end('<Response><Say>Invalid request body</Say></Response>');
+      return;
+    }
+    const ct = (req.headers['content-type'] || '').toLowerCase();
+    const ok = ct.includes('application/json') ? validateTwilioJson(req) : validateTwilioForm(req);
+    if (!ok) {
+      res.writeHead(403, { 'Content-Type': 'text/xml' });
+      res.end('<Response><Say>Forbidden</Say></Response>');
       return;
     }
   }
+
+  // Add query parameters to req.query for handler
   req.query = { ...parsedUrl.query };
   
   try {
@@ -299,6 +308,14 @@ async function handleApiTwilioRecording(req, res) {
         correlationId 
       }));
       return;
+    }
+    const ct = (req.headers['content-type'] || '').toLowerCase();
+    if (ct.includes('application/x-www-form-urlencoded')) {
+      if (!validateTwilioForm(req)) {
+        res.writeHead(403, { 'Content-Type': 'text/plain' });
+        res.end('Twilio signature validation failed');
+        return;
+      }
     }
   }
   
@@ -343,6 +360,13 @@ async function handleApiTwilioConversationalIntelligenceWebhook(req, res) {
       res.end(JSON.stringify({ error: 'Invalid request body' }));
       return;
     }
+    const ct = (req.headers['content-type'] || '').toLowerCase();
+    const ok = ct.includes('application/json') ? validateTwilioJson(req) : validateTwilioForm(req);
+    if (!ok) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Twilio signature validation failed' }));
+      return;
+    }
   }
   return await twilioConversationalIntelligenceWebhookHandler(req, res);
 }
@@ -353,6 +377,15 @@ async function handleApiTwilioLanguageWebhook(req, res) {
   }
   const parsedUrl = url.parse(req.url, true);
   req.query = { ...parsedUrl.query };
+  if (req.method === 'POST') {
+    const ct = (req.headers['content-type'] || '').toLowerCase();
+    const ok = ct.includes('application/json') ? validateTwilioJson(req) : validateTwilioForm(req);
+    if (!ok) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Twilio signature validation failed' }));
+      return;
+    }
+  }
   return await twilioLanguageWebhookHandler(req, res);
 }
 
@@ -378,6 +411,7 @@ function readJsonBody(req) {
     });
     req.on('end', () => {
       try { 
+        try { req.rawBody = data; } catch(_) {}
         resolve(data ? JSON.parse(data) : {}); 
       } catch (e) { 
         console.error('[Server] JSON Parse Error:', {
@@ -411,6 +445,30 @@ async function parseRequestBody(req) {
     console.warn(`[Server] Unspecified or unknown Content-Type: ${contentType} for URL: ${req.url} - attempting form-urlencoded parse`);
     return readFormUrlEncodedBody(req);
   }
+}
+
+function getExternalUrl(req) {
+  const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+  return `${proto}://${host}${req.url}`;
+}
+
+function validateTwilioForm(req) {
+  const sig = req.headers['x-twilio-signature'];
+  const token = process.env.TWILIO_AUTH_TOKEN || '';
+  if (!sig || !token) return true;
+  const urlFull = getExternalUrl(req);
+  const params = (req && req.body && typeof req.body === 'object') ? req.body : {};
+  try { return !!twilio.validateRequest(token, sig, urlFull, params); } catch(_) { return false; }
+}
+
+function validateTwilioJson(req) {
+  const sig = req.headers['x-twilio-signature'];
+  const token = process.env.TWILIO_AUTH_TOKEN || '';
+  if (!sig || !token) return true;
+  const urlFull = getExternalUrl(req);
+  const raw = typeof req.rawBody === 'string' ? req.rawBody : '';
+  try { return !!twilio.validateRequestBody(token, sig, urlFull, raw); } catch(_) { return false; }
 }
 
 // Twilio API endpoints (proxy to Vercel for production APIs)
@@ -1051,6 +1109,14 @@ async function handleApiTwilioStatus(req, res) {
       }));
       return;
     }
+    const ct = (req.headers['content-type'] || '').toLowerCase();
+    if (ct.includes('application/x-www-form-urlencoded')) {
+      if (!validateTwilioForm(req)) {
+        res.writeHead(403, { 'Content-Type': 'text/plain' });
+        res.end('Twilio signature validation failed');
+        return;
+      }
+    }
   }
   
   try {
@@ -1083,6 +1149,14 @@ async function handleApiTwilioDialStatus(req, res) {
         correlationId 
       }));
       return;
+    }
+    const ct = (req.headers['content-type'] || '').toLowerCase();
+    if (ct.includes('application/x-www-form-urlencoded')) {
+      if (!validateTwilioForm(req)) {
+        res.writeHead(403, { 'Content-Type': 'text/plain' });
+        res.end('Twilio signature validation failed');
+        return;
+      }
     }
   }
   
@@ -1117,6 +1191,13 @@ async function handleApiTwilioHangup(req, res) {
       }));
       return;
     }
+    const ct = (req.headers['content-type'] || '').toLowerCase();
+    const ok = ct.includes('application/json') ? validateTwilioJson(req) : validateTwilioForm(req);
+    if (!ok) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('Twilio signature validation failed');
+      return;
+    }
   }
   
   try {
@@ -1148,6 +1229,13 @@ async function handleApiTwilioCallerId(req, res) {
         details: error.message,
         correlationId 
       }));
+      return;
+    }
+    const ct = (req.headers['content-type'] || '').toLowerCase();
+    const ok = ct.includes('application/json') ? validateTwilioJson(req) : validateTwilioForm(req);
+    if (!ok) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('Twilio signature validation failed');
       return;
     }
   }
@@ -1979,8 +2067,18 @@ async function handleApiRecording(req, res, parsedUrl) {
       return;
     }
 
+    // Prefer dual-channel playback if not explicitly requested
+    let fetchUrl = remoteUrl;
+    try {
+      const u = new URL(fetchUrl);
+      if (!u.searchParams.has('RequestedChannels')) {
+        u.searchParams.set('RequestedChannels', '2');
+      }
+      fetchUrl = u.toString();
+    } catch (_) {}
+
     const authHeader = 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64');
-    const upstream = await fetch(remoteUrl, { headers: { Authorization: authHeader } });
+    const upstream = await fetch(fetchUrl, { headers: { Authorization: authHeader } });
     if (!upstream.ok) {
       const txt = await upstream.text().catch(() => '');
       res.writeHead(upstream.status, { 'Content-Type': 'text/plain' });
@@ -1991,7 +2089,10 @@ async function handleApiRecording(req, res, parsedUrl) {
     // Stream audio back to the client
     res.writeHead(200, {
       'Content-Type': upstream.headers.get('content-type') || 'audio/mpeg',
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET',
+      'Vary': 'Origin'
     });
     const reader = upstream.body.getReader();
     const pump = () => reader.read().then(({ done, value }) => {
