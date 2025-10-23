@@ -45,6 +45,19 @@
     document._emailsRestoreBound = true;
   }
 
+  // Subscribe to background email update events once
+  if (!document._emailsRealtimeBound) {
+    try {
+      document.addEventListener('pc:emails-loaded', () => {
+        try { loadData(); } catch(_) {}
+      });
+      document.addEventListener('pc:emails-updated', () => {
+        try { loadData(); } catch(_) {}
+      });
+      document._emailsRealtimeBound = true;
+    } catch(_) {}
+  }
+
   // Initialize DOM references
   function initDomRefs() {
     els.page = document.getElementById('emails-page');
@@ -249,8 +262,15 @@
       console.log('[EmailsPage] Inbox filter applied. Filtered count:', filtered.length);
     } else if (state.currentFolder === 'sent') {
       filtered = filtered.filter(email => {
-        // Only use standardized field for sent emails (new emails only)
-        return email.type === 'sent' && !email.deleted;
+        // Accept multiple indicators for sent emails to support legacy and new records
+        const isSent = (
+          email.type === 'sent' ||
+          email.emailType === 'sent' ||
+          email.isSentEmail === true ||
+          email.status === 'sent' ||
+          email.provider === 'sendgrid'
+        );
+        return isSent && !email.deleted;
       });
       console.log('[EmailsPage] Sent filter applied. Filtered count:', filtered.length);
     } else if (state.currentFolder === 'starred') {
