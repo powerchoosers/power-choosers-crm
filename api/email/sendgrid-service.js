@@ -145,6 +145,11 @@ export class SendGridService {
         };
       }
 
+      // Attach custom args so webhooks can resolve trackingId directly
+      if (trackingId) {
+        msg.customArgs = { trackingId };
+      }
+
       // Send email via SendGrid
       const response = await sgMail.send(msg);
       

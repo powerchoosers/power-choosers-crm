@@ -583,25 +583,31 @@ async function handleApiTwilioPollCIAnalysis(req, res) {
 // Create HTTP server
 console.log('[Server] Creating HTTP server...');
 const server = http.createServer(async (req, res) => {
-  // CORS headers
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'https://powerchoosers.com',
-    'https://www.powerchoosers.com'
-  ];
-  
-  if (allowedOrigins.includes(origin) || LOCAL_DEV_MODE) {
-    res.setHeader('Access-Control-Allow-Origin', origin || '*');
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+  // Determine path early so we can conditionally skip CORS for webhooks
+  const pathOnly = (req.url && req.url.split('?')[0]) || '';
+  const skipCorsForWebhooks = pathOnly === '/api/email/sendgrid-webhook' || pathOnly === '/api/email/inbound-email';
+
+  // CORS headers (skip for server-to-server webhooks)
+  if (!skipCorsForWebhooks) {
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'https://powerchoosers.com',
+      'https://www.powerchoosers.com'
+    ];
+    
+    if (allowedOrigins.includes(origin) || LOCAL_DEV_MODE) {
+      res.setHeader('Access-Control-Allow-Origin', origin || '*');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Vary', 'Origin');
   }
-  
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Vary', 'Origin');
 
   // Parse the URL
   const parsedUrl = url.parse(req.url, true);
@@ -2118,8 +2124,6 @@ async function handleApiSendGridWebhook(req, res) {
 
 // SendGrid inbound email handler
 async function handleApiInboundEmail(req, res) {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
-  }
+  // Do NOT pre-parse the body for multipart/form-data; let the handler (formidable) read the raw stream.
   return await inboundEmailHandler(req, res);
 }

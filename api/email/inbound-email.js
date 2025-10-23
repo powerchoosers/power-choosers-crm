@@ -9,22 +9,14 @@ import formidable from 'formidable';
 import { simpleParser } from 'mailparser';
 import sanitizeHtml from 'sanitize-html';
 
-// SendGrid signature verification
-function verifySendGridSignature(payload, signature, timestamp, publicKey) {
-  try {
-    const expectedSignature = crypto
-      .createHmac('sha256', publicKey)
-      .update(timestamp + payload)
-      .digest('base64');
-    
-    return crypto.timingSafeEqual(
-      Buffer.from(signature, 'base64'),
-      Buffer.from(expectedSignature, 'base64')
-    );
-  } catch (error) {
-    console.error('[InboundEmail] Signature verification error:', error);
-    return false;
-  }
+// Optional Basic Auth for Inbound Parse (no-cost hardening)
+function checkBasicAuth(req) {
+  const u = process.env.INBOUND_AUTH_USERNAME || '';
+  const p = process.env.INBOUND_AUTH_PASSWORD || '';
+  if (!u || !p) return true; // auth disabled
+  const hdr = req.headers['authorization'] || '';
+  const expected = 'Basic ' + Buffer.from(`${u}:${p}`).toString('base64');
+  return hdr === expected;
 }
 
 export const config = { api: { bodyParser: false } };
@@ -47,32 +39,26 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Enhanced security checks
-  if (!isFromSendGrid) {
-    console.log('[InboundEmail] Rejecting request - not from SendGrid');
-    res.writeHead(403, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Forbidden - not from SendGrid' }));
+  // Enhanced security checks (no extra paid infra)
+  // Enforce content type
+  const ct = (req.headers['content-type'] || '').toLowerCase();
+  if (!ct.includes('multipart/form-data')) {
+    console.log('[InboundEmail] Rejecting request - invalid content type:', ct);
+    res.writeHead(415, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Unsupported Media Type: expected multipart/form-data' }));
     return;
   }
 
-  // SendGrid signature verification (if webhook secret is configured)
-  if (process.env.SENDGRID_WEBHOOK_SECRET) {
-    const signature = req.headers['x-sendgrid-signature'];
-    const timestamp = req.headers['x-sendgrid-timestamp'];
-    
-    if (!signature || !timestamp) {
-      console.log('[InboundEmail] Missing signature or timestamp headers');
-      res.writeHead(403, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing signature headers' }));
-      return;
-    }
-    
-    // Note: For signature verification, we need the raw body
-    // This is a simplified check - in production, you'd need to capture raw body
-    console.log('[InboundEmail] Signature verification would be performed here');
-    console.log('[InboundEmail] Signature:', signature);
-    console.log('[InboundEmail] Timestamp:', timestamp);
+  // Optional Basic Auth via env
+  if (!checkBasicAuth(req)) {
+    console.log('[InboundEmail] Basic Auth failed');
+    res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="SendGrid Inbound"', 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Unauthorized' }));
+    return;
   }
+
+  // Note: Inbound Parse does not provide a first-party signed payload like Event Webhooks.
+  // We rely on Basic Auth + content-type checks. Avoid IP allowlists without LB due to spoofing risk.
 
   try {
     // Parse multipart/form-data using formidable
