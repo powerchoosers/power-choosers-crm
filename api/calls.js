@@ -1,18 +1,6 @@
 // Firestore-backed Calls API (GET recent calls, POST upsert by Call SID)
 // Uses Firebase Admin via api/_firebase.js; falls back to in-memory map if Firestore unavailable
-
-function corsMiddleware(req, res, next) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, PATCH, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
-    return;
-  }
-  next();
-}
-
+import { cors } from './_cors.js';
 import { db } from './_firebase.js';
 import { resolveToCallSid, isCallSid } from './_twilio-ids.js';
 
@@ -198,7 +186,7 @@ async function upsertCallInFirestore(payload) {
 }
 
 export default async function handler(req, res) {
-  corsMiddleware(req, res, () => {});
+  if (cors(req, res)) return;
 
   try {
     if (req.method === 'GET') {
@@ -261,8 +249,10 @@ export default async function handler(req, res) {
 
     if (req.method === 'DELETE') {
       // Support bulk or single delete by Call SID (id)
-      let body = {};
-      try { body = await readJson(req); } catch(_) { body = {}; }
+      let body = (req.body && typeof req.body === 'object') ? req.body : {};
+      if (!Object.keys(body).length) {
+        try { body = await readJson(req); } catch(_) { body = {}; }
+      }
       const ids = [];
       const pushId = (v) => { if (typeof v === 'string' && v.trim()) ids.push(v.trim()); };
       pushId(body.id);
@@ -314,7 +304,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const payload = await readJson(req);
+      const payload = (req.body && typeof req.body === 'object') ? req.body : await readJson(req);
 
       // Strict de-dup policy: only persist when we have a valid Twilio Call SID
       let callId = (payload.callSid && String(payload.callSid)) || '';
@@ -389,7 +379,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'PATCH') {
-      const payload = await readJson(req);
+      const payload = (req.body && typeof req.body === 'object') ? req.body : await readJson(req);
       const { callId, contactName, contactId } = payload;
 
       if (!callId) {

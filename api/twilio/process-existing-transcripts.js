@@ -10,21 +10,7 @@ function corsMiddleware(req, res, next) {
     
     if (req.method === 'OPTIONS') {
         res.writeHead(200);
-        res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.writeHead(200);
-res.end();
-return;
-return;
-return;
-return;
-return;
-return;
-return;
+        res.end();
         return;
     }
     
