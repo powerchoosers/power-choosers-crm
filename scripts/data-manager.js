@@ -97,7 +97,23 @@
     console.log('[DataManager] Starting data migration...');
     
     const db = firebase.firestore();
-    const collections = ['accounts', 'contacts', 'activities', 'tasks', 'emails', 'calls', 'notes', 'lists'];
+    const collections = [
+      'accounts',
+      'contacts',
+      'activities',
+      'tasks',
+      'emails',
+      'calls',
+      'notes',
+      'lists',
+      // Newly added per request
+      'notifications',
+      'settings',
+      'sequences',
+      'sequenceMembers',
+      'listMembers',
+      'threads'
+    ];
     const batchLimit = 500; // Firestore batch limit
     let totalUpdated = 0;
     
@@ -116,17 +132,28 @@
           const currentOwner = data.ownerId ? String(data.ownerId).toLowerCase() : null;
           const currentAssigned = data.assignedTo ? String(data.assignedTo).toLowerCase() : null;
           const currentCreatedBy = data.createdBy ? String(data.createdBy).toLowerCase() : null;
+          const currentUserId = data.userId ? String(data.userId).toLowerCase() : null; // for notifications/settings/members
 
           const updatePayload = {};
 
+          // Collection-specific owner inference
+          let inferredOwner = null;
+          if ((collectionName === 'notifications' || collectionName === 'settings' || 
+               collectionName === 'sequenceMembers' || collectionName === 'listMembers') && currentUserId) {
+            inferredOwner = currentUserId; // these are per-user docs
+          } else if (collectionName === 'sequences') {
+            // personal sequences: prefer existing owner, else createdBy
+            inferredOwner = currentOwner || currentCreatedBy || null;
+          }
+
           // If no ownership info at all, set to admin
           if (!currentOwner && !currentCreatedBy) {
-            updatePayload.ownerId = ADMIN_EMAIL;
+            updatePayload.ownerId = inferredOwner || ADMIN_EMAIL;
             updatePayload.createdBy = ADMIN_EMAIL;
-            updatePayload.assignedTo = ADMIN_EMAIL;
+            updatePayload.assignedTo = inferredOwner || ADMIN_EMAIL;
           } else {
             // Backfill missing with best available info, else admin
-            if (!currentOwner) updatePayload.ownerId = currentCreatedBy || currentAssigned || ADMIN_EMAIL;
+            if (!currentOwner) updatePayload.ownerId = inferredOwner || currentCreatedBy || currentAssigned || ADMIN_EMAIL;
             if (!currentAssigned) updatePayload.assignedTo = currentOwner || currentCreatedBy || ADMIN_EMAIL;
             if (!currentCreatedBy) updatePayload.createdBy = currentOwner || ADMIN_EMAIL;
 
