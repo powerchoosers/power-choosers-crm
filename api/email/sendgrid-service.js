@@ -155,9 +155,9 @@ export class SendGridService {
         trackingId: trackingId
       });
 
-      // Store email record in Firebase if tracking is enabled
-              if (deliverabilitySettings.enableTracking && trackingId && db) {
-                await this.storeEmailRecord({ ...emailData, threadId }, response[0].headers['x-message-id']);
+      // Store email record in Firebase (always store regardless of tracking setting)
+      if (trackingId && db) {
+        await this.storeEmailRecord({ ...emailData, threadId }, response[0].headers['x-message-id']);
       }
 
       return {
