@@ -3,7 +3,30 @@ import fs from 'fs';
 import path from 'path';
 import url from 'url';
 import { fileURLToPath } from 'url';
-import logger from './api/_logger.js';
+// Simple logging function for Cloud Run cost optimization
+const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
+const currentLogLevel = logLevels[process.env.LOG_LEVEL || 'info'];
+
+const logger = {
+  info: (message, context, data) => {
+    if (currentLogLevel >= logLevels.info && process.env.VERBOSE_LOGS === 'true') {
+      console.log(`[${context}] ${message}`, data || '');
+    }
+  },
+  error: (message, context, data) => {
+    console.error(`[${context}] ${message}`, data || '');
+  },
+  debug: (message, context, data) => {
+    if (currentLogLevel >= logLevels.debug && process.env.VERBOSE_LOGS === 'true') {
+      console.log(`[${context}] ${message}`, data || '');
+    }
+  },
+  warn: (message, context, data) => {
+    if (currentLogLevel >= logLevels.warn) {
+      console.warn(`[${context}] ${message}`, data || '');
+    }
+  }
+};
 
 // Define __filename and __dirname equivalent once at the top level
 const __filename = fileURLToPath(import.meta.url);
