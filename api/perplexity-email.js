@@ -796,8 +796,13 @@ Examples: "Companies in ${industry || 'your industry'} are facing rising electri
   * Operations Managers: Cost control, efficiency improvements
 Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs while reducing procurement complexity." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK. Statistics ARE allowed here (value prop only), just not in opening_hook.
 - social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional)
+${ctaPattern ? `
 - cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
 - cta_type: Return "${ctaPattern.type}"
+` : `
+- cta_text: Create a professional call-to-action question (under 12 words, ending with proper punctuation).
+- cta_type: Return "qualifying"
+`}
 
 CRITICAL QUALITY RULES:
 - PROBLEM AWARENESS: Lead with industry-specific problem or market condition
@@ -1010,7 +1015,7 @@ VALUE PROPOSITION (1-2 sentences MINIMUM):
 - THIS FIELD IS MANDATORY - NEVER LEAVE BLANK
 
 CTA:
-Use qualifying question or soft ask: "${ctaPattern.template}"
+${ctaPattern ? `Use qualifying question or soft ask: "${ctaPattern.template}"` : 'Create a professional qualifying question or soft ask'}
 - Qualifying questions work best: "When does your contract expire?", "Would you be open to discussing your energy setup?"
 - Avoid requesting specific meeting times in first email
 - Keep under 12 words

@@ -1,10 +1,35 @@
 import twilio from 'twilio';
 
+// Simple logging function for Cloud Run cost optimization
+const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
+const currentLogLevel = logLevels[process.env.LOG_LEVEL || 'info'];
+
+const logger = {
+    info: (message, context, data) => {
+        if (currentLogLevel >= logLevels.info && process.env.VERBOSE_LOGS === 'true') {
+            console.log(`[${context}] ${message}`, data || '');
+        }
+    },
+    error: (message, context, data) => {
+        console.error(`[${context}] ${message}`, data || '');
+    },
+    debug: (message, context, data) => {
+        if (currentLogLevel >= logLevels.debug && process.env.VERBOSE_LOGS === 'true') {
+            console.log(`[${context}] ${message}`, data || '');
+        }
+    },
+    warn: (message, context, data) => {
+        if (currentLogLevel >= logLevels.warn) {
+            console.warn(`[${context}] ${message}`, data || '');
+        }
+    }
+};
+
 export default async function handler(req, res) {
     // Accept GET for quick verification; Twilio will POST status updates
     if (req.method === 'GET') {
         try {
-            console.log('[Status GET] Host:', req.headers.host, 'Query:', req.query || {});
+            logger.debug('Status GET request', 'TwilioWebhook', { host: req.headers.host });
         } catch (_) {}
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('OK');
@@ -42,10 +67,18 @@ export default async function handler(req, res) {
         } = body;
         
         const sig = req.headers['x-twilio-signature'] || null;
-        console.log(`[Status Callback] Call ${CallSid} status: ${CallStatus}`);
-        console.log('  Host:', req.headers.host, 'Twilio-Signature:', sig);
-        console.log(`  From: ${From} → To: ${To}`);
-        console.log('  Raw body:', JSON.stringify(body).slice(0, 800));
+        logger.debug('Twilio status callback received', 'TwilioWebhook', { 
+            callSid: CallSid, 
+            status: CallStatus,
+            from: From,
+            to: To,
+            duration: Duration || CallDuration
+        });
+        logger.debug('Status callback details', 'TwilioWebhook', { 
+            host: req.headers.host,
+            hasSignature: !!sig,
+            payloadSize: JSON.stringify(body).length
+        });
 
         // Compute absolute base URL once
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';

@@ -1,6 +1,31 @@
 import { db } from '../_firebase.js';
 import { createPublicKey, verify as cryptoVerify } from 'crypto';
 
+// Simple logging function for Cloud Run cost optimization
+const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
+const currentLogLevel = logLevels[process.env.LOG_LEVEL || 'info'];
+
+const logger = {
+    info: (message, context, data) => {
+        if (currentLogLevel >= logLevels.info && process.env.VERBOSE_LOGS === 'true') {
+            console.log(`[${context}] ${message}`, data || '');
+        }
+    },
+    error: (message, context, data) => {
+        console.error(`[${context}] ${message}`, data || '');
+    },
+    debug: (message, context, data) => {
+        if (currentLogLevel >= logLevels.debug && process.env.VERBOSE_LOGS === 'true') {
+            console.log(`[${context}] ${message}`, data || '');
+        }
+    },
+    warn: (message, context, data) => {
+        if (currentLogLevel >= logLevels.warn) {
+            console.warn(`[${context}] ${message}`, data || '');
+        }
+    }
+};
+
 // Build KeyObject from SendGrid Signed Events public key stored in Cloud Run env
 // Env contains base64-encoded Ed25519 public key (SPKI/DER as shown in SendGrid UI)
 function getSendGridPublicKey() {
@@ -80,7 +105,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    console.log(`[SendGrid Webhook] Processing ${events.length} events`);
+    logger.debug('Processing SendGrid events', 'SendGridWebhook', { eventCount: events.length });
 
     for (const event of events) {
       await processSendGridEvent(event);
@@ -102,10 +127,12 @@ async function processSendGridEvent(event) {
   const { event: eventType, email, sg_message_id, timestamp, reason, category, url } = event;
   const trackingId = (event.custom_args && (event.custom_args.trackingId || event.custom_args.trackingID)) || null;
   
-  console.log(`[SendGrid Webhook] Processing ${eventType} for ${email}`, {
-    sg_message_id,
+  logger.debug('Processing SendGrid event', 'SendGridWebhook', {
+    eventType,
+    email,
+    sgMessageId: sg_message_id,
     timestamp,
-    url: url || 'N/A',
+    hasUrl: !!url,
     trackingId
   });
 
