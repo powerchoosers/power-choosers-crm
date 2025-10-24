@@ -45,36 +45,7 @@ export default async function handler(req, res) {
             RecordingDuration
         } = body;
         
-        try {
-            console.log('[Recording] Webhook headers:', {
-                host: req.headers.host,
-                'user-agent': req.headers['user-agent'] || '',
-                'content-type': req.headers['content-type'] || '',
-                'x-twilio-signature': req.headers['x-twilio-signature'] || ''
-            });
-        } catch(_) {}
-        console.log('[Recording] Webhook received:', {
-            RecordingSid,
-            CallSid,
-            RecordingStatus,
-            RecordingDuration,
-            RecordingUrl: RecordingUrl || '(none)'
-        });
-        try { console.log('[Recording] Raw body:', JSON.stringify(body).slice(0, 1200)); } catch(_) {}
-        try { if (body && (body.RecordingChannels || body.RecordingTrack)) console.log('[Recording] Channels/Track:', body.RecordingChannels || '(n/a)', body.RecordingTrack || '(n/a)'); } catch(_) {}
-        
-        // Log all recording-related fields for debugging
-        try {
-            console.log('[Recording] All recording fields:', {
-                RecordingSource: body.RecordingSource,
-                RecordingChannels: body.RecordingChannels,
-                RecordingTrack: body.RecordingTrack,
-                RecordingStatus: body.RecordingStatus,
-                RecordingDuration: body.RecordingDuration,
-                CallSid: body.CallSid,
-                RecordingSid: body.RecordingSid
-            });
-        } catch(_) {}
+        // Removed verbose logging to reduce Cloud Run costs
         
         // Guard: ignore only MONO DialVerb completions; allow dual ("2" or "dual")
         try {
@@ -83,28 +54,14 @@ export default async function handler(req, res) {
             const chNum = Number(body.RecordingChannels || body.Channels || 0);
             const isDual = chRaw === '2' || chRaw === 'dual' || chRaw === 'both' || chNum === 2;
             
-            console.log('[Recording] Channel analysis:', { 
-                RecordingChannels: body.RecordingChannels, 
-                chRaw, 
-                chNum, 
-                isDual, 
-                RecordingSource: body.RecordingSource,
-                src 
-            });
+            // Channel analysis for dual-channel detection
             
             // Monitor for dual-channel recording failures (alert condition)
             if (RecordingStatus === 'completed' && src === 'dialverb' && !isDual) {
-                console.warn('[Recording] ⚠️ DUAL-CHANNEL FAILURE: DialVerb recording fell back to mono!', {
-                    CallSid,
-                    RecordingSid,
-                    RecordingChannels: body.RecordingChannels,
-                    RecordingSource: body.RecordingSource,
-                    RecordingDuration: body.RecordingDuration
-                });
+                console.error('[Recording] DUAL-CHANNEL FAILURE: DialVerb fell back to mono', { CallSid, RecordingSid });
             }
             
             if (RecordingStatus === 'completed' && src === 'dialverb' && !isDual) {
-                console.log('[Recording] Ignoring mono DialVerb completion (will rely on REST dual):', { RecordingSid, CallSid, RecordingChannels: body.RecordingChannels, RecordingSource: body.RecordingSource });
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, ignored: true, reason: 'mono_dialverb' }));
                 return;
@@ -121,12 +78,9 @@ export default async function handler(req, res) {
                 if (recs && recs.length > 0) {
                     effectiveRecordingSid = recs[0].sid;
                     effectiveRecordingUrl = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Recordings/${effectiveRecordingSid}.mp3`;
-                    console.log('[Recording] Fetched recording by CallSid:', { effectiveRecordingSid, effectiveRecordingUrl });
-                } else {
-                    console.log('[Recording] No recordings found via API for CallSid:', CallSid);
                 }
             } catch (e) {
-                console.warn('[Recording] Failed to fetch recording by CallSid:', e?.message);
+                // Failed to fetch recording
             }
         }
 
@@ -155,11 +109,7 @@ export default async function handler(req, res) {
                 ? `${baseMp3}&RequestedChannels=2` 
                 : `${baseMp3}?RequestedChannels=2`;
             
-            console.log('[Recording] Processed URL for dual-channel:', {
-                original: rawUrl,
-                final: recordingMp3Url,
-                recordingSid: effectiveRecordingSid || RecordingSid
-            });
+            // Processed URL for dual-channel playback
 
             // Store call data in local memory (best-effort)
             const callData = {
@@ -194,7 +144,7 @@ export default async function handler(req, res) {
                         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
                         callResource = await client.calls(finalCallSid).fetch();
                     } catch (fe) {
-                        console.warn('[Recording] Could not fetch Call resource:', fe?.message);
+                        // Could not fetch Call resource
                     }
                 }
 
@@ -232,7 +182,6 @@ export default async function handler(req, res) {
                             businessPhone: businessPhone || undefined
                         })
                     }).catch(() => {});
-                    console.log('[Recording] Posted initial call data to /api/calls for', finalCallSid);
 
                     // If duration is 0 or metadata looked incomplete, schedule a follow-up refresh
                     try {
@@ -258,19 +207,16 @@ export default async function handler(req, res) {
                                                 recordingSource: finalSource
                                             })
                                         }).catch(() => {});
-                                        console.log('[Recording] Refreshed call with final duration/metadata:', { finalDuration, finalChannels, finalTrack, finalSource });
                                     }
                                 } catch (re) {
-                                    console.warn('[Recording] Follow-up Recording fetch failed:', re?.message);
+                                    // Follow-up fetch failed
                                 }
                             }, 6000); // allow processing time
                         }
                     } catch(_) {}
-                } else {
-                    console.warn('[Recording] Skipping initial /api/calls post due to unresolved Call SID', { CallSid, RecordingSid: effectiveRecordingSid || RecordingSid });
                 }
             } catch (e) {
-                console.warn('[Recording] Failed posting initial call data to /api/calls:', e?.message);
+                console.error('[Recording] Failed posting call data:', e?.message);
             }
 
             // Trigger background processing (non-blocking) - FIXED FREEZE ISSUE
@@ -284,9 +230,6 @@ export default async function handler(req, res) {
                             console.error('[Recording] Background processing error:', error);
                         }
                     });
-                    console.log('[Recording] Background processing scheduled for:', finalCallSid);
-                } else {
-                    console.warn('[Recording] Skipping processing due to unresolved Call SID', { CallSid, RecordingSid: effectiveRecordingSid || RecordingSid });
                 }
             } catch (error) {
                 console.error('[Recording] Error scheduling background processing:', error);
@@ -310,14 +253,11 @@ export default async function handler(req, res) {
 
 async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, baseUrl) {
     try {
-        console.log('[Recording] Starting Twilio AI processing for:', callSid);
-
-        // Hard gate: On-demand CI only. When disabled, do not auto-transcribe or create CI.
+        // Hard gate: On-demand CI only
         try {
             const auto = String(process.env.CI_AUTO_PROCESS || '').toLowerCase();
             const shouldAuto = auto === '1' || auto === 'true' || auto === 'yes';
             if (!shouldAuto) {
-                console.log('[Recording] CI auto-processing disabled; skipping transcription/AI until eye button request.');
                 // Persist minimal metadata so UI knows recording is ready but not processed
                 try {
                     const base = baseUrl || process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
@@ -333,7 +273,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                         })
                     }).catch(() => {});
                 } catch (_) {}
-                return; // Do not continue with any transcription/CI work
+                return;
             }
         } catch (_) {}
         

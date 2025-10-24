@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   try {
     const { event, trackingId, data, _deliverability } = req.body;
 
-    console.log('[Email] Webhook received:', { event, trackingId, data });
+    // Webhook received
 
     // Get deliverability settings (default to enabled if not provided)
     const deliverabilitySettings = _deliverability || {
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
 
     // If tracking is disabled, don't process webhook events
     if (!deliverabilitySettings.enableTracking) {
-      console.log('[Email] Tracking disabled by settings, ignoring webhook:', trackingId);
+      // Tracking disabled
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, message: 'Tracking disabled' }));
       return;
@@ -38,7 +38,6 @@ export default async function handler(req, res) {
     // Handle different webhook events
     switch (event) {
       case 'email_opened':
-        console.log('[Email] Email opened:', trackingId);
         // Update database with open event if Firebase is available
         if (db) {
           try {
@@ -54,14 +53,12 @@ export default async function handler(req, res) {
               lastOpened: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             });
-            console.log('[Email] Successfully updated Firebase with open event');
           } catch (firebaseError) {
             console.error('[Email] Firebase update error:', firebaseError);
           }
         }
         break;
       case 'email_replied':
-        console.log('[Email] Email replied:', trackingId);
         // Update database with reply event if Firebase is available
         if (db) {
           try {
@@ -76,14 +73,12 @@ export default async function handler(req, res) {
               lastReplied: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             });
-            console.log('[Email] Successfully updated Firebase with reply event');
           } catch (firebaseError) {
             console.error('[Email] Firebase update error:', firebaseError);
           }
         }
         break;
       case 'email_bounced':
-        console.log('[Email] Email bounced:', trackingId);
         // Update database with bounce event if Firebase is available
         if (db) {
           try {
@@ -94,14 +89,13 @@ export default async function handler(req, res) {
               bouncedAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             });
-            console.log('[Email] Successfully updated Firebase with bounce event');
           } catch (firebaseError) {
             console.error('[Email] Firebase update error:', firebaseError);
           }
         }
         break;
       default:
-        console.log('[Email] Unknown webhook event:', event);
+        // Unknown event
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });

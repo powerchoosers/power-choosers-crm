@@ -49,10 +49,7 @@ export class SequenceAutomation {
       // Schedule first email
       await this.scheduleNextEmail(executionId, sequence.steps[0], contactData);
 
-      console.log('[SequenceAutomation] Sequence started:', {
-        sequenceId,
-        contactId,
-        executionId,
+      // Sequence started: executionId
         nextSendDate: execution.nextSendDate
       });
 
@@ -68,10 +65,7 @@ export class SequenceAutomation {
    * Process pending sequence emails
    */
   async processPendingEmails() {
-    if (this.isProcessing) {
-      console.log('[SequenceAutomation] Already processing, skipping');
-      return;
-    }
+    if (this.isProcessing) return;
 
     this.isProcessing = true;
 
@@ -90,12 +84,7 @@ export class SequenceAutomation {
         .limit(50)
         .get();
 
-      if (executionsQuery.empty) {
-        console.log('[SequenceAutomation] No pending emails to process');
-        return;
-      }
-
-      console.log(`[SequenceAutomation] Processing ${executionsQuery.size} pending emails`);
+      if (executionsQuery.empty) return;
 
       for (const doc of executionsQuery.docs) {
         try {
@@ -157,12 +146,6 @@ export class SequenceAutomation {
           trackingId: result.trackingId
         }
       });
-
-      console.log(`[SequenceAutomation] Email sent for execution ${executionId}, step ${currentStep}`);
-
-      if (isCompleted) {
-        console.log(`[SequenceAutomation] Sequence completed for execution ${executionId}`);
-      }
 
     } catch (error) {
       console.error(`[SequenceAutomation] Process execution error for ${executionId}:`, error);
@@ -242,8 +225,6 @@ export class SequenceAutomation {
       completedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
-
-    console.log(`[SequenceAutomation] Sequence completed: ${executionId}`);
   }
 
   /**
@@ -254,8 +235,6 @@ export class SequenceAutomation {
       status: 'paused',
       updatedAt: new Date().toISOString()
     });
-
-    console.log(`[SequenceAutomation] Sequence paused: ${executionId}`);
   }
 
   /**
@@ -279,8 +258,6 @@ export class SequenceAutomation {
       nextSendDate: adjustedNextSendDate.toISOString(),
       updatedAt: new Date().toISOString()
     });
-
-    console.log(`[SequenceAutomation] Sequence resumed: ${executionId}`);
   }
 
   /**
