@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import url from 'url';
 import { fileURLToPath } from 'url';
+import logger from './api/_logger.js';
 
 // Define __filename and __dirname equivalent once at the top level
 const __filename = fileURLToPath(import.meta.url);
@@ -88,32 +89,42 @@ import { readFormUrlEncodedBody } from './api/_form-parser.js';
 // Load environment variables from .env file for localhost development
 try {
   await import('dotenv/config');
-  console.log('[Server] dotenv loaded successfully');
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Server] dotenv loaded successfully');
+  }
 } catch (error) {
-  console.log('[Server] dotenv not available or failed to load:', error.message);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Server] dotenv not available or failed to load:', error.message);
+  }
   // Continue with system environment variables
 }
 
-// Log environment variable status at startup (as recommended by Twilio AI)
-console.log('[Server] Starting Power Choosers CRM server...');
-console.log('[Server] Environment check:', {
-  hasSendGridApiKey: !!process.env.SENDGRID_API_KEY,
-  hasTwilioAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
-  hasTwilioAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
-  hasPerplexityApiKey: !!process.env.PERPLEXITY_API_KEY,
-  nodeEnv: process.env.NODE_ENV || 'development',
-  port: process.env.PORT || 3000
+// Essential startup logging only
+logger.info('Power Choosers CRM server starting', 'Server');
+logger.info('Server configuration loaded', 'Server', {
+  port: process.env.PORT || 3000,
+  nodeEnv: process.env.NODE_ENV || 'development'
 });
 
-console.log('[Server] PORT environment variable:', process.env.PORT);
-console.log('[Server] NODE_ENV:', process.env.NODE_ENV);
-console.log('[Server] API_BASE_URL:', process.env.API_BASE_URL);
-console.log('[Server] PUBLIC_BASE_URL:', process.env.PUBLIC_BASE_URL);
-
-console.log('[Server] dotenv processing complete.');
-console.log('[Server] Initializing Firebase connection...');
-console.log('[Server] Setting up Twilio client...');
-console.log('[Server] Loading API handlers...');
+// Development-only detailed logging
+if (process.env.NODE_ENV !== 'production') {
+  console.log('[Server] Environment check:', {
+    hasSendGridApiKey: !!process.env.SENDGRID_API_KEY,
+    hasTwilioAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
+    hasTwilioAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
+    hasPerplexityApiKey: !!process.env.PERPLEXITY_API_KEY,
+    nodeEnv: process.env.NODE_ENV || 'development',
+    port: process.env.PORT || 3000
+  });
+  console.log('[Server] PORT environment variable:', process.env.PORT);
+  console.log('[Server] NODE_ENV:', process.env.NODE_ENV);
+  console.log('[Server] API_BASE_URL:', process.env.API_BASE_URL);
+  console.log('[Server] PUBLIC_BASE_URL:', process.env.PUBLIC_BASE_URL);
+  console.log('[Server] dotenv processing complete.');
+  console.log('[Server] Initializing Firebase connection...');
+  console.log('[Server] Setting up Twilio client...');
+  console.log('[Server] Loading API handlers...');
+}
 
 // MIME types for different file extensions
 const mimeTypes = {
@@ -279,7 +290,7 @@ async function handleApiTwilioVoice(req, res, parsedUrl) {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
-      console.error(`[${correlationId}] [Server] Twilio Voice webhook - Body Parse Error:`, error.message, error.stack);
+      logger.error('Twilio Voice webhook parse error', 'TwilioWebhook', { correlationId, error: error.message });
       res.writeHead(400, { 'Content-Type': 'text/xml' });
       res.end('<Response><Say>Invalid request body</Say></Response>');
       return;
@@ -299,7 +310,7 @@ async function handleApiTwilioVoice(req, res, parsedUrl) {
   try {
     await twilioVoiceHandler(req, res);
   } catch (error) {
-    console.error(`[${correlationId}] [Server] Twilio Voice handler unhandled error:`, error.name, error.message, error.stack);
+    logger.error('Twilio Voice handler unhandled error', 'TwilioWebhook', { correlationId, error: error.message });
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'text/xml' });
       res.end('<Response><Say>Internal server error</Say></Response>');
@@ -430,16 +441,12 @@ function readJsonBody(req) {
         try { req.rawBody = data; } catch(_) {}
         resolve(data ? JSON.parse(data) : {}); 
       } catch (e) { 
-        console.error('[Server] JSON Parse Error:', {
-          error: e.message,
-          data: data ? data.substring(0, 100) : 'null', // Log first 100 chars
-          dataLength: data ? data.length : 0,
-          url: req.url,
+        logger.error('JSON parse error', 'Server', { 
+          error: e.message, 
+          url: req.url, 
           method: req.method,
-          headers: {
-            'content-type': req.headers['content-type'],
-            'content-length': req.headers['content-length']
-          }
+          contentType: req.headers['content-type'],
+          dataLength: data ? data.length : 0
         });
         reject(e); 
       }
@@ -597,7 +604,7 @@ async function handleApiTwilioPollCIAnalysis(req, res) {
 }
 
 // Create HTTP server
-console.log('[Server] Creating HTTP server...');
+logger.debug('Creating HTTP server', 'Server');
 const server = http.createServer(async (req, res) => {
   // CORS headers
   const origin = req.headers.origin;
@@ -882,7 +889,7 @@ const server = http.createServer(async (req, res) => {
   // Construct file path using the robust __dirname equivalent
   const filePath = path.join(__dirname, pathname);
   
-  console.log(`[Server] Attempting to serve static file: ${filePath}`); // Debug log
+  logger.debug('Attempting to serve static file', 'Server', { filePath });
   
   // Check if file exists first
   if (!fs.existsSync(filePath)) {
@@ -919,11 +926,11 @@ const server = http.createServer(async (req, res) => {
   try {
     const data = await fs.promises.readFile(filePath);
     const contentType = getContentType(filePath);
-    console.log(`[Server] Successfully served: ${filePath} (Content-Type: ${contentType})`);
+    logger.debug('Successfully served static file', 'Server', { filePath, contentType });
     res.writeHead(200, { 'Content-Type': contentType });
     res.end(data);
   } catch (error) {
-    console.error(`[Server] Error reading file ${filePath}:`, error.message);
+    logger.error('Error reading file', 'Server', { filePath, error: error.message });
     res.writeHead(500, { 'Content-Type': 'text/html' });
     res.end(`
       <!DOCTYPE html>
@@ -1469,14 +1476,16 @@ async function handleApiTwilioOperatorWebhook(req, res) {
 }
 
 // Start the server with error handling
-console.log(`[Server] About to start server on port ${PORT} binding to 0.0.0.0`);
+logger.debug('Starting server', 'Server', { port: PORT });
 try {
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Server] Power Choosers CRM server running on port ${PORT}`);
-    console.log(`[Server] Server successfully bound to 0.0.0.0:${PORT}`);
+    logger.info('Power Choosers CRM server running', 'Server', { port: PORT });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[Server] Server successfully bound to 0.0.0.0:${PORT}`);
+    }
   });
 } catch (error) {
-  console.error(`[Server] Failed to start server: ${error.message}`);
+  logger.error('Failed to start server', 'Server', { error: error.message });
   console.error(`[Server] Error details:`, error);
   process.exit(1);
 }
