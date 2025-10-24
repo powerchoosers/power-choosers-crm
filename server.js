@@ -1645,6 +1645,15 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
   }
 
   try {
+    const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+    res.writeHead(200, {
+      'Content-Type': 'image/png',
+      'Content-Length': pixel.length,
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'X-Content-Type-Options': 'nosniff'
+    });
+    res.end(pixel);
+    return;
     const trackingId = parsedUrl.pathname.split('/').pop();
     const userAgent = req.headers['user-agent'] || '';
     const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
