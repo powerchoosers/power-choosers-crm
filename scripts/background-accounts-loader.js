@@ -62,24 +62,6 @@
         console.log('[BackgroundAccountsLoader] Loading from Firestore...');
         // Admin path: original unfiltered query
         let query = window.firebaseDB.collection('accounts')
-          .select(
-            'id', 'name', 'accountName', 'companyName',
-            'companyPhone', 'phone', 'primaryPhone', 'mainPhone',
-            'industry', 'domain', 'website', 'site',
-            'employees', 'employeeCount', 'numEmployees',
-            'city', 'locationCity', 'town', 'state', 'locationState', 'region',
-            'billingCity', 'billingState', // For AI email generation
-            'contractEndDate', 'contractEnd', 'contract_end_date',
-            'squareFootage', 'sqft', 'square_feet',
-            'occupancyPct', 'occupancy', 'occupancy_percentage',
-            'logoUrl', // Required for account favicons in list view
-            'shortDescription', 'short_desc', 'descriptionShort', 'description', // Required for AI email generation
-            'annualUsage', 'annual_kwh', 'kwh', // Required for AI email generation
-            'electricitySupplier', 'supplier', // Required for AI email generation
-            'currentRate', 'rate', // Required for AI email generation
-            'notes', 'note', // Required for AI email generation
-            'updatedAt', 'createdAt'
-          )
           .orderBy('updatedAt', 'desc')
           .limit(100);
         const snapshot = await query.get();
@@ -174,24 +156,6 @@
       }
       console.log('[BackgroundAccountsLoader] Loading next batch...');
       let query = window.firebaseDB.collection('accounts')
-        .select(
-          'id', 'name', 'accountName', 'companyName',
-          'companyPhone', 'phone', 'primaryPhone', 'mainPhone',
-          'industry', 'domain', 'website', 'site',
-          'employees', 'employeeCount', 'numEmployees',
-          'city', 'locationCity', 'town', 'state', 'locationState', 'region',
-          'billingCity', 'billingState',
-          'contractEndDate', 'contractEnd', 'contract_end_date',
-          'squareFootage', 'sqft', 'square_feet',
-          'occupancyPct', 'occupancy', 'occupancy_percentage',
-          'logoUrl',
-          'shortDescription', 'short_desc', 'descriptionShort', 'description',
-          'annualUsage', 'annual_kwh', 'kwh',
-          'electricitySupplier', 'supplier',
-          'currentRate', 'rate',
-          'notes', 'note',
-          'updatedAt', 'createdAt'
-        )
         .orderBy('updatedAt', 'desc')
         .startAfter(lastLoadedDoc)
         .limit(100);

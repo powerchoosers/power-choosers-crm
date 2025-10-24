@@ -49,11 +49,6 @@
       } else {
         // Admin path
         let query = window.firebaseDB.collection('lists')
-          .select(
-            'id', 'name', 'description', 'kind', 'type',
-            'createdAt', 'updatedAt', 'createdBy', 'isActive',
-            'memberCount', 'lastUsed', 'tags', 'color'
-          )
           .orderBy('updatedAt', 'desc')
           .limit(100);
         const snapshot = await query.get();
@@ -145,11 +140,6 @@
       if (!isAdmin()) return { loaded: 0, hasMore: false };
       console.log('[BackgroundListsLoader] Loading next batch...');
       let query = window.firebaseDB.collection('lists')
-        .select(
-          'id', 'name', 'description', 'kind', 'type',
-          'createdAt', 'updatedAt', 'createdBy', 'isActive',
-          'memberCount', 'lastUsed', 'tags', 'color'
-        )
         .orderBy('updatedAt', 'desc')
         .startAfter(lastLoadedDoc)
         .limit(100);

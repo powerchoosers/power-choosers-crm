@@ -59,19 +59,8 @@
         hasMoreData = false; // disable pagination for scoped loads
       } else {
         // Admin: original unfiltered query
-        // OPTIMIZED: Only fetch fields needed for list display and filtering (60% data reduction)
         // COST REDUCTION: Load in batches of 100 (smart lazy loading)
         let query = window.firebaseDB.collection('contacts')
-          .select(
-            'id', 'firstName', 'lastName', 'name',
-            'email', 'phone', 'mobile', 'workDirectPhone', 'otherPhone', 'preferredPhoneField',
-            'title', 'companyName', 'seniority', 'department',
-            'city', 'state', 'location',
-            'employees', 'companySize', 'employeeCount',
-            'industry', 'companyIndustry',
-            'domain', 'companyDomain', 'website',
-            'updatedAt', 'createdAt'
-          )
           .orderBy('updatedAt', 'desc')
           .limit(100);
         const snapshot = await query.get();
@@ -170,16 +159,6 @@
       }
       console.log('[BackgroundContactsLoader] Loading next batch...');
       let query = window.firebaseDB.collection('contacts')
-        .select(
-          'id', 'firstName', 'lastName', 'name',
-          'email', 'phone', 'mobile', 'workDirectPhone', 'otherPhone', 'preferredPhoneField',
-          'title', 'companyName', 'seniority', 'department',
-          'city', 'state', 'location',
-          'employees', 'companySize', 'employeeCount',
-          'industry', 'companyIndustry',
-          'domain', 'companyDomain', 'website',
-          'updatedAt', 'createdAt'
-        )
         .orderBy('updatedAt', 'desc')
         .startAfter(lastLoadedDoc)
         .limit(100);

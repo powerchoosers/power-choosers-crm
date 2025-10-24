@@ -46,12 +46,6 @@
       } else {
         // Admin path
         let query = window.firebaseDB.collection('sequences')
-          .select(
-            'id', 'name', 'description', 'status', 'type',
-            'createdAt', 'updatedAt', 'createdBy', 'steps',
-            'targetType', 'isActive', 'totalSteps', 'completedSteps',
-            'lastExecuted', 'nextExecution', 'frequency'
-          )
           .orderBy('updatedAt', 'desc')
           .limit(100);
         const snapshot = await query.get();
@@ -137,12 +131,6 @@
       if (!isAdmin()) return { loaded: 0, hasMore: false };
       console.log('[BackgroundSequencesLoader] Loading next batch...');
       let query = window.firebaseDB.collection('sequences')
-        .select(
-          'id', 'name', 'description', 'status', 'type',
-          'createdAt', 'updatedAt', 'createdBy', 'steps',
-          'targetType', 'isActive', 'totalSteps', 'completedSteps',
-          'lastExecuted', 'nextExecution', 'frequency'
-        )
         .orderBy('updatedAt', 'desc')
         .startAfter(lastLoadedDoc)
         .limit(100);
