@@ -88,32 +88,9 @@ import { readFormUrlEncodedBody } from './api/_form-parser.js';
 // Load environment variables from .env file for localhost development
 try {
   await import('dotenv/config');
-  console.log('[Server] dotenv loaded successfully');
 } catch (error) {
-  console.log('[Server] dotenv not available or failed to load:', error.message);
   // Continue with system environment variables
 }
-
-// Log environment variable status at startup (as recommended by Twilio AI)
-console.log('[Server] Starting Power Choosers CRM server...');
-console.log('[Server] Environment check:', {
-  hasSendGridApiKey: !!process.env.SENDGRID_API_KEY,
-  hasTwilioAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
-  hasTwilioAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
-  hasPerplexityApiKey: !!process.env.PERPLEXITY_API_KEY,
-  nodeEnv: process.env.NODE_ENV || 'development',
-  port: process.env.PORT || 3000
-});
-
-console.log('[Server] PORT environment variable:', process.env.PORT);
-console.log('[Server] NODE_ENV:', process.env.NODE_ENV);
-console.log('[Server] API_BASE_URL:', process.env.API_BASE_URL);
-console.log('[Server] PUBLIC_BASE_URL:', process.env.PUBLIC_BASE_URL);
-
-console.log('[Server] dotenv processing complete.');
-console.log('[Server] Initializing Firebase connection...');
-console.log('[Server] Setting up Twilio client...');
-console.log('[Server] Loading API handlers...');
 
 // MIME types for different file extensions
 const mimeTypes = {
@@ -273,13 +250,12 @@ function readRawBody(req) {
 // Twilio Voice webhook (returns TwiML XML)
 async function handleApiTwilioVoice(req, res, parsedUrl) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Voice webhook for ${req.url}`);
   
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
-      console.error(`[${correlationId}] [Server] Twilio Voice webhook - Body Parse Error:`, error.message, error.stack);
+      console.error('[Server] Twilio Voice webhook - Body Parse Error:', error.message);
       res.writeHead(400, { 'Content-Type': 'text/xml' });
       res.end('<Response><Say>Invalid request body</Say></Response>');
       return;
@@ -299,7 +275,7 @@ async function handleApiTwilioVoice(req, res, parsedUrl) {
   try {
     await twilioVoiceHandler(req, res);
   } catch (error) {
-    console.error(`[${correlationId}] [Server] Twilio Voice handler unhandled error:`, error.name, error.message, error.stack);
+    console.error('[Server] Twilio Voice handler error:', error.message);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'text/xml' });
       res.end('<Response><Say>Internal server error</Say></Response>');
@@ -310,13 +286,12 @@ async function handleApiTwilioVoice(req, res, parsedUrl) {
 // Twilio Recording status webhook
 async function handleApiTwilioRecording(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Recording webhook for ${req.url}`);
   
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
-      console.error(`[${correlationId}] [Server] Twilio Recording webhook - Body Parse Error:`, error.message, error.stack);
+      console.error('[Server] Twilio Recording webhook - Body Parse Error:', error.message);
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         error: 'Invalid request body format',
@@ -338,7 +313,7 @@ async function handleApiTwilioRecording(req, res) {
   try {
     await twilioRecordingHandler(req, res);
   } catch (error) {
-    console.error(`[${correlationId}] [Server] Twilio Recording handler unhandled error:`, error.name, error.message, error.stack);
+    console.error('[Server] Twilio Recording handler error:', error.message);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
@@ -597,7 +572,6 @@ async function handleApiTwilioPollCIAnalysis(req, res) {
 }
 
 // Create HTTP server
-console.log('[Server] Creating HTTP server...');
 const server = http.createServer(async (req, res) => {
   // CORS headers
   const origin = req.headers.origin;
@@ -882,8 +856,6 @@ const server = http.createServer(async (req, res) => {
   // Construct file path using the robust __dirname equivalent
   const filePath = path.join(__dirname, pathname);
   
-  console.log(`[Server] Attempting to serve static file: ${filePath}`); // Debug log
-  
   // Check if file exists first
   if (!fs.existsSync(filePath)) {
     console.error(`[Server] File not found at constructed path: ${filePath}`);
@@ -919,7 +891,6 @@ const server = http.createServer(async (req, res) => {
   try {
     const data = await fs.promises.readFile(filePath);
     const contentType = getContentType(filePath);
-    console.log(`[Server] Successfully served: ${filePath} (Content-Type: ${contentType})`);
     res.writeHead(200, { 'Content-Type': contentType });
     res.end(data);
   } catch (error) {
@@ -1070,7 +1041,6 @@ async function handleApiDebugHealth(req, res) {
 
 async function handleApiDebugFirestore(req, res) {
   try {
-    console.log('[Debug] Testing Firestore connection...');
     
     // Test basic Firestore access
     const testDoc = await db.collection('debug').doc('test').get();
@@ -1110,7 +1080,6 @@ async function handleApiCallsContact(req, res, parsedUrl) {
 // Additional Twilio handlers
 async function handleApiTwilioStatus(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Status webhook for ${req.url}`);
   
   if (req.method === 'POST') {
     try {
@@ -1151,7 +1120,6 @@ async function handleApiTwilioStatus(req, res) {
 
 async function handleApiTwilioDialStatus(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Dial Status webhook for ${req.url}`);
   
   if (req.method === 'POST') {
     try {
@@ -1192,7 +1160,6 @@ async function handleApiTwilioDialStatus(req, res) {
 
 async function handleApiTwilioHangup(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Hangup webhook for ${req.url}`);
   
   if (req.method === 'POST') {
     try {
@@ -1232,7 +1199,6 @@ async function handleApiTwilioHangup(req, res) {
 
 async function handleApiTwilioCallerId(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Caller ID webhook for ${req.url}`);
   
   if (req.method === 'POST') {
     try {
@@ -1272,7 +1238,6 @@ async function handleApiTwilioCallerId(req, res) {
 
 async function handleApiTwilioCheckTranscriptStatus(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Check Transcript Status for ${req.url}`);
   
   if (req.method === 'POST') {
     try {
@@ -1305,7 +1270,6 @@ async function handleApiTwilioCheckTranscriptStatus(req, res) {
 
 async function handleApiTwilioDialComplete(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Dial Complete for ${req.url}`);
   
   if (req.method === 'POST') {
     try {
@@ -1338,7 +1302,6 @@ async function handleApiTwilioDialComplete(req, res) {
 
 async function handleApiTwilioProcessExistingTranscripts(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Process Existing Transcripts for ${req.url}`);
   
   if (req.method === 'POST') {
     try {
@@ -1371,7 +1334,6 @@ async function handleApiTwilioProcessExistingTranscripts(req, res) {
 
 async function handleApiTwilioTranscribe(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Transcribe for ${req.url}`);
   
   if (req.method === 'POST') {
     try {
@@ -1404,7 +1366,6 @@ async function handleApiTwilioTranscribe(req, res) {
 
 async function handleApiTwilioBridge(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Bridge webhook for ${req.url}`);
   
   if (req.method === 'POST') {
     try {
@@ -1437,7 +1398,6 @@ async function handleApiTwilioBridge(req, res) {
 
 async function handleApiTwilioOperatorWebhook(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Operator Webhook for ${req.url}`);
   
   if (req.method === 'POST') {
     try {
@@ -1469,14 +1429,12 @@ async function handleApiTwilioOperatorWebhook(req, res) {
 }
 
 // Start the server with error handling
-console.log(`[Server] About to start server on port ${PORT} binding to 0.0.0.0`);
 try {
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Server] Power Choosers CRM server running on port ${PORT}`);
-    console.log(`[Server] Server successfully bound to 0.0.0.0:${PORT}`);
+    console.log(`[Server] Power Choosers CRM running on port ${PORT}`);
   });
 } catch (error) {
-  console.error(`[Server] Failed to start server: ${error.message}`);
+  console.error('[Server] Failed to start server:', error.message);
   console.error(`[Server] Error details:`, error);
   process.exit(1);
 }
@@ -1827,12 +1785,7 @@ async function handleApiSendGridSend(req, res) {
     return;
   }
 
-  // Log environment status (masked for security)
-  console.log('[SendGrid] Environment check:', {
-    hasApiKey: !!process.env.SENDGRID_API_KEY,
-    fromEmail: process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com',
-    fromName: process.env.SENDGRID_FROM_NAME || 'Power Choosers CRM'
-  });
+  // Environment check
 
   try {
     const body = await parseRequestBody(req);
@@ -1868,30 +1821,20 @@ async function handleApiSendGridSend(req, res) {
       }
     };
 
-    console.log('[SendGrid] Sending email:', { to, subject, trackingId });
-
-    // Log payload details as recommended by Twilio AI
-    console.log('[SendGrid] Email payload:', {
-      to: emailData.to,
-      subject: emailData.subject,
-      from: emailData.from,
-      trackingId: emailData.trackingId,
-      contentLength: emailData.content ? emailData.content.length : 0,
-      hasTrackingPixel: emailData.content ? emailData.content.includes('<img') : false,
-      deliverabilitySettings: emailData._deliverability
-    });
-
-    // Import and use SendGrid service
-    const { SendGridService } = await import('./api/email/sendgrid-service.js');
+    // Send email via SendGrid
     const sendGridService = new SendGridService();
     const result = await sendGridService.sendEmail(emailData);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      success: true, 
-      trackingId: result.trackingId,
-      messageId: result.messageId,
-      message: 'Email sent successfully via SendGrid'
+    res.end(JSON.stringify({
+      success: true,
+      trackingId,
+      to: emailData.to,
+      subject: emailData.subject,
+      from: emailData.from,
+      contentLength: emailData.content ? emailData.content.length : 0,
+      hasTrackingPixel: emailData.content ? emailData.content.includes('<img') : false,
+      deliverabilitySettings: emailData._deliverability
     }));
 
   } catch (error) {
@@ -1931,7 +1874,7 @@ async function handleApiSendGridTest(req, res) {
       }
     };
 
-    console.log('[SendGrid] Test email payload:', testEmailData);
+    // Sending test email
 
     const { SendGridService } = await import('./api/email/sendgrid-service.js');
     const sendGridService = new SendGridService();
