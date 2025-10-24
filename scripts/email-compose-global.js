@@ -1665,6 +1665,14 @@
       const result = await response.json();
       console.log('[AI] Received response:', result);
 
+      // Save generation metadata for tracking (subject_style, cta_type, opening_style)
+      try {
+        window._lastGeneratedMetadata = result.metadata || null;
+        console.log('[AI] Stored generation metadata:', window._lastGeneratedMetadata);
+      } catch (_) {
+        // non-fatal
+      }
+
       // Handle different response formats based on mode and templateType
       const templateType = result.templateType || null;
       const output = result.output || '';
@@ -1701,10 +1709,11 @@
       if (html && editor) {
         // For HTML content, render it directly with a simple fade-in
         setTimeout(() => {
-          // Preserve signature before AI content insertion (emails.js approach)
-          const contentWithSignature = preserveSignatureAfterAI(editor, html);
-          
-          editor.innerHTML = contentWithSignature;
+          // IMPORTANT: For structured HTML templates, DO NOT append existing signature
+          // since the template includes a hard-coded signature block.
+          const finalHtml = templateType ? html : preserveSignatureAfterAI(editor, html);
+
+          editor.innerHTML = finalHtml;
           // Mark editor mode for proper signature handling
           if (templateType) {
             editor.setAttribute('data-mode', 'html');
@@ -1738,6 +1747,44 @@
 
   // ========== TEMPLATE BUILDER FUNCTIONS ==========
   
+  // Build sender profile signature once for all HTML templates
+  function getSenderProfile() {
+    const settings = (window.SettingsPage?.getSettings?.()) || {};
+    const g = settings?.general || {};
+    const first = g.firstName || '';
+    const last = g.lastName || '';
+    const name = (first && last) ? `${first} ${last}`.trim() : (g.agentName || 'Power Choosers Team');
+    return {
+      name,
+      title: g.jobTitle || 'Energy Strategist',
+      company: g.companyName || 'Power Choosers',
+      location: g.location || '',
+      phone: g.phone || '',
+      email: g.email || 'l.patterson@powerchoosers.com',
+      avatar: g.hostedPhotoURL || g.photoURL || ''
+    };
+  }
+
+  function buildSignatureBlock() {
+    const s = getSenderProfile();
+    return `
+      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+        <div style="display:flex; gap:12px; align-items:center;">
+          ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width:48px; height:48px; border-radius:50%; object-fit:cover;">` : ''}
+          <div>
+            <p style="margin: 0; font-size: 14px;">
+              <strong>${s.name}</strong><br>
+              ${s.title}<br>
+              ${s.company}<br>
+              ${s.location ? `${s.location}<br>` : ''}
+              ${s.phone ? `Phone: ${s.phone}<br>` : ''}
+              Email: ${s.email}
+            </p>
+          </div>
+        </div>
+      </div>`;
+  }
+
   function buildWarmIntroHtml(data, recipient, fromEmail) {
     const mail = fromEmail || 'l.patterson@powerchoosers.com';
     const company = recipient?.company || recipient?.accountName || 'Your Company';
@@ -1753,8 +1800,7 @@
         
         <p>${data.cta_text || 'Would you be available for a brief call this week to discuss next steps?'}</p>
         
-        <p>Best regards,<br>
-        Power Choosers Team</p>
+        ${buildSignatureBlock()}
       </div>
     `;
   }
@@ -1786,8 +1832,7 @@
         
         <p>${data.cta_text || 'Would you be interested in scheduling a brief call to discuss your specific situation?'}</p>
         
-        <p>Best regards,<br>
-        Power Choosers Team</p>
+        ${buildSignatureBlock()}
       </div>
     `;
   }
@@ -1821,8 +1866,7 @@
         
         <p>${data.cta_text || 'Would you be available for a 30-minute call this week to conduct this assessment?'}</p>
         
-        <p>Best regards,<br>
-        Power Choosers Team</p>
+        ${buildSignatureBlock()}
       </div>
     `;
   }
@@ -1854,8 +1898,7 @@
         
         <p>${data.cta_text || 'I\'d like to schedule a call to walk through the proposal details and answer any questions you may have.'}</p>
         
-        <p>Best regards,<br>
-        Power Choosers Team</p>
+        ${buildSignatureBlock()}
       </div>
     `;
   }
@@ -1877,8 +1920,7 @@
         
         <p>${data.cta_text || 'Would you be open to a brief conversation about your current energy situation?'}</p>
         
-        <p>Best regards,<br>
-        Power Choosers Team</p>
+        ${buildSignatureBlock()}
       </div>
     `;
   }
@@ -1922,8 +1964,7 @@
         
         <p>${data.cta_text || 'Will you be able to send over the invoice by end of day so me and my team can get started?'}</p>
         
-        <p>Best regards,<br>
-        Power Choosers Team</p>
+        ${buildSignatureBlock()}
       </div>
     `;
   }
@@ -1950,8 +1991,7 @@
         
         <p>${data.cta_text || 'I\'d love to discuss how we can help optimize your energy costs.'}</p>
         
-        <p>Best regards,<br>
-        Power Choosers Team</p>
+        ${buildSignatureBlock()}
       </div>
     `;
   }
@@ -1972,20 +2012,27 @@
     const senderPhone = g.phone || '';
     const senderTitle = g.jobTitle || 'Energy Strategist';
     const senderLocation = g.location || '';
+    const senderCompany = g.companyName || 'Power Choosers';
+    const senderAvatar = g.hostedPhotoURL || g.photoURL || '';
     
     return `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto;">
         ${sonarGeneratedHtml}
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-          <p style="margin: 0; font-size: 14px;">
-            <strong>${senderName}</strong><br>
-            ${senderTitle}<br>
-            Power Choosers<br>
-            ${senderLocation ? `${senderLocation}<br>` : ''}
-            ${senderPhone ? `Phone: ${senderPhone}<br>` : ''}
-            Email: ${senderEmail}
-          </p>
+          <div style="display:flex; gap:12px; align-items:center;">
+            ${senderAvatar ? `<img src="${senderAvatar}" alt="${senderName}" style="width:48px; height:48px; border-radius:50%; object-fit:cover;">` : ''}
+            <div>
+              <p style="margin: 0; font-size: 14px;">
+                <strong>${senderName}</strong><br>
+                ${senderTitle}<br>
+                ${senderCompany}<br>
+                ${senderLocation ? `${senderLocation}<br>` : ''}
+                ${senderPhone ? `Phone: ${senderPhone}<br>` : ''}
+                Email: ${senderEmail}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -2026,7 +2073,8 @@
         email: g.email || '',
         phone: g.phone || '',
         title: g.jobTitle || 'Energy Strategist',
-        company: g.companyName || 'Power Choosers'
+        company: g.companyName || 'Power Choosers',
+        location: g.location || ''
       };
 
       const get = (obj, key) => {
@@ -2048,11 +2096,27 @@
         return map.hasOwnProperty(k) ? (map[k] || '') : (obj[k] || '');
       };
 
-      // Replace raw tokens first
+      const senderCompanyName = g.companyName || 'Power Choosers';
+
+      // Replace raw scoped tokens first ({{contact.*}}, {{account.*}}, {{sender.*}})
       let out = String(html || '')
         .replace(/\{\{\s*contact\.([a-zA-Z0-9_]+)\s*\}\}/g, (m, k) => escapeHtml(get(contact, k)))
         .replace(/\{\{\s*account\.([a-zA-Z0-9_]+)\s*\}\}/g, (m, k) => escapeHtml(get(account, k)))
         .replace(/\{\{\s*sender\.([a-zA-Z0-9_]+)\s*\}\}/g, (m, k) => escapeHtml(get(sender, k)));
+
+      // Also replace common uppercase tokens used in example templates
+      const contactName = (contact.fullName || contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim()) || '';
+      const contactCompany = account.name || contact.company || '';
+      out = out
+        .replace(/\{\{\s*SENDER_AVATAR\s*\}\}/g, escapeHtml(g.hostedPhotoURL || g.photoURL || ''))
+        .replace(/\{\{\s*SENDER_NAME\s*\}\}/g, escapeHtml(senderName))
+        .replace(/\{\{\s*SENDER_TITLE\s*\}\}/g, escapeHtml(sender.title))
+        .replace(/\{\{\s*SENDER_LOCATION\s*\}\}/g, escapeHtml(sender.location || g.location || ''))
+        .replace(/\{\{\s*SENDER_PHONE\s*\}\}/g, escapeHtml(sender.phone || ''))
+        .replace(/\{\{\s*SENDER_EMAIL\s*\}\}/g, escapeHtml(sender.email || ''))
+        .replace(/\{\{\s*COMPANY_NAME\s*\}\}/g, escapeHtml(senderCompanyName))
+        .replace(/\{\{\s*CONTACT_NAME\s*\}\}/g, escapeHtml(contactName))
+        .replace(/\{\{\s*CONTACT_COMPANY\s*\}\}/g, escapeHtml(contactCompany));
 
       // Replace .var-chip elements if present
       const tmp = document.createElement('div');
@@ -2085,16 +2149,22 @@
       const subject = result.subject || 'Energy Solutions';
       
       // Build template HTML using the appropriate builder
-      const templateHtml = buildTemplateHtml(templateType, result, recipient);
+      let templateHtml = buildTemplateHtml(templateType, result, recipient);
+
+      // Replace any template tokens (e.g., {{SENDER_AVATAR}}, {{CONTACT_NAME}})
+      try {
+        templateHtml = replaceVariablesInHtml(templateHtml, recipient);
+      } catch (e) {
+        console.warn('[AI] Token replacement failed (non-fatal):', e);
+      }
       
-      // Wrap with branding (header + footer)
-      const fullHtml = wrapSonarHtmlWithBranding(templateHtml, recipient, subject);
-      
-      console.log('[AI] Template email built successfully');
+      // IMPORTANT: Templates already include a hard-coded signature block.
+      // Do NOT wrap with branding/signature to avoid duplication.
+      console.log('[AI] Template email built successfully (no extra signature wrap)');
       
       return {
         subject: improveSubject(subject, recipient),
-        html: fullHtml
+        html: templateHtml
       };
     } catch (error) {
       console.error('[AI] Error formatting templated email:', error);
@@ -2464,8 +2534,8 @@
     // Detect HTML mode and extract content appropriately
     const isHtmlMode = bodyInput?.getAttribute('data-mode') === 'html';
     const body = isHtmlMode ? 
-      (bodyInput?.textContent || '') :  // HTML mode: get raw HTML code
-      (bodyInput?.innerHTML || '');     // Text mode: get rendered HTML
+      (bodyInput?.innerHTML || '') :  // HTML mode: send the HTML we generated
+      (bodyInput?.innerHTML || '');   // Text mode: send rendered HTML with user's signature logic applied later
     
     console.log('[EmailCompose] Email mode:', isHtmlMode ? 'HTML' : 'Text');
     console.log('[EmailCompose] Content preview:', body.substring(0, 100) + '...');
