@@ -1645,125 +1645,18 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
   }
 
   try {
-    const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+    const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
     res.writeHead(200, {
       'Content-Type': 'image/png',
-      'Content-Length': pixel.length,
+      'Content-Length': PIXEL.length,
       'Cache-Control': 'public, max-age=31536000, immutable',
       'X-Content-Type-Options': 'nosniff'
     });
-    res.end(pixel);
-    return;
-    const trackingId = parsedUrl.pathname.split('/').pop();
-    const userAgent = req.headers['user-agent'] || '';
-    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
-    const referer = req.headers.referer || '';
-
-    // Get deliverability settings from localStorage (simulated - in production, get from database)
-    // For now, we'll use default settings that allow tracking
-    const deliverabilitySettings = {
-      enableTracking: true, // Default to enabled
-      includeBulkHeaders: false,
-      includeListUnsubscribe: false,
-      includePriorityHeaders: false,
-      forceGmailOnly: true,
-      useBrandedHtmlTemplate: false,
-      signatureImageEnabled: true
-    };
-
-    // If tracking is disabled, return pixel but don't track
-    if (!deliverabilitySettings.enableTracking) {
-      const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
-      res.writeHead(200, {
-        'Content-Type': 'image/png',
-        'Content-Length': pixel.length,
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-        'X-Content-Type-Options': 'nosniff'
-      });
-      res.end(pixel);
-      return;
-    }
-
-    // Detect common image proxy user agents (e.g., Gmail's GoogleImageProxy)
-    const ua = String(userAgent).toLowerCase();
-    const isGoogleProxy = ua.includes('googleimageproxy');
-    const isGenericProxy = isGoogleProxy || ua.includes('proxy');
-
-    // Create a unique session key for this user/email combination
-    const sessionKey = `${trackingId}_${ip}_${isGenericProxy ? 'proxy' : userAgent}`;
-    
-    // Initialize tracking sessions if not exists
-    if (!global.emailTrackingSessions) {
-      global.emailTrackingSessions = new Map();
-    }
-    
-    // Check if this session has already been tracked recently
-    const now = Date.now();
-    // Proxies can hammer the pixel repeatedly; use a long window for proxies
-    const windowMs = isGenericProxy ? (12 * 60 * 60 * 1000) : 5000; // 12h for proxies, 5s for real clients
-    const windowStart = now - windowMs;
-    
-    const existingSession = global.emailTrackingSessions.get(sessionKey);
-    if (existingSession && existingSession.lastTracked > windowStart) {
-      // Still return the pixel but don't create duplicate events
-    } else {
-      // Create new tracking event
-      const openEvent = {
-        trackingId,
-        openedAt: new Date().toISOString(),
-        userAgent,
-        ip,
-        referer
-      };
-      
-      // Store the session
-      global.emailTrackingSessions.set(sessionKey, {
-        lastTracked: now,
-        openEvent
-      });
-      
-      // Store the tracking event in memory for the client to pick up
-      if (!global.emailTrackingEvents) {
-        global.emailTrackingEvents = new Map();
-      }
-      
-      const eventKey = `${trackingId}_open_${now}`;
-      global.emailTrackingEvents.set(eventKey, {
-        trackingId,
-        type: 'open',
-        data: openEvent,
-        timestamp: new Date().toISOString()
-      });
-      
-    }
-
-    // Return a 1x1 transparent pixel with proper headers
-    const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
-    
-    // Set cache headers based on deliverability settings and proxy detection
-    const headers = {
-      'Content-Type': 'image/png',
-      'Content-Length': pixel.length,
-      'X-Content-Type-Options': 'nosniff'
-    };
-    if (isGenericProxy) {
-      // Encourage proxy to cache to avoid repeated refetches
-      headers['Cache-Control'] = 'public, max-age=31536000, immutable';
-    } else {
-      // For real user agents, avoid caching so a true reopen can refetch
-      headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
-      headers['Pragma'] = 'no-cache';
-      headers['Expires'] = '0';
-    }
-    res.writeHead(200, headers);
-    res.end(pixel);
-
+    res.end(PIXEL);
   } catch (error) {
     console.error('[Email] Track error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Failed to track email', message: error.message }));
+    res.writeHead(200, { 'Content-Type': 'image/png' });
+    res.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64'));
   }
 }
 
