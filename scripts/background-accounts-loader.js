@@ -15,50 +15,86 @@
   let accountsData = [];
   let lastLoadedDoc = null; // Track last document for pagination
   let hasMoreData = true; // Flag to indicate if more data exists
+  const isAdmin = () => {
+    try {
+      if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') return window.DataManager.isCurrentUserAdmin();
+      return window.currentUserRole === 'admin';
+    } catch(_) { return false; }
+  };
+  const getUserEmail = () => {
+    try {
+      if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') return window.DataManager.getCurrentUserEmail();
+      return (window.currentUserEmail || '').toLowerCase();
+    } catch(_) { return (window.currentUserEmail || '').toLowerCase(); }
+  };
   
   async function loadFromFirestore() {
-    if (!window.firebaseDB) {
+    if (!window.firebaseDB && !(window.DataManager && typeof window.DataManager.queryWithOwnership === 'function')) {
       console.warn('[BackgroundAccountsLoader] firebaseDB not available');
       return;
     }
     
     try {
-      console.log('[BackgroundAccountsLoader] Loading from Firestore...');
-      // OPTIMIZED: Only fetch fields needed for list display, filtering, and AI email generation (25% data reduction)
-      // COST REDUCTION: Load in batches of 100 (smart lazy loading)
-      let query = window.firebaseDB.collection('accounts')
-        .select(
-          'id', 'name', 'accountName', 'companyName',
-          'companyPhone', 'phone', 'primaryPhone', 'mainPhone',
-          'industry', 'domain', 'website', 'site',
-          'employees', 'employeeCount', 'numEmployees',
-          'city', 'locationCity', 'town', 'state', 'locationState', 'region',
-          'billingCity', 'billingState', // For AI email generation
-          'contractEndDate', 'contractEnd', 'contract_end_date',
-          'squareFootage', 'sqft', 'square_feet',
-          'occupancyPct', 'occupancy', 'occupancy_percentage',
-          'logoUrl', // Required for account favicons in list view
-          'shortDescription', 'short_desc', 'descriptionShort', 'description', // Required for AI email generation
-          'annualUsage', 'annual_kwh', 'kwh', // Required for AI email generation
-          'electricitySupplier', 'supplier', // Required for AI email generation
-          'currentRate', 'rate', // Required for AI email generation
-          'notes', 'note', // Required for AI email generation
-          'updatedAt', 'createdAt'
-        )
-        .orderBy('updatedAt', 'desc')
-        .limit(100);
-      
-      const snapshot = await query.get();
-      const newAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      accountsData = newAccounts;
-      
-      // Track last document for pagination
-      if (snapshot.docs.length > 0) {
-        lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
-        hasMoreData = snapshot.docs.length === 100; // If we got less than 100, no more data
-      } else {
+      console.log('[BackgroundAccountsLoader] Loading accounts...');
+      if (!isAdmin()) {
+        // Employee: scope by ownership
+        let newAccounts = [];
+        if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+          newAccounts = await window.DataManager.queryWithOwnership('accounts');
+        } else {
+          const db = window.firebaseDB;
+          const email = getUserEmail();
+          const [ownedSnap, assignedSnap] = await Promise.all([
+            db.collection('accounts').where('ownerId','==',email).get(),
+            db.collection('accounts').where('assignedTo','==',email).get()
+          ]);
+          const map = new Map();
+          ownedSnap.forEach(d=>map.set(d.id,{ id:d.id, ...d.data() }));
+          assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
+          newAccounts = Array.from(map.values());
+        }
+        // Sort latest first
+        newAccounts.sort((a,b)=> new Date(b.updatedAt||0) - new Date(a.updatedAt||0));
+        accountsData = newAccounts;
+        lastLoadedDoc = null;
         hasMoreData = false;
+      } else {
+        console.log('[BackgroundAccountsLoader] Loading from Firestore...');
+        // Admin path: original unfiltered query
+        let query = window.firebaseDB.collection('accounts')
+          .select(
+            'id', 'name', 'accountName', 'companyName',
+            'companyPhone', 'phone', 'primaryPhone', 'mainPhone',
+            'industry', 'domain', 'website', 'site',
+            'employees', 'employeeCount', 'numEmployees',
+            'city', 'locationCity', 'town', 'state', 'locationState', 'region',
+            'billingCity', 'billingState', // For AI email generation
+            'contractEndDate', 'contractEnd', 'contract_end_date',
+            'squareFootage', 'sqft', 'square_feet',
+            'occupancyPct', 'occupancy', 'occupancy_percentage',
+            'logoUrl', // Required for account favicons in list view
+            'shortDescription', 'short_desc', 'descriptionShort', 'description', // Required for AI email generation
+            'annualUsage', 'annual_kwh', 'kwh', // Required for AI email generation
+            'electricitySupplier', 'supplier', // Required for AI email generation
+            'currentRate', 'rate', // Required for AI email generation
+            'notes', 'note', // Required for AI email generation
+            'updatedAt', 'createdAt'
+          )
+          .orderBy('updatedAt', 'desc')
+          .limit(100);
+        const snapshot = await query.get();
+        const newAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        accountsData = newAccounts;
+        // Track admin pagination
+        if (snapshot.docs.length > 0) {
+          lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
+          hasMoreData = snapshot.docs.length === 100; // If we got less than 100, no more data
+        } else {
+          hasMoreData = false;
+        }
       }
+      
+      // Pagination handled per role above
       
       console.log('[BackgroundAccountsLoader] ✓ Loaded', accountsData.length, 'accounts from Firestore', hasMoreData ? '(more available)' : '(all loaded)');
       
@@ -132,6 +168,10 @@
     }
     
     try {
+      if (!isAdmin()) {
+        // For employees, we already scoped and disabled pagination
+        return { loaded: 0, hasMore: false };
+      }
       console.log('[BackgroundAccountsLoader] Loading next batch...');
       let query = window.firebaseDB.collection('accounts')
         .select(

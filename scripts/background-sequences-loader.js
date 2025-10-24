@@ -15,38 +15,52 @@
   let sequencesData = [];
   let lastLoadedDoc = null; // Track last document for pagination
   let hasMoreData = true; // Flag to indicate if more data exists
+  const isAdmin = () => {
+    try { if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin==='function') return window.DataManager.isCurrentUserAdmin(); return window.currentUserRole==='admin'; } catch(_) { return false; }
+  };
+  const getUserEmail = () => {
+    try { if (window.DataManager && typeof window.DataManager.getCurrentUserEmail==='function') return window.DataManager.getCurrentUserEmail(); return (window.currentUserEmail||'').toLowerCase(); } catch(_) { return (window.currentUserEmail||'').toLowerCase(); }
+  };
   
   async function loadFromFirestore() {
-    if (!window.firebaseDB) {
+    if (!window.firebaseDB && !(window.DataManager && typeof window.DataManager.queryWithOwnership==='function')) {
       console.warn('[BackgroundSequencesLoader] firebaseDB not available');
       return;
     }
     
     try {
-      console.log('[BackgroundSequencesLoader] Loading from Firestore...');
-      // OPTIMIZED: Only fetch fields needed for list display and filtering
-      // COST REDUCTION: Load in batches of 100 (smart lazy loading)
-      let query = window.firebaseDB.collection('sequences')
-        .select(
-          'id', 'name', 'description', 'status', 'type',
-          'createdAt', 'updatedAt', 'createdBy', 'steps',
-          'targetType', 'isActive', 'totalSteps', 'completedSteps',
-          'lastExecuted', 'nextExecution', 'frequency'
-        )
-        .orderBy('updatedAt', 'desc')
-        .limit(100);
-      
-      const snapshot = await query.get();
-      const newSequences = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      sequencesData = newSequences;
-      
-      // Track last document for pagination
-      if (snapshot.docs.length > 0) {
-        lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
-        hasMoreData = snapshot.docs.length === 100; // If we got less than 100, no more data
-      } else {
+      console.log('[BackgroundSequencesLoader] Loading sequences...');
+      if (!isAdmin()) {
+        let newSequences = [];
+        if (window.DataManager && typeof window.DataManager.queryWithOwnership==='function') {
+          newSequences = await window.DataManager.queryWithOwnership('sequences');
+        } else {
+          const email = getUserEmail();
+          const snap = await window.firebaseDB.collection('sequences').where('ownerId','==',email).get();
+          newSequences = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+        }
+        newSequences.sort((a,b)=> new Date(b.updatedAt||0) - new Date(a.updatedAt||0));
+        sequencesData = newSequences;
+        lastLoadedDoc = null;
         hasMoreData = false;
+      } else {
+        // Admin path
+        let query = window.firebaseDB.collection('sequences')
+          .select(
+            'id', 'name', 'description', 'status', 'type',
+            'createdAt', 'updatedAt', 'createdBy', 'steps',
+            'targetType', 'isActive', 'totalSteps', 'completedSteps',
+            'lastExecuted', 'nextExecution', 'frequency'
+          )
+          .orderBy('updatedAt', 'desc')
+          .limit(100);
+        const snapshot = await query.get();
+        const newSequences = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        sequencesData = newSequences;
+        if (snapshot.docs.length>0) { lastLoadedDoc = snapshot.docs[snapshot.docs.length-1]; hasMoreData = snapshot.docs.length===100; } else { hasMoreData=false; }
       }
+      
+      // Pagination already handled above per role
       
       console.log('[BackgroundSequencesLoader] ✓ Loaded', sequencesData.length, 'sequences from Firestore', hasMoreData ? '(more available)' : '(all loaded)');
       
@@ -120,6 +134,7 @@
     }
     
     try {
+      if (!isAdmin()) return { loaded: 0, hasMore: false };
       console.log('[BackgroundSequencesLoader] Loading next batch...');
       let query = window.firebaseDB.collection('sequences')
         .select(

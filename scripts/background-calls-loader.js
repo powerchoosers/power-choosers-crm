@@ -23,8 +23,16 @@
       console.log('[BackgroundCallsLoader] Loading from API...');
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
       const url = `${base}/api/calls?limit=100`; // Load 100 calls for efficiency
-      
-      const response = await fetch(url);
+      // Attach ID token for secured endpoints
+      let headers = {};
+      try {
+        const user = window.firebase && window.firebase.auth && window.firebase.auth().currentUser;
+        if (user) {
+          const token = await user.getIdToken();
+          headers = { 'Authorization': `Bearer ${token}` };
+        }
+      } catch(_) {}
+      const response = await fetch(url, { headers });
       if (!response.ok) {
         console.warn('[BackgroundCallsLoader] API request failed:', response.status);
         return;
@@ -109,8 +117,16 @@
       console.log('[BackgroundCallsLoader] Loading next batch...');
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
       const url = `${base}/api/calls?limit=100&offset=${lastLoadedOffset}`;
-      
-      const response = await fetch(url);
+      // Attach ID token for secured endpoints
+      let headers = {};
+      try {
+        const user = window.firebase && window.firebase.auth && window.firebase.auth().currentUser;
+        if (user) {
+          const token = await user.getIdToken();
+          headers = { 'Authorization': `Bearer ${token}` };
+        }
+      } catch(_) {}
+      const response = await fetch(url, { headers });
       if (!response.ok) {
         console.warn('[BackgroundCallsLoader] API request failed:', response.status);
         return { loaded: 0, hasMore: false };
@@ -160,11 +176,17 @@
       
       if (usePost) {
         // Use POST with JSON body for large requests
+        let headers = { 'Content-Type': 'application/json' };
+        try {
+          const user = window.firebase && window.firebase.auth && window.firebase.auth().currentUser;
+          if (user) {
+            const token = await user.getIdToken();
+            headers['Authorization'] = `Bearer ${token}`;
+          }
+        } catch(_) {}
         response = await fetch(`${base}/api/call-status`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers,
           body: JSON.stringify({
             phones: phones,
             accountIds: accountIds,
@@ -180,7 +202,15 @@
         if (contactIds.length) params.append('contactIds', contactIds.join(','));
         
         const url = `${base}/api/call-status?${params}`;
-        response = await fetch(url);
+        let headers = {};
+        try {
+          const user = window.firebase && window.firebase.auth && window.firebase.auth().currentUser;
+          if (user) {
+            const token = await user.getIdToken();
+            headers['Authorization'] = `Bearer ${token}`;
+          }
+        } catch(_) {}
+        response = await fetch(url, { headers });
       }
       
       if (response.ok) {

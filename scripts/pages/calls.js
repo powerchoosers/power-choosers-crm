@@ -1096,9 +1096,22 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.getCallsData === 'function') {
       const bgData = window.BackgroundCallsLoader.getCallsData();
       if (bgData && Array.isArray(bgData) && bgData.length > 0) {
-        console.log('[Calls] ✓ Using data from BackgroundCallsLoader:', bgData.length, 'calls');
+        const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
+          ? window.DataManager.isCurrentUserAdmin()
+          : (window.currentUserRole === 'admin');
+        const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+          ? window.DataManager.getCurrentUserEmail()
+          : ((window.currentUserEmail || '').toLowerCase());
+        const filteredBg = isAdmin ? bgData : bgData.filter(r => {
+          const o = r && r.ownerId ? String(r.ownerId).toLowerCase() : '';
+          const a = r && r.assignedTo ? String(r.assignedTo).toLowerCase() : '';
+          const c = r && r.createdBy ? String(r.createdBy).toLowerCase() : '';
+          return o === userEmail || a === userEmail || c === userEmail;
+        });
+
+        console.log('[Calls] ✓ Using data from BackgroundCallsLoader:', filteredBg.length, 'calls');
         // Check if data is already enriched (has counterpartyPretty field)
-        const isEnriched = bgData[0] && bgData[0].hasOwnProperty('counterpartyPretty');
+        const isEnriched = filteredBg[0] && filteredBg[0].hasOwnProperty('counterpartyPretty');
         
         if (isEnriched) {
           // Data is enriched - display immediately
@@ -1108,13 +1121,13 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
             const timeB = new Date(b.callTime || 0).getTime();
             return timeB - timeA;
           });
-          state.data = bgData;
-          state.filtered = bgData.slice();
+          state.data = filteredBg;
+          state.filtered = filteredBg.slice();
           state.hasMore = window.BackgroundCallsLoader.hasMore();
           chips.forEach(buildPool);
           render();
           try {
-            document.dispatchEvent(new CustomEvent('pc:calls-loaded', { detail: { count: bgData.length } }));
+            document.dispatchEvent(new CustomEvent('pc:calls-loaded', { detail: { count: filteredBg.length } }));
           } catch (e) { /* noop */ }
           return; // Exit early - data is ready!
         } else {
@@ -1131,22 +1144,34 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         const isValidCache = cached && Array.isArray(cached) && cached.length > 0;
         
         if (isValidCache) {
+          const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
+            ? window.DataManager.isCurrentUserAdmin()
+            : (window.currentUserRole === 'admin');
+          const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+            ? window.DataManager.getCurrentUserEmail()
+            : ((window.currentUserEmail || '').toLowerCase());
+          const cachedScoped = isAdmin ? cached : cached.filter(r => {
+            const o = r && r.ownerId ? String(r.ownerId).toLowerCase() : '';
+            const a = r && r.assignedTo ? String(r.assignedTo).toLowerCase() : '';
+            const c = r && r.createdBy ? String(r.createdBy).toLowerCase() : '';
+            return o === userEmail || a === userEmail || c === userEmail;
+          });
           // Check if cached data is enriched
-          const isEnriched = cached[0] && cached[0].hasOwnProperty('counterpartyPretty');
+          const isEnriched = cachedScoped[0] && cachedScoped[0].hasOwnProperty('counterpartyPretty');
           
           if (isEnriched) {
-            console.log('[Calls] Using enriched cached calls:', cached.length);
-          cached.sort((a, b) => {
+            console.log('[Calls] Using enriched cached calls:', cachedScoped.length);
+          cachedScoped.sort((a, b) => {
             const timeA = new Date(a.callTime || 0).getTime();
             const timeB = new Date(b.callTime || 0).getTime();
             return timeB - timeA;
           });
-          state.data = cached;
-          state.filtered = cached.slice();
+          state.data = cachedScoped;
+          state.filtered = cachedScoped.slice();
           chips.forEach(buildPool);
           render();
           try {
-            document.dispatchEvent(new CustomEvent('pc:calls-loaded', { detail: { count: cached.length } }));
+            document.dispatchEvent(new CustomEvent('pc:calls-loaded', { detail: { count: cachedScoped.length } }));
           } catch (e) { /* noop */ }
             return; // Exit early
           } else {
@@ -1160,14 +1185,40 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     
     // STEP 3: Load from API or BackgroundCallsLoader and enrich
     let allCalls = [];
+    // Employee path: fetch own calls directly from Firestore when available
+    try {
+      const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
+        ? window.DataManager.isCurrentUserAdmin()
+        : (window.currentUserRole === 'admin');
+      if (!isAdmin && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+        const ownCalls = await window.DataManager.queryWithOwnership('calls');
+        if (Array.isArray(ownCalls) && ownCalls.length > 0) {
+          allCalls = ownCalls;
+        }
+      }
+    } catch (e) {
+      console.warn('[Calls] Ownership query failed:', e);
+    }
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
     
     // Try BackgroundCallsLoader again for raw data
     if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.getCallsData === 'function') {
       const bgData = window.BackgroundCallsLoader.getCallsData();
-      if (bgData && bgData.length > 0) {
+      const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
+        ? window.DataManager.isCurrentUserAdmin()
+        : (window.currentUserRole === 'admin');
+      const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+        ? window.DataManager.getCurrentUserEmail()
+        : ((window.currentUserEmail || '').toLowerCase());
+      const filteredBg = isAdmin ? bgData : (Array.isArray(bgData) ? bgData.filter(r => {
+        const o = r && r.ownerId ? String(r.ownerId).toLowerCase() : '';
+        const a = r && r.assignedTo ? String(r.assignedTo).toLowerCase() : '';
+        const c = r && r.createdBy ? String(r.createdBy).toLowerCase() : '';
+        return o === userEmail || a === userEmail || c === userEmail;
+      }) : []);
+      if (allCalls.length === 0 && filteredBg && filteredBg.length > 0) {
         console.log('[Calls] Using raw data from BackgroundCallsLoader for enrichment');
-        allCalls = bgData;
+        allCalls = filteredBg;
       }
     }
     
