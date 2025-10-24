@@ -1,6 +1,31 @@
 // Dial status callback: start dual-channel recording on the bridged child leg
 import twilio from 'twilio';
 
+// Simple logging function for Cloud Run cost optimization
+const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
+const currentLogLevel = logLevels[process.env.LOG_LEVEL || 'info'];
+
+const logger = {
+    info: (message, context, data) => {
+        if (currentLogLevel >= logLevels.info && process.env.VERBOSE_LOGS === 'true') {
+            console.log(`[${context}] ${message}`, data || '');
+        }
+    },
+    error: (message, context, data) => {
+        console.error(`[${context}] ${message}`, data || '');
+    },
+    debug: (message, context, data) => {
+        if (currentLogLevel >= logLevels.debug && process.env.VERBOSE_LOGS === 'true') {
+            console.log(`[${context}] ${message}`, data || '');
+        }
+    },
+    warn: (message, context, data) => {
+        if (currentLogLevel >= logLevels.warn) {
+            console.warn(`[${context}] ${message}`, data || '');
+        }
+    }
+};
+
 export default async function handler(req, res) {
   // Twilio posts x-www-form-urlencoded data for dial status callbacks
   try {
@@ -39,7 +64,7 @@ export default async function handler(req, res) {
     // Prefer starting recordings on the PARENT call for reliable dual-channel capture
     const targetSid = parentSid || childSid;
     
-    console.log('[Dial-Status]', { 
+    logger.debug('Dial status event received', 'TwilioWebhook', { 
       event, 
       parentSid, 
       childSid,
@@ -52,7 +77,7 @@ export default async function handler(req, res) {
     // Start dual-channel recording when answered/in-progress/completed (to catch edge cases)
     // IMPORTANT: Only start REST API recording if NO TwiML DialVerb recording exists to avoid interference
     if ((event === 'in-progress' || event === 'answered' || event === 'completed') && targetSid) {
-      console.log('[Dial-Status] Event triggered, will check for DialVerb recordings after 5-second delay...');
+      logger.debug('Event triggered, checking for DialVerb recordings', 'TwilioWebhook');
       
       // Wait 5 seconds for TwiML recording to appear in REST API, then check for DialVerb recording
       setTimeout(async () => {

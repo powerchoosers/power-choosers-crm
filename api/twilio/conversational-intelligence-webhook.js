@@ -1,6 +1,31 @@
 import { URLSearchParams } from 'url';
 import { resolveToCallSid, isCallSid } from '../_twilio-ids.js';
 
+// Simple logging function for Cloud Run cost optimization
+const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
+const currentLogLevel = logLevels[process.env.LOG_LEVEL || 'info'];
+
+const logger = {
+    info: (message, context, data) => {
+        if (currentLogLevel >= logLevels.info && process.env.VERBOSE_LOGS === 'true') {
+            console.log(`[${context}] ${message}`, data || '');
+        }
+    },
+    error: (message, context, data) => {
+        console.error(`[${context}] ${message}`, data || '');
+    },
+    debug: (message, context, data) => {
+        if (currentLogLevel >= logLevels.debug && process.env.VERBOSE_LOGS === 'true') {
+            console.log(`[${context}] ${message}`, data || '');
+        }
+    },
+    warn: (message, context, data) => {
+        if (currentLogLevel >= logLevels.warn) {
+            console.warn(`[${context}] ${message}`, data || '');
+        }
+    }
+};
+
 // Twilio webhook: no CORS needed (server-to-server)
 
 function parseBody(req) {
@@ -151,8 +176,10 @@ export default async function handler(req, res) {
     try {
         const _start = Date.now();
         const _ts = new Date().toISOString();
-        try { console.log('[CI Webhook] Received at', _ts); } catch(_) {}
-        console.log('[Conversational Intelligence Webhook] Received webhook:', req.body);
+        try { logger.debug('CI Webhook received', 'TwilioWebhook', { timestamp: _ts }); } catch(_) {}
+        logger.debug('Conversational Intelligence webhook received', 'TwilioWebhook', { 
+            payloadSize: JSON.stringify(req.body).length 
+        });
         
         const { 
             TranscriptSid, 
@@ -167,18 +194,23 @@ export default async function handler(req, res) {
         } = req.body;
         
         if (!TranscriptSid || !ServiceSid) {
-            console.log('[Conversational Intelligence Webhook] Missing required fields');
+            logger.warn('Missing required fields in CI webhook', 'TwilioWebhook', { 
+                hasTranscriptSid: !!TranscriptSid, 
+                hasServiceSid: !!ServiceSid 
+            });
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Missing required fields' }));
             return;
         }
+
+        // Log webhook payload summary for debugging
+        logger.debug('CI webhook payload summary', 'TwilioWebhook', { 
+            payloadSize: JSON.stringify(req.body).length 
+        });
         
-        // Log full webhook payload for debugging
-        console.log('[Conversational Intelligence Webhook] Full webhook payload:', JSON.stringify(req.body, null, 2));
-        
-        console.log('[Conversational Intelligence Webhook] Processing webhook:', {
-            TranscriptSid,
-            ServiceSid,
+        logger.debug('Processing CI webhook', 'TwilioWebhook', {
+            transcriptSid: TranscriptSid,
+            serviceSid: ServiceSid,
             Status,
             CallSid,
             RecordingSid,

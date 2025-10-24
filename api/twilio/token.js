@@ -1,6 +1,31 @@
 import { cors } from '../_cors.js';
 import twilio from 'twilio';
 
+// Simple logging function for Cloud Run cost optimization
+const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
+const currentLogLevel = logLevels[process.env.LOG_LEVEL || 'info'];
+
+const logger = {
+    info: (message, context, data) => {
+        if (currentLogLevel >= logLevels.info && process.env.VERBOSE_LOGS === 'true') {
+            console.log(`[${context}] ${message}`, data || '');
+        }
+    },
+    error: (message, context, data) => {
+        console.error(`[${context}] ${message}`, data || '');
+    },
+    debug: (message, context, data) => {
+        if (currentLogLevel >= logLevels.debug && process.env.VERBOSE_LOGS === 'true') {
+            console.log(`[${context}] ${message}`, data || '');
+        }
+    },
+    warn: (message, context, data) => {
+        if (currentLogLevel >= logLevels.warn) {
+            console.warn(`[${context}] ${message}`, data || '');
+        }
+    }
+};
+
 // Helper function to parse query parameters from URL
 function parseQueryParams(url) {
   const queryString = url.split('?')[1];
@@ -28,11 +53,9 @@ export default async function handler(req, res) {
     const queryParams = parseQueryParams(req.url || '');
     const identity = queryParams.identity || 'agent';
 
-    console.log('[Token Debug] Request details:', {
+    logger.debug('Token request received', 'TwilioAuth', {
       url: req.url,
       method: req.method,
-      headers: req.headers,
-      queryParams,
       identity,
       timestamp: new Date().toISOString()
     });
@@ -45,7 +68,11 @@ export default async function handler(req, res) {
     
     // Validate required environment variables
     if (!accountSid || !apiKeySid || !apiKeySecret) {
-      console.error('[Token] Missing Twilio credentials');
+      logger.error('Missing Twilio credentials', 'TwilioAuth', { 
+        hasAccountSid: !!accountSid, 
+        hasApiKeySid: !!apiKeySid, 
+        hasApiKeySecret: !!apiKeySecret 
+      });
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         error: 'Missing Twilio credentials',
@@ -54,7 +81,7 @@ export default async function handler(req, res) {
       return;
     }
     if (!appSid) {
-      console.error('[Token] Missing TwiML App SID');
+      logger.error('Missing TwiML App SID', 'TwilioAuth', { hasAppSid: !!appSid });
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         error: 'Missing TwiML App SID',
@@ -82,7 +109,7 @@ export default async function handler(req, res) {
     
     token.addGrant(voiceGrant);
     
-    console.log(`[Token] Generated for identity: ${identity}`);
+    logger.debug('Token generated successfully', 'TwilioAuth', { identity });
     
     // Always return JSON
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -93,7 +120,10 @@ export default async function handler(req, res) {
     return;
     
   } catch (error) {
-    console.error('[Token] Generation error:', error);
+    logger.error('Token generation failed', 'TwilioAuth', { 
+      error: error.message,
+      stack: error.stack 
+    });
     // Always return JSON, even on error
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
