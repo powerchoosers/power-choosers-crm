@@ -1942,17 +1942,11 @@ async function handleApiSendGridSend(req, res) {
       return;
     }
 
-    // Generate unique tracking ID
+    // Generate unique tracking ID for SendGrid
     const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Create tracking pixel URL - handle both local and Vercel deployment
-    const protocol = req.headers['x-forwarded-proto'] || (req.connection.encrypted ? 'https' : 'http');
-    const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
-    const trackingPixelUrl = `${protocol}://${host}/api/email/track/${trackingId}`;
-    
-    // Inject tracking pixel into email content
-    const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
-    const emailContent = content + trackingPixel;
+    // Use SendGrid native tracking - no custom pixel injection
+    const emailContent = content;
 
     // Prepare email data for SendGrid
     const emailData = {
