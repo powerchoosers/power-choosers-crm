@@ -4,11 +4,16 @@
 (function() {
   'use strict';
 
-  const STORAGE_KEY = 'pc_employee_welcome_dismissed';
+  const STORAGE_KEY_PREFIX = 'pc_employee_welcome_dismissed';
+
+  function getStorageKey() {
+    const email = (window.currentUserEmail || '').toLowerCase() || 'unknown';
+    return `${STORAGE_KEY_PREFIX}:${email}`;
+  }
 
   // Check if welcome has been dismissed
   function isWelcomeDismissed() {
-    return localStorage.getItem(STORAGE_KEY) === 'true';
+    return localStorage.getItem(getStorageKey()) === 'true';
   }
 
   // Show welcome screen for new employees
@@ -105,8 +110,41 @@
       }, 300);
     }
 
-    localStorage.setItem(STORAGE_KEY, 'true');
+    localStorage.setItem(getStorageKey(), 'true');
     console.log('[EmployeeWelcome] Welcome dismissed');
+  }
+
+  // Check if the user has any accessible data
+  async function userHasNoData() {
+    try {
+      // Prefer DataManager helper if available
+      if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+        const [accounts, contacts, tasks] = await Promise.all([
+          window.DataManager.queryWithOwnership('accounts'),
+          window.DataManager.queryWithOwnership('contacts'),
+          window.DataManager.queryWithOwnership('tasks')
+        ]);
+        return (accounts.length + contacts.length + tasks.length) === 0;
+      }
+
+      // Fallback: direct minimal queries
+      const db = firebase.firestore();
+      const email = (window.currentUserEmail || '').toLowerCase();
+      if (!email) return false;
+
+      const collections = ['accounts', 'contacts', 'tasks'];
+      for (const col of collections) {
+        const [own, assigned] = await Promise.all([
+          db.collection(col).where('ownerId', '==', email).limit(1).get(),
+          db.collection(col).where('assignedTo', '==', email).limit(1).get()
+        ]);
+        if (!own.empty || !assigned.empty) return false;
+      }
+      return true;
+    } catch (e) {
+      console.warn('[EmployeeWelcome] Data presence check failed:', e);
+      return false;
+    }
   }
 
   // Auto-show welcome screen on page load if needed
@@ -116,13 +154,17 @@
       if (window.currentUserEmail && window.currentUserRole) {
         clearInterval(checkAuth);
         
-        // Only show for employees with no data
-        if (window.currentUserRole === 'employee' && !isWelcomeDismissed()) {
-          // Small delay to ensure page is loaded
-          setTimeout(() => {
-            showWelcomeScreen();
-          }, 500);
-        }
+        // Only show for employees, per-user, and only when they have zero data
+        (async () => {
+          if (window.currentUserRole === 'employee' && !isWelcomeDismissed()) {
+            const noData = await userHasNoData();
+            if (noData) {
+              setTimeout(() => {
+                showWelcomeScreen();
+              }, 400);
+            }
+          }
+        })();
       }
     }, 100);
 
@@ -134,7 +176,7 @@
   window.EmployeeWelcome = {
     show: showWelcomeScreen,
     dismiss: dismissWelcome,
-    isDissmissed: isWelcomeDismissed
+    isDismissed: isWelcomeDismissed
   };
 
   // Auto-initialize
