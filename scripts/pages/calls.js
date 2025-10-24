@@ -129,9 +129,7 @@ var console = {
             if (window.CacheManager && typeof window.CacheManager.get === 'function') {
               accounts = await window.CacheManager.get('accounts');
             } else if (window.firebaseDB) {
-            // OPTIMIZED: Only fetch needed fields for phone mapping (96% data reduction)
             const snap = await window.firebaseDB.collection('accounts')
-              .select('id', 'name', 'companyPhone', 'phone', 'primaryPhone', 'mainPhone')
               .limit(500)
               .get();
               accounts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -195,7 +193,6 @@ var console = {
         try{
           const snap1 = await window.firebaseDB.collection('contacts')
             .where('phone','!=',null)
-            .select('id', 'firstName', 'lastName', 'name', 'title', 'companyName', 'phone', 'mobile', 'workDirectPhone', 'otherPhone')
             .limit(500)
             .get();
             snap1.forEach(doc => contacts.push({ id: doc.id, ...doc.data() }));
@@ -204,7 +201,6 @@ var console = {
         try{
           const snap2 = await window.firebaseDB.collection('contacts')
             .where('mobile','!=',null)
-            .select('id', 'firstName', 'lastName', 'name', 'title', 'companyName', 'phone', 'mobile', 'workDirectPhone', 'otherPhone')
             .limit(500)
             .get();
             snap2.forEach(doc => contacts.push({ id: doc.id, ...doc.data() }));
@@ -213,7 +209,6 @@ var console = {
         try{
           const snap3 = await window.firebaseDB.collection('contacts')
             .where('workDirectPhone','!=',null)
-            .select('id', 'firstName', 'lastName', 'name', 'title', 'companyName', 'phone', 'mobile', 'workDirectPhone', 'otherPhone')
             .limit(500)
             .get();
             snap3.forEach(doc => contacts.push({ id: doc.id, ...doc.data() }));
@@ -222,7 +217,6 @@ var console = {
         try{
           const snap4 = await window.firebaseDB.collection('contacts')
             .where('otherPhone','!=',null)
-            .select('id', 'firstName', 'lastName', 'name', 'title', 'companyName', 'phone', 'mobile', 'workDirectPhone', 'otherPhone')
             .limit(500)
             .get();
             snap4.forEach(doc => contacts.push({ id: doc.id, ...doc.data() }));
