@@ -38,3 +38,10 @@ build/
 # Temporary files
 *.tmp
 *.temp
+
+# Secrets and credentials (prevent accidental commits)
+api-secrets/
+private.key
+*.key
+*.pem
+client_secret_*.json
