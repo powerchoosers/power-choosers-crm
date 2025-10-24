@@ -45,34 +45,57 @@ export default async function handler(req, res) {
             RecordingDuration
         } = body;
         
-        try {
-            console.log('[Recording] Webhook headers:', {
-                host: req.headers.host,
-                'user-agent': req.headers['user-agent'] || '',
-                'content-type': req.headers['content-type'] || '',
-                'x-twilio-signature': req.headers['x-twilio-signature'] || ''
-            });
-        } catch(_) {}
-        console.log('[Recording] Webhook received:', {
-            RecordingSid,
-            CallSid,
-            RecordingStatus,
-            RecordingDuration,
-            RecordingUrl: RecordingUrl || '(none)'
-        });
-        try { console.log('[Recording] Raw body:', JSON.stringify(body).slice(0, 1200)); } catch(_) {}
-        try { if (body && (body.RecordingChannels || body.RecordingTrack)) console.log('[Recording] Channels/Track:', body.RecordingChannels || '(n/a)', body.RecordingTrack || '(n/a)'); } catch(_) {}
+        // Simple logging function for Cloud Run cost optimization
+        const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
+        const currentLogLevel = logLevels[process.env.LOG_LEVEL || 'info'];
         
-        // Log all recording-related fields for debugging
+        const logger = {
+            info: (message, context, data) => {
+                if (currentLogLevel >= logLevels.info && process.env.VERBOSE_LOGS === 'true') {
+                    console.log(`[${context}] ${message}`, data || '');
+                }
+            },
+            error: (message, context, data) => {
+                console.error(`[${context}] ${message}`, data || '');
+            },
+            debug: (message, context, data) => {
+                if (currentLogLevel >= logLevels.debug && process.env.VERBOSE_LOGS === 'true') {
+                    console.log(`[${context}] ${message}`, data || '');
+                }
+            },
+            warn: (message, context, data) => {
+                if (currentLogLevel >= logLevels.warn) {
+                    console.warn(`[${context}] ${message}`, data || '');
+                }
+            }
+        };
+        logger.debug('Twilio recording webhook received', 'TwilioWebhook', { 
+            recordingSid: RecordingSid, 
+            callSid: CallSid, 
+            status: RecordingStatus,
+            duration: RecordingDuration 
+        });
+        try { 
+            logger.debug('Webhook payload received', 'TwilioWebhook', { 
+                payloadSize: JSON.stringify(body).length 
+            }); 
+        } catch(_) {}
+        try { 
+            if (body && (body.RecordingChannels || body.RecordingTrack)) {
+                logger.debug('Recording channels/track info', 'TwilioWebhook', { 
+                    channels: body.RecordingChannels, 
+                    track: body.RecordingTrack 
+                });
+            }
+        } catch(_) {}
+        
+        // Log key recording fields for debugging
         try {
-            console.log('[Recording] All recording fields:', {
-                RecordingSource: body.RecordingSource,
-                RecordingChannels: body.RecordingChannels,
-                RecordingTrack: body.RecordingTrack,
-                RecordingStatus: body.RecordingStatus,
-                RecordingDuration: body.RecordingDuration,
-                CallSid: body.CallSid,
-                RecordingSid: body.RecordingSid
+            logger.debug('Recording fields summary', 'TwilioWebhook', {
+                source: body.RecordingSource,
+                channels: body.RecordingChannels,
+                track: body.RecordingTrack,
+                status: body.RecordingStatus
             });
         } catch(_) {}
         
