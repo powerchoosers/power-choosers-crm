@@ -2,7 +2,7 @@
 // Much more efficient than loading all calls and filtering client-side
 
 import { cors } from '../../_cors.js';
-import { db } from '../../_firebase.js';
+import { db, admin } from '../../_firebase.js';
 
 // In-memory fallback store (for local/dev when Firestore isn't configured)
 const memoryStore = new Map();
@@ -12,6 +12,21 @@ function normalizePhone(phone) {
   if (!phone) return '';
   return String(phone).replace(/\D/g, '').slice(-10);
 }
+
+// Extract authenticated user email from Authorization: Bearer <idToken>
+async function getRequestUserEmail(req) {
+  try {
+    const auth = req.headers && (req.headers.authorization || req.headers.Authorization);
+    if (!auth || !auth.startsWith('Bearer ')) return null;
+    const token = auth.slice('Bearer '.length).trim();
+    if (!token) return null;
+    const decoded = await admin.auth().verifyIdToken(token);
+    const email = (decoded && decoded.email) ? String(decoded.email).toLowerCase() : null;
+    return email || null;
+  } catch (_) { return null; }
+}
+
+const ADMIN_EMAIL = 'l.patterson@powerchoosers.com';
 
 // Derive outcome from call status and duration
 function deriveOutcome(call) {
@@ -85,6 +100,15 @@ export default async function handler(req, res) {
         return;
       }
 
+      // AuthN: require a valid Firebase ID token
+      const userEmail = await getRequestUserEmail(req);
+      const isAdmin = userEmail === ADMIN_EMAIL;
+      if (!userEmail) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
+
       const { accountId } = req.query;
       if (!accountId) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -135,9 +159,7 @@ export default async function handler(req, res) {
           .limit(limit)
           .get();
 
-        accountCallsSnapshot.forEach(doc => {
-          allCalls.push({ id: doc.id, ...doc.data() });
-        });
+        accountCallsSnapshot.forEach(doc => { allCalls.push({ id: doc.id, ...doc.data() }); });
 
         // Query 2: Calls to/from company phone
         if (companyPhone && companyPhone.length === 10) {
@@ -148,9 +170,7 @@ export default async function handler(req, res) {
             .limit(limit)
             .get();
 
-          companyCallsSnapshot.forEach(doc => {
-            allCalls.push({ id: doc.id, ...doc.data() });
-          });
+          companyCallsSnapshot.forEach(doc => { allCalls.push({ id: doc.id, ...doc.data() }); });
 
           const companyCallsFromSnapshot = await db.collection('calls')
             .where('from', '==', companyPhone)
@@ -158,9 +178,7 @@ export default async function handler(req, res) {
             .limit(limit)
             .get();
 
-          companyCallsFromSnapshot.forEach(doc => {
-            allCalls.push({ id: doc.id, ...doc.data() });
-          });
+          companyCallsFromSnapshot.forEach(doc => { allCalls.push({ id: doc.id, ...doc.data() }); });
         }
 
         // Query 3: Calls with matching contactIds
@@ -175,9 +193,7 @@ export default async function handler(req, res) {
               .limit(limit)
               .get();
 
-            contactCallsSnapshot.forEach(doc => {
-              allCalls.push({ id: doc.id, ...doc.data() });
-            });
+            contactCallsSnapshot.forEach(doc => { allCalls.push({ id: doc.id, ...doc.data() }); });
           }
         }
 
@@ -195,9 +211,7 @@ export default async function handler(req, res) {
               .limit(limit)
               .get();
 
-            contactPhoneCallsSnapshot.forEach(doc => {
-              allCalls.push({ id: doc.id, ...doc.data() });
-            });
+            contactPhoneCallsSnapshot.forEach(doc => { allCalls.push({ id: doc.id, ...doc.data() }); });
 
             const contactPhoneCallsFromSnapshot = await db.collection('calls')
               .where('from', 'in', batch)
@@ -205,18 +219,14 @@ export default async function handler(req, res) {
               .limit(limit)
               .get();
 
-            contactPhoneCallsFromSnapshot.forEach(doc => {
-              allCalls.push({ id: doc.id, ...doc.data() });
-            });
+            contactPhoneCallsFromSnapshot.forEach(doc => { allCalls.push({ id: doc.id, ...doc.data() }); });
             const targetPhoneCallsSnapshot = await db.collection('calls')
               .where('targetPhone', 'in', batch)
               .orderBy('timestamp', 'desc')
               .limit(limit)
               .get();
 
-            targetPhoneCallsSnapshot.forEach(doc => {
-              allCalls.push({ id: doc.id, ...doc.data() });
-            });
+            targetPhoneCallsSnapshot.forEach(doc => { allCalls.push({ id: doc.id, ...doc.data() }); });
           }
         }
 
@@ -227,6 +237,17 @@ export default async function handler(req, res) {
             allCalls.push(call);
           }
         }
+      }
+
+      // Enforce ownership on server side for non-admins
+      if (!isAdmin) {
+        const ue = String(userEmail).toLowerCase();
+        allCalls = allCalls.filter(c => {
+          const o = c && c.ownerId ? String(c.ownerId).toLowerCase() : '';
+          const a = c && c.assignedTo ? String(c.assignedTo).toLowerCase() : '';
+          const cr = c && c.createdBy ? String(c.createdBy).toLowerCase() : '';
+          return o === ue || a === ue || cr === ue;
+        });
       }
 
       // Remove duplicates and sort by timestamp

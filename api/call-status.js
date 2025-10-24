@@ -2,7 +2,7 @@
 // Returns lightweight boolean status without loading full call objects
 
 import { cors } from './_cors.js';
-import { db } from './_firebase.js';
+import { db, admin } from './_firebase.js';
 
 // In-memory fallback store (for local/dev when Firestore isn't configured)
 const memoryStore = new Map();
@@ -13,8 +13,18 @@ function normalizePhone(phone) {
   return String(phone).replace(/\D/g, '').slice(-10);
 }
 
+// Helper: per-user ownership check
+function ownsDoc(data, ue) {
+  try {
+    const o = data && data.ownerId ? String(data.ownerId).toLowerCase() : '';
+    const a = data && data.assignedTo ? String(data.assignedTo).toLowerCase() : '';
+    const c = data && data.createdBy ? String(data.createdBy).toLowerCase() : '';
+    return o === ue || a === ue || c === ue;
+  } catch(_) { return false; }
+}
+
 // Check if a phone number has calls in Firestore
-async function hasCallsForPhone(phone, db) {
+async function hasCallsForPhone(phone, db, userEmail, isAdmin) {
   if (!phone || phone.length !== 10) return false;
   
   try {
@@ -25,7 +35,11 @@ async function hasCallsForPhone(phone, db) {
         .limit(1)
         .get();
 
-      if (!targetSnap.empty) return true;
+      if (!targetSnap.empty) {
+        if (isAdmin) return true;
+        const hit = targetSnap.docs.find(d => ownsDoc(d.data(), String(userEmail).toLowerCase()));
+        if (hit) return true;
+      }
 
       // Fallbacks for legacy records that may not have targetPhone set
       // Some older records may store 10-digit values in 'to'/'from'
@@ -34,19 +48,29 @@ async function hasCallsForPhone(phone, db) {
         .limit(1)
         .get();
 
-      if (!toSnap.empty) return true;
+      if (!toSnap.empty) {
+        if (isAdmin) return true;
+        const hit = toSnap.docs.find(d => ownsDoc(d.data(), String(userEmail).toLowerCase()));
+        if (hit) return true;
+      }
 
       const fromSnap = await db.collection('calls')
         .where('from', '==', phone)
         .limit(1)
         .get();
 
-      return !fromSnap.empty;
+      if (!fromSnap.empty) {
+        if (isAdmin) return true;
+        const hit = fromSnap.docs.find(d => ownsDoc(d.data(), String(userEmail).toLowerCase()));
+        if (hit) return true;
+      }
+      return false;
     } else {
       // Fallback to memory store
       for (const [_, call] of memoryStore) {
         if (normalizePhone(call.to) === phone || normalizePhone(call.from) === phone) {
-          return true;
+          if (isAdmin) return true;
+          if (ownsDoc(call, String(userEmail).toLowerCase())) return true;
         }
       }
       return false;
@@ -58,7 +82,7 @@ async function hasCallsForPhone(phone, db) {
 }
 
 // Check if an account ID has calls in Firestore
-async function hasCallsForAccount(accountId, db) {
+async function hasCallsForAccount(accountId, db, userEmail, isAdmin) {
   if (!accountId) return false;
   
   try {
@@ -67,13 +91,16 @@ async function hasCallsForAccount(accountId, db) {
         .where('accountId', '==', accountId)
         .limit(1)
         .get();
-      
-      return !snapshot.empty;
+      if (snapshot.empty) return false;
+      if (isAdmin) return true;
+      const hit = snapshot.docs.find(d => ownsDoc(d.data(), String(userEmail).toLowerCase()));
+      return !!hit;
     } else {
       // Fallback to memory store
       for (const [_, call] of memoryStore) {
         if (call.accountId === accountId) {
-          return true;
+          if (isAdmin) return true;
+          if (ownsDoc(call, String(userEmail).toLowerCase())) return true;
         }
       }
       return false;
@@ -85,7 +112,7 @@ async function hasCallsForAccount(accountId, db) {
 }
 
 // Check if a contact ID has calls in Firestore
-async function hasCallsForContact(contactId, db) {
+async function hasCallsForContact(contactId, db, userEmail, isAdmin) {
   if (!contactId) return false;
   
   try {
@@ -94,13 +121,16 @@ async function hasCallsForContact(contactId, db) {
         .where('contactId', '==', contactId)
         .limit(1)
         .get();
-      
-      return !snapshot.empty;
+      if (snapshot.empty) return false;
+      if (isAdmin) return true;
+      const hit = snapshot.docs.find(d => ownsDoc(d.data(), String(userEmail).toLowerCase()));
+      return !!hit;
     } else {
       // Fallback to memory store
       for (const [_, call] of memoryStore) {
         if (call.contactId === contactId) {
-          return true;
+          if (isAdmin) return true;
+          if (ownsDoc(call, String(userEmail).toLowerCase())) return true;
         }
       }
       return false;
@@ -160,21 +190,41 @@ export default async function handler(req, res) {
       contactIdList = contactIds ? contactIds.split(',').map(id => id.trim()).filter(Boolean) : [];
     }
 
+    // Auth: Require Firebase ID token; use for ownership scoping unless admin
+    let userEmail = null;
+    let isAdmin = false;
+    try {
+      const auth = req.headers && (req.headers.authorization || req.headers.Authorization);
+      if (auth && auth.startsWith('Bearer ')) {
+        const token = auth.slice('Bearer '.length).trim();
+        if (token) {
+          const decoded = await admin.auth().verifyIdToken(token);
+          userEmail = (decoded && decoded.email) ? String(decoded.email).toLowerCase() : null;
+          isAdmin = userEmail === 'l.patterson@powerchoosers.com';
+        }
+      }
+    } catch(_) { /* ignore */ }
+    if (!userEmail) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+
     const result = {};
 
     // Check phone numbers
     for (const phone of phoneList) {
-      result[phone] = await hasCallsForPhone(phone, db);
+      result[phone] = await hasCallsForPhone(phone, db, userEmail, isAdmin);
     }
 
     // Check account IDs
     for (const accountId of accountIdList) {
-      result[accountId] = await hasCallsForAccount(accountId, db);
+      result[accountId] = await hasCallsForAccount(accountId, db, userEmail, isAdmin);
     }
 
     // Check contact IDs
     for (const contactId of contactIdList) {
-      result[contactId] = await hasCallsForContact(contactId, db);
+      result[contactId] = await hasCallsForContact(contactId, db, userEmail, isAdmin);
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
