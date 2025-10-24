@@ -53,15 +53,8 @@
         hasMoreData = false;
       } else {
         // Admin path: original unfiltered query
-        // OPTIMIZED: Only fetch fields needed for list display and filtering
         // COST REDUCTION: Load in batches of 100 (smart lazy loading)
         let query = window.firebaseDB.collection('tasks')
-          .select(
-            'id', 'title', 'description', 'status', 'priority',
-            'dueDate', 'createdAt', 'updatedAt', 'assignedTo',
-            'contactId', 'accountId', 'type', 'category',
-            'completed', 'completedAt', 'notes'
-          )
           .orderBy('timestamp', 'desc')
           .limit(100);
         const snapshot = await query.get();
@@ -148,12 +141,6 @@
       if (!isAdmin()) return { loaded: 0, hasMore: false };
       console.log('[BackgroundTasksLoader] Loading next batch...');
       let query = window.firebaseDB.collection('tasks')
-        .select(
-          'id', 'title', 'description', 'status', 'priority',
-          'dueDate', 'createdAt', 'updatedAt', 'assignedTo',
-          'contactId', 'accountId', 'type', 'category',
-          'completed', 'completedAt', 'notes'
-        )
         .orderBy('timestamp', 'desc')
         .startAfter(lastLoadedDoc)
         .limit(100);
