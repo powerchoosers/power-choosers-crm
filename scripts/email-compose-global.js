@@ -751,28 +751,107 @@
     selection.addRange(range);
   }
 
-  // Handle image upload
-  function handleImageUpload(editor) {
-    window.crm?.showToast('Image upload coming soon');
+  function toggleFormattingBar() {
+    const formattingBar = document.querySelector('.formatting-bar');
+    if (!formattingBar) return;
+    
+    const isHidden = formattingBar.getAttribute('aria-hidden') === 'true';
+    formattingBar.setAttribute('aria-hidden', !isHidden);
   }
 
-  // Toggle HTML mode
-  function toggleHtmlMode(composeWindow) {
-    const editor = composeWindow.querySelector('.body-input');
-    if (!editor) return;
+  function togglePreviewMode() {
+    const compose = document.getElementById('compose-window');
+    if (!compose) return;
+
+    const editor = compose.querySelector('.body-input');
+    const previewContainer = compose.querySelector('.preview-container');
+    const previewBtn = compose.querySelector('[data-action="preview"]');
     
-    const isHtmlMode = editor.getAttribute('data-mode') === 'html';
-    if (isHtmlMode) {
-      // Switch to text mode
-      editor.setAttribute('data-mode', 'text');
-      editor.setAttribute('contenteditable', 'true');
-      editor.innerHTML = editor.textContent || '';
+    // Check if we're currently in preview mode
+    const isPreview = compose.classList.contains('preview-mode');
+    
+    if (isPreview) {
+      // Exit preview mode - show editor
+      compose.classList.remove('preview-mode');
+      if (previewContainer) previewContainer.remove();
+      if (editor) editor.style.display = '';
+      if (previewBtn) {
+        previewBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>`;
+        previewBtn.setAttribute('title', 'Preview');
+        previewBtn.setAttribute('aria-label', 'Preview message');
+      }
     } else {
-      // Switch to HTML mode
-      editor.setAttribute('data-mode', 'html');
-      editor.setAttribute('contenteditable', 'true');
-      const htmlContent = editor.innerHTML;
-      editor.textContent = htmlContent;
+      // Enter preview mode - show preview
+      compose.classList.add('preview-mode');
+      
+      // Get current email content
+      const bodyInput = compose.querySelector('.body-input');
+      const isHtmlMode = bodyInput?.getAttribute('data-mode') === 'html';
+      const content = isHtmlMode ? (bodyInput?.innerHTML || '') : (bodyInput?.innerHTML || '');
+      
+      // Create preview container
+      const preview = document.createElement('div');
+      preview.className = 'preview-container';
+      preview.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #fff;
+        overflow-y: auto;
+        padding: 20px;
+        z-index: 10;
+      `;
+      
+      // Create preview content with proper iframe or direct HTML
+      if (isHtmlMode) {
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'width: 100%; min-height: 500px; border: none; background: #f1f5fa;';
+        iframe.srcdoc = content;
+        preview.appendChild(iframe);
+      } else {
+        preview.innerHTML = content;
+      }
+      
+      // Add close button
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = '← Back to Editor';
+      closeBtn.style.cssText = `
+        position: sticky;
+        top: 0;
+        left: 0;
+        margin-bottom: 20px;
+        padding: 10px 20px;
+        background: #1e3a8a;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        z-index: 100;
+      `;
+      closeBtn.onclick = () => togglePreviewMode();
+      preview.insertBefore(closeBtn, preview.firstChild);
+      
+      // Hide editor and show preview
+      if (editor) editor.style.display = 'none';
+      compose.querySelector('.compose-editor').appendChild(preview);
+      
+      // Update button icon to edit/pencil
+      if (previewBtn) {
+        previewBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>`;
+        previewBtn.setAttribute('title', 'Edit');
+        previewBtn.setAttribute('aria-label', 'Edit message');
+      }
     }
   }
 
@@ -806,17 +885,21 @@
     editor?.addEventListener('mouseup', saveSelection);
     editor?.addEventListener('blur', saveSelection);
     
-    // Toolbar button clicks
-    toolbar?.addEventListener('click', (e) => {
+    // Toolbar actions
+    document.addEventListener('click', (e) => {
       const btn = e.target.closest('.toolbar-btn');
       if (!btn) return;
       
-      const action = btn.getAttribute('data-action');
-      console.log('🔧 Toolbar action:', action);
+      const action = btn.dataset.action;
       
-      if (typeof handleToolbarAction === 'function') {
-        handleToolbarAction(action, btn, editor, formattingBar, linkBar);
+      if (action === 'ai') {
+        openAIPanel();
+      } else if (action === 'formatting') {
+        toggleFormattingBar();
+      } else if (action === 'preview') {
+        togglePreviewMode();
       }
+      // Other toolbar actions can be added here
     });
     
     // Formatting button clicks
@@ -1786,213 +1869,845 @@
   }
 
   function buildWarmIntroHtml(data, recipient, fromEmail) {
-    const mail = fromEmail || 'l.patterson@powerchoosers.com';
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const s = getSenderProfile();
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Hi ${firstName},</p>
-        
-        <p>${data.call_reference || 'Thank you for taking the time to speak with me today.'}</p>
-        
-        <p>${data.main_message || 'I wanted to follow up on our conversation about your energy needs and how Power Choosers can help optimize your costs.'}</p>
-        
-        <p>${data.cta_text || 'Would you be available for a brief call this week to discuss next steps?'}</p>
-        
-        ${buildSignatureBlock()}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03);
+      overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px;
+      background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb {
+      margin:20px 24px 2px 24px; font-size:14px; color:#234bb7;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#f3f8ff; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .main-paragraph {margin:0 24px 18px 24px; padding:18px; background:#fff; border-radius:7px; line-height:1.6;}
+    .cta-container {
+      text-align:center; padding:22px 24px;
+      background:#f3f8ff; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(30,64,175,0.05);
+    }
+    .cta-btn {
+      display:inline-block; padding:13px 36px; background:#1e3a8a; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(30,64,175,0.13);
+      transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#1631a4;}
+    .signature {
+      margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer {
+      padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">Great speaking with you about ${company}'s energy needs</div>
+    <div class="intro">
+      <p>Hi ${firstName},</p>
+      <p>${data.call_reference || 'Thank you for taking my call today. I wanted to quickly follow up and ensure you have the key details about how Power Choosers can support your team\'s energy procurement goals.'}</p>
+    </div>
+    <div class="main-paragraph">
+      <p>${data.main_message || 'I wanted to follow up on our conversation about your energy needs and how Power Choosers can help optimize your costs.'}</p>
+    </div>
+    <div class="cta-container">
+      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Schedule a Follow-Up Call'}</a>
+      <div style="margin-top:8px;font-size:14px;color:#1e3a8a;opacity:0.83;">
+        Prefer email or need more info? Just reply—happy to assist.
       </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">` : ''}
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${s.name}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${s.location ? `${s.location}<br>` : ''}
+        ${s.phone ? `${s.phone}<br>` : ''}
+        ${s.company}
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
     `;
   }
 
   function buildFollowUpHtml(data, recipient, fromEmail) {
-    const mail = fromEmail || 'l.patterson@powerchoosers.com';
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const s = getSenderProfile();
     
     const valueProps = data.value_props || [
-      'Lower electricity rates through competitive procurement',
-      'Expert market analysis and timing recommendations',
-      'Ongoing monitoring of your energy portfolio',
-      'Transparent pricing with no hidden fees'
+      'Access to 50+ competitive suppliers',
+      'No cost for our procurement service',
+      'Transparent rate comparison',
+      'Expert contract negotiation'
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Hi ${firstName},</p>
-        
-        <p>${data.progress_update || 'I wanted to follow up on our previous conversation about optimizing your energy costs.'}</p>
-        
-        <p>Here's how we can help ${company}:</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 2px 24px; font-size:14px; color:#7c3aed;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#faf5ff; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .main-paragraph {margin:0 24px 18px 24px; padding:18px; background:#fff; border-radius:7px; line-height:1.6;}
+    .two-column { display:flex; gap:16px; margin:0 24px 18px 24px; }
+    .column { flex:1; background:#f6f7fb; border-radius:8px; padding:16px;
+      box-shadow:0 2px 8px rgba(30,64,175,0.06);
+    }
+    .column h4 { margin:0 0 12px 0; color:#7c3aed; font-size:15px; }
+    .column ul { margin:0; padding:0; list-style:none; font-size:14px; }
+    .column ul li { padding:4px 0; color:#22223b; }
+    .alert-box { background:#fef3c7; border-left:4px solid #f59e0b;
+      padding:14px 18px; margin:0 24px 18px 24px; border-radius:6px;
+    }
+    .alert-box p { margin:0; font-size:14px; color:#92400e; font-weight:600; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#f3f8ff; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(30,64,175,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#10b981; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(16,185,129,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#059669;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+    @media (max-width:650px){
+      .two-column { flex-direction:column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">Progress Update: ${company} Energy Analysis</div>
+    <div class="intro">
+      <p>Hi ${firstName},</p>
+      <p>${data.progress_update || 'Following our initial conversation, I\'ve completed a market analysis for facilities in your area. The findings are compelling, and I wanted to share what we discovered.'}</p>
+    </div>
+    <div class="two-column">
+      <div class="column">
+        <h4>✓ Key Benefits</h4>
         <ul>
-          ${valueProps.map(prop => `<li>${prop}</li>`).join('')}
+          ${valueProps.slice(0, Math.ceil(valueProps.length / 2)).map(prop => `<li>• ${prop}</li>`).join('')}
         </ul>
-        
-        <p>${data.urgency_message || 'With energy markets showing volatility, now is an ideal time to secure favorable rates.'}</p>
-        
-        <p>${data.cta_text || 'Would you be interested in scheduling a brief call to discuss your specific situation?'}</p>
-        
-        ${buildSignatureBlock()}
       </div>
+      <div class="column">
+        <h4>✓ Why Act Now</h4>
+        <ul>
+          ${valueProps.slice(Math.ceil(valueProps.length / 2)).map(prop => `<li>• ${prop}</li>`).join('')}
+        </ul>
+      </div>
+    </div>
+    <div class="alert-box">
+      <p>⚠️ ${data.urgency_message || 'Market Update: Rates are climbing faster than expected'}</p>
+    </div>
+    <div class="cta-container">
+      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Let\'s Continue the Conversation'}</a>
+      <div style="margin-top:8px;font-size:14px;color:#1e3a8a;opacity:0.83;">
+        Prefer a specific time? Just reply with your availability.
+      </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">` : ''}
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${s.name}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${s.location ? `${s.location}<br>` : ''}
+        ${s.phone ? `${s.phone}<br>` : ''}
+        ${s.company}
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
     `;
   }
 
   function buildEnergyHealthHtml(data, recipient, fromEmail) {
-    const mail = fromEmail || 'l.patterson@powerchoosers.com';
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const s = getSenderProfile();
     
     const assessmentItems = data.assessment_items || [
-      'Current rate analysis and market comparison',
-      'Contract terms and renewal timing',
-      'Usage patterns and optimization opportunities',
-      'Potential savings calculations'
+      'Current rate vs. market rates ($0.085/kWh benchmark)',
+      'Contract expiration timeline',
+      'Hidden charges and fees analysis',
+      'Efficiency improvement opportunities'
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Hi ${firstName},</p>
-        
-        <p>I'd like to offer ${company} a complimentary Energy Health Check to ensure you're getting the best value from your current energy setup.</p>
-        
-        <p>During this assessment, we'll review:</p>
-        <ul>
-          ${assessmentItems.map(item => `<li>${item}</li>`).join('')}
-        </ul>
-        
-        <p>${data.contract_info || 'This is especially valuable as your current contract approaches renewal.'}</p>
-        
-        <p>${data.benefits || 'You\'ll receive a detailed report with specific recommendations and potential savings opportunities.'}</p>
-        
-        <p>${data.cta_text || 'Would you be available for a 30-minute call this week to conduct this assessment?'}</p>
-        
-        ${buildSignatureBlock()}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 2px 24px; font-size:14px; color:#0f766e;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#f0fdfa; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .main-paragraph {margin:0 24px 18px 24px; padding:18px; background:#fff; border-radius:7px; line-height:1.6;}
+    .info-list { background:#f0fdfa; border-radius:8px; border:1px solid #99f6e4;
+      padding:16px 22px; margin:0 24px 18px 24px; box-shadow:0 2px 8px rgba(20,184,166,0.06);
+      font-size:15.5px; color:#22223b;
+    }
+    .info-list h3 { margin:0 0 12px 0; color:#0f766e; font-size:16px; }
+    .info-list ul {margin:0;padding:0;list-style:none;}
+    .info-list ul li {padding:8px 12px; margin:6px 0; background:#fff; border-radius:6px; border-left:3px solid #14b8a6; box-shadow:0 1px 2px rgba(0,0,0,0.05);}
+    .highlight-box { background:linear-gradient(135deg,#d1fae5 0%,#a7f3d0 100%);
+      padding:16px 20px; margin:0 24px 18px 24px; border-radius:8px;
+    }
+    .highlight-box p { margin:0; color:#065f46; font-size:15px; }
+    .highlight-box strong { color:#047857; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#f0fdfa; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(20,184,166,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#14b8a6; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(20,184,166,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#0d9488;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">⚡ Free Energy Health Check • No Obligation</div>
+    <div class="intro">
+      <p>Hi ${firstName},</p>
+      <p>I wanted to share an opportunity for ${company} to get a comprehensive energy assessment at no cost. Our team will analyze your current energy profile and identify potential savings opportunities.</p>
+    </div>
+    <div class="main-paragraph">
+      <p>${data.benefits || 'Our assessment typically uncovers <strong style="color:#14b8a6;">15-30% in cost reduction potential</strong> for facilities. We\'ll review your current rate structure, contract terms, and usage patterns to identify hidden charges and optimization opportunities.'}</p>
+    </div>
+    <div class="info-list">
+      <h3>📋 What We'll Review</h3>
+      <ul>
+        ${assessmentItems.map(item => `<li>✓ ${item}</li>`).join('')}
+      </ul>
+    </div>
+    <div class="highlight-box">
+      <p>${data.contract_info || '<strong>Your Contract:</strong> Perfect timing for assessment'}</p>
+    </div>
+    <div class="cta-container">
+      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Schedule Your Free Assessment'}</a>
+      <div style="margin-top:8px;font-size:14px;color:#0f766e;opacity:0.83;">
+        30-minute consultation • Zero pressure • Maximum insight
       </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">` : ''}
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${s.name}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${s.location ? `${s.location}<br>` : ''}
+        ${s.phone ? `${s.phone}<br>` : ''}
+        ${s.company}
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
     `;
   }
 
   function buildProposalHtml(data, recipient, fromEmail) {
-    const mail = fromEmail || 'l.patterson@powerchoosers.com';
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const s = getSenderProfile();
     
     const timeline = data.timeline || [
-      'Contract review and market analysis',
-      'Rate negotiation with suppliers',
-      'Proposal presentation and review',
-      'Implementation and monitoring setup'
+      'Contract review and approval (24 Hours)',
+      'Supplier onboarding and enrollment (30-45 days)',
+      'Service activation (seamless transition)'
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Hi ${firstName},</p>
-        
-        <p>${data.proposal_summary || 'I\'m pleased to present our proposal for optimizing your energy procurement strategy.'}</p>
-        
-        <p>${data.pricing_highlight || 'Based on current market conditions, we can secure rates that represent significant savings compared to your current arrangement.'}</p>
-        
-        <p>Our implementation timeline:</p>
-        <ol>
-          ${timeline.map(step => `<li>${step}</li>`).join('')}
-        </ol>
-        
-        <p>${data.cta_text || 'I\'d like to schedule a call to walk through the proposal details and answer any questions you may have.'}</p>
-        
-        ${buildSignatureBlock()}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 2px 24px; font-size:14px; color:#b45309;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#fef3c7; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .exclusive-badge { display:inline-block; background:#d97706; color:#fff;
+      padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700;
+      letter-spacing:0.05em; margin-left:8px; vertical-align:middle;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .main-paragraph {margin:0 24px 18px 24px; padding:18px; background:#fff; border-radius:7px; line-height:1.6;}
+    .summary-box { background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);
+      border:1px solid #fbbf24; padding:18px 20px; margin:0 24px 18px 24px;
+      border-radius:8px; box-shadow:0 2px 8px rgba(245,158,11,0.08);
+    }
+    .summary-box h3 { margin:0 0 10px 0; color:#b45309; font-size:16px; }
+    .summary-box p { margin:0; color:#1f2937; font-size:15px; line-height:1.5; }
+    .pricing-highlight { background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);
+      padding:20px; margin:0 24px 18px 24px; border-radius:8px;
+      text-align:center; box-shadow:0 4px 12px rgba(245,158,11,0.3);
+    }
+    .pricing-highlight h3 { margin:0 0 10px 0; color:#fff; font-size:18px; text-shadow:0 2px 4px rgba(0,0,0,0.2); }
+    .pricing-highlight p { margin:0; color:#fff; font-size:16px; font-weight:600; }
+    .timeline-box { background:#fff; padding:18px 20px; margin:0 24px 18px 24px;
+      border-radius:8px; border:1px solid #fbbf24; box-shadow:0 1px 3px rgba(0,0,0,0.05);
+    }
+    .timeline-box h3 { margin:0 0 15px 0; color:#b45309; font-size:16px; }
+    .timeline-step { padding:12px; margin:8px 0; background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);
+      border-radius:6px; border-left:4px solid #f59e0b;
+    }
+    .timeline-step p { margin:0; color:#1f2937; font-size:14px; }
+    .timeline-step strong { color:#b45309; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#fef3c7; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(245,158,11,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#f59e0b; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(245,158,11,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#d97706;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">
+      📄 Your Custom Proposal
+      <span class="exclusive-badge">EXCLUSIVE</span>
+    </div>
+    <div class="intro">
+      <p>Hi ${firstName},</p>
+      <p>${data.proposal_summary || 'I\'m excited to share the custom energy proposal we\'ve prepared for ' + company + '. Based on your facility\'s profile and energy needs, we\'ve secured competitive rates from top-tier suppliers.'}</p>
+    </div>
+    <div class="summary-box">
+      <h3>Proposal Summary</h3>
+      <p>This proposal includes fixed-rate options that lock in significant savings, protecting you from projected rate increases.</p>
+    </div>
+    <div class="pricing-highlight">
+      <h3>💰 Pricing Highlight</h3>
+      <p>${data.pricing_highlight || 'Competitive rates below current market pricing'}</p>
+    </div>
+    <div class="timeline-box">
+      <h3>📅 Implementation Timeline</h3>
+      ${timeline.map((step, i) => `<div class="timeline-step"><p><strong>Step ${i+1}:</strong> ${step}</p></div>`).join('')}
+    </div>
+    <div class="main-paragraph">
+      <p>Our team has negotiated these rates exclusively for your facility. The pricing is competitive, the transition is seamless, and you maintain complete control throughout the process. This is a <strong>time-sensitive offer</strong> as market conditions continue to shift.</p>
+    </div>
+    <div class="cta-container">
+      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Let\'s Discuss Your Proposal'}</a>
+      <div style="margin-top:8px;font-size:14px;color:#b45309;opacity:0.83;">
+        Questions? I'm here to walk through every detail.
       </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">` : ''}
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${s.name}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${s.location ? `${s.location}<br>` : ''}
+        ${s.phone ? `${s.phone}<br>` : ''}
+        ${s.company}
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
     `;
   }
 
   function buildColdEmailHtml(data, recipient, fromEmail) {
-    const mail = fromEmail || 'l.patterson@powerchoosers.com';
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const s = getSenderProfile();
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Hi ${firstName},</p>
-        
-        <p>${data.opening_hook || `${company} likely faces the same energy cost challenges as other businesses in your industry.`}</p>
-        
-        <p>${data.value_proposition || 'Power Choosers helps companies like yours secure better energy rates through competitive procurement and market expertise.'}</p>
-        
-        ${data.social_proof_optional ? `<p>${data.social_proof_optional}</p>` : ''}
-        
-        <p>${data.cta_text || 'Would you be open to a brief conversation about your current energy situation?'}</p>
-        
-        ${buildSignatureBlock()}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 2px 24px; font-size:14px; color:#dc2626;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#fee2e2; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .main-paragraph {margin:0 24px 18px 24px; padding:18px; background:#fff; border-radius:7px; line-height:1.6;}
+    .challenges-box { background:linear-gradient(135deg,#fef2f2 0%,#fee2e2 100%);
+      padding:18px 20px; margin:0 24px 18px 24px; border-radius:8px;
+      border:1px solid #fca5a5; box-shadow:0 2px 8px rgba(239,68,68,0.06);
+    }
+    .challenges-box h3 { margin:0 0 12px 0; color:#b91c1c; font-size:16px; }
+    .challenge-item { background:#fff; padding:10px 14px; margin:6px 0; border-radius:6px;
+      box-shadow:0 1px 2px rgba(0,0,0,0.05); font-size:14px; color:#1f2937;
+    }
+    .solution-box { background:linear-gradient(135deg,#f0fdfa 0%,#ccfbf1 100%);
+      border:1px solid #99f6e4; padding:18px 20px; margin:0 24px 18px 24px;
+      border-radius:8px; box-shadow:0 2px 8px rgba(20,184,166,0.06);
+    }
+    .solution-box h3 { margin:0 0 10px 0; color:#0f766e; font-size:16px; }
+    .solution-box p { margin:0; color:#1f2937; font-size:15px; line-height:1.5; }
+    .social-proof { background:linear-gradient(135deg,#dbeafe 0%,#bfdbfe 100%);
+      padding:14px 18px; margin:0 24px 18px 24px; border-radius:8px;
+    }
+    .social-proof p { margin:0; color:#1e40af; font-size:14px; font-style:italic; line-height:1.5; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#fee2e2; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(239,68,68,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#ef4444; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(239,68,68,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#dc2626;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">⚠️ Energy Costs Rising Fast</div>
+    <div class="intro">
+      <p>Hi ${firstName},</p>
+      <p>${data.opening_hook || `I tried reaching you earlier but couldn't connect. I wanted to share some important information about energy cost trends that could significantly impact ${company}.`}</p>
+    </div>
+    <div class="solution-box">
+      <h3>✓ How Power Choosers Helps</h3>
+      <p>${data.value_proposition || 'We help businesses like yours reduce energy costs through competitive procurement and efficiency solutions. Our team handles the entire process—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>'}</p>
+    </div>
+    ${data.social_proof_optional ? `<div class="social-proof"><p>${data.social_proof_optional}</p></div>` : ''}
+    <div class="cta-container">
+      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Explore Your Savings Potential'}</a>
+      <div style="margin-top:8px;font-size:14px;color:#dc2626;opacity:0.83;">
+        Quick 15-minute call to discuss your options—no obligation.
       </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">` : ''}
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${s.name}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${s.location ? `${s.location}<br>` : ''}
+        ${s.phone ? `${s.phone}<br>` : ''}
+        ${s.company}
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
     `;
   }
 
   function buildInvoiceHtml(data, recipient, fromEmail) {
-    const mail = fromEmail || 'l.patterson@powerchoosers.com';
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const s = getSenderProfile();
     
     const checklistItems = data.checklist_items || [
       'Invoice date and service address',
       'Billing period (start and end dates)',
-      'Detailed charge breakdown',
-      'Payment details and terms'
+      'Detailed charge breakdown (kWh rate, demand charges, fees)',
+      'Payment details and service address'
     ];
     
     const discrepancies = data.discrepancies || [
-      'High delivery charges',
-      'Incorrect rate classifications',
-      'Hidden fees or surcharges',
-      'Poor contract terms'
+      'Above-market kWh rates',
+      'Hidden demand charges',
+      'Incorrect contract terms',
+      'Billing errors and overcharges'
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Hi ${firstName},</p>
-        
-        <p>${data.intro_paragraph || `As we discussed, I'll conduct a comprehensive energy analysis for ${company} to identify potential cost savings and optimization opportunities.`}</p>
-        
-        <p>To get started, I'll need to review your most recent energy invoice. Here's what I'll be looking for:</p>
-        <ul>
-          ${checklistItems.map(item => `<li>${item}</li>`).join('')}
-        </ul>
-        
-        <p>Common issues I typically find include:</p>
-        <ul>
-          ${discrepancies.map(item => `<li>${item}</li>`).join('')}
-        </ul>
-        
-        <p>${data.deadline || 'Please send the invoice by end of day so I can begin the analysis.'}</p>
-        
-        <p>${data.cta_text || 'Will you be able to send over the invoice by end of day so me and my team can get started?'}</p>
-        
-        ${buildSignatureBlock()}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 2px 24px; font-size:14px; color:#2563eb;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#f0f9ff; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .key-points-box { background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%);
+      border:1px solid #fbbf24; padding:20px 22px; margin:0 24px 18px 24px;
+      border-radius:8px; box-shadow:0 1px 3px rgba(245,158,11,0.08);
+    }
+    .key-points-box h3 { margin:0 0 12px 0; color:#d97706; font-size:16px; font-weight:600;
+      letter-spacing:0.02em;
+    }
+    .key-points-box p { margin:0; color:#1f2937; font-size:15.5px; line-height:1.6; font-weight:500; }
+    .two-column-box { background:linear-gradient(135deg,#f0f9ff 0%,#e0f2fe 100%);
+      padding:20px; margin:0 24px 18px 24px; border-radius:8px;
+      border:1px solid #bae6fd; box-shadow:0 2px 8px rgba(37,99,235,0.06);
+    }
+    .two-columns { display:flex; gap:20px; }
+    .column { flex:1; }
+    .column h3 { margin:0 0 12px 0; font-size:15px; }
+    .column h3.review { color:#0369a1; }
+    .column h3.discrepancies { color:#dc2626; }
+    .column ul { margin:0; padding:0; list-style:none; }
+    .column ul li { padding:4px 0; color:#1f2937; font-size:13px; line-height:1.5; }
+    .urgency-banner { background:linear-gradient(135deg,#fee2e2 0%,#fecaca 100%);
+      padding:16px 20px; margin:0 24px 18px 24px; border-radius:8px;
+      border:1px solid #fca5a5; text-align:center;
+    }
+    .urgency-banner p { margin:0; color:#dc2626; font-size:16px; font-weight:600; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#f0f9ff; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(37,99,235,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#2563eb; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(37,99,235,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#1d4ed8;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+    @media (max-width:650px){
+      .two-columns { flex-direction:column; gap:16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">📎 Invoice Request for Energy Analysis</div>
+    <div class="intro">
+      <p>Hi ${firstName},</p>
+      <p>${data.intro_paragraph || `As we discussed, we're conducting an energy analysis for ${company} to identify any discrepancies and determine how your facility is using energy. This will help us figure out the best plan moving forward.`}</p>
+    </div>
+    <div class="two-column-box">
+      <div class="two-columns">
+        <div class="column">
+          <h3 class="review">✓ What We'll Review</h3>
+          <ul>
+            ${checklistItems.map(item => `<li>• ${item}</li>`).join('')}
+          </ul>
+        </div>
+        <div class="column">
+          <h3 class="discrepancies">⚠️ Common Discrepancies</h3>
+          <ul>
+            ${discrepancies.map(item => `<li>• ${item}</li>`).join('')}
+          </ul>
+        </div>
       </div>
+    </div>
+    <div class="urgency-banner">
+      <p>⏰ ${data.deadline || 'Needed in 3 business days'}</p>
+    </div>
+    <div class="cta-container">
+      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Reply with Invoice Attached'}</a>
+      <div style="margin-top:8px;font-size:14px;color:#2563eb;opacity:0.83;">
+        Or reply with your invoice attached—we'll get started right away.
+      </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">` : ''}
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${s.name}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${s.location ? `${s.location}<br>` : ''}
+        ${s.phone ? `${s.phone}<br>` : ''}
+        ${s.company}
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
     `;
   }
 
   function buildGeneralHtml(data, recipient, fromEmail) {
-    const mail = fromEmail || 'l.patterson@powerchoosers.com';
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const s = getSenderProfile();
     
     const sections = data.sections || [
-      'We help businesses optimize their energy procurement',
-      'Our expertise can identify significant cost savings',
-      'We provide ongoing monitoring and support'
+      'We\'ve secured exclusive rates for facilities that are 15-25% below typical renewal offers',
+      'Our team handles all supplier negotiations and contract reviews at no cost to you',
+      'You maintain complete control and transparency throughout the entire process',
+      'Early action now protects you from anticipated rate increases'
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Hi ${firstName},</p>
-        
-        <p>${data.list_header || 'How We Can Help:'}</p>
-        <ul>
-          ${sections.map(section => `<li>${section}</li>`).join('')}
-        </ul>
-        
-        <p>${data.cta_text || 'I\'d love to discuss how we can help optimize your energy costs.'}</p>
-        
-        ${buildSignatureBlock()}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 10px 24px; font-size:14px; color:#234bb7;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#eff6ff; padding:8px 15px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 18px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 12px 0; font-size:16px; color:#1e3a8a; line-height:1.6; }
+    .intro p:last-child { margin-bottom:0; }
+    .info-list { background:#f6f7fb; border-radius:8px;
+      padding:12px 18px; margin:0 auto 18px auto; max-width:450px; box-shadow:0 2px 8px rgba(30,64,175,0.06);
+      font-size:14px; color:#22223b;
+    }
+    .info-list ul {margin:0;padding:0;list-style:none;}
+    .info-list ul li {padding:4px 0; border-bottom:1px solid #e5e8ec; line-height:1.5;}
+    .info-list ul li:last-child { border-bottom:none; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#eff6ff; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(249,115,22,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#f97316; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(249,115,22,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#ea580c;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+    @media (max-width:650px){
+      .info-list {margin:0 3vw 18px 3vw; max-width:100%;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">Energy Solutions for ${company}</div>
+    <div class="intro">
+      <p>Hi ${firstName},</p>
+      <p>I wanted to reach out about an interesting opportunity for ${company}.</p>
+    </div>
+    <div class="info-list">
+      <strong>${data.list_header || 'How We Can Help:'}</strong>
+      <ul>
+        ${sections.map(section => `<li>${section}</li>`).join('')}
+      </ul>
+    </div>
+    <div class="cta-container">
+      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Schedule A Meeting'}</a>
+      <div style="margin-top:8px;font-size:14px;color:#1e3a8a;opacity:0.83;">
+        Prefer email or need more info? Just reply—happy to assist.
       </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">` : ''}
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${s.name}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${s.location ? `${s.location}<br>` : ''}
+        ${s.phone ? `${s.phone}<br>` : ''}
+        ${s.company}
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
     `;
   }
 
