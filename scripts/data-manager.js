@@ -8,9 +8,9 @@
   
   // Get current logged-in user email
   function getCurrentUserEmail() {
-    if (window.currentUserEmail) return window.currentUserEmail;
+    if (window.currentUserEmail) return window.currentUserEmail.toLowerCase();
     const user = firebase.auth().currentUser;
-    return user ? user.email : null;
+    return user ? user.email.toLowerCase() : null;
   }
 
   // Check if current user is admin
@@ -92,12 +92,12 @@
     return results;
   }
 
-  // One-time migration: Add ownership to all existing records
+  // One-time migration: Add/normalize ownership to all existing records
   async function migrateExistingData() {
     console.log('[DataManager] Starting data migration...');
     
     const db = firebase.firestore();
-    const collections = ['accounts', 'contacts', 'deals', 'tasks', 'emails', 'calls', 'notes', 'lists'];
+    const collections = ['accounts', 'contacts', 'activities', 'tasks', 'emails', 'calls', 'notes', 'lists'];
     const batchLimit = 500; // Firestore batch limit
     let totalUpdated = 0;
     
@@ -112,20 +112,35 @@
         for (const doc of snapshot.docs) {
           const data = doc.data();
           
-          // Skip if already has ownership fields
-          if (data.ownerId || data.createdBy) {
-            continue;
+          // Normalize lowercase
+          const currentOwner = data.ownerId ? String(data.ownerId).toLowerCase() : null;
+          const currentAssigned = data.assignedTo ? String(data.assignedTo).toLowerCase() : null;
+          const currentCreatedBy = data.createdBy ? String(data.createdBy).toLowerCase() : null;
+
+          const updatePayload = {};
+
+          // If no ownership info at all, set to admin
+          if (!currentOwner && !currentCreatedBy) {
+            updatePayload.ownerId = ADMIN_EMAIL;
+            updatePayload.createdBy = ADMIN_EMAIL;
+            updatePayload.assignedTo = ADMIN_EMAIL;
+          } else {
+            // Backfill missing with best available info, else admin
+            if (!currentOwner) updatePayload.ownerId = currentCreatedBy || currentAssigned || ADMIN_EMAIL;
+            if (!currentAssigned) updatePayload.assignedTo = currentOwner || currentCreatedBy || ADMIN_EMAIL;
+            if (!currentCreatedBy) updatePayload.createdBy = currentOwner || ADMIN_EMAIL;
+
+            // Ensure lowercase on existing fields
+            if (currentOwner && data.ownerId !== currentOwner) updatePayload.ownerId = currentOwner;
+            if (currentAssigned && data.assignedTo !== currentAssigned) updatePayload.assignedTo = currentAssigned;
+            if (currentCreatedBy && data.createdBy !== currentCreatedBy) updatePayload.createdBy = currentCreatedBy;
           }
-          
-          // Add ownership fields pointing to admin
-          batch.update(doc.ref, {
-            ownerId: ADMIN_EMAIL,
-            createdBy: ADMIN_EMAIL,
-            assignedTo: ADMIN_EMAIL,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          
-          updateCount++;
+
+          if (Object.keys(updatePayload).length > 0) {
+            updatePayload.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+            batch.update(doc.ref, updatePayload);
+            updateCount++;
+          }
           
           // Commit batch if reaching limit and create new batch
           if (updateCount >= batchLimit) {
