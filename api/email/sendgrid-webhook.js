@@ -80,7 +80,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    console.log(`[SendGrid Webhook] Processing ${events.length} events`);
+    // Processing events
 
     for (const event of events) {
       await processSendGridEvent(event);
@@ -102,13 +102,6 @@ async function processSendGridEvent(event) {
   const { event: eventType, email, sg_message_id, timestamp, reason, category, url } = event;
   const trackingId = (event.custom_args && (event.custom_args.trackingId || event.custom_args.trackingID)) || null;
   
-  console.log(`[SendGrid Webhook] Processing ${eventType} for ${email}`, {
-    sg_message_id,
-    timestamp,
-    url: url || 'N/A',
-    trackingId
-  });
-
   try {
     switch (eventType) {
       case 'delivered':
@@ -144,7 +137,7 @@ async function processSendGridEvent(event) {
         break;
         
       default:
-        console.log(`[SendGrid Webhook] Unhandled event type: ${eventType}`);
+        // Unhandled event type
     }
   } catch (error) {
     console.error(`[SendGrid Webhook] Error processing ${eventType}:`, error);
@@ -167,7 +160,6 @@ async function handleDelivered(email, sgMessageId, timestamp, trackingId) {
           sgMessageId: sgMessageId,
           updatedAt: new Date().toISOString()
         });
-        console.log(`[SendGrid Webhook] Marked email as delivered by trackingId: ${trackingId}`);
         return;
       }
     } catch(_) { /* continue to fallbacks */ }
@@ -187,7 +179,6 @@ async function handleDelivered(email, sgMessageId, timestamp, trackingId) {
       sgMessageId: sgMessageId,
       updatedAt: new Date().toISOString()
     });
-    console.log(`[SendGrid Webhook] Marked email as delivered (fallback): ${email}`);
   }
 }
 
@@ -212,7 +203,6 @@ async function handleOpen(email, sgMessageId, timestamp, trackingId) {
           lastOpened: openData.openedAt,
           updatedAt: new Date().toISOString()
         });
-        console.log(`[SendGrid Webhook] Recorded open by trackingId: ${trackingId}`);
         return;
       }
     } catch(_) { /* continue to fallbacks */ }
@@ -250,16 +240,10 @@ async function handleOpen(email, sgMessageId, timestamp, trackingId) {
       lastOpened: openData.openedAt,
       updatedAt: new Date().toISOString()
     });
-    
-    console.log(`[SendGrid Webhook] Recorded open for ${email} (${emailDoc.id})`);
-  } else {
-    console.log(`[SendGrid Webhook] Email not found for open event: ${email} (${sgMessageId})`);
   }
 }
 
 async function handleClick(email, sgMessageId, timestamp, url, trackingId) {
-  // Find and update the email record by messageId first, then by email
-  // Prefer direct ID mapping via custom_args.trackingId
   if (trackingId) {
     try {
       const ref = db.collection('emails').doc(trackingId);
@@ -268,10 +252,8 @@ async function handleClick(email, sgMessageId, timestamp, url, trackingId) {
         const emailData = snap.data();
         const clickData = {
           clickedAt: new Date(timestamp * 1000).toISOString(),
-          sgMessageId: sgMessageId,
           url: url,
-          userAgent: 'SendGrid Webhook',
-          ip: 'SendGrid Server'
+          sgMessageId: sgMessageId
         };
         await ref.update({
           clicks: [...(emailData.clicks || []), clickData],
@@ -279,7 +261,6 @@ async function handleClick(email, sgMessageId, timestamp, url, trackingId) {
           lastClicked: clickData.clickedAt,
           updatedAt: new Date().toISOString()
         });
-        console.log(`[SendGrid Webhook] Recorded click by trackingId: ${trackingId}`);
         return;
       }
     } catch(_) { /* continue to fallbacks */ }
@@ -290,7 +271,6 @@ async function handleClick(email, sgMessageId, timestamp, url, trackingId) {
     .limit(1)
     .get();
 
-  // Fallback: find by email if messageId not found
   if (emailQuery.empty) {
     emailQuery = await db.collection('emails')
       .where('to', 'array-contains', email)
@@ -303,25 +283,17 @@ async function handleClick(email, sgMessageId, timestamp, url, trackingId) {
   if (!emailQuery.empty) {
     const emailDoc = emailQuery.docs[0];
     const emailData = emailDoc.data();
-    
     const clickData = {
       clickedAt: new Date(timestamp * 1000).toISOString(),
-      sgMessageId: sgMessageId,
       url: url,
-      userAgent: 'SendGrid Webhook',
-      ip: 'SendGrid Server'
+      sgMessageId: sgMessageId
     };
-
     await emailDoc.ref.update({
       clicks: [...(emailData.clicks || []), clickData],
       clickCount: (emailData.clickCount || 0) + 1,
       lastClicked: clickData.clickedAt,
       updatedAt: new Date().toISOString()
     });
-    
-    console.log(`[SendGrid Webhook] Recorded click for ${email} (${emailDoc.id}): ${url}`);
-  } else {
-    console.log(`[SendGrid Webhook] Email not found for click event: ${email} (${sgMessageId})`);
   }
 }
 
@@ -345,28 +317,22 @@ async function handleBounce(email, sgMessageId, timestamp, reason, category) {
       updatedAt: new Date().toISOString()
     });
   }
-  
-  console.log(`[SendGrid Webhook] Contact bounced: ${email} - ${reason}`);
 }
 
 async function handleBlocked(email, sgMessageId, timestamp, reason) {
   await suppressContact(email, 'blocked', reason);
-  console.log(`[SendGrid Webhook] Contact blocked: ${email} - ${reason}`);
 }
 
 async function handleSpamReport(email, sgMessageId, timestamp) {
   await suppressContact(email, 'spam_reported', 'User marked as spam');
-  console.log(`[SendGrid Webhook] Spam report: ${email}`);
 }
 
 async function handleUnsubscribe(email, sgMessageId, timestamp) {
   await suppressContact(email, 'unsubscribed', 'User unsubscribed');
-  console.log(`[SendGrid Webhook] Unsubscribe: ${email}`);
 }
 
 async function handleGroupUnsubscribe(email, sgMessageId, timestamp) {
   await suppressContact(email, 'group_unsubscribed', 'User unsubscribed from group');
-  console.log(`[SendGrid Webhook] Group unsubscribe: ${email}`);
 }
 
 async function suppressContact(email, reason, details) {
