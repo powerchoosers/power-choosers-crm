@@ -1303,8 +1303,8 @@ return;
           citations: citations,
           researchData: researchData,
           metadata: {
-            subject_style: jsonData.subject_style,
-            cta_type: jsonData.cta_type,
+            subject_style: jsonData.subject_style || null,
+            cta_type: jsonData.cta_type || null,
             opening_style: templateType === 'cold_email' ? (openingStyleUsed || null) : null,
             generated_at: new Date().toISOString()
           }
