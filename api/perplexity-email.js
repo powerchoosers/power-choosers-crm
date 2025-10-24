@@ -908,7 +908,8 @@ CRITICAL RULES:
 
     return { 
       prompt: basePrompt + (templateInstructions[templateType] || templateInstructions.general),
-      researchData: researchData
+      researchData: researchData,
+      openingStyle: openingStyle?.type || null
     };
   }
 
@@ -1036,7 +1037,8 @@ TONE: Problem-aware, consultative, and value-focused
 
     return { 
       prompt: [identity, recipientContext, coldEmailRules, outputFormat].join('\n\n'),
-      researchData: researchData
+      researchData: researchData,
+      openingStyle: openingStyle?.type || null
     };
   }
 
@@ -1085,7 +1087,8 @@ CRITICAL: Return ONLY valid JSON. Each paragraph should be a separate field. Do 
 
     return { 
       prompt: [identity, recipientContext, invoiceRules, invoiceOutputFormat].join('\n'),
-      researchData: researchData
+      researchData: researchData,
+      openingStyle: null
     };
   }
 
@@ -1127,7 +1130,8 @@ CRITICAL RULES:
 
   return { 
     prompt: [identity, recipientContext, qualityRules, outputFormat].join('\n'),
-    researchData: researchData
+    researchData: researchData,
+    openingStyle: null
   };
 }
 
@@ -1178,7 +1182,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    const { prompt: systemPrompt, researchData } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences });
+    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences });
     const fullSystemPrompt = dateContext + systemPrompt;
     
     // Call Perplexity API
@@ -1301,7 +1305,7 @@ return;
           metadata: {
             subject_style: jsonData.subject_style,
             cta_type: jsonData.cta_type,
-            opening_style: templateType === 'cold_email' ? openingStyle?.type : null,
+            opening_style: templateType === 'cold_email' ? (openingStyleUsed || null) : null,
             generated_at: new Date().toISOString()
           }
         }));
