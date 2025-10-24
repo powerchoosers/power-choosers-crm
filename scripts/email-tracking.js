@@ -23,28 +23,8 @@ class EmailTrackingManager {
     }
 
     startTrackingEventPolling() {
-        // Only poll the local development server; production uses serverless pixel + Firebase
-        const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-        if (!isLocal) {
-            return;
-        }
-        // Poll for tracking events every 5 seconds (local dev)
-        setInterval(async () => {
-            try {
-                const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-                const response = await fetch(`${base}/api/email/tracking-events`);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.events && data.events.length > 0) {
-                        for (const event of data.events) {
-                            await this.processTrackingEvent(event);
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('[EmailTracking] Error polling tracking events:', error);
-            }
-        }, 5000);
+        // SendGrid webhooks handle tracking events - no polling needed
+        console.log('[EmailTracking] Using SendGrid webhooks for tracking events');
     }
 
     async processTrackingEvent(event) {
@@ -123,17 +103,8 @@ class EmailTrackingManager {
             // Generate unique tracking ID
             const trackingId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             
-            // Conditionally inject tracking pixel
-            let emailContent = content;
-            if (deliver.enableTracking) {
-                const baseUrl = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-                const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
-                const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
-                // Avoid double injection if present
-                if (!/\/api\/email\/track\//.test(emailContent)) {
-                    emailContent = emailContent + trackingPixel;
-                }
-            }
+            // Use SendGrid native tracking - no custom pixel injection
+            const emailContent = content;
 
             // Create email record
             const emailRecord = {
@@ -156,9 +127,9 @@ class EmailTrackingManager {
             // Save to Firebase
             await this.db.collection('emails').doc(trackingId).set(emailRecord);
 
-            // Send the email via API using configured base
+            // Send the email via SendGrid API
             const apiBase = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-            const apiUrl = `${apiBase}/api/email/send`;
+            const apiUrl = `${apiBase}/api/email/sendgrid-send`;
                 
             const response = await fetch(apiUrl, {
                 method: 'POST',
@@ -170,7 +141,8 @@ class EmailTrackingManager {
                     subject,
                     content: emailContent,
                     from,
-                    trackingId
+                    trackingId,
+                    _deliverability: deliver
                 })
             });
 
@@ -928,7 +900,7 @@ class EmailTrackingManager {
     }
 
     /**
-     * Simulate email open for testing (since tracking pixels aren't working yet)
+     * Simulate email open for testing (SendGrid webhooks handle real tracking)
      */
     async simulateEmailOpen(trackingId) {
         try {
