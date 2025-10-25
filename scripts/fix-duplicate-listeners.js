@@ -180,7 +180,10 @@
     '_callsVisibilityChangeBound',
     
     // NEW: Left navigation sidebar listeners (main.js)
-    '_sidebarHoverBound'
+    '_sidebarHoverBound',
+    
+    // NEW: Email compose toolbar listeners (email-compose-global.js)
+    '_composeToolbarClickBound'
   ];
   
   guards.forEach(guard => {
