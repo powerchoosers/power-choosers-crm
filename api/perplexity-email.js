@@ -875,7 +875,7 @@ SUBJECT LINE RULES:
 - Return the style you chose in subject_style field
 
 OPENING STYLE:
-Use "${openingStyle.type}" approach. ${openingStyle.prompt}. Keep it 1-2 sentences, natural and conversational. ${accountDescription ? `Reference: "${accountDescription}"` : 'Focus on their company.'}
+${openingStyle ? `Use "${openingStyle.type}" approach. ${openingStyle.prompt}. Keep it 1-2 sentences, natural and conversational. ${accountDescription ? `Reference: "${accountDescription}"` : 'Focus on their company.'}` : 'Use problem-aware approach focusing on their business challenges.'}
 `,
 
       invoice: `
