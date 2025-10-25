@@ -809,13 +809,16 @@
     
     if (isPreview) {
       // Exit preview mode with animation
+      
+      // Remove preview-mode class immediately to restore toolbar interactivity
+      compose.classList.remove('preview-mode');
+      
       if (previewContainer) {
         // Add exit animation class
         previewContainer.classList.add('exiting');
         
         // Wait for animation to complete before removing
         setTimeout(() => {
-          compose.classList.remove('preview-mode');
           previewContainer.remove();
           
           // Show editor with animation
@@ -833,7 +836,6 @@
           if (composeHeader) composeHeader.style.display = '';
           if (composeRecipients) composeRecipients.style.display = '';
           if (composeSubject) composeSubject.style.display = '';
-          if (editorToolbar) editorToolbar.style.display = '';
           if (composeFooter) composeFooter.style.display = '';
         }, 300); // Match animation duration
       }
@@ -861,8 +863,14 @@
         }, 250);
       }
       
-      // Hide UI elements immediately (they'll fade out via CSS transition)
+      // Add preview-mode class (toolbar stays visible via CSS override)
       compose.classList.add('preview-mode');
+      
+      // Hide non-toolbar UI elements
+      if (composeHeader) composeHeader.style.display = 'none';
+      if (composeRecipients) composeRecipients.style.display = 'none';
+      if (composeSubject) composeSubject.style.display = 'none';
+      if (composeFooter) composeFooter.style.display = 'none';
       
       // Get current email content
       const bodyInput = compose.querySelector('.body-input');
@@ -2081,6 +2089,17 @@
 
   function buildSignatureBlock() {
     const s = getSenderProfile();
+    
+    // Debug logging to verify location is being retrieved
+    console.log('[Signature] Building signature block with:', {
+      name: s.name,
+      title: s.title,
+      company: s.company,
+      location: s.location,
+      phone: s.phone,
+      email: s.email
+    });
+    
     return `
       <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
         <div style="display:flex; gap:12px; align-items:center;">
@@ -3129,13 +3148,32 @@
     try {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
-      // Look for signature div by data attribute or style pattern
-      const sigDiv = doc.querySelector('[data-signature="true"]') || 
-                    Array.from(doc.querySelectorAll('div')).find(div => 
-                      div.style.marginTop === '20px' && 
-                      div.style.paddingTop === '20px' && 
-                      (div.style.borderTop && div.style.borderTop.includes('1px solid'))
-                    );
+      
+      // Look for signature div by multiple methods:
+      // 1. Data attribute
+      let sigDiv = doc.querySelector('[data-signature="true"]');
+      
+      // 2. Look for div with signature-like styling (check both inline and computed)
+      if (!sigDiv) {
+        sigDiv = Array.from(doc.querySelectorAll('div')).find(div => {
+          const style = div.getAttribute('style') || '';
+          // Check if style contains signature-like patterns
+          return (style.includes('margin-top') && style.includes('padding-top') && style.includes('border-top')) ||
+                 (style.includes('border-top: 1px solid'));
+        });
+      }
+      
+      // 3. Look for last div that contains typical signature content
+      if (!sigDiv) {
+        const allDivs = Array.from(doc.querySelectorAll('div'));
+        sigDiv = allDivs.reverse().find(div => {
+          const text = div.textContent.toLowerCase();
+          return text.includes('energy strategist') || 
+                 text.includes('power choosers') ||
+                 (text.includes('phone:') && text.includes('email:'));
+        });
+      }
+      
       return sigDiv ? sigDiv.outerHTML : null;
     } catch (e) {
       console.warn('[Email] extractSignature failed:', e);
@@ -3242,7 +3280,17 @@
 
         // Add closing as its OWN paragraph so it renders separately
         if (jsonData.closing) {
-          body += '\n\n' + jsonData.closing;
+          // Ensure closing has proper line breaks (e.g., "Best regards,\nLewis")
+          // If AI returns "Best regards, Lewis" on one line, split it
+          let closing = jsonData.closing;
+          if (closing.includes('Best regards,') && !closing.includes('\n')) {
+            closing = closing.replace(/Best regards,\s*/i, 'Best regards,\n');
+          } else if (closing.includes('Sincerely,') && !closing.includes('\n')) {
+            closing = closing.replace(/Sincerely,\s*/i, 'Sincerely,\n');
+          } else if (closing.includes('Regards,') && !closing.includes('\n')) {
+            closing = closing.replace(/Regards,\s*/i, 'Regards,\n');
+          }
+          body += '\n\n' + closing;
         }
         console.log('[AI] Built body from JSON:', body);
 
@@ -3514,55 +3562,64 @@
         sendButton.textContent = 'Sending...';
       }
 
-      // Optionally remove signature image if disabled
-      let preparedBody = body;
-      if (deliver.signatureImageEnabled === false) {
-        preparedBody = preparedBody.replace(/<img[^>]*alt=\"Signature\"[\s\S]*?>/gi, '');
-      }
-
-      // Check if signature is already in the body (prevent duplication)
-      const signature = window.getEmailSignature ? window.getEmailSignature() : '';
-      const hasSignature = preparedBody.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;');
-
-      // Debug signature retrieval
-      console.log('[Signature Debug] Signature retrieved:', signature ? 'YES' : 'NO', 'Length:', signature.length);
-      console.log('[Signature Debug] isHtmlMode:', isHtmlMode);
-      console.log('[Signature Debug] hasSignature:', hasSignature);
-      console.log('[Signature Debug] preparedBody length:', preparedBody.length);
-
-      // Only add signature for standard mode (non-HTML AI emails)
-      // HTML templates have their own hardcoded signatures via wrapSonarHtmlWithBranding
-      let contentWithSignature = preparedBody;
-      if (!isHtmlMode && !hasSignature) {
-        let sig = signature;
-        
-        // If no signature from settings, build basic one
-        if (!sig) {
-          const settings = window.SettingsPage?.getSettings?.() || {};
-          const general = settings.general || {};
-          const name = (general.firstName && general.lastName) 
-            ? `${general.firstName} ${general.lastName}`.trim()
-            : (general.agentName || 'Power Choosers Team');
-          
-          sig = `<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
-            <p style="margin: 0; color: #666;">${name}</p>
-            <p style="margin: 5px 0 0 0; color: #999; font-size: 14px;">Energy Strategist</p>
-          </div>`;
-          
-          console.log('[Signature Debug] Using fallback signature');
-        }
-        
-        if (sig) {
-          console.log('[Signature Debug] Adding signature to email');
-          contentWithSignature = preparedBody + sig;
-        }
+      // HTML emails: Use content as-is (has hardcoded signature from wrapSonarHtmlWithBranding)
+      // Standard emails: Apply signature settings
+      let contentWithSignature = body;
+      
+      if (isHtmlEmail) {
+        // HTML email templates: Don't apply any signature settings
+        // They have their own hardcoded signatures via wrapSonarHtmlWithBranding
+        console.log('[Signature Debug] HTML email - skipping all signature settings');
+        contentWithSignature = body;
       } else {
-        console.log('[Signature Debug] NOT adding signature. Reasons:', {
-          isHtmlMode,
-          hasSignature,
-          hasSignatureFunction: !!window.getEmailSignature,
-          signatureEmpty: !signature
-        });
+        // Standard email: Apply signature settings
+        console.log('[Signature Debug] Standard email - applying signature settings');
+        
+        let preparedBody = body;
+        
+        // Optionally remove signature image if disabled (standard emails only)
+        if (deliver.signatureImageEnabled === false) {
+          preparedBody = preparedBody.replace(/<img[^>]*alt=\"Signature\"[\s\S]*?>/gi, '');
+          console.log('[Signature Debug] Removed signature image (disabled in settings)');
+        }
+
+        // Check if signature is already in the body (prevent duplication)
+        const signature = window.getEmailSignature ? window.getEmailSignature() : '';
+        const hasSignature = preparedBody.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;');
+
+        console.log('[Signature Debug] Signature retrieved:', signature ? 'YES' : 'NO', 'Length:', signature.length);
+        console.log('[Signature Debug] hasSignature:', hasSignature);
+
+        // Add signature if not already present
+        if (!hasSignature) {
+          let sig = signature;
+          
+          // If no signature from settings, build basic one
+          if (!sig) {
+            const settings = window.SettingsPage?.getSettings?.() || {};
+            const general = settings.general || {};
+            const name = (general.firstName && general.lastName) 
+              ? `${general.firstName} ${general.lastName}`.trim()
+              : (general.agentName || 'Power Choosers Team');
+            
+            sig = `<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+              <p style="margin: 0; color: #666;">${name}</p>
+              <p style="margin: 5px 0 0 0; color: #999; font-size: 14px;">Energy Strategist</p>
+            </div>`;
+            
+            console.log('[Signature Debug] Using fallback signature');
+          }
+          
+          if (sig) {
+            console.log('[Signature Debug] Adding signature to email');
+            contentWithSignature = preparedBody + sig;
+          } else {
+            contentWithSignature = preparedBody;
+          }
+        } else {
+          console.log('[Signature Debug] Signature already present, not adding');
+          contentWithSignature = preparedBody;
+        }
       }
 
       const emailData = {

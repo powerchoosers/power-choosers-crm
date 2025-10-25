@@ -963,14 +963,21 @@ button:hover:not(:disabled),
     transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
+/* When in preview mode, hide UI elements but keep them in DOM for smooth transitions */
 .compose-window.preview-mode .compose-header,
 .compose-window.preview-mode .compose-recipients,
 .compose-window.preview-mode .compose-subject,
-.compose-window.preview-mode .editor-toolbar,
 .compose-window.preview-mode .compose-footer {
     opacity: 0;
     transform: translateY(-5px);
     pointer-events: none;
+}
+
+/* Keep toolbar visible and interactive in preview mode (for preview button) */
+.compose-window.preview-mode .editor-toolbar {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 /* === GLOBAL TABLE ROW ANIMATIONS === */
@@ -17888,7 +17895,8 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 .widget-header h3,
 .widget-title,
 .task-item:hover,
-.energy-news-item {
+.news-item,
+.news-item * {
     color: var(--text-primary) !important;
 }
 
@@ -17914,23 +17922,6 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     contain: layout style;
 }
 
-/* Ensure HTML email templates render in isolation within the editor */
-.body-input[data-html-email="true"] {
-    all: initial;
-    display: block;
-    width: 100%;
-    min-height: 300px;
-    padding: 16px;
-    background: white;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 14px;
-    line-height: 1.6;
-    color: #1e3a8a;
-    overflow-y: auto;
-}
-
-/* Reset contenteditable behavior for HTML emails */
-.body-input[data-html-email="true"][contenteditable="true"] {
-    outline: none;
-    cursor: text;
-}
+/* Note: Removed problematic styles that were persisting after HTML generation.
+   The data-html-email attribute is now only used as metadata for sending,
+   not for styling the editor. Editor should maintain normal appearance. */
