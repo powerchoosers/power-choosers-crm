@@ -60,6 +60,7 @@
       setTimeout(() => {
         const toInput = document.getElementById('compose-to');
         const subjectInput = document.getElementById('compose-subject');
+        const bodyInput = document.querySelector('.body-input');
         
         console.log('[EmailCompose] Subject field value after opening:', subjectInput?.value);
         
@@ -71,10 +72,29 @@
         if (subjectInput && subjectInput.value.includes('Re:')) {
           console.log('[EmailCompose] Clearing Re: prefix from subject');
           subjectInput.value = '';
+        }
+        
+        // Ensure HTML mode is OFF when opening (show rendered view, not source)
+        if (emailManager._isHtmlMode) {
+          console.log('[EmailCompose] Resetting HTML mode on open');
+          emailManager._isHtmlMode = false;
+          const composeWindow = document.getElementById('compose-window');
+          const codeBtn = composeWindow?.querySelector('.editor-toolbar [data-action="code"]');
+          if (codeBtn) {
+            codeBtn.classList.remove('is-active');
+            codeBtn.setAttribute('aria-pressed', 'false');
+            codeBtn.setAttribute('title', 'Edit raw HTML');
           }
+        }
+        
+        // If body has HTML email content, ensure it's rendered (not shown as source)
+        if (bodyInput && bodyInput.getAttribute('data-html-email') === 'true') {
+          console.log('[EmailCompose] HTML email detected, ensuring rendered view');
+          bodyInput.removeAttribute('data-mode');
+        }
           
-          // Focus the To input
-          setTimeout(() => toInput.focus(), 100);
+        // Focus the To input
+        setTimeout(() => toInput?.focus(), 100);
       }, 200);
       
       // Setup toolbar event listeners after compose window is ready
@@ -158,6 +178,18 @@
           setTimeout(() => {
             composeWindow.style.display = 'none';
           }, 300);
+          
+          // Reset HTML mode state when closing
+          if (window.emailManager && window.emailManager._isHtmlMode) {
+            console.log('[EmailCompose] Resetting HTML mode state on close');
+            window.emailManager._isHtmlMode = false;
+            const codeBtn = composeWindow.querySelector('.editor-toolbar [data-action="code"]');
+            if (codeBtn) {
+              codeBtn.classList.remove('is-active');
+              codeBtn.setAttribute('aria-pressed', 'false');
+              codeBtn.setAttribute('title', 'Edit raw HTML');
+            }
+          }
         }
         
         console.log('[EmailCompose] Compose window closed');
@@ -776,17 +808,35 @@
     const isPreview = compose.classList.contains('preview-mode');
     
     if (isPreview) {
-      // Exit preview mode - show editor and UI elements
-      compose.classList.remove('preview-mode');
-      if (previewContainer) previewContainer.remove();
-      if (editor) editor.style.display = '';
-      
-      // Show header, recipients, subject, toolbar, and footer
-      if (composeHeader) composeHeader.style.display = '';
-      if (composeRecipients) composeRecipients.style.display = '';
-      if (composeSubject) composeSubject.style.display = '';
-      if (editorToolbar) editorToolbar.style.display = '';
-      if (composeFooter) composeFooter.style.display = '';
+      // Exit preview mode with animation
+      if (previewContainer) {
+        // Add exit animation class
+        previewContainer.classList.add('exiting');
+        
+        // Wait for animation to complete before removing
+        setTimeout(() => {
+          compose.classList.remove('preview-mode');
+          previewContainer.remove();
+          
+          // Show editor with animation
+          if (editor) {
+            editor.style.display = '';
+            editor.classList.add('preview-showing');
+            
+            // Clean up animation class
+            setTimeout(() => {
+              editor.classList.remove('preview-showing');
+            }, 300);
+          }
+          
+          // Show UI elements (they'll fade in via CSS transition)
+          if (composeHeader) composeHeader.style.display = '';
+          if (composeRecipients) composeRecipients.style.display = '';
+          if (composeSubject) composeSubject.style.display = '';
+          if (editorToolbar) editorToolbar.style.display = '';
+          if (composeFooter) composeFooter.style.display = '';
+        }, 300); // Match animation duration
+      }
       
       if (previewBtn) {
         previewBtn.innerHTML = `
@@ -798,20 +848,26 @@
         previewBtn.setAttribute('aria-label', 'Preview message');
       }
     } else {
-      // Enter preview mode - show preview and hide UI elements
-      compose.classList.add('preview-mode');
+      // Enter preview mode with animation
       
-      // Hide header, recipients, subject, toolbar, and footer
-      if (composeHeader) composeHeader.style.display = 'none';
-      if (composeRecipients) composeRecipients.style.display = 'none';
-      if (composeSubject) composeSubject.style.display = 'none';
-      if (editorToolbar) editorToolbar.style.display = 'none';
-      if (composeFooter) composeFooter.style.display = 'none';
+      // Animate editor out
+      if (editor) {
+        editor.classList.add('preview-hiding');
+        
+        // Wait for editor fade out before showing preview
+        setTimeout(() => {
+          editor.style.display = 'none';
+          editor.classList.remove('preview-hiding');
+        }, 250);
+      }
+      
+      // Hide UI elements immediately (they'll fade out via CSS transition)
+      compose.classList.add('preview-mode');
       
       // Get current email content
       const bodyInput = compose.querySelector('.body-input');
-      const isHtmlMode = bodyInput?.getAttribute('data-mode') === 'html';
-      const content = isHtmlMode ? (bodyInput?.innerHTML || '') : (bodyInput?.innerHTML || '');
+      const isHtmlEmail = bodyInput?.getAttribute('data-html-email') === 'true';
+      const content = bodyInput?.innerHTML || '';
       
       // Create preview container with rounded top corners
       const preview = document.createElement('div');
@@ -854,7 +910,16 @@
         cursor: pointer;
         font-weight: 600;
         font-size: 14px;
+        transition: all 0.2s ease;
       `;
+      closeBtn.onmouseover = () => {
+        closeBtn.style.background = '#2563eb';
+        closeBtn.style.transform = 'translateY(-1px)';
+      };
+      closeBtn.onmouseout = () => {
+        closeBtn.style.background = '#1e3a8a';
+        closeBtn.style.transform = 'translateY(0)';
+      };
       closeBtn.onclick = () => togglePreviewMode();
       backBtnContainer.appendChild(closeBtn);
       preview.appendChild(backBtnContainer);
@@ -864,19 +929,32 @@
       iframeContainer.style.cssText = 'padding: 20px;';
       
       // Create preview content with proper iframe or direct HTML
-      if (isHtmlMode) {
+      if (isHtmlEmail) {
+        // HTML emails: use iframe for isolation
         const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'width: 100%; min-height: 600px; border: none; background: #f1f5fa; border-radius: 8px;';
+        iframe.style.cssText = 'width: 100%; min-height: 600px; border: none; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);';
         iframe.srcdoc = content;
         iframeContainer.appendChild(iframe);
       } else {
-        iframeContainer.innerHTML = content;
+        // Standard emails: render directly with styling
+        const contentWrapper = document.createElement('div');
+        contentWrapper.style.cssText = `
+          background: white;
+          padding: 40px;
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          font-size: 14px;
+          line-height: 1.6;
+          color: #1f2937;
+        `;
+        contentWrapper.innerHTML = content;
+        iframeContainer.appendChild(contentWrapper);
       }
       
       preview.appendChild(iframeContainer);
       
-      // Hide editor and show preview
-      if (editor) editor.style.display = 'none';
+      // Add preview to compose editor (animation will trigger via CSS)
       compose.querySelector('.compose-editor').appendChild(preview);
       
       // Update button icon to edit/pencil
@@ -1164,9 +1242,10 @@
 
   // ========== AI GENERATION ANIMATION FUNCTIONS ==========
   
-  function startGeneratingAnimation(composeWindow) {
+  function startGeneratingAnimation(composeWindow, mode = 'standard') {
     const subjectInput = composeWindow?.querySelector('#compose-subject');
     const bodyInput = composeWindow?.querySelector('.body-input');
+    const composeBody = composeWindow?.querySelector('.compose-body');
     
     // Add glow effect and skeleton to subject input
     if (subjectInput) {
@@ -1174,18 +1253,29 @@
       createSkeletonInField(subjectInput, 'subject');
     }
     
-    // Add glow effect and skeleton to body input
-    if (bodyInput) {
-      bodyInput.classList.add('compose-generating');
-      createSkeletonInField(bodyInput, 'body');
+    // Add glow effect to compose-body container (outer border)
+    if (composeBody) {
+      composeBody.classList.add('compose-generating');
     }
     
-    console.log('[AI Animation] Started generating animation in input fields');
+    // Different body animations for HTML vs standard emails
+    if (bodyInput) {
+      if (mode === 'html') {
+        // HTML emails: use shimmer effect
+        createHtmlEmailShimmer(bodyInput);
+      } else {
+        // Standard emails: use skeleton bars
+        createSkeletonInField(bodyInput, 'body');
+      }
+    }
+    
+    console.log(`[AI Animation] Started generating animation (${mode} mode)`);
   }
   
   function stopGeneratingAnimation(composeWindow) {
     const subjectInput = composeWindow?.querySelector('#compose-subject');
     const bodyInput = composeWindow?.querySelector('.body-input');
+    const composeBody = composeWindow?.querySelector('.compose-body');
     
     // Remove glow effect and skeleton from subject input
     if (subjectInput) {
@@ -1193,10 +1283,15 @@
       removeSkeletonFromField(subjectInput);
     }
     
-    // Remove glow effect and skeleton from body input
+    // Remove glow effect from compose-body container
+    if (composeBody) {
+      composeBody.classList.remove('compose-generating');
+    }
+    
+    // Remove skeleton or shimmer from body input
     if (bodyInput) {
-      bodyInput.classList.remove('compose-generating');
       removeSkeletonFromField(bodyInput);
+      removeHtmlEmailShimmer(bodyInput);
     }
     
     console.log('[AI Animation] Stopped generating animation');
@@ -1343,6 +1438,88 @@
     } else {
       progressiveReveal(field, content);
     }
+  }
+  
+  // ========== HTML EMAIL TEMPLATE ANIMATION ==========
+  
+  function createHtmlEmailShimmer(bodyInput) {
+    if (!bodyInput) return;
+    
+    // Clear existing content
+    bodyInput.innerHTML = '';
+    
+    // Create shimmer placeholder that mimics email structure
+    const shimmerContainer = document.createElement('div');
+    shimmerContainer.className = 'html-email-shimmer-container';
+    shimmerContainer.style.cssText = 'padding: 20px;';
+    
+    shimmerContainer.innerHTML = `
+      <div class="html-email-shimmer" style="height: 60px; margin-bottom: 20px; border-radius: 8px;"></div>
+      <div class="html-email-shimmer" style="height: 20px; width: 70%; margin-bottom: 12px; border-radius: 4px;"></div>
+      <div class="html-email-shimmer" style="height: 80px; margin-bottom: 20px; border-radius: 6px;"></div>
+      <div class="html-email-shimmer" style="height: 40px; width: 50%; margin: 0 auto 20px; border-radius: 20px;"></div>
+      <div class="html-email-shimmer" style="height: 60px; border-radius: 8px;"></div>
+    `;
+    
+    bodyInput.appendChild(shimmerContainer);
+  }
+  
+  function removeHtmlEmailShimmer(bodyInput) {
+    if (!bodyInput) return;
+    
+    const shimmerContainer = bodyInput.querySelector('.html-email-shimmer-container');
+    if (shimmerContainer) {
+      shimmerContainer.style.opacity = '0';
+      shimmerContainer.style.transition = 'opacity 0.3s ease';
+      
+      setTimeout(() => {
+        if (shimmerContainer.parentNode) {
+          shimmerContainer.remove();
+        }
+      }, 300);
+    }
+  }
+  
+  function revealHtmlEmailSections(element, html) {
+    if (!element || !html) return;
+    
+    // Remove shimmer first
+    removeHtmlEmailShimmer(element);
+    
+    // Wait for shimmer to fade out
+    setTimeout(() => {
+      // Insert the HTML content
+      element.innerHTML = html;
+      
+      // Find major sections and wrap them for animation
+      // Look for common email template structures
+      const children = Array.from(element.children);
+      
+      children.forEach((child, index) => {
+        // Determine section type based on content and position
+        let sectionType = 'body';
+        
+        if (index === 0) {
+          sectionType = 'header';
+        } else if (child.querySelector('a[href]') && child.textContent.length < 100) {
+          sectionType = 'cta';
+        } else if (child.querySelector('img') || child.textContent.toLowerCase().includes('best regards') || 
+                   child.textContent.toLowerCase().includes('sincerely') || index === children.length - 1) {
+          sectionType = 'signature';
+        } else if (index === 1) {
+          sectionType = 'greeting';
+        }
+        
+        // Add reveal animation classes
+        child.classList.add('html-email-reveal');
+        child.setAttribute('data-section', sectionType);
+        
+        // Trigger animation
+        setTimeout(() => {
+          child.classList.add('visible');
+        }, 50);
+      });
+    }, 350);
   }
 
   // ========== AI BAR RENDERING ==========
@@ -1714,9 +1891,6 @@
     const status = aiBar?.querySelector('.ai-status');
     const prompt = aiBar?.querySelector('.ai-prompt')?.value?.trim() || '';
     const toInput = compose?.querySelector('#compose-to');
-    
-    // Start the generation animation
-    startGeneratingAnimation(compose);
     const subjectInput = compose?.querySelector('#compose-subject');
     
     if (!editor) return;
@@ -1727,8 +1901,8 @@
       aiBar.setAttribute('aria-hidden', 'true');
     }
 
-    // Start generating animation
-    startGeneratingAnimation(compose);
+    // Start generating animation with appropriate mode
+    startGeneratingAnimation(compose, mode);
     if (status) status.textContent = 'Generating...';
     
     try {
@@ -1827,28 +2001,48 @@
       }
 
       if (html && editor) {
-        // For HTML content, render it directly with a simple fade-in
+        // Different animations for HTML templates vs standard emails
         setTimeout(() => {
           // IMPORTANT: For structured HTML templates, DO NOT append existing signature
           // since the template includes a hard-coded signature block.
           const finalHtml = templateType ? html : preserveSignatureAfterAI(editor, html);
-
-          editor.innerHTML = finalHtml;
-          // Mark editor mode for proper signature handling
-          if (templateType) {
-            editor.setAttribute('data-mode', 'html');
-          } else {
-            editor.removeAttribute('data-mode');
-          }
-          editor.style.opacity = '0';
-          editor.style.transform = 'translateY(10px)';
-          editor.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
           
-          // Trigger the animation
-          setTimeout(() => {
-            editor.style.opacity = '1';
-            editor.style.transform = 'translateY(0)';
-          }, 50);
+          // Mark content type for sending (but don't activate HTML source view)
+          if (templateType) {
+            editor.setAttribute('data-template-type', templateType);
+            editor.setAttribute('data-html-email', 'true');
+          } else {
+            editor.removeAttribute('data-template-type');
+            editor.removeAttribute('data-html-email');
+          }
+          
+          // Ensure we're NOT in HTML source code view mode
+          // If emailManager exists and is in HTML mode, toggle it off to show rendered view
+          if (window.emailManager && window.emailManager._isHtmlMode) {
+            console.log('[AI] Exiting HTML source mode to show rendered template');
+            window.emailManager.toggleHtmlMode(compose);
+          }
+          
+          // Ensure data-mode is NOT set (this was causing the monospace font issue)
+          editor.removeAttribute('data-mode');
+          
+          // Use different animations based on template type
+          if (templateType) {
+            // HTML email template: use section-by-section reveal
+            revealHtmlEmailSections(editor, finalHtml);
+          } else {
+            // Standard email: use simple fade-in
+            editor.innerHTML = finalHtml;
+            editor.style.opacity = '0';
+            editor.style.transform = 'translateY(10px)';
+            editor.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            
+            // Trigger the animation
+            setTimeout(() => {
+              editor.style.opacity = '1';
+              editor.style.transform = 'translateY(0)';
+            }, 50);
+          }
         }, 800);
       }
 
@@ -3283,13 +3477,11 @@
     const to = toInput?.value?.trim() || '';
     const subject = subjectInput?.value?.trim() || '';
     
-    // Detect HTML mode and extract content appropriately
-    const isHtmlMode = bodyInput?.getAttribute('data-mode') === 'html';
-    const body = isHtmlMode ? 
-      (bodyInput?.innerHTML || '') :  // HTML mode: send the HTML we generated
-      (bodyInput?.innerHTML || '');   // Text mode: send rendered HTML with user's signature logic applied later
+    // Detect if this is an HTML email template (full HTML with styling)
+    const isHtmlEmail = bodyInput?.getAttribute('data-html-email') === 'true';
+    const body = bodyInput?.innerHTML || '';
     
-    console.log('[EmailCompose] Email mode:', isHtmlMode ? 'HTML' : 'Text');
+    console.log('[EmailCompose] Email mode:', isHtmlEmail ? 'HTML Template' : 'Standard');
     console.log('[EmailCompose] Content preview:', body.substring(0, 100) + '...');
     
     if (!to) {
