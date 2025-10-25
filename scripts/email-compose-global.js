@@ -766,15 +766,28 @@
     const editor = compose.querySelector('.body-input');
     const previewContainer = compose.querySelector('.preview-container');
     const previewBtn = compose.querySelector('[data-action="preview"]');
+    const composeHeader = compose.querySelector('.compose-header');
+    const composeRecipients = compose.querySelector('.compose-recipients');
+    const composeSubject = compose.querySelector('.compose-subject');
+    const editorToolbar = compose.querySelector('.editor-toolbar');
+    const composeFooter = compose.querySelector('.compose-footer');
     
     // Check if we're currently in preview mode
     const isPreview = compose.classList.contains('preview-mode');
     
     if (isPreview) {
-      // Exit preview mode - show editor
+      // Exit preview mode - show editor and UI elements
       compose.classList.remove('preview-mode');
       if (previewContainer) previewContainer.remove();
       if (editor) editor.style.display = '';
+      
+      // Show header, recipients, subject, toolbar, and footer
+      if (composeHeader) composeHeader.style.display = '';
+      if (composeRecipients) composeRecipients.style.display = '';
+      if (composeSubject) composeSubject.style.display = '';
+      if (editorToolbar) editorToolbar.style.display = '';
+      if (composeFooter) composeFooter.style.display = '';
+      
       if (previewBtn) {
         previewBtn.innerHTML = `
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -785,15 +798,22 @@
         previewBtn.setAttribute('aria-label', 'Preview message');
       }
     } else {
-      // Enter preview mode - show preview
+      // Enter preview mode - show preview and hide UI elements
       compose.classList.add('preview-mode');
+      
+      // Hide header, recipients, subject, toolbar, and footer
+      if (composeHeader) composeHeader.style.display = 'none';
+      if (composeRecipients) composeRecipients.style.display = 'none';
+      if (composeSubject) composeSubject.style.display = 'none';
+      if (editorToolbar) editorToolbar.style.display = 'none';
+      if (composeFooter) composeFooter.style.display = 'none';
       
       // Get current email content
       const bodyInput = compose.querySelector('.body-input');
       const isHtmlMode = bodyInput?.getAttribute('data-mode') === 'html';
       const content = isHtmlMode ? (bodyInput?.innerHTML || '') : (bodyInput?.innerHTML || '');
       
-      // Create preview container
+      // Create preview container with rounded top corners
       const preview = document.createElement('div');
       preview.className = 'preview-container';
       preview.style.cssText = `
@@ -802,30 +822,30 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: #fff;
+        background: #f1f5fa;
         overflow-y: auto;
-        padding: 20px;
+        padding: 0;
         z-index: 10;
+        border-radius: 12px 12px 0 0;
       `;
       
-      // Create preview content with proper iframe or direct HTML
-      if (isHtmlMode) {
-        const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'width: 100%; min-height: 500px; border: none; background: #f1f5fa;';
-        iframe.srcdoc = content;
-        preview.appendChild(iframe);
-      } else {
-        preview.innerHTML = content;
-      }
-      
-      // Add close button
-      const closeBtn = document.createElement('button');
-      closeBtn.textContent = '← Back to Editor';
-      closeBtn.style.cssText = `
+      // Create back button container with rounded top
+      const backBtnContainer = document.createElement('div');
+      backBtnContainer.style.cssText = `
         position: sticky;
         top: 0;
         left: 0;
-        margin-bottom: 20px;
+        right: 0;
+        background: #fff;
+        padding: 16px 20px;
+        border-bottom: 1px solid #e5e7eb;
+        z-index: 100;
+        border-radius: 12px 12px 0 0;
+      `;
+      
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = '← Back to Editor';
+      closeBtn.style.cssText = `
         padding: 10px 20px;
         background: #1e3a8a;
         color: white;
@@ -833,10 +853,27 @@
         border-radius: 6px;
         cursor: pointer;
         font-weight: 600;
-        z-index: 100;
+        font-size: 14px;
       `;
       closeBtn.onclick = () => togglePreviewMode();
-      preview.insertBefore(closeBtn, preview.firstChild);
+      backBtnContainer.appendChild(closeBtn);
+      preview.appendChild(backBtnContainer);
+      
+      // Create iframe container with padding
+      const iframeContainer = document.createElement('div');
+      iframeContainer.style.cssText = 'padding: 20px;';
+      
+      // Create preview content with proper iframe or direct HTML
+      if (isHtmlMode) {
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'width: 100%; min-height: 600px; border: none; background: #f1f5fa; border-radius: 8px;';
+        iframe.srcdoc = content;
+        iframeContainer.appendChild(iframe);
+      } else {
+        iframeContainer.innerHTML = content;
+      }
+      
+      preview.appendChild(iframeContainer);
       
       // Hide editor and show preview
       if (editor) editor.style.display = 'none';
