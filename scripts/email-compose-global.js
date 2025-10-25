@@ -233,25 +233,56 @@
         e.preventDefault();
         e.stopPropagation();
         
-        // Reset preview state if active
+        console.log('[EmailCompose] Closing and fully resetting compose window...');
+        
+        // FULL RESET: Clear all fields and state for clean slate on next open
         try {
-          const previewContainer = composeWindow?.querySelector('.preview-container');
-          if (composeWindow?.classList.contains('preview-mode')) composeWindow.classList.remove('preview-mode');
-          if (previewContainer) previewContainer.remove();
-          const editor = composeWindow?.querySelector('.body-input');
-          if (editor) {
-            editor.style.display = '';
-            editor.classList.remove('preview-showing');
-            editor.classList.remove('preview-hiding');
+          // 1. Clear all input fields
+          const toInput = composeWindow?.querySelector('#compose-to');
+          const ccInput = composeWindow?.querySelector('#compose-cc');
+          const bccInput = composeWindow?.querySelector('#compose-bcc');
+          const subjectInput = composeWindow?.querySelector('#compose-subject');
+          const bodyInput = composeWindow?.querySelector('.body-input');
+          
+          if (toInput) toInput.value = '';
+          if (ccInput) ccInput.value = '';
+          if (bccInput) bccInput.value = '';
+          if (subjectInput) subjectInput.value = '';
+          if (bodyInput) {
+            bodyInput.innerHTML = '';
+            bodyInput.removeAttribute('data-html-email');
+            bodyInput.removeAttribute('data-template-type');
+            bodyInput.removeAttribute('data-mode');
+            bodyInput.style.display = '';
+            bodyInput.style.opacity = '';
+            bodyInput.style.transform = '';
+            bodyInput.style.transition = '';
+            bodyInput.classList.remove('preview-showing', 'preview-hiding');
           }
+          
+          // 2. Reset preview state completely
+          const previewContainer = composeWindow?.querySelector('.preview-container');
+          if (composeWindow?.classList.contains('preview-mode')) {
+            composeWindow.classList.remove('preview-mode');
+          }
+          if (previewContainer) {
+            previewContainer.remove();
+          }
+          
+          // 3. Restore all UI elements visibility
           const composeHeader = composeWindow?.querySelector('.compose-header');
           const composeRecipients = composeWindow?.querySelector('.compose-recipients');
           const composeSubject = composeWindow?.querySelector('.compose-subject');
           const composeFooter = composeWindow?.querySelector('.compose-footer');
+          const editorToolbar = composeWindow?.querySelector('.editor-toolbar');
+          
           if (composeHeader) composeHeader.style.display = '';
           if (composeRecipients) composeRecipients.style.display = '';
           if (composeSubject) composeSubject.style.display = '';
           if (composeFooter) composeFooter.style.display = '';
+          if (editorToolbar) editorToolbar.style.display = '';
+          
+          // 4. Reset preview button to default state
           const previewBtn = composeWindow?.querySelector('[data-action="preview"]');
           if (previewBtn) {
             previewBtn.innerHTML = `
@@ -261,27 +292,66 @@
           </svg>`;
             previewBtn.setAttribute('title', 'Preview');
             previewBtn.setAttribute('aria-label', 'Preview message');
+            previewBtn.disabled = false;
           }
-        } catch(_) {}
-        
-        // Close compose window
-        if (composeWindow) {
-          composeWindow.classList.remove('open');
-          setTimeout(() => {
-            composeWindow.style.display = 'none';
-          }, 300);
           
-          // Reset HTML mode state when closing
+          // 5. Clear AI bar state (prompt text and status)
+          const aiBar = composeWindow?.querySelector('.ai-bar');
+          if (aiBar) {
+            const aiPrompt = aiBar.querySelector('.ai-prompt');
+            const aiStatus = aiBar.querySelector('.ai-status');
+            if (aiPrompt) aiPrompt.value = '';
+            if (aiStatus) aiStatus.textContent = '';
+            aiBar.classList.remove('open');
+            aiBar.setAttribute('aria-hidden', 'true');
+          }
+          
+          // 6. Close all toolbars
+          const formattingBar = composeWindow?.querySelector('.formatting-bar');
+          const linkBar = composeWindow?.querySelector('.link-bar');
+          const variablesBar = composeWindow?.querySelector('.variables-bar');
+          
+          if (formattingBar) {
+            formattingBar.classList.remove('open');
+            formattingBar.setAttribute('aria-hidden', 'true');
+          }
+          if (linkBar) {
+            linkBar.classList.remove('open');
+            linkBar.setAttribute('aria-hidden', 'true');
+          }
+          if (variablesBar) {
+            variablesBar.classList.remove('open');
+            variablesBar.setAttribute('aria-hidden', 'true');
+          }
+          
+          // 7. Reset HTML mode state
           if (window.emailManager && window.emailManager._isHtmlMode) {
-            console.log('[EmailCompose] Resetting HTML mode state on close');
+            console.log('[EmailCompose] Resetting HTML mode state');
             window.emailManager._isHtmlMode = false;
-            const codeBtn = composeWindow.querySelector('.editor-toolbar [data-action="code"]');
+            const codeBtn = composeWindow?.querySelector('.editor-toolbar [data-action="code"]');
             if (codeBtn) {
               codeBtn.classList.remove('is-active');
               codeBtn.setAttribute('aria-pressed', 'false');
               codeBtn.setAttribute('title', 'Edit raw HTML');
             }
           }
+          
+          // 8. Clear any generation metadata
+          if (window._lastGeneratedMetadata) {
+            window._lastGeneratedMetadata = null;
+          }
+          
+          console.log('[EmailCompose] Full reset complete - clean slate ready');
+        } catch(err) {
+          console.error('[EmailCompose] Error during reset:', err);
+        }
+        
+        // Close compose window with animation
+        if (composeWindow) {
+          composeWindow.classList.remove('open');
+          setTimeout(() => {
+            composeWindow.style.display = 'none';
+          }, 300);
         }
         
         console.log('[EmailCompose] Compose window closed');
@@ -1287,12 +1357,11 @@
             }
           }
           
-          // Insert a proper line break with following space
-          // This creates a new line and moves the cursor to it properly
+          // Insert single line break for single spacing (like Gmail/Outlook)
           try {
-            // Insert <br> followed by a zero-width space to ensure cursor positioning
-            document.execCommand('insertHTML', false, '<br><br>');
-            console.log('[Enter] Line break inserted via execCommand');
+            // Insert single <br> for single spacing
+            document.execCommand('insertHTML', false, '<br>');
+            console.log('[Enter] Single line break inserted via execCommand');
           } catch (error) {
             console.error('[Enter] execCommand failed:', error);
             // Try alternative approach
@@ -1301,18 +1370,16 @@
               const range = selection.getRangeAt(0);
               range.deleteContents();
               
-              // Insert two <br> tags for proper paragraph spacing
-              const br1 = document.createElement('br');
-              const br2 = document.createElement('br');
-              range.insertNode(br2);
-              range.insertNode(br1);
+              // Insert single <br> tag for single spacing
+              const br = document.createElement('br');
+              range.insertNode(br);
               
-              // Move cursor after the breaks
-              range.setStartAfter(br2);
+              // Move cursor after the break
+              range.setStartAfter(br);
               range.collapse(true);
               selection.removeAllRanges();
               selection.addRange(range);
-              console.log('[Enter] Line break inserted via DOM manipulation');
+              console.log('[Enter] Single line break inserted via DOM manipulation');
             } catch (fallbackError) {
               console.error('[Enter] DOM manipulation also failed:', fallbackError);
             }
