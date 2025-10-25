@@ -6603,20 +6603,33 @@ async function createContactSequenceThenAdd(name) {
       // Event delegation - ALWAYS re-attach to ensure it works after panel recreation
       // Remove any existing listener first to prevent duplicates
       if (container._listItemClickHandler) {
-        container.removeEventListener('click', container._listItemClickHandler);
+        try {
+          container.removeEventListener('click', container._listItemClickHandler);
+          console.log('[ContactDetail] Removed old list item click handler');
+        } catch(e) {
+          console.warn('[ContactDetail] Error removing old handler:', e);
+        }
       }
       
-      // Create and store the handler function
+      // Create and store the handler function with detailed logging
       container._listItemClickHandler = (e) => {
+        console.log('[ContactDetail] Click detected in list container', e.target);
         const listItem = e.target.closest('.list-item');
+        console.log('[ContactDetail] Closest list-item:', listItem);
         if (listItem && !listItem.hasAttribute('aria-disabled')) {
+          console.log('[ContactDetail] Calling handleListChoose for:', listItem.getAttribute('data-name'));
           handleListChoose(listItem);
+        } else {
+          console.log('[ContactDetail] List item click ignored:', {
+            hasListItem: !!listItem,
+            isDisabled: listItem?.hasAttribute('aria-disabled')
+          });
         }
       };
       
       // Attach the listener
       container.addEventListener('click', container._listItemClickHandler);
-      console.log('[ContactDetail] List item click handler attached to container');
+      console.log('[ContactDetail] List item click handler attached to container:', container.id);
     } catch (err) {
       console.warn('Failed to load lists', err);
     }
