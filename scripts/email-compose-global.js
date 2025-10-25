@@ -1170,22 +1170,26 @@
     editor?.addEventListener('mouseup', saveSelection);
     editor?.addEventListener('blur', saveSelection);
     
-    // Toolbar actions
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest('.toolbar-btn');
-      if (!btn) return;
-      
-      const action = btn.dataset.action;
-      
-      if (action === 'ai') {
-        openAIPanel();
-      } else if (action === 'formatting') {
-        toggleFormattingBar();
-      } else if (action === 'preview') {
-        togglePreviewMode();
-      }
-      // Other toolbar actions can be added here
-    });
+    // Toolbar actions - DEDUPLICATED to prevent multiple listeners
+    if (!document._composeToolbarClickBound) {
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.toolbar-btn');
+        if (!btn) return;
+        
+        const action = btn.dataset.action;
+        
+        if (action === 'ai') {
+          openAIPanel();
+        } else if (action === 'formatting') {
+          toggleFormattingBar();
+        } else if (action === 'preview') {
+          togglePreviewMode();
+        }
+        // Other toolbar actions can be added here
+      });
+      document._composeToolbarClickBound = true;
+      console.log('[EmailCompose] Toolbar click listener bound (deduplicated)');
+    }
     
     // Formatting button clicks
     formattingBar?.addEventListener('click', (e) => {

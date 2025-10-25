@@ -6241,6 +6241,18 @@ async function createContactSequenceThenAdd(name) {
   function closeContactListsPanel() {
     const panel = document.getElementById('contact-lists-panel');
     const cleanup = () => {
+      // Clean up the click handler before removing the panel
+      if (panel) {
+        const container = panel.querySelector('#contact-lists-body');
+        if (container && container._listItemClickHandler) {
+          try {
+            container.removeEventListener('click', container._listItemClickHandler);
+            container._listItemClickHandler = null;
+            console.log('[ContactDetail] List item click handler removed');
+          } catch(_) {}
+        }
+      }
+      
       if (panel && panel.parentElement) panel.parentElement.removeChild(panel);
       try { document.removeEventListener('mousedown', _onContactListsOutside, true); } catch(_) {}
       // Reset trigger state and restore focus
@@ -6588,16 +6600,23 @@ async function createContactSequenceThenAdd(name) {
       if (createRow) container.appendChild(createRow);
       container.insertAdjacentHTML('beforeend', listHtml || `<div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">No lists found</div><div class="list-meta">Create a new list</div></div></div>`);
 
-      // Event delegation - attach once to container, persists through re-renders
-      if (!container._listItemHandlerAttached) {
-        container.addEventListener('click', (e) => {
-          const listItem = e.target.closest('.list-item');
-          if (listItem && !listItem.hasAttribute('aria-disabled')) {
-            handleListChoose(listItem);
-          }
-        });
-        container._listItemHandlerAttached = true;
+      // Event delegation - ALWAYS re-attach to ensure it works after panel recreation
+      // Remove any existing listener first to prevent duplicates
+      if (container._listItemClickHandler) {
+        container.removeEventListener('click', container._listItemClickHandler);
       }
+      
+      // Create and store the handler function
+      container._listItemClickHandler = (e) => {
+        const listItem = e.target.closest('.list-item');
+        if (listItem && !listItem.hasAttribute('aria-disabled')) {
+          handleListChoose(listItem);
+        }
+      };
+      
+      // Attach the listener
+      container.addEventListener('click', container._listItemClickHandler);
+      console.log('[ContactDetail] List item click handler attached to container');
     } catch (err) {
       console.warn('Failed to load lists', err);
     }
