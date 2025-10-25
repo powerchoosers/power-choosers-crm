@@ -58,6 +58,36 @@
       
       // Wait for compose window to be ready, then prefill
       setTimeout(() => {
+        const composeWindow = document.getElementById('compose-window');
+        if (composeWindow) {
+          const previewContainer = composeWindow.querySelector('.preview-container');
+          if (composeWindow.classList.contains('preview-mode')) composeWindow.classList.remove('preview-mode');
+          if (previewContainer) previewContainer.remove();
+          const editorEl = composeWindow.querySelector('.body-input');
+          if (editorEl) {
+            editorEl.style.display = '';
+            editorEl.classList.remove('preview-showing');
+            editorEl.classList.remove('preview-hiding');
+          }
+          const composeHeader = composeWindow.querySelector('.compose-header');
+          const composeRecipients = composeWindow.querySelector('.compose-recipients');
+          const composeSubject = composeWindow.querySelector('.compose-subject');
+          const composeFooter = composeWindow.querySelector('.compose-footer');
+          if (composeHeader) composeHeader.style.display = '';
+          if (composeRecipients) composeRecipients.style.display = '';
+          if (composeSubject) composeSubject.style.display = '';
+          if (composeFooter) composeFooter.style.display = '';
+          const previewBtn = composeWindow.querySelector('[data-action="preview"]');
+          if (previewBtn) {
+            previewBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>`;
+            previewBtn.setAttribute('title', 'Preview');
+            previewBtn.setAttribute('aria-label', 'Preview message');
+          }
+        }
         const toInput = document.getElementById('compose-to');
         const subjectInput = document.getElementById('compose-subject');
         const bodyInput = document.querySelector('.body-input');
@@ -138,6 +168,37 @@
       composeWindow.classList.add('open');
     }, 10);
     
+    // Ensure preview state is reset when opening
+    try {
+      const previewContainer = composeWindow.querySelector('.preview-container');
+      if (composeWindow.classList.contains('preview-mode')) composeWindow.classList.remove('preview-mode');
+      if (previewContainer) previewContainer.remove();
+      const editor = composeWindow.querySelector('.body-input');
+      if (editor) {
+        editor.style.display = '';
+        editor.classList.remove('preview-showing');
+        editor.classList.remove('preview-hiding');
+      }
+      const composeHeader = composeWindow.querySelector('.compose-header');
+      const composeRecipients = composeWindow.querySelector('.compose-recipients');
+      const composeSubject = composeWindow.querySelector('.compose-subject');
+      const composeFooter = composeWindow.querySelector('.compose-footer');
+      if (composeHeader) composeHeader.style.display = '';
+      if (composeRecipients) composeRecipients.style.display = '';
+      if (composeSubject) composeSubject.style.display = '';
+      if (composeFooter) composeFooter.style.display = '';
+      const previewBtn = composeWindow.querySelector('[data-action="preview"]');
+      if (previewBtn) {
+        previewBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>`;
+        previewBtn.setAttribute('title', 'Preview');
+        previewBtn.setAttribute('aria-label', 'Preview message');
+      }
+    } catch(_) {}
+    
     // Prefill the To field
     setTimeout(() => {
       if (toInput) {
@@ -171,6 +232,37 @@
       closeBtn.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
+        
+        // Reset preview state if active
+        try {
+          const previewContainer = composeWindow?.querySelector('.preview-container');
+          if (composeWindow?.classList.contains('preview-mode')) composeWindow.classList.remove('preview-mode');
+          if (previewContainer) previewContainer.remove();
+          const editor = composeWindow?.querySelector('.body-input');
+          if (editor) {
+            editor.style.display = '';
+            editor.classList.remove('preview-showing');
+            editor.classList.remove('preview-hiding');
+          }
+          const composeHeader = composeWindow?.querySelector('.compose-header');
+          const composeRecipients = composeWindow?.querySelector('.compose-recipients');
+          const composeSubject = composeWindow?.querySelector('.compose-subject');
+          const composeFooter = composeWindow?.querySelector('.compose-footer');
+          if (composeHeader) composeHeader.style.display = '';
+          if (composeRecipients) composeRecipients.style.display = '';
+          if (composeSubject) composeSubject.style.display = '';
+          if (composeFooter) composeFooter.style.display = '';
+          const previewBtn = composeWindow?.querySelector('[data-action="preview"]');
+          if (previewBtn) {
+            previewBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>`;
+            previewBtn.setAttribute('title', 'Preview');
+            previewBtn.setAttribute('aria-label', 'Preview message');
+          }
+        } catch(_) {}
         
         // Close compose window
         if (composeWindow) {
@@ -1184,31 +1276,39 @@
           console.log('[Enter] Enter key pressed in email editor');
           e.preventDefault();
           
-          // Check if cursor is at or near signature boundary
+          // Check if cursor is INSIDE signature (not just near it)
           const selection = window.getSelection();
           if (selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);
-            const isNearSignature = isCursorNearSignature(editor, range);
-            if (isNearSignature) {
-              console.log('[Enter] Cursor near signature - preventing edit');
+            const isInsideSignature = isCursorInsideSignature(editor, range);
+            if (isInsideSignature) {
+              console.log('[Enter] Cursor inside signature - preventing edit');
               return;
             }
           }
           
-          // Simple approach: just insert a line break
+          // Insert a proper line break with following space
+          // This creates a new line and moves the cursor to it properly
           try {
-            document.execCommand('insertHTML', false, '<br>');
+            // Insert <br> followed by a zero-width space to ensure cursor positioning
+            document.execCommand('insertHTML', false, '<br><br>');
             console.log('[Enter] Line break inserted via execCommand');
           } catch (error) {
             console.error('[Enter] execCommand failed:', error);
             // Try alternative approach
             try {
-              const br = document.createElement('br');
               const selection = window.getSelection();
               const range = selection.getRangeAt(0);
               range.deleteContents();
-              range.insertNode(br);
-              range.setStartAfter(br);
+              
+              // Insert two <br> tags for proper paragraph spacing
+              const br1 = document.createElement('br');
+              const br2 = document.createElement('br');
+              range.insertNode(br2);
+              range.insertNode(br1);
+              
+              // Move cursor after the breaks
+              range.setStartAfter(br2);
               range.collapse(true);
               selection.removeAllRanges();
               selection.addRange(range);
@@ -1224,24 +1324,25 @@
     document._emailComposeEnterHandlerBound = true;
   }
   
-  // Helper function to check if cursor is near signature
-  function isCursorNearSignature(editor, range) {
-    // Check if cursor is near signature boundary to prevent editing into signature area
+  // Helper function to check if cursor is INSIDE signature (not just near)
+  function isCursorInsideSignature(editor, range) {
+    // Check if the cursor's parent node is within a signature element
     const signatureElements = editor.querySelectorAll('[data-signature], .signature, .email-signature');
     if (signatureElements.length === 0) return false;
     
+    // Get the current node where cursor is positioned
+    let currentNode = range.startContainer;
+    if (currentNode.nodeType === Node.TEXT_NODE) {
+      currentNode = currentNode.parentNode;
+    }
+    
+    // Walk up the DOM tree to check if we're inside a signature
     for (const signature of signatureElements) {
-      const signatureRange = document.createRange();
-      signatureRange.selectNode(signature);
-      
-      // Check if cursor is within 50px of signature
-      const cursorRect = range.getBoundingClientRect();
-      const signatureRect = signatureRange.getBoundingClientRect();
-      
-      if (Math.abs(cursorRect.top - signatureRect.top) < 50) {
+      if (signature.contains(currentNode)) {
         return true;
       }
     }
+    
     return false;
   }
   
@@ -1486,6 +1587,77 @@
         }
       }, 300);
     }
+  }
+  
+  // Render HTML email in an isolated iframe to prevent CSS bleeding
+  function renderHtmlEmailInIframe(editor, html) {
+    if (!editor || !html) return;
+    
+    // Remove shimmer first
+    removeHtmlEmailShimmer(editor);
+    
+    // Wait for shimmer to fade out
+    setTimeout(() => {
+      // Clear editor and create iframe container
+      editor.innerHTML = '';
+      
+      // Create iframe wrapper
+      const iframeWrapper = document.createElement('div');
+      iframeWrapper.className = 'html-email-iframe-wrapper';
+      iframeWrapper.style.cssText = `
+        width: 100%;
+        height: 100%;
+        min-height: 500px;
+        position: relative;
+        background: #f1f5fa;
+        border-radius: 8px;
+        overflow: hidden;
+      `;
+      
+      // Create iframe for CSS isolation
+      const iframe = document.createElement('iframe');
+      iframe.className = 'html-email-iframe';
+      iframe.style.cssText = `
+        width: 100%;
+        height: 100%;
+        min-height: 500px;
+        border: none;
+        background: white;
+        display: block;
+      `;
+      
+      // Set iframe content using srcdoc (isolates CSS completely)
+      iframe.srcdoc = html;
+      
+      // Auto-resize iframe to content height
+      iframe.onload = () => {
+        try {
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+          const height = iframeDoc.body.scrollHeight;
+          iframe.style.height = Math.max(height, 500) + 'px';
+          iframeWrapper.style.minHeight = Math.max(height, 500) + 'px';
+          console.log('[HTML Email] Iframe loaded, height:', height);
+        } catch (e) {
+          console.warn('[HTML Email] Could not resize iframe:', e);
+        }
+      };
+      
+      // Append iframe to wrapper and wrapper to editor
+      iframeWrapper.appendChild(iframe);
+      editor.appendChild(iframeWrapper);
+      
+      // Fade in animation
+      editor.style.opacity = '0';
+      editor.style.transform = 'translateY(10px)';
+      editor.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+      
+      setTimeout(() => {
+        editor.style.opacity = '1';
+        editor.style.transform = 'translateY(0)';
+      }, 50);
+      
+      console.log('[HTML Email] Rendered in isolated iframe to prevent CSS bleeding');
+    }, 350);
   }
   
   function revealHtmlEmailSections(element, html) {
@@ -2036,8 +2208,8 @@
           
           // Use different animations based on template type
           if (templateType) {
-            // HTML email template: use section-by-section reveal
-            revealHtmlEmailSections(editor, finalHtml);
+            // HTML email template: wrap in iframe to isolate CSS and prevent style bleeding
+            renderHtmlEmailInIframe(editor, finalHtml);
           } else {
             // Standard email: use simple fade-in
             editor.innerHTML = finalHtml;
@@ -3283,13 +3455,20 @@
           // Ensure closing has proper line breaks (e.g., "Best regards,\nLewis")
           // If AI returns "Best regards, Lewis" on one line, split it
           let closing = jsonData.closing;
+          
+          // Handle different closing formats and ensure proper line break
           if (closing.includes('Best regards,') && !closing.includes('\n')) {
+            // Replace "Best regards, Name" with "Best regards,\nName"
             closing = closing.replace(/Best regards,\s*/i, 'Best regards,\n');
           } else if (closing.includes('Sincerely,') && !closing.includes('\n')) {
             closing = closing.replace(/Sincerely,\s*/i, 'Sincerely,\n');
           } else if (closing.includes('Regards,') && !closing.includes('\n')) {
             closing = closing.replace(/Regards,\s*/i, 'Regards,\n');
+          } else if (closing.includes('Best regards,') && closing.includes('\\n')) {
+            // Handle escaped newline \\n from API (convert to actual newline)
+            closing = closing.replace(/\\n/g, '\n');
           }
+          
           body += '\n\n' + closing;
         }
         console.log('[AI] Built body from JSON:', body);
