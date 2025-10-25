@@ -180,10 +180,10 @@
     '_callsVisibilityChangeBound',
     
     // NEW: Left navigation sidebar listeners (main.js)
-    '_sidebarHoverBound',
+    '_sidebarHoverBound'
     
-    // NEW: Email compose toolbar listeners (email-compose-global.js)
-    '_composeToolbarClickBound'
+    // NOTE: _composeToolbarClickBound removed - it was preventing the listener from being attached at all
+    // The compose toolbar uses its own guard logic in setupToolbarEventListeners()
   ];
   
   guards.forEach(guard => {
