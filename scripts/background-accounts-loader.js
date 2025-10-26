@@ -15,6 +15,7 @@
   let accountsData = [];
   let lastLoadedDoc = null; // Track last document for pagination
   let hasMoreData = true; // Flag to indicate if more data exists
+  let loadedFromCache = false; // Track if data was loaded from cache (no cost)
   const isAdmin = () => {
     try {
       if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') return window.DataManager.isCurrentUserAdmin();
@@ -102,6 +103,7 @@
         const cached = await window.CacheManager.get('accounts');
         if (cached && Array.isArray(cached) && cached.length > 0) {
           accountsData = cached;
+          loadedFromCache = true; // Mark as loaded from cache
           console.log('[BackgroundAccountsLoader] ✓ Loaded', cached.length, 'accounts from cache');
           
           // Notify that cached data is available
@@ -125,6 +127,7 @@
           const cached = await window.CacheManager.get('accounts');
           if (cached && Array.isArray(cached) && cached.length > 0) {
             accountsData = cached;
+            loadedFromCache = true; // Mark as loaded from cache
             console.log('[BackgroundAccountsLoader] ✓ Loaded', cached.length, 'accounts from cache (delayed)');
             document.dispatchEvent(new CustomEvent('pc:accounts-loaded', { 
               detail: { count: cached.length, cached: true } 
@@ -241,7 +244,8 @@
     hasMore: () => hasMoreData,
     getCount: () => accountsData.length,
     getTotalCount: getTotalCount,
-    addAccount: addAccountToCache
+    addAccount: addAccountToCache,
+    isFromCache: () => loadedFromCache // Expose cache status
   };
   
   console.log('[BackgroundAccountsLoader] Module initialized');
