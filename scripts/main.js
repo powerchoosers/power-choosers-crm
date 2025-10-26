@@ -1230,43 +1230,83 @@ class PowerChoosersCRM {
     // Sidebar Hover Effects
     setupSidebarHover() {
         const sidebar = document.getElementById('sidebar');
-        let hoverTimeout;
-        let isNavigating = false;
+        if (!sidebar) return;
+
+        // Timers and state
+        let openTimer = null;
+        let closeTimer = null;
+        let lockCollapse = false;   // When true, ignore hover-open until unlocked
+        let pointerInside = false;  // Track pointer within sidebar
+
+        // Helpers
+        const clearTimers = () => { if (openTimer) clearTimeout(openTimer); if (closeTimer) clearTimeout(closeTimer); openTimer = closeTimer = null; };
+        const openSidebar = () => { if (!lockCollapse) sidebar.classList.add('expanded'); };
+        const closeSidebar = () => { if (!pointerInside) sidebar.classList.remove('expanded'); };
 
         if (!sidebar._hoverBound) {
-            sidebar.addEventListener('mouseenter', () => {
-                clearTimeout(hoverTimeout);
-                sidebar.classList.add('expanded');
-                isNavigating = false; // Reset navigation flag
+            // Pointer-based hover inside the sidebar
+            sidebar.addEventListener('pointerenter', () => {
+                pointerInside = true;
+                if (closeTimer) clearTimeout(closeTimer);
+                // Small show delay to avoid accidental flicker
+                openTimer = setTimeout(openSidebar, 90);
             });
 
-            sidebar.addEventListener('mouseleave', () => {
-                // Don't close if we're in the middle of navigation
-                if (!isNavigating) {
-                    hoverTimeout = setTimeout(() => {
-                        sidebar.classList.remove('expanded');
-                    }, 150);
+            sidebar.addEventListener('pointerleave', () => {
+                pointerInside = false;
+                if (!lockCollapse) {
+                    // Small hide delay for smoother exit
+                    closeTimer = setTimeout(closeSidebar, 150);
                 }
             });
 
-            // Add click handler to nav items to prevent sidebar collapse during navigation
+            // Edge-trigger: open when pointer approaches left edge, even if not over sidebar yet
+            // This improves discoverability without a dedicated DOM edge element
+            const edgeWidth = 12; // px
+            document.addEventListener('pointermove', (e) => {
+                if (lockCollapse) return;
+                if (e.clientX <= edgeWidth) {
+                    if (closeTimer) clearTimeout(closeTimer);
+                    if (!sidebar.classList.contains('expanded')) {
+                        if (openTimer) clearTimeout(openTimer);
+                        openTimer = setTimeout(openSidebar, 90);
+                    }
+                } else if (!pointerInside) {
+                    if (openTimer) clearTimeout(openTimer);
+                    // Debounced close when pointer moves away from edge and not inside
+                    closeTimer = setTimeout(closeSidebar, 150);
+                }
+            });
+
+            // On nav click: collapse immediately and lock until pointer leaves (prevents quick reopen)
             const navItems = document.querySelectorAll('.nav-item');
             navItems.forEach(item => {
                 if (!item._sidebarNavBound) {
                     item.addEventListener('click', () => {
-                        isNavigating = true;
-                        // Clear any pending timeout
-                        clearTimeout(hoverTimeout);
-                        // Keep sidebar expanded during navigation
-                        sidebar.classList.add('expanded');
-                        
-                        // Reset navigation flag after a short delay
-                        setTimeout(() => {
-                            isNavigating = false;
-                        }, 300);
+                        lockCollapse = true;
+                        pointerInside = false;
+                        clearTimers();
+                        sidebar.classList.remove('expanded');
+
+                        // Unlock on next pointerleave from sidebar, or after safety timeout
+                        const unlockOnLeave = () => {
+                            lockCollapse = false;
+                            sidebar.removeEventListener('pointerleave', unlockOnLeave);
+                        };
+                        sidebar.addEventListener('pointerleave', unlockOnLeave);
+                        setTimeout(() => { lockCollapse = false; }, 1200);
                     });
                     item._sidebarNavBound = true;
                 }
+            });
+
+            // Also collapse on hashchange/navigation to ensure closed state during page load
+            window.addEventListener('hashchange', () => {
+                lockCollapse = true;
+                clearTimers();
+                pointerInside = false;
+                sidebar.classList.remove('expanded');
+                setTimeout(() => { lockCollapse = false; }, 600);
             });
 
             sidebar._hoverBound = true;

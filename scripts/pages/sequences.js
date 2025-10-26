@@ -269,10 +269,15 @@
           return;
         }
         const now = Date.now();
-        const seq = {
+        const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+          ? window.DataManager.getCurrentUserEmail()
+          : ((window.currentUserEmail || '').toLowerCase());
+        const baseSeq = {
           id: 'seq-' + now,
           name,
-          createdBy: 'You',
+          createdBy: userEmail || 'unknown',
+          ownerId: userEmail || 'unknown',
+          assignedTo: userEmail || 'unknown',
           isActive: false,
           sendDuringBusinessHours: !!(els.chkBiz && els.chkBiz.checked),
           createdAt: now,
@@ -282,7 +287,12 @@
             replyPct: 0, interestedPct: 0
           }
         };
-        state.data.unshift(seq);
+        // Persisted payload with server timestamps/ownership via DataManager if available
+        const toSave = (window.DataManager && typeof window.DataManager.addOwnership === 'function')
+          ? window.DataManager.addOwnership({ ...baseSeq })
+          : { ...baseSeq };
+        // Update UI immediately with local createdAt
+        state.data.unshift(baseSeq);
         state.currentPage = 1;
         applyFilters();
         closeCreateModal();
@@ -290,7 +300,7 @@
           window.crm.showToast('Sequence created');
         }
         // Persist to Firestore
-        saveToFirestore(seq).catch((err) => console.warn('Failed to save sequence:', err));
+        saveToFirestore(toSave).catch((err) => console.warn('Failed to save sequence:', err));
         // Navigate to the new sequence in the builder
         if (window.SequenceBuilder && typeof window.SequenceBuilder.show === 'function') {
           try { window.SequenceBuilder.show(seq); } catch (e) { /* noop */ }
@@ -346,10 +356,16 @@
             break;
           case 'duplicate': {
             const now = Date.now();
-            const copy = { ...it, id: 'seq-' + Math.random().toString(36).slice(2), name: it.name + ' (Copy)', createdAt: now };
-            state.data.unshift(copy);
+            const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+              ? window.DataManager.getCurrentUserEmail()
+              : ((window.currentUserEmail || '').toLowerCase());
+            const copyLocal = { ...it, id: 'seq-' + Math.random().toString(36).slice(2), name: it.name + ' (Copy)', createdAt: now, ownerId: userEmail || it.ownerId, createdBy: userEmail || it.createdBy, assignedTo: userEmail || it.assignedTo };
+            const copyToSave = (window.DataManager && typeof window.DataManager.addOwnership === 'function')
+              ? window.DataManager.addOwnership({ ...copyLocal })
+              : { ...copyLocal };
+            state.data.unshift(copyLocal);
             applyFilters();
-            saveToFirestore(copy).catch((err) => console.warn('Failed to duplicate sequence:', err));
+            saveToFirestore(copyToSave).catch((err) => console.warn('Failed to duplicate sequence:', err));
             break;
           }
           case 'delete': {

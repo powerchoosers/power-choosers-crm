@@ -40,9 +40,10 @@ class AuthManager {
 
         if (user) {
             console.log('[Auth] User object:', {email: user.email, uid: user.uid});
+            const emailLower = user.email ? user.email.toLowerCase() : '';
             
-            // Check domain restriction
-            if (!user.email.endsWith('@powerchoosers.com')) {
+            // Check domain restriction (case-insensitive)
+            if (!emailLower.endsWith('@powerchoosers.com')) {
                 console.warn('[Auth] ✗ Unauthorized domain:', user.email);
                 this.showError('Access restricted to Power Choosers employees (@powerchoosers.com)');
                 await this.signOut();
@@ -66,16 +67,6 @@ class AuthManager {
             console.log('[Auth] Updating user profile UI...');
             this.updateUserProfile(user);
             
-            // Run migration if admin and not done
-            if (window.DataManager) {
-                console.log('[Auth] Checking for data migration...');
-                try {
-                    await window.DataManager.checkAndRunMigration();
-                } catch (error) {
-                    console.error('[Auth] Migration error:', error);
-                }
-            }
-            
             console.log('[Auth] ✓ Auth flow complete');
         } else {
             console.log('[Auth] No user - showing login');
@@ -85,26 +76,27 @@ class AuthManager {
 
     async ensureUserProfile(user) {
         const db = firebase.firestore();
-        const userRef = db.collection('users').doc(user.email);
+        const emailLower = user.email.toLowerCase();
+        const userRef = db.collection('users').doc(emailLower);
         
         try {
             const userDoc = await userRef.get();
             
             if (!userDoc.exists) {
                 // First time login - create profile
-                const isAdmin = (user.email === 'l.patterson@powerchoosers.com');
+                const isAdmin = (emailLower === 'l.patterson@powerchoosers.com');
                 const role = isAdmin ? 'admin' : 'employee';
                 
                 await userRef.set({
-                    email: user.email,
-                    name: user.displayName || user.email.split('@')[0],
+                    email: emailLower,
+                    name: user.displayName || emailLower.split('@')[0],
                     role: role,
                     photoURL: user.photoURL || null,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 
-                console.log(`[Auth] Created ${role} profile for ${user.email}`);
+                console.log(`[Auth] Created ${role} profile for ${emailLower}`);
             } else {
                 // Update last login
                 await userRef.update({
@@ -116,14 +108,15 @@ class AuthManager {
             const profile = await userRef.get();
             const userData = profile.data();
             window.currentUserRole = userData.role;
-            window.currentUserEmail = user.email;
+            window.currentUserEmail = emailLower;
             
             console.log(`[Auth] User role: ${userData.role}`);
         } catch (error) {
             console.error('[Auth] Error ensuring user profile:', error);
             // Fallback to determining role from email
-            window.currentUserEmail = user.email;
-            window.currentUserRole = (user.email === 'l.patterson@powerchoosers.com') ? 'admin' : 'employee';
+            const emailLower = user.email.toLowerCase();
+            window.currentUserEmail = emailLower;
+            window.currentUserRole = (emailLower === 'l.patterson@powerchoosers.com') ? 'admin' : 'employee';
         }
     }
 

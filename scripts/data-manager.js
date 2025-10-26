@@ -8,9 +8,9 @@
   
   // Get current logged-in user email
   function getCurrentUserEmail() {
-    if (window.currentUserEmail) return window.currentUserEmail;
+    if (window.currentUserEmail) return window.currentUserEmail.toLowerCase();
     const user = firebase.auth().currentUser;
-    return user ? user.email : null;
+    return user ? user.email.toLowerCase() : null;
   }
 
   // Check if current user is admin
@@ -92,97 +92,6 @@
     return results;
   }
 
-  // One-time migration: Add ownership to all existing records
-  async function migrateExistingData() {
-    console.log('[DataManager] Starting data migration...');
-    
-    const db = firebase.firestore();
-    const collections = ['accounts', 'contacts', 'deals', 'tasks', 'emails', 'calls', 'notes', 'lists'];
-    const batchLimit = 500; // Firestore batch limit
-    let totalUpdated = 0;
-    
-    for (const collectionName of collections) {
-      try {
-        console.log(`[DataManager] Migrating ${collectionName}...`);
-        const snapshot = await db.collection(collectionName).get();
-        
-        let batch = db.batch(); // Create new batch for each collection
-        let updateCount = 0;
-        
-        for (const doc of snapshot.docs) {
-          const data = doc.data();
-          
-          // Skip if already has ownership fields
-          if (data.ownerId || data.createdBy) {
-            continue;
-          }
-          
-          // Add ownership fields pointing to admin
-          batch.update(doc.ref, {
-            ownerId: ADMIN_EMAIL,
-            createdBy: ADMIN_EMAIL,
-            assignedTo: ADMIN_EMAIL,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          
-          updateCount++;
-          
-          // Commit batch if reaching limit and create new batch
-          if (updateCount >= batchLimit) {
-            await batch.commit();
-            console.log(`[DataManager] Committed batch of ${updateCount} updates for ${collectionName}`);
-            totalUpdated += updateCount;
-            batch = db.batch(); // Create NEW batch for next set
-            updateCount = 0;
-          }
-        }
-        
-        // Commit remaining updates for this collection
-        if (updateCount > 0) {
-          await batch.commit();
-          console.log(`[DataManager] Committed final batch of ${updateCount} updates for ${collectionName}`);
-          totalUpdated += updateCount;
-        }
-        
-        console.log(`[DataManager] ✓ Migrated ${collectionName}`);
-      } catch (error) {
-        console.error(`[DataManager] Error migrating ${collectionName}:`, error);
-      }
-    }
-    
-    console.log(`[DataManager] ✅ Migration complete! Updated ${totalUpdated} records`);
-    
-    // Store migration flag
-    localStorage.setItem('pc_data_migrated', 'true');
-    return true;
-  }
-
-  // Check if migration has been run
-  function isMigrationComplete() {
-    return localStorage.getItem('pc_data_migrated') === 'true';
-  }
-
-  // Auto-run migration on admin login if not done yet
-  async function checkAndRunMigration() {
-    if (isCurrentUserAdmin() && !isMigrationComplete()) {
-      console.log('[DataManager] Admin detected - checking if migration needed...');
-      
-      // Quick check: see if any accounts lack ownership
-      const db = firebase.firestore();
-      const sample = await db.collection('accounts').limit(1).get();
-      
-      if (!sample.empty) {
-        const firstDoc = sample.docs[0].data();
-        if (!firstDoc.ownerId) {
-          console.log('[DataManager] Migration needed - starting...');
-          await migrateExistingData();
-        } else {
-          console.log('[DataManager] Data already has ownership fields');
-          localStorage.setItem('pc_data_migrated', 'true');
-        }
-      }
-    }
-  }
 
   // Expose functions globally
   try {
@@ -191,9 +100,6 @@
       isCurrentUserAdmin,
       addOwnership,
       queryWithOwnership,
-      migrateExistingData,
-      isMigrationComplete,
-      checkAndRunMigration,
       ADMIN_EMAIL
     };
     console.log('[DataManager] Initialized');

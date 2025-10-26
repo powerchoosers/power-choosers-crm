@@ -38,8 +38,8 @@ class SettingsPage {
                 },
                 emailDeliverability: {
                     // SendGrid Settings
-                    enableTracking: true,
-                    enableClickTracking: true,
+                    enableTracking: true,        // SendGrid Open Tracking (tracks email opens)
+                    enableClickTracking: true,   // SendGrid Click Tracking (tracks link clicks)
                     includeBulkHeaders: false,
                     includeListUnsubscribe: true,
                     includePriorityHeaders: false,

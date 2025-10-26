@@ -15,38 +15,56 @@
   let tasksData = [];
   let lastLoadedDoc = null; // Track last document for pagination
   let hasMoreData = true; // Flag to indicate if more data exists
+  const isAdmin = () => {
+    try { if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin==='function') return window.DataManager.isCurrentUserAdmin(); return window.currentUserRole==='admin'; } catch(_) { return false; }
+  };
+  const getUserEmail = () => {
+    try { if (window.DataManager && typeof window.DataManager.getCurrentUserEmail==='function') return window.DataManager.getCurrentUserEmail(); return (window.currentUserEmail||'').toLowerCase(); } catch(_) { return (window.currentUserEmail||'').toLowerCase(); }
+  };
   
   async function loadFromFirestore() {
-    if (!window.firebaseDB) {
+    if (!window.firebaseDB && !(window.DataManager && typeof window.DataManager.queryWithOwnership==='function')) {
       console.warn('[BackgroundTasksLoader] firebaseDB not available');
       return;
     }
     
     try {
-      console.log('[BackgroundTasksLoader] Loading from Firestore...');
-      // OPTIMIZED: Only fetch fields needed for list display and filtering
-      // COST REDUCTION: Load in batches of 100 (smart lazy loading)
-      let query = window.firebaseDB.collection('tasks')
-        .select(
-          'id', 'title', 'description', 'status', 'priority',
-          'dueDate', 'createdAt', 'updatedAt', 'assignedTo',
-          'contactId', 'accountId', 'type', 'category',
-          'completed', 'completedAt', 'notes'
-        )
-        .orderBy('timestamp', 'desc')
-        .limit(100);
-      
-      const snapshot = await query.get();
-      const newTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      tasksData = newTasks;
-      
-      // Track last document for pagination
-      if (snapshot.docs.length > 0) {
-        lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
-        hasMoreData = snapshot.docs.length === 100; // If we got less than 100, no more data
-      } else {
+      console.log('[BackgroundTasksLoader] Loading tasks...');
+      if (!isAdmin()) {
+        let newTasks = [];
+        if (window.DataManager && typeof window.DataManager.queryWithOwnership==='function') {
+          newTasks = await window.DataManager.queryWithOwnership('tasks');
+        } else {
+          const email = getUserEmail();
+          const db = window.firebaseDB;
+          const [ownedSnap, assignedSnap] = await Promise.all([
+            db.collection('tasks').where('ownerId','==',email).get(),
+            db.collection('tasks').where('assignedTo','==',email).get()
+          ]);
+          const map = new Map();
+          ownedSnap.forEach(d=>map.set(d.id,{ id:d.id, ...d.data() }));
+          assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
+          newTasks = Array.from(map.values());
+        }
+        // Sort by updatedAt/timestamp desc similar to original
+        newTasks.sort((a,b)=> new Date(b.updatedAt||b.timestamp||0) - new Date(a.updatedAt||a.timestamp||0));
+        tasksData = newTasks;
+        lastLoadedDoc = null;
         hasMoreData = false;
+      } else {
+        // Admin path: original unfiltered query
+        // COST REDUCTION: Load in batches of 100 (smart lazy loading)
+        let query = window.firebaseDB.collection('tasks')
+          .orderBy('timestamp', 'desc')
+          .limit(100);
+        const snapshot = await query.get();
+        const newTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        tasksData = newTasks;
+        // Admin pagination
+        if (snapshot.docs.length>0) { lastLoadedDoc = snapshot.docs[snapshot.docs.length-1]; hasMoreData = snapshot.docs.length===100; } else { hasMoreData=false; }
       }
+      
+      // Pagination handled per role above
       
       console.log('[BackgroundTasksLoader] ✓ Loaded', tasksData.length, 'tasks from Firestore', hasMoreData ? '(more available)' : '(all loaded)');
       
@@ -120,14 +138,9 @@
     }
     
     try {
+      if (!isAdmin()) return { loaded: 0, hasMore: false };
       console.log('[BackgroundTasksLoader] Loading next batch...');
       let query = window.firebaseDB.collection('tasks')
-        .select(
-          'id', 'title', 'description', 'status', 'priority',
-          'dueDate', 'createdAt', 'updatedAt', 'assignedTo',
-          'contactId', 'accountId', 'type', 'category',
-          'completed', 'completedAt', 'notes'
-        )
         .orderBy('timestamp', 'desc')
         .startAfter(lastLoadedDoc)
         .limit(100);
