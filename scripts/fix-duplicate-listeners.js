@@ -180,7 +180,19 @@
     '_callsVisibilityChangeBound',
     
     // NEW: Left navigation sidebar listeners (main.js)
-    '_sidebarHoverBound'
+    '_sidebarHoverBound',
+    
+    // NEW: Contact lists panel listeners (contact-detail.js)
+    '_contactListsResizeBound',
+    '_contactListsScrollBound',
+    '_contactListsKeydownBound',
+    '_contactListsMousedownBound',
+    
+    // NEW: Contact sequences panel listeners (contact-detail.js)
+    '_contactSequencesResizeBound',
+    '_contactSequencesScrollBound',
+    '_contactSequencesKeydownBound',
+    '_contactSequencesMousedownBound'
     
     // NOTE: _composeToolbarClickBound removed - it was preventing the listener from being attached at all
     // The compose toolbar uses its own guard logic in setupToolbarEventListeners()

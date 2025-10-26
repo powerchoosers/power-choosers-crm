@@ -5913,8 +5913,16 @@ function openContactSequencesPanel() {
   };
   _positionContactSequencesPanel();
   setTimeout(() => panel.classList.add('--show'), 0);
-  try { window.addEventListener('resize', _positionContactSequencesPanel, true); } catch (_) {}
-  try { window.addEventListener('scroll', _positionContactSequencesPanel, true); } catch (_) {}
+  
+  // Guard against duplicate resize/scroll listeners
+  if (!document._contactSequencesResizeBound) {
+    try { window.addEventListener('resize', _positionContactSequencesPanel, true); } catch (_) {}
+    document._contactSequencesResizeBound = true;
+  }
+  if (!document._contactSequencesScrollBound) {
+    try { window.addEventListener('scroll', _positionContactSequencesPanel, true); } catch (_) {}
+    document._contactSequencesScrollBound = true;
+  }
 
   // Interactions
   panel.addEventListener('click', (e) => {
@@ -5931,7 +5939,13 @@ function openContactSequencesPanel() {
       handleSequenceChoose(document.activeElement);
     }
   };
-  document.addEventListener('keydown', _onContactSequencesKeydown, true);
+  
+  // Guard against duplicate keydown listeners
+  if (!document._contactSequencesKeydownBound) {
+    document.addEventListener('keydown', _onContactSequencesKeydown, true);
+    document._contactSequencesKeydownBound = true;
+  }
+  
   _onContactSequencesOutside = (e) => {
     const inside = panel.contains(e.target);
     const isTrigger = !!(e.target.closest && e.target.closest('#add-contact-to-sequences'));
@@ -5943,7 +5957,12 @@ function openContactSequencesPanel() {
       }
     }
   };
-  document.addEventListener('mousedown', _onContactSequencesOutside, true);
+  
+  // Guard against duplicate mousedown listeners
+  if (!document._contactSequencesMousedownBound) {
+    document.addEventListener('mousedown', _onContactSequencesOutside, true);
+    document._contactSequencesMousedownBound = true;
+  }
 }
 
 // Populate sequences into the contact sequences panel
@@ -6394,8 +6413,16 @@ async function createContactSequenceThenAdd(name) {
       panel.style.left = `${Math.round(left)}px`;
     };
     _positionContactListsPanel();
-    window.addEventListener('resize', _positionContactListsPanel, true);
-    window.addEventListener('scroll', _positionContactListsPanel, true);
+    
+    // Guard against duplicate resize/scroll listeners
+    if (!document._contactListsResizeBound) {
+      window.addEventListener('resize', _positionContactListsPanel, true);
+      document._contactListsResizeBound = true;
+    }
+    if (!document._contactListsScrollBound) {
+      window.addEventListener('scroll', _positionContactListsPanel, true);
+      document._contactListsScrollBound = true;
+    }
 
     // Animate in
     requestAnimationFrame(() => { panel.classList.add('--show'); });
@@ -6419,7 +6446,12 @@ async function createContactSequenceThenAdd(name) {
         const el = document.activeElement; handleListChoose(el);
       }
     };
-    document.addEventListener('keydown', _onContactListsKeydown, true);
+    
+    // Guard against duplicate keydown listeners
+    if (!document._contactListsKeydownBound) {
+      document.addEventListener('keydown', _onContactListsKeydown, true);
+      document._contactListsKeydownBound = true;
+    }
 
     // Click-away
     _onContactListsOutside = (e) => {
@@ -6435,7 +6467,12 @@ async function createContactSequenceThenAdd(name) {
         }
       }
     };
-    document.addEventListener('mousedown', _onContactListsOutside, true);
+    
+    // Guard against duplicate mousedown listeners
+    if (!document._contactListsMousedownBound) {
+      document.addEventListener('mousedown', _onContactListsOutside, true);
+      document._contactListsMousedownBound = true;
+    }
 
   }
 
