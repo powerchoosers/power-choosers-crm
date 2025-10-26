@@ -31,9 +31,10 @@ class BadgeLoader {
         return [];
       }
 
-      // Query calls metadata (transcripts now in separate callDetails collection)
+      // Query calls with only the fields we need for badges
       // This is 10x faster than loading full call records with transcripts/AI data
       const snapshot = await window.firebaseDB.collection('calls')
+        .select('contactId', 'accountId', 'counterparty', 'to', 'from', 'targetPhone')
         .get();
 
       const badgeData = snapshot.docs.map(doc => {

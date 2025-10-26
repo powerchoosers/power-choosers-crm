@@ -45,19 +45,6 @@
     document._emailsRestoreBound = true;
   }
 
-  // Subscribe to background email update events once
-  if (!document._emailsRealtimeBound) {
-    try {
-      document.addEventListener('pc:emails-loaded', () => {
-        try { loadData(); } catch(_) {}
-      });
-      document.addEventListener('pc:emails-updated', () => {
-        try { loadData(); } catch(_) {}
-      });
-      document._emailsRealtimeBound = true;
-    } catch(_) {}
-  }
-
   // Initialize DOM references
   function initDomRefs() {
     els.page = document.getElementById('emails-page');
@@ -262,15 +249,8 @@
       console.log('[EmailsPage] Inbox filter applied. Filtered count:', filtered.length);
     } else if (state.currentFolder === 'sent') {
       filtered = filtered.filter(email => {
-        // Accept multiple indicators for sent emails to support legacy and new records
-        const isSent = (
-          email.type === 'sent' ||
-          email.emailType === 'sent' ||
-          email.isSentEmail === true ||
-          email.status === 'sent' ||
-          email.provider === 'sendgrid'
-        );
-        return isSent && !email.deleted;
+        // Only use standardized field for sent emails (new emails only)
+        return email.type === 'sent' && !email.deleted;
       });
       console.log('[EmailsPage] Sent filter applied. Filtered count:', filtered.length);
     } else if (state.currentFolder === 'starred') {
@@ -374,24 +354,14 @@
                 <circle cx="12" cy="12" r="3"/>
               </svg>
             </button>
-            ${email.isSentEmail ? `
-              <button class="qa-btn" data-action="clicks" data-email-id="${email.id}" title="View clicks">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
-                  <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/>
-                  <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-3.5"/>
-                  <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
-                </svg>
-              </button>
-            ` : `
-              <button class="qa-btn" data-action="reply" data-email-id="${email.id}" title="Reply">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="9,10 4,15 9,20"/>
-                  <path d="M20,4v7a4,4,0,0,1-4,4H4"/>
-                </svg>
-              </button>
-            `}
+            <button class="qa-btn" data-action="reply" data-email-id="${email.id}" title="Reply">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9,10 4,15 9,20"/>
+                <path d="M20,4v7a4,4,0,0,1-4,4H4"/>
+              </svg>
+            </button>
           </div>
+          ${renderTrackingIcons(email)}
         </td>
       </tr>
     `;
@@ -430,8 +400,6 @@
         
         if (action === 'view') {
           viewEmail(emailId);
-        } else if (action === 'clicks') {
-          showClickDetails(emailId);
         } else if (action === 'reply') {
           replyToEmail(emailId);
         }
@@ -462,101 +430,6 @@
     if (email) {
       // Open compose modal with reply data
       openComposeModal(email);
-    }
-  }
-
-  // Show click details for sent emails
-  function showClickDetails(emailId) {
-    const email = state.data.find(e => e.id === emailId);
-    if (!email) {
-      console.warn('[EmailsPage] Email not found for click details:', emailId);
-      return;
-    }
-    
-    const clicks = Array.isArray(email.clicks) ? email.clicks : [];
-    if (clicks.length === 0) {
-      window.crm?.showToast && window.crm.showToast('No clicks recorded for this email yet.');
-      return;
-    }
-    
-    // Create modal content
-    const clickItems = clicks.map(click => {
-      const timestamp = click.timestamp ? new Date(click.timestamp).toLocaleString() : 'Unknown time';
-      const url = click.url || 'Unknown URL';
-      const userAgent = click.user_agent || 'Unknown browser';
-      
-      return `
-        <div class="click-item" style="padding: 12px; border-bottom: 1px solid var(--border-color);">
-          <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
-            ${escapeHtml(url)}
-          </div>
-          <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 2px;">
-            ${timestamp}
-          </div>
-          <div style="font-size: 11px; color: var(--text-tertiary);">
-            ${escapeHtml(userAgent)}
-          </div>
-        </div>
-      `;
-    }).join('');
-    
-    const modalContent = `
-      <div class="modal-header" style="padding: 20px 20px 0 20px; border-bottom: 1px solid var(--border-color);">
-        <h3 style="margin: 0; color: var(--text-primary);">Email Click Activity</h3>
-        <p style="margin: 8px 0 0 0; color: var(--text-secondary); font-size: 14px;">
-          ${clicks.length} click${clicks.length !== 1 ? 's' : ''} recorded
-        </p>
-      </div>
-      <div class="modal-body" style="padding: 0; max-height: 400px; overflow-y: auto;">
-        ${clickItems}
-      </div>
-    `;
-    
-    // Show modal using CRM's modal system
-    if (window.crm && typeof window.crm.showModal === 'function') {
-      window.crm.showModal('Email Clicks', modalContent, {
-        width: '600px',
-        height: '500px'
-      });
-    } else {
-      // Fallback: create simple modal
-      const modal = document.createElement('div');
-      modal.className = 'email-clicks-modal';
-      modal.style.cssText = `
-        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0,0,0,0.5); z-index: 10000;
-        display: flex; align-items: center; justify-content: center;
-      `;
-      
-      const modalBox = document.createElement('div');
-      modalBox.style.cssText = `
-        background: var(--bg-primary); border-radius: 8px;
-        width: 600px; max-height: 500px; overflow: hidden;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-      `;
-      modalBox.innerHTML = modalContent;
-      
-      modal.appendChild(modalBox);
-      document.body.appendChild(modal);
-      
-      // Close on click outside
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-          document.body.removeChild(modal);
-        }
-      });
-      
-      // Add close button
-      const closeBtn = document.createElement('button');
-      closeBtn.innerHTML = '×';
-      closeBtn.style.cssText = `
-        position: absolute; top: 15px; right: 20px;
-        background: none; border: none; font-size: 24px;
-        color: var(--text-secondary); cursor: pointer;
-      `;
-      closeBtn.onclick = () => document.body.removeChild(modal);
-      modalBox.style.position = 'relative';
-      modalBox.appendChild(closeBtn);
     }
   }
 
@@ -781,6 +654,43 @@
     return preview || 'No preview available';
   }
 
+  // Render tracking icons for sent emails (from old emails.js)
+  function renderTrackingIcons(email) {
+    // Only show tracking icons for sent emails
+    if (!email.isSentEmail) {
+      return '';
+    }
+
+    const openCount = email.openCount || 0;
+    const clickCount = email.clickCount || 0;
+    const hasOpened = openCount > 0;
+    const hasClicked = clickCount > 0;
+
+    const gmailBadge = email.sentVia === 'gmail_api' ? 
+      '<div class="gmail-badge" title="Sent via Gmail API">Gmail</div>' : '';
+
+    return `
+      <div class="email-tracking-icons">
+        <div class="tracking-icon ${hasOpened ? 'opened' : 'not-opened'}" title="${hasOpened ? `Opened ${openCount} time${openCount !== 1 ? 's' : ''}` : 'Not opened'}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          ${hasOpened ? `<span class="tracking-badge">${openCount}</span>` : ''}
+        </div>
+        <div class="tracking-icon ${hasClicked ? 'clicked' : 'not-clicked'}" title="${hasClicked ? `Clicked ${clickCount} time${clickCount !== 1 ? 's' : ''}` : 'No clicks'}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
+            <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/>
+            <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-3.5"/>
+            <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
+          </svg>
+          ${hasClicked ? `<span class="tracking-badge">${clickCount}</span>` : ''}
+        </div>
+        ${gmailBadge}
+      </div>
+    `;
+  }
 
   // Initialize
   async function init() {

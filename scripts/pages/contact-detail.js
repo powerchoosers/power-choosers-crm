@@ -4812,12 +4812,7 @@
     
     try {
       // Use new targeted API endpoint for much better performance
-      const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser)
-        ? await window.firebase.auth().currentUser.getIdToken()
-        : null;
-      const r = await fetch(`${base}/api/calls/contact/${contactId}?limit=50`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
+      const r = await fetch(`${base}/api/calls/contact/${contactId}?limit=50`);
       const j = await r.json().catch(()=>({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
       
@@ -5913,16 +5908,8 @@ function openContactSequencesPanel() {
   };
   _positionContactSequencesPanel();
   setTimeout(() => panel.classList.add('--show'), 0);
-  
-  // Guard against duplicate resize/scroll listeners
-  if (!document._contactSequencesResizeBound) {
-    try { window.addEventListener('resize', _positionContactSequencesPanel, true); } catch (_) {}
-    document._contactSequencesResizeBound = true;
-  }
-  if (!document._contactSequencesScrollBound) {
-    try { window.addEventListener('scroll', _positionContactSequencesPanel, true); } catch (_) {}
-    document._contactSequencesScrollBound = true;
-  }
+  try { window.addEventListener('resize', _positionContactSequencesPanel, true); } catch (_) {}
+  try { window.addEventListener('scroll', _positionContactSequencesPanel, true); } catch (_) {}
 
   // Interactions
   panel.addEventListener('click', (e) => {
@@ -5939,13 +5926,7 @@ function openContactSequencesPanel() {
       handleSequenceChoose(document.activeElement);
     }
   };
-  
-  // Guard against duplicate keydown listeners
-  if (!document._contactSequencesKeydownBound) {
-    document.addEventListener('keydown', _onContactSequencesKeydown, true);
-    document._contactSequencesKeydownBound = true;
-  }
-  
+  document.addEventListener('keydown', _onContactSequencesKeydown, true);
   _onContactSequencesOutside = (e) => {
     const inside = panel.contains(e.target);
     const isTrigger = !!(e.target.closest && e.target.closest('#add-contact-to-sequences'));
@@ -5957,12 +5938,7 @@ function openContactSequencesPanel() {
       }
     }
   };
-  
-  // Guard against duplicate mousedown listeners
-  if (!document._contactSequencesMousedownBound) {
-    document.addEventListener('mousedown', _onContactSequencesOutside, true);
-    document._contactSequencesMousedownBound = true;
-  }
+  document.addEventListener('mousedown', _onContactSequencesOutside, true);
 }
 
 // Populate sequences into the contact sequences panel
@@ -6260,18 +6236,6 @@ async function createContactSequenceThenAdd(name) {
   function closeContactListsPanel() {
     const panel = document.getElementById('contact-lists-panel');
     const cleanup = () => {
-      // Clean up the click handler before removing the panel
-      if (panel) {
-        const container = panel.querySelector('#contact-lists-body');
-        if (container && container._listItemClickHandler) {
-          try {
-            container.removeEventListener('click', container._listItemClickHandler);
-            container._listItemClickHandler = null;
-            console.log('[ContactDetail] List item click handler removed');
-          } catch(_) {}
-        }
-      }
-      
       if (panel && panel.parentElement) panel.parentElement.removeChild(panel);
       try { document.removeEventListener('mousedown', _onContactListsOutside, true); } catch(_) {}
       // Reset trigger state and restore focus
@@ -6413,16 +6377,8 @@ async function createContactSequenceThenAdd(name) {
       panel.style.left = `${Math.round(left)}px`;
     };
     _positionContactListsPanel();
-    
-    // Guard against duplicate resize/scroll listeners
-    if (!document._contactListsResizeBound) {
-      window.addEventListener('resize', _positionContactListsPanel, true);
-      document._contactListsResizeBound = true;
-    }
-    if (!document._contactListsScrollBound) {
-      window.addEventListener('scroll', _positionContactListsPanel, true);
-      document._contactListsScrollBound = true;
-    }
+    window.addEventListener('resize', _positionContactListsPanel, true);
+    window.addEventListener('scroll', _positionContactListsPanel, true);
 
     // Animate in
     requestAnimationFrame(() => { panel.classList.add('--show'); });
@@ -6446,12 +6402,7 @@ async function createContactSequenceThenAdd(name) {
         const el = document.activeElement; handleListChoose(el);
       }
     };
-    
-    // Guard against duplicate keydown listeners
-    if (!document._contactListsKeydownBound) {
-      document.addEventListener('keydown', _onContactListsKeydown, true);
-      document._contactListsKeydownBound = true;
-    }
+    document.addEventListener('keydown', _onContactListsKeydown, true);
 
     // Click-away
     _onContactListsOutside = (e) => {
@@ -6467,12 +6418,7 @@ async function createContactSequenceThenAdd(name) {
         }
       }
     };
-    
-    // Guard against duplicate mousedown listeners
-    if (!document._contactListsMousedownBound) {
-      document.addEventListener('mousedown', _onContactListsOutside, true);
-      document._contactListsMousedownBound = true;
-    }
+    document.addEventListener('mousedown', _onContactListsOutside, true);
 
   }
 
@@ -6637,36 +6583,16 @@ async function createContactSequenceThenAdd(name) {
       if (createRow) container.appendChild(createRow);
       container.insertAdjacentHTML('beforeend', listHtml || `<div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">No lists found</div><div class="list-meta">Create a new list</div></div></div>`);
 
-      // Event delegation - ALWAYS re-attach to ensure it works after panel recreation
-      // Remove any existing listener first to prevent duplicates
-      if (container._listItemClickHandler) {
-        try {
-          container.removeEventListener('click', container._listItemClickHandler);
-          console.log('[ContactDetail] Removed old list item click handler');
-        } catch(e) {
-          console.warn('[ContactDetail] Error removing old handler:', e);
-        }
+      // Event delegation - attach once to container, persists through re-renders
+      if (!container._listItemHandlerAttached) {
+        container.addEventListener('click', (e) => {
+          const listItem = e.target.closest('.list-item');
+          if (listItem && !listItem.hasAttribute('aria-disabled')) {
+            handleListChoose(listItem);
+          }
+        });
+        container._listItemHandlerAttached = true;
       }
-      
-      // Create and store the handler function with detailed logging
-      container._listItemClickHandler = (e) => {
-        console.log('[ContactDetail] Click detected in list container', e.target);
-        const listItem = e.target.closest('.list-item');
-        console.log('[ContactDetail] Closest list-item:', listItem);
-        if (listItem && !listItem.hasAttribute('aria-disabled')) {
-          console.log('[ContactDetail] Calling handleListChoose for:', listItem.getAttribute('data-name'));
-          handleListChoose(listItem);
-        } else {
-          console.log('[ContactDetail] List item click ignored:', {
-            hasListItem: !!listItem,
-            isDisabled: listItem?.hasAttribute('aria-disabled')
-          });
-        }
-      };
-      
-      // Attach the listener
-      container.addEventListener('click', container._listItemClickHandler);
-      console.log('[ContactDetail] List item click handler attached to container:', container.id);
     } catch (err) {
       console.warn('Failed to load lists', err);
     }

@@ -5,16 +5,11 @@
  * on app initialization, making data globally available for instant access.
  * 
  * Features:
- * - Cache-first loading with ENRICHED data (zero API calls + zero enrichment delay)
+ * - Cache-first loading (zero API calls after first visit)
  * - Global data availability via window.BackgroundCallsLoader
  * - Event notifications when data is ready
  * - Automatic fallback to API if cache is empty
  * - Works exactly like contacts/accounts loaders for consistency
- * 
- * PERFORMANCE OPTIMIZATION:
- * - Caches enriched call data (with contact/account names) instead of raw data
- * - Eliminates 5-10 second enrichment delay on page load
- * - Reduces Firebase costs by avoiding redundant phone-to-contact queries
  */
 
 (function() {
@@ -22,23 +17,14 @@
   let callStatusCache = new Map(); // Cache for call status lookups
   let lastLoadedOffset = 0; // Track pagination offset
   let hasMoreData = true; // Track if more data is available
-  let isEnriched = false; // Track if data is enriched
   
   async function loadFromAPI() {
     try {
       console.log('[BackgroundCallsLoader] Loading from API...');
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
       const url = `${base}/api/calls?limit=100`; // Load 100 calls for efficiency
-      // Attach ID token for secured endpoints
-      let headers = {};
-      try {
-        const user = window.firebase && window.firebase.auth && window.firebase.auth().currentUser;
-        if (user) {
-          const token = await user.getIdToken();
-          headers = { 'Authorization': `Bearer ${token}` };
-        }
-      } catch(_) {}
-      const response = await fetch(url, { headers });
+      
+      const response = await fetch(url);
       if (!response.ok) {
         console.warn('[BackgroundCallsLoader] API request failed:', response.status);
         return;
@@ -50,16 +36,17 @@
         callsData = data.calls;
         lastLoadedOffset = data.calls.length;
         hasMoreData = data.calls.length === 100; // If we got less than 100, no more data
-        isEnriched = false; // Mark as not enriched (raw API data)
         console.log('[BackgroundCallsLoader] ✓ Loaded', callsData.length, 'calls from API', hasMoreData ? '(more available)' : '(all loaded)');
         
-        // COST OPTIMIZATION: Do NOT cache raw data here - let calls.js enrich first, then cache
-        // This avoids double cache writes (raw + enriched) and ensures we always cache enriched data
-        console.log('[BackgroundCallsLoader] Raw data loaded - calls.js will enrich and cache');
+        // Save to cache for future sessions (use standard 'calls' key)
+        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+          await window.CacheManager.set('calls', callsData);
+          console.log('[BackgroundCallsLoader] ✓ Cached', callsData.length, 'calls');
+        }
         
         // Notify other modules
         document.dispatchEvent(new CustomEvent('pc:calls-loaded', { 
-          detail: { count: callsData.length, fromAPI: true, enriched: false } 
+          detail: { count: callsData.length, fromAPI: true } 
         }));
       } else {
         console.log('[BackgroundCallsLoader] No calls data from API:', data);
@@ -76,13 +63,11 @@
         const cached = await window.CacheManager.get('calls');
         if (cached && Array.isArray(cached) && cached.length > 0) {
           callsData = cached;
-          // Check if data is enriched (has counterpartyPretty field)
-          isEnriched = cached[0] && cached[0].hasOwnProperty('counterpartyPretty');
-          console.log('[BackgroundCallsLoader] ✓ Loaded', cached.length, 'calls from cache', isEnriched ? '(enriched)' : '(raw)');
+          console.log('[BackgroundCallsLoader] ✓ Loaded', cached.length, 'calls from cache');
           
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:calls-loaded', { 
-            detail: { count: cached.length, cached: true, enriched: isEnriched } 
+            detail: { count: cached.length, cached: true } 
           }));
         } else {
           // Cache empty, load from API
@@ -101,11 +86,9 @@
           const cached = await window.CacheManager.get('calls');
           if (cached && Array.isArray(cached) && cached.length > 0) {
             callsData = cached;
-            // Check if data is enriched
-            isEnriched = cached[0] && cached[0].hasOwnProperty('counterpartyPretty');
-            console.log('[BackgroundCallsLoader] ✓ Loaded', cached.length, 'calls from cache (delayed)', isEnriched ? '(enriched)' : '(raw)');
+            console.log('[BackgroundCallsLoader] ✓ Loaded', cached.length, 'calls from cache (delayed)');
             document.dispatchEvent(new CustomEvent('pc:calls-loaded', { 
-              detail: { count: cached.length, cached: true, enriched: isEnriched } 
+              detail: { count: cached.length, cached: true } 
             }));
           } else {
             await loadFromAPI();
@@ -126,16 +109,8 @@
       console.log('[BackgroundCallsLoader] Loading next batch...');
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
       const url = `${base}/api/calls?limit=100&offset=${lastLoadedOffset}`;
-      // Attach ID token for secured endpoints
-      let headers = {};
-      try {
-        const user = window.firebase && window.firebase.auth && window.firebase.auth().currentUser;
-        if (user) {
-          const token = await user.getIdToken();
-          headers = { 'Authorization': `Bearer ${token}` };
-        }
-      } catch(_) {}
-      const response = await fetch(url, { headers });
+      
+      const response = await fetch(url);
       if (!response.ok) {
         console.warn('[BackgroundCallsLoader] API request failed:', response.status);
         return { loaded: 0, hasMore: false };
@@ -148,16 +123,17 @@
         callsData = [...callsData, ...data.calls];
         lastLoadedOffset += data.calls.length;
         hasMoreData = data.calls.length === 100;
-        isEnriched = false; // New data is raw, needs enrichment
         
         console.log('[BackgroundCallsLoader] ✓ Loaded', data.calls.length, 'more calls. Total:', callsData.length, hasMoreData ? '(more available)' : '(all loaded)');
         
-        // COST OPTIMIZATION: Do NOT cache here - let calls.js enrich the combined data and cache once
-        console.log('[BackgroundCallsLoader] New data loaded - calls.js will enrich and cache updated dataset');
+        // Update cache
+        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+          await window.CacheManager.set('calls', callsData);
+        }
         
         // Notify listeners
         document.dispatchEvent(new CustomEvent('pc:calls-loaded-more', { 
-          detail: { count: data.calls.length, total: callsData.length, hasMore: hasMoreData, enriched: false } 
+          detail: { count: data.calls.length, total: callsData.length, hasMore: hasMoreData } 
         }));
         
         return { loaded: data.calls.length, hasMore: hasMoreData };
@@ -184,17 +160,11 @@
       
       if (usePost) {
         // Use POST with JSON body for large requests
-        let headers = { 'Content-Type': 'application/json' };
-        try {
-          const user = window.firebase && window.firebase.auth && window.firebase.auth().currentUser;
-          if (user) {
-            const token = await user.getIdToken();
-            headers['Authorization'] = `Bearer ${token}`;
-          }
-        } catch(_) {}
         response = await fetch(`${base}/api/call-status`, {
           method: 'POST',
-          headers,
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({
             phones: phones,
             accountIds: accountIds,
@@ -210,15 +180,7 @@
         if (contactIds.length) params.append('contactIds', contactIds.join(','));
         
         const url = `${base}/api/call-status?${params}`;
-        let headers = {};
-        try {
-          const user = window.firebase && window.firebase.auth && window.firebase.auth().currentUser;
-          if (user) {
-            const token = await user.getIdToken();
-            headers['Authorization'] = `Bearer ${token}`;
-          }
-        } catch(_) {}
-        response = await fetch(url, { headers });
+        response = await fetch(url);
       }
       
       if (response.ok) {
@@ -273,20 +235,7 @@
     hasMore: () => hasMoreData,
     getCount: () => callsData.length,
     getCallStatus: getCallStatus,
-    invalidateCache: invalidateCallStatusCache,
-    isEnriched: () => isEnriched,
-    setEnriched: (value) => { isEnriched = value; },
-    updateCache: async (enrichedData) => {
-      // Update the in-memory data and cache with enriched data
-      if (enrichedData && Array.isArray(enrichedData)) {
-        callsData = enrichedData;
-        isEnriched = true;
-        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
-          await window.CacheManager.set('calls', enrichedData);
-          console.log('[BackgroundCallsLoader] ✓ Updated cache with', enrichedData.length, 'enriched calls');
-        }
-      }
-    }
+    invalidateCache: invalidateCallStatusCache
   };
   
   console.log('[BackgroundCallsLoader] Module initialized');
