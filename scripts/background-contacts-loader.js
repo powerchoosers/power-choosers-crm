@@ -15,6 +15,7 @@
   let contactsData = [];
   let lastLoadedDoc = null; // Track last document for pagination
   let hasMoreData = true; // Flag to indicate if more data exists
+  let loadedFromCache = false; // Track if data was loaded from cache (no cost)
   const isAdmin = () => {
     try {
       if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') return window.DataManager.isCurrentUserAdmin();
@@ -105,6 +106,7 @@
         const cached = await window.CacheManager.get('contacts');
         if (cached && Array.isArray(cached) && cached.length > 0) {
           contactsData = cached;
+          loadedFromCache = true; // Mark as loaded from cache
           console.log('[BackgroundContactsLoader] ✓ Loaded', cached.length, 'contacts from cache');
           
           // Notify that cached data is available
@@ -128,6 +130,7 @@
           const cached = await window.CacheManager.get('contacts');
           if (cached && Array.isArray(cached) && cached.length > 0) {
             contactsData = cached;
+            loadedFromCache = true; // Mark as loaded from cache
             console.log('[BackgroundContactsLoader] ✓ Loaded', cached.length, 'contacts from cache (delayed)');
             document.dispatchEvent(new CustomEvent('pc:contacts-loaded', { 
               detail: { count: cached.length, cached: true } 
@@ -244,7 +247,8 @@
     hasMore: () => hasMoreData,
     getCount: () => contactsData.length,
     getTotalCount: getTotalCount,
-    addContact: addContactToCache
+    addContact: addContactToCache,
+    isFromCache: () => loadedFromCache // Expose cache status
   };
   
   console.log('[BackgroundContactsLoader] Module initialized');
