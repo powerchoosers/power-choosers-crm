@@ -540,11 +540,17 @@ button:hover:not(:disabled),
 }
 
 /* Compose editor paragraph spacing */
+/* Removed bottom margin to fix Enter key double-spacing issue */
+/* AI-generated emails use inline styles and won't be affected */
 .body-input p {
-  margin: 0 0 12px 0;
+  margin: 0;
 }
-.body-input p:last-child {
-  margin-bottom: 0;
+
+/* Normalize br spacing for consistent single-line breaks */
+.body-input br {
+  display: block;
+  margin: 0;
+  content: '';
 }
 
 /* === EMAIL EDITOR: AI BAR (slide-down) === */
@@ -717,11 +723,21 @@ button:hover:not(:disabled),
 }
 
 /* Apply glow only to input fields during generation */
-#compose-subject.compose-generating,
-.body-input.compose-generating {
+#compose-subject.compose-generating {
     position: relative;
     border: 2px solid var(--orange-primary);
     border-radius: 8px;
+    box-shadow: 
+        0 0 15px rgba(249, 115, 22, 0.3),
+        0 0 30px rgba(249, 115, 22, 0.2),
+        inset 0 0 15px rgba(249, 115, 22, 0.1);
+    animation: compose-glow 2s ease-in-out infinite alternate;
+}
+
+/* Apply glow to compose-body container (outer border) for body input */
+.compose-body.compose-generating {
+    position: relative;
+    border: 2px solid var(--orange-primary);
     box-shadow: 
         0 0 15px rgba(249, 115, 22, 0.3),
         0 0 30px rgba(249, 115, 22, 0.2),
@@ -801,7 +817,7 @@ button:hover:not(:disabled),
     }
 }
 
-/* Progressive word reveal */
+/* Progressive word reveal (for standard emails) */
 .word-reveal {
     opacity: 0;
     transform: translateY(20px);
@@ -811,6 +827,163 @@ button:hover:not(:disabled),
 .word-reveal.visible {
     opacity: 1;
     transform: translateY(0);
+}
+
+/* HTML Email Template Animation - Section-by-Section Reveal */
+.html-email-reveal {
+    opacity: 0;
+    transform: scale(0.98) translateY(10px);
+    transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.html-email-reveal.visible {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+/* Stagger delays for different sections */
+.html-email-reveal[data-section="header"] {
+    transition-delay: 0ms;
+}
+
+.html-email-reveal[data-section="greeting"] {
+    transition-delay: 150ms;
+}
+
+.html-email-reveal[data-section="body"] {
+    transition-delay: 300ms;
+}
+
+.html-email-reveal[data-section="cta"] {
+    transition-delay: 450ms;
+    transform: scale(0.95) translateY(10px);
+}
+
+.html-email-reveal[data-section="cta"].visible {
+    transform: scale(1) translateY(0);
+}
+
+.html-email-reveal[data-section="signature"] {
+    transition-delay: 600ms;
+}
+
+/* Shimmer effect for HTML email loading (alternative to skeleton) */
+.html-email-shimmer {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.05) 0%,
+        rgba(249, 115, 22, 0.1) 50%,
+        rgba(255, 255, 255, 0.05) 100%
+    );
+    background-size: 200% 100%;
+    animation: html-shimmer 2s ease-in-out infinite;
+}
+
+@keyframes html-shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* ========================================
+   PREVIEW MODE ANIMATIONS
+   ======================================== */
+
+/* Preview container entrance animation */
+@keyframes previewSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.98);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Preview container exit animation */
+@keyframes previewSlideOut {
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.98);
+    }
+}
+
+/* Editor fade out when entering preview */
+@keyframes editorFadeOut {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+}
+
+/* Editor fade in when exiting preview */
+@keyframes editorFadeIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Apply animations to preview container */
+.preview-container {
+    animation: previewSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.preview-container.exiting {
+    animation: previewSlideOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Apply animations to editor */
+.body-input.preview-hiding {
+    animation: editorFadeOut 0.25s ease-out forwards;
+}
+
+.body-input.preview-showing {
+    animation: editorFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Smooth transition for UI elements hiding/showing */
+.compose-header,
+.compose-recipients,
+.compose-subject,
+.editor-toolbar,
+.compose-footer {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* When in preview mode, hide UI elements but keep them in DOM for smooth transitions */
+.compose-window.preview-mode .compose-header,
+.compose-window.preview-mode .compose-recipients,
+.compose-window.preview-mode .compose-subject,
+.compose-window.preview-mode .compose-footer {
+    opacity: 0;
+    transform: translateY(-5px);
+    pointer-events: none;
+}
+
+/* Keep toolbar visible and interactive in preview mode (for preview button) */
+.compose-window.preview-mode .editor-toolbar {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 /* === GLOBAL TABLE ROW ANIMATIONS === */
@@ -4017,12 +4190,10 @@ html, body {
     border-right: 1px solid rgba(255, 255, 255, 0.05);
     box-shadow: 2px 0 16px rgba(0, 0, 0, 0.15);
     transition: width var(--transition-smooth);
+    will-change: width;
+    contain: layout paint;
     overflow: hidden;
     z-index: 100;
-}
-
-.sidebar:hover {
-    width: var(--sidebar-expanded);
 }
 
 /* Also support JS-applied expanded class for hover intent */
@@ -4038,9 +4209,8 @@ html, body {
     overflow-x: hidden;
 }
 
-/* Enable scrolling only when expanded */
-.sidebar.expanded .sidebar-content,
-.sidebar:hover .sidebar-content {
+/* Enable scrolling only when expanded (JS-controlled) */
+.sidebar.expanded .sidebar-content {
     overflow-y: auto;
 }
 
@@ -4077,19 +4247,15 @@ html, body {
     transition: opacity var(--transition-fast);
 }
 
-.sidebar:hover .nav-text {
-    opacity: 1;
-}
-
-/* Collapsed state: center icons and hide labels */
-.sidebar:not(.expanded):not(:hover) .nav-item {
+/* Collapsed state: center icons and hide labels (JS-only, no :hover dependency) */
+.sidebar:not(.expanded) .nav-item {
     justify-content: center;
     padding: var(--spacing-md) 0; /* remove side padding so icons center */
 }
-.sidebar:not(.expanded):not(:hover) .nav-item svg {
+.sidebar:not(.expanded) .nav-item svg {
     margin-right: 0;
 }
-.sidebar:not(.expanded):not(:hover) .nav-text {
+.sidebar:not(.expanded) .nav-text {
     display: none;
 }
 
@@ -4105,7 +4271,7 @@ html, body {
 }
 
 /* Fine‑tune: Lists icon appears slightly right-shifted. Make it a bit larger and nudge left when collapsed */
-.sidebar:not(.expanded):not(:hover) .nav-item[data-page="lists"] svg {
+.sidebar:not(.expanded) .nav-item[data-page="lists"] svg {
     width: 23px;
     height: 23px;
     transform: translateX(-2px);
@@ -17716,3 +17882,45 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     color: var(--text-secondary);
     font-style: italic;
 }
+
+/* ========================================
+   EMAIL TEMPLATE STYLE ISOLATION
+   Prevent HTML email template styles from bleeding into UI
+   ======================================== */
+
+/* Protect UI elements from email template color inheritance */
+.recipient-toggle,
+#toggle-cc-bcc,
+.widget-header h3,
+.widget-title,
+.task-item:hover,
+.news-item,
+.news-item * {
+    color: var(--text-primary) !important;
+}
+
+/* Ensure Cc/Bcc button maintains correct styling */
+.recipient-toggle {
+    background: transparent !important;
+    border: 1px solid var(--border-light) !important;
+    padding: 6px 12px !important;
+    border-radius: 6px !important;
+    font-size: 13px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+}
+
+.recipient-toggle:hover {
+    background: var(--bg-hover) !important;
+    border-color: var(--border-dark) !important;
+}
+
+/* Isolate email editor content to prevent style leakage */
+.body-input {
+    isolation: isolate;
+    contain: layout style;
+}
+
+/* Note: Removed problematic styles that were persisting after HTML generation.
+   The data-html-email attribute is now only used as metadata for sending,
+   not for styling the editor. Editor should maintain normal appearance. */

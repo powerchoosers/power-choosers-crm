@@ -1814,7 +1814,7 @@
       if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getTotalCount === 'function') {
         try {
           state.totalCount = await window.BackgroundContactsLoader.getTotalCount();
-          console.log('[People] Total contacts in database:', state.totalCount);
+          // console.log('[People] Total contacts in database:', state.totalCount);
         } catch (error) {
           console.warn('[People] Failed to get total count, using loaded count:', error);
           state.totalCount = contactsData.length;
@@ -1823,11 +1823,27 @@
         state.totalCount = contactsData.length;
       }
       
-      // TRUE LAZY LOADING: Only load initial batch of 100 records
-      const initialBatchSize = 100; // Load only what's needed initially
-      state.data = contactsData.slice(0, initialBatchSize);
-      state.filtered = state.data.slice();
-      state.hasMore = contactsData.length > initialBatchSize;
+      // SMART LAZY LOADING: 
+      // - If from cache (no cost): Load ALL contacts immediately
+      // - If from Firestore (costs money): Only load first 100 to reduce reads
+      const isFromCache = window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.isFromCache === 'function' 
+        ? window.BackgroundContactsLoader.isFromCache() 
+        : false;
+      
+      if (isFromCache) {
+        // Cache is free - load everything at once
+        state.data = contactsData;
+        state.filtered = state.data.slice();
+        state.hasMore = false;
+        console.log('[People] Loaded ALL', contactsData.length, 'contacts from cache (no pagination needed)');
+      } else {
+        // Firestore costs money - lazy load in batches of 100
+        const initialBatchSize = 100;
+        state.data = contactsData.slice(0, initialBatchSize);
+        state.filtered = state.data.slice();
+        state.hasMore = contactsData.length > initialBatchSize;
+        console.log('[People] Loaded first', initialBatchSize, 'contacts from Firestore (lazy loading enabled)');
+      }
       
       // Build quick lookups for accounts → employees
       const accountById = new Map();

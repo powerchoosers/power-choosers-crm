@@ -314,6 +314,13 @@
         .replace(/javascript:/gi, '')
         .replace(/data:text\/html/gi, '');
 
+      // Remove legacy tracking pixels to avoid 404s and any custom tracking
+      // Custom path: /api/email/track/<id>
+      // Legacy path: *.vercel.app/api/email/track/<id>
+      decodedHtml = decodedHtml
+        .replace(/<img[^>]*src=["'][^"']*\/api\/email\/track\/[^"']+["'][^>]*>/gi, '')
+        .replace(/<img[^>]*src=["'][^"']*vercel\.app\/api\/email\/track\/[^"']+["'][^>]*>/gi, '');
+
       // If no content after sanitization, show fallback
       if (!decodedHtml.trim() || decodedHtml.trim() === '') {
         return '<p>No content available</p>';

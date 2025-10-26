@@ -301,27 +301,62 @@
             const db = window.firebaseDB;
             if (!db) return;
 
-            // Get current user ID (assuming Firebase Auth is initialized)
-            const userId = window.firebase?.auth?.()?.currentUser?.uid || 'default-user';
+            const user = window.firebase?.auth?.()?.currentUser || null;
+            const userId = user?.uid || 'default-user';
+            const email = (user?.email || '').toLowerCase();
 
-            // Query notifications for current user
-            const notificationsRef = db.collection('notifications')
+            if (firestoreUnsubscribe) { firestoreUnsubscribe(); }
+
+            const resultsMap = new Map();
+            let maxId = 0;
+
+            const onUpdate = () => {
+                notifications = Array.from(resultsMap.values()).sort((a,b)=>{
+                    const ta = a.timestamp instanceof Date ? a.timestamp : new Date(a.timestamp);
+                    const tb = b.timestamp instanceof Date ? b.timestamp : new Date(b.timestamp);
+                    return tb - ta;
+                });
+                notificationId = Math.max(1, (maxId || 0) + 1);
+                updateBadge();
+                renderNotifications();
+                saveToLocalStorage();
+                console.log('[Notifications] Loaded', notifications.length, 'notifications from Firestore');
+            };
+
+            const refOwner = email ? db.collection('notifications')
+                .where('ownerId', '==', email)
+                .orderBy('timestamp', 'desc')
+                .limit(100) : null;
+
+            const refLegacy = db.collection('notifications')
                 .where('userId', '==', userId)
                 .orderBy('timestamp', 'desc')
                 .limit(100);
 
-            // Set up real-time listener
-            if (firestoreUnsubscribe) {
-                firestoreUnsubscribe();
+            const unsubscribes = [];
+            if (refOwner) {
+                unsubscribes.push(refOwner.onSnapshot((snapshot)=>{
+                    snapshot.forEach((doc)=>{
+                        const data = doc.data();
+                        const n = {
+                            id: data.id || doc.id,
+                            type: data.type,
+                            title: data.title,
+                            message: data.message,
+                            timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp),
+                            read: data.read || false,
+                            data: data.data || {}
+                        };
+                        resultsMap.set(`${doc.id}`, n);
+                        if (typeof n.id === 'number' && n.id > maxId) maxId = n.id;
+                    });
+                    onUpdate();
+                }, (error)=>{ console.error('[Notifications] ownerId listener error:', error); }));
             }
-
-            firestoreUnsubscribe = notificationsRef.onSnapshot((snapshot) => {
-                notifications = [];
-                let maxId = 0;
-
-                snapshot.forEach((doc) => {
+            unsubscribes.push(refLegacy.onSnapshot((snapshot)=>{
+                snapshot.forEach((doc)=>{
                     const data = doc.data();
-                    const notification = {
+                    const n = {
                         id: data.id || doc.id,
                         type: data.type,
                         title: data.title,
@@ -330,29 +365,16 @@
                         read: data.read || false,
                         data: data.data || {}
                     };
-                    notifications.push(notification);
-                    
-                    // Track highest ID for auto-increment
-                    if (typeof notification.id === 'number' && notification.id > maxId) {
-                        maxId = notification.id;
-                    }
+                    resultsMap.set(`${doc.id}`, n);
+                    if (typeof n.id === 'number' && n.id > maxId) maxId = n.id;
                 });
-
-                // Update notificationId counter for next notification
-                notificationId = maxId + 1;
-
-                updateBadge();
-                renderNotifications();
-                
-                // Also save to localStorage as backup
-                saveToLocalStorage();
-                
-                console.log('[Notifications] Loaded', notifications.length, 'notifications from Firestore');
-            }, (error) => {
-                console.error('[Notifications] Firestore listener error:', error);
-                // Fallback to localStorage
+                onUpdate();
+            }, (error)=>{
+                console.error('[Notifications] userId listener error:', error);
                 loadFromLocalStorage();
-            });
+            }));
+
+            firestoreUnsubscribe = () => { try { unsubscribes.forEach(u=>u && u()); } catch(_) {} };
 
         } catch (error) {
             console.error('[Notifications] Error setting up Firestore listener:', error);
@@ -379,11 +401,15 @@
                 return;
             }
 
-            const userId = window.firebase?.auth?.()?.currentUser?.uid || 'default-user';
+            const user = window.firebase?.auth?.()?.currentUser || null;
+            const userId = user?.uid || 'default-user';
+            const email = (user?.email || '').toLowerCase();
 
-            // Create notification document
             const notificationDoc = {
                 userId: userId,
+                ownerId: email || null,
+                assignedTo: email || null,
+                createdBy: email || null,
                 id: notification.id,
                 type: notification.type,
                 title: notification.title,
@@ -393,10 +419,9 @@
                 data: notification.data || {}
             };
 
-            // Use notification ID as document ID for easy updates
             await db.collection('notifications')
                 .doc(`${userId}_${notification.id}`)
-                .set(notificationDoc);
+                .set(notificationDoc, { merge: true });
 
             console.log('[Notifications] Saved to Firestore:', notification.title);
         } catch (error) {

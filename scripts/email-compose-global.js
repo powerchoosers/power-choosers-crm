@@ -58,8 +58,39 @@
       
       // Wait for compose window to be ready, then prefill
       setTimeout(() => {
+        const composeWindow = document.getElementById('compose-window');
+        if (composeWindow) {
+          const previewContainer = composeWindow.querySelector('.preview-container');
+          if (composeWindow.classList.contains('preview-mode')) composeWindow.classList.remove('preview-mode');
+          if (previewContainer) previewContainer.remove();
+          const editorEl = composeWindow.querySelector('.body-input');
+          if (editorEl) {
+            editorEl.style.display = '';
+            editorEl.classList.remove('preview-showing');
+            editorEl.classList.remove('preview-hiding');
+          }
+          const composeHeader = composeWindow.querySelector('.compose-header');
+          const composeRecipients = composeWindow.querySelector('.compose-recipients');
+          const composeSubject = composeWindow.querySelector('.compose-subject');
+          const composeFooter = composeWindow.querySelector('.compose-footer');
+          if (composeHeader) composeHeader.style.display = '';
+          if (composeRecipients) composeRecipients.style.display = '';
+          if (composeSubject) composeSubject.style.display = '';
+          if (composeFooter) composeFooter.style.display = '';
+          const previewBtn = composeWindow.querySelector('[data-action="preview"]');
+          if (previewBtn) {
+            previewBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>`;
+            previewBtn.setAttribute('title', 'Preview');
+            previewBtn.setAttribute('aria-label', 'Preview message');
+          }
+        }
         const toInput = document.getElementById('compose-to');
         const subjectInput = document.getElementById('compose-subject');
+        const bodyInput = document.querySelector('.body-input');
         
         console.log('[EmailCompose] Subject field value after opening:', subjectInput?.value);
         
@@ -71,10 +102,29 @@
         if (subjectInput && subjectInput.value.includes('Re:')) {
           console.log('[EmailCompose] Clearing Re: prefix from subject');
           subjectInput.value = '';
+        }
+        
+        // Ensure HTML mode is OFF when opening (show rendered view, not source)
+        if (emailManager._isHtmlMode) {
+          console.log('[EmailCompose] Resetting HTML mode on open');
+          emailManager._isHtmlMode = false;
+          const composeWindow = document.getElementById('compose-window');
+          const codeBtn = composeWindow?.querySelector('.editor-toolbar [data-action="code"]');
+          if (codeBtn) {
+            codeBtn.classList.remove('is-active');
+            codeBtn.setAttribute('aria-pressed', 'false');
+            codeBtn.setAttribute('title', 'Edit raw HTML');
           }
+        }
+        
+        // If body has HTML email content, ensure it's rendered (not shown as source)
+        if (bodyInput && bodyInput.getAttribute('data-html-email') === 'true') {
+          console.log('[EmailCompose] HTML email detected, ensuring rendered view');
+          bodyInput.removeAttribute('data-mode');
+        }
           
-          // Focus the To input
-          setTimeout(() => toInput.focus(), 100);
+        // Focus the To input
+        setTimeout(() => toInput?.focus(), 100);
       }, 200);
       
       // Setup toolbar event listeners after compose window is ready
@@ -118,6 +168,37 @@
       composeWindow.classList.add('open');
     }, 10);
     
+    // Ensure preview state is reset when opening
+    try {
+      const previewContainer = composeWindow.querySelector('.preview-container');
+      if (composeWindow.classList.contains('preview-mode')) composeWindow.classList.remove('preview-mode');
+      if (previewContainer) previewContainer.remove();
+      const editor = composeWindow.querySelector('.body-input');
+      if (editor) {
+        editor.style.display = '';
+        editor.classList.remove('preview-showing');
+        editor.classList.remove('preview-hiding');
+      }
+      const composeHeader = composeWindow.querySelector('.compose-header');
+      const composeRecipients = composeWindow.querySelector('.compose-recipients');
+      const composeSubject = composeWindow.querySelector('.compose-subject');
+      const composeFooter = composeWindow.querySelector('.compose-footer');
+      if (composeHeader) composeHeader.style.display = '';
+      if (composeRecipients) composeRecipients.style.display = '';
+      if (composeSubject) composeSubject.style.display = '';
+      if (composeFooter) composeFooter.style.display = '';
+      const previewBtn = composeWindow.querySelector('[data-action="preview"]');
+      if (previewBtn) {
+        previewBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>`;
+        previewBtn.setAttribute('title', 'Preview');
+        previewBtn.setAttribute('aria-label', 'Preview message');
+      }
+    } catch(_) {}
+    
     // Prefill the To field
     setTimeout(() => {
       if (toInput) {
@@ -152,7 +233,120 @@
         e.preventDefault();
         e.stopPropagation();
         
-        // Close compose window
+        console.log('[EmailCompose] Closing and fully resetting compose window...');
+        
+        // FULL RESET: Clear all fields and state for clean slate on next open
+        try {
+          // 1. Clear all input fields
+          const toInput = composeWindow?.querySelector('#compose-to');
+          const ccInput = composeWindow?.querySelector('#compose-cc');
+          const bccInput = composeWindow?.querySelector('#compose-bcc');
+          const subjectInput = composeWindow?.querySelector('#compose-subject');
+          const bodyInput = composeWindow?.querySelector('.body-input');
+          
+          if (toInput) toInput.value = '';
+          if (ccInput) ccInput.value = '';
+          if (bccInput) bccInput.value = '';
+          if (subjectInput) subjectInput.value = '';
+          if (bodyInput) {
+            bodyInput.innerHTML = '';
+            bodyInput.removeAttribute('data-html-email');
+            bodyInput.removeAttribute('data-template-type');
+            bodyInput.removeAttribute('data-mode');
+            bodyInput.style.display = '';
+            bodyInput.style.opacity = '';
+            bodyInput.style.transform = '';
+            bodyInput.style.transition = '';
+            bodyInput.classList.remove('preview-showing', 'preview-hiding');
+          }
+          
+          // 2. Reset preview state completely
+          const previewContainer = composeWindow?.querySelector('.preview-container');
+          if (composeWindow?.classList.contains('preview-mode')) {
+            composeWindow.classList.remove('preview-mode');
+          }
+          if (previewContainer) {
+            previewContainer.remove();
+          }
+          
+          // 3. Restore all UI elements visibility
+          const composeHeader = composeWindow?.querySelector('.compose-header');
+          const composeRecipients = composeWindow?.querySelector('.compose-recipients');
+          const composeSubject = composeWindow?.querySelector('.compose-subject');
+          const composeFooter = composeWindow?.querySelector('.compose-footer');
+          const editorToolbar = composeWindow?.querySelector('.editor-toolbar');
+          
+          if (composeHeader) composeHeader.style.display = '';
+          if (composeRecipients) composeRecipients.style.display = '';
+          if (composeSubject) composeSubject.style.display = '';
+          if (composeFooter) composeFooter.style.display = '';
+          if (editorToolbar) editorToolbar.style.display = '';
+          
+          // 4. Reset preview button to default state
+          const previewBtn = composeWindow?.querySelector('[data-action="preview"]');
+          if (previewBtn) {
+            previewBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>`;
+            previewBtn.setAttribute('title', 'Preview');
+            previewBtn.setAttribute('aria-label', 'Preview message');
+            previewBtn.disabled = false;
+          }
+          
+          // 5. Clear AI bar state (prompt text and status)
+          const aiBar = composeWindow?.querySelector('.ai-bar');
+          if (aiBar) {
+            const aiPrompt = aiBar.querySelector('.ai-prompt');
+            const aiStatus = aiBar.querySelector('.ai-status');
+            if (aiPrompt) aiPrompt.value = '';
+            if (aiStatus) aiStatus.textContent = '';
+            aiBar.classList.remove('open');
+            aiBar.setAttribute('aria-hidden', 'true');
+          }
+          
+          // 6. Close all toolbars
+          const formattingBar = composeWindow?.querySelector('.formatting-bar');
+          const linkBar = composeWindow?.querySelector('.link-bar');
+          const variablesBar = composeWindow?.querySelector('.variables-bar');
+          
+          if (formattingBar) {
+            formattingBar.classList.remove('open');
+            formattingBar.setAttribute('aria-hidden', 'true');
+          }
+          if (linkBar) {
+            linkBar.classList.remove('open');
+            linkBar.setAttribute('aria-hidden', 'true');
+          }
+          if (variablesBar) {
+            variablesBar.classList.remove('open');
+            variablesBar.setAttribute('aria-hidden', 'true');
+          }
+          
+          // 7. Reset HTML mode state
+          if (window.emailManager && window.emailManager._isHtmlMode) {
+            console.log('[EmailCompose] Resetting HTML mode state');
+            window.emailManager._isHtmlMode = false;
+            const codeBtn = composeWindow?.querySelector('.editor-toolbar [data-action="code"]');
+            if (codeBtn) {
+              codeBtn.classList.remove('is-active');
+              codeBtn.setAttribute('aria-pressed', 'false');
+              codeBtn.setAttribute('title', 'Edit raw HTML');
+            }
+          }
+          
+          // 8. Clear any generation metadata
+          if (window._lastGeneratedMetadata) {
+            window._lastGeneratedMetadata = null;
+          }
+          
+          console.log('[EmailCompose] Full reset complete - clean slate ready');
+        } catch(err) {
+          console.error('[EmailCompose] Error during reset:', err);
+        }
+        
+        // Close compose window with animation
         if (composeWindow) {
           composeWindow.classList.remove('open');
           setTimeout(() => {
@@ -751,28 +945,198 @@
     selection.addRange(range);
   }
 
-  // Handle image upload
-  function handleImageUpload(editor) {
-    window.crm?.showToast('Image upload coming soon');
+  function toggleFormattingBar() {
+    const formattingBar = document.querySelector('.formatting-bar');
+    if (!formattingBar) return;
+    
+    const isHidden = formattingBar.getAttribute('aria-hidden') === 'true';
+    formattingBar.setAttribute('aria-hidden', !isHidden);
   }
 
-  // Toggle HTML mode
-  function toggleHtmlMode(composeWindow) {
-    const editor = composeWindow.querySelector('.body-input');
-    if (!editor) return;
+  function togglePreviewMode() {
+    const compose = document.getElementById('compose-window');
+    if (!compose) return;
+
+    const editor = compose.querySelector('.body-input');
+    const previewContainer = compose.querySelector('.preview-container');
+    const previewBtn = compose.querySelector('[data-action="preview"]');
+    const composeHeader = compose.querySelector('.compose-header');
+    const composeRecipients = compose.querySelector('.compose-recipients');
+    const composeSubject = compose.querySelector('.compose-subject');
+    const editorToolbar = compose.querySelector('.editor-toolbar');
+    const composeFooter = compose.querySelector('.compose-footer');
     
-    const isHtmlMode = editor.getAttribute('data-mode') === 'html';
-    if (isHtmlMode) {
-      // Switch to text mode
-      editor.setAttribute('data-mode', 'text');
-      editor.setAttribute('contenteditable', 'true');
-      editor.innerHTML = editor.textContent || '';
+    // Check if we're currently in preview mode
+    const isPreview = compose.classList.contains('preview-mode');
+    
+    if (isPreview) {
+      // Exit preview mode with animation
+      
+      // Remove preview-mode class immediately to restore toolbar interactivity
+      compose.classList.remove('preview-mode');
+      
+      if (previewContainer) {
+        // Add exit animation class
+        previewContainer.classList.add('exiting');
+        
+        // Wait for animation to complete before removing
+        setTimeout(() => {
+          previewContainer.remove();
+          
+          // Show editor with animation
+          if (editor) {
+            editor.style.display = '';
+            editor.classList.add('preview-showing');
+            
+            // Clean up animation class
+            setTimeout(() => {
+              editor.classList.remove('preview-showing');
+            }, 300);
+          }
+          
+          // Show UI elements (they'll fade in via CSS transition)
+          if (composeHeader) composeHeader.style.display = '';
+          if (composeRecipients) composeRecipients.style.display = '';
+          if (composeSubject) composeSubject.style.display = '';
+          if (composeFooter) composeFooter.style.display = '';
+        }, 300); // Match animation duration
+      }
+      
+      if (previewBtn) {
+        previewBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>`;
+        previewBtn.setAttribute('title', 'Preview');
+        previewBtn.setAttribute('aria-label', 'Preview message');
+      }
     } else {
-      // Switch to HTML mode
-      editor.setAttribute('data-mode', 'html');
-      editor.setAttribute('contenteditable', 'true');
-      const htmlContent = editor.innerHTML;
-      editor.textContent = htmlContent;
+      // Enter preview mode with animation
+      
+      // Animate editor out
+      if (editor) {
+        editor.classList.add('preview-hiding');
+        
+        // Wait for editor fade out before showing preview
+        setTimeout(() => {
+          editor.style.display = 'none';
+          editor.classList.remove('preview-hiding');
+        }, 250);
+      }
+      
+      // Add preview-mode class (toolbar stays visible via CSS override)
+      compose.classList.add('preview-mode');
+      
+      // Hide non-toolbar UI elements
+      if (composeHeader) composeHeader.style.display = 'none';
+      if (composeRecipients) composeRecipients.style.display = 'none';
+      if (composeSubject) composeSubject.style.display = 'none';
+      if (composeFooter) composeFooter.style.display = 'none';
+      
+      // Get current email content
+      const bodyInput = compose.querySelector('.body-input');
+      const isHtmlEmail = bodyInput?.getAttribute('data-html-email') === 'true';
+      const content = bodyInput?.innerHTML || '';
+      
+      // Create preview container with rounded top corners
+      const preview = document.createElement('div');
+      preview.className = 'preview-container';
+      preview.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #f1f5fa;
+        overflow-y: auto;
+        padding: 0;
+        z-index: 10;
+        border-radius: 12px 12px 0 0;
+      `;
+      
+      // Create back button container with rounded top
+      const backBtnContainer = document.createElement('div');
+      backBtnContainer.style.cssText = `
+        position: sticky;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: #fff;
+        padding: 16px 20px;
+        border-bottom: 1px solid #e5e7eb;
+        z-index: 100;
+        border-radius: 12px 12px 0 0;
+      `;
+      
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = '← Back to Editor';
+      closeBtn.style.cssText = `
+        padding: 10px 20px;
+        background: #1e3a8a;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 14px;
+        transition: all 0.2s ease;
+      `;
+      closeBtn.onmouseover = () => {
+        closeBtn.style.background = '#2563eb';
+        closeBtn.style.transform = 'translateY(-1px)';
+      };
+      closeBtn.onmouseout = () => {
+        closeBtn.style.background = '#1e3a8a';
+        closeBtn.style.transform = 'translateY(0)';
+      };
+      closeBtn.onclick = () => togglePreviewMode();
+      backBtnContainer.appendChild(closeBtn);
+      preview.appendChild(backBtnContainer);
+      
+      // Create iframe container with padding
+      const iframeContainer = document.createElement('div');
+      iframeContainer.style.cssText = 'padding: 20px;';
+      
+      // Create preview content with proper iframe or direct HTML
+      if (isHtmlEmail) {
+        // HTML emails: use iframe for isolation
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'width: 100%; min-height: 600px; border: none; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);';
+        iframe.srcdoc = content;
+        iframeContainer.appendChild(iframe);
+      } else {
+        // Standard emails: render directly with styling
+        const contentWrapper = document.createElement('div');
+        contentWrapper.style.cssText = `
+          background: white;
+          padding: 40px;
+          border-radius: 8px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          font-size: 14px;
+          line-height: 1.6;
+          color: #1f2937;
+        `;
+        contentWrapper.innerHTML = content;
+        iframeContainer.appendChild(contentWrapper);
+      }
+      
+      preview.appendChild(iframeContainer);
+      
+      // Add preview to compose editor (animation will trigger via CSS)
+      compose.querySelector('.compose-editor').appendChild(preview);
+      
+      // Update button icon to edit/pencil
+      if (previewBtn) {
+        previewBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>`;
+        previewBtn.setAttribute('title', 'Edit');
+        previewBtn.setAttribute('aria-label', 'Edit message');
+      }
     }
   }
 
@@ -806,18 +1170,26 @@
     editor?.addEventListener('mouseup', saveSelection);
     editor?.addEventListener('blur', saveSelection);
     
-    // Toolbar button clicks
-    toolbar?.addEventListener('click', (e) => {
-      const btn = e.target.closest('.toolbar-btn');
-      if (!btn) return;
-      
-      const action = btn.getAttribute('data-action');
-      console.log('🔧 Toolbar action:', action);
-      
-      if (typeof handleToolbarAction === 'function') {
-        handleToolbarAction(action, btn, editor, formattingBar, linkBar);
-      }
-    });
+    // Toolbar actions - DEDUPLICATED to prevent multiple listeners
+    if (!document._composeToolbarClickBound) {
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.toolbar-btn');
+        if (!btn) return;
+        
+        const action = btn.dataset.action;
+        
+        if (action === 'ai') {
+          openAIPanel();
+        } else if (action === 'formatting') {
+          toggleFormattingBar();
+        } else if (action === 'preview') {
+          togglePreviewMode();
+        }
+        // Other toolbar actions can be added here
+      });
+      document._composeToolbarClickBound = true;
+      console.log('[EmailCompose] Toolbar click listener bound (deduplicated)');
+    }
     
     // Formatting button clicks
     formattingBar?.addEventListener('click', (e) => {
@@ -978,35 +1350,40 @@
           console.log('[Enter] Enter key pressed in email editor');
           e.preventDefault();
           
-          // Check if cursor is at or near signature boundary
+          // Check if cursor is INSIDE signature (not just near it)
           const selection = window.getSelection();
           if (selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);
-            const isNearSignature = isCursorNearSignature(editor, range);
-            if (isNearSignature) {
-              console.log('[Enter] Cursor near signature - preventing edit');
+            const isInsideSignature = isCursorInsideSignature(editor, range);
+            if (isInsideSignature) {
+              console.log('[Enter] Cursor inside signature - preventing edit');
               return;
             }
           }
           
-          // Simple approach: just insert a line break
+          // Insert single line break for single spacing (like Gmail/Outlook)
           try {
+            // Insert single <br> for single spacing
             document.execCommand('insertHTML', false, '<br>');
-            console.log('[Enter] Line break inserted via execCommand');
+            console.log('[Enter] Single line break inserted via execCommand');
           } catch (error) {
             console.error('[Enter] execCommand failed:', error);
             // Try alternative approach
             try {
-              const br = document.createElement('br');
               const selection = window.getSelection();
               const range = selection.getRangeAt(0);
               range.deleteContents();
+              
+              // Insert single <br> tag for single spacing
+              const br = document.createElement('br');
               range.insertNode(br);
+              
+              // Move cursor after the break
               range.setStartAfter(br);
               range.collapse(true);
               selection.removeAllRanges();
               selection.addRange(range);
-              console.log('[Enter] Line break inserted via DOM manipulation');
+              console.log('[Enter] Single line break inserted via DOM manipulation');
             } catch (fallbackError) {
               console.error('[Enter] DOM manipulation also failed:', fallbackError);
             }
@@ -1018,24 +1395,25 @@
     document._emailComposeEnterHandlerBound = true;
   }
   
-  // Helper function to check if cursor is near signature
-  function isCursorNearSignature(editor, range) {
-    // Check if cursor is near signature boundary to prevent editing into signature area
+  // Helper function to check if cursor is INSIDE signature (not just near)
+  function isCursorInsideSignature(editor, range) {
+    // Check if the cursor's parent node is within a signature element
     const signatureElements = editor.querySelectorAll('[data-signature], .signature, .email-signature');
     if (signatureElements.length === 0) return false;
     
+    // Get the current node where cursor is positioned
+    let currentNode = range.startContainer;
+    if (currentNode.nodeType === Node.TEXT_NODE) {
+      currentNode = currentNode.parentNode;
+    }
+    
+    // Walk up the DOM tree to check if we're inside a signature
     for (const signature of signatureElements) {
-      const signatureRange = document.createRange();
-      signatureRange.selectNode(signature);
-      
-      // Check if cursor is within 50px of signature
-      const cursorRect = range.getBoundingClientRect();
-      const signatureRect = signatureRange.getBoundingClientRect();
-      
-      if (Math.abs(cursorRect.top - signatureRect.top) < 50) {
+      if (signature.contains(currentNode)) {
         return true;
       }
     }
+    
     return false;
   }
   
@@ -1044,9 +1422,10 @@
 
   // ========== AI GENERATION ANIMATION FUNCTIONS ==========
   
-  function startGeneratingAnimation(composeWindow) {
+  function startGeneratingAnimation(composeWindow, mode = 'standard') {
     const subjectInput = composeWindow?.querySelector('#compose-subject');
     const bodyInput = composeWindow?.querySelector('.body-input');
+    const composeBody = composeWindow?.querySelector('.compose-body');
     
     // Add glow effect and skeleton to subject input
     if (subjectInput) {
@@ -1054,18 +1433,29 @@
       createSkeletonInField(subjectInput, 'subject');
     }
     
-    // Add glow effect and skeleton to body input
-    if (bodyInput) {
-      bodyInput.classList.add('compose-generating');
-      createSkeletonInField(bodyInput, 'body');
+    // Add glow effect to compose-body container (outer border)
+    if (composeBody) {
+      composeBody.classList.add('compose-generating');
     }
     
-    console.log('[AI Animation] Started generating animation in input fields');
+    // Different body animations for HTML vs standard emails
+    if (bodyInput) {
+      if (mode === 'html') {
+        // HTML emails: use shimmer effect
+        createHtmlEmailShimmer(bodyInput);
+      } else {
+        // Standard emails: use skeleton bars
+        createSkeletonInField(bodyInput, 'body');
+      }
+    }
+    
+    console.log(`[AI Animation] Started generating animation (${mode} mode)`);
   }
   
   function stopGeneratingAnimation(composeWindow) {
     const subjectInput = composeWindow?.querySelector('#compose-subject');
     const bodyInput = composeWindow?.querySelector('.body-input');
+    const composeBody = composeWindow?.querySelector('.compose-body');
     
     // Remove glow effect and skeleton from subject input
     if (subjectInput) {
@@ -1073,10 +1463,15 @@
       removeSkeletonFromField(subjectInput);
     }
     
-    // Remove glow effect and skeleton from body input
+    // Remove glow effect from compose-body container
+    if (composeBody) {
+      composeBody.classList.remove('compose-generating');
+    }
+    
+    // Remove skeleton or shimmer from body input
     if (bodyInput) {
-      bodyInput.classList.remove('compose-generating');
       removeSkeletonFromField(bodyInput);
+      removeHtmlEmailShimmer(bodyInput);
     }
     
     console.log('[AI Animation] Stopped generating animation');
@@ -1223,6 +1618,159 @@
     } else {
       progressiveReveal(field, content);
     }
+  }
+  
+  // ========== HTML EMAIL TEMPLATE ANIMATION ==========
+  
+  function createHtmlEmailShimmer(bodyInput) {
+    if (!bodyInput) return;
+    
+    // Clear existing content
+    bodyInput.innerHTML = '';
+    
+    // Create shimmer placeholder that mimics email structure
+    const shimmerContainer = document.createElement('div');
+    shimmerContainer.className = 'html-email-shimmer-container';
+    shimmerContainer.style.cssText = 'padding: 20px;';
+    
+    shimmerContainer.innerHTML = `
+      <div class="html-email-shimmer" style="height: 60px; margin-bottom: 20px; border-radius: 8px;"></div>
+      <div class="html-email-shimmer" style="height: 20px; width: 70%; margin-bottom: 12px; border-radius: 4px;"></div>
+      <div class="html-email-shimmer" style="height: 80px; margin-bottom: 20px; border-radius: 6px;"></div>
+      <div class="html-email-shimmer" style="height: 40px; width: 50%; margin: 0 auto 20px; border-radius: 20px;"></div>
+      <div class="html-email-shimmer" style="height: 60px; border-radius: 8px;"></div>
+    `;
+    
+    bodyInput.appendChild(shimmerContainer);
+  }
+  
+  function removeHtmlEmailShimmer(bodyInput) {
+    if (!bodyInput) return;
+    
+    const shimmerContainer = bodyInput.querySelector('.html-email-shimmer-container');
+    if (shimmerContainer) {
+      shimmerContainer.style.opacity = '0';
+      shimmerContainer.style.transition = 'opacity 0.3s ease';
+      
+      setTimeout(() => {
+        if (shimmerContainer.parentNode) {
+          shimmerContainer.remove();
+        }
+      }, 300);
+    }
+  }
+  
+  // Render HTML email in an isolated iframe to prevent CSS bleeding
+  function renderHtmlEmailInIframe(editor, html) {
+    if (!editor || !html) return;
+    
+    // Remove shimmer first
+    removeHtmlEmailShimmer(editor);
+    
+    // Wait for shimmer to fade out
+    setTimeout(() => {
+      // Clear editor and create iframe container
+      editor.innerHTML = '';
+      
+      // Create iframe wrapper
+      const iframeWrapper = document.createElement('div');
+      iframeWrapper.className = 'html-email-iframe-wrapper';
+      iframeWrapper.style.cssText = `
+        width: 100%;
+        height: 100%;
+        min-height: 500px;
+        position: relative;
+        background: #f1f5fa;
+        border-radius: 8px;
+        overflow: hidden;
+      `;
+      
+      // Create iframe for CSS isolation
+      const iframe = document.createElement('iframe');
+      iframe.className = 'html-email-iframe';
+      iframe.style.cssText = `
+        width: 100%;
+        height: 100%;
+        min-height: 500px;
+        border: none;
+        background: white;
+        display: block;
+      `;
+      
+      // Set iframe content using srcdoc (isolates CSS completely)
+      iframe.srcdoc = html;
+      
+      // Auto-resize iframe to content height
+      iframe.onload = () => {
+        try {
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+          const height = iframeDoc.body.scrollHeight;
+          iframe.style.height = Math.max(height, 500) + 'px';
+          iframeWrapper.style.minHeight = Math.max(height, 500) + 'px';
+          console.log('[HTML Email] Iframe loaded, height:', height);
+        } catch (e) {
+          console.warn('[HTML Email] Could not resize iframe:', e);
+        }
+      };
+      
+      // Append iframe to wrapper and wrapper to editor
+      iframeWrapper.appendChild(iframe);
+      editor.appendChild(iframeWrapper);
+      
+      // Fade in animation
+      editor.style.opacity = '0';
+      editor.style.transform = 'translateY(10px)';
+      editor.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+      
+      setTimeout(() => {
+        editor.style.opacity = '1';
+        editor.style.transform = 'translateY(0)';
+      }, 50);
+      
+      console.log('[HTML Email] Rendered in isolated iframe to prevent CSS bleeding');
+    }, 350);
+  }
+  
+  function revealHtmlEmailSections(element, html) {
+    if (!element || !html) return;
+    
+    // Remove shimmer first
+    removeHtmlEmailShimmer(element);
+    
+    // Wait for shimmer to fade out
+    setTimeout(() => {
+      // Insert the HTML content
+      element.innerHTML = html;
+      
+      // Find major sections and wrap them for animation
+      // Look for common email template structures
+      const children = Array.from(element.children);
+      
+      children.forEach((child, index) => {
+        // Determine section type based on content and position
+        let sectionType = 'body';
+        
+        if (index === 0) {
+          sectionType = 'header';
+        } else if (child.querySelector('a[href]') && child.textContent.length < 100) {
+          sectionType = 'cta';
+        } else if (child.querySelector('img') || child.textContent.toLowerCase().includes('best regards') || 
+                   child.textContent.toLowerCase().includes('sincerely') || index === children.length - 1) {
+          sectionType = 'signature';
+        } else if (index === 1) {
+          sectionType = 'greeting';
+        }
+        
+        // Add reveal animation classes
+        child.classList.add('html-email-reveal');
+        child.setAttribute('data-section', sectionType);
+        
+        // Trigger animation
+        setTimeout(() => {
+          child.classList.add('visible');
+        }, 50);
+      });
+    }, 350);
   }
 
   // ========== AI BAR RENDERING ==========
@@ -1594,9 +2142,6 @@
     const status = aiBar?.querySelector('.ai-status');
     const prompt = aiBar?.querySelector('.ai-prompt')?.value?.trim() || '';
     const toInput = compose?.querySelector('#compose-to');
-    
-    // Start the generation animation
-    startGeneratingAnimation(compose);
     const subjectInput = compose?.querySelector('#compose-subject');
     
     if (!editor) return;
@@ -1607,8 +2152,8 @@
       aiBar.setAttribute('aria-hidden', 'true');
     }
 
-    // Start generating animation
-    startGeneratingAnimation(compose);
+    // Start generating animation with appropriate mode
+    startGeneratingAnimation(compose, mode);
     if (status) status.textContent = 'Generating...';
     
     try {
@@ -1665,6 +2210,14 @@
       const result = await response.json();
       console.log('[AI] Received response:', result);
 
+      // Save generation metadata for tracking (subject_style, cta_type, opening_style)
+      try {
+        window._lastGeneratedMetadata = result.metadata || null;
+        console.log('[AI] Stored generation metadata:', window._lastGeneratedMetadata);
+      } catch (_) {
+        // non-fatal
+      }
+
       // Handle different response formats based on mode and templateType
       const templateType = result.templateType || null;
       const output = result.output || '';
@@ -1699,27 +2252,48 @@
       }
 
       if (html && editor) {
-        // For HTML content, render it directly with a simple fade-in
+        // Different animations for HTML templates vs standard emails
         setTimeout(() => {
-          // Preserve signature before AI content insertion (emails.js approach)
-          const contentWithSignature = preserveSignatureAfterAI(editor, html);
+          // IMPORTANT: For structured HTML templates, DO NOT append existing signature
+          // since the template includes a hard-coded signature block.
+          const finalHtml = templateType ? html : preserveSignatureAfterAI(editor, html);
           
-          editor.innerHTML = contentWithSignature;
-          // Mark editor mode for proper signature handling
+          // Mark content type for sending (but don't activate HTML source view)
           if (templateType) {
-            editor.setAttribute('data-mode', 'html');
+            editor.setAttribute('data-template-type', templateType);
+            editor.setAttribute('data-html-email', 'true');
           } else {
-            editor.removeAttribute('data-mode');
+            editor.removeAttribute('data-template-type');
+            editor.removeAttribute('data-html-email');
           }
-          editor.style.opacity = '0';
-          editor.style.transform = 'translateY(10px)';
-          editor.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
           
-          // Trigger the animation
-          setTimeout(() => {
-            editor.style.opacity = '1';
-            editor.style.transform = 'translateY(0)';
-          }, 50);
+          // Ensure we're NOT in HTML source code view mode
+          // If emailManager exists and is in HTML mode, toggle it off to show rendered view
+          if (window.emailManager && window.emailManager._isHtmlMode) {
+            console.log('[AI] Exiting HTML source mode to show rendered template');
+            window.emailManager.toggleHtmlMode(compose);
+          }
+          
+          // Ensure data-mode is NOT set (this was causing the monospace font issue)
+          editor.removeAttribute('data-mode');
+          
+          // Use different animations based on template type
+          if (templateType) {
+            // HTML email template: wrap in iframe to isolate CSS and prevent style bleeding
+            renderHtmlEmailInIframe(editor, finalHtml);
+          } else {
+            // Standard email: use simple fade-in
+            editor.innerHTML = finalHtml;
+            editor.style.opacity = '0';
+            editor.style.transform = 'translateY(10px)';
+            editor.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            
+            // Trigger the animation
+            setTimeout(() => {
+              editor.style.opacity = '1';
+              editor.style.transform = 'translateY(0)';
+            }, 50);
+          }
         }, 800);
       }
 
@@ -1738,221 +2312,895 @@
 
   // ========== TEMPLATE BUILDER FUNCTIONS ==========
   
-  function buildWarmIntroHtml(data, recipient, fromEmail) {
-    const mail = fromEmail || 'l.patterson@powerchoosers.com';
-    const company = recipient?.company || recipient?.accountName || 'Your Company';
-    const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+  // Build sender profile signature once for all HTML templates
+  function getSenderProfile() {
+    const settings = (window.SettingsPage?.getSettings?.()) || {};
+    const g = settings?.general || {};
+    const first = g.firstName || '';
+    const last = g.lastName || '';
+    const name = (first && last) ? `${first} ${last}`.trim() : (g.agentName || 'Power Choosers Team');
+    return {
+      name,
+      title: g.jobTitle || 'Energy Strategist',
+      company: g.companyName || 'Power Choosers',
+      location: g.location || '',
+      phone: g.phone || '',
+      email: g.email || 'l.patterson@powerchoosers.com',
+      avatar: g.hostedPhotoURL || g.photoURL || ''
+    };
+  }
+
+  function buildSignatureBlock() {
+    const s = getSenderProfile();
+    
+    // Debug logging to verify location is being retrieved
+    console.log('[Signature] Building signature block with:', {
+      name: s.name,
+      title: s.title,
+      company: s.company,
+      location: s.location,
+      phone: s.phone,
+      email: s.email
+    });
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Hi ${firstName},</p>
-        
-        <p>${data.call_reference || 'Thank you for taking the time to speak with me today.'}</p>
-        
-        <p>${data.main_message || 'I wanted to follow up on our conversation about your energy needs and how Power Choosers can help optimize your costs.'}</p>
-        
-        <p>${data.cta_text || 'Would you be available for a brief call this week to discuss next steps?'}</p>
-        
-        <p>Best regards,<br>
-        Power Choosers Team</p>
+      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+        <div style="display:flex; gap:12px; align-items:center;">
+          ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width:48px; height:48px; border-radius:50%; object-fit:cover;">` : ''}
+          <div>
+            <p style="margin: 0; font-size: 14px;">
+              <strong>${s.name}</strong><br>
+              ${s.title}<br>
+              ${s.company}<br>
+              ${s.location ? `${s.location}<br>` : ''}
+              ${s.phone ? `Phone: ${s.phone}<br>` : ''}
+              Email: ${s.email}
+            </p>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function buildWarmIntroHtml(data, recipient, fromEmail) {
+    const company = recipient?.company || recipient?.accountName || 'Your Company';
+    const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const s = getSenderProfile();
+    
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03);
+      overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px;
+      background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb {
+      margin:20px 24px 2px 24px; font-size:14px; color:#234bb7;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#f3f8ff; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .main-paragraph {margin:0 24px 18px 24px; padding:18px; background:#fff; border-radius:7px; line-height:1.6;}
+    .cta-container {
+      text-align:center; padding:22px 24px;
+      background:#f3f8ff; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(30,64,175,0.05);
+    }
+    .cta-btn {
+      display:inline-block; padding:13px 36px; background:#1e3a8a; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(30,64,175,0.13);
+      transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#1631a4;}
+    .signature {
+      margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer {
+      padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">Great speaking with you about ${company}'s energy needs</div>
+    <div class="intro">
+      <p>Hi ${firstName},</p>
+      <p>${data.call_reference || 'Thank you for taking my call today. I wanted to quickly follow up and ensure you have the key details about how Power Choosers can support your team\'s energy procurement goals.'}</p>
+    </div>
+    <div class="main-paragraph">
+      <p>${data.main_message || 'I wanted to follow up on our conversation about your energy needs and how Power Choosers can help optimize your costs.'}</p>
+    </div>
+    <div class="cta-container">
+      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Schedule a Follow-Up Call'}</a>
+      <div style="margin-top:8px;font-size:14px;color:#1e3a8a;opacity:0.83;">
+        Prefer email or need more info? Just reply—happy to assist.
       </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">` : ''}
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${s.name}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${s.location ? `${s.location}<br>` : ''}
+        ${s.phone ? `${s.phone}<br>` : ''}
+        ${s.company}
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
     `;
   }
 
   function buildFollowUpHtml(data, recipient, fromEmail) {
-    const mail = fromEmail || 'l.patterson@powerchoosers.com';
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const s = getSenderProfile();
     
     const valueProps = data.value_props || [
-      'Lower electricity rates through competitive procurement',
-      'Expert market analysis and timing recommendations',
-      'Ongoing monitoring of your energy portfolio',
-      'Transparent pricing with no hidden fees'
+      'Access to 50+ competitive suppliers',
+      'No cost for our procurement service',
+      'Transparent rate comparison',
+      'Expert contract negotiation'
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Hi ${firstName},</p>
-        
-        <p>${data.progress_update || 'I wanted to follow up on our previous conversation about optimizing your energy costs.'}</p>
-        
-        <p>Here's how we can help ${company}:</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 2px 24px; font-size:14px; color:#7c3aed;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#faf5ff; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .main-paragraph {margin:0 24px 18px 24px; padding:18px; background:#fff; border-radius:7px; line-height:1.6;}
+    .two-column { display:flex; gap:16px; margin:0 24px 18px 24px; }
+    .column { flex:1; background:#f6f7fb; border-radius:8px; padding:16px;
+      box-shadow:0 2px 8px rgba(30,64,175,0.06);
+    }
+    .column h4 { margin:0 0 12px 0; color:#7c3aed; font-size:15px; }
+    .column ul { margin:0; padding:0; list-style:none; font-size:14px; }
+    .column ul li { padding:4px 0; color:#22223b; }
+    .alert-box { background:#fef3c7; border-left:4px solid #f59e0b;
+      padding:14px 18px; margin:0 24px 18px 24px; border-radius:6px;
+    }
+    .alert-box p { margin:0; font-size:14px; color:#92400e; font-weight:600; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#f3f8ff; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(30,64,175,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#10b981; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(16,185,129,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#059669;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+    @media (max-width:650px){
+      .two-column { flex-direction:column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">Progress Update: ${company} Energy Analysis</div>
+    <div class="intro">
+      <p>Hi ${firstName},</p>
+      <p>${data.progress_update || 'Following our initial conversation, I\'ve completed a market analysis for facilities in your area. The findings are compelling, and I wanted to share what we discovered.'}</p>
+    </div>
+    <div class="two-column">
+      <div class="column">
+        <h4>✓ Key Benefits</h4>
         <ul>
-          ${valueProps.map(prop => `<li>${prop}</li>`).join('')}
+          ${valueProps.slice(0, Math.ceil(valueProps.length / 2)).map(prop => `<li>• ${prop}</li>`).join('')}
         </ul>
-        
-        <p>${data.urgency_message || 'With energy markets showing volatility, now is an ideal time to secure favorable rates.'}</p>
-        
-        <p>${data.cta_text || 'Would you be interested in scheduling a brief call to discuss your specific situation?'}</p>
-        
-        <p>Best regards,<br>
-        Power Choosers Team</p>
       </div>
+      <div class="column">
+        <h4>✓ Why Act Now</h4>
+        <ul>
+          ${valueProps.slice(Math.ceil(valueProps.length / 2)).map(prop => `<li>• ${prop}</li>`).join('')}
+        </ul>
+      </div>
+    </div>
+    <div class="alert-box">
+      <p>⚠️ ${data.urgency_message || 'Market Update: Rates are climbing faster than expected'}</p>
+    </div>
+    <div class="cta-container">
+      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Let\'s Continue the Conversation'}</a>
+      <div style="margin-top:8px;font-size:14px;color:#1e3a8a;opacity:0.83;">
+        Prefer a specific time? Just reply with your availability.
+      </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">` : ''}
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${s.name}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${s.location ? `${s.location}<br>` : ''}
+        ${s.phone ? `${s.phone}<br>` : ''}
+        ${s.company}
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
     `;
   }
 
   function buildEnergyHealthHtml(data, recipient, fromEmail) {
-    const mail = fromEmail || 'l.patterson@powerchoosers.com';
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const s = getSenderProfile();
     
     const assessmentItems = data.assessment_items || [
-      'Current rate analysis and market comparison',
-      'Contract terms and renewal timing',
-      'Usage patterns and optimization opportunities',
-      'Potential savings calculations'
+      'Current rate vs. market rates ($0.085/kWh benchmark)',
+      'Contract expiration timeline',
+      'Hidden charges and fees analysis',
+      'Efficiency improvement opportunities'
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Hi ${firstName},</p>
-        
-        <p>I'd like to offer ${company} a complimentary Energy Health Check to ensure you're getting the best value from your current energy setup.</p>
-        
-        <p>During this assessment, we'll review:</p>
-        <ul>
-          ${assessmentItems.map(item => `<li>${item}</li>`).join('')}
-        </ul>
-        
-        <p>${data.contract_info || 'This is especially valuable as your current contract approaches renewal.'}</p>
-        
-        <p>${data.benefits || 'You\'ll receive a detailed report with specific recommendations and potential savings opportunities.'}</p>
-        
-        <p>${data.cta_text || 'Would you be available for a 30-minute call this week to conduct this assessment?'}</p>
-        
-        <p>Best regards,<br>
-        Power Choosers Team</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 2px 24px; font-size:14px; color:#0f766e;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#f0fdfa; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .main-paragraph {margin:0 24px 18px 24px; padding:18px; background:#fff; border-radius:7px; line-height:1.6;}
+    .info-list { background:#f0fdfa; border-radius:8px; border:1px solid #99f6e4;
+      padding:16px 22px; margin:0 24px 18px 24px; box-shadow:0 2px 8px rgba(20,184,166,0.06);
+      font-size:15.5px; color:#22223b;
+    }
+    .info-list h3 { margin:0 0 12px 0; color:#0f766e; font-size:16px; }
+    .info-list ul {margin:0;padding:0;list-style:none;}
+    .info-list ul li {padding:8px 12px; margin:6px 0; background:#fff; border-radius:6px; border-left:3px solid #14b8a6; box-shadow:0 1px 2px rgba(0,0,0,0.05);}
+    .highlight-box { background:linear-gradient(135deg,#d1fae5 0%,#a7f3d0 100%);
+      padding:16px 20px; margin:0 24px 18px 24px; border-radius:8px;
+    }
+    .highlight-box p { margin:0; color:#065f46; font-size:15px; }
+    .highlight-box strong { color:#047857; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#f0fdfa; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(20,184,166,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#14b8a6; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(20,184,166,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#0d9488;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">⚡ Free Energy Health Check • No Obligation</div>
+    <div class="intro">
+      <p>Hi ${firstName},</p>
+      <p>I wanted to share an opportunity for ${company} to get a comprehensive energy assessment at no cost. Our team will analyze your current energy profile and identify potential savings opportunities.</p>
+    </div>
+    <div class="main-paragraph">
+      <p>${data.benefits || 'Our assessment typically uncovers <strong style="color:#14b8a6;">15-30% in cost reduction potential</strong> for facilities. We\'ll review your current rate structure, contract terms, and usage patterns to identify hidden charges and optimization opportunities.'}</p>
+    </div>
+    <div class="info-list">
+      <h3>📋 What We'll Review</h3>
+      <ul>
+        ${assessmentItems.map(item => `<li>✓ ${item}</li>`).join('')}
+      </ul>
+    </div>
+    <div class="highlight-box">
+      <p>${data.contract_info || '<strong>Your Contract:</strong> Perfect timing for assessment'}</p>
+    </div>
+    <div class="cta-container">
+      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Schedule Your Free Assessment'}</a>
+      <div style="margin-top:8px;font-size:14px;color:#0f766e;opacity:0.83;">
+        30-minute consultation • Zero pressure • Maximum insight
       </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">` : ''}
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${s.name}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${s.location ? `${s.location}<br>` : ''}
+        ${s.phone ? `${s.phone}<br>` : ''}
+        ${s.company}
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
     `;
   }
 
   function buildProposalHtml(data, recipient, fromEmail) {
-    const mail = fromEmail || 'l.patterson@powerchoosers.com';
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const s = getSenderProfile();
     
     const timeline = data.timeline || [
-      'Contract review and market analysis',
-      'Rate negotiation with suppliers',
-      'Proposal presentation and review',
-      'Implementation and monitoring setup'
+      'Contract review and approval (24 Hours)',
+      'Supplier onboarding and enrollment (30-45 days)',
+      'Service activation (seamless transition)'
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Hi ${firstName},</p>
-        
-        <p>${data.proposal_summary || 'I\'m pleased to present our proposal for optimizing your energy procurement strategy.'}</p>
-        
-        <p>${data.pricing_highlight || 'Based on current market conditions, we can secure rates that represent significant savings compared to your current arrangement.'}</p>
-        
-        <p>Our implementation timeline:</p>
-        <ol>
-          ${timeline.map(step => `<li>${step}</li>`).join('')}
-        </ol>
-        
-        <p>${data.cta_text || 'I\'d like to schedule a call to walk through the proposal details and answer any questions you may have.'}</p>
-        
-        <p>Best regards,<br>
-        Power Choosers Team</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 2px 24px; font-size:14px; color:#b45309;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#fef3c7; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .exclusive-badge { display:inline-block; background:#d97706; color:#fff;
+      padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700;
+      letter-spacing:0.05em; margin-left:8px; vertical-align:middle;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .main-paragraph {margin:0 24px 18px 24px; padding:18px; background:#fff; border-radius:7px; line-height:1.6;}
+    .summary-box { background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);
+      border:1px solid #fbbf24; padding:18px 20px; margin:0 24px 18px 24px;
+      border-radius:8px; box-shadow:0 2px 8px rgba(245,158,11,0.08);
+    }
+    .summary-box h3 { margin:0 0 10px 0; color:#b45309; font-size:16px; }
+    .summary-box p { margin:0; color:#1f2937; font-size:15px; line-height:1.5; }
+    .pricing-highlight { background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);
+      padding:20px; margin:0 24px 18px 24px; border-radius:8px;
+      text-align:center; box-shadow:0 4px 12px rgba(245,158,11,0.3);
+    }
+    .pricing-highlight h3 { margin:0 0 10px 0; color:#fff; font-size:18px; text-shadow:0 2px 4px rgba(0,0,0,0.2); }
+    .pricing-highlight p { margin:0; color:#fff; font-size:16px; font-weight:600; }
+    .timeline-box { background:#fff; padding:18px 20px; margin:0 24px 18px 24px;
+      border-radius:8px; border:1px solid #fbbf24; box-shadow:0 1px 3px rgba(0,0,0,0.05);
+    }
+    .timeline-box h3 { margin:0 0 15px 0; color:#b45309; font-size:16px; }
+    .timeline-step { padding:12px; margin:8px 0; background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);
+      border-radius:6px; border-left:4px solid #f59e0b;
+    }
+    .timeline-step p { margin:0; color:#1f2937; font-size:14px; }
+    .timeline-step strong { color:#b45309; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#fef3c7; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(245,158,11,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#f59e0b; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(245,158,11,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#d97706;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">
+      📄 Your Custom Proposal
+      <span class="exclusive-badge">EXCLUSIVE</span>
+    </div>
+    <div class="intro">
+      <p>Hi ${firstName},</p>
+      <p>${data.proposal_summary || 'I\'m excited to share the custom energy proposal we\'ve prepared for ' + company + '. Based on your facility\'s profile and energy needs, we\'ve secured competitive rates from top-tier suppliers.'}</p>
+    </div>
+    <div class="summary-box">
+      <h3>Proposal Summary</h3>
+      <p>This proposal includes fixed-rate options that lock in significant savings, protecting you from projected rate increases.</p>
+    </div>
+    <div class="pricing-highlight">
+      <h3>💰 Pricing Highlight</h3>
+      <p>${data.pricing_highlight || 'Competitive rates below current market pricing'}</p>
+    </div>
+    <div class="timeline-box">
+      <h3>📅 Implementation Timeline</h3>
+      ${timeline.map((step, i) => `<div class="timeline-step"><p><strong>Step ${i+1}:</strong> ${step}</p></div>`).join('')}
+    </div>
+    <div class="main-paragraph">
+      <p>Our team has negotiated these rates exclusively for your facility. The pricing is competitive, the transition is seamless, and you maintain complete control throughout the process. This is a <strong>time-sensitive offer</strong> as market conditions continue to shift.</p>
+    </div>
+    <div class="cta-container">
+      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Let\'s Discuss Your Proposal'}</a>
+      <div style="margin-top:8px;font-size:14px;color:#b45309;opacity:0.83;">
+        Questions? I'm here to walk through every detail.
       </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">` : ''}
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${s.name}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${s.location ? `${s.location}<br>` : ''}
+        ${s.phone ? `${s.phone}<br>` : ''}
+        ${s.company}
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
     `;
   }
 
   function buildColdEmailHtml(data, recipient, fromEmail) {
-    const mail = fromEmail || 'l.patterson@powerchoosers.com';
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const s = getSenderProfile();
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Hi ${firstName},</p>
-        
-        <p>${data.opening_hook || `${company} likely faces the same energy cost challenges as other businesses in your industry.`}</p>
-        
-        <p>${data.value_proposition || 'Power Choosers helps companies like yours secure better energy rates through competitive procurement and market expertise.'}</p>
-        
-        ${data.social_proof_optional ? `<p>${data.social_proof_optional}</p>` : ''}
-        
-        <p>${data.cta_text || 'Would you be open to a brief conversation about your current energy situation?'}</p>
-        
-        <p>Best regards,<br>
-        Power Choosers Team</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 2px 24px; font-size:14px; color:#dc2626;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#fee2e2; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .main-paragraph {margin:0 24px 18px 24px; padding:18px; background:#fff; border-radius:7px; line-height:1.6;}
+    .challenges-box { background:linear-gradient(135deg,#fef2f2 0%,#fee2e2 100%);
+      padding:18px 20px; margin:0 24px 18px 24px; border-radius:8px;
+      border:1px solid #fca5a5; box-shadow:0 2px 8px rgba(239,68,68,0.06);
+    }
+    .challenges-box h3 { margin:0 0 12px 0; color:#b91c1c; font-size:16px; }
+    .challenge-item { background:#fff; padding:10px 14px; margin:6px 0; border-radius:6px;
+      box-shadow:0 1px 2px rgba(0,0,0,0.05); font-size:14px; color:#1f2937;
+    }
+    .solution-box { background:linear-gradient(135deg,#f0fdfa 0%,#ccfbf1 100%);
+      border:1px solid #99f6e4; padding:18px 20px; margin:0 24px 18px 24px;
+      border-radius:8px; box-shadow:0 2px 8px rgba(20,184,166,0.06);
+    }
+    .solution-box h3 { margin:0 0 10px 0; color:#0f766e; font-size:16px; }
+    .solution-box p { margin:0; color:#1f2937; font-size:15px; line-height:1.5; }
+    .social-proof { background:linear-gradient(135deg,#dbeafe 0%,#bfdbfe 100%);
+      padding:14px 18px; margin:0 24px 18px 24px; border-radius:8px;
+    }
+    .social-proof p { margin:0; color:#1e40af; font-size:14px; font-style:italic; line-height:1.5; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#fee2e2; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(239,68,68,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#ef4444; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(239,68,68,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#dc2626;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">⚠️ Energy Costs Rising Fast</div>
+    <div class="intro">
+      <p>Hi ${firstName},</p>
+      <p>${data.opening_hook || `I tried reaching you earlier but couldn't connect. I wanted to share some important information about energy cost trends that could significantly impact ${company}.`}</p>
+    </div>
+    <div class="solution-box">
+      <h3>✓ How Power Choosers Helps</h3>
+      <p>${data.value_proposition || 'We help businesses like yours reduce energy costs through competitive procurement and efficiency solutions. Our team handles the entire process—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>'}</p>
+    </div>
+    ${data.social_proof_optional ? `<div class="social-proof"><p>${data.social_proof_optional}</p></div>` : ''}
+    <div class="cta-container">
+      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Explore Your Savings Potential'}</a>
+      <div style="margin-top:8px;font-size:14px;color:#dc2626;opacity:0.83;">
+        Quick 15-minute call to discuss your options—no obligation.
       </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">` : ''}
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${s.name}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${s.location ? `${s.location}<br>` : ''}
+        ${s.phone ? `${s.phone}<br>` : ''}
+        ${s.company}
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
     `;
   }
 
   function buildInvoiceHtml(data, recipient, fromEmail) {
-    const mail = fromEmail || 'l.patterson@powerchoosers.com';
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const s = getSenderProfile();
     
     const checklistItems = data.checklist_items || [
       'Invoice date and service address',
       'Billing period (start and end dates)',
-      'Detailed charge breakdown',
-      'Payment details and terms'
+      'Detailed charge breakdown (kWh rate, demand charges, fees)',
+      'Payment details and service address'
     ];
     
     const discrepancies = data.discrepancies || [
-      'High delivery charges',
-      'Incorrect rate classifications',
-      'Hidden fees or surcharges',
-      'Poor contract terms'
+      'Above-market kWh rates',
+      'Hidden demand charges',
+      'Incorrect contract terms',
+      'Billing errors and overcharges'
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Hi ${firstName},</p>
-        
-        <p>${data.intro_paragraph || `As we discussed, I'll conduct a comprehensive energy analysis for ${company} to identify potential cost savings and optimization opportunities.`}</p>
-        
-        <p>To get started, I'll need to review your most recent energy invoice. Here's what I'll be looking for:</p>
-        <ul>
-          ${checklistItems.map(item => `<li>${item}</li>`).join('')}
-        </ul>
-        
-        <p>Common issues I typically find include:</p>
-        <ul>
-          ${discrepancies.map(item => `<li>${item}</li>`).join('')}
-        </ul>
-        
-        <p>${data.deadline || 'Please send the invoice by end of day so I can begin the analysis.'}</p>
-        
-        <p>${data.cta_text || 'Will you be able to send over the invoice by end of day so me and my team can get started?'}</p>
-        
-        <p>Best regards,<br>
-        Power Choosers Team</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 2px 24px; font-size:14px; color:#2563eb;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#f0f9ff; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .key-points-box { background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%);
+      border:1px solid #fbbf24; padding:20px 22px; margin:0 24px 18px 24px;
+      border-radius:8px; box-shadow:0 1px 3px rgba(245,158,11,0.08);
+    }
+    .key-points-box h3 { margin:0 0 12px 0; color:#d97706; font-size:16px; font-weight:600;
+      letter-spacing:0.02em;
+    }
+    .key-points-box p { margin:0; color:#1f2937; font-size:15.5px; line-height:1.6; font-weight:500; }
+    .two-column-box { background:linear-gradient(135deg,#f0f9ff 0%,#e0f2fe 100%);
+      padding:20px; margin:0 24px 18px 24px; border-radius:8px;
+      border:1px solid #bae6fd; box-shadow:0 2px 8px rgba(37,99,235,0.06);
+    }
+    .two-columns { display:flex; gap:20px; }
+    .column { flex:1; }
+    .column h3 { margin:0 0 12px 0; font-size:15px; }
+    .column h3.review { color:#0369a1; }
+    .column h3.discrepancies { color:#dc2626; }
+    .column ul { margin:0; padding:0; list-style:none; }
+    .column ul li { padding:4px 0; color:#1f2937; font-size:13px; line-height:1.5; }
+    .urgency-banner { background:linear-gradient(135deg,#fee2e2 0%,#fecaca 100%);
+      padding:16px 20px; margin:0 24px 18px 24px; border-radius:8px;
+      border:1px solid #fca5a5; text-align:center;
+    }
+    .urgency-banner p { margin:0; color:#dc2626; font-size:16px; font-weight:600; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#f0f9ff; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(37,99,235,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#2563eb; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(37,99,235,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#1d4ed8;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+    @media (max-width:650px){
+      .two-columns { flex-direction:column; gap:16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">📎 Invoice Request for Energy Analysis</div>
+    <div class="intro">
+      <p>Hi ${firstName},</p>
+      <p>${data.intro_paragraph || `As we discussed, we're conducting an energy analysis for ${company} to identify any discrepancies and determine how your facility is using energy. This will help us figure out the best plan moving forward.`}</p>
+    </div>
+    <div class="two-column-box">
+      <div class="two-columns">
+        <div class="column">
+          <h3 class="review">✓ What We'll Review</h3>
+          <ul>
+            ${checklistItems.map(item => `<li>• ${item}</li>`).join('')}
+          </ul>
+        </div>
+        <div class="column">
+          <h3 class="discrepancies">⚠️ Common Discrepancies</h3>
+          <ul>
+            ${discrepancies.map(item => `<li>• ${item}</li>`).join('')}
+          </ul>
+        </div>
       </div>
+    </div>
+    <div class="urgency-banner">
+      <p>⏰ ${data.deadline || 'Needed in 3 business days'}</p>
+    </div>
+    <div class="cta-container">
+      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Reply with Invoice Attached'}</a>
+      <div style="margin-top:8px;font-size:14px;color:#2563eb;opacity:0.83;">
+        Or reply with your invoice attached—we'll get started right away.
+      </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">` : ''}
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${s.name}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${s.location ? `${s.location}<br>` : ''}
+        ${s.phone ? `${s.phone}<br>` : ''}
+        ${s.company}
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
     `;
   }
 
   function buildGeneralHtml(data, recipient, fromEmail) {
-    const mail = fromEmail || 'l.patterson@powerchoosers.com';
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const s = getSenderProfile();
     
     const sections = data.sections || [
-      'We help businesses optimize their energy procurement',
-      'Our expertise can identify significant cost savings',
-      'We provide ongoing monitoring and support'
+      'We\'ve secured exclusive rates for facilities that are 15-25% below typical renewal offers',
+      'Our team handles all supplier negotiations and contract reviews at no cost to you',
+      'You maintain complete control and transparency throughout the entire process',
+      'Early action now protects you from anticipated rate increases'
     ];
     
     return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-        <p>Hi ${firstName},</p>
-        
-        <p>${data.list_header || 'How We Can Help:'}</p>
-        <ul>
-          ${sections.map(section => `<li>${section}</li>`).join('')}
-        </ul>
-        
-        <p>${data.cta_text || 'I\'d love to discuss how we can help optimize your energy costs.'}</p>
-        
-        <p>Best regards,<br>
-        Power Choosers Team</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 10px 24px; font-size:14px; color:#234bb7;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#eff6ff; padding:8px 15px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 18px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 12px 0; font-size:16px; color:#1e3a8a; line-height:1.6; }
+    .intro p:last-child { margin-bottom:0; }
+    .info-list { background:#f6f7fb; border-radius:8px;
+      padding:12px 18px; margin:0 auto 18px auto; max-width:450px; box-shadow:0 2px 8px rgba(30,64,175,0.06);
+      font-size:14px; color:#22223b;
+    }
+    .info-list ul {margin:0;padding:0;list-style:none;}
+    .info-list ul li {padding:4px 0; border-bottom:1px solid #e5e8ec; line-height:1.5;}
+    .info-list ul li:last-child { border-bottom:none; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#eff6ff; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(249,115,22,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#f97316; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(249,115,22,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#ea580c;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+    @media (max-width:650px){
+      .info-list {margin:0 3vw 18px 3vw; max-width:100%;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">Energy Solutions for ${company}</div>
+    <div class="intro">
+      <p>Hi ${firstName},</p>
+      <p>I wanted to reach out about an interesting opportunity for ${company}.</p>
+    </div>
+    <div class="info-list">
+      <strong>${data.list_header || 'How We Can Help:'}</strong>
+      <ul>
+        ${sections.map(section => `<li>${section}</li>`).join('')}
+      </ul>
+    </div>
+    <div class="cta-container">
+      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Schedule A Meeting'}</a>
+      <div style="margin-top:8px;font-size:14px;color:#1e3a8a;opacity:0.83;">
+        Prefer email or need more info? Just reply—happy to assist.
       </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover;">` : ''}
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${s.name}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
+        ${s.location ? `${s.location}<br>` : ''}
+        ${s.phone ? `${s.phone}<br>` : ''}
+        ${s.company}
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
     `;
   }
 
@@ -1972,20 +3220,27 @@
     const senderPhone = g.phone || '';
     const senderTitle = g.jobTitle || 'Energy Strategist';
     const senderLocation = g.location || '';
+    const senderCompany = g.companyName || 'Power Choosers';
+    const senderAvatar = g.hostedPhotoURL || g.photoURL || '';
     
     return `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto;">
         ${sonarGeneratedHtml}
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-          <p style="margin: 0; font-size: 14px;">
-            <strong>${senderName}</strong><br>
-            ${senderTitle}<br>
-            Power Choosers<br>
-            ${senderLocation ? `${senderLocation}<br>` : ''}
-            ${senderPhone ? `Phone: ${senderPhone}<br>` : ''}
-            Email: ${senderEmail}
-          </p>
+          <div style="display:flex; gap:12px; align-items:center;">
+            ${senderAvatar ? `<img src="${senderAvatar}" alt="${senderName}" style="width:48px; height:48px; border-radius:50%; object-fit:cover;">` : ''}
+            <div>
+              <p style="margin: 0; font-size: 14px;">
+                <strong>${senderName}</strong><br>
+                ${senderTitle}<br>
+                ${senderCompany}<br>
+                ${senderLocation ? `${senderLocation}<br>` : ''}
+                ${senderPhone ? `Phone: ${senderPhone}<br>` : ''}
+                Email: ${senderEmail}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -2026,7 +3281,8 @@
         email: g.email || '',
         phone: g.phone || '',
         title: g.jobTitle || 'Energy Strategist',
-        company: g.companyName || 'Power Choosers'
+        company: g.companyName || 'Power Choosers',
+        location: g.location || ''
       };
 
       const get = (obj, key) => {
@@ -2048,11 +3304,27 @@
         return map.hasOwnProperty(k) ? (map[k] || '') : (obj[k] || '');
       };
 
-      // Replace raw tokens first
+      const senderCompanyName = g.companyName || 'Power Choosers';
+
+      // Replace raw scoped tokens first ({{contact.*}}, {{account.*}}, {{sender.*}})
       let out = String(html || '')
         .replace(/\{\{\s*contact\.([a-zA-Z0-9_]+)\s*\}\}/g, (m, k) => escapeHtml(get(contact, k)))
         .replace(/\{\{\s*account\.([a-zA-Z0-9_]+)\s*\}\}/g, (m, k) => escapeHtml(get(account, k)))
         .replace(/\{\{\s*sender\.([a-zA-Z0-9_]+)\s*\}\}/g, (m, k) => escapeHtml(get(sender, k)));
+
+      // Also replace common uppercase tokens used in example templates
+      const contactName = (contact.fullName || contact.name || `${contact.firstName || ''} ${contact.lastName || ''}`.trim()) || '';
+      const contactCompany = account.name || contact.company || '';
+      out = out
+        .replace(/\{\{\s*SENDER_AVATAR\s*\}\}/g, escapeHtml(g.hostedPhotoURL || g.photoURL || ''))
+        .replace(/\{\{\s*SENDER_NAME\s*\}\}/g, escapeHtml(senderName))
+        .replace(/\{\{\s*SENDER_TITLE\s*\}\}/g, escapeHtml(sender.title))
+        .replace(/\{\{\s*SENDER_LOCATION\s*\}\}/g, escapeHtml(sender.location || g.location || ''))
+        .replace(/\{\{\s*SENDER_PHONE\s*\}\}/g, escapeHtml(sender.phone || ''))
+        .replace(/\{\{\s*SENDER_EMAIL\s*\}\}/g, escapeHtml(sender.email || ''))
+        .replace(/\{\{\s*COMPANY_NAME\s*\}\}/g, escapeHtml(senderCompanyName))
+        .replace(/\{\{\s*CONTACT_NAME\s*\}\}/g, escapeHtml(contactName))
+        .replace(/\{\{\s*CONTACT_COMPANY\s*\}\}/g, escapeHtml(contactCompany));
 
       // Replace .var-chip elements if present
       const tmp = document.createElement('div');
@@ -2085,16 +3357,22 @@
       const subject = result.subject || 'Energy Solutions';
       
       // Build template HTML using the appropriate builder
-      const templateHtml = buildTemplateHtml(templateType, result, recipient);
+      let templateHtml = buildTemplateHtml(templateType, result, recipient);
+
+      // Replace any template tokens (e.g., {{SENDER_AVATAR}}, {{CONTACT_NAME}})
+      try {
+        templateHtml = replaceVariablesInHtml(templateHtml, recipient);
+      } catch (e) {
+        console.warn('[AI] Token replacement failed (non-fatal):', e);
+      }
       
-      // Wrap with branding (header + footer)
-      const fullHtml = wrapSonarHtmlWithBranding(templateHtml, recipient, subject);
-      
-      console.log('[AI] Template email built successfully');
+      // IMPORTANT: Templates already include a hard-coded signature block.
+      // Do NOT wrap with branding/signature to avoid duplication.
+      console.log('[AI] Template email built successfully (no extra signature wrap)');
       
       return {
         subject: improveSubject(subject, recipient),
-        html: fullHtml
+        html: templateHtml
       };
     } catch (error) {
       console.error('[AI] Error formatting templated email:', error);
@@ -2113,13 +3391,32 @@
     try {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
-      // Look for signature div by data attribute or style pattern
-      const sigDiv = doc.querySelector('[data-signature="true"]') || 
-                    Array.from(doc.querySelectorAll('div')).find(div => 
-                      div.style.marginTop === '20px' && 
-                      div.style.paddingTop === '20px' && 
-                      (div.style.borderTop && div.style.borderTop.includes('1px solid'))
-                    );
+      
+      // Look for signature div by multiple methods:
+      // 1. Data attribute
+      let sigDiv = doc.querySelector('[data-signature="true"]');
+      
+      // 2. Look for div with signature-like styling (check both inline and computed)
+      if (!sigDiv) {
+        sigDiv = Array.from(doc.querySelectorAll('div')).find(div => {
+          const style = div.getAttribute('style') || '';
+          // Check if style contains signature-like patterns
+          return (style.includes('margin-top') && style.includes('padding-top') && style.includes('border-top')) ||
+                 (style.includes('border-top: 1px solid'));
+        });
+      }
+      
+      // 3. Look for last div that contains typical signature content
+      if (!sigDiv) {
+        const allDivs = Array.from(doc.querySelectorAll('div'));
+        sigDiv = allDivs.reverse().find(div => {
+          const text = div.textContent.toLowerCase();
+          return text.includes('energy strategist') || 
+                 text.includes('power choosers') ||
+                 (text.includes('phone:') && text.includes('email:'));
+        });
+      }
+      
       return sigDiv ? sigDiv.outerHTML : null;
     } catch (e) {
       console.warn('[Email] extractSignature failed:', e);
@@ -2226,7 +3523,24 @@
 
         // Add closing as its OWN paragraph so it renders separately
         if (jsonData.closing) {
-          body += '\n\n' + jsonData.closing;
+          // Ensure closing has proper line breaks (e.g., "Best regards,\nLewis")
+          // If AI returns "Best regards, Lewis" on one line, split it
+          let closing = jsonData.closing;
+          
+          // Handle different closing formats and ensure proper line break
+          if (closing.includes('Best regards,') && !closing.includes('\n')) {
+            // Replace "Best regards, Name" with "Best regards,\nName"
+            closing = closing.replace(/Best regards,\s*/i, 'Best regards,\n');
+          } else if (closing.includes('Sincerely,') && !closing.includes('\n')) {
+            closing = closing.replace(/Sincerely,\s*/i, 'Sincerely,\n');
+          } else if (closing.includes('Regards,') && !closing.includes('\n')) {
+            closing = closing.replace(/Regards,\s*/i, 'Regards,\n');
+          } else if (closing.includes('Best regards,') && closing.includes('\\n')) {
+            // Handle escaped newline \\n from API (convert to actual newline)
+            closing = closing.replace(/\\n/g, '\n');
+          }
+          
+          body += '\n\n' + closing;
         }
         console.log('[AI] Built body from JSON:', body);
 
@@ -2461,13 +3775,11 @@
     const to = toInput?.value?.trim() || '';
     const subject = subjectInput?.value?.trim() || '';
     
-    // Detect HTML mode and extract content appropriately
-    const isHtmlMode = bodyInput?.getAttribute('data-mode') === 'html';
-    const body = isHtmlMode ? 
-      (bodyInput?.textContent || '') :  // HTML mode: get raw HTML code
-      (bodyInput?.innerHTML || '');     // Text mode: get rendered HTML
+    // Detect if this is an HTML email template (full HTML with styling)
+    const isHtmlEmail = bodyInput?.getAttribute('data-html-email') === 'true';
+    const body = bodyInput?.innerHTML || '';
     
-    console.log('[EmailCompose] Email mode:', isHtmlMode ? 'HTML' : 'Text');
+    console.log('[EmailCompose] Email mode:', isHtmlEmail ? 'HTML Template' : 'Standard');
     console.log('[EmailCompose] Content preview:', body.substring(0, 100) + '...');
     
     if (!to) {
@@ -2500,55 +3812,64 @@
         sendButton.textContent = 'Sending...';
       }
 
-      // Optionally remove signature image if disabled
-      let preparedBody = body;
-      if (deliver.signatureImageEnabled === false) {
-        preparedBody = preparedBody.replace(/<img[^>]*alt=\"Signature\"[\s\S]*?>/gi, '');
-      }
-
-      // Check if signature is already in the body (prevent duplication)
-      const signature = window.getEmailSignature ? window.getEmailSignature() : '';
-      const hasSignature = preparedBody.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;');
-
-      // Debug signature retrieval
-      console.log('[Signature Debug] Signature retrieved:', signature ? 'YES' : 'NO', 'Length:', signature.length);
-      console.log('[Signature Debug] isHtmlMode:', isHtmlMode);
-      console.log('[Signature Debug] hasSignature:', hasSignature);
-      console.log('[Signature Debug] preparedBody length:', preparedBody.length);
-
-      // Only add signature for standard mode (non-HTML AI emails)
-      // HTML templates have their own hardcoded signatures via wrapSonarHtmlWithBranding
-      let contentWithSignature = preparedBody;
-      if (!isHtmlMode && !hasSignature) {
-        let sig = signature;
-        
-        // If no signature from settings, build basic one
-        if (!sig) {
-          const settings = window.SettingsPage?.getSettings?.() || {};
-          const general = settings.general || {};
-          const name = (general.firstName && general.lastName) 
-            ? `${general.firstName} ${general.lastName}`.trim()
-            : (general.agentName || 'Power Choosers Team');
-          
-          sig = `<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
-            <p style="margin: 0; color: #666;">${name}</p>
-            <p style="margin: 5px 0 0 0; color: #999; font-size: 14px;">Energy Strategist</p>
-          </div>`;
-          
-          console.log('[Signature Debug] Using fallback signature');
-        }
-        
-        if (sig) {
-          console.log('[Signature Debug] Adding signature to email');
-          contentWithSignature = preparedBody + sig;
-        }
+      // HTML emails: Use content as-is (has hardcoded signature from wrapSonarHtmlWithBranding)
+      // Standard emails: Apply signature settings
+      let contentWithSignature = body;
+      
+      if (isHtmlEmail) {
+        // HTML email templates: Don't apply any signature settings
+        // They have their own hardcoded signatures via wrapSonarHtmlWithBranding
+        console.log('[Signature Debug] HTML email - skipping all signature settings');
+        contentWithSignature = body;
       } else {
-        console.log('[Signature Debug] NOT adding signature. Reasons:', {
-          isHtmlMode,
-          hasSignature,
-          hasSignatureFunction: !!window.getEmailSignature,
-          signatureEmpty: !signature
-        });
+        // Standard email: Apply signature settings
+        console.log('[Signature Debug] Standard email - applying signature settings');
+        
+        let preparedBody = body;
+        
+        // Optionally remove signature image if disabled (standard emails only)
+        if (deliver.signatureImageEnabled === false) {
+          preparedBody = preparedBody.replace(/<img[^>]*alt=\"Signature\"[\s\S]*?>/gi, '');
+          console.log('[Signature Debug] Removed signature image (disabled in settings)');
+        }
+
+        // Check if signature is already in the body (prevent duplication)
+        const signature = window.getEmailSignature ? window.getEmailSignature() : '';
+        const hasSignature = preparedBody.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;');
+
+        console.log('[Signature Debug] Signature retrieved:', signature ? 'YES' : 'NO', 'Length:', signature.length);
+        console.log('[Signature Debug] hasSignature:', hasSignature);
+
+        // Add signature if not already present
+        if (!hasSignature) {
+          let sig = signature;
+          
+          // If no signature from settings, build basic one
+          if (!sig) {
+            const settings = window.SettingsPage?.getSettings?.() || {};
+            const general = settings.general || {};
+            const name = (general.firstName && general.lastName) 
+              ? `${general.firstName} ${general.lastName}`.trim()
+              : (general.agentName || 'Power Choosers Team');
+            
+            sig = `<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+              <p style="margin: 0; color: #666;">${name}</p>
+              <p style="margin: 5px 0 0 0; color: #999; font-size: 14px;">Energy Strategist</p>
+            </div>`;
+            
+            console.log('[Signature Debug] Using fallback signature');
+          }
+          
+          if (sig) {
+            console.log('[Signature Debug] Adding signature to email');
+            contentWithSignature = preparedBody + sig;
+          } else {
+            contentWithSignature = preparedBody;
+          }
+        } else {
+          console.log('[Signature Debug] Signature already present, not adding');
+          contentWithSignature = preparedBody;
+        }
       }
 
       const emailData = {
