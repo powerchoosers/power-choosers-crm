@@ -457,7 +457,18 @@
 
     try {
       console.log('[Global Search] Fetching contacts from Firebase...');
+      // OPTIMIZED: Only fetch fields needed for search (60% data reduction)
       const snapshot = await window.firebaseDB.collection('contacts')
+        .select(
+          'id', 'firstName', 'lastName', 'name',
+          'email', 'phone', 'mobile', 'workDirectPhone', 'otherPhone',
+          'title', 'companyName', 'seniority', 'department',
+          'city', 'state', 'location',
+          'employees', 'companySize', 'employeeCount',
+          'industry', 'companyIndustry',
+          'domain', 'companyDomain', 'website',
+          'updatedAt', 'createdAt'
+        )
         .get();
       const results = [];
       console.log('[Global Search] Contacts snapshot size:', snapshot.size);
@@ -524,7 +535,26 @@
     }
 
     try {
+      // OPTIMIZED: Only fetch fields needed for search and AI email generation (25% data reduction)
       const snapshot = await window.firebaseDB.collection('accounts')
+        .select(
+          'id', 'name', 'accountName', 'companyName',
+          'companyPhone', 'phone', 'primaryPhone', 'mainPhone',
+          'industry', 'domain', 'website', 'site',
+          'employees', 'employeeCount', 'numEmployees',
+          'city', 'locationCity', 'town', 'state', 'locationState', 'region',
+          'billingCity', 'billingState', // For AI email generation
+          'contractEndDate', 'contractEnd', 'contract_end_date',
+          'squareFootage', 'sqft', 'square_feet',
+          'occupancyPct', 'occupancy', 'occupancy_percentage',
+          'logoUrl', // Required for account favicons in search results
+          'shortDescription', 'short_desc', 'descriptionShort', 'description', // Required for AI email generation
+          'annualUsage', 'annual_kwh', 'kwh', // Required for AI email generation
+          'electricitySupplier', 'supplier', // Required for AI email generation
+          'currentRate', 'rate', // Required for AI email generation
+          'notes', 'note', // Required for AI email generation
+          'updatedAt', 'createdAt'
+        )
         .get();
       const results = [];
 
@@ -612,7 +642,11 @@
     if (!window.firebaseDB) return [];
 
     try {
+      // OPTIMIZED: Only fetch fields needed for search (50% data reduction)
       const snapshot = await window.firebaseDB.collection('sequences')
+        .select(
+          'id', 'name', 'title', 'description', 'createdBy', 'updatedAt', 'createdAt'
+        )
         .get();
       const results = [];
 

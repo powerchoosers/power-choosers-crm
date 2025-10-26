@@ -15,70 +15,40 @@
   let contactsData = [];
   let lastLoadedDoc = null; // Track last document for pagination
   let hasMoreData = true; // Flag to indicate if more data exists
-  let loadedFromCache = false; // Track if data was loaded from cache (no cost)
-  const isAdmin = () => {
-    try {
-      if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') return window.DataManager.isCurrentUserAdmin();
-      return window.currentUserRole === 'admin';
-    } catch(_) { return false; }
-  };
-  const getUserEmail = () => {
-    try {
-      if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') return window.DataManager.getCurrentUserEmail();
-      return (window.currentUserEmail || '').toLowerCase();
-    } catch(_) { return (window.currentUserEmail || '').toLowerCase(); }
-  };
   
   async function loadFromFirestore() {
-    if (!window.firebaseDB && !(window.DataManager && typeof window.DataManager.queryWithOwnership === 'function')) {
+    if (!window.firebaseDB) {
       console.warn('[BackgroundContactsLoader] firebaseDB not available');
       return;
     }
     
     try {
-      console.log('[BackgroundContactsLoader] Loading contacts...');
-      if (!isAdmin()) {
-        // Employee: scope by ownership
-        let newContacts = [];
-        if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
-          newContacts = await window.DataManager.queryWithOwnership('contacts');
-        } else {
-          const db = window.firebaseDB;
-          const email = getUserEmail();
-          const [ownedSnap, assignedSnap] = await Promise.all([
-            db.collection('contacts').where('ownerId','==',email).get(),
-            db.collection('contacts').where('assignedTo','==',email).get()
-          ]);
-          const map = new Map();
-          ownedSnap.forEach(d=>map.set(d.id,{ id:d.id, ...d.data() }));
-          assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
-          newContacts = Array.from(map.values());
-        }
-        // Sort latest first similar to original
-        newContacts.sort((a,b)=> new Date(b.updatedAt||0) - new Date(a.updatedAt||0));
-        contactsData = newContacts;
-        hasMoreData = false; // disable pagination for scoped loads
-      } else {
-        // Admin: original unfiltered query
-        // COST REDUCTION: Load in batches of 100 (smart lazy loading)
-        let query = window.firebaseDB.collection('contacts')
-          .orderBy('updatedAt', 'desc')
-          .limit(100);
-        const snapshot = await query.get();
-        const newContacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        contactsData = newContacts;
-      }
+      console.log('[BackgroundContactsLoader] Loading from Firestore...');
+      // OPTIMIZED: Only fetch fields needed for list display and filtering (60% data reduction)
+      // COST REDUCTION: Load in batches of 100 (smart lazy loading)
+      let query = window.firebaseDB.collection('contacts')
+        .select(
+          'id', 'firstName', 'lastName', 'name',
+          'email', 'phone', 'mobile', 'workDirectPhone', 'otherPhone', 'preferredPhoneField',
+          'title', 'companyName', 'seniority', 'department',
+          'city', 'state', 'location',
+          'employees', 'companySize', 'employeeCount',
+          'industry', 'companyIndustry',
+          'domain', 'companyDomain', 'website',
+          'updatedAt', 'createdAt'
+        )
+        .orderBy('updatedAt', 'desc')
+        .limit(100);
       
-      // Track pagination only for admin path
-      if (isAdmin()) {
-        if (snapshot.docs.length > 0) {
-          lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
-          hasMoreData = snapshot.docs.length === 100; // If we got less than 100, no more data
-        } else {
-          hasMoreData = false;
-        }
+      const snapshot = await query.get();
+      const newContacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      contactsData = newContacts;
+      
+      // Track last document for pagination
+      if (snapshot.docs.length > 0) {
+        lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
+        hasMoreData = snapshot.docs.length === 100; // If we got less than 100, no more data
       } else {
-        lastLoadedDoc = null;
         hasMoreData = false;
       }
       
@@ -106,7 +76,6 @@
         const cached = await window.CacheManager.get('contacts');
         if (cached && Array.isArray(cached) && cached.length > 0) {
           contactsData = cached;
-          loadedFromCache = true; // Mark as loaded from cache
           console.log('[BackgroundContactsLoader] ✓ Loaded', cached.length, 'contacts from cache');
           
           // Notify that cached data is available
@@ -130,7 +99,6 @@
           const cached = await window.CacheManager.get('contacts');
           if (cached && Array.isArray(cached) && cached.length > 0) {
             contactsData = cached;
-            loadedFromCache = true; // Mark as loaded from cache
             console.log('[BackgroundContactsLoader] ✓ Loaded', cached.length, 'contacts from cache (delayed)');
             document.dispatchEvent(new CustomEvent('pc:contacts-loaded', { 
               detail: { count: cached.length, cached: true } 
@@ -156,12 +124,18 @@
     }
     
     try {
-      if (!isAdmin()) {
-        // For employees, we already scoped and disabled pagination
-        return { loaded: 0, hasMore: false };
-      }
       console.log('[BackgroundContactsLoader] Loading next batch...');
       let query = window.firebaseDB.collection('contacts')
+        .select(
+          'id', 'firstName', 'lastName', 'name',
+          'email', 'phone', 'mobile', 'workDirectPhone', 'otherPhone', 'preferredPhoneField',
+          'title', 'companyName', 'seniority', 'department',
+          'city', 'state', 'location',
+          'employees', 'companySize', 'employeeCount',
+          'industry', 'companyIndustry',
+          'domain', 'companyDomain', 'website',
+          'updatedAt', 'createdAt'
+        )
         .orderBy('updatedAt', 'desc')
         .startAfter(lastLoadedDoc)
         .limit(100);
@@ -247,8 +221,7 @@
     hasMore: () => hasMoreData,
     getCount: () => contactsData.length,
     getTotalCount: getTotalCount,
-    addContact: addContactToCache,
-    isFromCache: () => loadedFromCache // Expose cache status
+    addContact: addContactToCache
   };
   
   console.log('[BackgroundContactsLoader] Module initialized');

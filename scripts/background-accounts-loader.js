@@ -15,69 +15,50 @@
   let accountsData = [];
   let lastLoadedDoc = null; // Track last document for pagination
   let hasMoreData = true; // Flag to indicate if more data exists
-  let loadedFromCache = false; // Track if data was loaded from cache (no cost)
-  const isAdmin = () => {
-    try {
-      if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') return window.DataManager.isCurrentUserAdmin();
-      return window.currentUserRole === 'admin';
-    } catch(_) { return false; }
-  };
-  const getUserEmail = () => {
-    try {
-      if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') return window.DataManager.getCurrentUserEmail();
-      return (window.currentUserEmail || '').toLowerCase();
-    } catch(_) { return (window.currentUserEmail || '').toLowerCase(); }
-  };
   
   async function loadFromFirestore() {
-    if (!window.firebaseDB && !(window.DataManager && typeof window.DataManager.queryWithOwnership === 'function')) {
+    if (!window.firebaseDB) {
       console.warn('[BackgroundAccountsLoader] firebaseDB not available');
       return;
     }
     
     try {
-      console.log('[BackgroundAccountsLoader] Loading accounts...');
-      if (!isAdmin()) {
-        // Employee: scope by ownership
-        let newAccounts = [];
-        if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
-          newAccounts = await window.DataManager.queryWithOwnership('accounts');
-        } else {
-          const db = window.firebaseDB;
-          const email = getUserEmail();
-          const [ownedSnap, assignedSnap] = await Promise.all([
-            db.collection('accounts').where('ownerId','==',email).get(),
-            db.collection('accounts').where('assignedTo','==',email).get()
-          ]);
-          const map = new Map();
-          ownedSnap.forEach(d=>map.set(d.id,{ id:d.id, ...d.data() }));
-          assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
-          newAccounts = Array.from(map.values());
-        }
-        // Sort latest first
-        newAccounts.sort((a,b)=> new Date(b.updatedAt||0) - new Date(a.updatedAt||0));
-        accountsData = newAccounts;
-        lastLoadedDoc = null;
-        hasMoreData = false;
-      } else {
-        console.log('[BackgroundAccountsLoader] Loading from Firestore...');
-        // Admin path: original unfiltered query
-        let query = window.firebaseDB.collection('accounts')
-          .orderBy('updatedAt', 'desc')
-          .limit(100);
-        const snapshot = await query.get();
-        const newAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        accountsData = newAccounts;
-        // Track admin pagination
-        if (snapshot.docs.length > 0) {
-          lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
-          hasMoreData = snapshot.docs.length === 100; // If we got less than 100, no more data
-        } else {
-          hasMoreData = false;
-        }
-      }
+      console.log('[BackgroundAccountsLoader] Loading from Firestore...');
+      // OPTIMIZED: Only fetch fields needed for list display, filtering, and AI email generation (25% data reduction)
+      // COST REDUCTION: Load in batches of 100 (smart lazy loading)
+      let query = window.firebaseDB.collection('accounts')
+        .select(
+          'id', 'name', 'accountName', 'companyName',
+          'companyPhone', 'phone', 'primaryPhone', 'mainPhone',
+          'industry', 'domain', 'website', 'site',
+          'employees', 'employeeCount', 'numEmployees',
+          'city', 'locationCity', 'town', 'state', 'locationState', 'region',
+          'billingCity', 'billingState', // For AI email generation
+          'contractEndDate', 'contractEnd', 'contract_end_date',
+          'squareFootage', 'sqft', 'square_feet',
+          'occupancyPct', 'occupancy', 'occupancy_percentage',
+          'logoUrl', // Required for account favicons in list view
+          'shortDescription', 'short_desc', 'descriptionShort', 'description', // Required for AI email generation
+          'annualUsage', 'annual_kwh', 'kwh', // Required for AI email generation
+          'electricitySupplier', 'supplier', // Required for AI email generation
+          'currentRate', 'rate', // Required for AI email generation
+          'notes', 'note', // Required for AI email generation
+          'updatedAt', 'createdAt'
+        )
+        .orderBy('updatedAt', 'desc')
+        .limit(100);
       
-      // Pagination handled per role above
+      const snapshot = await query.get();
+      const newAccounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      accountsData = newAccounts;
+      
+      // Track last document for pagination
+      if (snapshot.docs.length > 0) {
+        lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
+        hasMoreData = snapshot.docs.length === 100; // If we got less than 100, no more data
+      } else {
+        hasMoreData = false;
+      }
       
       console.log('[BackgroundAccountsLoader] ✓ Loaded', accountsData.length, 'accounts from Firestore', hasMoreData ? '(more available)' : '(all loaded)');
       
@@ -103,7 +84,6 @@
         const cached = await window.CacheManager.get('accounts');
         if (cached && Array.isArray(cached) && cached.length > 0) {
           accountsData = cached;
-          loadedFromCache = true; // Mark as loaded from cache
           console.log('[BackgroundAccountsLoader] ✓ Loaded', cached.length, 'accounts from cache');
           
           // Notify that cached data is available
@@ -127,7 +107,6 @@
           const cached = await window.CacheManager.get('accounts');
           if (cached && Array.isArray(cached) && cached.length > 0) {
             accountsData = cached;
-            loadedFromCache = true; // Mark as loaded from cache
             console.log('[BackgroundAccountsLoader] ✓ Loaded', cached.length, 'accounts from cache (delayed)');
             document.dispatchEvent(new CustomEvent('pc:accounts-loaded', { 
               detail: { count: cached.length, cached: true } 
@@ -153,12 +132,26 @@
     }
     
     try {
-      if (!isAdmin()) {
-        // For employees, we already scoped and disabled pagination
-        return { loaded: 0, hasMore: false };
-      }
       console.log('[BackgroundAccountsLoader] Loading next batch...');
       let query = window.firebaseDB.collection('accounts')
+        .select(
+          'id', 'name', 'accountName', 'companyName',
+          'companyPhone', 'phone', 'primaryPhone', 'mainPhone',
+          'industry', 'domain', 'website', 'site',
+          'employees', 'employeeCount', 'numEmployees',
+          'city', 'locationCity', 'town', 'state', 'locationState', 'region',
+          'billingCity', 'billingState',
+          'contractEndDate', 'contractEnd', 'contract_end_date',
+          'squareFootage', 'sqft', 'square_feet',
+          'occupancyPct', 'occupancy', 'occupancy_percentage',
+          'logoUrl',
+          'shortDescription', 'short_desc', 'descriptionShort', 'description',
+          'annualUsage', 'annual_kwh', 'kwh',
+          'electricitySupplier', 'supplier',
+          'currentRate', 'rate',
+          'notes', 'note',
+          'updatedAt', 'createdAt'
+        )
         .orderBy('updatedAt', 'desc')
         .startAfter(lastLoadedDoc)
         .limit(100);
@@ -244,8 +237,7 @@
     hasMore: () => hasMoreData,
     getCount: () => accountsData.length,
     getTotalCount: getTotalCount,
-    addAccount: addAccountToCache,
-    isFromCache: () => loadedFromCache // Expose cache status
+    addAccount: addAccountToCache
   };
   
   console.log('[BackgroundAccountsLoader] Module initialized');

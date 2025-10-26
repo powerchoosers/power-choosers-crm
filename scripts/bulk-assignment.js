@@ -251,15 +251,14 @@
     const batch = db.batch();
     const count = currentSelectedIds.length;
     
-    const assigneeLower = (assigneeEmail || '').toLowerCase();
-    console.log(`[BulkAssignment] Assigning ${count} ${currentCollectionType} to ${assigneeLower}`);
+    console.log(`[BulkAssignment] Assigning ${count} ${currentCollectionType} to ${assigneeEmail}`);
 
     try {
       // Update each selected item
       currentSelectedIds.forEach(itemId => {
         const ref = db.collection(currentCollectionType).doc(itemId);
         batch.update(ref, {
-          assignedTo: assigneeLower,
+          assignedTo: assigneeEmail,
           assignedBy: window.DataManager.getCurrentUserEmail(),
           assignedAt: firebase.firestore.FieldValue.serverTimestamp(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -269,8 +268,8 @@
       await batch.commit();
       
       // Get assignee name
-      const assignee = teamMembers.find(m => (m.email || '').toLowerCase() === assigneeLower);
-      const assigneeName = assignee ? assignee.name : assigneeLower;
+      const assignee = teamMembers.find(m => m.email === assigneeEmail);
+      const assigneeName = assignee ? assignee.name : assigneeEmail;
       
       // Show success toast
       if (window.crm && typeof window.crm.showToast === 'function') {

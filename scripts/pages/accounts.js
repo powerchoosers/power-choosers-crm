@@ -1002,27 +1002,11 @@ var console = {
         console.log('[Accounts] Restoring to page:', targetPage, 'from back navigation');
       }
       
-      // SMART LAZY LOADING: 
-      // - If from cache (no cost): Load ALL accounts immediately
-      // - If from Firestore (costs money): Only load first 100 to reduce reads
-      const isFromCache = window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.isFromCache === 'function' 
-        ? window.BackgroundAccountsLoader.isFromCache() 
-        : false;
-      
-      if (isFromCache) {
-        // Cache is free - load everything at once
-        state.data = accountsData;
-        state.filtered = state.data.slice();
-        state.hasMore = false;
-        console.log('[Accounts] Loaded ALL', accountsData.length, 'accounts from cache (no pagination needed)');
-      } else {
-        // Firestore costs money - lazy load in batches of 100
-        const initialBatchSize = 100;
-        state.data = accountsData.slice(0, initialBatchSize);
-        state.filtered = state.data.slice();
-        state.hasMore = accountsData.length > initialBatchSize;
-        console.log('[Accounts] Loaded first', initialBatchSize, 'accounts from Firestore (lazy loading enabled)');
-      }
+      // TRUE LAZY LOADING: Only load initial batch of 100 records
+      const initialBatchSize = 100; // Load only what's needed initially
+      state.data = accountsData.slice(0, initialBatchSize);
+      state.filtered = state.data.slice();
+      state.hasMore = accountsData.length > initialBatchSize;
       
       state.loaded = true;
       state.errorMsg = '';

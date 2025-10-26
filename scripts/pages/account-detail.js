@@ -1758,12 +1758,7 @@ var console = {
     
     try {
       // Use new targeted API endpoint for much better performance
-      const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser)
-        ? await window.firebase.auth().currentUser.getIdToken()
-        : null;
-      const r = await fetch(`${base}/api/calls/account/${accountId}?limit=50`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
+      const r = await fetch(`${base}/api/calls/account/${accountId}?limit=50`);
       const j = await r.json().catch(()=>({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
       
