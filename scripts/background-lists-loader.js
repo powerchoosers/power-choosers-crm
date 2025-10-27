@@ -88,8 +88,13 @@
       try {
         const cached = await window.CacheManager.get('lists');
         if (cached && Array.isArray(cached) && cached.length > 0) {
-          listsData = cached;
-          console.log('[BackgroundListsLoader] ✓ Loaded', cached.length, 'lists from cache');
+          if (!isAdmin()) {
+            const email = getUserEmail();
+            listsData = (cached || []).filter(l => (l && (l.ownerId === email || l.assignedTo === email)));
+          } else {
+            listsData = cached;
+          }
+          console.log('[BackgroundListsLoader] ✓ Loaded', listsData.length, 'lists from cache (filtered)');
           
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:lists-loaded', { 
@@ -111,8 +116,13 @@
         if (window.CacheManager) {
           const cached = await window.CacheManager.get('lists');
           if (cached && Array.isArray(cached) && cached.length > 0) {
-            listsData = cached;
-            console.log('[BackgroundListsLoader] ✓ Loaded', cached.length, 'lists from cache (delayed)');
+            if (!isAdmin()) {
+              const email = getUserEmail();
+              listsData = (cached || []).filter(l => (l && (l.ownerId === email || l.assignedTo === email)));
+            } else {
+              listsData = cached;
+            }
+            console.log('[BackgroundListsLoader] ✓ Loaded', listsData.length, 'lists from cache (delayed, filtered)');
             document.dispatchEvent(new CustomEvent('pc:lists-loaded', { 
               detail: { count: cached.length, cached: true } 
             }));

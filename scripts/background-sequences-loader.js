@@ -79,8 +79,13 @@
       try {
         const cached = await window.CacheManager.get('sequences');
         if (cached && Array.isArray(cached) && cached.length > 0) {
-          sequencesData = cached;
-          console.log('[BackgroundSequencesLoader] ✓ Loaded', cached.length, 'sequences from cache');
+          if (!isAdmin()) {
+            const email = getUserEmail();
+            sequencesData = (cached || []).filter(s => (s && s.ownerId === email));
+          } else {
+            sequencesData = cached;
+          }
+          console.log('[BackgroundSequencesLoader] ✓ Loaded', sequencesData.length, 'sequences from cache (filtered)');
           
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:sequences-loaded', { 
@@ -102,8 +107,13 @@
         if (window.CacheManager) {
           const cached = await window.CacheManager.get('sequences');
           if (cached && Array.isArray(cached) && cached.length > 0) {
-            sequencesData = cached;
-            console.log('[BackgroundSequencesLoader] ✓ Loaded', cached.length, 'sequences from cache (delayed)');
+            if (!isAdmin()) {
+              const email = getUserEmail();
+              sequencesData = (cached || []).filter(s => (s && s.ownerId === email));
+            } else {
+              sequencesData = cached;
+            }
+            console.log('[BackgroundSequencesLoader] ✓ Loaded', sequencesData.length, 'sequences from cache (delayed, filtered)');
             document.dispatchEvent(new CustomEvent('pc:sequences-loaded', { 
               detail: { count: cached.length, cached: true } 
             }));
