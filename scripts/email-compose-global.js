@@ -3694,10 +3694,16 @@
   
   async function sendEmailViaSendGrid(emailData) {
     try {
-      const { to, subject, content, _deliverability, threadId, inReplyTo, references, trackingMetadata } = emailData;
+      const { to, subject, content, _deliverability, threadId, inReplyTo, references, trackingMetadata, isHtmlEmail } = emailData;
       
       // Generate unique tracking ID for this email
       const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      console.log('[SendGrid] Email data received:', {
+        isHtmlEmail,
+        contentLength: content.length,
+        contentPreview: content.substring(0, 100) + '...'
+      });
       
       // Prepare email data for SendGrid
       const emailPayload = {
@@ -3708,7 +3714,7 @@
         threadId: threadId,
         inReplyTo: inReplyTo,
         references: references,
-        isHtmlEmail: emailData.isHtmlEmail || false,
+        isHtmlEmail: isHtmlEmail || false,
         _deliverability: _deliverability
       };
       

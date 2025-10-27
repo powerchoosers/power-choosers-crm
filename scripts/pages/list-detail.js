@@ -951,21 +951,49 @@
             console.debug('[ListDetail] loadDataOnce: accounts loaded from CacheManager', { count: state.dataAccounts.length });
           }
         } else if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
-          // Firestore fallback - OPTIMIZED with field selection
+          // Firestore fallback - SCOPED queries for security compliance
+          const email = window.currentUserEmail || '';
+          
           if (!state.loadedPeople) {
-            const peopleSnap = await window.firebaseDB.collection('contacts')
-              .get();
+            let peopleSnap;
+            if (window.currentUserRole !== 'admin' && email) {
+              // Non-admin: use scoped queries
+              const [ownedSnap, assignedSnap] = await Promise.all([
+                window.firebaseDB.collection('contacts').where('ownerId', '==', email).limit(1000).get(),
+                window.firebaseDB.collection('contacts').where('assignedTo', '==', email).limit(1000).get()
+              ]);
+              const map = new Map();
+              ownedSnap.forEach(d => map.set(d.id, d));
+              assignedSnap.forEach(d => { if (!map.has(d.id)) map.set(d.id, d); });
+              peopleSnap = { docs: Array.from(map.values()) };
+            } else {
+              // Admin: use unfiltered query
+              peopleSnap = await window.firebaseDB.collection('contacts').limit(1000).get();
+            }
             state.dataPeople = peopleSnap ? peopleSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
             state.loadedPeople = true;
-            console.debug('[ListDetail] loadDataOnce: people loaded from Firestore (optimized)', { count: state.dataPeople.length });
+            console.debug('[ListDetail] loadDataOnce: people loaded from Firestore (scoped)', { count: state.dataPeople.length });
           }
           
           if (!state.loadedAccounts) {
-            const accountsSnap = await window.firebaseDB.collection('accounts')
-              .get();
+            let accountsSnap;
+            if (window.currentUserRole !== 'admin' && email) {
+              // Non-admin: use scoped queries
+              const [ownedSnap, assignedSnap] = await Promise.all([
+                window.firebaseDB.collection('accounts').where('ownerId', '==', email).limit(1000).get(),
+                window.firebaseDB.collection('accounts').where('assignedTo', '==', email).limit(1000).get()
+              ]);
+              const map = new Map();
+              ownedSnap.forEach(d => map.set(d.id, d));
+              assignedSnap.forEach(d => { if (!map.has(d.id)) map.set(d.id, d); });
+              accountsSnap = { docs: Array.from(map.values()) };
+            } else {
+              // Admin: use unfiltered query
+              accountsSnap = await window.firebaseDB.collection('accounts').limit(1000).get();
+            }
             state.dataAccounts = accountsSnap ? accountsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
             state.loadedAccounts = true;
-            console.debug('[ListDetail] loadDataOnce: accounts loaded from Firestore (optimized)', { count: state.dataAccounts.length });
+            console.debug('[ListDetail] loadDataOnce: accounts loaded from Firestore (scoped)', { count: state.dataAccounts.length });
           }
         }
       }

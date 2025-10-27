@@ -317,7 +317,22 @@
       
       // Use BackgroundListsLoader (cache-first)
       if (window.BackgroundListsLoader) {
-        const listsData = window.BackgroundListsLoader.getListsData() || [];
+        let listsData = window.BackgroundListsLoader.getListsData() || [];
+        
+        // If background loader hasn't loaded data yet, wait for it
+        if (listsData.length === 0) {
+          console.log('[ListsOverview] BackgroundListsLoader not ready yet, waiting...');
+          // Wait up to 3 seconds for background loader
+          for (let attempt = 0; attempt < 30; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            listsData = window.BackgroundListsLoader.getListsData() || [];
+            if (listsData.length > 0) {
+              console.log('[ListsOverview] BackgroundListsLoader ready after', (attempt + 1) * 100, 'ms with', listsData.length, 'lists');
+              break;
+            }
+          }
+        }
+        
         // Filter by kind client-side
         const filteredLists = listsData.filter(list => {
           const listKind = (list.kind || list.type || list.listType || '').toLowerCase();
@@ -352,7 +367,7 @@
         }
         
         if (console.timeEnd) console.timeEnd(`[ListsOverview] loadLists ${kind}`);
-        render();
+        renderFilteredItems(kind === 'people' ? state.peopleLists : state.accountLists);
         return;
       }
       
@@ -448,7 +463,7 @@
           snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
           state.peopleLists = items;
           state.loadedPeople = true;
-          if (state.kind === 'people') render();
+          if (state.kind === 'people') renderFilteredItems(state.peopleLists);
         } catch (_) { /* noop */ }
       }) : null;
       // Account lists
@@ -459,7 +474,7 @@
           snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
           state.accountLists = items;
           state.loadedAccounts = true;
-          if (state.kind === 'accounts') render();
+          if (state.kind === 'accounts') renderFilteredItems(state.accountLists);
         } catch (_) { /* noop */ }
       }) : null;
     } catch (e) {
