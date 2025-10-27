@@ -1271,6 +1271,109 @@
       console.error('Debug failed:', error);
     }
   };
+  
+  // ONE-TIME FIX: Sync recordCount with actual member counts
+  window.syncListCounts = async () => {
+    if (!window.firebaseDB) return console.log('Firebase not available');
+    
+    console.log('🔄 Starting list count sync...');
+    
+    try {
+      // Get all lists for current user
+      const email = window.currentUserEmail || '';
+      let listsSnap;
+      
+      if (window.currentUserRole !== 'admin' && email) {
+        // Non-admin: get scoped lists
+        const [ownedSnap, assignedSnap, createdSnap] = await Promise.all([
+          window.firebaseDB.collection('lists').where('ownerId','==',email).get(),
+          window.firebaseDB.collection('lists').where('assignedTo','==',email).get(),
+          window.firebaseDB.collection('lists').where('createdBy','==',email).get()
+        ]);
+        
+        const map = new Map();
+        ownedSnap.forEach(d=>map.set(d.id, d));
+        assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
+        createdSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
+        listsSnap = { docs: Array.from(map.values()) };
+      } else {
+        // Admin: get all lists
+        listsSnap = await window.firebaseDB.collection('lists').get();
+      }
+      
+      console.log(`📋 Found ${listsSnap.docs.length} lists to sync`);
+      
+      let updated = 0;
+      let errors = 0;
+      
+      for (const listDoc of listsSnap.docs) {
+        const listId = listDoc.id;
+        const listData = listDoc.data();
+        
+        try {
+          // Count actual members
+          let peopleCount = 0;
+          let accountsCount = 0;
+          
+          // Try subcollection first
+          try {
+            const subSnap = await window.firebaseDB.collection('lists').doc(listId).collection('members').get();
+            if (subSnap && subSnap.docs && subSnap.docs.length) {
+              subSnap.docs.forEach(d => {
+                const m = d.data() || {};
+                const t = (m.targetType || m.type || '').toLowerCase();
+                if (t === 'people' || t === 'contact' || t === 'contacts') peopleCount++;
+                else if (t === 'accounts' || t === 'account') accountsCount++;
+              });
+            }
+          } catch (_) {}
+          
+          // Fallback to top-level listMembers
+          if (peopleCount === 0 && accountsCount === 0) {
+            try {
+              const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).get();
+              lmSnap?.docs?.forEach(d => {
+                const m = d.data() || {};
+                const t = (m.targetType || m.type || '').toLowerCase();
+                if (t === 'people' || t === 'contact' || t === 'contacts') peopleCount++;
+                else if (t === 'accounts' || t === 'account') accountsCount++;
+              });
+            } catch (_) {}
+          }
+          
+          const totalCount = peopleCount + accountsCount;
+          const currentRecordCount = listData.recordCount || 0;
+          
+          if (totalCount !== currentRecordCount) {
+            console.log(`📊 ${listData.name}: ${currentRecordCount} → ${totalCount} (${peopleCount} people, ${accountsCount} accounts)`);
+            
+            await window.firebaseDB.collection('lists').doc(listId).update({
+              recordCount: totalCount,
+              updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp || new Date()
+            });
+            
+            updated++;
+          } else {
+            console.log(`✅ ${listData.name}: ${totalCount} (already correct)`);
+          }
+          
+        } catch (error) {
+          console.error(`❌ Failed to sync ${listData.name}:`, error);
+          errors++;
+        }
+      }
+      
+      console.log(`🎉 Sync complete! Updated: ${updated}, Errors: ${errors}`);
+      
+      // Refresh the lists overview
+      if (window.ListsOverview && window.ListsOverview.refreshCounts) {
+        window.ListsOverview.refreshCounts();
+      }
+      
+    } catch (error) {
+      console.error('❌ Sync failed:', error);
+    }
+  };
 
   // Listen for background lists loader events
   document.addEventListener('pc:lists-loaded', async () => {
