@@ -44,7 +44,7 @@ export class SendGridService {
    */
           async sendEmail(emailData) {
     try {
-              const { to, subject, content, from, trackingId, _deliverability, inReplyTo, references, threadId } = emailData;
+              const { to, subject, content, from, trackingId, _deliverability, inReplyTo, references, threadId, isHtmlEmail } = emailData;
       
       // Check if any recipients are suppressed
       const recipients = Array.isArray(to) ? to : [to];
@@ -93,27 +93,13 @@ export class SendGridService {
       };
 
       // Prepare email message with filtered recipients
-      // Detect if this is an HTML email template
-      const isHtmlEmail = content.includes('<html') || content.includes('<!DOCTYPE') || 
-                         content.includes('<div style=') || content.includes('<table') ||
-                         content.includes('font-family:') || content.includes('max-width:');
-      
-      console.log('[SendGrid] Email type detection:', {
-        isHtmlEmail,
-        contentLength: content.length,
-        hasHtmlTag: content.includes('<html'),
-        hasDoctype: content.includes('<!DOCTYPE'),
-        hasStyledDiv: content.includes('<div style='),
-        hasTable: content.includes('<table'),
-        hasFontFamily: content.includes('font-family:'),
-        hasMaxWidth: content.includes('max-width:')
-      });
-      
-      // Generate appropriate content versions
+      // Generate appropriate content versions based on email type
       const htmlContent = content;
       const textContent = isHtmlEmail ? 
         this.generateTextFromHtml(content) : 
         this.stripHtml(content);
+      
+      console.log('[SendGrid] Email type:', isHtmlEmail ? 'HTML' : 'Standard', 'Content length:', content.length);
       
               const msg = {
         to: allowedRecipients,
@@ -137,15 +123,6 @@ export class SendGridService {
               if (references && references.length) {
                 msg.headers = { ...(msg.headers || {}), 'References': references.join(' ') };
               }
-
-      // Add content-type headers for HTML emails
-      if (isHtmlEmail) {
-        msg.headers = {
-          ...msg.headers,
-          'Content-Type': 'text/html; charset=UTF-8',
-          'X-Mailer': 'Power Choosers CRM'
-        };
-      }
 
       // Add custom headers based on deliverability settings
       if (deliverabilitySettings.includePriorityHeaders) {
