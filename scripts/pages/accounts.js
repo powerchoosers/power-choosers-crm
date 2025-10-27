@@ -982,17 +982,12 @@ var console = {
       // Store full dataset for pagination
       state.allAccountsCache = accountsData;
       
-      // Get total count from Firestore for proper pagination display
+      // Get total count (non-blocking). Use loaded count immediately for UI.
+      state.totalCount = accountsData.length;
       if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getTotalCount === 'function') {
-        try {
-          state.totalCount = await window.BackgroundAccountsLoader.getTotalCount();
-          console.log('[Accounts] Total accounts in database:', state.totalCount);
-        } catch (error) {
-          console.warn('[Accounts] Failed to get total count, using loaded count:', error);
-          state.totalCount = accountsData.length;
-        }
-      } else {
-        state.totalCount = accountsData.length;
+        window.BackgroundAccountsLoader.getTotalCount()
+          .then((cnt) => { state.totalCount = cnt; console.log('[Accounts] Total accounts (async):', cnt); })
+          .catch((error) => { console.warn('[Accounts] Failed to get total count, keeping loaded count:', error); });
       }
       
       // Check if we're restoring from back navigation
@@ -1010,11 +1005,12 @@ var console = {
         : false;
       
       if (isFromCache) {
-        // Cache is free - load everything at once
-        state.data = accountsData;
+        // Display-first: show only the first batch immediately; paginate the rest
+        const initialBatchSize = 100;
+        state.data = accountsData.slice(0, initialBatchSize);
         state.filtered = state.data.slice();
-        state.hasMore = false;
-        console.log('[Accounts] Loaded ALL', accountsData.length, 'accounts from cache (no pagination needed)');
+        state.hasMore = accountsData.length > initialBatchSize;
+        console.log('[Accounts] Initial render with', state.data.length, 'of', accountsData.length, 'accounts from cache');
       } else {
         // Firestore costs money - lazy load in batches of 100
         const initialBatchSize = 100;
