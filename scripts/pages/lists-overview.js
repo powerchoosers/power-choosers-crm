@@ -353,8 +353,21 @@
           await window.__preloadListMembers(filteredLists);
         } else {
           // Fallback: load members individually
+          console.log('[ListsOverview] Using fallback member loading...');
           for (const list of filteredLists) {
-            await loadListMembers(list.id);
+            const members = await fetchMembersForList(list.id);
+            
+            // Store in global cache
+            if (!window.listMembersCache) window.listMembersCache = {};
+            window.listMembersCache[list.id] = members;
+            
+            // Update count on the list object
+            const kind = (list.kind || 'people').toLowerCase();
+            if (kind === 'accounts') {
+              list.count = members.accounts?.size || 0;
+            } else {
+              list.count = members.people?.size || 0;
+            }
           }
         }
 
@@ -457,26 +470,52 @@
       const col = window.firebaseDB.collection('lists');
       // People lists
       if (_unsubListsPeople) { try { _unsubListsPeople(); } catch(_) {} _unsubListsPeople = null; }
-      _unsubListsPeople = col.where ? col.where('kind', '==', 'people').onSnapshot((snap) => {
-        try {
-          const items = [];
-          snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
-          state.peopleLists = items;
-          state.loadedPeople = true;
-          if (state.kind === 'people') renderFilteredItems(state.peopleLists);
-        } catch (_) { /* noop */ }
-      }) : null;
+      _unsubListsPeople = col.where ? col.where('kind', '==', 'people').onSnapshot(
+        (snap) => {
+          // Success handler
+          try {
+            const items = [];
+            snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+            state.peopleLists = items;
+            state.loadedPeople = true;
+            if (state.kind === 'people') renderFilteredItems(state.peopleLists);
+          } catch (e) {
+            console.error('[ListsOverview] People lists snapshot error:', e);
+          }
+        },
+        (error) => {
+          // Error handler - prevents 400 errors from crashing the app
+          console.error('[ListsOverview] People lists live listener error:', error);
+          if (_unsubListsPeople) {
+            _unsubListsPeople();
+            _unsubListsPeople = null;
+          }
+        }
+      ) : null;
       // Account lists
       if (_unsubListsAccounts) { try { _unsubListsAccounts(); } catch(_) {} _unsubListsAccounts = null; }
-      _unsubListsAccounts = col.where ? col.where('kind', '==', 'accounts').onSnapshot((snap) => {
-        try {
-          const items = [];
-          snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
-          state.accountLists = items;
-          state.loadedAccounts = true;
-          if (state.kind === 'accounts') renderFilteredItems(state.accountLists);
-        } catch (_) { /* noop */ }
-      }) : null;
+      _unsubListsAccounts = col.where ? col.where('kind', '==', 'accounts').onSnapshot(
+        (snap) => {
+          // Success handler
+          try {
+            const items = [];
+            snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+            state.accountLists = items;
+            state.loadedAccounts = true;
+            if (state.kind === 'accounts') renderFilteredItems(state.accountLists);
+          } catch (e) {
+            console.error('[ListsOverview] Account lists snapshot error:', e);
+          }
+        },
+        (error) => {
+          // Error handler - prevents 400 errors from crashing the app
+          console.error('[ListsOverview] Account lists live listener error:', error);
+          if (_unsubListsAccounts) {
+            _unsubListsAccounts();
+            _unsubListsAccounts = null;
+          }
+        }
+      ) : null;
     } catch (e) {
       console.warn('[ListsOverview] Failed to start live listeners', e);
     }
