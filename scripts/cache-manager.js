@@ -250,14 +250,26 @@ class CacheManager {
       if (['contacts', 'tasks', 'accounts', 'emails', 'lists', 'sequences'].includes(collection)) {
         const email = window.currentUserEmail || '';
         if (window.currentUserRole !== 'admin' && email) {
-          // Non-admin: use scoped queries
-          const [ownedSnap, assignedSnap] = await Promise.all([
-            window.firebaseDB.collection(collection).where('ownerId','==',email).get(),
-            window.firebaseDB.collection(collection).where('assignedTo','==',email).get()
-          ]);
+          // Non-admin: use scoped queries - check multiple ownership fields
+          const queries = [];
+          
+          // Check ownerId field
+          queries.push(window.firebaseDB.collection(collection).where('ownerId','==',email).get());
+          // Check assignedTo field  
+          queries.push(window.firebaseDB.collection(collection).where('assignedTo','==',email).get());
+          
+          // For lists, also check createdBy field (legacy field)
+          if (collection === 'lists') {
+            queries.push(window.firebaseDB.collection(collection).where('createdBy','==',email).get());
+          }
+          
+          const snapshots = await Promise.all(queries);
           const map = new Map();
-          ownedSnap.forEach(d=>map.set(d.id,{ id:d.id, ...d.data() }));
-          assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
+          
+          snapshots.forEach(snap => {
+            snap.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+          });
+          
           const data = Array.from(map.values());
           console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore (scoped)`);
           return data;

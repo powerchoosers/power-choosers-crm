@@ -33,13 +33,16 @@
         } else {
           const email = window.currentUserEmail || '';
           const db = window.firebaseDB;
-          const [ownedSnap, assignedSnap] = await Promise.all([
+          // Check multiple ownership fields for lists
+          const [ownedSnap, assignedSnap, createdSnap] = await Promise.all([
             db.collection('lists').where('ownerId','==',email).get(),
-            db.collection('lists').where('assignedTo','==',email).get()
+            db.collection('lists').where('assignedTo','==',email).get(),
+            db.collection('lists').where('createdBy','==',email).get()
           ]);
           const map = new Map();
           ownedSnap.forEach(d=>map.set(d.id,{ id:d.id, ...d.data() }));
           assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
+          createdSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
           newLists = Array.from(map.values());
         }
         newLists.sort((a,b)=> new Date(b.updatedAt||0) - new Date(a.updatedAt||0));

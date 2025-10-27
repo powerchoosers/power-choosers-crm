@@ -3706,6 +3706,29 @@
     });
   }
 
+  // ========== AI PANEL FUNCTIONS ==========
+  
+  /**
+   * Opens the AI Panel, delegating to the main email manager if available.
+   */
+  function openAIPanel() {
+    if (window.emailManager && typeof window.emailManager.toggleAIPanel === 'function') {
+      console.log('[EmailCompose] Delegating to emailManager.toggleAIPanel');
+      window.emailManager.toggleAIPanel();
+    } else {
+      // Fallback if the main manager is not loaded
+      const composeWindow = document.getElementById('compose-window');
+      const aiBar = composeWindow?.querySelector('.ai-bar');
+      if (aiBar) {
+        const isOpen = aiBar.classList.toggle('open');
+        aiBar.setAttribute('aria-hidden', String(!isOpen));
+        console.log('[EmailCompose] Toggled AI bar directly.');
+      } else {
+        console.error('[EmailCompose] AI panel not found.');
+      }
+    }
+  }
+
   // ========== EMAIL SENDING FUNCTIONS ==========
   
   async function sendEmailViaSendGrid(emailData) {
