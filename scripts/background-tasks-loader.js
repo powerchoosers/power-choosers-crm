@@ -89,7 +89,12 @@
       try {
         const cached = await window.CacheManager.get('tasks');
         if (cached && Array.isArray(cached) && cached.length > 0) {
-          tasksData = cached;
+          if (!isAdmin()) {
+            const email = getUserEmail();
+            tasksData = (cached || []).filter(t => (t && (t.ownerId === email || t.assignedTo === email)));
+          } else {
+            tasksData = cached;
+          }
           console.log('[BackgroundTasksLoader] ✓ Loaded', cached.length, 'tasks from cache');
           
           // Notify that cached data is available

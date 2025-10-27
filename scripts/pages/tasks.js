@@ -220,18 +220,31 @@
     }
   }
 
+  function getUserTasksKey(){
+    try {
+      const email = (window.DataManager && typeof window.DataManager.getCurrentUserEmail==='function') ? window.DataManager.getCurrentUserEmail() : (window.currentUserEmail||'').toLowerCase();
+      return email ? `userTasks:${email}` : 'userTasks';
+    } catch(_) { return 'userTasks'; }
+  }
+
   async function loadData(){
     // Build from real sources: BackgroundTasksLoader + localStorage tasks + LinkedIn sequence tasks
     const linkedInTasks = getLinkedInTasksFromSequences();
     let userTasks = [];
     let firebaseTasks = [];
     
-    // Load from localStorage
-    try { 
-      userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]'); 
-    } catch(_) { 
-      userTasks = []; 
-    }
+    // Load from localStorage (namespaced by user email; fallback to legacy key)
+    try {
+      const key = getUserTasksKey();
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        userTasks = JSON.parse(raw);
+      } else {
+        // Fallback migration from legacy key
+        const legacy = localStorage.getItem('userTasks');
+        userTasks = legacy ? JSON.parse(legacy) : [];
+      }
+    } catch(_) { userTasks = []; }
     
     // Load from BackgroundTasksLoader (cache-first)
     try {
@@ -425,11 +438,12 @@
       // Remove from state immediately
       const [removed] = state.data.splice(recIdx,1);
       state.filtered = state.data.slice();
-      // Remove from localStorage immediately
+      // Remove from localStorage immediately (namespaced)
       try {
-        const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-        const filtered = userTasks.filter(t => t.id !== id);
-        localStorage.setItem('userTasks', JSON.stringify(filtered));
+        const key = getUserTasksKey();
+        const current = JSON.parse(localStorage.getItem(key) || '[]');
+        const filtered = current.filter(t => t.id !== id);
+        localStorage.setItem(key, JSON.stringify(filtered));
       } catch (e) { console.warn('Could not remove task from localStorage:', e); }
       // Remove from Firebase (best-effort)
       try {

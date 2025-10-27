@@ -222,7 +222,18 @@
       try {
         const cached = await window.CacheManager.get('emails');
         if (cached && Array.isArray(cached) && cached.length > 0) {
-          emailsData = cached;
+          try {
+            const email = getUserEmail();
+            if (!isAdmin() && email) {
+              const e = String(email).toLowerCase();
+              emailsData = (cached||[]).filter(x => {
+                const fields = [x && x.ownerId, x && x.assignedTo, x && x.from];
+                return fields.some(v => String(v||'').toLowerCase() === e);
+              });
+            } else {
+              emailsData = cached;
+            }
+          } catch(_) { emailsData = cached; }
           console.log('[BackgroundEmailsLoader] ✓ Loaded', cached.length, 'emails from cache');
           
           // Notify that cached data is available
