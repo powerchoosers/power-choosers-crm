@@ -3553,11 +3553,25 @@ class PowerChoosersCRM {
             let existingContacts = [];
             if (updateExisting && modal._importType === 'contacts' && window.ContactMerger) {
                 console.log('Fetching existing contacts for duplicate detection...');
-                const allContactsQuery = await db.collection('contacts').get();
-                existingContacts = allContactsQuery.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
+                const email = getUserEmail();
+                if (!isAdmin() && email) {
+                    // Non-admin: use scoped query
+                    const [ownedSnap, assignedSnap] = await Promise.all([
+                        db.collection('contacts').where('ownerId','==',email).get(),
+                        db.collection('contacts').where('assignedTo','==',email).get()
+                    ]);
+                    const map = new Map();
+                    ownedSnap.forEach(d=>map.set(d.id,{ id:d.id, ...d.data() }));
+                    assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
+                    existingContacts = Array.from(map.values());
+                } else {
+                    // Admin: use unfiltered query
+                    const allContactsQuery = await db.collection('contacts').get();
+                    existingContacts = allContactsQuery.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                }
                 console.log(`Loaded ${existingContacts.length} existing contacts for comparison`);
             }
             

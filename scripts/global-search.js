@@ -648,7 +648,23 @@
     if (!window.firebaseDB) return [];
 
     try {
-      const snapshot = await window.firebaseDB.collection('deals').get();
+      const email = getUserEmail();
+      let snapshot;
+      if (!isAdmin() && email) {
+        // Non-admin: use scoped query
+        const [ownedSnap, assignedSnap] = await Promise.all([
+          window.firebaseDB.collection('deals').where('ownerId','==',email).get(),
+          window.firebaseDB.collection('deals').where('assignedTo','==',email).get()
+        ]);
+        const map = new Map();
+        ownedSnap.forEach(d=>map.set(d.id, d));
+        assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
+        snapshot = { forEach: (callback) => map.forEach(callback) };
+      } else {
+        // Admin: use unfiltered query
+        snapshot = await window.firebaseDB.collection('deals').get();
+      }
+      
       const results = [];
 
       snapshot.forEach(doc => {

@@ -1649,7 +1649,23 @@
     if (!window.firebaseDB) return [];
     const q = String(query || '').toLowerCase().trim();
     try {
-      const snapshot = await window.firebaseDB.collection('contacts').get();
+      const email = getUserEmail();
+      let snapshot;
+      if (!isAdmin() && email) {
+        // Non-admin: use scoped query
+        const [ownedSnap, assignedSnap] = await Promise.all([
+          window.firebaseDB.collection('contacts').where('ownerId','==',email).get(),
+          window.firebaseDB.collection('contacts').where('assignedTo','==',email).get()
+        ]);
+        const map = new Map();
+        ownedSnap.forEach(d=>map.set(d.id, d));
+        assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
+        snapshot = { forEach: (callback) => map.forEach(callback) };
+      } else {
+        // Admin: use unfiltered query
+        snapshot = await window.firebaseDB.collection('contacts').get();
+      }
+      
       const out = [];
       snapshot.forEach(doc => {
         const person = { id: doc.id, ...doc.data() };

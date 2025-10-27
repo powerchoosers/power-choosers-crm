@@ -3980,7 +3980,15 @@
         let items = local;
         try {
           if (window.firebaseDB) {
-            const snap = await window.firebaseDB.collection('sequences').get();
+            const email = getUserEmail();
+            let snap;
+            if (!isAdmin() && email) {
+              // Non-admin: use scoped query
+              snap = await window.firebaseDB.collection('sequences').where('ownerId','==',email).get();
+            } else {
+              // Admin: use unfiltered query
+              snap = await window.firebaseDB.collection('sequences').get();
+            }
             items = [];
             snap.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
           }

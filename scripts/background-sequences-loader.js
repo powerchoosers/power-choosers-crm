@@ -183,8 +183,16 @@
     if (!window.firebaseDB) return 0;
     
     try {
-      const snapshot = await window.firebaseDB.collection('sequences').get();
-      return snapshot.size;
+      const email = getUserEmail();
+      if (!isAdmin() && email) {
+        // Non-admin: count only owned sequences
+        const snapshot = await window.firebaseDB.collection('sequences').where('ownerId','==',email).get();
+        return snapshot.size;
+      } else {
+        // Admin: count all sequences
+        const snapshot = await window.firebaseDB.collection('sequences').get();
+        return snapshot.size;
+      }
     } catch (error) {
       console.error('[BackgroundSequencesLoader] Failed to get total count:', error);
       return sequencesData.length; // Fallback to loaded count
