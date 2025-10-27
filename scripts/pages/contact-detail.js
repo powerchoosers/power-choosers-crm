@@ -6772,6 +6772,22 @@ async function createContactSequenceThenAdd(name) {
         }
         await db.collection('listMembers').add(doc);
         
+        // Update the recordCount field in the list document
+        try {
+          const increment = window.firebase?.firestore?.FieldValue?.increment ? 
+            window.firebase.firestore.FieldValue.increment(1) : 
+            (await db.collection('lists').doc(listId).get()).data()?.recordCount + 1 || 1;
+          
+          await db.collection('lists').doc(listId).update({
+            recordCount: increment,
+            updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp || new Date()
+          });
+          
+          console.log('[ContactDetail] Updated list recordCount for', listId);
+        } catch (countError) {
+          console.warn('[ContactDetail] Failed to update list count:', countError);
+        }
+        
         // Update the cache for this list
         if (window.listMembersCache && window.listMembersCache[listId]) {
           window.listMembersCache[listId].people.add(contactId);

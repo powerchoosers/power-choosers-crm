@@ -5341,11 +5341,20 @@ var console = {
       }
       await db.collection('listMembers').add(doc);
       
-      // Increment list member count (using 'count' field like lists-overview.js)
-      if (window.firebase?.firestore?.FieldValue) {
+      // Increment list member count (using 'recordCount' field for consistency)
+      try {
+        const increment = window.firebase?.firestore?.FieldValue?.increment ? 
+          window.firebase.firestore.FieldValue.increment(1) : 
+          (await db.collection('lists').doc(listId).get()).data()?.recordCount + 1 || 1;
+        
         await db.collection('lists').doc(listId).update({
-          count: window.firebase.firestore.FieldValue.increment(1)
+          recordCount: increment,
+          updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp || new Date()
         });
+        
+        console.log('[AccountDetail] Updated list recordCount for', listId);
+      } catch (countError) {
+        console.warn('[AccountDetail] Failed to update list count:', countError);
       }
       
       window.crm?.showToast && window.crm.showToast('Added to list');
