@@ -99,7 +99,16 @@ export class SendGridService {
         this.generateTextFromHtml(content) : 
         this.stripHtml(content);
       
+      // Validate content before sending
+      if (!htmlContent || htmlContent.trim().length === 0) {
+        throw new Error('HTML content cannot be empty');
+      }
+      if (!textContent || textContent.trim().length === 0) {
+        throw new Error('Text content cannot be empty');
+      }
+      
       console.log('[SendGrid] Email type:', isHtmlEmail ? 'HTML' : 'Standard', 'Content length:', content.length);
+      console.log('[SendGrid] Text content length:', textContent.length);
       
               const msg = {
         to: allowedRecipients,
@@ -272,7 +281,7 @@ export class SendGridService {
    * Generate proper text version from HTML email
    */
   generateTextFromHtml(html) {
-    if (!html) return '';
+    if (!html) return 'HTML email content';
     
     try {
       // Remove script and style tags completely
@@ -301,10 +310,18 @@ export class SendGridService {
       text = text.replace(/[ \t]+/g, ' '); // Multiple spaces to single space
       text = text.replace(/\n /g, '\n'); // Remove leading spaces on new lines
       
-      return text.trim();
+      const result = text.trim();
+      
+      // Ensure we always return non-empty content
+      if (!result || result.length === 0) {
+        console.warn('[SendGrid] Generated text is empty, using fallback');
+        return this.stripHtml(html) || 'HTML email content';
+      }
+      
+      return result;
     } catch (e) {
       console.warn('[SendGrid] Failed to generate text from HTML, falling back to basic strip:', e);
-      return this.stripHtml(html);
+      return this.stripHtml(html) || 'HTML email content';
     }
   }
 
