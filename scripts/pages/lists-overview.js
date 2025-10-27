@@ -352,21 +352,30 @@
         if (typeof window.__preloadListMembers === 'function') {
           await window.__preloadListMembers(filteredLists);
         } else {
-          // Fallback: load members individually
-          console.log('[ListsOverview] Using fallback member loading...');
+          // Fallback: load members individually with simple function
+          console.log('[ListsOverview] Using simple fallback member loading...');
           for (const list of filteredLists) {
-            const members = await fetchMembersForList(list.id);
-            
-            // Store in global cache
-            if (!window.listMembersCache) window.listMembersCache = {};
-            window.listMembersCache[list.id] = members;
-            
-            // Update count on the list object
-            const kind = (list.kind || 'people').toLowerCase();
-            if (kind === 'accounts') {
-              list.count = members.accounts?.size || 0;
-            } else {
-              list.count = members.people?.size || 0;
+            try {
+              // Simple member loading - just get the count from the list document
+              if (window.firebaseDB && window.firebaseDB.collection) {
+                const listDoc = await window.firebaseDB.collection('lists').doc(list.id).get();
+                if (listDoc.exists) {
+                  const data = listDoc.data();
+                  const kind = (list.kind || 'people').toLowerCase();
+                  if (kind === 'accounts') {
+                    list.count = data.accountCount || data.accounts?.length || 0;
+                  } else {
+                    list.count = data.peopleCount || data.people?.length || 0;
+                  }
+                } else {
+                  list.count = 0;
+                }
+              } else {
+                list.count = 0;
+              }
+            } catch (error) {
+              console.warn('[ListsOverview] Failed to load count for list', list.id, error);
+              list.count = 0;
             }
           }
         }
