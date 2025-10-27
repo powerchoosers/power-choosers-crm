@@ -3708,6 +3708,7 @@
         threadId: threadId,
         inReplyTo: inReplyTo,
         references: references,
+        isHtmlEmail: emailData.isHtmlEmail || false,
         _deliverability: _deliverability
       };
       
@@ -3876,6 +3877,7 @@
         to: to.split(',').map(email => email.trim()),
         subject,
         content: contentWithSignature,
+        isHtmlEmail: isHtmlEmail,
         trackingMetadata: window._lastGeneratedMetadata || null
       };
 
