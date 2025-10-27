@@ -272,27 +272,40 @@ export class SendGridService {
    * Generate proper text version from HTML email
    */
   generateTextFromHtml(html) {
-    // Remove script and style tags completely
-    let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-    text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+    if (!html) return '';
     
-    // Convert common HTML elements to text equivalents
-    text = text.replace(/<br\s*\/?>/gi, '\n');
-    text = text.replace(/<\/p>/gi, '\n\n');
-    text = text.replace(/<\/div>/gi, '\n');
-    text = text.replace(/<\/h[1-6]>/gi, '\n\n');
-    text = text.replace(/<li>/gi, '• ');
-    text = text.replace(/<\/li>/gi, '\n');
-    
-    // Remove all remaining HTML tags
-    text = text.replace(/<[^>]*>/g, '');
-    
-    // Clean up whitespace
-    text = text.replace(/\n\s*\n\s*\n/g, '\n\n'); // Max 2 consecutive newlines
-    text = text.replace(/[ \t]+/g, ' '); // Multiple spaces to single space
-    text = text.replace(/\n /g, '\n'); // Remove leading spaces on new lines
-    
-    return text.trim();
+    try {
+      // Remove script and style tags completely
+      let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+      text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+      
+      // Convert common HTML elements to text equivalents
+      text = text.replace(/<br\s*\/?>/gi, '\n');
+      text = text.replace(/<\/p>/gi, '\n\n');
+      text = text.replace(/<\/div>/gi, '\n');
+      text = text.replace(/<\/h[1-6]>/gi, '\n\n');
+      text = text.replace(/<li>/gi, '• ');
+      text = text.replace(/<\/li>/gi, '\n');
+      
+      // Replace links with text and URL
+      text = text.replace(/<a href="([^"]+)">([^<]+)<\/a>/gi, '$2 ($1)');
+      
+      // Remove all remaining HTML tags
+      text = text.replace(/<[^>]*>/g, '');
+      
+      // Decode HTML entities
+      text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+      
+      // Clean up whitespace
+      text = text.replace(/\n\s*\n\s*\n/g, '\n\n'); // Max 2 consecutive newlines
+      text = text.replace(/[ \t]+/g, ' '); // Multiple spaces to single space
+      text = text.replace(/\n /g, '\n'); // Remove leading spaces on new lines
+      
+      return text.trim();
+    } catch (e) {
+      console.warn('[SendGrid] Failed to generate text from HTML, falling back to basic strip:', e);
+      return this.stripHtml(html);
+    }
   }
 
   /**
