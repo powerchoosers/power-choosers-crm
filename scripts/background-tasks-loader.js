@@ -30,12 +30,12 @@
     
     try {
       console.log('[BackgroundTasksLoader] Loading tasks...');
-      if (!isAdmin()) {
+      if (window.currentUserRole !== 'admin') {
         let newTasks = [];
         if (window.DataManager && typeof window.DataManager.queryWithOwnership==='function') {
           newTasks = await window.DataManager.queryWithOwnership('tasks');
         } else {
-          const email = getUserEmail();
+          const email = window.currentUserEmail || '';
           const db = window.firebaseDB;
           const [ownedSnap, assignedSnap] = await Promise.all([
             db.collection('tasks').where('ownerId','==',email).get(),
@@ -89,8 +89,8 @@
       try {
         const cached = await window.CacheManager.get('tasks');
         if (cached && Array.isArray(cached) && cached.length > 0) {
-          if (!isAdmin()) {
-            const email = getUserEmail();
+          if (window.currentUserRole !== 'admin') {
+            const email = window.currentUserEmail || '';
             tasksData = (cached || []).filter(t => (t && (t.ownerId === email || t.assignedTo === email)));
           } else {
             tasksData = cached;
@@ -117,8 +117,8 @@
         if (window.CacheManager) {
           const cached = await window.CacheManager.get('tasks');
           if (cached && Array.isArray(cached) && cached.length > 0) {
-            if (!isAdmin()) {
-              const email = getUserEmail();
+            if (window.currentUserRole !== 'admin') {
+              const email = window.currentUserEmail || '';
               tasksData = (cached || []).filter(t => (t && (t.ownerId === email || t.assignedTo === email)));
             } else {
               tasksData = cached;
@@ -148,7 +148,7 @@
     }
     
     try {
-      if (!isAdmin()) return { loaded: 0, hasMore: false };
+      if (window.currentUserRole !== 'admin') return { loaded: 0, hasMore: false };
       console.log('[BackgroundTasksLoader] Loading next batch...');
       let query = window.firebaseDB.collection('tasks')
         .orderBy('timestamp', 'desc')
@@ -193,8 +193,8 @@
     if (!window.firebaseDB) return 0;
     
     try {
-      const email = getUserEmail();
-      if (!isAdmin() && email) {
+      const email = window.currentUserEmail || '';
+      if (window.currentUserRole !== 'admin' && email) {
         // Non-admin: count only owned/assigned tasks
         const [ownedSnap, assignedSnap] = await Promise.all([
           window.firebaseDB.collection('tasks').where('ownerId','==',email).get(),

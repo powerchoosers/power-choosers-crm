@@ -294,6 +294,15 @@ class AuthManager {
     }
 }
 
+// Global utility functions for checking user role and email
+function isAdmin() {
+    return window.currentUserRole === 'admin';
+}
+
+function getUserEmail() {
+    return window.currentUserEmail || '';
+}
+
 // Initialize auth manager
 window.authManager = new AuthManager();
 

@@ -67,17 +67,18 @@
         const snapshot = await query.get();
         const newContacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         contactsData = newContacts;
-      }
-      
-      // Track pagination only for admin path
-      if (isAdmin()) {
+        
+        // Track pagination for admin path
         if (snapshot.docs.length > 0) {
           lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
           hasMoreData = snapshot.docs.length === 100; // If we got less than 100, no more data
         } else {
           hasMoreData = false;
         }
-      } else {
+      }
+      
+      // For non-admin path, disable pagination
+      if (!isAdmin()) {
         lastLoadedDoc = null;
         hasMoreData = false;
       }
