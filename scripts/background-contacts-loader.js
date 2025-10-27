@@ -106,12 +106,8 @@
       try {
         const cached = await window.CacheManager.get('contacts');
         if (cached && Array.isArray(cached) && cached.length > 0) {
-          if (window.currentUserRole !== 'admin') {
-            const email = window.currentUserEmail || '';
-            contactsData = (cached || []).filter(c => (c && (c.ownerId === email || c.assignedTo === email)));
-          } else {
-            contactsData = cached;
-          }
+          // CacheManager already handles scoped queries, so use cached data directly
+          contactsData = cached;
           loadedFromCache = true; // Mark as loaded from cache
           console.log('[BackgroundContactsLoader] ✓ Loaded', cached.length, 'contacts from cache');
           
@@ -135,14 +131,10 @@
         if (window.CacheManager) {
           const cached = await window.CacheManager.get('contacts');
           if (cached && Array.isArray(cached) && cached.length > 0) {
-            if (window.currentUserRole !== 'admin') {
-              const email = window.currentUserEmail || '';
-              contactsData = (cached || []).filter(c => (c && (c.ownerId === email || c.assignedTo === email)));
-            } else {
-              contactsData = cached;
-            }
+            // CacheManager already handles scoped queries, so use cached data directly
+            contactsData = cached;
             loadedFromCache = true; // Mark as loaded from cache
-            console.log('[BackgroundContactsLoader] ✓ Loaded', contactsData.length, 'contacts from cache (delayed, filtered)');
+            console.log('[BackgroundContactsLoader] ✓ Loaded', cached.length, 'contacts from cache (delayed)');
             document.dispatchEvent(new CustomEvent('pc:contacts-loaded', { 
               detail: { count: cached.length, cached: true } 
             }));
