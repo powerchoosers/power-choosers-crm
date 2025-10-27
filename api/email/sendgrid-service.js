@@ -93,9 +93,27 @@ export class SendGridService {
       };
 
       // Prepare email message with filtered recipients
-      // Generate both HTML and text versions for maximum compatibility
+      // Detect if this is an HTML email template
+      const isHtmlEmail = content.includes('<html') || content.includes('<!DOCTYPE') || 
+                         content.includes('<div style=') || content.includes('<table') ||
+                         content.includes('font-family:') || content.includes('max-width:');
+      
+      console.log('[SendGrid] Email type detection:', {
+        isHtmlEmail,
+        contentLength: content.length,
+        hasHtmlTag: content.includes('<html'),
+        hasDoctype: content.includes('<!DOCTYPE'),
+        hasStyledDiv: content.includes('<div style='),
+        hasTable: content.includes('<table'),
+        hasFontFamily: content.includes('font-family:'),
+        hasMaxWidth: content.includes('max-width:')
+      });
+      
+      // Generate appropriate content versions
       const htmlContent = content;
-      const textContent = this.stripHtml(content);
+      const textContent = isHtmlEmail ? 
+        this.generateTextFromHtml(content) : 
+        this.stripHtml(content);
       
               const msg = {
         to: allowedRecipients,
@@ -119,6 +137,15 @@ export class SendGridService {
               if (references && references.length) {
                 msg.headers = { ...(msg.headers || {}), 'References': references.join(' ') };
               }
+
+      // Add content-type headers for HTML emails
+      if (isHtmlEmail) {
+        msg.headers = {
+          ...msg.headers,
+          'Content-Type': 'text/html; charset=UTF-8',
+          'X-Mailer': 'Power Choosers CRM'
+        };
+      }
 
       // Add custom headers based on deliverability settings
       if (deliverabilitySettings.includePriorityHeaders) {
@@ -262,6 +289,33 @@ export class SendGridService {
    */
   stripHtml(html) {
     return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  }
+
+  /**
+   * Generate proper text version from HTML email
+   */
+  generateTextFromHtml(html) {
+    // Remove script and style tags completely
+    let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+    text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+    
+    // Convert common HTML elements to text equivalents
+    text = text.replace(/<br\s*\/?>/gi, '\n');
+    text = text.replace(/<\/p>/gi, '\n\n');
+    text = text.replace(/<\/div>/gi, '\n');
+    text = text.replace(/<\/h[1-6]>/gi, '\n\n');
+    text = text.replace(/<li>/gi, '• ');
+    text = text.replace(/<\/li>/gi, '\n');
+    
+    // Remove all remaining HTML tags
+    text = text.replace(/<[^>]*>/g, '');
+    
+    // Clean up whitespace
+    text = text.replace(/\n\s*\n\s*\n/g, '\n\n'); // Max 2 consecutive newlines
+    text = text.replace(/[ \t]+/g, ' '); // Multiple spaces to single space
+    text = text.replace(/\n /g, '\n'); // Remove leading spaces on new lines
+    
+    return text.trim();
   }
 
   /**
