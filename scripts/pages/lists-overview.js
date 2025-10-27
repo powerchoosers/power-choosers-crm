@@ -352,31 +352,10 @@
         if (typeof window.__preloadListMembers === 'function') {
           await window.__preloadListMembers(filteredLists);
         } else {
-          // Fallback: load members individually with simple function
-          console.log('[ListsOverview] Using simple fallback member loading...');
+          // Fallback: set default counts
+          console.log('[ListsOverview] Preloader not available, setting default counts');
           for (const list of filteredLists) {
-            try {
-              // Simple member loading - just get the count from the list document
-              if (window.firebaseDB && window.firebaseDB.collection) {
-                const listDoc = await window.firebaseDB.collection('lists').doc(list.id).get();
-                if (listDoc.exists) {
-                  const data = listDoc.data();
-                  const kind = (list.kind || 'people').toLowerCase();
-                  if (kind === 'accounts') {
-                    list.count = data.accountCount || data.accounts?.length || 0;
-                  } else {
-                    list.count = data.peopleCount || data.people?.length || 0;
-                  }
-                } else {
-                  list.count = 0;
-                }
-              } else {
-                list.count = 0;
-              }
-            } catch (error) {
-              console.warn('[ListsOverview] Failed to load count for list', list.id, error);
-              list.count = 0;
-            }
+            list.count = 0;
           }
         }
 
@@ -1179,11 +1158,79 @@
     document.head.appendChild(style);
   }
 
-  // Expose API for other modules
-  window.ListsOverview = {
-    refreshCounts: refreshCounts,
-    getCurrentState: getCurrentState
-  };
+  // Global preloader function for list members
+  async function preloadListMembersGlobal(lists) {
+    if (!lists || !Array.isArray(lists) || lists.length === 0) return;
+    
+    console.log('[ListsOverview] Preloading members for', lists.length, 'lists...');
+    try { window.listMembersCache = window.listMembersCache || {}; } catch (_) {}
+    
+    const tasks = [];
+    for (const list of lists) {
+      if (!list?.id) continue;
+      
+      // Skip if already cached
+      if (window.listMembersCache && window.listMembersCache[list.id] && window.listMembersCache[list.id].loaded) continue;
+      
+      tasks.push(
+        fetchListMembersSimple(list.id).then((members) => {
+          try { 
+            window.listMembersCache[list.id] = members;
+            // Update count on the list object
+            const kind = (list.kind || 'people').toLowerCase();
+            if (kind === 'accounts') {
+              list.count = members.accounts?.size || 0;
+            } else {
+              list.count = members.people?.size || 0;
+            }
+          } catch (_) {}
+        })
+      );
+    }
+    
+    if (tasks.length) {
+      try { await Promise.all(tasks); } catch (_) {}
+      console.log('[ListsOverview] ✓ Preloaded members for', tasks.length, 'lists');
+    }
+  }
+  
+  // Simple function to fetch list members
+  async function fetchListMembersSimple(listId) {
+    const out = { people: new Set(), accounts: new Set(), loaded: false };
+    if (!listId || !window.firebaseDB || typeof window.firebaseDB.collection !== 'function') return out;
+    
+    try {
+      // Try subcollection first
+      const subSnap = await window.firebaseDB.collection('lists').doc(listId).collection('members').get();
+      if (subSnap && subSnap.docs && subSnap.docs.length) {
+        subSnap.docs.forEach(d => {
+          const m = d.data() || {};
+          const t = (m.targetType || m.type || '').toLowerCase();
+          const id = m.targetId || m.id || d.id;
+          if (t === 'people' || t === 'contact' || t === 'contacts') out.people.add(id);
+          else if (t === 'accounts' || t === 'account') out.accounts.add(id);
+        });
+      } else {
+        // Fallback to top-level listMembers
+        const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).limit(5000).get();
+        lmSnap?.docs?.forEach(d => {
+          const m = d.data() || {};
+          const t = (m.targetType || m.type || '').toLowerCase();
+          const id = m.targetId || m.id || d.id;
+          if (t === 'people' || t === 'contact' || t === 'contacts') out.people.add(id);
+          else if (t === 'accounts' || t === 'account') out.accounts.add(id);
+        });
+      }
+      out.loaded = true;
+    } catch (error) {
+      console.warn('[ListsOverview] Failed to fetch members for list', listId, error);
+    }
+    
+    return out;
+  }
+
+  // Expose globally for debugging
+  window.__preloadListMembers = preloadListMembersGlobal;
 
   // Listen for background lists loader events
   document.addEventListener('pc:lists-loaded', async () => {

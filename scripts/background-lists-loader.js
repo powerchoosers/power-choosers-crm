@@ -87,13 +87,9 @@
       try {
         const cached = await window.CacheManager.get('lists');
         if (cached && Array.isArray(cached) && cached.length > 0) {
-          if (window.currentUserRole !== 'admin') {
-            const email = window.currentUserEmail || '';
-            listsData = (cached || []).filter(l => (l && (l.ownerId === email || l.assignedTo === email)));
-          } else {
-            listsData = cached;
-          }
-          console.log('[BackgroundListsLoader] ✓ Loaded', listsData.length, 'lists from cache (filtered)');
+          // CacheManager already handles scoped queries, so use cached data directly
+          listsData = cached;
+          console.log('[BackgroundListsLoader] ✓ Loaded', listsData.length, 'lists from cache');
           
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:lists-loaded', { 
@@ -115,13 +111,9 @@
         if (window.CacheManager) {
           const cached = await window.CacheManager.get('lists');
           if (cached && Array.isArray(cached) && cached.length > 0) {
-            if (window.currentUserRole !== 'admin') {
-              const email = window.currentUserEmail || '';
-              listsData = (cached || []).filter(l => (l && (l.ownerId === email || l.assignedTo === email)));
-            } else {
-              listsData = cached;
-            }
-            console.log('[BackgroundListsLoader] ✓ Loaded', listsData.length, 'lists from cache (delayed, filtered)');
+            // CacheManager already handles scoped queries, so use cached data directly
+            listsData = cached;
+            console.log('[BackgroundListsLoader] ✓ Loaded', listsData.length, 'lists from cache (delayed)');
             document.dispatchEvent(new CustomEvent('pc:lists-loaded', { 
               detail: { count: cached.length, cached: true } 
             }));
