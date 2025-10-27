@@ -1247,6 +1247,7 @@ class PowerChoosersCRM {
             // Pointer-based hover inside the sidebar
             sidebar.addEventListener('pointerenter', () => {
                 pointerInside = true;
+                if (lockCollapse) return; // Do not schedule open while locked after click
                 if (closeTimer) clearTimeout(closeTimer);
                 // Small show delay to avoid accidental flicker
                 openTimer = setTimeout(openSidebar, 90);
@@ -1294,7 +1295,6 @@ class PowerChoosersCRM {
                             sidebar.removeEventListener('pointerleave', unlockOnLeave);
                         };
                         sidebar.addEventListener('pointerleave', unlockOnLeave);
-                        setTimeout(() => { lockCollapse = false; }, 1200);
                     });
                     item._sidebarNavBound = true;
                 }
@@ -1306,7 +1306,7 @@ class PowerChoosersCRM {
                 clearTimers();
                 pointerInside = false;
                 sidebar.classList.remove('expanded');
-                setTimeout(() => { lockCollapse = false; }, 600);
+                // Remain locked until pointer leaves, to avoid re-opening during page load
             });
 
             sidebar._hoverBound = true;

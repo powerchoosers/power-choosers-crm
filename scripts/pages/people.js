@@ -1810,17 +1810,12 @@
       // Store full dataset for pagination
       state.allContactsCache = contactsData;
       
-      // Get total count from Firestore for proper pagination display
+      // Get total count (non-blocking). Use loaded count for immediate UI.
+      state.totalCount = contactsData.length;
       if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getTotalCount === 'function') {
-        try {
-          state.totalCount = await window.BackgroundContactsLoader.getTotalCount();
-          // console.log('[People] Total contacts in database:', state.totalCount);
-        } catch (error) {
-          console.warn('[People] Failed to get total count, using loaded count:', error);
-          state.totalCount = contactsData.length;
-        }
-      } else {
-        state.totalCount = contactsData.length;
+        window.BackgroundContactsLoader.getTotalCount()
+          .then((cnt) => { state.totalCount = cnt; })
+          .catch((error) => { console.warn('[People] Failed to get total count, keeping loaded count:', error); });
       }
       
       // SMART LAZY LOADING: 
@@ -1830,22 +1825,7 @@
         ? window.BackgroundContactsLoader.isFromCache() 
         : false;
       
-      if (isFromCache) {
-        // Cache is free - load everything at once
-        state.data = contactsData;
-        state.filtered = state.data.slice();
-        state.hasMore = false;
-        console.log('[People] Loaded ALL', contactsData.length, 'contacts from cache (no pagination needed)');
-      } else {
-        // Firestore costs money - lazy load in batches of 100
-        const initialBatchSize = 100;
-        state.data = contactsData.slice(0, initialBatchSize);
-        state.filtered = state.data.slice();
-        state.hasMore = contactsData.length > initialBatchSize;
-        console.log('[People] Loaded first', initialBatchSize, 'contacts from Firestore (lazy loading enabled)');
-      }
-      
-      // Build quick lookups for accounts → employees
+      // Build quick lookups for accounts → employees (reuse across batches)
       const accountById = new Map();
       const accountByName = new Map();
       const getEmployeesFromAccount = (acc) => {
@@ -1869,13 +1849,15 @@
         }
       }
 
-      // Process contacts data (works with both arrays and Firestore snapshots)
+      // Persist maps for reuse during loadMore from cache
+      state._accountById = accountById;
+      state._accountByName = accountByName;
+
+      // Prepare contacts array in normalized form
       const contactsArray = Array.isArray(contactsData) ? contactsData : (contactsData && contactsData.docs ? contactsData.docs.map(d => ({ id: d.id, ...d.data() })) : []);
-      
-      // Map contacts and inject derived accountEmployees from accounts by id or name
-      state.data = contactsArray.map((c) => {
-        // c is already an object with id and data
-        // Locate matching account by id or name
+
+      // Helper to enrich a batch of contacts
+      const enrichBatch = (arr) => arr.map((c) => {
         let acc = null;
         if (c.accountId && accountById.has(c.accountId)) {
           acc = accountById.get(c.accountId);
@@ -1883,22 +1865,16 @@
           const key = (c.accountName || '').toString().trim();
           if (key) acc = accountByName.get(normalize(key)) || null;
         }
-
-        // Derive employees count from account
         let employeesVal = acc ? getEmployeesFromAccount(acc) : null;
         if (employeesVal == null) {
           const fromContact = [c.accountEmployees, c.employees].find((v) => typeof v === 'number' && isFinite(v));
           if (typeof fromContact === 'number') employeesVal = fromContact;
         }
         if (employeesVal != null) c.accountEmployees = employeesVal;
-
-        // Derive company association for display if missing on contact
         if (!c.companyName) {
           if (acc) c.companyName = acc.accountName || acc.name || acc.companyName || c.accountName || '';
           else if (c.accountName) c.companyName = c.accountName;
         }
-
-        // Optionally enrich website/domain from account for quick actions
         if (acc) {
           if (!c.companyWebsite && (acc.website || acc.site)) c.companyWebsite = acc.website || acc.site;
           if (!c.companyDomain && acc.domain) c.companyDomain = acc.domain;
@@ -1908,8 +1884,16 @@
         }
         return c;
       });
-      state.filtered = state.data.slice();
+
+      // Determine initial batch and render immediately
+      const initialBatchSize = 100;
+      const initialBatch = contactsArray.slice(0, initialBatchSize);
+      const enrichedInitial = enrichBatch(initialBatch);
+      state.data = enrichedInitial;
+      state.filtered = enrichedInitial.slice();
+      state.hasMore = contactsArray.length > initialBatchSize;
       state.loaded = true;
+      console.log('[People] Initial render with', state.data.length, 'contacts from', contactsArray.length);
       
       // Check if we're restoring from back navigation
       if (window.__restoringPeople && window._peopleReturn) {
@@ -1962,6 +1946,9 @@
         // Re-render to show updated badges
         render();
       });
+      
+      // Defer enrichment/loading of remaining cache records via existing pagination path
+      // If using cache, the remaining data will be appended by loadMoreContacts() when needed
     } catch (e) {
       console.error('Failed loading contacts:', e);
       state.data = [];
@@ -1994,9 +1981,48 @@
           state.data.length,
           state.data.length + 100 // Load next 100 records from cache
         );
-        moreContacts = nextBatch;
+        // Enrich using stored maps
+        const accountById = state._accountById instanceof Map ? state._accountById : new Map();
+        const accountByName = state._accountByName instanceof Map ? state._accountByName : new Map();
+        const getEmployeesFromAccount = (acc) => {
+          if (!acc || typeof acc !== 'object') return null;
+          const candidates = [acc.employees, acc.employeeCount, acc.numEmployees];
+          for (const v of candidates) {
+            if (typeof v === 'number' && isFinite(v)) return v;
+            const n = Number(v);
+            if (!isNaN(n) && isFinite(n)) return n;
+          }
+          return null;
+        };
+        moreContacts = nextBatch.map((c) => {
+          let acc = null;
+          if (c.accountId && accountById.has(c.accountId)) {
+            acc = accountById.get(c.accountId);
+          } else {
+            const key = (c.accountName || '').toString().trim().toLowerCase();
+            if (key) acc = accountByName.get(key) || null;
+          }
+          let employeesVal = acc ? getEmployeesFromAccount(acc) : null;
+          if (employeesVal == null) {
+            const fromContact = [c.accountEmployees, c.employees].find((v) => typeof v === 'number' && isFinite(v));
+            if (typeof fromContact === 'number') employeesVal = fromContact;
+          }
+          if (employeesVal != null) c.accountEmployees = employeesVal;
+          if (!c.companyName) {
+            if (acc) c.companyName = acc.accountName || acc.name || acc.companyName || c.accountName || '';
+            else if (c.accountName) c.companyName = c.accountName;
+          }
+          if (acc) {
+            if (!c.companyWebsite && (acc.website || acc.site)) c.companyWebsite = acc.website || acc.site;
+            if (!c.companyDomain && acc.domain) c.companyDomain = acc.domain;
+            if (!c.linkedin && !c.linkedinUrl && (acc.linkedin || acc.linkedinUrl || acc.linkedin_url)) {
+              c.linkedinUrl = acc.linkedin || acc.linkedinUrl || acc.linkedin_url;
+            }
+          }
+          return c;
+        });
         state.hasMore = state.data.length + nextBatch.length < state.allContactsCache.length;
-        console.log(`[People] Loaded ${nextBatch.length} more contacts from cache`);
+        console.log(`[People] Loaded ${nextBatch.length} more contacts from cache (enriched)`);
       } else if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.loadMore === 'function') {
         // Use BackgroundContactsLoader for seamless pagination
         const result = await window.BackgroundContactsLoader.loadMore();
