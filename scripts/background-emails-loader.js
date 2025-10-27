@@ -223,8 +223,8 @@
         const cached = await window.CacheManager.get('emails');
         if (cached && Array.isArray(cached) && cached.length > 0) {
           try {
-            const email = getUserEmail();
-            if (!isAdmin() && email) {
+            const email = window.currentUserEmail || '';
+            if (window.currentUserRole !== 'admin' && email) {
               const e = String(email).toLowerCase();
               emailsData = (cached||[]).filter(x => {
                 const fields = [x && x.ownerId, x && x.assignedTo, x && x.from];
