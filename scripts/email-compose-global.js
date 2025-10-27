@@ -122,6 +122,22 @@
           console.log('[EmailCompose] HTML email detected, ensuring rendered view');
           bodyInput.removeAttribute('data-mode');
         }
+        
+        // Detect if content is HTML template and set attribute for persistence
+        if (bodyInput && bodyInput.innerHTML) {
+          const content = bodyInput.innerHTML;
+          const isHtml = content.includes('<!DOCTYPE html>') || 
+                         content.includes('<html') || 
+                         (content.includes('<div') && content.includes('class="container"')) ||
+                         content.includes('class="header"') ||
+                         content.includes('font-family: Arial') ||
+                         content.includes('max-width: 600px');
+          
+          if (isHtml && !bodyInput.getAttribute('data-html-email')) {
+            bodyInput.setAttribute('data-html-email', 'true');
+            console.log('[EmailCompose] Detected HTML email, setting attribute for persistence');
+          }
+        }
           
         // Focus the To input
         setTimeout(() => toInput?.focus(), 100);
@@ -3782,11 +3798,23 @@
     const to = toInput?.value?.trim() || '';
     const subject = subjectInput?.value?.trim() || '';
     
-    // Detect if this is an HTML email template (full HTML with styling)
-    const isHtmlEmail = bodyInput?.getAttribute('data-html-email') === 'true';
     const body = bodyInput?.innerHTML || '';
     
+    // Check attribute first, then detect HTML structure as fallback
+    const hasHtmlAttribute = bodyInput?.getAttribute('data-html-email') === 'true';
+    const hasHtmlStructure = body && (
+      body.includes('<!DOCTYPE html>') ||
+      body.includes('<html') ||
+      (body.includes('<div') && body.includes('class="container"') && body.includes('style="')) ||
+      body.includes('class="header"') || // Common in your templates
+      body.includes('class="email-template"') || // Another common pattern
+      body.includes('font-family: Arial') || // Template styling
+      body.includes('max-width: 600px') // Template container width
+    );
+    const isHtmlEmail = hasHtmlAttribute || hasHtmlStructure;
+    
     console.log('[EmailCompose] Email mode:', isHtmlEmail ? 'HTML Template' : 'Standard');
+    console.log('[EmailCompose] Detection:', {hasHtmlAttribute, hasHtmlStructure});
     console.log('[EmailCompose] Content preview:', body.substring(0, 100) + '...');
     
     if (!to) {
