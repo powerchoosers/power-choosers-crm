@@ -1716,6 +1716,10 @@
       // Set iframe content using srcdoc (isolates CSS completely)
       iframe.srcdoc = html;
       
+      // Store original HTML as backup in data attribute
+      editor.setAttribute('data-original-html', html);
+      console.log('[HTML Email] Stored original HTML backup, length:', html.length);
+      
       // Auto-resize iframe to content height
       iframe.onload = () => {
         try {
@@ -3798,7 +3802,41 @@
     const to = toInput?.value?.trim() || '';
     const subject = subjectInput?.value?.trim() || '';
     
-    const body = bodyInput?.innerHTML || '';
+    // Extract content - handle iframe wrapper for HTML emails with robust fallbacks
+    let body = '';
+    const iframes = bodyInput?.querySelectorAll('.html-email-iframe');
+    const backupHtml = bodyInput?.getAttribute('data-original-html');
+    
+    if (iframes && iframes.length > 0) {
+      // HTML email: try to extract from iframe(s)
+      let extractedHtml = '';
+      
+      // Try each iframe (handle multiple iframes scenario)
+      for (let i = 0; i < iframes.length; i++) {
+        const iframe = iframes[i];
+        if (iframe.srcdoc && iframe.srcdoc.trim().length > 0) {
+          extractedHtml = iframe.srcdoc;
+          console.log(`[EmailCompose] Extracted HTML from iframe ${i + 1}, length:`, extractedHtml.length);
+          break; // Use first valid iframe
+        }
+      }
+      
+      if (extractedHtml) {
+        body = extractedHtml;
+      } else if (backupHtml) {
+        // Fallback to stored backup HTML
+        body = backupHtml;
+        console.log('[EmailCompose] Using backup HTML from data attribute, length:', body.length);
+      } else {
+        // Last resort: use innerHTML (might be iframe wrapper)
+        body = bodyInput?.innerHTML || '';
+        console.warn('[EmailCompose] No iframe content or backup found, using innerHTML, length:', body.length);
+      }
+    } else {
+      // Regular email: use innerHTML
+      body = bodyInput?.innerHTML || '';
+      console.log('[EmailCompose] Using regular innerHTML, length:', body.length);
+    }
     
     // Check attribute first, then detect HTML structure as fallback
     const hasHtmlAttribute = bodyInput?.getAttribute('data-html-email') === 'true';
@@ -3811,10 +3849,23 @@
       body.includes('font-family: Arial') || // Template styling
       body.includes('max-width: 600px') // Template container width
     );
-    const isHtmlEmail = hasHtmlAttribute || hasHtmlStructure;
+    const isHtmlEmail = hasHtmlAttribute || hasHtmlStructure || (iframes && iframes.length > 0) || !!backupHtml;
+    
+    // Check for mixed content (manual edits outside iframe)
+    if (isHtmlEmail && iframes && iframes.length > 0) {
+      const wrapperContent = bodyInput?.innerHTML || '';
+      const iframeWrapperPattern = /<div class="html-email-iframe-wrapper">.*?<\/div>/s;
+      const contentOutsideIframe = wrapperContent.replace(iframeWrapperPattern, '').trim();
+      
+      if (contentOutsideIframe && contentOutsideIframe.length > 0) {
+        console.warn('[EmailCompose] Mixed content detected - manual edits outside iframe:', contentOutsideIframe.length, 'chars');
+        console.warn('[EmailCompose] These edits may not be included in the sent email');
+        // Note: We could merge this content, but for now we'll warn the user
+      }
+    }
     
     console.log('[EmailCompose] Email mode:', isHtmlEmail ? 'HTML Template' : 'Standard');
-    console.log('[EmailCompose] Detection:', {hasHtmlAttribute, hasHtmlStructure});
+    console.log('[EmailCompose] Detection:', {hasHtmlAttribute, hasHtmlStructure, iframeCount: iframes?.length || 0, hasBackup: !!backupHtml});
     console.log('[EmailCompose] Content preview:', body.substring(0, 100) + '...');
     
     if (!to) {
