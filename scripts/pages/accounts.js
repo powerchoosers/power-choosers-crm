@@ -1074,7 +1074,11 @@ var console = {
       const col = window.firebaseDB.collection('accounts');
       // CRITICAL COST REDUCTION: Limit real-time updates to 100 most recent accounts
       // This prevents loading all 1,833 accounts on every change (was costing $180/month)
-      _unsubscribeAccounts = col.orderBy('updatedAt', 'desc').limit(100).onSnapshot((snap) => {
+      
+      // Set up listener based on user role
+      if (window.currentUserRole === 'admin') {
+        // Admin: unfiltered listener
+        _unsubscribeAccounts = col.orderBy('updatedAt', 'desc').limit(100).onSnapshot((snap) => {
         try {
           // Skip first fire to prevent double-render on page load
           // (loadDataOnce already populated the data)
@@ -1103,6 +1107,69 @@ var console = {
       }, (err) => {
         console.warn('[Accounts] onSnapshot error', err);
       });
+      } else {
+        // Non-admin: scoped listener
+        const email = window.currentUserEmail || '';
+        if (email) {
+          const [ownedQuery, assignedQuery] = [
+            col.where('ownerId', '==', email).orderBy('updatedAt', 'desc').limit(100),
+            col.where('assignedTo', '==', email).orderBy('updatedAt', 'desc').limit(100)
+          ];
+          
+          // Set up listeners for both owned and assigned accounts
+          const ownedUnsub = ownedQuery.onSnapshot((snap) => {
+            try {
+              if (_snapshotFirstFire) {
+                _snapshotFirstFire = false;
+                return;
+              }
+              
+              const fresh = [];
+              snap.forEach((doc) => { fresh.push({ id: doc.id, ...doc.data() }); });
+              state.data = fresh;
+              
+              if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+                window.CacheManager.set('accounts', fresh).catch(() => {});
+              }
+              
+              if (!window.__restoringAccounts) {
+                applyFilters();
+              }
+            } catch (_) { /* noop */ }
+          }, (err) => {
+            console.warn('[Accounts] owned accounts onSnapshot error', err);
+          });
+          
+          const assignedUnsub = assignedQuery.onSnapshot((snap) => {
+            try {
+              if (_snapshotFirstFire) {
+                _snapshotFirstFire = false;
+                return;
+              }
+              
+              const fresh = [];
+              snap.forEach((doc) => { fresh.push({ id: doc.id, ...doc.data() }); });
+              state.data = fresh;
+              
+              if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+                window.CacheManager.set('accounts', fresh).catch(() => {});
+              }
+              
+              if (!window.__restoringAccounts) {
+                applyFilters();
+              }
+            } catch (_) { /* noop */ }
+          }, (err) => {
+            console.warn('[Accounts] assigned accounts onSnapshot error', err);
+          });
+          
+          // Store both unsubscribers
+          _unsubscribeAccounts = () => {
+            try { ownedUnsub(); } catch(_) {}
+            try { assignedUnsub(); } catch(_) {}
+          };
+        }
+      }
     } catch (e) {
       console.warn('[Accounts] Failed to start live listener', e);
     }
