@@ -102,9 +102,14 @@
       try {
         const cached = await window.CacheManager.get('accounts');
         if (cached && Array.isArray(cached) && cached.length > 0) {
-          accountsData = cached;
+          if (!isAdmin()) {
+            const email = getUserEmail();
+            accountsData = (cached || []).filter(a => (a && (a.ownerId === email || a.assignedTo === email)));
+          } else {
+            accountsData = cached;
+          }
           loadedFromCache = true; // Mark as loaded from cache
-          console.log('[BackgroundAccountsLoader] ✓ Loaded', cached.length, 'accounts from cache');
+          console.log('[BackgroundAccountsLoader] ✓ Loaded', accountsData.length, 'accounts from cache (filtered)');
           
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:accounts-loaded', { 
@@ -126,9 +131,14 @@
         if (window.CacheManager) {
           const cached = await window.CacheManager.get('accounts');
           if (cached && Array.isArray(cached) && cached.length > 0) {
-            accountsData = cached;
+            if (!isAdmin()) {
+              const email = getUserEmail();
+              accountsData = (cached || []).filter(a => (a && (a.ownerId === email || a.assignedTo === email)));
+            } else {
+              accountsData = cached;
+            }
             loadedFromCache = true; // Mark as loaded from cache
-            console.log('[BackgroundAccountsLoader] ✓ Loaded', cached.length, 'accounts from cache (delayed)');
+            console.log('[BackgroundAccountsLoader] ✓ Loaded', accountsData.length, 'accounts from cache (delayed, filtered)');
             document.dispatchEvent(new CustomEvent('pc:accounts-loaded', { 
               detail: { count: cached.length, cached: true } 
             }));

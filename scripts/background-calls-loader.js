@@ -126,10 +126,23 @@
         if (window.CacheManager) {
           const cached = await window.CacheManager.get('calls');
           if (cached && Array.isArray(cached) && cached.length > 0) {
-            callsData = cached;
+            try {
+              const isAdminUser = (typeof window.DataManager==='object' && typeof window.DataManager.isCurrentUserAdmin==='function') ? window.DataManager.isCurrentUserAdmin() : (window.currentUserRole==='admin');
+              if (!isAdminUser) {
+                const email = (typeof window.DataManager==='object' && typeof window.DataManager.getCurrentUserEmail==='function') ? window.DataManager.getCurrentUserEmail() : (window.currentUserEmail||'').toLowerCase();
+                const allowed = (rec)=>{
+                  const e = (email||'').toLowerCase();
+                  const fields = [rec && rec.ownerId, rec && rec.assignedTo, rec && rec.createdBy, rec && rec.agentEmail, rec && rec.userEmail];
+                  return fields.some(v=> (String(v||'').toLowerCase()===e));
+                };
+                callsData = (cached||[]).filter(allowed);
+              } else {
+                callsData = cached;
+              }
+            } catch(_) { callsData = cached; }
             // Check if data is enriched
             isEnriched = cached[0] && cached[0].hasOwnProperty('counterpartyPretty');
-            console.log('[BackgroundCallsLoader] ✓ Loaded', cached.length, 'calls from cache (delayed)', isEnriched ? '(enriched)' : '(raw)');
+            console.log('[BackgroundCallsLoader] ✓ Loaded', callsData.length, 'calls from cache (delayed, filtered)', isEnriched ? '(enriched)' : '(raw)');
             document.dispatchEvent(new CustomEvent('pc:calls-loaded', { 
               detail: { count: cached.length, cached: true, enriched: isEnriched } 
             }));

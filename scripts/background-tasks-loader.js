@@ -117,8 +117,13 @@
         if (window.CacheManager) {
           const cached = await window.CacheManager.get('tasks');
           if (cached && Array.isArray(cached) && cached.length > 0) {
-            tasksData = cached;
-            console.log('[BackgroundTasksLoader] ✓ Loaded', cached.length, 'tasks from cache (delayed)');
+            if (!isAdmin()) {
+              const email = getUserEmail();
+              tasksData = (cached || []).filter(t => (t && (t.ownerId === email || t.assignedTo === email)));
+            } else {
+              tasksData = cached;
+            }
+            console.log('[BackgroundTasksLoader] ✓ Loaded', tasksData.length, 'tasks from cache (delayed, filtered)');
             document.dispatchEvent(new CustomEvent('pc:tasks-loaded', { 
               detail: { count: cached.length, cached: true } 
             }));
