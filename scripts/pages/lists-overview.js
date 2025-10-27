@@ -169,7 +169,16 @@
     const createBtn = popoverEl?.querySelector('[data-act="create"]');
     if (createBtn) createBtn.disabled = true;
 
-    let newItem = { name, kind, recordCount: 0, createdAt: new Date(), updatedAt: new Date() };
+    let newItem = { 
+      name, 
+      kind, 
+      recordCount: 0, 
+      createdAt: new Date(), 
+      updatedAt: new Date(),
+      ownerId: window.currentUserEmail || '',
+      createdBy: window.currentUserEmail || '',
+      assignedTo: window.currentUserEmail || ''
+    };
     try {
       if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
         const payload = { ...newItem };
@@ -387,14 +396,16 @@
             const email = window.currentUserEmail || '';
             let altSnap;
             if (window.currentUserRole !== 'admin' && email) {
-              // Non-admin: use scoped query
-              const [ownedSnap, assignedSnap] = await Promise.all([
+              // Non-admin: use scoped query - check multiple ownership fields
+              const [ownedSnap, assignedSnap, createdSnap] = await Promise.all([
                 window.firebaseDB.collection('lists').where('ownerId','==',email).limit(200).get(),
-                window.firebaseDB.collection('lists').where('assignedTo','==',email).limit(200).get()
+                window.firebaseDB.collection('lists').where('assignedTo','==',email).limit(200).get(),
+                window.firebaseDB.collection('lists').where('createdBy','==',email).limit(200).get()
               ]);
               const map = new Map();
               ownedSnap.forEach(d=>map.set(d.id, d));
               assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
+              createdSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
               altSnap = { docs: Array.from(map.values()) };
             } else {
               // Admin: use unfiltered query
@@ -1231,6 +1242,35 @@
 
   // Expose globally for debugging
   window.__preloadListMembers = preloadListMembersGlobal;
+  
+  // Debug helper to check list ownership fields
+  window.debugListOwnership = async () => {
+    if (!window.firebaseDB) return console.log('Firebase not available');
+    
+    const email = window.currentUserEmail || '';
+    console.log('Debugging list ownership for email:', email);
+    
+    try {
+      const [ownedSnap, assignedSnap, createdSnap, allSnap] = await Promise.all([
+        window.firebaseDB.collection('lists').where('ownerId','==',email).get(),
+        window.firebaseDB.collection('lists').where('assignedTo','==',email).get(),
+        window.firebaseDB.collection('lists').where('createdBy','==',email).get(),
+        window.firebaseDB.collection('lists').limit(10).get()
+      ]);
+      
+      console.log('Ownership Debug Results:');
+      console.log('- ownerId matches:', ownedSnap.docs.length);
+      console.log('- assignedTo matches:', assignedSnap.docs.length);
+      console.log('- createdBy matches:', createdSnap.docs.length);
+      console.log('- total lists (sample):', allSnap.docs.length);
+      
+      if (allSnap.docs.length > 0) {
+        console.log('Sample list fields:', allSnap.docs[0].data());
+      }
+    } catch (error) {
+      console.error('Debug failed:', error);
+    }
+  };
 
   // Listen for background lists loader events
   document.addEventListener('pc:lists-loaded', async () => {
