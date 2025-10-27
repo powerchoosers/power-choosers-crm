@@ -368,9 +368,9 @@
         // and filter client-side using flexible field names: kind | type | listType.
         if (!items.length) {
           try {
-            const email = getUserEmail();
+            const email = window.currentUserEmail || '';
             let altSnap;
-            if (!isAdmin() && email) {
+            if (window.currentUserRole !== 'admin' && email) {
               // Non-admin: use scoped query
               const [ownedSnap, assignedSnap] = await Promise.all([
                 window.firebaseDB.collection('lists').where('ownerId','==',email).limit(200).get(),

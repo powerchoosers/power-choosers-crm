@@ -37,14 +37,14 @@
     
     try {
       console.log('[BackgroundContactsLoader] Loading contacts...');
-      if (!isAdmin()) {
+      if (window.currentUserRole !== 'admin') {
         // Employee: scope by ownership
         let newContacts = [];
         if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
           newContacts = await window.DataManager.queryWithOwnership('contacts');
         } else {
           const db = window.firebaseDB;
-          const email = getUserEmail();
+          const email = window.currentUserEmail || '';
           const [ownedSnap, assignedSnap] = await Promise.all([
             db.collection('contacts').where('ownerId','==',email).get(),
             db.collection('contacts').where('assignedTo','==',email).get()
@@ -78,7 +78,7 @@
       }
       
       // For non-admin path, disable pagination
-      if (!isAdmin()) {
+      if (window.currentUserRole !== 'admin') {
         lastLoadedDoc = null;
         hasMoreData = false;
       }
@@ -106,8 +106,8 @@
       try {
         const cached = await window.CacheManager.get('contacts');
         if (cached && Array.isArray(cached) && cached.length > 0) {
-          if (!isAdmin()) {
-            const email = getUserEmail();
+          if (window.currentUserRole !== 'admin') {
+            const email = window.currentUserEmail || '';
             contactsData = (cached || []).filter(c => (c && (c.ownerId === email || c.assignedTo === email)));
           } else {
             contactsData = cached;
@@ -135,8 +135,8 @@
         if (window.CacheManager) {
           const cached = await window.CacheManager.get('contacts');
           if (cached && Array.isArray(cached) && cached.length > 0) {
-            if (!isAdmin()) {
-              const email = getUserEmail();
+            if (window.currentUserRole !== 'admin') {
+              const email = window.currentUserEmail || '';
               contactsData = (cached || []).filter(c => (c && (c.ownerId === email || c.assignedTo === email)));
             } else {
               contactsData = cached;
@@ -167,7 +167,7 @@
     }
     
     try {
-      if (!isAdmin()) {
+      if (window.currentUserRole !== 'admin') {
         // For employees, we already scoped and disabled pagination
         return { loaded: 0, hasMore: false };
       }
@@ -215,8 +215,8 @@
     if (!window.firebaseDB) return 0;
     
     try {
-      const email = getUserEmail();
-      if (!isAdmin() && email) {
+      const email = window.currentUserEmail || '';
+      if (window.currentUserRole !== 'admin' && email) {
         // Non-admin: count only owned/assigned contacts
         const [ownedSnap, assignedSnap] = await Promise.all([
           window.firebaseDB.collection('contacts').where('ownerId','==',email).get(),

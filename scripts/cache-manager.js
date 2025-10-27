@@ -241,8 +241,8 @@ class CacheManager {
 
       // Use scoped queries for user-specific collections
       if (['contacts', 'tasks', 'accounts', 'emails', 'lists', 'sequences'].includes(collection)) {
-        const email = getUserEmail();
-        if (!isAdmin() && email) {
+        const email = window.currentUserEmail || '';
+        if (window.currentUserRole !== 'admin' && email) {
           // Non-admin: use scoped queries
           const [ownedSnap, assignedSnap] = await Promise.all([
             window.firebaseDB.collection(collection).where('ownerId','==',email).get(),
@@ -264,7 +264,7 @@ class CacheManager {
       }
 
       // For other collections, use standard query (admin only)
-      if (isAdmin()) {
+      if (window.currentUserRole === 'admin') {
         const snapshot = await window.firebaseDB.collection(collection).get();
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore`);

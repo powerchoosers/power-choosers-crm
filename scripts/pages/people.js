@@ -3980,9 +3980,9 @@
         let items = local;
         try {
           if (window.firebaseDB) {
-            const email = getUserEmail();
+            const email = window.currentUserEmail || '';
             let snap;
-            if (!isAdmin() && email) {
+            if (window.currentUserRole !== 'admin' && email) {
               // Non-admin: use scoped query
               snap = await window.firebaseDB.collection('sequences').where('ownerId','==',email).get();
             } else {

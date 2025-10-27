@@ -3553,8 +3553,8 @@ class PowerChoosersCRM {
             let existingContacts = [];
             if (updateExisting && modal._importType === 'contacts' && window.ContactMerger) {
                 console.log('Fetching existing contacts for duplicate detection...');
-                const email = getUserEmail();
-                if (!isAdmin() && email) {
+                const email = window.currentUserEmail || '';
+                if (window.currentUserRole !== 'admin' && email) {
                     // Non-admin: use scoped query
                     const [ownedSnap, assignedSnap] = await Promise.all([
                         db.collection('contacts').where('ownerId','==',email).get(),

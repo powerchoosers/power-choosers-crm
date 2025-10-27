@@ -648,9 +648,9 @@
     if (!window.firebaseDB) return [];
 
     try {
-      const email = getUserEmail();
+      const email = window.currentUserEmail || '';
       let snapshot;
-      if (!isAdmin() && email) {
+      if (window.currentUserRole !== 'admin' && email) {
         // Non-admin: use scoped query
         const [ownedSnap, assignedSnap] = await Promise.all([
           window.firebaseDB.collection('deals').where('ownerId','==',email).get(),
