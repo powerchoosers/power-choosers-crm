@@ -1669,6 +1669,11 @@
     
     // Wait for shimmer to fade out
     setTimeout(() => {
+      // Persist raw HTML for send flow and mark type
+      try {
+        editor.setAttribute('data-html-email', 'true');
+        editor.dataset.htmlEmailContent = html;
+      } catch (_) {}
       // Clear editor and create iframe container
       editor.innerHTML = '';
       
@@ -2279,7 +2284,7 @@
           
           // Use different animations based on template type
           if (templateType) {
-            // HTML email template: wrap in iframe to isolate CSS and prevent style bleeding
+            // HTML email template: preview in iframe and store raw HTML for sending
             renderHtmlEmailInIframe(editor, finalHtml);
           } else {
             // Standard email: use simple fade-in
@@ -2295,23 +2300,7 @@
             }, 50);
           }
         }, 800);
-      }
 
-      // Stop generating animation after content is inserted
-      setTimeout(() => {
-        stopGeneratingAnimation(compose);
-        if (status) status.textContent = 'Generated successfully!';
-      }, 1200);
-
-    } catch (error) {
-      console.error('[AI] Generation failed:', error);
-      stopGeneratingAnimation(compose);
-      if (status) status.textContent = 'Generation failed. Please try again.';
-    }
-  }
-
-  // ========== TEMPLATE BUILDER FUNCTIONS ==========
-  
   // Build sender profile signature once for all HTML templates
   function getSenderProfile() {
     const settings = (window.SettingsPage?.getSettings?.()) || {};
@@ -3700,6 +3689,19 @@
       const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
       // Prepare email data for SendGrid
+      // Determine sender and owner for scoping
+      let senderEmail = '';
+      try {
+        const settings = (window.SettingsPage?.getSettings?.()) || {};
+        senderEmail = settings?.general?.email || '';
+      } catch (_) {}
+      let ownerId = '';
+      try {
+        if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+          ownerId = String(window.DataManager.getCurrentUserEmail() || '').toLowerCase();
+        }
+      } catch (_) {}
+
       const emailPayload = {
         to: to,
         subject: subject,
@@ -3708,7 +3710,9 @@
         threadId: threadId,
         inReplyTo: inReplyTo,
         references: references,
-        _deliverability: _deliverability
+        _deliverability: _deliverability,
+        from: senderEmail || undefined,
+        ownerId: ownerId || undefined
       };
       
       // Send via SendGrid API
@@ -3728,8 +3732,8 @@
       const result = await response.json();
       console.log('[SendGrid] Email sent successfully:', result);
       
-      // Store email record for tracking
-      if (window.emailTrackingManager && result.trackingId) {
+      // Server already stores the email record. Avoid client-side overwrite unless explicitly enabled.
+      if (window.USE_CLIENT_EMAIL_SAVE && window.emailTrackingManager && result.trackingId) {
         const trackingEmailData = {
           id: result.trackingId,
           to: emailData.to,
@@ -3748,9 +3752,9 @@
         
         try {
           await window.emailTrackingManager.saveEmailRecord(trackingEmailData);
-          console.log('[SendGrid] Email record saved to tracking system');
+          console.log('[SendGrid] Email record saved to tracking system (client override)');
         } catch (trackingError) {
-          console.warn('[SendGrid] Failed to save email record:', trackingError);
+          console.warn('[SendGrid] Failed to save email record (client override):', trackingError);
         }
       }
       
@@ -3812,15 +3816,17 @@
         sendButton.textContent = 'Sending...';
       }
 
-      // HTML emails: Use content as-is (has hardcoded signature from wrapSonarHtmlWithBranding)
+      // HTML emails: Use stored raw HTML (from iframe preview) as-is; standard emails apply signature
       // Standard emails: Apply signature settings
-      let contentWithSignature = body;
+      // Prefer stored raw HTML for HTML templates
+      const rawHtmlFromDataset = bodyInput?.dataset?.htmlEmailContent || '';
+      let contentWithSignature = isHtmlEmail ? (rawHtmlFromDataset || body) : body;
       
       if (isHtmlEmail) {
         // HTML email templates: Don't apply any signature settings
         // They have their own hardcoded signatures via wrapSonarHtmlWithBranding
         console.log('[Signature Debug] HTML email - skipping all signature settings');
-        contentWithSignature = body;
+        contentWithSignature = rawHtmlFromDataset || body;
       } else {
         // Standard email: Apply signature settings
         console.log('[Signature Debug] Standard email - applying signature settings');

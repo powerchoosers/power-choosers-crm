@@ -35,12 +35,22 @@ class AuthManager {
     }
 
     async handleAuthStateChange(user) {
-        console.log('[Auth] ==> handleAuthStateChange triggered, user:', user ? user.email : 'null');
-        this.user = user;
+      console.log('[Auth] ==> handleAuthStateChange triggered, user:', user ? user.email : 'null');
+      this.user = user;
 
-        if (user) {
-            console.log('[Auth] User object:', {email: user.email, uid: user.uid});
-            const emailLower = user.email ? user.email.toLowerCase() : '';
+      if (user) {
+        console.log('[Auth] User object:', {email: user.email, uid: user.uid});
+        const emailLower = user.email ? user.email.toLowerCase() : '';
+        try {
+          const prev = localStorage.getItem('pc:lastUserEmail') || '';
+          if (prev && prev !== emailLower) {
+            console.log('[Auth] Detected account switch. Invalidating all caches...');
+            if (window.CacheManager && typeof window.CacheManager.invalidateAll === 'function') {
+              await window.CacheManager.invalidateAll();
+            }
+          }
+          localStorage.setItem('pc:lastUserEmail', emailLower);
+        } catch(_) {}
             
             // Check domain restriction (case-insensitive)
             if (!emailLower.endsWith('@powerchoosers.com')) {
@@ -69,9 +79,14 @@ class AuthManager {
             
             console.log('[Auth] ✓ Auth flow complete');
         } else {
-            console.log('[Auth] No user - showing login');
-            this.showLogin();
-        }
+        console.log('[Auth] No user - showing login');
+        try {
+          if (window.CacheManager && typeof window.CacheManager.invalidateAll === 'function') {
+            await window.CacheManager.invalidateAll();
+          }
+        } catch(_) {}
+        this.showLogin();
+      }
     }
 
     async ensureUserProfile(user) {
@@ -147,15 +162,20 @@ class AuthManager {
     }
 
     async signOut() {
+      try {
+        await this.auth.signOut();
+        console.log('[Auth] Sign-out successful');
         try {
-            await this.auth.signOut();
-            console.log('[Auth] Sign-out successful');
-            this.showSuccess('Signed out successfully');
-        } catch (error) {
-            console.error('[Auth] Sign-out error:', error);
-            this.showError('Failed to sign out. Please try again.');
-        }
-    }
+          if (window.CacheManager && typeof window.CacheManager.invalidateAll === 'function') {
+            await window.CacheManager.invalidateAll();
+          }
+        } catch(_) {}
+        this.showSuccess('Signed out successfully');
+      } catch (error) {
+        console.error('[Auth] Sign-out error:', error);
+        this.showError('Failed to sign out. Please try again.');
+      }
+  }
 
     showLogin() {
         const loginOverlay = document.getElementById('login-overlay');

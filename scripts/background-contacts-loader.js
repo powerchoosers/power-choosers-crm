@@ -105,7 +105,12 @@
       try {
         const cached = await window.CacheManager.get('contacts');
         if (cached && Array.isArray(cached) && cached.length > 0) {
-          contactsData = cached;
+          if (!isAdmin()) {
+            const email = getUserEmail();
+            contactsData = (cached || []).filter(c => (c && (c.ownerId === email || c.assignedTo === email)));
+          } else {
+            contactsData = cached;
+          }
           loadedFromCache = true; // Mark as loaded from cache
           console.log('[BackgroundContactsLoader] ✓ Loaded', cached.length, 'contacts from cache');
           
