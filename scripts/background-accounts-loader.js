@@ -211,8 +211,22 @@
     if (!window.firebaseDB) return 0;
     
     try {
-      const snapshot = await window.firebaseDB.collection('accounts').get();
-      return snapshot.size;
+      const email = getUserEmail();
+      if (!isAdmin() && email) {
+        // Non-admin: count only owned/assigned accounts
+        const [ownedSnap, assignedSnap] = await Promise.all([
+          window.firebaseDB.collection('accounts').where('ownerId','==',email).get(),
+          window.firebaseDB.collection('accounts').where('assignedTo','==',email).get()
+        ]);
+        const map = new Map();
+        ownedSnap.forEach(d=>map.set(d.id, d.id));
+        assignedSnap.forEach(d=>map.set(d.id, d.id));
+        return map.size;
+      } else {
+        // Admin: count all accounts
+        const snapshot = await window.firebaseDB.collection('accounts').get();
+        return snapshot.size;
+      }
     } catch (error) {
       console.error('[BackgroundAccountsLoader] Failed to get total count:', error);
       return accountsData.length; // Fallback to loaded count

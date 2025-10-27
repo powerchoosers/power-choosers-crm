@@ -368,7 +368,22 @@
         // and filter client-side using flexible field names: kind | type | listType.
         if (!items.length) {
           try {
-            const altSnap = await window.firebaseDB.collection('lists').limit(200).get();
+            const email = getUserEmail();
+            let altSnap;
+            if (!isAdmin() && email) {
+              // Non-admin: use scoped query
+              const [ownedSnap, assignedSnap] = await Promise.all([
+                window.firebaseDB.collection('lists').where('ownerId','==',email).limit(200).get(),
+                window.firebaseDB.collection('lists').where('assignedTo','==',email).limit(200).get()
+              ]);
+              const map = new Map();
+              ownedSnap.forEach(d=>map.set(d.id, d));
+              assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
+              altSnap = { docs: Array.from(map.values()) };
+            } else {
+              // Admin: use unfiltered query
+              altSnap = await window.firebaseDB.collection('lists').limit(200).get();
+            }
             const all = (altSnap && altSnap.docs) ? altSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
             const want = (v) => (v || '').toString().trim().toLowerCase();
             items = all.filter(doc => {

@@ -193,8 +193,22 @@
     if (!window.firebaseDB) return 0;
     
     try {
-      const snapshot = await window.firebaseDB.collection('tasks').get();
-      return snapshot.size;
+      const email = getUserEmail();
+      if (!isAdmin() && email) {
+        // Non-admin: count only owned/assigned tasks
+        const [ownedSnap, assignedSnap] = await Promise.all([
+          window.firebaseDB.collection('tasks').where('ownerId','==',email).get(),
+          window.firebaseDB.collection('tasks').where('assignedTo','==',email).get()
+        ]);
+        const map = new Map();
+        ownedSnap.forEach(d=>map.set(d.id, d.id));
+        assignedSnap.forEach(d=>map.set(d.id, d.id));
+        return map.size;
+      } else {
+        // Admin: count all tasks
+        const snapshot = await window.firebaseDB.collection('tasks').get();
+        return snapshot.size;
+      }
     } catch (error) {
       console.error('[BackgroundTasksLoader] Failed to get total count:', error);
       return tasksData.length; // Fallback to loaded count

@@ -239,11 +239,40 @@ class CacheManager {
         }
       }
 
-      // Standard Firestore query
-      const snapshot = await window.firebaseDB.collection(collection).get();
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore`);
-      return data;
+      // Use scoped queries for user-specific collections
+      if (['contacts', 'tasks', 'accounts', 'emails', 'lists', 'sequences'].includes(collection)) {
+        const email = getUserEmail();
+        if (!isAdmin() && email) {
+          // Non-admin: use scoped queries
+          const [ownedSnap, assignedSnap] = await Promise.all([
+            window.firebaseDB.collection(collection).where('ownerId','==',email).get(),
+            window.firebaseDB.collection(collection).where('assignedTo','==',email).get()
+          ]);
+          const map = new Map();
+          ownedSnap.forEach(d=>map.set(d.id,{ id:d.id, ...d.data() }));
+          assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
+          const data = Array.from(map.values());
+          console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore (scoped)`);
+          return data;
+        } else {
+          // Admin: use unfiltered query
+          const snapshot = await window.firebaseDB.collection(collection).get();
+          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore (admin)`);
+          return data;
+        }
+      }
+
+      // For other collections, use standard query (admin only)
+      if (isAdmin()) {
+        const snapshot = await window.firebaseDB.collection(collection).get();
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore`);
+        return data;
+      } else {
+        console.warn(`[CacheManager] Non-admin access denied for collection: ${collection}`);
+        return [];
+      }
     } catch (error) {
       console.error(`[CacheManager] Error fetching ${collection} from Firestore:`, error);
       return [];
