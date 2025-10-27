@@ -150,6 +150,13 @@ class CacheManager {
   async isFresh(collection) {
     try {
       await this.init();
+      
+      // Check if database is still open
+      if (!this.db || this.db.version === 0) {
+        console.warn(`[CacheManager] Database not available for freshness check on ${collection}`);
+        return false;
+      }
+      
       const tx = this.db.transaction(['_meta'], 'readonly');
       const store = tx.objectStore('_meta');
       const request = store.get(collection);
@@ -283,6 +290,13 @@ class CacheManager {
   async getFromCache(collection) {
     try {
       await this.init();
+      
+      // Check if database is still open
+      if (!this.db || this.db.version === 0) {
+        console.warn(`[CacheManager] Database not available for reading ${collection}`);
+        return [];
+      }
+      
       const tx = this.db.transaction([collection], 'readonly');
       const store = tx.objectStore(collection);
       const request = store.getAll();
@@ -301,6 +315,12 @@ class CacheManager {
   async set(collection, data) {
     try {
       await this.init();
+      
+      // Check if database is still open
+      if (!this.db || this.db.version === 0) {
+        console.warn(`[CacheManager] Database not available for ${collection}, skipping cache`);
+        return;
+      }
       
       // Store data
       const dataTx = this.db.transaction([collection], 'readwrite');
