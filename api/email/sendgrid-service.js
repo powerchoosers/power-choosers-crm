@@ -230,7 +230,6 @@ export class SendGridService {
         subject: emailData.subject,
         content: emailData.content,
         from: emailData.from || this.fromEmail,
-        ownerId: (emailData.ownerId || '').toLowerCase() || null,
         sentAt: new Date().toISOString(),
         messageId: messageId,
                 threadId: emailData.threadId || null,
