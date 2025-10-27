@@ -54,15 +54,14 @@
         const snapshot = await query.get();
         const newLists = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         listsData = newLists;
-        if (snapshot.docs.length>0) { lastLoadedDoc = snapshot.docs[snapshot.docs.length-1]; hasMoreData = snapshot.docs.length===100; } else { hasMoreData=false; }
-      }
-      
-      // Track last document for pagination
-      if (snapshot.docs.length > 0) {
-        lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
-        hasMoreData = snapshot.docs.length === 100; // If we got less than 100, no more data
-      } else {
-        hasMoreData = false;
+        
+        // Track pagination for admin path
+        if (snapshot.docs.length > 0) {
+          lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
+          hasMoreData = snapshot.docs.length === 100; // If we got less than 100, no more data
+        } else {
+          hasMoreData = false;
+        }
       }
       
       console.log('[BackgroundListsLoader] ✓ Loaded', listsData.length, 'lists from Firestore', hasMoreData ? '(more available)' : '(all loaded)');

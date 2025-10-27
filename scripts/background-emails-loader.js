@@ -38,13 +38,13 @@
     
     try {
       console.log('[BackgroundEmailsLoader] Loading from Firestore...');
-      if (!isAdmin()) {
+      if (window.currentUserRole !== 'admin') {
         // Employee: scope by ownership
         let raw = [];
         if (window.DataManager && typeof window.DataManager.queryWithOwnership==='function') {
           raw = await window.DataManager.queryWithOwnership('emails');
         } else {
-          const email = getUserEmail();
+          const email = window.currentUserEmail || '';
           const db = window.firebaseDB;
           const [ownedSnap, assignedSnap] = await Promise.all([
             db.collection('emails').where('ownerId','==',email).limit(100).get(),
@@ -105,7 +105,7 @@
       }));
 
       // Start realtime listener after initial load
-      if (!isAdmin()) startRealtimeListenerScoped(getUserEmail()); else startRealtimeListener();
+      if (window.currentUserRole !== 'admin') startRealtimeListenerScoped(window.currentUserEmail || ''); else startRealtimeListener();
     } catch (error) {
       console.error('[BackgroundEmailsLoader] Failed to load from Firestore:', error);
     }
@@ -260,8 +260,8 @@
           const cached = await window.CacheManager.get('emails');
           if (cached && Array.isArray(cached) && cached.length > 0) {
             try {
-              const email = getUserEmail();
-              if (!isAdmin() && email) {
+              const email = window.currentUserEmail || '';
+              if (window.currentUserRole !== 'admin' && email) {
                 const e = String(email).toLowerCase();
                 emailsData = (cached||[]).filter(x => {
                   const fields = [x && x.ownerId, x && x.assignedTo, x && x.from];

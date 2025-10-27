@@ -30,12 +30,12 @@
     
     try {
       console.log('[BackgroundSequencesLoader] Loading sequences...');
-      if (!isAdmin()) {
+      if (window.currentUserRole !== 'admin') {
         let newSequences = [];
         if (window.DataManager && typeof window.DataManager.queryWithOwnership==='function') {
           newSequences = await window.DataManager.queryWithOwnership('sequences');
         } else {
-          const email = getUserEmail();
+          const email = window.currentUserEmail || '';
           const snap = await window.firebaseDB.collection('sequences').where('ownerId','==',email).get();
           newSequences = snap.docs.map(d=>({ id:d.id, ...d.data() }));
         }
@@ -79,8 +79,8 @@
       try {
         const cached = await window.CacheManager.get('sequences');
         if (cached && Array.isArray(cached) && cached.length > 0) {
-          if (!isAdmin()) {
-            const email = getUserEmail();
+          if (window.currentUserRole !== 'admin') {
+            const email = window.currentUserEmail || '';
             sequencesData = (cached || []).filter(s => (s && s.ownerId === email));
           } else {
             sequencesData = cached;
@@ -107,8 +107,8 @@
         if (window.CacheManager) {
           const cached = await window.CacheManager.get('sequences');
           if (cached && Array.isArray(cached) && cached.length > 0) {
-            if (!isAdmin()) {
-              const email = getUserEmail();
+            if (window.currentUserRole !== 'admin') {
+              const email = window.currentUserEmail || '';
               sequencesData = (cached || []).filter(s => (s && s.ownerId === email));
             } else {
               sequencesData = cached;
@@ -138,7 +138,7 @@
     }
     
     try {
-      if (!isAdmin()) return { loaded: 0, hasMore: false };
+      if (window.currentUserRole !== 'admin') return { loaded: 0, hasMore: false };
       console.log('[BackgroundSequencesLoader] Loading next batch...');
       let query = window.firebaseDB.collection('sequences')
         .orderBy('updatedAt', 'desc')
@@ -183,8 +183,8 @@
     if (!window.firebaseDB) return 0;
     
     try {
-      const email = getUserEmail();
-      if (!isAdmin() && email) {
+      const email = window.currentUserEmail || '';
+      if (window.currentUserRole !== 'admin' && email) {
         // Non-admin: count only owned sequences
         const snapshot = await window.firebaseDB.collection('sequences').where('ownerId','==',email).get();
         return snapshot.size;
