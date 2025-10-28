@@ -1722,90 +1722,90 @@
                             
                             <div class="page-content">
                                 <!-- Loading and Error States -->
-                                <div class="loading-spinner" style="display: none;">
+                                <div class="loading-spinner" style="display: none; text-align: center; padding: 40px;">
                                     <div class="spinner"></div>
                                     <p>Loading agents data...</p>
                                 </div>
                                 
-                                <div class="error-message" style="display: none;">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <div class="error-message" style="display: none; text-align: center; padding: 40px; color: var(--red-500);">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 10px;">
                                         <circle cx="12" cy="12" r="10"></circle>
                                         <line x1="15" y1="9" x2="9" y2="15"></line>
                                         <line x1="9" y1="9" x2="15" y2="15"></line>
                                     </svg>
-                                    <span class="error-text"></span>
+                                    <div class="error-text"></div>
                                 </div>
 
                                 <!-- Agents Dashboard -->
                                 <div class="agents-dashboard" style="display: none;">
                                     <!-- Overview Metrics -->
-                                    <div class="agents-overview">
-                                        <div class="metric-card">
-                                            <div class="metric-icon">
-                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                                                    <circle cx="9" cy="7" r="4"></circle>
-                                                    <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-                                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                                </svg>
+                                    <div class="agents-overview" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--spacing-base); margin-bottom: var(--spacing-base);">
+                                        <div class="dashboard-card">
+                                            <div class="card-header" style="display: flex; align-items: center; gap: var(--spacing-sm);">
+                                                <div class="metric-icon" style="width: 24px; height: 24px; color: var(--orange-subtle);">
+                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                                                        <circle cx="9" cy="7" r="4"></circle>
+                                                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                                    </svg>
+                                                </div>
+                                                <h3 class="card-title">Active Agents</h3>
                                             </div>
-                                            <div class="metric-content">
-                                                <h3>Active Agents</h3>
-                                                <div class="metric-value" id="active-agents-count">0</div>
-                                            </div>
+                                            <div class="metric-value" id="active-agents-count" style="font-size: 2rem; font-weight: 600; color: var(--text-inverse); margin-top: var(--spacing-sm);">0</div>
                                         </div>
                                         
-                                        <div class="metric-card">
-                                            <div class="metric-icon">
-                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                                                </svg>
+                                        <div class="dashboard-card">
+                                            <div class="card-header" style="display: flex; align-items: center; gap: var(--spacing-sm);">
+                                                <div class="metric-icon" style="width: 24px; height: 24px; color: var(--orange-subtle);">
+                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                                                    </svg>
+                                                </div>
+                                                <h3 class="card-title">Total Calls Today</h3>
                                             </div>
-                                            <div class="metric-content">
-                                                <h3>Total Calls Today</h3>
-                                                <div class="metric-value" id="total-calls-today">0</div>
-                                            </div>
+                                            <div class="metric-value" id="total-calls-today" style="font-size: 2rem; font-weight: 600; color: var(--text-inverse); margin-top: var(--spacing-sm);">0</div>
                                         </div>
                                         
-                                        <div class="metric-card">
-                                            <div class="metric-icon">
-                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                                                    <polyline points="22,6 12,13 2,6"></polyline>
-                                                </svg>
+                                        <div class="dashboard-card">
+                                            <div class="card-header" style="display: flex; align-items: center; gap: var(--spacing-sm);">
+                                                <div class="metric-icon" style="width: 24px; height: 24px; color: var(--orange-subtle);">
+                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                                        <polyline points="22,6 12,13 2,6"></polyline>
+                                                    </svg>
+                                                </div>
+                                                <h3 class="card-title">Emails Sent Today</h3>
                                             </div>
-                                            <div class="metric-content">
-                                                <h3>Emails Sent Today</h3>
-                                                <div class="metric-value" id="total-emails-today">0</div>
-                                            </div>
+                                            <div class="metric-value" id="total-emails-today" style="font-size: 2rem; font-weight: 600; color: var(--text-inverse); margin-top: var(--spacing-sm);">0</div>
                                         </div>
                                         
-                                        <div class="metric-card">
-                                            <div class="metric-icon">
-                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <polyline points="9,11 12,14 22,4"></polyline>
-                                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-                                                </svg>
+                                        <div class="dashboard-card">
+                                            <div class="card-header" style="display: flex; align-items: center; gap: var(--spacing-sm);">
+                                                <div class="metric-icon" style="width: 24px; height: 24px; color: var(--orange-subtle);">
+                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <polyline points="9,11 12,14 22,4"></polyline>
+                                                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                                    </svg>
+                                                </div>
+                                                <h3 class="card-title">Tasks Completed</h3>
                                             </div>
-                                            <div class="metric-content">
-                                                <h3>Tasks Completed</h3>
-                                                <div class="metric-value" id="tasks-completed-today">0</div>
-                                            </div>
+                                            <div class="metric-value" id="tasks-completed-today" style="font-size: 2rem; font-weight: 600; color: var(--text-inverse); margin-top: var(--spacing-sm);">0</div>
                                         </div>
                                     </div>
                                     
                                     <!-- Agents Table -->
-                                    <div class="agents-table-container">
-                                        <div class="table-header">
-                                            <h3>Agent Management</h3>
-                                            <div class="table-filters">
-                                                <select id="agent-status-filter" class="filter-select">
+                                    <div class="dashboard-card">
+                                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-base);">
+                                            <h3 class="card-title">Agent Management</h3>
+                                            <div class="table-filters" style="display: flex; gap: var(--spacing-sm);">
+                                                <select id="agent-status-filter" class="filter-select" style="background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); padding: var(--spacing-sm); color: var(--text-inverse);">
                                                     <option value="all">All Status</option>
                                                     <option value="online">Online</option>
                                                     <option value="offline">Offline</option>
                                                     <option value="busy">Busy</option>
                                                 </select>
-                                                <select id="agent-territory-filter" class="filter-select">
+                                                <select id="agent-territory-filter" class="filter-select" style="background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); padding: var(--spacing-sm); color: var(--text-inverse);">
                                                     <option value="all">All Territories</option>
                                                     <option value="west_coast">West Coast</option>
                                                     <option value="east_coast">East Coast</option>
@@ -1815,25 +1815,27 @@
                                             </div>
                                         </div>
                                         
-                                        <div class="table-wrapper">
-                                            <table class="agents-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Agent</th>
-                                                        <th>Status</th>
-                                                        <th>Phone Number</th>
-                                                        <th>Email Address</th>
-                                                        <th>Calls Today</th>
-                                                        <th>Emails Today</th>
-                                                        <th>Tasks Completed</th>
-                                                        <th>Current Activity</th>
-                                                        <th>Actions</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="agents-table-body">
-                                                    <!-- Populated by JavaScript -->
-                                                </tbody>
-                                            </table>
+                                        <div class="table-container">
+                                            <div class="table-scroll">
+                                                <table class="data-table" id="agents-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Agent</th>
+                                                            <th>Status</th>
+                                                            <th>Phone Number</th>
+                                                            <th>Email Address</th>
+                                                            <th>Calls Today</th>
+                                                            <th>Emails Today</th>
+                                                            <th>Tasks Completed</th>
+                                                            <th>Current Activity</th>
+                                                            <th>Actions</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="agents-table-body">
+                                                        <!-- Populated by JavaScript -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
