@@ -19068,9 +19068,10 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     font-size: 0.875rem;
 }
 
-/* ========== SEQUENCE AI BAR STYLES ========== */
+/* ========== AGENTS PAGE AI BAR STYLES (More Specific) ========== */
 
-.ai-bar {
+#agents-page .ai-bar,
+#agent-detail-page .ai-bar {
     background: var(--grey-800);
     border: 1px solid var(--grey-600);
     border-radius: var(--border-radius-md);
@@ -19081,7 +19082,8 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     opacity: 0;
 }
 
-.ai-bar.open {
+#agents-page .ai-bar.open,
+#agent-detail-page .ai-bar.open {
     max-height: 500px;
     opacity: 1;
     padding: var(--spacing-md);
