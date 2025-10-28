@@ -5,8 +5,8 @@
   const state = {
     loaded: false,
     loading: false,
-    userEmail: '',
-    isAdmin: false,
+    userEmail: window.currentUserEmail || '',
+    isAdmin: window.currentUserRole === 'admin',
     data: {
       accounts: [],
       contacts: [],
@@ -571,14 +571,14 @@
       const enterpriseLabel = enterprise.querySelector('.segment-label');
       if (enterpriseValue) enterpriseValue.textContent = `${metrics.clients.enterprise} clients`;
       if (enterpriseLabel) enterpriseLabel.textContent = 'Enterprise (1000+ employees)';
-
+      
       // Mid-market
       const midmarket = segmentItems[1];
       const midmarketValue = midmarket.querySelector('.segment-value');
       const midmarketLabel = midmarket.querySelector('.segment-label');
       if (midmarketValue) midmarketValue.textContent = `${metrics.clients.midmarket} clients`;
       if (midmarketLabel) midmarketLabel.textContent = 'Mid-market (100-999 employees)';
-
+      
       // SMB
       const smb = segmentItems[2];
       const smbValue = smb.querySelector('.segment-value');
@@ -617,24 +617,6 @@
       });
     }
 
-    // Add filter event handlers
-    const contractStatusFilter = document.getElementById('contract-status-filter');
-    const clientSizeFilter = document.getElementById('client-size-filter');
-    
-    if (contractStatusFilter) {
-      contractStatusFilter.addEventListener('change', (e) => {
-        state.filters.contractStatus = e.target.value;
-        renderClientList();
-      });
-    }
-    
-    if (clientSizeFilter) {
-      clientSizeFilter.addEventListener('change', (e) => {
-        state.filters.clientSize = e.target.value;
-        renderClientList();
-      });
-    }
-
     // Add click handlers for card actions
     const cardActions = els.dashboard.querySelectorAll('.card-action');
     cardActions.forEach(action => {
@@ -670,28 +652,19 @@
   function show() {
     if (!initDomRefs()) return;
     
-    // Wait for authentication to complete before checking user
-    const checkAuth = () => {
-      if (window.currentUserEmail) {
-        // Update state with current user info
-        state.userEmail = window.currentUserEmail;
-        state.isAdmin = window.currentUserRole === 'admin';
-        
-        renderDashboard();
-        attachEvents();
-        
-        // Load data if not already loaded
-        if (!state.loaded) {
-          loadClientData();
-        }
-      } else {
-        // Wait a bit more for auth to complete
-        setTimeout(checkAuth, 100);
-      }
-    };
+    // Check if user is authenticated
+    if (!state.userEmail) {
+      showError('User authentication required. Please log in.');
+      return;
+    }
+
+    renderDashboard();
+    attachEvents();
     
-    // Start checking for authentication
-    checkAuth();
+    // Load data if not already loaded
+    if (!state.loaded) {
+      loadClientData();
+    }
   }
 
   // Public API
@@ -725,3 +698,4 @@
     }
   }
 })();
+
