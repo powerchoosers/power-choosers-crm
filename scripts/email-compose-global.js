@@ -3735,6 +3735,7 @@
         inReplyTo: inReplyTo,
         references: references,
         isHtmlEmail: isHtmlEmail || false,
+        userEmail: window.currentUserEmail,
         _deliverability: _deliverability
       };
       
