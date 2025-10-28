@@ -4157,22 +4157,23 @@ html, body {
 .profile-avatar {
     width: 36px;
     height: 36px;
-    background: var(--blue-subtle);
+    background: var(--orange-subtle);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 600;
-    color: var(--text-inverse);
+    color: #fff;
     cursor: pointer;
     transition: var(--transition-fast);
     font-size: 0.875rem;
+    letter-spacing: 0.5px;
 }
 
 .profile-avatar:hover {
-    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
-    transform: scale(1.1) rotate(5deg);
-    box-shadow: 0 4px 12px rgba(30, 64, 175, 0.4);
+    background: var(--orange-primary);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(255, 140, 0, 0.3);
 }
 
 /* === MAIN LAYOUT === */
@@ -14858,9 +14859,9 @@ input.row-select[type="checkbox"]:focus-visible {
 
 /* Profile avatar hover effect */
 .profile-avatar:hover {
-    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
-    transform: scale(1.1) rotate(5deg);
-    box-shadow: 0 4px 12px rgba(30, 64, 175, 0.4);
+    background: var(--orange-primary);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(255, 140, 0, 0.3);
 }
 
 /* Quick action buttons glow */
@@ -17493,8 +17494,8 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: var(--orange-primary);
-    color: white;
+    background: var(--orange-subtle);
+    color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;

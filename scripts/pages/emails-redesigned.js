@@ -30,6 +30,9 @@
           tab.classList.toggle('active', tab.dataset.folder === state.currentFolder);
         });
         
+        // Show/hide Generate Now button
+        updateGenerateButtonVisibility();
+        
         applyFilters();
         render();
         
@@ -67,6 +70,7 @@
     els.searchInput = document.getElementById('emails-search');
     els.clearBtn = document.getElementById('clear-search-btn');
     els.composeBtn = document.getElementById('compose-email-btn');
+    els.generateBtn = document.getElementById('generate-scheduled-btn');
     els.summary = document.getElementById('emails-summary');
     els.count = document.getElementById('emails-count');
     els.pagination = document.getElementById('emails-pagination');
@@ -89,6 +93,10 @@
           state.currentFolder = tab.dataset.folder;
           state.currentPage = 1;
           console.log('[EmailsPage] Current folder set to:', state.currentFolder);
+          
+          // Show/hide Generate Now button
+          updateGenerateButtonVisibility();
+          
           applyFilters();
         });
         tab._emailTabBound = true;
@@ -117,6 +125,14 @@
       els.composeBtn.addEventListener('click', (e) => {
         e.preventDefault();
         openComposeModal(); // Call with no parameters for new email
+      });
+    }
+
+    // Generate scheduled emails button
+    if (els.generateBtn) {
+      els.generateBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        generateScheduledEmails();
       });
     }
 
@@ -273,6 +289,18 @@
         return isSent && !email.deleted;
       });
       console.log('[EmailsPage] Sent filter applied. Filtered count:', filtered.length);
+    } else if (state.currentFolder === 'scheduled') {
+      // Scheduled emails are already filtered by ownership in BackgroundEmailsLoader
+      // Only shows scheduled emails owned by or assigned to current user
+      filtered = filtered.filter(email => {
+        return email.type === 'scheduled' && 
+               email.scheduledSendTime && 
+               email.scheduledSendTime > Date.now() &&
+               !email.deleted;
+      });
+      // Sort by scheduled send time (earliest first)
+      filtered.sort((a, b) => a.scheduledSendTime - b.scheduledSendTime);
+      console.log('[EmailsPage] Scheduled filter applied. Filtered count:', filtered.length);
     } else if (state.currentFolder === 'starred') {
       filtered = filtered.filter(email => email.starred && !email.deleted);
       console.log('[EmailsPage] Starred filter applied. Filtered count:', filtered.length);
@@ -781,6 +809,57 @@
     return preview || 'No preview available';
   }
 
+
+  // Update Generate Now button visibility
+  function updateGenerateButtonVisibility() {
+    if (els.generateBtn) {
+      els.generateBtn.style.display = state.currentFolder === 'scheduled' ? 'inline-block' : 'none';
+    }
+  }
+
+  // Generate scheduled emails manually
+  async function generateScheduledEmails() {
+    if (!els.generateBtn) return;
+    
+    // Disable button and show loading state
+    els.generateBtn.disabled = true;
+    els.generateBtn.textContent = 'Generating...';
+    
+    try {
+      const response = await fetch('/api/generate-scheduled-emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ immediate: true })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('[EmailsPage] Generated scheduled emails:', result);
+      
+      // Show success message
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast(`Generated ${result.count || 0} scheduled emails`);
+      }
+      
+      // Reload data to show new emails
+      await loadData();
+      
+    } catch (error) {
+      console.error('[EmailsPage] Failed to generate scheduled emails:', error);
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Failed to generate scheduled emails');
+      }
+    } finally {
+      // Re-enable button
+      els.generateBtn.disabled = false;
+      els.generateBtn.textContent = 'Generate Now';
+    }
+  }
 
   // Initialize
   async function init() {

@@ -5,6 +5,7 @@
   const state = {
     loaded: false,
     loading: false,
+    eventsInitialized: false, // Add this flag
     userEmail: window.currentUserEmail || '',
     isAdmin: window.currentUserRole === 'admin',
     data: {
@@ -129,72 +130,148 @@
     return 'smb';
   }
 
-  // Load real data from Firebase
+  // Load real data from cache-first approach
   async function loadClientData() {
-    const db = window.firebaseDB;
-    const userEmail = state.userEmail;
+    const startTime = performance.now();
     
-    if (!db || !userEmail) {
-      showError('Database connection or user authentication not available');
+    if (!state.userEmail) {
+      showError('User authentication required');
       return;
     }
 
     showLoading();
 
     try {
-      // Load accounts (owned by user)
-      const accountsQuery = state.isAdmin 
-        ? db.collection('accounts').get()
-        : db.collection('accounts').where('ownerId', '==', userEmail).get();
+      // 1. Load from cache immediately (fastest - no Firebase cost)
+      const cachedAccounts = window.BackgroundAccountsLoader?.getAccountsData() || [];
+      const cachedContacts = await window.CacheManager?.get('contacts') || [];
+      const cachedTasks = await window.CacheManager?.get('tasks') || [];
       
-      // Load contacts (owned by user)  
-      const contactsQuery = state.isAdmin
-        ? db.collection('contacts').get()
-        : db.collection('contacts').where('ownerId', '==', userEmail).get();
-        
-      // Load tasks (owned by user)
-      const tasksQuery = state.isAdmin
-        ? db.collection('tasks').get() 
-        : db.collection('tasks').where('ownerId', '==', userEmail).get();
-
-      // Execute queries in parallel
-      const [accountsSnap, contactsSnap, tasksSnap] = await Promise.all([
-        accountsQuery,
-        contactsQuery, 
-        tasksQuery
-      ]);
-
-      // Process accounts
-      state.data.accounts = accountsSnap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      // Process contacts
-      state.data.contacts = contactsSnap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      // Process tasks
-      state.data.tasks = tasksSnap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      // Load recent calls and emails (optional - can be added later)
-      state.data.calls = [];
-      state.data.emails = [];
-
-      console.log(`Loaded ${state.data.accounts.length} accounts, ${state.data.contacts.length} contacts, ${state.data.tasks.length} tasks`);
-
+      // 2. Filter by ownership if not admin
+      if (!state.isAdmin && state.userEmail) {
+        state.data.accounts = cachedAccounts.filter(acc => 
+          acc.ownerId === state.userEmail || acc.assignedTo === state.userEmail
+        );
+        state.data.contacts = cachedContacts.filter(contact => 
+          contact.ownerId === state.userEmail || contact.assignedTo === state.userEmail
+        );
+        state.data.tasks = cachedTasks.filter(task => 
+          task.ownerId === state.userEmail || task.assignedTo === state.userEmail
+        );
+      } else {
+        state.data.accounts = cachedAccounts;
+        state.data.contacts = cachedContacts;
+        state.data.tasks = cachedTasks;
+      }
+      
+      // 3. Render immediately with cached data
       hideLoading();
       renderDashboard();
-
+      
+      const loadTime = performance.now() - startTime;
+      console.log(`[ClientManagement] Page loaded in ${loadTime.toFixed(2)}ms from cache`);
+      
+      // 4. Refresh stale data in background (no UI blocking)
+      refreshStaleData();
+      
     } catch (error) {
-      console.error('Failed to load client data:', error);
+      console.error('[ClientManagement] Failed to load data:', error);
       showError('Failed to load client data. Please try again.');
+      hideLoading();
     }
+  }
+
+  // Smart cache refresh logic for background updates
+  async function refreshStaleData() {
+    try {
+      // Check cache freshness
+      const accountsFresh = window.BackgroundAccountsLoader?.isFromCache() || false;
+      const contactsFresh = await window.CacheManager?.isFresh('contacts') || false;
+      const tasksFresh = await window.CacheManager?.isFresh('tasks') || false;
+      
+      // Refresh stale data in background
+      if (!accountsFresh) {
+        console.log('[ClientManagement] Refreshing stale accounts...');
+        await window.BackgroundAccountsLoader?.reload();
+      }
+      
+      if (!contactsFresh) {
+        console.log('[ClientManagement] Refreshing stale contacts...');
+        await window.CacheManager?.get('contacts'); // Triggers refresh
+      }
+      
+      if (!tasksFresh) {
+        console.log('[ClientManagement] Refreshing stale tasks...');
+        await window.CacheManager?.get('tasks'); // Triggers refresh
+      }
+    } catch (error) {
+      console.error('[ClientManagement] Background refresh failed:', error);
+    }
+  }
+
+  // Real-time event listeners for live updates
+  function setupRealTimeUpdates() {
+    // Listen for account updates
+    document.addEventListener('pc:accounts-loaded', (event) => {
+      console.log('[ClientManagement] Accounts updated, refreshing...');
+      const accounts = window.BackgroundAccountsLoader?.getAccountsData() || [];
+      
+      if (!state.isAdmin && state.userEmail) {
+        state.data.accounts = accounts.filter(acc => 
+          acc.ownerId === state.userEmail || acc.assignedTo === state.userEmail
+        );
+      } else {
+        state.data.accounts = accounts;
+      }
+      
+      if (state.loaded) {
+        renderClientList();
+        renderOverviewStats(calculateMetrics());
+        renderContractRenewalDashboard(calculateMetrics());
+        renderClientSegmentation(calculateMetrics());
+      }
+    });
+    
+    // Listen for task updates
+    document.addEventListener('tasksUpdated', async () => {
+      console.log('[ClientManagement] Tasks updated, refreshing...');
+      const tasks = await window.CacheManager?.get('tasks') || [];
+      
+      if (!state.isAdmin && state.userEmail) {
+        state.data.tasks = tasks.filter(task => 
+          task.ownerId === state.userEmail || task.assignedTo === state.userEmail
+        );
+      } else {
+        state.data.tasks = tasks;
+      }
+      
+      if (state.loaded) {
+        const metrics = calculateMetrics();
+        renderOverviewStats(metrics);
+        renderTaskDashboard(metrics);
+        renderClientList(); // Refresh overdue task counts per client
+      }
+    });
+    
+    // Listen for contact updates
+    document.addEventListener('pc:contacts-loaded', async () => {
+      console.log('[ClientManagement] Contacts updated, refreshing...');
+      const contacts = await window.CacheManager?.get('contacts') || [];
+      
+      if (!state.isAdmin && state.userEmail) {
+        state.data.contacts = contacts.filter(contact => 
+          contact.ownerId === state.userEmail || contact.assignedTo === state.userEmail
+        );
+      } else {
+        state.data.contacts = contacts;
+      }
+      
+      if (state.loaded) {
+        renderClientList(); // Refresh primary contact display
+      }
+    });
+    
+    console.log('[ClientManagement] Real-time event listeners initialized');
   }
 
   // Calculate dashboard metrics from real data
@@ -644,9 +721,22 @@
     renderClientList();
   }
 
-  function refresh() {
+  async function refresh() {
     if (!state.loaded) return;
-    loadClientData();
+    
+    console.log('[ClientManagement] Manual refresh triggered');
+    
+    // Invalidate caches to force fresh data
+    await window.CacheManager?.invalidate('accounts');
+    await window.CacheManager?.invalidate('contacts');
+    await window.CacheManager?.invalidate('tasks');
+    
+    // Reload from Firestore
+    await window.BackgroundAccountsLoader?.reload();
+    await window.CacheManager?.get('contacts');
+    await window.CacheManager?.get('tasks');
+    
+    // Data will be updated via event listeners automatically
   }
 
   function show() {
@@ -658,12 +748,20 @@
       return;
     }
 
-    renderDashboard();
+    // Set up real-time updates (only once)
+    if (!state.eventsInitialized) {
+      setupRealTimeUpdates();
+      state.eventsInitialized = true;
+    }
+
     attachEvents();
     
     // Load data if not already loaded
     if (!state.loaded) {
       loadClientData();
+    } else {
+      // Already loaded, just render
+      renderDashboard();
     }
   }
 

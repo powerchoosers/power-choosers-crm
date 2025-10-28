@@ -7,7 +7,7 @@ class CacheManager {
     this.dbVersion = 4; // Bumped for tasks, sequences, lists collections
     this.db = null;
     this.cacheExpiry = 15 * 60 * 1000; // 15 minutes in milliseconds
-    this.collections = ['contacts', 'accounts', 'calls', 'calls-raw', 'tasks', 'sequences', 'lists', 'deals', 'settings', 'badge-data', 'emails'];
+    this.collections = ['contacts', 'accounts', 'calls', 'calls-raw', 'tasks', 'sequences', 'lists', 'deals', 'settings', 'badge-data', 'emails', 'agents', 'agent_activities'];
     this.listMembersExpiry = 10 * 60 * 1000; // 10 minutes for list members
     this.initPromise = null;
   }
@@ -498,6 +498,285 @@ class CacheManager {
       });
     } catch (error) {
       return null;
+    }
+  }
+
+  // ===== AGENT-SPECIFIC CACHING METHODS =====
+
+  // Cache agent metrics (separate from full agent data for performance)
+  async cacheAgentMetrics(agentEmail, metrics) {
+    const cacheKey = `agent-metrics-${agentEmail}`;
+    const data = {
+      id: cacheKey,
+      agentEmail,
+      ...metrics,
+      timestamp: Date.now(),
+      expiry: Date.now() + (5 * 60 * 1000) // 5 minutes
+    };
+    
+    try {
+      await this.init();
+      const tx = this.db.transaction(['agents'], 'readwrite');
+      const store = tx.objectStore('agents');
+      store.put(data);
+      
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = () => {
+          console.log(`[CacheManager] ✓ Cached metrics for agent ${agentEmail}`);
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (error) {
+      console.error(`[CacheManager] Error caching agent metrics:`, error);
+    }
+  }
+
+  // Get cached agent metrics
+  async getCachedAgentMetrics(agentEmail) {
+    try {
+      await this.init();
+      const cacheKey = `agent-metrics-${agentEmail}`;
+      const tx = this.db.transaction(['agents'], 'readonly');
+      const store = tx.objectStore('agents');
+      const request = store.get(cacheKey);
+      
+      return new Promise((resolve) => {
+        request.onsuccess = () => {
+          const cached = request.result;
+          if (!cached || !cached.expiry || cached.expiry < Date.now()) {
+            resolve(null);
+            return;
+          }
+          
+          console.log(`[CacheManager] ✓ Agent metrics cache HIT for ${agentEmail}`);
+          resolve(cached);
+        };
+        
+        request.onerror = () => resolve(null);
+      });
+    } catch (error) {
+      console.error(`[CacheManager] Error getting cached agent metrics:`, error);
+      return null;
+    }
+  }
+
+  // Cache recent agent activities (last 50 per agent)
+  async cacheAgentActivities(agentEmail, activities) {
+    const cacheKey = `agent-activities-${agentEmail}`;
+    const data = {
+      id: cacheKey,
+      agentEmail,
+      activities: activities.slice(0, 50), // Limit to 50 most recent
+      timestamp: Date.now(),
+      expiry: Date.now() + (2 * 60 * 1000) // 2 minutes (more frequent updates)
+    };
+    
+    try {
+      await this.init();
+      const tx = this.db.transaction(['agent_activities'], 'readwrite');
+      const store = tx.objectStore('agent_activities');
+      store.put(data);
+      
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = () => {
+          console.log(`[CacheManager] ✓ Cached ${activities.length} activities for agent ${agentEmail}`);
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (error) {
+      console.error(`[CacheManager] Error caching agent activities:`, error);
+    }
+  }
+
+  // Get cached agent activities
+  async getCachedAgentActivities(agentEmail) {
+    try {
+      await this.init();
+      const cacheKey = `agent-activities-${agentEmail}`;
+      const tx = this.db.transaction(['agent_activities'], 'readonly');
+      const store = tx.objectStore('agent_activities');
+      const request = store.get(cacheKey);
+      
+      return new Promise((resolve) => {
+        request.onsuccess = () => {
+          const cached = request.result;
+          if (!cached || !cached.expiry || cached.expiry < Date.now()) {
+            resolve(null);
+            return;
+          }
+          
+          console.log(`[CacheManager] ✓ Agent activities cache HIT for ${agentEmail}`);
+          resolve(cached.activities || []);
+        };
+        
+        request.onerror = () => resolve(null);
+      });
+    } catch (error) {
+      console.error(`[CacheManager] Error getting cached agent activities:`, error);
+      return null;
+    }
+  }
+
+  // Cache Twilio phone numbers (longer expiry - changes infrequently)
+  async cacheTwilioNumbers(numbers) {
+    const data = {
+      id: 'twilio-numbers',
+      numbers,
+      timestamp: Date.now(),
+      expiry: Date.now() + (30 * 60 * 1000) // 30 minutes
+    };
+    
+    try {
+      await this.init();
+      const tx = this.db.transaction(['agents'], 'readwrite');
+      const store = tx.objectStore('agents');
+      store.put(data);
+      
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = () => {
+          console.log(`[CacheManager] ✓ Cached ${numbers.length} Twilio numbers`);
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (error) {
+      console.error(`[CacheManager] Error caching Twilio numbers:`, error);
+    }
+  }
+
+  // Get cached Twilio numbers
+  async getCachedTwilioNumbers() {
+    try {
+      await this.init();
+      const tx = this.db.transaction(['agents'], 'readonly');
+      const store = tx.objectStore('agents');
+      const request = store.get('twilio-numbers');
+      
+      return new Promise((resolve) => {
+        request.onsuccess = () => {
+          const cached = request.result;
+          if (!cached || !cached.expiry || cached.expiry < Date.now()) {
+            resolve(null);
+            return;
+          }
+          
+          console.log(`[CacheManager] ✓ Twilio numbers cache HIT`);
+          resolve(cached.numbers || []);
+        };
+        
+        request.onerror = () => resolve(null);
+      });
+    } catch (error) {
+      console.error(`[CacheManager] Error getting cached Twilio numbers:`, error);
+      return null;
+    }
+  }
+
+  // Cache SendGrid email addresses (longer expiry - changes infrequently)
+  async cacheSendGridEmails(emails) {
+    const data = {
+      id: 'sendgrid-emails',
+      emails,
+      timestamp: Date.now(),
+      expiry: Date.now() + (30 * 60 * 1000) // 30 minutes
+    };
+    
+    try {
+      await this.init();
+      const tx = this.db.transaction(['agents'], 'readwrite');
+      const store = tx.objectStore('agents');
+      store.put(data);
+      
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = () => {
+          console.log(`[CacheManager] ✓ Cached ${emails.length} SendGrid emails`);
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch (error) {
+      console.error(`[CacheManager] Error caching SendGrid emails:`, error);
+    }
+  }
+
+  // Get cached SendGrid emails
+  async getCachedSendGridEmails() {
+    try {
+      await this.init();
+      const tx = this.db.transaction(['agents'], 'readonly');
+      const store = tx.objectStore('agents');
+      const request = store.get('sendgrid-emails');
+      
+      return new Promise((resolve) => {
+        request.onsuccess = () => {
+          const cached = request.result;
+          if (!cached || !cached.expiry || cached.expiry < Date.now()) {
+            resolve(null);
+            return;
+          }
+          
+          console.log(`[CacheManager] ✓ SendGrid emails cache HIT`);
+          resolve(cached.emails || []);
+        };
+        
+        request.onerror = () => resolve(null);
+      });
+    } catch (error) {
+      console.error(`[CacheManager] Error getting cached SendGrid emails:`, error);
+      return null;
+    }
+  }
+
+  // Update agent status in cache (for real-time updates)
+  async updateAgentStatus(agentEmail, status, lastActive) {
+    try {
+      await this.init();
+      const tx = this.db.transaction(['agents'], 'readwrite');
+      const store = tx.objectStore('agents');
+      
+      // Get existing agent data
+      const getRequest = store.get(agentEmail);
+      
+      getRequest.onsuccess = () => {
+        const existing = getRequest.result || { id: agentEmail };
+        const updated = { 
+          ...existing, 
+          status, 
+          lastActive: lastActive || new Date(),
+          updatedAt: new Date()
+        };
+        
+        store.put(updated);
+        console.log(`[CacheManager] ✓ Updated agent status for ${agentEmail}: ${status}`);
+      };
+
+      getRequest.onerror = () => {
+        console.error(`[CacheManager] Error updating agent status:`, getRequest.error);
+      };
+    } catch (error) {
+      console.error(`[CacheManager] Error updating agent status:`, error);
+    }
+  }
+
+  // Add new agent activity to cache (for real-time updates)
+  async addAgentActivity(activity) {
+    try {
+      await this.init();
+      const tx = this.db.transaction(['agent_activities'], 'readwrite');
+      const store = tx.objectStore('agent_activities');
+      
+      // Store individual activity
+      store.put({
+        id: activity.id || `activity-${Date.now()}-${Math.random()}`,
+        ...activity,
+        timestamp: activity.timestamp || new Date()
+      });
+      
+      console.log(`[CacheManager] ✓ Added agent activity: ${activity.type}`);
+    } catch (error) {
+      console.error(`[CacheManager] Error adding agent activity:`, error);
     }
   }
 }

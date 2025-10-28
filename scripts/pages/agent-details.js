@@ -85,10 +85,47 @@
     state.loaded = true;
   }
 
-  // Load agent data from Firebase
+  // Load agent data with cache-first approach
   async function loadAgentData() {
     showLoading();
     
+    try {
+      // 1. Try to get agent from cached agents list first
+      if (window.CacheManager) {
+        const cachedAgents = await window.CacheManager.getCachedData('agents');
+        const cachedAgent = cachedAgents?.find(agent => agent.email === state.currentAgentEmail);
+        
+        if (cachedAgent) {
+          state.currentAgent = cachedAgent;
+          console.log('[AgentDetails] Loaded agent from cache');
+          
+          // Load activities from cache
+          await loadActivitiesFromCache();
+          
+          // Load Twilio/SendGrid from cache
+          await loadTwilioNumbers();
+          await loadSendGridEmails();
+          
+          renderAgentDetails();
+          hideLoading();
+          
+          // Start real-time listener for this specific agent
+          startAgentRealtimeListener();
+          return;
+        }
+      }
+      
+      // 2. Cache miss - load from Firestore
+      await loadFromFirestore();
+      
+    } catch (error) {
+      console.error('[AgentDetails] Error loading data:', error);
+      showError('Failed to load agent data. Please try again.');
+    }
+  }
+
+  // Load from Firestore
+  async function loadFromFirestore() {
     try {
       const db = firebase.firestore();
       
@@ -105,6 +142,49 @@
       };
 
       // Load agent activities
+      await loadActivitiesFromFirestore();
+      
+      // Load Twilio phone numbers
+      await loadTwilioNumbers();
+      
+      // Load SendGrid email addresses
+      await loadSendGridEmails();
+
+      renderAgentDetails();
+      hideLoading();
+      
+      // Start real-time listener
+      startAgentRealtimeListener();
+      
+    } catch (error) {
+      console.error('[AgentDetails] Error loading from Firestore:', error);
+      showError('Failed to load agent data. Please try again.');
+    }
+  }
+
+  // Load activities from cache
+  async function loadActivitiesFromCache() {
+    if (!window.CacheManager) return;
+    
+    try {
+      const cachedActivities = await window.CacheManager.getCachedAgentActivities(state.currentAgentEmail);
+      if (cachedActivities && cachedActivities.length > 0) {
+        state.agentActivities = cachedActivities;
+        console.log('[AgentDetails] Loaded activities from cache');
+        return;
+      }
+    } catch (error) {
+      console.warn('[AgentDetails] Error loading activities from cache:', error);
+    }
+    
+    // Fallback to Firestore
+    await loadActivitiesFromFirestore();
+  }
+
+  // Load activities from Firestore
+  async function loadActivitiesFromFirestore() {
+    try {
+      const db = firebase.firestore();
       const activitiesSnapshot = await db.collection('agent_activities')
         .where('agentEmail', '==', state.currentAgentEmail)
         .orderBy('timestamp', 'desc')
@@ -116,24 +196,81 @@
         ...doc.data()
       }));
 
-      // Load Twilio phone numbers
-      await loadTwilioNumbers();
+      // Cache activities
+      if (window.CacheManager) {
+        await window.CacheManager.cacheAgentActivities(state.currentAgentEmail, state.agentActivities);
+      }
       
-      // Load SendGrid email addresses
-      await loadSendGridEmails();
-
-      renderAgentDetails();
-      hideLoading();
-      
+      console.log('[AgentDetails] Loaded activities from Firestore');
     } catch (error) {
-      console.error('[AgentDetails] Error loading data:', error);
-      showError('Failed to load agent data. Please try again.');
+      console.error('[AgentDetails] Error loading activities from Firestore:', error);
     }
   }
 
-  // Load available Twilio phone numbers
+  // Start real-time listener for this specific agent
+  function startAgentRealtimeListener() {
+    if (!window.firebaseDB || state.realtimeListener) return;
+    
+    try {
+      state.realtimeListener = firebase.firestore()
+        .collection('agent_activities')
+        .where('agentEmail', '==', state.currentAgentEmail)
+        .orderBy('timestamp', 'desc')
+        .limit(10)
+        .onSnapshot(snapshot => {
+          const newActivities = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          
+          // Update state
+          state.agentActivities = newActivities;
+          
+          // Update cache
+          if (window.CacheManager) {
+            window.CacheManager.cacheAgentActivities(state.currentAgentEmail, newActivities);
+          }
+          
+          // Re-render
+          updateActivityTimeline();
+          
+          console.log(`[AgentDetails] Updated activities: ${newActivities.length} activities`);
+        });
+      
+      console.log(`[AgentDetails] Started real-time listener for ${state.currentAgentEmail}`);
+      
+    } catch (error) {
+      console.error('[AgentDetails] Error starting real-time listener:', error);
+    }
+  }
+
+  // Stop real-time listener
+  function stopAgentRealtimeListener() {
+    if (state.realtimeListener) {
+      try {
+        state.realtimeListener();
+        state.realtimeListener = null;
+        console.log('[AgentDetails] Stopped real-time listener');
+      } catch (error) {
+        console.error('[AgentDetails] Error stopping real-time listener:', error);
+      }
+    }
+  }
+
+  // Load available Twilio phone numbers (cache-first)
   async function loadTwilioNumbers() {
     try {
+      // Try cache first (30-minute expiry)
+      if (window.CacheManager) {
+        const cached = await window.CacheManager.getCachedTwilioNumbers();
+        if (cached && cached.length > 0) {
+          state.twilioNumbers = cached;
+          console.log('[AgentDetails] Loaded Twilio numbers from cache:', cached.length);
+          return;
+        }
+      }
+      
+      // Cache miss - fetch from API
       const response = await fetch('/api/twilio/phone-numbers', {
         method: 'GET',
         headers: {
@@ -145,7 +282,13 @@
       if (response.ok) {
         const data = await response.json();
         state.twilioNumbers = data.phoneNumbers || [];
-        console.log('[AgentDetails] Loaded Twilio numbers:', state.twilioNumbers.length);
+        
+        // Cache for 30 minutes
+        if (window.CacheManager) {
+          await window.CacheManager.cacheTwilioNumbers(state.twilioNumbers);
+        }
+        
+        console.log('[AgentDetails] Loaded Twilio numbers from API:', state.twilioNumbers.length);
       } else {
         console.warn('[AgentDetails] Failed to load Twilio numbers');
         state.twilioNumbers = [];
@@ -156,9 +299,20 @@
     }
   }
 
-  // Load available SendGrid email addresses
+  // Load available SendGrid email addresses (cache-first)
   async function loadSendGridEmails() {
     try {
+      // Try cache first (30-minute expiry)
+      if (window.CacheManager) {
+        const cached = await window.CacheManager.getCachedSendGridEmails();
+        if (cached && cached.length > 0) {
+          state.sendgridEmails = cached;
+          console.log('[AgentDetails] Loaded SendGrid emails from cache:', cached.length);
+          return;
+        }
+      }
+      
+      // Cache miss - fetch from API
       const response = await fetch('/api/sendgrid/email-addresses', {
         method: 'GET',
         headers: {
@@ -170,7 +324,13 @@
       if (response.ok) {
         const data = await response.json();
         state.sendgridEmails = data.emailAddresses || [];
-        console.log('[AgentDetails] Loaded SendGrid emails:', state.sendgridEmails.length);
+        
+        // Cache for 30 minutes
+        if (window.CacheManager) {
+          await window.CacheManager.cacheSendGridEmails(state.sendgridEmails);
+        }
+        
+        console.log('[AgentDetails] Loaded SendGrid emails from API:', state.sendgridEmails.length);
       } else {
         console.warn('[AgentDetails] Failed to load SendGrid emails');
         state.sendgridEmails = [];
@@ -729,7 +889,15 @@
         if (agentEmail) {
           initAgentDetailsPage(agentEmail);
         }
+      } else {
+        // Stop real-time listener when navigating away
+        stopAgentRealtimeListener();
       }
+    });
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function() {
+      stopAgentRealtimeListener();
     });
   });
 
