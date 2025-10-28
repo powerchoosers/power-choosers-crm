@@ -229,36 +229,23 @@ class AuthManager {
         const profileName = document.getElementById('user-profile-name');
         const profileEmail = document.getElementById('user-profile-email');
 
-        if (user.photoURL) {
-            // Show Google profile picture, hide fallback
-            if (profilePic) {
-                profilePic.src = user.photoURL;
-                profilePic.alt = user.displayName || user.email;
-                profilePic.style.display = 'block';
-            }
-            if (profilePicLarge) {
-                profilePicLarge.src = user.photoURL;
-                profilePicLarge.alt = user.displayName || user.email;
-            }
-            if (profileFallback) {
-                profileFallback.style.display = 'none';
-            }
-        } else {
-            // No photo URL, keep fallback avatar
-            if (profilePic) {
-                profilePic.style.display = 'none';
-            }
-            if (profileFallback) {
-                profileFallback.style.display = 'flex';
-                // Update initials from name
-                const initials = (user.displayName || user.email)
-                    .split(' ')
-                    .map(n => n[0])
-                    .join('')
-                    .toUpperCase()
-                    .substring(0, 2);
-                profileFallback.textContent = initials;
-            }
+        // Always use initials avatar per avatar rules (never use actual photos)
+        if (profilePic) {
+            profilePic.style.display = 'none';
+        }
+        if (profilePicLarge) {
+            profilePicLarge.style.display = 'none';
+        }
+        if (profileFallback) {
+            profileFallback.style.display = 'flex';
+            // Update initials from name
+            const initials = (user.displayName || user.email)
+                .split(' ')
+                .map(n => n[0])
+                .join('')
+                .toUpperCase()
+                .substring(0, 2);
+            profileFallback.textContent = initials;
         }
 
         if (profileName) {

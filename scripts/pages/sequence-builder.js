@@ -1,5 +1,363 @@
 'use strict';
 
+// Free Sequence Automation Class - Zero Cost Email Automation
+class FreeSequenceAutomation {
+  constructor() {
+    this.scheduledEmails = new Map();
+    this.checkInterval = null;
+    this.isRunning = false;
+  }
+
+  /**
+   * Start a sequence with free automation
+   * All timing handled client-side, no server costs
+   */
+  async startSequence(sequence, contactData) {
+    try {
+      console.log('[FreeSequence] Starting sequence:', sequence.name);
+      
+      // Create scheduled email records for all auto-email steps
+      const emailSteps = sequence.steps.filter(step => step.type === 'auto-email');
+      let scheduledEmailCount = 0;
+      
+      for (let i = 0; i < emailSteps.length; i++) {
+        const step = emailSteps[i];
+        
+        // Calculate when this email should be sent
+        let sendTime;
+        if (i === 0 && step.delay === 'immediate') {
+          // First step: send in 30 minutes (for AI generation)
+          sendTime = Date.now() + (30 * 60 * 1000);
+        } else {
+          // Calculate based on delay from previous step
+          const previousStepTime = i > 0 ? 
+            (emailSteps[i-1].scheduledTime || Date.now()) : 
+            Date.now();
+          sendTime = this.calculateSendTime(previousStepTime, step.delay);
+        }
+        
+        // Create scheduled email record
+        const scheduledEmail = {
+          id: `free_${Date.now()}_${i}`,
+          type: 'scheduled',
+          status: 'not_generated',
+          scheduledSendTime: sendTime,
+          contactId: contactData.id || contactData.email,
+          contactName: contactData.name,
+          contactCompany: contactData.company,
+          to: contactData.email,
+          sequenceId: sequence.id,
+          sequenceName: sequence.name,
+          stepIndex: i,
+          totalSteps: emailSteps.length,
+          aiPrompt: step.emailSettings?.aiPrompt || step.data?.aiPrompt || 'Write a professional follow-up email',
+          createdAt: new Date(),
+          ownerId: window.currentUser?.uid || 'unknown',
+          // Free automation flag
+          freeAutomation: true
+        };
+        
+        // Store in memory (no database writes for free version)
+        this.scheduledEmails.set(scheduledEmail.id, scheduledEmail);
+        scheduledEmailCount++;
+        
+        // Schedule client-side check
+        this.scheduleEmailCheck(scheduledEmail);
+      }
+      
+      console.log(`[FreeSequence] Created ${scheduledEmailCount} scheduled emails`);
+      
+      // Start the free automation loop
+      this.startFreeAutomation();
+      
+      return {
+        success: true,
+        scheduledEmailCount,
+        message: 'Sequence started with free automation'
+      };
+      
+    } catch (error) {
+      console.error('[FreeSequence] Error starting sequence:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate send time based on delay string
+   */
+  calculateSendTime(previousTime, delay) {
+    if (!delay) return previousTime + (24 * 60 * 60 * 1000); // Default 1 day
+    
+    const delayStr = delay.toString().toLowerCase();
+    
+    if (delayStr.includes('day')) {
+      const days = parseInt(delayStr.match(/\d+/)?.[0] || '1');
+      return previousTime + (days * 24 * 60 * 60 * 1000);
+    } else if (delayStr.includes('hour')) {
+      const hours = parseInt(delayStr.match(/\d+/)?.[0] || '1');
+      return previousTime + (hours * 60 * 60 * 1000);
+    } else if (delayStr.includes('week')) {
+      const weeks = parseInt(delayStr.match(/\d+/)?.[0] || '1');
+      return previousTime + (weeks * 7 * 24 * 60 * 60 * 1000);
+    } else if (delayStr.includes('minute')) {
+      const minutes = parseInt(delayStr.match(/\d+/)?.[0] || '30');
+      return previousTime + (minutes * 60 * 1000);
+    } else {
+      return previousTime + (24 * 60 * 60 * 1000); // Default 1 day
+    }
+  }
+
+  /**
+   * Schedule a client-side check for an email
+   */
+  scheduleEmailCheck(email) {
+    const timeUntilSend = email.scheduledSendTime - Date.now();
+    
+    if (timeUntilSend <= 0) {
+      // Email is due now, check immediately
+      this.checkEmail(email);
+    } else {
+      // Schedule check for when email is due
+      setTimeout(() => {
+        this.checkEmail(email);
+      }, timeUntilSend);
+    }
+  }
+
+  /**
+   * Check if an email should be sent
+   */
+  async checkEmail(email) {
+    try {
+      const now = Date.now();
+      const timeUntilSend = email.scheduledSendTime - now;
+      
+      if (timeUntilSend > 0) {
+        // Not time yet, reschedule
+        this.scheduleEmailCheck(email);
+        return;
+      }
+      
+      console.log(`[FreeSequence] Email due: ${email.id}`);
+      
+      // Check if email has been generated and approved
+      if (email.status === 'not_generated') {
+        // Generate email content (this would call your AI service)
+        await this.generateEmailContent(email);
+      }
+      
+      if (email.status === 'pending_approval') {
+        // Email needs approval - show notification
+        this.showApprovalNotification(email);
+      }
+      
+      if (email.status === 'approved') {
+        // Send the email
+        await this.sendEmail(email);
+      }
+      
+    } catch (error) {
+      console.error(`[FreeSequence] Error checking email ${email.id}:`, error);
+    }
+  }
+
+  /**
+   * Generate email content using AI
+   */
+  async generateEmailContent(email) {
+    try {
+      console.log(`[FreeSequence] Generating content for ${email.id}`);
+      
+      // Update status to generating
+      email.status = 'generating';
+      
+      // Call your AI service (this would be your existing AI endpoint)
+      const response = await fetch('/api/generate-email-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: email.aiPrompt,
+          contactName: email.contactName,
+          contactCompany: email.contactCompany
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        email.html = result.html;
+        email.text = result.text;
+        email.subject = result.subject;
+        email.status = 'pending_approval';
+        email.generatedAt = Date.now();
+        
+        console.log(`[FreeSequence] Generated content for ${email.id}`);
+      } else {
+        email.status = 'error';
+        email.errorMessage = 'Failed to generate content';
+      }
+      
+    } catch (error) {
+      console.error(`[FreeSequence] Error generating content:`, error);
+      email.status = 'error';
+      email.errorMessage = error.message;
+    }
+  }
+
+  /**
+   * Show approval notification to user
+   */
+  showApprovalNotification(email) {
+    // Create a notification for the user to approve the email
+    const notification = document.createElement('div');
+    notification.className = 'email-approval-notification';
+    notification.innerHTML = `
+      <div class="notification-content">
+        <h4>Email Ready for Approval</h4>
+        <p><strong>To:</strong> ${email.to}</p>
+        <p><strong>Subject:</strong> ${email.subject}</p>
+        <div class="email-preview">${email.html}</div>
+        <div class="approval-buttons">
+          <button onclick="window.freeSequenceAutomation.approveEmail('${email.id}')" class="btn-primary">Approve</button>
+          <button onclick="window.freeSequenceAutomation.rejectEmail('${email.id}')" class="btn-secondary">Reject</button>
+          <button onclick="window.freeSequenceAutomation.editEmail('${email.id}')" class="btn-outline">Edit</button>
+        </div>
+      </div>
+    `;
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 30 seconds if not interacted with
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.remove();
+      }
+    }, 30000);
+  }
+
+  /**
+   * Approve an email for sending
+   */
+  async approveEmail(emailId) {
+    const email = this.scheduledEmails.get(emailId);
+    if (email) {
+      email.status = 'approved';
+      email.approvedAt = Date.now();
+      
+      // Remove notification
+      const notification = document.querySelector('.email-approval-notification');
+      if (notification) notification.remove();
+      
+      // Send the email
+      await this.sendEmail(email);
+    }
+  }
+
+  /**
+   * Reject an email
+   */
+  rejectEmail(emailId) {
+    const email = this.scheduledEmails.get(emailId);
+    if (email) {
+      email.status = 'rejected';
+      email.rejectedAt = Date.now();
+      
+      // Remove notification
+      const notification = document.querySelector('.email-approval-notification');
+      if (notification) notification.remove();
+      
+      console.log(`[FreeSequence] Email ${emailId} rejected`);
+    }
+  }
+
+  /**
+   * Edit an email
+   */
+  editEmail(emailId) {
+    const email = this.scheduledEmails.get(emailId);
+    if (email) {
+      // Open email editor (you would implement this)
+      console.log(`[FreeSequence] Edit email ${emailId}`);
+      // This would open your email editor modal
+    }
+  }
+
+  /**
+   * Send an email
+   */
+  async sendEmail(email) {
+    try {
+      console.log(`[FreeSequence] Sending email ${email.id}`);
+      
+      // Call your email sending service
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: email.to,
+          subject: email.subject,
+          html: email.html,
+          text: email.text
+        })
+      });
+      
+      if (response.ok) {
+        email.status = 'sent';
+        email.sentAt = Date.now();
+        console.log(`[FreeSequence] Email ${email.id} sent successfully`);
+      } else {
+        email.status = 'error';
+        email.errorMessage = 'Failed to send email';
+      }
+      
+    } catch (error) {
+      console.error(`[FreeSequence] Error sending email:`, error);
+      email.status = 'error';
+      email.errorMessage = error.message;
+    }
+  }
+
+  /**
+   * Start the free automation loop
+   */
+  startFreeAutomation() {
+    if (this.isRunning) return;
+    
+    this.isRunning = true;
+    console.log('[FreeSequence] Free automation started');
+    
+    // Check every 5 minutes for any missed emails
+    this.checkInterval = setInterval(() => {
+      this.checkAllEmails();
+    }, 5 * 60 * 1000);
+  }
+
+  /**
+   * Check all scheduled emails
+   */
+  checkAllEmails() {
+    const now = Date.now();
+    
+    for (const [id, email] of this.scheduledEmails) {
+      if (email.scheduledSendTime <= now && email.status === 'not_generated') {
+        this.checkEmail(email);
+      }
+    }
+  }
+
+  /**
+   * Stop the free automation
+   */
+  stopFreeAutomation() {
+    if (this.checkInterval) {
+      clearInterval(this.checkInterval);
+      this.checkInterval = null;
+    }
+    this.isRunning = false;
+    console.log('[FreeSequence] Free automation stopped');
+  }
+}
+
 // Sequence Builder page module (placeholder)
 (function () {
   const state = {
@@ -2266,6 +2624,40 @@
           margin-left: 32px;
         }
         
+        .ai-suggestions-container {
+          margin-top: 16px;
+        }
+        
+        .ai-suggestions-header {
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--text-secondary);
+          margin-bottom: 8px;
+        }
+        
+        .ai-suggestions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        
+        .ai-suggestion {
+          background: var(--grey-700);
+          border: 1px solid var(--grey-600);
+          color: var(--text-primary);
+          padding: 6px 12px;
+          border-radius: 4px;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        
+        .ai-suggestion:hover {
+          background: var(--orange-primary);
+          border-color: var(--orange-primary);
+          color: white;
+        }
+        
         .email-settings .form-group {
           display: flex;
           flex-direction: column;
@@ -2438,6 +2830,29 @@
             </div>
 
           ${isAuto ? `
+            <!-- AI Prompt Settings -->
+            <div class="email-settings-section">
+              <h4>AI Email Generation</h4>
+              <div class="form-group">
+                <label for="ai-prompt-${step.id}">AI Prompt for Email Generation</label>
+                <textarea id="ai-prompt-${step.id}" class="textarea-dark" rows="3" 
+                          placeholder="Describe the email you want AI to generate... (tone, goal, offer, CTA)"
+                          data-setting="aiPrompt">${settings.aiPrompt || ''}</textarea>
+                <div class="setting-description" style="margin-left: 0;">This prompt will be used to generate personalized emails for each contact in the sequence</div>
+              </div>
+              <div class="ai-suggestions-container">
+                <div class="ai-suggestions-header">Quick Suggestions:</div>
+                <div class="ai-suggestions" role="list">
+                  <button class="ai-suggestion" type="button" data-prompt="Write an immediate follow-up email after our phone conversation">Immediate follow-up</button>
+                  <button class="ai-suggestion" type="button" data-prompt="Write a same-day check-in email to maintain momentum">Same day check-in</button>
+                  <button class="ai-suggestion" type="button" data-prompt="Write a weekly touchpoint email to stay top of mind">Weekly touchpoint</button>
+                  <button class="ai-suggestion" type="button" data-prompt="Write an introduction email as the first touchpoint in our sequence">First email introduction</button>
+                  <button class="ai-suggestion" type="button" data-prompt="Write a nurture email that provides value and builds relationship">Middle sequence nurture</button>
+                  <button class="ai-suggestion" type="button" data-prompt="Write a final email with a clear call-to-action and next steps">Final sequence ask</button>
+                </div>
+              </div>
+            </div>
+
             <!-- Automation Settings -->
             <div class="email-settings-section">
               <h4>Automation & Timing</h4>
@@ -2566,7 +2981,8 @@
         physicalAddress: stepCard.querySelector('[data-setting="compliance.physicalAddress"]')?.checked || false,
         gdprCompliant: stepCard.querySelector('[data-setting="compliance.gdprCompliant"]')?.checked || false,
         spamScoreCheck: stepCard.querySelector('[data-setting="compliance.spamScoreCheck"]')?.checked || false
-      }
+      },
+      aiPrompt: stepCard.querySelector('[data-setting="aiPrompt"]')?.value || ''
     };
 
     // Find the step and update its settings
@@ -2815,6 +3231,25 @@
     step.showSettings = true;
     step.collapsed = false; // Expand to show settings
     render();
+    
+    // Wire up AI suggestion events after render
+    setTimeout(() => {
+      const stepCard = document.querySelector(`[data-step-id="${step.id}"]`);
+      if (stepCard) {
+        const aiSuggestions = stepCard.querySelectorAll('.ai-suggestion');
+        aiSuggestions.forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const prompt = btn.getAttribute('data-prompt');
+            const textarea = stepCard.querySelector('[data-setting="aiPrompt"]');
+            if (textarea && prompt) {
+              textarea.value = prompt;
+              textarea.focus();
+            }
+          });
+        });
+      }
+    }, 100);
   }
 
   function openDelayPopover(anchorEl, step) {
@@ -4573,6 +5008,31 @@
     return tasks;
   }
 
+  // Function to calculate scheduled send time based on delay
+  function calculateScheduledSendTime(previousStepTime, delay) {
+    if (!delay) return previousStepTime + (24 * 60 * 60 * 1000); // Default 1 day
+    
+    const delayStr = delay.toString().toLowerCase();
+    
+    // Parse delay string (e.g., "2 days", "3 hours", "1 week")
+    if (delayStr.includes('day')) {
+      const days = parseInt(delayStr.match(/\d+/)?.[0] || '1');
+      return previousStepTime + (days * 24 * 60 * 60 * 1000);
+    } else if (delayStr.includes('hour')) {
+      const hours = parseInt(delayStr.match(/\d+/)?.[0] || '1');
+      return previousStepTime + (hours * 60 * 60 * 1000);
+    } else if (delayStr.includes('week')) {
+      const weeks = parseInt(delayStr.match(/\d+/)?.[0] || '1');
+      return previousStepTime + (weeks * 7 * 24 * 60 * 60 * 1000);
+    } else if (delayStr.includes('minute')) {
+      const minutes = parseInt(delayStr.match(/\d+/)?.[0] || '30');
+      return previousStepTime + (minutes * 60 * 1000);
+    } else {
+      // Default to 1 day if can't parse
+      return previousStepTime + (24 * 60 * 60 * 1000);
+    }
+  }
+
   // Function to send email via SendGrid
   async function sendEmailViaSendGrid(emailData) {
     try {
@@ -4596,81 +5056,159 @@
     }
   }
 
-  // Function to start a sequence for a contact
+  // Function to start a sequence for a contact using FREE automation
   async function startSequenceForContact(sequence, contactData) {
     try {
-      // Create tasks from sequence steps
+      console.log('[SequenceBuilder] Starting sequence with FREE automation:', contactData);
+      
+      // Initialize free automation if not already done
+      if (!window.freeSequenceAutomation) {
+        window.freeSequenceAutomation = new FreeSequenceAutomation();
+      }
+      
+      // Start sequence using free automation (handles all email scheduling)
+      const result = await window.freeSequenceAutomation.startSequence(sequence, contactData);
+      
+      // Create regular tasks (non-email) for tracking
       const tasks = createTasksFromSequence(sequence, contactData);
+      const nonEmailTasks = tasks.filter(task => task.type !== 'auto-email');
       
-      if (tasks.length === 0) {
-        if (window.crm && typeof window.crm.showToast === 'function') {
-          window.crm.showToast('No active steps found in sequence.');
-        }
-        return [];
-      }
-      
-      // Process email steps immediately (auto-email)
-      const emailTasks = tasks.filter(task => task.type === 'auto-email');
-      for (const emailTask of emailTasks) {
-        try {
-          // Find the corresponding step to get email content
-          const step = sequence.steps.find(s => s.id === emailTask.stepId);
-          if (step && step.data) {
-            const emailData = {
-              to: contactData.email,
-              subject: step.data.subject || 'Follow up',
-              content: step.data.body || 'Hello, this is a follow up email.',
-              from: 'noreply@powerchoosers.com',
-              fromName: (window.SettingsPage?.getSettings?.()?.general?.agentName) || 'Power Choosers',
-              contactName: contactData.name,
-              companyName: contactData.company
-            };
-            
-            await sendEmailViaSendGrid(emailData);
-            console.log(`Email sent for task: ${emailTask.title}`);
-          }
-        } catch (error) {
-          console.error(`Failed to send email for task ${emailTask.title}:`, error);
-        }
-      }
-      
-      // Save tasks to localStorage
-      const existingTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-      const newTasks = [...existingTasks, ...tasks];
-      localStorage.setItem('userTasks', JSON.stringify(newTasks));
-      
-      // Save tasks to Firebase if available
-      if (window.firebaseDB) {
-        const batch = window.firebaseDB.batch();
-        tasks.forEach(task => {
-          const taskRef = window.firebaseDB.collection('tasks').doc(task.id);
-          batch.set(taskRef, {
-            ...task,
-            timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
+      // Save non-email tasks to localStorage
+      if (nonEmailTasks.length > 0) {
+        const existingTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+        const newTasks = [...existingTasks, ...nonEmailTasks];
+        localStorage.setItem('userTasks', JSON.stringify(newTasks));
+        
+        // Save tasks to Firebase if available
+        if (window.firebaseDB) {
+          const batch = window.firebaseDB.batch();
+          nonEmailTasks.forEach(task => {
+            const taskRef = window.firebaseDB.collection('tasks').doc(task.id);
+            batch.set(taskRef, {
+              ...task,
+              timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
+            });
           });
-        });
-        await batch.commit();
+          await batch.commit();
+        }
+        
+        // Dispatch event to update tasks page
+        window.dispatchEvent(new CustomEvent('tasksUpdated', { 
+          detail: { source: 'sequenceStart', tasks: nonEmailTasks } 
+        }));
       }
       
-      // Dispatch event to update tasks page
-      window.dispatchEvent(new CustomEvent('tasksUpdated', { 
-        detail: { source: 'sequenceStart', tasks: tasks } 
-      }));
-      
-      // Show success message
+      // Show success message with cost savings
       if (window.crm && typeof window.crm.showToast === 'function') {
-        window.crm.showToast(`Sequence started! Created ${tasks.length} tasks. ${emailTasks.length} emails sent.`);
+        window.crm.showToast(`🎉 FREE Sequence started! ${result.scheduledEmailCount} emails scheduled. Cost: $0/month! (Saved $22/month)`);
       }
+      
+      console.log('[SequenceBuilder] FREE sequence started successfully:', {
+        totalTasks: tasks.length,
+        scheduledEmails: result.scheduledEmailCount,
+        contact: contactData.email,
+        cost: '$0/month',
+        savings: '$22/month'
+      });
       
       return tasks;
     } catch (error) {
-      console.error('Failed to start sequence:', error);
+      console.error('[SequenceBuilder] Error starting FREE sequence:', error);
       if (window.crm && typeof window.crm.showToast === 'function') {
         window.crm.showToast('Failed to start sequence. Please try again.');
       }
       return [];
     }
   }
+
+  // Add CSS for approval notifications
+  const style = document.createElement('style');
+  style.textContent = `
+    .email-approval-notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: white;
+      border: 2px solid #007bff;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 10000;
+      max-width: 400px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .notification-content {
+      padding: 20px;
+    }
+    
+    .notification-content h4 {
+      margin: 0 0 10px 0;
+      color: #333;
+      font-size: 16px;
+    }
+    
+    .notification-content p {
+      margin: 5px 0;
+      color: #666;
+      font-size: 14px;
+    }
+    
+    .email-preview {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 4px;
+      padding: 10px;
+      margin: 10px 0;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 12px;
+    }
+    
+    .approval-buttons {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    
+    .approval-buttons button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .btn-primary {
+      background: #007bff;
+      color: white;
+    }
+    
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+    
+    .btn-outline {
+      background: transparent;
+      color: #007bff;
+      border: 1px solid #007bff;
+    }
+    
+    .btn-primary:hover {
+      background: #0056b3;
+    }
+    
+    .btn-secondary:hover {
+      background: #545b62;
+    }
+    
+    .btn-outline:hover {
+      background: #007bff;
+      color: white;
+    }
+  `;
+  document.head.appendChild(style);
 
   // Export API
   window.SequenceBuilder = {

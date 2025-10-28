@@ -60,8 +60,10 @@
           const updatedAt = tsToIso(data.updatedAt);
           const sentAt = tsToIso(data.sentAt);
           const receivedAt = tsToIso(data.receivedAt);
-          const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
-          return { ...data, createdAt, updatedAt, sentAt, receivedAt, timestamp, emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent') };
+          const scheduledSendTime = tsToIso(data.scheduledSendTime);
+          const generatedAt = tsToIso(data.generatedAt);
+          const timestamp = sentAt || receivedAt || scheduledSendTime || createdAt || new Date().toISOString();
+          return { ...data, createdAt, updatedAt, sentAt, receivedAt, scheduledSendTime, generatedAt, timestamp, emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent') };
         });
         // Sort newest first
         emailsData.sort((a,b)=> new Date(b.timestamp||0) - new Date(a.timestamp||0));
@@ -77,7 +79,9 @@
           const updatedAt = tsToIso(data.updatedAt);
           const sentAt = tsToIso(data.sentAt);
           const receivedAt = tsToIso(data.receivedAt);
-          const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
+          const scheduledSendTime = tsToIso(data.scheduledSendTime);
+          const generatedAt = tsToIso(data.generatedAt);
+          const timestamp = sentAt || receivedAt || scheduledSendTime || createdAt || new Date().toISOString();
           return {
             id: doc.id,
             ...data,
@@ -85,6 +89,8 @@
             updatedAt,
             sentAt,
             receivedAt,
+            scheduledSendTime,
+            generatedAt,
             timestamp,
             emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
           };
@@ -129,7 +135,9 @@
             const updatedAt = tsToIso(data.updatedAt);
             const sentAt = tsToIso(data.sentAt);
             const receivedAt = tsToIso(data.receivedAt);
-            const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
+            const scheduledSendTime = tsToIso(data.scheduledSendTime);
+            const generatedAt = tsToIso(data.generatedAt);
+            const timestamp = sentAt || receivedAt || scheduledSendTime || createdAt || new Date().toISOString();
             updated.push({
               id: doc.id,
               ...data,
@@ -137,6 +145,8 @@
               updatedAt,
               sentAt,
               receivedAt,
+              scheduledSendTime,
+              generatedAt,
               timestamp,
               emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
             });
@@ -184,8 +194,10 @@
           const updatedAt = tsToIso(data.updatedAt);
           const sentAt = tsToIso(data.sentAt);
           const receivedAt = tsToIso(data.receivedAt);
-          const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
-          updated.push({ id: doc.id, ...data, createdAt, updatedAt, sentAt, receivedAt, timestamp, emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent') });
+          const scheduledSendTime = tsToIso(data.scheduledSendTime);
+          const generatedAt = tsToIso(data.generatedAt);
+          const timestamp = sentAt || receivedAt || scheduledSendTime || createdAt || new Date().toISOString();
+          updated.push({ id: doc.id, ...data, createdAt, updatedAt, sentAt, receivedAt, scheduledSendTime, generatedAt, timestamp, emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent') });
         });
         // Merge into emailsData by id
         const map = new Map(emailsData.map(e=>[e.id,e]));
