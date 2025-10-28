@@ -1322,7 +1322,7 @@ function getRoleSpecificLanguage(role) {
   };
 }
 
-async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, marketContext, meetingPreferences, sequenceContext }) {
+async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, marketContext, meetingPreferences }) {
   // Analyze manual prompt for enhanced context understanding
   const promptAnalysis = analyzeManualPrompt(prompt);
   
@@ -1472,13 +1472,6 @@ ${energy.currentRate ? '- Current Rate: "At ' + energy.currentRate + '/kWh, ther
 ${contractEndLabel ? '- Contract Timing: "With your contract ending ' + contractEndLabel + ', timing is critical..."' : ''}
 ${accountDescription ? '- Company Description: "As ' + accountDescription + ', energy costs are likely a significant expense..."' : ''}
 ${industryContent ? '- Industry Focus: "Manufacturing companies like ' + company + ' typically face ' + industryContent.painPoints[0] + '..."' : ''}
-
-SEQUENCE CONTEXT:
-${sequenceContext ? '- Step Position: Step ' + sequenceContext.stepIndex + ' of ' + sequenceContext.totalSteps + ' in sequence "' + sequenceContext.sequenceName + '"' : ''}
-${sequenceContext && sequenceContext.stepIndex > 0 ? '- Previous Steps: This is a follow-up email in an ongoing sequence' : ''}
-${sequenceContext && sequenceContext.stepIndex === 0 ? '- First Contact: This is the initial outreach in the sequence' : ''}
-${sequenceContext && sequenceContext.stepIndex >= sequenceContext.totalSteps - 2 ? '- Final Steps: This is near the end of the sequence - use stronger CTAs' : ''}
-${sequenceContext ? '- Sequence Goal: Maintain consistent messaging and build on previous communications' : ''}
 ${companySizeContext ? '- Size Context: "As a ' + companySizeContext.size + ' company, ' + companySizeContext.focus + ' is key..."' : ''}
 ${contractUrgency ? '- Urgency Level: "With ' + contractUrgency.level + ' timing, ' + contractUrgency.focus + '..."' : ''}
 
@@ -1972,7 +1965,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext, meetingPreferences, sequenceContext } = req.body || {};
+    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext, meetingPreferences } = req.body || {};
     
     // Detect template type for both HTML and standard modes
     const templateType = getTemplateType(prompt);
@@ -2011,7 +2004,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, sequenceContext });
+    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences });
     const fullSystemPrompt = dateContext + systemPrompt;
     
     // Call Perplexity API
