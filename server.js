@@ -74,11 +74,7 @@ import sendgridWebhookHandler from './api/email/sendgrid-webhook.js';
 import inboundEmailHandler from './api/email/inbound-email.js';
 
 // ADDITIONAL IMPORTS FOR REMAINING PROXY FUNCTIONS
-import emailAutomationCronHandler from './api/email/automation-cron.js';
 import emailBackfillThreadsHandler from './api/email/backfill-threads.js';
-import emailSequenceAutomationHandler from './api/email/sequence-automation.js';
-import emailSequenceStatusHandler from './api/email/sequence-status.js';
-import emailStartSequenceHandler from './api/email/start-sequence.js';
 import emailUnsubscribeHandler from './api/email/unsubscribe.js';
 import processCallHandler from './api/process-call.js';
 import trackEmailPerformanceHandler from './api/track-email-performance.js';
@@ -704,11 +700,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/email/sendgrid-webhook' ||
     pathname === '/api/email/inbound-email' ||
     pathname === '/api/email/stats' ||
-    pathname === '/api/email/automation-cron' ||
     pathname === '/api/email/backfill-threads' ||
-    pathname === '/api/email/sequence-automation' ||
-    pathname === '/api/email/sequence-status' ||
-    pathname === '/api/email/start-sequence' ||
     pathname === '/api/email/unsubscribe' ||
     pathname === '/api/recording'
   )) {
@@ -810,20 +802,8 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/email/stats') {
     return handleApiEmailStats(req, res, parsedUrl);
   }
-  if (pathname === '/api/email/automation-cron') {
-    return handleApiEmailAutomationCron(req, res);
-  }
   if (pathname === '/api/email/backfill-threads') {
     return handleApiEmailBackfillThreads(req, res);
-  }
-  if (pathname === '/api/email/sequence-automation') {
-    return handleApiEmailSequenceAutomation(req, res);
-  }
-  if (pathname === '/api/email/sequence-status') {
-    return handleApiEmailSequenceStatus(req, res);
-  }
-  if (pathname === '/api/email/start-sequence') {
-    return handleApiEmailStartSequence(req, res);
   }
   if (pathname === '/api/email/unsubscribe') {
     return handleApiEmailUnsubscribe(req, res);
@@ -976,39 +956,11 @@ const server = http.createServer(async (req, res) => {
 // ---------------- Additional API Handler Functions ----------------
 
 // Email automation handlers
-async function handleApiEmailAutomationCron(req, res) {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
-  }
-  return await emailAutomationCronHandler(req, res);
-}
-
 async function handleApiEmailBackfillThreads(req, res) {
   if (req.method === 'POST') {
     req.body = await parseRequestBody(req);
   }
   return await emailBackfillThreadsHandler(req, res);
-}
-
-async function handleApiEmailSequenceAutomation(req, res) {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
-  }
-  return await emailSequenceAutomationHandler(req, res);
-}
-
-async function handleApiEmailSequenceStatus(req, res) {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
-  }
-  return await emailSequenceStatusHandler(req, res);
-}
-
-async function handleApiEmailStartSequence(req, res) {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
-  }
-  return await emailStartSequenceHandler(req, res);
 }
 
 async function handleApiEmailUnsubscribe(req, res) {
