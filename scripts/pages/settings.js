@@ -36,6 +36,55 @@ class SettingsPage {
                         timeZone: 'EST'
                     }
                 },
+                // NEW: A/B Testing Configuration
+                abTesting: {
+                    enabled: true,
+                    minSampleSize: 100,
+                    testVariables: [
+                        'subject_line',
+                        'opening_hook', 
+                        'value_prop_format',
+                        'cta_type'
+                    ],
+                    winnerThreshold: 0.05,
+                    autoPromoteWinner: true
+                },
+                // NEW: Industry Segmentation Rules
+                industrySegmentation: {
+                    enabled: true,
+                    rules: {
+                        manufacturing: {
+                            painPoints: ['production downtime', 'energy-intensive operations', 'equipment reliability'],
+                            avgSavings: '15-25%',
+                            keyBenefit: 'operational continuity',
+                            urgencyDrivers: ['production schedules', 'equipment uptime']
+                        },
+                        healthcare: {
+                            painPoints: ['budget constraints', 'regulatory compliance', 'patient care continuity'],
+                            avgSavings: '10-18%',
+                            keyBenefit: 'cost predictability',
+                            urgencyDrivers: ['budget cycles', 'compliance deadlines']
+                        },
+                        retail: {
+                            painPoints: ['multiple locations', 'unpredictable costs', 'seasonal demand'],
+                            avgSavings: '12-20%',
+                            keyBenefit: 'centralized management',
+                            urgencyDrivers: ['lease renewals', 'expansion plans']
+                        },
+                        hospitality: {
+                            painPoints: ['seasonal demand', 'guest comfort', 'operational costs'],
+                            avgSavings: '12-18%',
+                            keyBenefit: 'cost stability',
+                            urgencyDrivers: ['seasonal planning', 'guest satisfaction']
+                        },
+                        education: {
+                            painPoints: ['budget constraints', 'facility maintenance', 'student safety'],
+                            avgSavings: '10-15%',
+                            keyBenefit: 'budget optimization',
+                            urgencyDrivers: ['academic year cycles', 'facility upgrades']
+                        }
+                    }
+                },
                 emailDeliverability: {
                     // SendGrid Settings
                     enableTracking: true,        // SendGrid Open Tracking (tracks email opens)
@@ -53,7 +102,9 @@ class SettingsPage {
                     // Compliance
                     includePhysicalAddress: true,
                     gdprCompliant: true,
-                    spamScoreCheck: false
+                    spamScoreCheck: true,
+                    spamScoreThreshold: 5.0,
+                    autoRejectAbove: 7.0
                 },
                 twilioNumbers: [],
                 general: {
