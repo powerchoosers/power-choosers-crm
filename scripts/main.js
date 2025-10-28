@@ -1237,17 +1237,18 @@ class PowerChoosersCRM {
         let closeTimer = null;
         let lockCollapse = false;   // When true, ignore hover-open until unlocked
         let pointerInside = false;  // Track pointer within sidebar
+        let clickJustHappened = false; // Track if click just occurred
 
         // Helpers
         const clearTimers = () => { if (openTimer) clearTimeout(openTimer); if (closeTimer) clearTimeout(closeTimer); openTimer = closeTimer = null; };
-        const openSidebar = () => { if (!lockCollapse) sidebar.classList.add('expanded'); };
+        const openSidebar = () => { if (!lockCollapse && !clickJustHappened) sidebar.classList.add('expanded'); };
         const closeSidebar = () => { if (!pointerInside) sidebar.classList.remove('expanded'); };
 
         if (!sidebar._hoverBound) {
             // Pointer-based hover inside the sidebar
             sidebar.addEventListener('pointerenter', () => {
                 pointerInside = true;
-                if (lockCollapse) return; // Do not schedule open while locked after click
+                if (lockCollapse || clickJustHappened) return; // Don't open if locked or click just happened
                 if (closeTimer) clearTimeout(closeTimer);
                 // Small show delay to avoid accidental flicker
                 openTimer = setTimeout(openSidebar, 90);
@@ -1255,6 +1256,7 @@ class PowerChoosersCRM {
 
             sidebar.addEventListener('pointerleave', () => {
                 pointerInside = false;
+                clickJustHappened = false; // Reset click flag when leaving
                 if (!lockCollapse) {
                     // Small hide delay for smoother exit
                     closeTimer = setTimeout(closeSidebar, 150);
@@ -1265,7 +1267,7 @@ class PowerChoosersCRM {
             // This improves discoverability without a dedicated DOM edge element
             const edgeWidth = 12; // px
             document.addEventListener('pointermove', (e) => {
-                if (lockCollapse) return;
+                if (lockCollapse || clickJustHappened) return;
                 if (e.clientX <= edgeWidth) {
                     if (closeTimer) clearTimeout(closeTimer);
                     if (!sidebar.classList.contains('expanded')) {
@@ -1284,6 +1286,7 @@ class PowerChoosersCRM {
             navItems.forEach(item => {
                 if (!item._sidebarNavBound) {
                     item.addEventListener('click', () => {
+                        clickJustHappened = true; // Set click flag
                         lockCollapse = true;
                         pointerInside = false;
                         clearTimers();
@@ -1292,9 +1295,15 @@ class PowerChoosersCRM {
                         // Unlock on next pointerleave from sidebar, or after safety timeout
                         const unlockOnLeave = () => {
                             lockCollapse = false;
+                            clickJustHappened = false; // Reset click flag
                             sidebar.removeEventListener('pointerleave', unlockOnLeave);
                         };
                         sidebar.addEventListener('pointerleave', unlockOnLeave);
+                        
+                        // Safety timeout to prevent permanent lock
+                        setTimeout(() => {
+                            clickJustHappened = false;
+                        }, 500);
                     });
                     item._sidebarNavBound = true;
                 }
@@ -1303,6 +1312,7 @@ class PowerChoosersCRM {
             // Also collapse on hashchange/navigation to ensure closed state during page load
             window.addEventListener('hashchange', () => {
                 lockCollapse = true;
+                clickJustHappened = true;
                 clearTimers();
                 pointerInside = false;
                 sidebar.classList.remove('expanded');
