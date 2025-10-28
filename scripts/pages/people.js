@@ -2793,7 +2793,7 @@
     return badges.join('');
   }
   
-  // Synchronous version for rendering (uses cache)
+  // Synchronous version for rendering (uses cache + proactive API calls)
   function generateStatusBadgesSync(contact) {
     const badges = [];
     
@@ -2867,7 +2867,48 @@
           return !peopleCallStatusCache.get(contact.id);
         }
         
-        // If not in cache, don't show badge (will be updated when cache is populated)
+        // If not in cache, make proactive API call for this specific contact
+        if (window.BadgeLoader && typeof window.BadgeLoader.getCallStatus === 'function') {
+          // Make individual API call and cache result
+          window.BadgeLoader.getCallStatus(phones, [], [contact.id]).then(callStatus => {
+            // Cache the results
+            phones.forEach(phone => {
+              if (callStatus[phone] !== undefined) {
+                peopleCallStatusCache.set(phone, callStatus[phone]);
+              }
+            });
+            if (callStatus[contact.id] !== undefined) {
+              peopleCallStatusCache.set(contact.id, callStatus[contact.id]);
+            }
+            
+            // Re-render this specific row to show the updated badge
+            const rowElement = document.querySelector(`[data-contact-id="${contact.id}"]`);
+            if (rowElement) {
+              const nameCell = rowElement.querySelector('.name-cell');
+              if (nameCell) {
+                const hasNoCallsNow = !phones.some(phone => callStatus[phone]) && !callStatus[contact.id];
+                const nameWrap = nameCell.querySelector('.name-cell__wrap');
+                if (nameWrap) {
+                  // Remove existing badges
+                  const existingBadges = nameWrap.querySelectorAll('.status-badge');
+                  existingBadges.forEach(badge => badge.remove());
+                  
+                  // Add new badge if needed
+                  if (!isNew && hasNoCallsNow) {
+                    const badgeSpan = document.createElement('span');
+                    badgeSpan.className = 'status-badge status-badge-no-calls';
+                    badgeSpan.textContent = 'No Calls';
+                    nameWrap.appendChild(badgeSpan);
+                  }
+                }
+              }
+            }
+          }).catch(error => {
+            console.warn('[People] Failed to get call status for contact:', contact.id, error);
+          });
+        }
+        
+        // Return false initially, will update when API responds
         return false;
       } catch (e) {
         return false;
@@ -4538,19 +4579,19 @@
   }
 
   function getTotalPages() {
-    // In browse mode with more data available, calculate pages based on total count
-    // In search mode, use filtered results
-    const totalRecords = state.searchMode ? state.filtered.length : (state.totalCount || state.filtered.length);
+    // In browse mode, use loaded data length; in search mode, use filtered results
+    const totalRecords = state.searchMode ? state.filtered.length : state.data.length;
     return Math.max(1, Math.ceil(totalRecords / state.pageSize));
   }
 
   function getPageItems() {
-    const total = state.filtered.length;
+    // In search mode, use filtered results; in browse mode, use loaded data
+    const total = state.searchMode ? state.filtered.length : state.data.length;
     const totalPages = getTotalPages();
     if (state.currentPage > totalPages) state.currentPage = totalPages;
     const start = (state.currentPage - 1) * state.pageSize;
     const end = Math.min(total, start + state.pageSize);
-    return state.filtered.slice(start, end);
+    return state.searchMode ? state.filtered.slice(start, end) : state.data.slice(start, end);
   }
 
   function renderPagination() {
@@ -4558,8 +4599,8 @@
     const totalPages = getTotalPages();
     const current = Math.min(state.currentPage, totalPages);
     state.currentPage = current;
-    // Show total count from database, not just loaded contacts
-    const total = state.searchMode ? state.filtered.length : (state.totalCount || state.filtered.length);
+    // Show count based on current mode
+    const total = state.searchMode ? state.filtered.length : state.data.length;
     const start = total === 0 ? 0 : (current - 1) * state.pageSize + 1;
     const end = total === 0 ? 0 : Math.min(total, current * state.pageSize);
 

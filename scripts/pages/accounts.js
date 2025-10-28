@@ -1612,7 +1612,7 @@ var console = {
     return badges.join('');
   }
   
-  // Synchronous version for rendering (uses cache)
+  // Synchronous version for rendering (uses cache + proactive API calls)
   function generateStatusBadgesForAccountSync(account) {
     const badges = [];
     
@@ -1629,7 +1629,7 @@ var console = {
       }
     })();
     
-    // Check if account has any calls logged (using cache)
+    // Check if account has any calls logged (using cache + proactive API calls)
     const hasNoCalls = (() => {
       try {
         // Get the company phone number
@@ -1647,7 +1647,46 @@ var console = {
           return !accountCallStatusCache.get(account.id);
         }
         
-        // If not in cache, don't show badge (will be updated when cache is populated)
+        // If not in cache, make proactive API call for this specific account
+        if (window.BadgeLoader && typeof window.BadgeLoader.getCallStatus === 'function') {
+          // Make individual API call and cache result
+          window.BadgeLoader.getCallStatus([phone], [account.id]).then(callStatus => {
+            // Cache the results
+            if (callStatus[phone] !== undefined) {
+              accountCallStatusCache.set(phone, callStatus[phone]);
+            }
+            if (callStatus[account.id] !== undefined) {
+              accountCallStatusCache.set(account.id, callStatus[account.id]);
+            }
+            
+            // Re-render this specific row to show the updated badge
+            const rowElement = document.querySelector(`[data-account-id="${account.id}"]`);
+            if (rowElement) {
+              const nameCell = rowElement.querySelector('.name-cell');
+              if (nameCell) {
+                const hasNoCallsNow = !callStatus[phone] && !callStatus[account.id];
+                const accountName = nameCell.querySelector('.account-name');
+                if (accountName) {
+                  // Remove existing badges
+                  const existingBadges = nameCell.querySelectorAll('.status-badge');
+                  existingBadges.forEach(badge => badge.remove());
+                  
+                  // Add new badge if needed
+                  if (!isNew && hasNoCallsNow) {
+                    const badgeSpan = document.createElement('span');
+                    badgeSpan.className = 'status-badge status-badge-no-calls';
+                    badgeSpan.textContent = 'No Calls';
+                    accountName.parentNode.appendChild(badgeSpan);
+                  }
+                }
+              }
+            }
+          }).catch(error => {
+            console.warn('[Accounts] Failed to get call status for account:', account.id, error);
+          });
+        }
+        
+        // Return false initially, will update when API responds
         return false;
       } catch (e) {
         return false;
