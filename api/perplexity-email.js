@@ -1752,7 +1752,8 @@ OUTPUT FORMAT (JSON):
   "closing": "Best regards,\\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
 }
 
-CRITICAL: Return ONLY valid JSON. Each paragraph should be a separate field. Do not include any text outside the JSON structure.`;
+CRITICAL: Return ONLY valid JSON. Each paragraph should be a separate field. Do not include any text outside the JSON structure.
+IMPORTANT: The closing field must include a newline between "Best regards," and the sender name (e.g., "Best regards,\\nLewis").`;
 
   // Check if this is a cold email in standard mode
   const isColdEmailStandard = /cold.*email|could.*not.*reach/i.test(String(prompt || ''));
@@ -1895,7 +1896,8 @@ OUTPUT FORMAT (JSON):
   "closing": "Best regards,\\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
 }
 
-CRITICAL: Return ONLY valid JSON. Each paragraph should be a separate field. Do not include any text outside the JSON structure.`;
+CRITICAL: Return ONLY valid JSON. Each paragraph should be a separate field. Do not include any text outside the JSON structure.
+IMPORTANT: The closing field must include a newline between "Best regards," and the sender name (e.g., "Best regards,\\nLewis").`;
 
     return { 
       prompt: [identity, recipientContext, invoiceRules, invoiceOutputFormat].join('\n'),
@@ -1912,7 +1914,7 @@ QUALITY REQUIREMENTS:
 ✓ MUST mention "15-25%" rate increase
 ✓ CTA: Use qualifying questions only (e.g., "When does your contract expire?", "Are rising costs affecting your budget?")
 ✓ Subject line: Under 50 chars, include ${firstName || 'recipient name'}
-✓ Closing: "Best regards," on its own line
+✓ Closing: "Best regards," on its own line, followed by sender name on next line
 ✓ DO NOT include citation markers like [1], [2], [3]
 
 PARAGRAPH STRUCTURE (CRITICAL):
