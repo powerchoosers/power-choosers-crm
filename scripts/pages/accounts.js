@@ -1588,8 +1588,8 @@ var console = {
         }
         
         // Get call status from API (lightweight)
-        if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.getCallStatus === 'function') {
-          const callStatus = await window.BackgroundCallsLoader.getCallStatus([phone], [account.id]);
+        if (window.BadgeLoader && typeof window.BadgeLoader.getCallStatus === 'function') {
+          const callStatus = await window.BadgeLoader.getCallStatus([phone], [account.id]);
           return !callStatus[phone] && !callStatus[account.id];
         }
         
@@ -1669,7 +1669,7 @@ var console = {
   
   // Batch update call status for all visible accounts
   async function updateAccountCallStatus() {
-    if (!window.BackgroundCallsLoader || typeof window.BackgroundCallsLoader.getCallStatus !== 'function') {
+    if (!window.BadgeLoader || typeof window.BadgeLoader.getCallStatus !== 'function') {
       return;
     }
     
@@ -1694,7 +1694,7 @@ var console = {
       if (phones.length === 0 && accountIds.length === 0) return;
       
       // Single API call for all badges
-      const callStatus = await window.BackgroundCallsLoader.getCallStatus(phones, accountIds);
+      const callStatus = await window.BadgeLoader.getCallStatus(phones, accountIds);
       
       // Update cache
       Object.entries(callStatus).forEach(([key, value]) => {

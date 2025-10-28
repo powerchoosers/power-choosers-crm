@@ -3098,7 +3098,10 @@ class PowerChoosersCRM {
                     name, 
                     kind: listKind, 
                     count: 0,
-                    recordCount: 0
+                    recordCount: 0,
+                    ownerId: window.currentUserEmail || '',
+                    createdBy: window.currentUserEmail || '',
+                    assignedTo: window.currentUserEmail || ''
                 };
                 
                 if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
@@ -3111,6 +3114,17 @@ class PowerChoosersCRM {
 
                 const ref = await db.collection('lists').add(payload);
                 const newListId = ref.id;
+
+                // Notify lists overview page of new list creation
+                try {
+                    document.dispatchEvent(new CustomEvent('pc:list-created', { 
+                        detail: { 
+                            id: newListId, 
+                            list: { id: newListId, ...payload },
+                            kind: listKind
+                        } 
+                    }));
+                } catch (_) { /* noop */ }
 
                 // Select the new list
                 this.handleListSelection(modal, newListId, name);

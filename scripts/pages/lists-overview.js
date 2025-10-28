@@ -472,11 +472,11 @@
       _unsubListsPeople = col.where ? col.where('kind', '==', 'people').onSnapshot(
         (snap) => {
           // Success handler
-          try {
-            const items = [];
-            snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
-            state.peopleLists = items;
-            state.loadedPeople = true;
+        try {
+          const items = [];
+          snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+          state.peopleLists = items;
+          state.loadedPeople = true;
             if (state.kind === 'people') renderFilteredItems(state.peopleLists);
           } catch (e) {
             console.error('[ListsOverview] People lists snapshot error:', e);
@@ -496,11 +496,11 @@
       _unsubListsAccounts = col.where ? col.where('kind', '==', 'accounts').onSnapshot(
         (snap) => {
           // Success handler
-          try {
-            const items = [];
-            snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
-            state.accountLists = items;
-            state.loadedAccounts = true;
+        try {
+          const items = [];
+          snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
+          state.accountLists = items;
+          state.loadedAccounts = true;
             if (state.kind === 'accounts') renderFilteredItems(state.accountLists);
           } catch (e) {
             console.error('[ListsOverview] Account lists snapshot error:', e);
@@ -1382,6 +1382,34 @@
     state.loadedPeople = false;
     state.loadedAccounts = false;
     await ensureLoadedThenRender();
+  });
+
+  // Listen for new list creation events
+  document.addEventListener('pc:list-created', (event) => {
+    try {
+      const { id, list, kind } = event.detail || {};
+      if (!id || !list || !kind) return;
+      
+      console.log('[ListsOverview] New list created:', { id, name: list.name, kind });
+      
+      // Add to appropriate state array
+      if (kind === 'people') {
+        state.peopleLists = [list, ...state.peopleLists];
+        state.loadedPeople = true;
+      } else if (kind === 'accounts') {
+        state.accountLists = [list, ...state.accountLists];
+        state.loadedAccounts = true;
+      }
+      
+      // Re-render if we're viewing the correct kind
+      if (state.kind === kind) {
+        applyFilters();
+      }
+      
+      console.log('[ListsOverview] List added to UI immediately');
+    } catch (error) {
+      console.error('[ListsOverview] Error handling new list creation:', error);
+    }
   });
 
   // Initialize

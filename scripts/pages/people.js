@@ -280,7 +280,14 @@
       try {
         let newId = null;
         if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
-          const payload = { name, kind: 'people', recordCount: 0 };
+          const payload = { 
+            name, 
+            kind: 'people', 
+            recordCount: 0,
+            ownerId: window.currentUserEmail || '',
+            createdBy: window.currentUserEmail || '',
+            assignedTo: window.currentUserEmail || ''
+          };
           if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
             payload.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
             payload.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
@@ -290,6 +297,17 @@
           }
           const ref = await window.firebaseDB.collection('lists').add(payload);
           newId = ref.id;
+          
+          // Notify lists overview page of new list creation
+          try {
+            document.dispatchEvent(new CustomEvent('pc:list-created', { 
+              detail: { 
+                id: newId, 
+                list: { id: newId, ...payload },
+                kind: 'people'
+              } 
+            }));
+          } catch (_) { /* noop */ }
         }
         if (newId) {
           await addSelectedPeopleToList(newId, name);
@@ -2751,8 +2769,8 @@
         }
         
         // Get call status from API (lightweight)
-        if (window.BackgroundCallsLoader && typeof window.BackgroundCallsLoader.getCallStatus === 'function') {
-          const callStatus = await window.BackgroundCallsLoader.getCallStatus(phones, [], [contact.id]);
+        if (window.BadgeLoader && typeof window.BadgeLoader.getCallStatus === 'function') {
+          const callStatus = await window.BadgeLoader.getCallStatus(phones, [], [contact.id]);
           return !phones.some(phone => callStatus[phone]) && !callStatus[contact.id];
         }
         
@@ -2871,7 +2889,7 @@
   
   // Batch update call status for all visible contacts
   async function updatePeopleCallStatus() {
-    if (!window.BackgroundCallsLoader || typeof window.BackgroundCallsLoader.getCallStatus !== 'function') {
+    if (!window.BadgeLoader || typeof window.BadgeLoader.getCallStatus !== 'function') {
       return;
     }
     
@@ -2931,7 +2949,7 @@
       if (phones.length === 0 && contactIds.length === 0) return;
       
       // Single API call for all badges
-      const callStatus = await window.BackgroundCallsLoader.getCallStatus(phones, [], contactIds);
+      const callStatus = await window.BadgeLoader.getCallStatus(phones, [], contactIds);
       
       // Update cache
       Object.entries(callStatus).forEach(([key, value]) => {
