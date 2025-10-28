@@ -31,13 +31,63 @@
   };
   
   async function loadFromFirestore() {
+    try {
+      console.log('[BackgroundEmailsLoader] Loading emails through CacheManager...');
+      
+      // Use CacheManager to get emails (handles caching, ownership, and Firestore queries)
+      if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+        const raw = await window.CacheManager.get('emails');
+        
+        // Process the data (same as before)
+        emailsData = raw.map((data) => {
+          const createdAt = tsToIso(data.createdAt);
+          const updatedAt = tsToIso(data.updatedAt);
+          const sentAt = tsToIso(data.sentAt);
+          const receivedAt = tsToIso(data.receivedAt);
+          const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
+          return { 
+            ...data, 
+            createdAt, 
+            updatedAt, 
+            sentAt, 
+            receivedAt, 
+            timestamp, 
+            emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent') 
+          };
+        });
+        
+        // Sort newest first
+        emailsData.sort((a,b)=> new Date(b.timestamp||0) - new Date(a.timestamp||0));
+        
+        console.log('[BackgroundEmailsLoader] ✓ Loaded', emailsData.length, 'emails via CacheManager');
+        
+        // Notify other modules
+        document.dispatchEvent(new CustomEvent('pc:emails-loaded', { 
+          detail: { count: emailsData.length, fromCache: true } 
+        }));
+
+        // Start realtime listener after initial load
+        if (window.currentUserRole !== 'admin') startRealtimeListenerScoped(window.currentUserEmail || ''); else startRealtimeListener();
+      } else {
+        console.warn('[BackgroundEmailsLoader] CacheManager not available, falling back to direct Firestore');
+        await loadFromFirestoreDirect();
+      }
+    } catch (error) {
+      console.error('[BackgroundEmailsLoader] Failed to load via CacheManager:', error);
+      // Fallback to direct Firestore loading
+      await loadFromFirestoreDirect();
+    }
+  }
+
+  // Fallback: Direct Firestore loading (original logic)
+  async function loadFromFirestoreDirect() {
     if (!window.firebaseDB) {
       console.warn('[BackgroundEmailsLoader] firebaseDB not available');
       return;
     }
     
     try {
-      console.log('[BackgroundEmailsLoader] Loading from Firestore...');
+      console.log('[BackgroundEmailsLoader] Loading from Firestore directly...');
       if (window.currentUserRole !== 'admin') {
         // Employee: scope by ownership
         let raw = [];
@@ -144,11 +194,12 @@
 
           emailsData = updated;
 
-          // Throttle cache writes to avoid excessive IndexedDB operations
+          // Update cache through CacheManager
           if (!_cacheWritePending && window.CacheManager && typeof window.CacheManager.set === 'function') {
             _cacheWritePending = true;
             setTimeout(async () => {
               try {
+                // Use CacheManager to update cache (handles ownership filtering)
                 await window.CacheManager.set('emails', emailsData);
                 document.dispatchEvent(new CustomEvent('pc:emails-updated', { detail: { count: emailsData.length } }));
               } finally {
@@ -191,10 +242,13 @@
         const map = new Map(emailsData.map(e=>[e.id,e]));
         updated.forEach(e=>map.set(e.id,e));
         emailsData = Array.from(map.values()).sort((a,b)=> new Date(b.timestamp||0) - new Date(a.timestamp||0));
+        
+        // Update cache through CacheManager
         if (!_cacheWritePending && window.CacheManager && typeof window.CacheManager.set === 'function') {
           _cacheWritePending = true;
           setTimeout(async () => {
             try {
+              // Use CacheManager to update cache (handles ownership filtering)
               await window.CacheManager.set('emails', emailsData);
               document.dispatchEvent(new CustomEvent('pc:emails-updated', { detail: { count: emailsData.length } }));
             } finally { _cacheWritePending = false; }
@@ -218,68 +272,11 @@
   
   // Load from cache immediately on module init
   (async function() {
-    if (window.CacheManager && typeof window.CacheManager.get === 'function') {
-      try {
-        const cached = await window.CacheManager.get('emails');
-        if (cached && Array.isArray(cached) && cached.length > 0) {
-          try {
-            const email = window.currentUserEmail || '';
-            if (window.currentUserRole !== 'admin' && email) {
-              const e = String(email).toLowerCase();
-              emailsData = (cached||[]).filter(x => {
-                const fields = [x && x.ownerId, x && x.assignedTo, x && x.from];
-                return fields.some(v => String(v||'').toLowerCase() === e);
-              });
-            } else {
-              emailsData = cached;
-            }
-          } catch(_) { emailsData = cached; }
-          console.log('[BackgroundEmailsLoader] ✓ Loaded', cached.length, 'emails from cache');
-          
-          // Notify that cached data is available
-          document.dispatchEvent(new CustomEvent('pc:emails-loaded', { 
-            detail: { count: cached.length, cached: true } 
-          }));
-
-          // Ensure realtime listener is running even when using cache first
-          startRealtimeListener();
-        } else {
-          // Cache empty, load from Firestore
-          console.log('[BackgroundEmailsLoader] Cache empty, loading from Firestore');
-          await loadFromFirestore();
-        }
-      } catch (e) {
-        console.warn('[BackgroundEmailsLoader] Cache load failed:', e);
-        await loadFromFirestore();
-      }
-    } else {
-      console.warn('[BackgroundEmailsLoader] CacheManager not available, waiting...');
-      // Retry after a short delay if CacheManager isn't ready yet
-      setTimeout(async () => {
-        if (window.CacheManager) {
-          const cached = await window.CacheManager.get('emails');
-          if (cached && Array.isArray(cached) && cached.length > 0) {
-            try {
-              const email = window.currentUserEmail || '';
-              if (window.currentUserRole !== 'admin' && email) {
-                const e = String(email).toLowerCase();
-                emailsData = (cached||[]).filter(x => {
-                  const fields = [x && x.ownerId, x && x.assignedTo, x && x.from];
-                  return fields.some(v => String(v||'').toLowerCase() === e);
-                });
-              } else {
-                emailsData = cached;
-              }
-            } catch(_) { emailsData = cached; }
-            console.log('[BackgroundEmailsLoader] ✓ Loaded', emailsData.length, 'emails from cache (delayed, filtered)');
-            document.dispatchEvent(new CustomEvent('pc:emails-loaded', { 
-              detail: { count: cached.length, cached: true } 
-            }));
-          } else {
-            await loadFromFirestore();
-          }
-        }
-      }, 500);
+    try {
+      // Use CacheManager which handles caching, ownership filtering, and Firestore fallback
+      await loadFromFirestore();
+    } catch (e) {
+      console.warn('[BackgroundEmailsLoader] Initial load failed:', e);
     }
   })();
   

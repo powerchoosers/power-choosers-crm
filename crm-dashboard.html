@@ -668,6 +668,7 @@
                                         <button class="filter-tab active" data-folder="inbox">Inbox</button>
                                         <button class="filter-tab" data-folder="sent">Sent</button>
                                         <button class="filter-tab" data-folder="starred">Starred</button>
+                                        <button class="filter-tab" data-folder="scheduled">Scheduled</button>
                                         <button class="filter-tab" data-folder="trash">Trash</button>
                                     </div>
                                     <div class="filter-actions">
@@ -3054,7 +3055,8 @@
                 ],
                 sequences: [
                     'scripts/pages/sequence-builder.js',
-                    'scripts/pages/sequences.js'
+                    'scripts/pages/sequences.js',
+                    'scripts/utils/scheduler.js'
                 ],
                 deals: [
                     'scripts/pages/deals.js'
