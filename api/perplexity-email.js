@@ -1749,7 +1749,7 @@ OUTPUT FORMAT (JSON):
   "paragraph1": "[Opening paragraph with context - 2-3 sentences]",
   "paragraph2": "[Main message paragraph - 3-4 sentences about value and next steps]",
   "paragraph3": "[Call to action paragraph - clear question or request]",
-  "closing": "Best regards,\\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
+  "closing": "Best regards,\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
 }
 
 CRITICAL: Return ONLY valid JSON. Each paragraph should be a separate field. Do not include any text outside the JSON structure.
@@ -1893,7 +1893,7 @@ OUTPUT FORMAT (JSON):
   "paragraph1": "[Context about energy analysis - 2-3 sentences]",
   "paragraph2": "What we'll review from your invoice:\\n• Invoice date and service address\\n• Billing period (start and end dates)\\n• Detailed charge breakdown (including kWh rate, demand charges, fees)\\n• Payment details and service address",
   "paragraph3": "Will you be able to send over the invoice by end of day so me and my team can get started?",
-  "closing": "Best regards,\\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
+  "closing": "Best regards,\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
 }
 
 CRITICAL: Return ONLY valid JSON. Each paragraph should be a separate field. Do not include any text outside the JSON structure.
