@@ -4,9 +4,6 @@
 import { cors } from './_cors.js';
 import { db, admin } from './_firebase.js';
 
-// In-memory fallback store (for local/dev when Firestore isn't configured)
-const memoryStore = new Map();
-
 // Normalize phone number to last 10 digits
 function normalizePhone(phone) {
   if (!phone) return '';
@@ -66,13 +63,8 @@ async function hasCallsForPhone(phone, db, userEmail, isAdmin) {
       }
       return false;
     } else {
-      // Fallback to memory store
-      for (const [_, call] of memoryStore) {
-        if (normalizePhone(call.to) === phone || normalizePhone(call.from) === phone) {
-          if (isAdmin) return true;
-          if (ownsDoc(call, String(userEmail).toLowerCase())) return true;
-        }
-      }
+      // No Firestore available - return false (don't fall back to limited memory store)
+      console.warn('[CallStatus] Firestore not available for phone check:', phone);
       return false;
     }
   } catch (error) {
@@ -96,13 +88,8 @@ async function hasCallsForAccount(accountId, db, userEmail, isAdmin) {
       const hit = snapshot.docs.find(d => ownsDoc(d.data(), String(userEmail).toLowerCase()));
       return !!hit;
     } else {
-      // Fallback to memory store
-      for (const [_, call] of memoryStore) {
-        if (call.accountId === accountId) {
-          if (isAdmin) return true;
-          if (ownsDoc(call, String(userEmail).toLowerCase())) return true;
-        }
-      }
+      // No Firestore available - return false (don't fall back to limited memory store)
+      console.warn('[CallStatus] Firestore not available for account check:', accountId);
       return false;
     }
   } catch (error) {
@@ -126,13 +113,8 @@ async function hasCallsForContact(contactId, db, userEmail, isAdmin) {
       const hit = snapshot.docs.find(d => ownsDoc(d.data(), String(userEmail).toLowerCase()));
       return !!hit;
     } else {
-      // Fallback to memory store
-      for (const [_, call] of memoryStore) {
-        if (call.contactId === contactId) {
-          if (isAdmin) return true;
-          if (ownsDoc(call, String(userEmail).toLowerCase())) return true;
-        }
-      }
+      // No Firestore available - return false (don't fall back to limited memory store)
+      console.warn('[CallStatus] Firestore not available for contact check:', contactId);
       return false;
     }
   } catch (error) {
