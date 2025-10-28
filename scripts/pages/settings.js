@@ -456,15 +456,30 @@ class SettingsPage {
                     this.state.settings.general.hostedPhotoURL = imageUrl;
                     this.markDirty();
                     console.log('[Settings] Google avatar hosted successfully:', imageUrl);
+                    
+                    // Trigger profile photo refresh in auth system
+                    if (window.authManager && typeof window.authManager.refreshProfilePhoto === 'function') {
+                        window.authManager.refreshProfilePhoto();
+                    }
                 }
             } else {
                 console.warn('[Settings] Upload failed, using Google URL directly');
                 this.state.settings.general.hostedPhotoURL = googlePhotoURL;
+                
+                // Still trigger refresh even with fallback
+                if (window.authManager && typeof window.authManager.refreshProfilePhoto === 'function') {
+                    window.authManager.refreshProfilePhoto();
+                }
             }
         } catch (error) {
             console.error('[Settings] Error hosting Google avatar:', error);
             // Fallback to direct Google URL
             this.state.settings.general.hostedPhotoURL = googlePhotoURL;
+            
+            // Still trigger refresh even with fallback
+            if (window.authManager && typeof window.authManager.refreshProfilePhoto === 'function') {
+                window.authManager.refreshProfilePhoto();
+            }
         }
     }
 

@@ -548,9 +548,8 @@ button:hover:not(:disabled),
 
 /* Normalize br spacing for consistent single-line breaks */
 .body-input br {
-  display: block;
+  display: inline;
   margin: 0;
-  content: '';
 }
 
 /* === EMAIL EDITOR: AI BAR (slide-down) === */
@@ -9170,8 +9169,8 @@ html, body {
 /* === Client Management Dashboard === */
 .client-dashboard {
     padding: var(--spacing-base);
-    overflow-y: auto;
-    height: 100%;
+    overflow: visible;
+    height: auto;
 }
 
 .dashboard-section {
@@ -9644,15 +9643,15 @@ html, body {
 }
 
 .btn-primary {
-    background: var(--orange-primary);
+    background: var(--bg-item);
     color: var(--text-inverse);
-    border-color: var(--orange-primary);
+    border: 1px solid var(--border-light);
 }
 
 .btn-primary:hover {
-    background: var(--orange-dark);
-    border-color: var(--orange-dark);
-    transform: translateY(-1px);
+    background: var(--grey-700);
+    border-color: var(--grey-600);
+    color: var(--text-inverse);
 }
 
 .client-details {
@@ -18808,7 +18807,8 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     border-bottom: none;
 }
 
-.activity-icon {
+/* Agent Detail Page Activity Icons - More specific selector */
+#agent-detail-page .activity-icon {
     width: 32px;
     height: 32px;
     border-radius: 50%;
@@ -18819,27 +18819,27 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     flex-shrink: 0;
 }
 
-.activity-icon.call {
+#agent-detail-page .activity-icon.call {
     background: rgba(34, 197, 94, 0.1);
     color: #22c55e;
 }
 
-.activity-icon.email {
+#agent-detail-page .activity-icon.email {
     background: rgba(59, 130, 246, 0.1);
     color: #3b82f6;
 }
 
-.activity-icon.task_completed {
+#agent-detail-page .activity-icon.task_completed {
     background: rgba(16, 185, 129, 0.1);
     color: #10b981;
 }
 
-.activity-icon.note {
+#agent-detail-page .activity-icon.note {
     background: rgba(245, 158, 11, 0.1);
     color: #f59e0b;
 }
 
-.activity-icon.deal {
+#agent-detail-page .activity-icon.deal {
     background: rgba(168, 85, 247, 0.1);
     color: #a855f7;
 }

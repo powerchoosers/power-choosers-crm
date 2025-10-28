@@ -1379,29 +1379,51 @@
           
           // Insert single line break for single spacing (like Gmail/Outlook)
           try {
-            // Insert single <br> for single spacing
-            document.execCommand('insertHTML', false, '<br>');
-            console.log('[Enter] Single line break inserted via execCommand');
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) throw new Error('No selection');
+            const range = sel.getRangeAt(0);
+
+            // If the previous sibling is a BR, don't insert another one
+            const prev = range.startContainer.nodeType === Node.TEXT_NODE
+              ? range.startContainer.previousSibling
+              : range.startContainer.childNodes[range.startOffset - 1];
+
+            if (prev && prev.nodeName === 'BR') {
+              // Move caret after existing BR and exit
+              const after = document.createRange();
+              after.setStartAfter(prev);
+              after.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(after);
+              console.log('[Enter] Cursor moved after existing BR');
+              return;
+            }
+
+            // Insert a single BR
+            const br = document.createElement('br');
+            range.deleteContents();
+            range.insertNode(br);
+
+            // Remove any accidental duplicate BRs right after the inserted one
+            while (br.nextSibling && br.nextSibling.nodeName === 'BR') {
+              br.nextSibling.remove();
+            }
+
+            // Place caret after the inserted BR
+            const after = document.createRange();
+            after.setStartAfter(br);
+            after.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(after);
+            console.log('[Enter] Single line break inserted via DOM manipulation');
           } catch (error) {
-            console.error('[Enter] execCommand failed:', error);
-            // Try alternative approach
+            console.error('[Enter] DOM manipulation failed:', error);
+            // Fallback to execCommand if needed
             try {
-              const selection = window.getSelection();
-              const range = selection.getRangeAt(0);
-              range.deleteContents();
-              
-              // Insert single <br> tag for single spacing
-              const br = document.createElement('br');
-              range.insertNode(br);
-              
-              // Move cursor after the break
-              range.setStartAfter(br);
-              range.collapse(true);
-              selection.removeAllRanges();
-              selection.addRange(range);
-              console.log('[Enter] Single line break inserted via DOM manipulation');
+              document.execCommand('insertHTML', false, '<br>');
+              console.log('[Enter] Single line break inserted via execCommand fallback');
             } catch (fallbackError) {
-              console.error('[Enter] DOM manipulation also failed:', fallbackError);
+              console.error('[Enter] execCommand fallback also failed:', fallbackError);
             }
           }
         }
@@ -3545,7 +3567,7 @@
         if (jsonData.closing) {
           // Ensure closing has proper line breaks (e.g., "Best regards,\nLewis")
           // If AI returns "Best regards, Lewis" on one line, split it
-          let closing = jsonData.closing;
+          let closing = String(jsonData.closing || '').trim();
           
           // Handle different closing formats and ensure proper line break
           if (closing.includes('Best regards,') && !closing.includes('\n')) {
@@ -3558,6 +3580,12 @@
           } else if (closing.includes('Best regards,') && closing.includes('\\n')) {
             // Handle escaped newline \\n from API (convert to actual newline)
             closing = closing.replace(/\\n/g, '\n');
+          }
+          
+          // Additional robust handling: detect any single-line closing pattern
+          const singleLineMatch = closing.match(/^(best regards|sincerely|regards),?\s+(.+)$/i);
+          if (singleLineMatch && !closing.includes('\n')) {
+            closing = `${singleLineMatch[1]},\n${singleLineMatch[2]}`;
           }
           
           body += '\n\n' + closing;
