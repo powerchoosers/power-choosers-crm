@@ -1376,6 +1376,13 @@ class PowerChoosersCRM {
             this.createAddContactModal();
             return;
         }
+        if (modalType === 'add-deal') {
+            // Handle via deals.js
+            if (window.Deals && typeof window.Deals.openModal === 'function') {
+                window.Deals.openModal();
+            }
+            return;
+        }
         // Fallback for other modal types not yet wired here
         this.showToast(`Opening ${modalType} modal...`);
     }

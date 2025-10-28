@@ -31,11 +31,31 @@
         makeCard(contactId, 'contact');
     }
 
-    function openDealForAccount(accountId) {
+    async function openDealForAccount(accountId) {
         currentAccountId = accountId;
         currentContactId = null;
         currentEntityType = 'account';
-        makeCard(accountId, 'account');
+        
+        // Load existing deal data from Firebase if available
+        const db = window.firebaseDB;
+        let existingDealData = null;
+        
+        if (db) {
+            try {
+                const dealsSnapshot = await db.collection('deals')
+                    .where('accountId', '==', accountId)
+                    .limit(1)
+                    .get();
+                
+                if (!dealsSnapshot.empty) {
+                    existingDealData = dealsSnapshot.docs[0].data();
+                }
+            } catch (error) {
+                console.warn('Error loading deal data:', error);
+            }
+        }
+        
+        makeCard(accountId, 'account', existingDealData);
     }
 
     function closeDeal() {
@@ -110,7 +130,7 @@
         });
     }
 
-    function makeCard(entityId, entityType) {
+    function makeCard(entityId, entityType, existingDealData = null) {
         // Remove existing deal card if any
         removeExistingWidget();
 
@@ -148,29 +168,29 @@
                         
                         <div class="deal-input-group">
                             <label for="annual-usage" class="deal-input-label">Annual Usage (kWh)</label>
-                            <input type="text" id="annual-usage" class="deal-form-input" placeholder="Enter annual usage (kWh)">
+                            <input type="text" id="annual-usage" class="deal-form-input" placeholder="Enter annual usage (kWh)" value="${existingDealData?.annualUsage ? existingDealData.annualUsage.toLocaleString() : ''}">
                         </div>
                         
                         <div class="deal-input-group">
                             <label for="mills" class="deal-input-label">Mills (Margin)</label>
-                            <input type="number" id="mills" class="deal-form-input" placeholder="Enter mills (e.g., 8 for 0.008)" min="0" step="0.1">
+                            <input type="number" id="mills" class="deal-form-input" placeholder="Enter mills (e.g., 8 for 0.008)" min="0" step="0.1" value="${existingDealData?.mills || ''}">
                             <small class="deal-input-note">Note: 8 mills = $0.008 per kWh</small>
                         </div>
                         
                         <div class="deal-input-group">
                             <label for="contract-length" class="deal-input-label">Contract Length (Years)</label>
-                            <input type="number" id="contract-length" class="deal-form-input" placeholder="Enter contract length in years" min="0.5" step="0.5">
+                            <input type="number" id="contract-length" class="deal-form-input" placeholder="Enter contract length in years" min="0.5" step="0.5" value="${existingDealData?.contractLength || ''}">
                         </div>
                         
                         <div class="deal-commission-type">
                             <label class="deal-commission-label">Commission Type</label>
                             <div class="deal-radio-group">
                                 <label class="deal-radio-label">
-                                    <input type="radio" name="commission-type" value="annual" checked>
+                                    <input type="radio" name="commission-type" value="annual" ${(!existingDealData || existingDealData.commissionType === 'annual') ? 'checked' : ''}>
                                     <span class="deal-radio-text">Annual</span>
                                 </label>
                                 <label class="deal-radio-label">
-                                    <input type="radio" name="commission-type" value="monthly">
+                                    <input type="radio" name="commission-type" value="monthly" ${existingDealData?.commissionType === 'monthly' ? 'checked' : ''}>
                                     <span class="deal-radio-text">Monthly</span>
                                 </label>
                             </div>
@@ -275,6 +295,14 @@
 
         isDealOpen = true;
         attachEventListeners();
+        
+        // Auto-calculate if we have existing data
+        if (existingDealData && existingDealData.annualUsage && existingDealData.mills && existingDealData.contractLength) {
+            setTimeout(() => {
+                calculateDeal();
+            }, 500);
+        }
+        
         return dealCard;
     }
 
@@ -551,5 +579,29 @@
     window.Widgets.openDealForAccount = openDealForAccount;
     window.Widgets.closeDeal = closeDeal;
     window.Widgets.isDealOpen = isDealOpenFunc;
+
+    // Listen for deal updates from deals page
+    document.addEventListener('pc:deal-created', async (e) => {
+        const dealId = e.detail?.dealId;
+        if (!dealId) return;
+        
+        // Reload deal data if widget is open for same account
+        if (isDealOpen && currentAccountId) {
+            const db = window.firebaseDB;
+            if (db) {
+                try {
+                    const dealDoc = await db.collection('deals').doc(dealId).get();
+                    const dealData = dealDoc.data();
+                    
+                    if (dealData && dealData.accountId === currentAccountId) {
+                        // Refresh widget with updated data
+                        openDealForAccount(currentAccountId);
+                    }
+                } catch (error) {
+                    console.warn('Error refreshing deal widget:', error);
+                }
+            }
+        }
+    });
 
 })();
