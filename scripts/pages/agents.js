@@ -2,22 +2,23 @@
 
 // Agents Management Dashboard - Real Data Integration with Twilio & SendGrid
 (function () {
-  const state = {
-    loaded: false,
-    loading: false,
-    userEmail: window.currentUserEmail || '',
-    isAdmin: window.currentUserRole === 'admin',
-    agents: [],
-    activities: [],
-    twilioNumbers: [],
-    sendgridEmails: [],
-    filters: {
-      status: 'all', // all, online, offline, busy
-      territory: 'all'
-    },
-    currentPage: 1,
-    pageSize: 20
-  };
+const state = {
+  loaded: false,
+  loading: false,
+  userEmail: window.currentUserEmail || '',
+  isAdmin: window.currentUserRole === 'admin',
+  agents: [],
+  activities: [],
+  twilioNumbers: [],
+  sendgridEmails: [],
+  filters: {
+    status: 'all', // all, online, offline, busy
+    territory: 'all'
+  },
+  currentPage: 1,
+  pageSize: 20,
+  realtimeListeners: new Map() // ← ADDED: Map for tracking real-time listeners
+};
 
   const els = {};
 

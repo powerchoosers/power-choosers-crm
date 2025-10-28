@@ -4194,6 +4194,9 @@ html, body {
     contain: layout paint;
     overflow: hidden;
     z-index: 100;
+    /* Add transform optimization */
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 /* Also support JS-applied expanded class for hover intent */
@@ -4290,6 +4293,14 @@ html, body {
     background: var(--bg-main);
     overflow: hidden;
     position: relative;
+    /* Reserve space for expanded sidebar to prevent layout shift */
+    min-width: calc(100vw - var(--sidebar-expanded));
+    transition: none; /* Disable transitions on main content */
+    /* Add transform optimization */
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    /* Prevent unnecessary repaints */
+    contain: layout style paint;
 }
 
 /* === DASHBOARD (SCROLLABLE) === */
@@ -8542,6 +8553,25 @@ html, body {
     font-weight: 500;
     margin-bottom: 4px;
     font-size: 0.875rem;
+    /* Prevent text wrapping when sidebar expands */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: help;
+}
+
+/* Show full text on hover for widget titles */
+.task-name:hover, .news-title:hover, .lead-name:hover {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: break-word;
+    position: relative;
+    z-index: 10;
+    background: var(--bg-card);
+    padding: 8px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .task-time, .news-time {
@@ -11056,6 +11086,22 @@ margin-bottom: var(--spacing-md);
     word-break: normal; /* override parent break-word */
     min-width: 0;       /* allow flex shrink */
     flex: 1 1 auto;     /* occupy available space next to actions */
+    cursor: help;       /* indicate hoverable for full text */
+}
+
+/* Show full text on hover for info values */
+#contact-detail-view .info-value-text:hover,
+#account-detail-view .info-value-text:hover {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: break-word;
+    position: relative;
+    z-index: 10;
+    background: var(--bg-card);
+    padding: 8px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 /* Keep consistent line height to avoid vertical jump on hover */
 #contact-detail-view .info-value { line-height: 24px; }
@@ -11508,15 +11554,36 @@ margin-bottom: var(--spacing-md);
 }
 
 /* Keep account detail grid stable to avoid vertical reflow when side panel toggles */
-#account-detail-view .info-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+#account-detail-view .info-grid { 
+    grid-template-columns: repeat(4, minmax(0, 1fr)); 
+    /* Prevent grid from shrinking below minimum viable width */
+    min-width: 600px;
+}
 @media (max-width: 900px) {
   #account-detail-view .info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {
   #account-detail-view .info-grid { grid-template-columns: 1fr; }
 }
-/* Full-width row (e.g., Short Description) */
-#account-detail-view .info-row--full { grid-column: 1 / -1; }
+
+/* Keep contact detail grid stable to avoid vertical reflow when side panel toggles */
+#contact-detail-view .info-grid { 
+    grid-template-columns: repeat(4, minmax(0, 1fr)); 
+    /* Prevent grid from shrinking below minimum viable width */
+    min-width: 600px;
+}
+@media (max-width: 900px) {
+  #contact-detail-view .info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  #contact-detail-view .info-grid { grid-template-columns: 1fr; }
+}
+/* Full-width row (e.g., Short Description) - prevent wrapping */
+#account-detail-view .info-row--full { 
+    grid-column: 1 / -1; 
+    /* Prevent text wrapping by using ellipsis instead */
+    overflow: hidden;
+}
 
 /* Contact detail service addresses should use same 4-column grid as account detail */
 #contact-service-addresses-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -11529,11 +11596,27 @@ margin-bottom: var(--spacing-md);
 /* Multiline value display */
 #account-detail-view .info-value-wrap--multiline { align-items: flex-start; }
 #account-detail-view .info-value-wrap .info-value-text--multiline {
-    white-space: pre-wrap; /* preserve newlines */
+    white-space: nowrap; /* Change from pre-wrap to nowrap */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: normal; /* Change from break-word */
+    line-height: 1.4;
+    /* Show full text on hover */
+    cursor: help;
+}
+
+/* Show full text on hover for multiline fields */
+#account-detail-view .info-value-text--multiline:hover {
+    white-space: pre-wrap;
     overflow: visible;
     text-overflow: clip;
     word-break: break-word;
-    line-height: 1.4;
+    position: relative;
+    z-index: 10;
+    background: var(--bg-card);
+    padding: 8px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 /* Multiline edit layout */
 #account-detail-view .info-input-wrap--multiline { display: flex; align-items: flex-start; gap: 6px; width: 100%; }
