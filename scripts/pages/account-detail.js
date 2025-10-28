@@ -5406,7 +5406,15 @@ var console = {
       const db = window.firebaseDB;
       let newId = null;
       if (db && typeof db.collection === 'function') {
-        const payload = { name, kind: 'accounts', count: 1 };
+        const payload = { 
+          name, 
+          kind: 'accounts', 
+          count: 1,
+          recordCount: 1,
+          ownerId: window.currentUserEmail || '',
+          createdBy: window.currentUserEmail || '',
+          assignedTo: window.currentUserEmail || ''
+        };
         if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
           payload.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
           payload.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
@@ -5416,6 +5424,17 @@ var console = {
         }
         const ref = await db.collection('lists').add(payload);
         newId = ref.id;
+        
+        // Notify lists overview page of new list creation
+        try {
+          document.dispatchEvent(new CustomEvent('pc:list-created', { 
+            detail: { 
+              id: newId, 
+              list: { id: newId, ...payload },
+              kind: 'accounts'
+            } 
+          }));
+        } catch (_) { /* noop */ }
       }
       if (newId) {
         // Add the account to the new list
