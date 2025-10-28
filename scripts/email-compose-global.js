@@ -1195,7 +1195,7 @@
         const action = btn.dataset.action;
         
         if (action === 'ai') {
-          // AI functionality is handled by setupAIButtonHandler()
+          openAIPanel();
         } else if (action === 'formatting') {
           toggleFormattingBar();
         } else if (action === 'preview') {
@@ -1379,51 +1379,29 @@
           
           // Insert single line break for single spacing (like Gmail/Outlook)
           try {
-            const sel = window.getSelection();
-            if (!sel || sel.rangeCount === 0) throw new Error('No selection');
-            const range = sel.getRangeAt(0);
-
-            // If the previous sibling is a BR, don't insert another one
-            const prev = range.startContainer.nodeType === Node.TEXT_NODE
-              ? range.startContainer.previousSibling
-              : range.startContainer.childNodes[range.startOffset - 1];
-
-            if (prev && prev.nodeName === 'BR') {
-              // Move caret after existing BR and exit
-              const after = document.createRange();
-              after.setStartAfter(prev);
-              after.collapse(true);
-              sel.removeAllRanges();
-              sel.addRange(after);
-              console.log('[Enter] Cursor moved after existing BR');
-              return;
-            }
-
-            // Insert a single BR
-            const br = document.createElement('br');
-            range.deleteContents();
-            range.insertNode(br);
-
-            // Remove any accidental duplicate BRs right after the inserted one
-            while (br.nextSibling && br.nextSibling.nodeName === 'BR') {
-              br.nextSibling.remove();
-            }
-
-            // Place caret after the inserted BR
-            const after = document.createRange();
-            after.setStartAfter(br);
-            after.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(after);
-            console.log('[Enter] Single line break inserted via DOM manipulation');
+            // Insert single <br> for single spacing
+            document.execCommand('insertHTML', false, '<br>');
+            console.log('[Enter] Single line break inserted via execCommand');
           } catch (error) {
-            console.error('[Enter] DOM manipulation failed:', error);
-            // Fallback to execCommand if needed
+            console.error('[Enter] execCommand failed:', error);
+            // Try alternative approach
             try {
-              document.execCommand('insertHTML', false, '<br>');
-              console.log('[Enter] Single line break inserted via execCommand fallback');
+              const selection = window.getSelection();
+              const range = selection.getRangeAt(0);
+              range.deleteContents();
+              
+              // Insert single <br> tag for single spacing
+              const br = document.createElement('br');
+              range.insertNode(br);
+              
+              // Move cursor after the break
+              range.setStartAfter(br);
+              range.collapse(true);
+              selection.removeAllRanges();
+              selection.addRange(range);
+              console.log('[Enter] Single line break inserted via DOM manipulation');
             } catch (fallbackError) {
-              console.error('[Enter] execCommand fallback also failed:', fallbackError);
+              console.error('[Enter] DOM manipulation also failed:', fallbackError);
             }
           }
         }
@@ -1737,10 +1715,6 @@
       
       // Set iframe content using srcdoc (isolates CSS completely)
       iframe.srcdoc = html;
-      
-      // Store original HTML as backup in data attribute
-      editor.setAttribute('data-original-html', html);
-      console.log('[HTML Email] Stored original HTML backup, length:', html.length);
       
       // Auto-resize iframe to content height
       iframe.onload = () => {
@@ -3567,7 +3541,7 @@
         if (jsonData.closing) {
           // Ensure closing has proper line breaks (e.g., "Best regards,\nLewis")
           // If AI returns "Best regards, Lewis" on one line, split it
-          let closing = String(jsonData.closing || '').trim();
+          let closing = jsonData.closing;
           
           // Handle different closing formats and ensure proper line break
           if (closing.includes('Best regards,') && !closing.includes('\n')) {
@@ -3580,12 +3554,6 @@
           } else if (closing.includes('Best regards,') && closing.includes('\\n')) {
             // Handle escaped newline \\n from API (convert to actual newline)
             closing = closing.replace(/\\n/g, '\n');
-          }
-          
-          // Additional robust handling: detect any single-line closing pattern
-          const singleLineMatch = closing.match(/^(best regards|sincerely|regards),?\s+(.+)$/i);
-          if (singleLineMatch && !closing.includes('\n')) {
-            closing = `${singleLineMatch[1]},\n${singleLineMatch[2]}`;
           }
           
           body += '\n\n' + closing;
@@ -3738,6 +3706,29 @@
     });
   }
 
+  // ========== AI PANEL FUNCTIONS ==========
+  
+  /**
+   * Opens the AI Panel, delegating to the main email manager if available.
+   */
+  function openAIPanel() {
+    if (window.emailManager && typeof window.emailManager.toggleAIPanel === 'function') {
+      console.log('[EmailCompose] Delegating to emailManager.toggleAIPanel');
+      window.emailManager.toggleAIPanel();
+    } else {
+      // Fallback if the main manager is not loaded
+      const composeWindow = document.getElementById('compose-window');
+      const aiBar = composeWindow?.querySelector('.ai-bar');
+      if (aiBar) {
+        const isOpen = aiBar.classList.toggle('open');
+        aiBar.setAttribute('aria-hidden', String(!isOpen));
+        console.log('[EmailCompose] Toggled AI bar directly.');
+      } else {
+        console.error('[EmailCompose] AI panel not found.');
+      }
+    }
+  }
+
   // ========== EMAIL SENDING FUNCTIONS ==========
   
   async function sendEmailViaSendGrid(emailData) {
@@ -3763,7 +3754,6 @@
         inReplyTo: inReplyTo,
         references: references,
         isHtmlEmail: isHtmlEmail || false,
-        userEmail: window.currentUserEmail,
         _deliverability: _deliverability
       };
       
@@ -3831,41 +3821,7 @@
     const to = toInput?.value?.trim() || '';
     const subject = subjectInput?.value?.trim() || '';
     
-    // Extract content - handle iframe wrapper for HTML emails with robust fallbacks
-    let body = '';
-    const iframes = bodyInput?.querySelectorAll('.html-email-iframe');
-    const backupHtml = bodyInput?.getAttribute('data-original-html');
-    
-    if (iframes && iframes.length > 0) {
-      // HTML email: try to extract from iframe(s)
-      let extractedHtml = '';
-      
-      // Try each iframe (handle multiple iframes scenario)
-      for (let i = 0; i < iframes.length; i++) {
-        const iframe = iframes[i];
-        if (iframe.srcdoc && iframe.srcdoc.trim().length > 0) {
-          extractedHtml = iframe.srcdoc;
-          console.log(`[EmailCompose] Extracted HTML from iframe ${i + 1}, length:`, extractedHtml.length);
-          break; // Use first valid iframe
-        }
-      }
-      
-      if (extractedHtml) {
-        body = extractedHtml;
-      } else if (backupHtml) {
-        // Fallback to stored backup HTML
-        body = backupHtml;
-        console.log('[EmailCompose] Using backup HTML from data attribute, length:', body.length);
-      } else {
-        // Last resort: use innerHTML (might be iframe wrapper)
-        body = bodyInput?.innerHTML || '';
-        console.warn('[EmailCompose] No iframe content or backup found, using innerHTML, length:', body.length);
-      }
-    } else {
-      // Regular email: use innerHTML
-      body = bodyInput?.innerHTML || '';
-      console.log('[EmailCompose] Using regular innerHTML, length:', body.length);
-    }
+    const body = bodyInput?.innerHTML || '';
     
     // Check attribute first, then detect HTML structure as fallback
     const hasHtmlAttribute = bodyInput?.getAttribute('data-html-email') === 'true';
@@ -3878,23 +3834,10 @@
       body.includes('font-family: Arial') || // Template styling
       body.includes('max-width: 600px') // Template container width
     );
-    const isHtmlEmail = hasHtmlAttribute || hasHtmlStructure || (iframes && iframes.length > 0) || !!backupHtml;
-    
-    // Check for mixed content (manual edits outside iframe)
-    if (isHtmlEmail && iframes && iframes.length > 0) {
-      const wrapperContent = bodyInput?.innerHTML || '';
-      const iframeWrapperPattern = /<div class="html-email-iframe-wrapper">.*?<\/div>/s;
-      const contentOutsideIframe = wrapperContent.replace(iframeWrapperPattern, '').trim();
-      
-      if (contentOutsideIframe && contentOutsideIframe.length > 0) {
-        console.warn('[EmailCompose] Mixed content detected - manual edits outside iframe:', contentOutsideIframe.length, 'chars');
-        console.warn('[EmailCompose] These edits may not be included in the sent email');
-        // Note: We could merge this content, but for now we'll warn the user
-      }
-    }
+    const isHtmlEmail = hasHtmlAttribute || hasHtmlStructure;
     
     console.log('[EmailCompose] Email mode:', isHtmlEmail ? 'HTML Template' : 'Standard');
-    console.log('[EmailCompose] Detection:', {hasHtmlAttribute, hasHtmlStructure, iframeCount: iframes?.length || 0, hasBackup: !!backupHtml});
+    console.log('[EmailCompose] Detection:', {hasHtmlAttribute, hasHtmlStructure});
     console.log('[EmailCompose] Content preview:', body.substring(0, 100) + '...');
     
     if (!to) {
