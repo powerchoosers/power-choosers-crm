@@ -19,7 +19,7 @@ async function researchCompanyInfo(companyName, industry) {
   }
   
   try {
-    const researchPrompt = `Research ${companyName}${industry ? `, a ${industry} company` : ''}. Provide a brief 1-2 sentence description of what they do, their business focus, and any relevant operational details for energy cost discussions. Focus on operations, not financials. Be specific and factual.`;
+    const researchPrompt = `Research ${companyName}${industry ? ', a ' + industry + ' company' : ''}. Provide a brief 1-2 sentence description of what they do, their business focus, and any relevant operational details for energy cost discussions. Focus on operations, not financials. Be specific and factual.`;
     
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
@@ -198,37 +198,272 @@ async function scrapeCompanyWebsite(domain, companyName) {
   }
 }
 
-// Template type detection (exact match + pattern matching)
+// Enhanced manual prompt analysis and context extraction
+function analyzeManualPrompt(prompt) {
+  const promptLower = String(prompt || '').toLowerCase();
+  
+  const analysis = {
+    // Intent detection
+    intent: {
+      urgent: /urgent|asap|immediately|quickly|rush/i.test(promptLower),
+      casual: /casual|informal|friendly|relaxed/i.test(promptLower),
+      formal: /formal|professional|business|official/i.test(promptLower),
+      detailed: /detailed|comprehensive|thorough|extensive/i.test(promptLower),
+      brief: /brief|short|concise|quick/i.test(promptLower)
+    },
+    
+    // Content requests
+    contentRequests: {
+      caseStudy: /case.*study|example|similar.*company|reference/i.test(promptLower),
+      pricing: /pricing|cost|price|rate|savings/i.test(promptLower),
+      timeline: /timeline|schedule|when|deadline|time/i.test(promptLower),
+      contract: /contract|agreement|terms|renewal/i.test(promptLower),
+      meeting: /meeting|call|schedule|appointment/i.test(promptLower),
+      proposal: /proposal|quote|estimate|bid/i.test(promptLower)
+    },
+    
+    // Relationship context
+    relationship: {
+      cold: /cold|first.*contact|never.*met|new.*lead/i.test(promptLower),
+      warm: /warm|met.*at|spoke.*with|conference/i.test(promptLower),
+      hot: /hot|interested|ready|decision/i.test(promptLower),
+      existing: /existing|current|ongoing|continue/i.test(promptLower)
+    },
+    
+    // Specific mentions
+    mentions: {
+      contractEnd: /contract.*end|expires|renewal.*date/i.test(promptLower),
+      currentSupplier: /current.*supplier|existing.*supplier/i.test(promptLower),
+      energyCosts: /energy.*cost|electricity.*cost|utility.*cost/i.test(promptLower),
+      budget: /budget|financial|cost.*control/i.test(promptLower),
+      industry: /manufacturing|healthcare|retail|hospitality|education/i.test(promptLower)
+    },
+    
+    // Tone indicators
+    tone: {
+      question: /\?/.test(prompt),
+      exclamation: /!/.test(prompt),
+      polite: /please|thank|appreciate/i.test(promptLower),
+      direct: /need|want|require|must/i.test(promptLower)
+    }
+  };
+  
+  console.log('[Prompt Analysis] Extracted context:', analysis);
+  return analysis;
+}
+
+// Build conditional rules based on prompt analysis
+function buildConditionalRules(promptAnalysis, templateType) {
+  let rules = [];
+  
+  // Tone-based rules
+  if (promptAnalysis.intent.casual) {
+    rules.push('TONE: Use casual, friendly language. Avoid overly formal business language.');
+  } else if (promptAnalysis.intent.formal) {
+    rules.push('TONE: Use formal, professional business language throughout.');
+  }
+  
+  // Urgency-based rules
+  if (promptAnalysis.intent.urgent) {
+    rules.push('URGENCY: Include urgency messaging and time-sensitive language.');
+    rules.push('CTA: Use more direct CTAs that convey urgency.');
+  }
+  
+  // Length-based rules
+  if (promptAnalysis.intent.detailed) {
+    rules.push('LENGTH: Provide comprehensive, detailed information.');
+    rules.push('CONTENT: Include more background and context.');
+  } else if (promptAnalysis.intent.brief) {
+    rules.push('LENGTH: Keep content concise and to the point.');
+    rules.push('CONTENT: Focus on essential information only.');
+  }
+  
+  // Content-specific rules
+  if (promptAnalysis.contentRequests.caseStudy) {
+    rules.push('CONTENT: Include relevant case studies or examples from similar companies.');
+  }
+  
+  if (promptAnalysis.contentRequests.pricing) {
+    rules.push('CONTENT: Include specific pricing information and cost savings details.');
+  }
+  
+  if (promptAnalysis.contentRequests.timeline) {
+    rules.push('CONTENT: Include timeline information and scheduling details.');
+  }
+  
+  if (promptAnalysis.contentRequests.meeting) {
+    rules.push('CTA: Include meeting scheduling options or time slots.');
+  }
+  
+  // Relationship-based rules
+  if (promptAnalysis.relationship.cold) {
+    rules.push('APPROACH: Use introduction context about how you found them.');
+    rules.push('CTA: Use qualifying questions rather than meeting requests.');
+  }
+  
+  if (promptAnalysis.relationship.warm) {
+    rules.push('APPROACH: Reference the previous meeting or connection.');
+    rules.push('TONE: Use relationship-building language.');
+  }
+  
+  if (promptAnalysis.relationship.hot) {
+    rules.push('APPROACH: Focus on decision-making and next steps.');
+    rules.push('CTA: Use more direct, action-oriented CTAs.');
+  }
+  
+  // Specific mention rules
+  if (promptAnalysis.mentions.contractEnd) {
+    rules.push('CONTENT: MUST reference contract end date and renewal timing.');
+  }
+  
+  if (promptAnalysis.mentions.currentSupplier) {
+    rules.push('CONTENT: Reference their current supplier when relevant.');
+  }
+  
+  if (promptAnalysis.mentions.budget) {
+    rules.push('CONTENT: Focus on budget impact and cost control benefits.');
+  }
+  
+  return rules.length > 0 ? `CONDITIONAL RULES BASED ON PROMPT:\n${rules.map(rule => `- ${rule}`).join('\n')}\n` : '';
+}
+
+// Dynamic field generation based on prompt analysis
+function generateDynamicFields(templateType, promptAnalysis, recipient) {
+  const dynamicFields = [];
+  
+  // Add fields based on content requests
+  if (promptAnalysis.contentRequests.caseStudy) {
+    dynamicFields.push({
+      name: 'case_study',
+      type: 'string',
+      description: 'Include a relevant case study or example from similar companies'
+    });
+  }
+  
+  if (promptAnalysis.contentRequests.pricing) {
+    dynamicFields.push({
+      name: 'pricing_details',
+      type: 'string', 
+      description: 'Include specific pricing information or cost savings details'
+    });
+  }
+  
+  if (promptAnalysis.contentRequests.timeline) {
+    dynamicFields.push({
+      name: 'timeline_info',
+      type: 'string',
+      description: 'Include timeline information or scheduling details'
+    });
+  }
+  
+  if (promptAnalysis.contentRequests.meeting) {
+    dynamicFields.push({
+      name: 'meeting_options',
+      type: 'string',
+      description: 'Include meeting scheduling options or time slots'
+    });
+  }
+  
+  // Add urgency-based fields
+  if (promptAnalysis.intent.urgent) {
+    dynamicFields.push({
+      name: 'urgency_message',
+      type: 'string',
+      description: 'Include urgency messaging based on prompt context'
+    });
+  }
+  
+  // Add relationship-based fields
+  if (promptAnalysis.relationship.cold) {
+    dynamicFields.push({
+      name: 'introduction_context',
+      type: 'string',
+      description: 'Include context about how you found them or why you\'re reaching out'
+    });
+  }
+  
+  if (promptAnalysis.relationship.warm) {
+    dynamicFields.push({
+      name: 'connection_reference',
+      type: 'string',
+      description: 'Reference the previous meeting or connection'
+    });
+  }
+  
+  console.log('[Dynamic Fields] Generated fields:', dynamicFields);
+  return dynamicFields;
+}
+
+// Enhanced template type detection with flexible patterns and context analysis
 function getTemplateType(prompt) {
   const promptLower = String(prompt || '').toLowerCase();
   
-  // Check for cold email patterns first
-  if (/cold.*email|could.*not.*reach/i.test(promptLower)) {
-    return 'cold_email';
+  // Enhanced pattern matching with more flexible detection
+  const flexiblePatterns = {
+    cold_email: [
+      /cold.*email/i,
+      /could.*not.*reach/i,
+      /first.*contact/i,
+      /initial.*outreach/i,
+      /never.*spoke/i,
+      /new.*lead/i,
+      /prospect.*research/i
+    ],
+    warm_intro: [
+      /warm.*intro/i,
+      /after.*call/i,
+      /met.*at/i,
+      /spoke.*with/i,
+      /conference.*meeting/i,
+      /event.*introduction/i,
+      /mutual.*connection/i
+    ],
+    follow_up: [
+      /follow.*up/i,
+      /followup/i,
+      /checking.*in/i,
+      /status.*update/i,
+      /next.*steps/i,
+      /where.*stand/i,
+      /progress.*update/i
+    ],
+    energy_health: [
+      /energy.*health.*check/i,
+      /energy.*audit/i,
+      /assessment/i,
+      /review.*energy/i,
+      /analyze.*usage/i,
+      /energy.*analysis/i
+    ],
+    proposal: [
+      /proposal.*delivery/i,
+      /proposal/i,
+      /next.*steps/i,
+      /delivery.*proposal/i,
+      /send.*proposal/i,
+      /proposal.*ready/i
+    ],
+    invoice: [
+      /invoice.*request/i,
+      /send.*invoice/i,
+      /billing.*request/i,
+      /payment.*request/i,
+      /invoice.*analysis/i,
+      /billing.*review/i
+    ]
+  };
+  
+  // Check patterns in order of priority
+  for (const [templateType, patterns] of Object.entries(flexiblePatterns)) {
+    for (const pattern of patterns) {
+      if (pattern.test(promptLower)) {
+        console.log(`[Template Detection] Matched "${templateType}" for prompt: "${prompt}"`);
+        return templateType;
+      }
+    }
   }
   
-  // Check for other patterns
-  if (/warm.*intro|after.*call/i.test(promptLower)) {
-    return 'warm_intro';
-  }
-  
-  if (/follow.*up|followup/i.test(promptLower)) {
-    return 'follow_up';
-  }
-  
-  if (/energy.*health.*check/i.test(promptLower)) {
-    return 'energy_health';
-  }
-  
-  if (/proposal.*delivery|proposal/i.test(promptLower)) {
-    return 'proposal';
-  }
-  
-  if (/invoice.*request|send.*invoice/i.test(promptLower)) {
-    return 'invoice';
-  }
-  
-  // Exact matches for specific prompts
+  // Exact matches for specific prompts (fallback)
   const promptMap = {
     'Warm intro after a call': 'warm_intro',
     'Follow-up with tailored value props': 'follow_up',
@@ -238,12 +473,159 @@ function getTemplateType(prompt) {
     'Standard Invoice Request': 'invoice'
   };
   
-  return promptMap[prompt] || 'general'; // Default to general template for manual prompts
+  if (promptMap[prompt]) {
+    console.log(`[Template Detection] Exact match "${promptMap[prompt]}" for prompt: "${prompt}"`);
+    return promptMap[prompt];
+  }
+  
+  // Default to general template for unrecognized prompts
+  console.log(`[Template Detection] Using "general" template for prompt: "${prompt}"`);
+  return 'general';
 }
 
 // CTA Pattern System (Hybrid Approach with Role-Specific CTAs)
-function getCTAPattern(recipient, meetingPreferences = null) {
-  // If hardcoded times are enabled, use meeting-based CTAs
+function getCTAPattern(recipient, meetingPreferences = null, templateType = null) {
+  // For cold emails, NEVER use meeting requests - always use qualifying questions
+  if (templateType === 'cold_email') {
+    // Role-specific CTA patterns (higher conversion rates)
+    const jobTitle = (recipient?.job || '').toLowerCase();
+    
+    // CFO/Finance Director patterns (40% response rate)
+    if (jobTitle.includes('cfo') || jobTitle.includes('finance') || jobTitle.includes('controller') || jobTitle.includes('treasurer')) {
+      const cfoPatterns = [
+        {
+          type: 'budget_focus',
+          template: 'Are rising electricity costs affecting your 2025 budget?',
+          guidance: 'Budget-focused question for CFOs'
+        },
+        {
+          type: 'cost_predictability',
+          template: 'Would energy cost predictability help your financial planning?',
+          guidance: 'Cost predictability for budget planning'
+        },
+        {
+          type: 'roi_question',
+          template: 'Would you like to see how we\'ve helped similar companies reduce energy spend?',
+          guidance: 'ROI-focused question with social proof'
+        }
+      ];
+      return cfoPatterns[Math.floor(Math.random() * cfoPatterns.length)];
+    }
+    
+    // Facilities Manager patterns (35% response rate)
+    if (jobTitle.includes('facilities') || jobTitle.includes('facility') || jobTitle.includes('maintenance') || jobTitle.includes('operations manager')) {
+      const facilitiesPatterns = [
+        {
+          type: 'operational_efficiency',
+          template: 'Is energy procurement adding to your operational workload?',
+          guidance: 'Operational efficiency question for facilities managers'
+        },
+        {
+          type: 'simplify_management',
+          template: 'Would you be interested in simplifying your energy management?',
+          guidance: 'Simplification focus for facilities teams'
+        },
+        {
+          type: 'vendor_management',
+          template: 'How many energy suppliers are you currently managing?',
+          guidance: 'Vendor management complexity question'
+        }
+      ];
+      return facilitiesPatterns[Math.floor(Math.random() * facilitiesPatterns.length)];
+    }
+    
+    // Procurement Manager patterns (38% response rate)
+    if (jobTitle.includes('procurement') || jobTitle.includes('purchasing') || jobTitle.includes('sourcing') || jobTitle.includes('supply')) {
+      const procurementPatterns = [
+        {
+          type: 'market_competitiveness',
+          template: 'Are you seeing competitive rates in the current energy market?',
+          guidance: 'Market competitiveness question for procurement'
+        },
+        {
+          type: 'supplier_comparison',
+          template: 'Would you like to see our supplier comparison process?',
+          guidance: 'Process-focused question for procurement professionals'
+        },
+        {
+          type: 'vendor_optimization',
+          template: 'How do you currently evaluate energy suppliers?',
+          guidance: 'Evaluation process question'
+        }
+      ];
+      return procurementPatterns[Math.floor(Math.random() * procurementPatterns.length)];
+    }
+    
+    // Operations Manager patterns (32% response rate)
+    if (jobTitle.includes('operations') || jobTitle.includes('operational') || jobTitle.includes('plant manager') || jobTitle.includes('production')) {
+      const operationsPatterns = [
+        {
+          type: 'cost_control',
+          template: 'Would energy cost predictability help your planning?',
+          guidance: 'Cost control question for operations'
+        },
+        {
+          type: 'efficiency_gains',
+          template: 'Are energy costs impacting your operational efficiency?',
+          guidance: 'Efficiency-focused question'
+        },
+        {
+          type: 'budget_pressure',
+          template: 'How are rising energy costs affecting your operations budget?',
+          guidance: 'Budget pressure question for operations'
+        }
+      ];
+      return operationsPatterns[Math.floor(Math.random() * operationsPatterns.length)];
+    }
+    
+    // Generic qualifying patterns (fallback)
+    const patterns = [
+      {
+        type: 'contract_timing',
+        template: 'When does your current electricity contract expire?',
+        guidance: 'Qualifying question that reveals urgency and timeline'
+      },
+      {
+        type: 'budget_qualification',
+        template: 'What\'s your annual electricity spend?',
+        guidance: 'Budget qualification for lead scoring'
+      },
+      {
+        type: 'decision_maker',
+        template: 'Are you the right person to discuss energy procurement?',
+        guidance: 'Decision maker identification'
+      },
+      {
+        type: 'pain_point',
+        template: 'Are rising electricity costs affecting your budget?',
+        guidance: 'Pain point qualification'
+      },
+      {
+        type: 'timing_urgency',
+        template: 'Is your energy contract renewal on your radar for 2025?',
+        guidance: 'Timing and urgency qualification'
+      },
+      {
+        type: 'industry_specific',
+        template: `How is ${recipient?.company || 'your company'} approaching energy cost management for 2025?`,
+        guidance: 'Company-specific strategic question'
+      }
+    ];
+    
+    // Updated weights for new qualifying-focused patterns
+    const weights = [0.25, 0.20, 0.15, 0.15, 0.15, 0.10];
+    const random = Math.random();
+    let cumulative = 0;
+    
+    for (let i = 0; i < patterns.length; i++) {
+      cumulative += weights[i];
+      if (random <= cumulative) return patterns[i];
+    }
+    
+    return patterns[0];
+  }
+  
+  // For follow-up emails, use hardcoded times if enabled
   if (meetingPreferences?.enabled && meetingPreferences?.useHardcodedTimes) {
     const slot1 = meetingPreferences.slot1Time || '2-3pm';
     const slot2 = meetingPreferences.slot2Time || '10-11am';
@@ -257,7 +639,7 @@ function getCTAPattern(recipient, meetingPreferences = null) {
     };
   }
   
-  // Role-specific CTA patterns (higher conversion rates)
+  // Fallback to role-specific patterns for other email types
   const jobTitle = (recipient?.job || '').toLowerCase();
   
   // CFO/Finance Director patterns (40% response rate)
@@ -674,8 +1056,8 @@ const generalSchema = {
   }
 };
 
-// Get schema based on template type
-function getTemplateSchema(templateType) {
+// Get schema based on template type with dynamic field support
+function getTemplateSchema(templateType, dynamicFields = []) {
   const schemas = {
     warm_intro: warmIntroSchema,
     follow_up: followUpSchema,
@@ -685,7 +1067,26 @@ function getTemplateSchema(templateType) {
     invoice: invoiceSchema,
     general: generalSchema
   };
-  return schemas[templateType] || generalSchema;
+  
+  let baseSchema = schemas[templateType] || generalSchema;
+  
+  // Add dynamic fields to schema if any exist
+  if (dynamicFields.length > 0) {
+    const enhancedSchema = JSON.parse(JSON.stringify(baseSchema)); // Deep clone
+    
+    // Add dynamic fields to properties
+    dynamicFields.forEach(field => {
+      enhancedSchema.json_schema.schema.properties[field.name] = {
+        type: field.type || 'string',
+        description: field.description
+      };
+    });
+    
+    console.log('[Schema Enhancement] Added dynamic fields:', dynamicFields.map(f => f.name));
+    return enhancedSchema;
+  }
+  
+  return baseSchema;
 }
 
 // Industry-Specific Content Function
@@ -922,6 +1323,9 @@ function getRoleSpecificLanguage(role) {
 }
 
 async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, marketContext, meetingPreferences }) {
+  // Analyze manual prompt for enhanced context understanding
+  const promptAnalysis = analyzeManualPrompt(prompt);
+  
   // Extract recipient data
   const r = recipient || {};
   const name = r.fullName || r.full_name || r.name || '';
@@ -1001,7 +1405,7 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const contractEndLabel = toMonthYear(energy.contractEnd || '');
   
   // Get dynamic patterns for cold emails (needed for both HTML and standard modes)
-  const ctaPattern = templateType === 'cold_email' ? getCTAPattern(recipient, meetingPreferences) : null;
+  const ctaPattern = templateType === 'cold_email' ? getCTAPattern(recipient, meetingPreferences, templateType) : null;
   const openingStyle = templateType === 'cold_email' ? getOpeningStyle(recipient) : null;
   
   // Get role-specific context
@@ -1024,24 +1428,20 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   
   const recipientContext = `
 RECIPIENT INFORMATION:
-- Name: ${firstName || 'there'} ${company ? `at ${company}` : ''}
-${job ? `- Role: ${job} (focus on ${roleContext?.language || 'business operations'})` : ''}
-${industry ? `- Industry: ${industry}` : ''}
-${accountDescription ? `- Company Description: ${accountDescription}` : ''}
-${linkedinContext ? `- LinkedIn Insights: ${linkedinContext}` : ''}
-${websiteContext ? `- Company Website Info: ${websiteContext}` : ''}
-${energy.supplier ? `- Current Supplier: ${energy.supplier}` : ''}
-${energy.currentRate ? `- Current Rate: ${energy.currentRate}/kWh` : ''}
-${contractEndLabel ? `- Contract Ends: ${contractEndLabel}` : ''}
-${transcript ? `- Call Notes: ${transcript}` : ''}
-${notes ? `- Additional Notes: ${notes}` : ''}
+- Name: ${firstName || 'there'} ${company ? 'at ' + company : ''}
+${job ? '- Role: ' + job + ' (focus on ' + (roleContext?.language || 'business operations') + ')' : ''}
+${industry ? '- Industry: ' + industry : ''}
+${accountDescription ? '- Company Description: ' + accountDescription : ''}
+${linkedinContext ? '- LinkedIn Insights: ' + linkedinContext : ''}
+${websiteContext ? '- Company Website Info: ' + websiteContext : ''}
+${energy.supplier ? '- Current Supplier: ' + energy.supplier : ''}
+${energy.currentRate ? '- Current Rate: ' + energy.currentRate + '/kWh' : ''}
+${contractEndLabel ? '- Contract Ends: ' + contractEndLabel : ''}
+${transcript ? '- Call Notes: ' + transcript : ''}
+${notes ? '- Additional Notes: ' + notes : ''}
 
 INDUSTRY-SPECIFIC CONTEXT:
-${industryContent ? `- Industry Focus: ${industryContent.language}
-- Key Pain Points: ${industryContent.painPoints.join(', ')}
-- Average Savings: ${industryContent.avgSavings}
-- Key Benefit: ${industryContent.keyBenefit}
-- Urgency Drivers: ${industryContent.urgencyDrivers.join(', ')}` : ''}
+${industryContent ? '- Industry Focus: ' + industryContent.language + '\n- Key Pain Points: ' + industryContent.painPoints.join(', ') + '\n- Average Savings: ' + industryContent.avgSavings + '\n- Key Benefit: ' + industryContent.keyBenefit + '\n- Urgency Drivers: ' + industryContent.urgencyDrivers.join(', ') : ''}
 
 COMPANY SIZE CONTEXT:
 - Size Category: ${companySizeContext.size}
@@ -1057,14 +1457,30 @@ CONTRACT URGENCY LEVEL:
 - Language: ${contractUrgency.language}
 
 TRIGGER EVENTS:
-${triggerEvents.length > 0 ? triggerEvents.map(event => `- ${event.type}: ${event.description} (${event.relevance} relevance)`).join('\n') : '- No recent trigger events detected'}
+${triggerEvents.length > 0 ? triggerEvents.map(event => '- ' + event.type + ': ' + event.description + ' (' + event.relevance + ' relevance)').join('\n') : '- No recent trigger events detected'}
 
 DEEP PERSONALIZATION:
-${deepPersonalization.achievements.length > 0 ? `- Company Achievements: ${deepPersonalization.achievements.join(', ')}` : ''}
-${deepPersonalization.recentActivity.length > 0 ? `- Recent Activity: ${deepPersonalization.recentActivity.join(', ')}` : ''}
-${deepPersonalization.painPoints.length > 0 ? `- Identified Pain Points: ${deepPersonalization.painPoints.join(', ')}` : ''}
-${deepPersonalization.opportunities.length > 0 ? `- Opportunities: ${deepPersonalization.opportunities.join(', ')}` : ''}
-${roleContext ? `- Role-Specific Focus: ${roleContext.painPoints.join(', ')}` : ''}
+${deepPersonalization.achievements.length > 0 ? '- Company Achievements: ' + deepPersonalization.achievements.join(', ') : ''}
+${deepPersonalization.recentActivity.length > 0 ? '- Recent Activity: ' + deepPersonalization.recentActivity.join(', ') : ''}
+${deepPersonalization.painPoints.length > 0 ? '- Identified Pain Points: ' + deepPersonalization.painPoints.join(', ') : ''}
+${deepPersonalization.opportunities.length > 0 ? '- Opportunities: ' + deepPersonalization.opportunities.join(', ') : ''}
+${roleContext ? '- Role-Specific Focus: ' + roleContext.painPoints.join(', ') : ''}
+
+COMPANY-SPECIFIC DATA USAGE EXAMPLES:
+${energy.supplier ? '- Current Supplier: "With ' + energy.supplier + ' as your current supplier, you may be missing competitive rates..."' : ''}
+${energy.currentRate ? '- Current Rate: "At ' + energy.currentRate + '/kWh, there\'s likely room for improvement..."' : ''}
+${contractEndLabel ? '- Contract Timing: "With your contract ending ' + contractEndLabel + ', timing is critical..."' : ''}
+${accountDescription ? '- Company Description: "As ' + accountDescription + ', energy costs are likely a significant expense..."' : ''}
+${industryContent ? '- Industry Focus: "Manufacturing companies like ' + company + ' typically face ' + industryContent.painPoints[0] + '..."' : ''}
+${companySizeContext ? '- Size Context: "As a ' + companySizeContext.size + ' company, ' + companySizeContext.focus + ' is key..."' : ''}
+${contractUrgency ? '- Urgency Level: "With ' + contractUrgency.level + ' timing, ' + contractUrgency.focus + '..."' : ''}
+
+ROLE-SPECIFIC OPENING HOOK EXAMPLES:
+${job?.toLowerCase().includes('cfo') || job?.toLowerCase().includes('finance') ? '- CFO: "As CFO of ' + company + ', you\'re likely planning 2025 budgets with energy costs rising..."' : ''}
+${job?.toLowerCase().includes('facilities') || job?.toLowerCase().includes('maintenance') ? '- Facilities: "Managing energy procurement on top of facilities operations can be time-consuming..."' : ''}
+${job?.toLowerCase().includes('procurement') || job?.toLowerCase().includes('purchasing') ? '- Procurement: "As procurement manager, you know the energy market is competitive..."' : ''}
+${job?.toLowerCase().includes('operations') || job?.toLowerCase().includes('manager') ? '- Operations: "Energy costs can be one of the most unpredictable operational expenses..."' : ''}
+${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo') ? '- Executive: "As President of ' + company + ', you understand the importance of managing operational costs..."' : ''}
 `;
 
   // Debug log for recipient context
@@ -1079,6 +1495,12 @@ ${roleContext ? `- Role-Specific Focus: ${roleContext.painPoints.join(', ')}` : 
   // For HTML mode, return text-only prompts based on template type
   if (mode === 'html') {
     
+    // Generate dynamic fields based on prompt analysis
+    const dynamicFields = generateDynamicFields(templateType, promptAnalysis, recipient);
+    
+    // Build conditional rules based on prompt intent
+    const conditionalRules = buildConditionalRules(promptAnalysis, templateType);
+    
     const basePrompt = `${whoWeAre || 'You are generating TEXT CONTENT ONLY for Power Choosers email templates.'}
 
 SENDER: ${senderName}
@@ -1086,6 +1508,8 @@ IMPORTANT: Return PLAIN TEXT only in JSON fields. NO HTML tags, NO styling, NO f
 We handle all HTML/CSS styling on our end.
 
 ${recipientContext}
+
+${conditionalRules}
 
 Use web search to personalize content about ${company || 'the recipient'}.`;
 
@@ -1130,21 +1554,21 @@ Generate text for these fields:
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: "Hello ${firstName},"
-- opening_hook: Start with problem awareness or market condition (1-2 sentences). ${accountDescription ? `Reference: "${accountDescription}".` : 'Reference their business.'} Focus on specific energy challenges:
-  * Contract renewal timing and rate increases
-  * Budget pressure from rising electricity costs  
-  * Operational efficiency concerns
-  * Regulatory compliance requirements
-  * Energy procurement complexity
-  * Risk management for energy costs
-Examples: "Companies in ${industry || 'your industry'} are facing rising electricity costs", "${company} likely sees energy as a significant operational expense", "With contracts renewing in 2025, ${company} may be facing higher energy rates", "Energy procurement is becoming increasingly complex for ${industry || 'your industry'} companies" IMPORTANT: Always reference ${company} specifically. Use qualitative language (rising, increasing, higher) NOT percentages (15-25%, 20-30%). Keep it natural and conversational.
+- opening_hook: Start with SPECIFIC problem awareness or market condition (1-2 sentences). ${accountDescription ? 'MUST reference: "' + accountDescription + '"' : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
+  * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
+  * Healthcare: Budget constraints, regulatory compliance, patient care continuity
+  * Retail: Multiple locations, unpredictable costs, seasonal demand
+  * Hospitality: Guest comfort, operational costs, seasonal planning
+  * Education: Facility maintenance, student safety, budget optimization
+  * Use company-specific data: current supplier, rate, contract timing, recent achievements
+IMPORTANT: Always reference ${company} specifically. Use qualitative language (rising, increasing, higher) NOT percentages (15-25%, 20-30%). Keep it natural and conversational.
 - value_proposition: How Power Choosers helps (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X annually", "helped similar companies achieve Y". Include role-specific benefits:
   * CFOs: Budget predictability, cost reduction, risk mitigation
   * Facilities Managers: Operational efficiency, maintenance cost reduction
   * Procurement Managers: Vendor management, contract optimization
   * Operations Managers: Cost control, efficiency improvements
 Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs while reducing procurement complexity." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK. Statistics ARE allowed here (value prop only), just not in opening_hook.
-- social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional). Use specific outcomes: "We recently helped [similar company] reduce energy costs by 18%", "Our clients in [industry] typically save $X annually", "Companies like [company] have achieved 15-20% savings". Be specific and credible.
+- social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional). Use specific outcomes: "We recently helped [similar company] reduce energy costs by 18%", "Our clients in [industry] typically save $X annually", "Companies like [company] have achieved 15-20% savings". Be specific and credible. NEVER use vague phrases like "similar companies" or "many businesses".
 ${ctaPattern ? `
 - cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
 - cta_type: Return "${ctaPattern.type}"
@@ -1160,17 +1584,21 @@ CRITICAL QUALITY RULES:
 - COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
 - QUALIFYING CTAs: Prefer questions over meeting requests for cold emails
 - SOCIAL PROOF: Use real outcomes when mentioning similar companies
-- USE ACCOUNT DESCRIPTION: If provided, naturally reference "${accountDescription || 'their business'}"
-- NATURAL LANGUAGE: Write like a real person, not a template
+- USE ACCOUNT DESCRIPTION: ${accountDescription ? 'MUST naturally reference: "' + accountDescription + '"' : 'Reference their specific business'}
+- NATURAL LANGUAGE: Write like a real person researching their company
 - SPECIFIC TO THEM: Reference actual company details, not generic industry statements
 - COMPANY SPECIFICITY: ALWAYS reference ${company} specifically. NEVER mention other companies by name in this email.
+- TONE CONSISTENCY: Use professional but conversational tone throughout. Avoid mixing formal and casual language.
+- PERSONALIZATION DEPTH: Reference specific company data (supplier, rate, contract timing, recent achievements) when available.
 - COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
 - SINGLE CTA: Generate exactly ONE call to action per email
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
-- EMAIL LENGTH: Keep total email body under 100 words
-- CTA LENGTH: CTAs should be 10-12 words maximum
+- EMAIL LENGTH: Keep total email body 90-130 words (research optimal range)
+- CTA LENGTH: CTAs should be 8-12 words maximum
 - VALUE PROP MUST: Include HOW we help AND WHAT results (e.g., "We help [industry] companies secure better rates before contracts expire. Clients typically save ${marketContext?.typicalClientSavings || '10-20%'}.")
 - MOBILE OPTIMIZATION: Keep paragraphs short (2-3 sentences max), use clear CTA placement, optimize for mobile preview text (52% of emails opened on mobile)
+- LENGTH VALIDATION: If email exceeds 130 words, prioritize: greeting + opening hook + value prop + CTA only
+- COMPANY DATA USAGE: MUST use current supplier, rate, contract timing, recent achievements when available
 
 FORBIDDEN PHRASES (TWO-TIER APPROACH):
 TIER 1 - OPENING HOOK (NO statistics allowed):
@@ -1229,9 +1657,31 @@ SUBJECT LINE RULES:
 - Include company name for personalization when possible
 - NO statistics or percentages in subject lines
 - Return the style you chose in subject_style field
+- INDUSTRY-SPECIFIC: Use industry pain points in subject when relevant (e.g., "Manufacturing energy costs?", "Healthcare budget pressure?")
 
-OPENING STYLE:
-${openingStyle ? `Use "${openingStyle.type}" approach. ${openingStyle.prompt}. Keep it 1-2 sentences, natural and conversational. ${accountDescription ? `Reference: "${accountDescription}"` : 'Focus on their company.'}` : 'Use problem-aware approach focusing on their business challenges.'}
+EMAIL STRUCTURE FRAMEWORKS (Choose ONE):
+1. PROBLEM-AGITATE-SOLUTION (PAS) - Best for cold outreach:
+   - Opening: Industry-specific problem affecting their business
+   - Middle: Agitate the problem with specific consequences
+   - Value Prop: Solution with measurable results
+   - CTA: Qualifying question
+
+2. BEFORE-AFTER-BRIDGE (BAB) - Best for contract renewals:
+   - Opening: Current situation (positive observation)
+   - Middle: Future risk (rate increases, market changes)
+   - Value Prop: Bridge solution with specific savings
+   - CTA: Timing-focused question
+
+3. AIDA (Attention-Interest-Desire-Action) - Best for executives:
+   - Opening: Attention-grabbing question about their situation
+   - Middle: Interest with specific benefits and social proof
+   - Value Prop: Desire with concrete outcomes
+   - CTA: Action-oriented qualifying question
+
+CHOOSE framework based on:
+- Contract timing: BAB for renewals, PAS for general outreach
+- Role: AIDA for C-level, PAS for operational roles
+- Industry: PAS for problem-aware industries, BAB for timing-sensitive
 `,
 
       invoice: `
@@ -1242,8 +1692,8 @@ Generate text for these fields:
 - checklist_items: Array of 3-4 specific items we'll review from the invoice (e.g., invoice date/number, billing period, charge breakdown, payment details)
 - discrepancies: Array of 3-4 common billing discrepancies to watch for. Intelligently select based on:
   * Industry type: ${industry || 'general business'}
-  * Company size: ${energy.annualUsage ? `${energy.annualUsage} kWh annually` : 'standard commercial'}
-  * Business nature: ${company || 'commercial'} ${job ? `(${job})` : ''}
+  * Company size: ${energy.annualUsage ? energy.annualUsage + ' kWh annually' : 'standard commercial'}
+  * Business nature: ${company || 'commercial'} ${job ? '(' + job + ')' : ''}
   Choose from: high rates, excessive delivery charges, hidden fees, wrong contract type, poor customer service, unfavorable renewal timing, demand charges, peak usage penalties, incorrect meter readings, unauthorized fees
 - deadline: Use exactly: "${formatDeadline(3)}"
 - cta_text: Use exactly: "Will you be able to send over the invoice by end of day so me and my team can get started?"`,
@@ -1255,17 +1705,23 @@ Generate text for these fields:
 - sections: Array of 2-5 content points - EACH MUST BE EXACTLY ONE SENTENCE (no multi-sentence items)
 - list_header: Choose a contextual header for the list section based on email content (e.g., "How We Can Help:", "Key Benefits:", "Why This Matters:", "What to Expect:", "Our Approach:")
 - cta_text: Appropriate call to action based on context
+${dynamicFields.length > 0 ? `
+DYNAMIC FIELDS (include if relevant):
+${dynamicFields.map(field => `- ${field.name}: ${field.description}`).join('\n')}
+` : ''}
 
 CRITICAL RULES:
 - Each item in sections array = ONE SENTENCE ONLY
 - list_header must be relevant to the specific email content, not generic
-- Keep sections concise and actionable`
+- Keep sections concise and actionable
+- Use conditional rules from prompt analysis above`
     };
 
     return { 
       prompt: basePrompt + (templateInstructions[templateType] || templateInstructions.general),
       researchData: researchData,
-      openingStyle: openingStyle?.type || null
+      openingStyle: openingStyle?.type || null,
+      dynamicFields: dynamicFields
     };
   }
 
@@ -1273,9 +1729,9 @@ CRITICAL RULES:
   const identity = whoWeAre || `You are ${senderName}, an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.
 
 CONTEXT USAGE RULES:
-${contractEndLabel ? `- The recipient's contract ends ${contractEndLabel} - YOU MUST REFERENCE THIS` : ''}
-${notes || transcript ? `- Use call notes/transcript to add specific context from your conversation` : ''}
-${job ? `- Acknowledge their role as ${job}` : ''}
+${contractEndLabel ? '- The recipient\'s contract ends ' + contractEndLabel + ' - YOU MUST REFERENCE THIS' : ''}
+${notes || transcript ? '- Use call notes/transcript to add specific context from your conversation' : ''}
+${job ? '- Acknowledge their role as ' + job : ''}
 - Personalize based on their industry and current situation
 - Make it feel like you just spoke with them
 
@@ -1302,7 +1758,7 @@ CRITICAL: Return ONLY valid JSON. Each paragraph should be a separate field. Do 
   const isColdEmailStandard = /cold.*email|could.*not.*reach/i.test(String(prompt || ''));
   
   if (isColdEmailStandard) {
-    const ctaPattern = getCTAPattern(recipient, meetingPreferences);
+    const ctaPattern = getCTAPattern(recipient, meetingPreferences, 'cold_email');
     const openingStyle = getOpeningStyle(recipient);
     
     const coldEmailRules = `
@@ -1321,7 +1777,7 @@ CRITICAL QUALITY RULES:
 - COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
 - QUALIFYING CTAs: Prefer questions over meeting requests for cold emails
 - SOCIAL PROOF: Use real outcomes when mentioning similar companies
-- USE ACCOUNT DESCRIPTION: ${accountDescription ? `Must naturally reference: "${accountDescription}"` : 'Reference their specific business'}
+- USE ACCOUNT DESCRIPTION: ${accountDescription ? 'Must naturally reference: "' + accountDescription + '"' : 'Reference their specific business'}
 - NATURAL LANGUAGE: Write like a real person researching their company
 - COMPANY SPECIFICITY: ALWAYS reference ${company} specifically. NEVER mention other companies by name in this email.
 - COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
@@ -1364,7 +1820,7 @@ IMPORTANT: Always reference ${company} specifically, not other companies.
 VALUE PROPOSITION (1-2 sentences MINIMUM):
 - Explain how Power Choosers helps with SPECIFIC MEASURABLE VALUE
 - MUST include: (1) What we do, (2) Concrete numbers: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X", "clients typically see Y"
-- Reference: ${accountDescription ? `"${accountDescription}"` : 'their business type'}
+- Reference: ${accountDescription ? '"' + accountDescription + '"' : 'their business type'}
 - Add social proof if relevant: "helped similar companies achieve [specific result]"
 - Example: "We help ${industry || 'businesses'} secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs."
 - NEVER end with incomplete phrases or "within [company name]"
@@ -1372,7 +1828,7 @@ VALUE PROPOSITION (1-2 sentences MINIMUM):
 - THIS FIELD IS MANDATORY - NEVER LEAVE BLANK
 
 CTA:
-${ctaPattern ? `Use qualifying question or soft ask: "${ctaPattern.template}"` : 'Create a professional qualifying question or soft ask'}
+${ctaPattern ? 'Use qualifying question or soft ask: "' + ctaPattern.template + '"' : 'Create a professional qualifying question or soft ask'}
 - Qualifying questions work best: "When does your contract expire?", "Would you be open to discussing your energy setup?"
 - Avoid requesting specific meeting times in first email
 - Keep under 12 words
@@ -1454,7 +1910,7 @@ QUALITY REQUIREMENTS:
 ✓ Use "${firstName || 'there'}," in greeting ONCE (no duplicate names)
 ✓ Middle paragraph: 3-4 complete sentences
 ✓ MUST mention "15-25%" rate increase
-✓ CTA: 2 COMPLETE time slots with question mark (e.g., "Tuesday 2-3pm or Thursday 10-11am")
+✓ CTA: Use qualifying questions only (e.g., "When does your contract expire?", "Are rising costs affecting your budget?")
 ✓ Subject line: Under 50 chars, include ${firstName || 'recipient name'}
 ✓ Closing: "Best regards," on its own line
 ✓ DO NOT include citation markers like [1], [2], [3]
@@ -1468,21 +1924,20 @@ PARAGRAPH STRUCTURE (CRITICAL):
 ✓ Each paragraph must be separated by blank line
 
 PERSONALIZATION REQUIREMENTS:
-${contractEndLabel ? `✓ MUST reference contract ending ${contractEndLabel} - this is CRITICAL context` : ''}
-${energy.supplier ? `✓ Reference their current supplier ${energy.supplier} when relevant` : ''}
-${notes || transcript ? `✓ MUST reference specific details from call notes/transcript` : ''}
-${job ? `✓ Reference their role as ${job} when relevant` : ''}
-${industry ? `✓ Include industry-specific insights for ${industry} sector` : ''}
+${contractEndLabel ? '✓ MUST reference contract ending ' + contractEndLabel + ' - this is CRITICAL context' : ''}
+${energy.supplier ? '✓ Reference their current supplier ' + energy.supplier + ' when relevant' : ''}
+${notes || transcript ? '✓ MUST reference specific details from call notes/transcript' : ''}
+${job ? '✓ Reference their role as ' + job + ' when relevant' : ''}
+${industry ? '✓ Include industry-specific insights for ' + industry + ' sector' : ''}
 
 CRITICAL RULES:
 ❌ NO duplicate names after greeting
-❌ NO vague CTAs - must include BOTH complete time slots from suggested meeting times
+❌ NO meeting requests in cold emails - use qualifying questions only
 ❌ NO incomplete sentences - every sentence must have proper ending
 ❌ NO generic contract references - use actual date ${contractEndLabel || 'when provided'}
-❌ NO generic "Tuesday/Thursday" - use the EXACT meeting times provided above
 ✅ MUST stop after paragraph 3
 ✅ MUST include question mark in CTA
-✅ MUST use the suggested meeting times with proper "this week" or "next week" context`;
+✅ MUST use qualifying questions that reveal urgency and timeline`;
 
   return { 
     prompt: [identity, recipientContext, qualityRules, outputFormat].join('\n'),
@@ -1526,7 +1981,16 @@ export default async function handler(req, res) {
     
     const meetingTimes = getSuggestedMeetingTimes(meetingPreferences);
     
-    const dateContext = `TODAY'S DATE: ${todayLabel}
+    // Only suggest meeting times for follow-up emails, not cold emails
+    const dateContext = templateType === 'cold_email' ? `TODAY'S DATE: ${todayLabel}
+
+COLD EMAIL RULES:
+- Use qualifying questions only (NO meeting requests)
+- Focus on problem awareness and value proposition
+- Keep CTAs under 12 words
+- Use role-specific qualifying questions
+
+` : `TODAY'S DATE: ${todayLabel}
 
 SUGGESTED MEETING TIMES (2+ business days out):
 - Option 1: ${meetingTimes.slot1} ${meetingTimes.slot1Time}
@@ -1538,7 +2002,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences });
+    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences });
     const fullSystemPrompt = dateContext + systemPrompt;
     
     // Call Perplexity API
@@ -1549,8 +2013,8 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         { role: 'user', content: prompt || 'Draft a professional email' }
       ],
       max_tokens: 600, // Increased to prevent CTA truncation
-      // Add JSON schema for HTML mode
-      ...(mode === 'html' ? { response_format: getTemplateSchema(templateType) } : {})
+      // Add JSON schema for HTML mode with dynamic fields
+      ...(mode === 'html' ? { response_format: getTemplateSchema(templateType, dynamicFields) } : {})
     };
 
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
@@ -1648,6 +2112,26 @@ return;
               .replace(/20-30%/gi, 'considerably')
               .replace(/10-20%/gi, 'substantially');
             console.warn('[Validation] Fixed opening_hook:', jsonData.opening_hook);
+          }
+        }
+        
+        // Validate email length for cold emails (90-130 words optimal)
+        if (templateType === 'cold_email') {
+          const fullEmail = `${jsonData.greeting || ''} ${jsonData.opening_hook || ''} ${jsonData.value_proposition || ''} ${jsonData.cta_text || ''}`.trim();
+          const wordCount = fullEmail.split(/\s+/).length;
+          
+          if (wordCount > 150) {
+            console.warn(`[Validation] Email too long (${wordCount} words), optimizing...`);
+            // Only remove social proof if present
+            if (jsonData.social_proof_optional) {
+              jsonData.social_proof_optional = '';
+            }
+          } else if (wordCount < 80) {
+            console.warn(`[Validation] Email too short (${wordCount} words), expanding value proposition...`);
+            // Only expand if value prop is very short
+            if (jsonData.value_proposition && jsonData.value_proposition.length < 40) {
+              jsonData.value_proposition = `${jsonData.value_proposition} Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs.`;
+            }
           }
         }
         
