@@ -279,6 +279,18 @@
     } else if (state.currentFolder === 'trash') {
       filtered = filtered.filter(email => email.deleted);
       console.log('[EmailsPage] Trash filter applied. Filtered count:', filtered.length);
+    } else if (state.currentFolder === 'scheduled') {
+      // Scheduled emails are already filtered by ownership in BackgroundEmailsLoader
+      // Only shows scheduled emails owned by or assigned to current user
+      filtered = filtered.filter(email => {
+        return email.type === 'scheduled' && 
+               email.scheduledSendTime && 
+               email.scheduledSendTime > Date.now() &&
+               !email.deleted;
+      });
+      // Sort by scheduled send time (earliest first)
+      filtered.sort((a, b) => a.scheduledSendTime - b.scheduledSendTime);
+      console.log('[EmailsPage] Scheduled filter applied. Filtered count:', filtered.length);
     }
 
     // Filter by search
@@ -336,6 +348,11 @@
 
   // Generate email row HTML with favicon integration and snippet
   function rowHtml(email) {
+    // Handle scheduled emails differently
+    if (email.type === 'scheduled') {
+      return rowHtmlScheduled(email);
+    }
+    
     const senderDomain = extractDomain(email.from);
     const faviconHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
       domain: senderDomain,
@@ -396,6 +413,89 @@
       </tr>
     `;
   }
+  
+  // Generate scheduled email row HTML
+  function rowHtmlScheduled(email) {
+    const contactName = email.contactName || 'Unknown Contact';
+    const contactCompany = email.contactCompany || '';
+    const isSelected = state.selected.has(email.id);
+    const emailPreview = getEmailPreview(email);
+    
+    // Get status badge
+    const statusBadge = getStatusBadge(email.status);
+    
+    // Get countdown timer
+    const countdown = getCountdownTimer(email.scheduledSendTime);
+    
+    return `
+      <tr class="email-row scheduled-row ${isSelected ? 'row-selected' : ''}" data-email-id="${email.id}">
+        <td class="col-select">
+          <input type="checkbox" class="row-select" data-email-id="${email.id}" ${isSelected ? 'checked' : ''}>
+        </td>
+        <td class="email-sender-cell">
+          <div class="sender-cell__wrap">
+            <div class="contact-avatar">${contactName.charAt(0).toUpperCase()}</div>
+            <span class="sender-name">${escapeHtml(contactName)}${contactCompany ? ' at ' + contactCompany : ''}</span>
+          </div>
+        </td>
+        <td class="email-subject-cell">
+          <div class="email-subject-content">
+            <span class="email-subject">${escapeHtml(email.subject)}</span>
+            <div class="email-snippet">${escapeHtml(emailPreview)}</div>
+            <div class="status-badge">${statusBadge}</div>
+          </div>
+        </td>
+        <td class="email-date-cell">
+          <span class="email-date">${countdown}</span>
+        </td>
+        <td class="qa-cell">
+          <div class="qa-actions">
+            <button class="qa-btn" data-action="review" data-email-id="${email.id}" title="Review">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+  
+  // Get status badge HTML
+  function getStatusBadge(status) {
+    const badges = {
+      'pending_approval': '<span class="status-badge pending">Pending Approval</span>',
+      'approved': '<span class="status-badge approved">Approved</span>',
+      'rejected': '<span class="status-badge rejected">Rejected</span>',
+      'generating': '<span class="status-badge generating">Generating...</span>'
+    };
+    return badges[status] || '<span class="status-badge unknown">Unknown</span>';
+  }
+  
+  // Get countdown timer HTML
+  function getCountdownTimer(scheduledSendTime) {
+    if (!scheduledSendTime) return 'No time set';
+    
+    const now = Date.now();
+    const timeDiff = scheduledSendTime - now;
+    
+    if (timeDiff <= 0) {
+      return 'Ready to send';
+    }
+    
+    const minutes = Math.floor(timeDiff / (1000 * 60));
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) {
+      return `Sends in ${days}d ${hours % 24}h`;
+    } else if (hours > 0) {
+      return `Sends in ${hours}h ${minutes % 60}m`;
+    } else {
+      return `Sends in ${minutes}m`;
+    }
+  }
 
   // Bind events to email rows
   function bindRowEvents() {
@@ -434,6 +534,8 @@
           showClickDetails(emailId);
         } else if (action === 'reply') {
           replyToEmail(emailId);
+        } else if (action === 'review') {
+          viewEmail(emailId); // Same as view for now, will be enhanced in email detail page
         }
       });
     });

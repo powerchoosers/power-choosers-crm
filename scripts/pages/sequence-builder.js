@@ -3466,7 +3466,7 @@
 
         switch (action) {
           case 'ai': {
-            try { window.crm && window.crm.showToast && window.crm.showToast('AI drafting coming soon'); } catch (_) {}
+            initializeSequenceAI(card, editor);
             break;
           }
           case 'formatting': {
@@ -4670,6 +4670,318 @@
       }
       return [];
     }
+  }
+
+  // ========== SEQUENCE AI INTEGRATION ==========
+  
+  function initializeSequenceAI(card, editor) {
+    const stepId = card.getAttribute('data-id');
+    const step = state.currentSequence?.steps?.find(s => s.id === stepId);
+    
+    if (!step) {
+      console.warn('[Sequence AI] Step not found:', stepId);
+      return;
+    }
+    
+    // Check if AI bar already exists
+    let aiBar = card.querySelector('.ai-bar');
+    
+    if (!aiBar) {
+      // Create AI bar
+      aiBar = createSequenceAIBar(card, step);
+      card.appendChild(aiBar);
+    }
+    
+    // Initialize AI bar if not already rendered
+    if (!aiBar.dataset.rendered) {
+      renderSequenceAIBar(aiBar, step);
+    }
+    
+    // Toggle AI bar
+    const isOpen = aiBar.classList.toggle('open');
+    aiBar.setAttribute('aria-hidden', String(!isOpen));
+    
+    console.log('[Sequence AI] AI bar toggled:', isOpen ? 'open' : 'closed');
+  }
+  
+  function createSequenceAIBar(card, step) {
+    const aiBar = document.createElement('div');
+    aiBar.className = 'ai-bar';
+    aiBar.setAttribute('aria-hidden', 'true');
+    aiBar.setAttribute('data-rendered', 'false');
+    return aiBar;
+  }
+  
+  function renderSequenceAIBar(aiBar, step) {
+    const stepIndex = state.currentSequence.steps.findIndex(s => s.id === step.id);
+    const totalSteps = state.currentSequence.steps.length;
+    const previousSteps = state.currentSequence.steps.slice(0, stepIndex);
+    
+    // Get sequence-specific suggestions
+    const suggestions = getSequenceSuggestions(step, stepIndex, totalSteps, previousSteps);
+    
+    aiBar.innerHTML = `
+      <div class="ai-inner">
+        <div class="ai-row">
+          <textarea class="ai-prompt input-dark" rows="3" placeholder="Describe the email you want... (tone, goal, offer, CTA)"></textarea>
+        </div>
+        <div class="ai-row suggestions" role="list">
+          ${suggestions.map(s => `<button class="ai-suggestion" type="button" data-prompt="${s.prompt}">${s.text}</button>`).join('')}
+        </div>
+        <div class="ai-row actions">
+          <button class="fmt-btn ai-generate" data-mode="standard">Generate Standard</button>
+          <button class="fmt-btn ai-generate" data-mode="html">Generate HTML</button>
+          <div class="ai-status" aria-live="polite"></div>
+        </div>
+      </div>
+    `;
+    
+    // Wire events
+    wireSequenceAIEvents(aiBar, step);
+    
+    aiBar.dataset.rendered = 'true';
+    console.log('[Sequence AI] AI bar rendered for step:', step.id);
+  }
+  
+  function wireSequenceAIEvents(aiBar, step) {
+    // Suggestion buttons
+    aiBar.querySelectorAll('.ai-suggestion').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const prompt = btn.getAttribute('data-prompt');
+        const textarea = aiBar.querySelector('.ai-prompt');
+        if (textarea) {
+          textarea.value = prompt;
+        }
+      });
+    });
+    
+    // Generate buttons
+    aiBar.querySelectorAll('.ai-generate').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const mode = btn.getAttribute('data-mode');
+        const prompt = aiBar.querySelector('.ai-prompt')?.value?.trim();
+        
+        if (!prompt) {
+          window.crm?.showToast && window.crm.showToast('Please enter a prompt or select a suggestion');
+          return;
+        }
+        
+        await generateSequenceEmail(step, prompt, mode);
+      });
+    });
+  }
+  
+  function getSequenceSuggestions(step, stepIndex, totalSteps, previousSteps) {
+    const suggestions = [];
+    
+    // Timing-based suggestions
+    const delayMinutes = step.delayMinutes || 0;
+    if (delayMinutes <= 30) {
+      suggestions.push(
+        { text: 'Quick follow-up after initial contact', prompt: 'Write a quick follow-up email after our initial contact' },
+        { text: 'Urgent pricing inquiry response', prompt: 'Write an urgent response to their pricing inquiry' },
+        { text: 'Meeting confirmation with next steps', prompt: 'Confirm our meeting and outline next steps' }
+      );
+    } else if (delayMinutes <= 480) { // Same day
+      suggestions.push(
+        { text: 'Follow-up on morning conversation', prompt: 'Follow up on our morning conversation with additional value' },
+        { text: 'Afternoon check-in with proposal', prompt: 'Send afternoon check-in with proposal details' },
+        { text: 'End-of-day status update', prompt: 'Send end-of-day status update with next steps' }
+      );
+    } else if (delayMinutes <= 1440) { // Next day
+      suggestions.push(
+        { text: 'Next day follow-up with case study', prompt: 'Write next day follow-up email with relevant case study' },
+        { text: '48-hour reminder with urgency', prompt: 'Send 48-hour reminder with urgency messaging' },
+        { text: 'Mid-week check-in', prompt: 'Send mid-week check-in email' }
+      );
+    } else { // Weekly
+      suggestions.push(
+        { text: 'Weekly follow-up with new insights', prompt: 'Write weekly follow-up with new industry insights' },
+        { text: 'End-of-week summary', prompt: 'Send end-of-week summary and next steps' },
+        { text: 'Monday morning motivation', prompt: 'Send Monday morning motivation email' }
+      );
+    }
+    
+    // Position-based suggestions
+    if (stepIndex === 0) {
+      suggestions.push(
+        { text: 'Cold outreach with industry insight', prompt: 'Write cold outreach email with industry-specific insight' },
+        { text: 'Warm introduction after referral', prompt: 'Write warm introduction email after referral' },
+        { text: 'Event follow-up introduction', prompt: 'Write follow-up email after meeting at event' }
+      );
+    } else if (stepIndex < totalSteps - 2) {
+      suggestions.push(
+        { text: 'Value proposition with social proof', prompt: 'Write email with value proposition and social proof' },
+        { text: 'Case study sharing with urgency', prompt: 'Share relevant case study with urgency messaging' },
+        { text: 'Educational content delivery', prompt: 'Send educational content with thought leadership' }
+      );
+    } else {
+      suggestions.push(
+        { text: 'Final attempt with clear CTA', prompt: 'Write final attempt email with clear call to action' },
+        { text: 'Break-up email with future touch', prompt: 'Write break-up email with future touch point' },
+        { text: 'Handoff to sales team', prompt: 'Write handoff email to sales team' }
+      );
+    }
+    
+    // Channel-specific suggestions
+    if (step.type === 'auto-email') {
+      suggestions.push(
+        { text: 'Automated email with personalization', prompt: 'Write automated email with personalization' },
+        { text: 'HTML email with visual appeal', prompt: 'Write HTML email with visual appeal' }
+      );
+    } else if (step.type === 'manual-email') {
+      suggestions.push(
+        { text: 'Manual email with custom context', prompt: 'Write manual email with custom context' },
+        { text: 'Plain text for personal touch', prompt: 'Write plain text email for personal touch' }
+      );
+    }
+    
+    // Previous step context
+    if (previousSteps.length > 0) {
+      const lastStep = previousSteps[previousSteps.length - 1];
+      if (lastStep.type === 'phone-call') {
+        suggestions.push(
+          { text: 'Post-call follow-up email', prompt: 'Write follow-up email after our phone call' }
+        );
+      } else if (lastStep.type === 'li-connect') {
+        suggestions.push(
+          { text: 'LinkedIn connection follow-up', prompt: 'Write follow-up email after LinkedIn connection' }
+        );
+      }
+    }
+    
+    // Limit to 8 suggestions and add metadata
+    return suggestions.slice(0, 8).map(suggestion => ({
+      ...suggestion,
+      metadata: `Step ${stepIndex + 1} of ${totalSteps} • ${formatDelay(step.delayMinutes || 0)}`
+    }));
+  }
+  
+  async function generateSequenceEmail(step, prompt, mode) {
+    try {
+      // Get sequence contacts
+      const contacts = state.currentSequence?.contacts || [];
+      
+      if (contacts.length === 0) {
+        window.crm?.showToast && window.crm.showToast('No contacts assigned to this sequence');
+        return;
+      }
+      
+      // For now, use first contact for generation
+      // TODO: Add contact selection UI for multiple contacts
+      const contact = contacts[0];
+      
+      // Create recipient object
+      const recipient = {
+        firstName: contact.firstName,
+        fullName: contact.fullName,
+        company: contact.company,
+        title: contact.title,
+        industry: contact.industry,
+        email: contact.email,
+        energy: contact.energy || {},
+        notes: contact.notes,
+        account: contact.account
+      };
+      
+      // Get sender info from settings
+      const settings = (window.SettingsPage?.getSettings?.()) || {};
+      const g = settings?.general || {};
+      const senderName = (g.firstName && g.lastName) 
+        ? `${g.firstName} ${g.lastName}`.trim()
+        : (g.agentName || 'Power Choosers Team');
+      
+      // Get AI templates
+      const aiTemplates = getAITemplatesFromSettings();
+      const whoWeAre = aiTemplates.who_we_are || 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.';
+      
+      // Call AI generation API
+      const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+      const genUrl = `${base}/api/perplexity-email`;
+      
+      console.log('[Sequence AI] Generating email for step:', step.id);
+      
+      const response = await fetch(genUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: prompt,
+          recipient: recipient,
+          mode: mode,
+          senderName: senderName,
+          whoWeAre: whoWeAre,
+          marketContext: aiTemplates.marketContext,
+          meetingPreferences: aiTemplates.meetingPreferences,
+          sequenceContext: {
+            stepId: step.id,
+            stepIndex: state.currentSequence.steps.findIndex(s => s.id === step.id),
+            totalSteps: state.currentSequence.steps.length,
+            sequenceName: state.currentSequence.name
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('[Sequence AI] Generated email:', result);
+      
+      // Store generated content in step data
+      if (mode === 'html' && result.html) {
+        step.data.subject = result.subject || 'Generated Email';
+        step.data.html = result.html;
+        step.data.text = result.text || '';
+        step.data.aiGenerated = true;
+        step.data.aiPrompt = prompt;
+        step.data.aiMode = mode;
+      } else if (mode === 'standard' && result.subject) {
+        step.data.subject = result.subject;
+        step.data.body = result.body || '';
+        step.data.aiGenerated = true;
+        step.data.aiPrompt = prompt;
+        step.data.aiMode = mode;
+      }
+      
+      // Save step data
+      scheduleStepSave(step.id);
+      
+      // Show success message
+      window.crm?.showToast && window.crm.showToast('Email generated successfully! Check the editor.');
+      
+      // Close AI bar
+      const aiBar = document.querySelector(`[data-id="${step.id}"] .ai-bar`);
+      if (aiBar) {
+        aiBar.classList.remove('open');
+        aiBar.setAttribute('aria-hidden', 'true');
+      }
+      
+    } catch (error) {
+      console.error('[Sequence AI] Generation failed:', error);
+      window.crm?.showToast && window.crm.showToast('Failed to generate email. Please try again.');
+    }
+  }
+  
+  function getAITemplatesFromSettings() {
+    // Try SettingsPage instance first
+    if (window.SettingsPage && window.SettingsPage.instance) {
+      const settings = window.SettingsPage.instance.getSettings();
+      return settings.aiTemplates || {};
+    }
+    
+    // Fallback to localStorage
+    try {
+      const savedSettings = localStorage.getItem('crm-settings');
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        return settings.aiTemplates || {};
+      }
+    } catch (error) {
+      console.warn('[Sequence AI] Failed to load settings:', error);
+    }
+    
+    return {};
   }
 
   // Export API
