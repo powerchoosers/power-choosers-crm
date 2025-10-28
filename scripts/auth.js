@@ -80,6 +80,9 @@ class AuthManager {
             // Update admin-only elements visibility
             this.updateAdminOnlyElements();
             
+            // Listen for settings updates to refresh profile photo
+            this.setupSettingsListener();
+            
             console.log('[Auth] ✓ Auth flow complete');
         } else {
         console.log('[Auth] No user - showing login');
@@ -229,15 +232,41 @@ class AuthManager {
         const profileName = document.getElementById('user-profile-name');
         const profileEmail = document.getElementById('user-profile-email');
 
-        if (user.photoURL) {
-            // Show Google profile picture, hide fallback
+        // Get hosted photo URL from settings if available, otherwise use Google URL
+        let photoUrl = user.photoURL;
+        
+        // Try to get hosted photo URL from settings
+        if (window.SettingsPage && window.SettingsPage.instance) {
+            const settings = window.SettingsPage.instance.getSettings();
+            if (settings && settings.general && settings.general.hostedPhotoURL) {
+                photoUrl = settings.general.hostedPhotoURL;
+                console.log('[Auth] Using hosted photo URL:', photoUrl);
+            }
+        } else {
+            // Settings not loaded yet, try localStorage as fallback
+            try {
+                const savedSettings = localStorage.getItem('crm-settings');
+                if (savedSettings) {
+                    const settings = JSON.parse(savedSettings);
+                    if (settings && settings.general && settings.general.hostedPhotoURL) {
+                        photoUrl = settings.general.hostedPhotoURL;
+                        console.log('[Auth] Using hosted photo URL from localStorage:', photoUrl);
+                    }
+                }
+            } catch (error) {
+                console.warn('[Auth] Failed to parse settings from localStorage:', error);
+            }
+        }
+
+        if (photoUrl) {
+            // Show profile picture (hosted or Google), hide fallback
             if (profilePic) {
-                profilePic.src = user.photoURL;
+                profilePic.src = photoUrl;
                 profilePic.alt = user.displayName || user.email;
                 profilePic.style.display = 'block';
             }
             if (profilePicLarge) {
-                profilePicLarge.src = user.photoURL;
+                profilePicLarge.src = photoUrl;
                 profilePicLarge.alt = user.displayName || user.email;
             }
             if (profileFallback) {
@@ -305,6 +334,24 @@ class AuthManager {
         });
         
         console.log(`[Auth] Updated admin-only elements visibility: ${isAdmin ? 'visible' : 'hidden'}`);
+    }
+
+    setupSettingsListener() {
+        // Listen for settings updates to refresh profile photo
+        document.addEventListener('pc:settings-updated', (event) => {
+            if (this.user && event.detail && event.detail.settings) {
+                console.log('[Auth] Settings updated, refreshing profile photo...');
+                this.updateUserProfile(this.user);
+            }
+        });
+    }
+
+    // Public method to refresh profile photo (useful for manual updates)
+    refreshProfilePhoto() {
+        if (this.user) {
+            console.log('[Auth] Manually refreshing profile photo...');
+            this.updateUserProfile(this.user);
+        }
     }
 }
 

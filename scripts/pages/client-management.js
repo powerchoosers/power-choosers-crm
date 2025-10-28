@@ -5,8 +5,8 @@
   const state = {
     loaded: false,
     loading: false,
-    userEmail: window.currentUserEmail || '',
-    isAdmin: window.currentUserRole === 'admin',
+    userEmail: '',
+    isAdmin: false,
     data: {
       accounts: [],
       contacts: [],
@@ -670,19 +670,28 @@
   function show() {
     if (!initDomRefs()) return;
     
-    // Check if user is authenticated
-    if (!state.userEmail) {
-      showError('User authentication required. Please log in.');
-      return;
-    }
-
-    renderDashboard();
-    attachEvents();
+    // Wait for authentication to complete before checking user
+    const checkAuth = () => {
+      if (window.currentUserEmail) {
+        // Update state with current user info
+        state.userEmail = window.currentUserEmail;
+        state.isAdmin = window.currentUserRole === 'admin';
+        
+        renderDashboard();
+        attachEvents();
+        
+        // Load data if not already loaded
+        if (!state.loaded) {
+          loadClientData();
+        }
+      } else {
+        // Wait a bit more for auth to complete
+        setTimeout(checkAuth, 100);
+      }
+    };
     
-    // Load data if not already loaded
-    if (!state.loaded) {
-      loadClientData();
-    }
+    // Start checking for authentication
+    checkAuth();
   }
 
   // Public API
