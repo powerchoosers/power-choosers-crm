@@ -403,37 +403,37 @@ function getOpeningStyle(recipient) {
     {
       type: 'problem_aware',
       prompt: 'Start with industry-specific energy problem or market condition affecting their business',
-      example: `${recipient?.industry || 'Companies'} are facing rising electricity costs as contracts renew in 2025. ${recipient?.company || 'Your company'} is likely seeing significant rate increases...`,
+      example: '[Industry] companies are facing rising electricity costs as contracts renew in 2025. [Company] is likely seeing significant rate increases...',
       energyFocus: 'Contract renewal timing and rate increases'
     },
     {
       type: 'role_specific',
-      prompt: `Focus on ${roleContext?.language || 'operational'} energy challenges specific to their role`,
-      example: `As a ${recipient?.job || 'business professional'}, you're likely dealing with unpredictable energy costs affecting your ${roleContext?.painPoint || 'operations'}. ${recipient?.company || 'Your company'}...`,
+      prompt: 'Focus on energy challenges specific to their role',
+      example: 'As a [job title], you\'re likely dealing with unpredictable energy costs affecting your operations. [Company]...',
       energyFocus: 'Role-specific energy pain points'
     },
     {
       type: 'timing_urgency',
       prompt: 'Open with timing-related urgency relevant to their energy situation',
-      example: 'Companies renewing electricity contracts in 2025 are facing 15-25% higher rates. Early procurement could save ${recipient?.company || 'your company'} significant costs...',
+      example: 'Companies renewing electricity contracts in 2025 are facing 15-25% higher rates. Early procurement could save [company] significant costs...',
       energyFocus: 'Contract timing and early renewal benefits'
     },
     {
       type: 'budget_pressure',
       prompt: 'Lead with budget or cost pressure relevant to their energy spend',
-      example: 'Rising electricity costs are putting pressure on operational budgets across ${recipient?.industry || 'all industries'}. ${recipient?.company || 'Your company'} may be experiencing...',
+      example: 'Rising electricity costs are putting pressure on operational budgets across [industry]. [Company] may be experiencing...',
       energyFocus: 'Budget pressure from energy cost increases'
     },
     {
       type: 'compliance_risk',
       prompt: 'Reference regulatory or compliance considerations for energy procurement',
-      example: 'Energy procurement regulations are evolving, and companies need strategic approaches to compliance. ${recipient?.company || 'Your company'} may need to consider...',
+      example: 'Energy procurement regulations are evolving, and companies need strategic approaches to compliance. [Company] may need to consider...',
       energyFocus: 'Regulatory compliance and energy procurement'
     },
     {
       type: 'operational_efficiency',
       prompt: 'Focus on operational efficiency challenges related to energy management',
-      example: 'Managing multiple energy suppliers and contracts is becoming increasingly complex. ${recipient?.company || 'Your company'} likely faces...',
+      example: 'Managing multiple energy suppliers and contracts is becoming increasingly complex. [Company] likely faces...',
       energyFocus: 'Energy management complexity and operational efficiency'
     }
   ];
@@ -688,6 +688,208 @@ function getTemplateSchema(templateType) {
   return schemas[templateType] || generalSchema;
 }
 
+// Industry-Specific Content Function
+function getIndustrySpecificContent(industry) {
+  const industryMap = {
+    manufacturing: {
+      painPoints: ['production downtime', 'energy-intensive operations', 'equipment reliability'],
+      avgSavings: '15-25%',
+      keyBenefit: 'operational continuity',
+      urgencyDrivers: ['production schedules', 'equipment uptime'],
+      language: 'operational efficiency and production continuity'
+    },
+    healthcare: {
+      painPoints: ['budget constraints', 'regulatory compliance', 'patient care continuity'],
+      avgSavings: '10-18%',
+      keyBenefit: 'cost predictability',
+      urgencyDrivers: ['budget cycles', 'compliance deadlines'],
+      language: 'budget optimization and regulatory compliance'
+    },
+    retail: {
+      painPoints: ['multiple locations', 'unpredictable costs', 'seasonal demand'],
+      avgSavings: '12-20%',
+      keyBenefit: 'centralized management',
+      urgencyDrivers: ['lease renewals', 'expansion plans'],
+      language: 'cost control and centralized management'
+    },
+    hospitality: {
+      painPoints: ['seasonal demand', 'guest comfort', 'operational costs'],
+      avgSavings: '12-18%',
+      keyBenefit: 'cost stability',
+      urgencyDrivers: ['seasonal planning', 'guest satisfaction'],
+      language: 'cost stability and guest experience'
+    },
+    education: {
+      painPoints: ['budget constraints', 'facility maintenance', 'student safety'],
+      avgSavings: '10-15%',
+      keyBenefit: 'budget optimization',
+      urgencyDrivers: ['academic year cycles', 'facility upgrades'],
+      language: 'budget optimization and facility management'
+    }
+  };
+  return industryMap[industry?.toLowerCase()] || industryMap.manufacturing;
+}
+
+// Company Size Context Function
+function getCompanySizeContext(companyData) {
+  const employees = companyData?.employees || 0;
+  const usage = companyData?.annualUsage || 0;
+  
+  if (employees <= 50 || usage < 500000) {
+    return {
+      size: 'small',
+      focus: 'cost savings and simplicity',
+      painPoints: ['limited resources', 'time constraints'],
+      approach: 'quick wins and easy implementation',
+      language: 'cost-effective solutions and simplified processes'
+    };
+  } else if (employees <= 500 || usage < 5000000) {
+    return {
+      size: 'medium',
+      focus: 'operational efficiency',
+      painPoints: ['growing complexity', 'scalability'],
+      approach: 'streamlined processes and automation',
+      language: 'operational efficiency and scalable solutions'
+    };
+  } else {
+    return {
+      size: 'large',
+      focus: 'enterprise solutions and compliance',
+      painPoints: ['multiple stakeholders', 'regulatory requirements'],
+      approach: 'comprehensive strategy and risk management',
+      language: 'enterprise-grade solutions and comprehensive strategy'
+    };
+  }
+}
+
+// Contract Timing Urgency Function
+function getContractUrgencyLevel(contractEndDate) {
+  if (!contractEndDate) return { level: 'unknown', messaging: 'general', tone: 'informative' };
+  
+  const today = new Date();
+  const endDate = new Date(contractEndDate);
+  const monthsUntil = (endDate - today) / (1000 * 60 * 60 * 24 * 30);
+  
+  if (monthsUntil <= 3) {
+    return {
+      level: 'urgent',
+      messaging: 'immediate action needed',
+      tone: 'direct and urgent',
+      focus: 'act now to avoid rate increases',
+      language: 'urgent action required to secure competitive rates'
+    };
+  } else if (monthsUntil <= 12) {
+    return {
+      level: 'planning',
+      messaging: 'strategic timing opportunity',
+      tone: 'consultative and strategic',
+      focus: 'early planning for best rates',
+      language: 'strategic timing for optimal procurement'
+    };
+  } else {
+    return {
+      level: 'research',
+      messaging: 'educational approach',
+      tone: 'informative and relationship-building',
+      focus: 'market insights and preparation',
+      language: 'market insights and strategic preparation'
+    };
+  }
+}
+
+// Trigger Event Detection Function
+function detectTriggerEvents(companyData, recipient) {
+  const events = [];
+  
+  // Check for recent company announcements
+  if (companyData?.recentAnnouncements) {
+    events.push({
+      type: 'company_announcement',
+      description: companyData.recentAnnouncements,
+      relevance: 'high'
+    });
+  }
+  
+  // Check for funding or expansion
+  if (companyData?.funding || companyData?.expansion) {
+    events.push({
+      type: 'growth_event',
+      description: companyData.funding || companyData.expansion,
+      relevance: 'high'
+    });
+  }
+  
+  // Check for job changes
+  if (recipient?.recentJobChange) {
+    events.push({
+      type: 'job_change',
+      description: recipient.recentJobChange,
+      relevance: 'medium'
+    });
+  }
+  
+  // Check for industry news
+  if (companyData?.industryNews) {
+    events.push({
+      type: 'industry_news',
+      description: companyData.industryNews,
+      relevance: 'medium'
+    });
+  }
+  
+  return events;
+}
+
+// Deep Personalization Function
+function getDeepPersonalization(companyData, recipient) {
+  const personalization = {
+    achievements: [],
+    recentActivity: [],
+    painPoints: [],
+    opportunities: []
+  };
+  
+  // Company achievements
+  if (companyData?.funding) {
+    personalization.achievements.push(`recent funding of ${companyData.funding}`);
+  }
+  if (companyData?.expansion) {
+    personalization.achievements.push(`expansion to ${companyData.expansion}`);
+  }
+  if (companyData?.newFacilities) {
+    personalization.achievements.push(`new facilities at ${companyData.newFacilities}`);
+  }
+  
+  // Recent activity
+  if (companyData?.recentAnnouncements) {
+    personalization.recentActivity.push(companyData.recentAnnouncements);
+  }
+  if (recipient?.recentLinkedInActivity) {
+    personalization.recentActivity.push(recipient.recentLinkedInActivity);
+  }
+  
+  // Pain points based on company data
+  if (companyData?.energyIntensive) {
+    personalization.painPoints.push('high energy consumption');
+  }
+  if (companyData?.multipleLocations) {
+    personalization.painPoints.push('complex multi-location management');
+  }
+  if (companyData?.budgetConstraints) {
+    personalization.painPoints.push('budget pressure');
+  }
+  
+  // Opportunities
+  if (companyData?.contractExpiring) {
+    personalization.opportunities.push('contract renewal timing');
+  }
+  if (companyData?.growthPlans) {
+    personalization.opportunities.push('scaling energy needs');
+  }
+  
+  return personalization;
+}
+
 // Role-specific language for better personalization
 function getRoleSpecificLanguage(role) {
   const roleMap = {
@@ -805,6 +1007,21 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   // Get role-specific context
   const roleContext = job ? getRoleSpecificLanguage(job) : null;
   
+  // Get industry-specific content
+  const industryContent = industry ? getIndustrySpecificContent(industry) : null;
+  
+  // Get company size context
+  const companySizeContext = getCompanySizeContext(r.account || {});
+  
+  // Get contract urgency level
+  const contractUrgency = getContractUrgencyLevel(energy.contractEnd);
+  
+  // Detect trigger events
+  const triggerEvents = detectTriggerEvents(r.account || {}, recipient);
+  
+  // Get deep personalization
+  const deepPersonalization = getDeepPersonalization(r.account || {}, recipient);
+  
   const recipientContext = `
 RECIPIENT INFORMATION:
 - Name: ${firstName || 'there'} ${company ? `at ${company}` : ''}
@@ -818,6 +1035,35 @@ ${energy.currentRate ? `- Current Rate: ${energy.currentRate}/kWh` : ''}
 ${contractEndLabel ? `- Contract Ends: ${contractEndLabel}` : ''}
 ${transcript ? `- Call Notes: ${transcript}` : ''}
 ${notes ? `- Additional Notes: ${notes}` : ''}
+
+INDUSTRY-SPECIFIC CONTEXT:
+${industryContent ? `- Industry Focus: ${industryContent.language}
+- Key Pain Points: ${industryContent.painPoints.join(', ')}
+- Average Savings: ${industryContent.avgSavings}
+- Key Benefit: ${industryContent.keyBenefit}
+- Urgency Drivers: ${industryContent.urgencyDrivers.join(', ')}` : ''}
+
+COMPANY SIZE CONTEXT:
+- Size Category: ${companySizeContext.size}
+- Focus Area: ${companySizeContext.focus}
+- Pain Points: ${companySizeContext.painPoints.join(', ')}
+- Approach: ${companySizeContext.approach}
+- Language Style: ${companySizeContext.language}
+
+CONTRACT URGENCY LEVEL:
+- Urgency Level: ${contractUrgency.level}
+- Messaging Tone: ${contractUrgency.tone}
+- Focus: ${contractUrgency.focus}
+- Language: ${contractUrgency.language}
+
+TRIGGER EVENTS:
+${triggerEvents.length > 0 ? triggerEvents.map(event => `- ${event.type}: ${event.description} (${event.relevance} relevance)`).join('\n') : '- No recent trigger events detected'}
+
+DEEP PERSONALIZATION:
+${deepPersonalization.achievements.length > 0 ? `- Company Achievements: ${deepPersonalization.achievements.join(', ')}` : ''}
+${deepPersonalization.recentActivity.length > 0 ? `- Recent Activity: ${deepPersonalization.recentActivity.join(', ')}` : ''}
+${deepPersonalization.painPoints.length > 0 ? `- Identified Pain Points: ${deepPersonalization.painPoints.join(', ')}` : ''}
+${deepPersonalization.opportunities.length > 0 ? `- Opportunities: ${deepPersonalization.opportunities.join(', ')}` : ''}
 ${roleContext ? `- Role-Specific Focus: ${roleContext.painPoints.join(', ')}` : ''}
 `;
 
@@ -924,6 +1170,7 @@ CRITICAL QUALITY RULES:
 - EMAIL LENGTH: Keep total email body under 100 words
 - CTA LENGTH: CTAs should be 10-12 words maximum
 - VALUE PROP MUST: Include HOW we help AND WHAT results (e.g., "We help [industry] companies secure better rates before contracts expire. Clients typically save ${marketContext?.typicalClientSavings || '10-20%'}.")
+- MOBILE OPTIMIZATION: Keep paragraphs short (2-3 sentences max), use clear CTA placement, optimize for mobile preview text (52% of emails opened on mobile)
 
 FORBIDDEN PHRASES (TWO-TIER APPROACH):
 TIER 1 - OPENING HOOK (NO statistics allowed):
@@ -968,7 +1215,8 @@ PREFERRED LANGUAGE:
 - "Current market conditions are driving up energy costs for [industry] operations..."
 
 SUBJECT LINE RULES:
-- Under 50 characters
+- Target: 3-4 words (sweet spot for engagement)
+- Maximum: 41 characters (ensures full display on mobile - 52% of emails opened on mobile in 2025)
 - Choose ONE pattern and customize naturally (42-45% open rates):
   * "Hi ${firstName}" (45% open rate - ultra-personal)
   * "${firstName}, made this for you" (43% open rate - curiosity-driven)

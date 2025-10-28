@@ -258,6 +258,8 @@ export class SendGridService {
         emailType: 'sent',         // Alternative field for filtering
         isSentEmail: true,         // Additional flag for filtering
         provider: 'sendgrid',      // Identify the email provider
+        ownerId: emailData.userEmail || null,     // Required for non-admin users
+        assignedTo: emailData.userEmail || null,  // Required for non-admin users
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
