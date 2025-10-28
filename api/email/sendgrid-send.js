@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   }
 
           try {
-            const { to, subject, content, from, _deliverability, threadId, inReplyTo, references, isHtmlEmail } = req.body;
+            const { to, subject, content, from, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail } = req.body;
 
     if (!to || !subject || !content) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -41,6 +41,7 @@ export default async function handler(req, res) {
               inReplyTo: inReplyTo || undefined,
               references: Array.isArray(references) ? references : (references ? [references] : undefined),
               isHtmlEmail: isHtmlEmail || false,
+      userEmail: userEmail || null,
       _deliverability: _deliverability || {
         enableTracking: true,
         includeBulkHeaders: false,
