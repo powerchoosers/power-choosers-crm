@@ -77,6 +77,9 @@ class AuthManager {
             console.log('[Auth] Updating user profile UI...');
             this.updateUserProfile(user);
             
+            // Update admin-only elements visibility
+            this.updateAdminOnlyElements();
+            
             console.log('[Auth] ✓ Auth flow complete');
         } else {
         console.log('[Auth] No user - showing login');
@@ -291,6 +294,17 @@ class AuthManager {
 
     isAuthenticated() {
         return this.user !== null;
+    }
+
+    updateAdminOnlyElements() {
+        const isAdmin = window.currentUserRole === 'admin';
+        const adminOnlyElements = document.querySelectorAll('.admin-only');
+        
+        adminOnlyElements.forEach(element => {
+            element.style.display = isAdmin ? 'flex' : 'none';
+        });
+        
+        console.log(`[Auth] Updated admin-only elements visibility: ${isAdmin ? 'visible' : 'hidden'}`);
     }
 }
 

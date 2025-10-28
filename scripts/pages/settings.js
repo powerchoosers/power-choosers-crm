@@ -29,7 +29,7 @@ class SettingsPage {
                     // NEW: Meeting Preferences Settings
                     meetingPreferences: {
                         enabled: true,
-                        useHardcodedTimes: true,
+                        useHardcodedTimes: false,
                         slot1Time: '2-3pm',
                         slot2Time: '10-11am',
                         callDuration: '15-minute',
@@ -491,7 +491,7 @@ class SettingsPage {
                 // NEW: Meeting Preferences
                 meetingPreferences: {
                     enabled: document.getElementById('meeting-preferences-enabled')?.checked ?? true,
-                    useHardcodedTimes: document.getElementById('meeting-use-hardcoded')?.checked ?? true,
+                    useHardcodedTimes: document.getElementById('meeting-use-hardcoded')?.checked ?? false,
                     slot1Time: document.getElementById('meeting-slot1-time')?.value || '2-3pm',
                     slot2Time: document.getElementById('meeting-slot2-time')?.value || '10-11am',
                     callDuration: document.getElementById('meeting-call-duration')?.value || '15-minute',

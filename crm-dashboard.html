@@ -285,6 +285,15 @@
                         </svg>
                         <span class="nav-text">Client Management</span>
                     </a>
+                    <a href="#agents" class="nav-item admin-only" data-page="agents" style="display: none;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        <span class="nav-text">Agents</span>
+                    </a>
                     <a href="#settings" class="nav-item" data-page="settings">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="3"></circle>
@@ -1100,6 +1109,23 @@
                                 </div>
                             </div>
                             <div class="page-content">
+                                <!-- Loading and Error States -->
+                                <div class="loading-spinner" style="display: none;">
+                                    <div class="spinner"></div>
+                                    <p>Loading client data...</p>
+                                </div>
+                                
+                                <div class="error-message" style="display: none;">
+                                    <div class="error-icon">
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                                        </svg>
+                                    </div>
+                                    <p class="error-text"></p>
+                                </div>
+
                                 <div class="client-dashboard">
                                     <!-- Overview Stats -->
                                     <div class="dashboard-section">
@@ -1115,8 +1141,8 @@
                                                     </svg>
                                                 </div>
                                                 <div class="stat-content">
-                                                    <div class="stat-value">247</div>
-                                                    <div class="stat-label">Active Clients</div>
+                                                    <div class="stat-value">0</div>
+                                                    <div class="stat-label">Total Clients</div>
                                                 </div>
                                             </div>
                                             <div class="stat-card">
@@ -1126,8 +1152,8 @@
                                                     </svg>
                                                 </div>
                                                 <div class="stat-content">
-                                                    <div class="stat-value">$2.4M</div>
-                                                    <div class="stat-label">Monthly Revenue</div>
+                                                    <div class="stat-value">0</div>
+                                                    <div class="stat-label">Contracts Expiring (30 days)</div>
                                                 </div>
                                             </div>
                                             <div class="stat-card">
@@ -1138,8 +1164,8 @@
                                                     </svg>
                                                 </div>
                                                 <div class="stat-content">
-                                                    <div class="stat-value">15.2M</div>
-                                                    <div class="stat-label">kWh Managed</div>
+                                                    <div class="stat-value">0</div>
+                                                    <div class="stat-label">Overdue Tasks</div>
                                                 </div>
                                             </div>
                                             <div class="stat-card">
@@ -1151,20 +1177,20 @@
                                                     </svg>
                                                 </div>
                                                 <div class="stat-content">
-                                                    <div class="stat-value">94%</div>
-                                                    <div class="stat-label">Retention Rate</div>
+                                                    <div class="stat-value">0</div>
+                                                    <div class="stat-label">Active Contracts</div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <!-- Contract Management -->
+                                    <!-- Contract Renewal Dashboard -->
                                     <div class="dashboard-section">
-                                        <h3 class="section-title">Contract Management</h3>
+                                        <h3 class="section-title">Contract Renewal Management</h3>
                                         <div class="cards-grid">
                                             <div class="dashboard-card">
                                                 <div class="card-header">
-                                                    <h4 class="card-title">Contract Status</h4>
+                                                    <h4 class="card-title">Contract Renewals</h4>
                                                     <div class="card-action">
                                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                             <polyline points="6,9 12,15 18,9"></polyline>
@@ -1174,26 +1200,26 @@
                                                 <div class="card-content">
                                                     <div class="metric-row">
                                                         <span class="metric-label">Expiring in 30 days</span>
-                                                        <span class="metric-value">12</span>
+                                                        <span class="metric-value">0</span>
                                                     </div>
                                                     <div class="metric-row">
-                                                        <span class="metric-label">Expiring in 60 days</span>
-                                                        <span class="metric-value">28</span>
+                                                        <span class="metric-label">Expiring in 90 days</span>
+                                                        <span class="metric-value">0</span>
                                                     </div>
                                                     <div class="metric-row">
-                                                        <span class="metric-label">New this month</span>
-                                                        <span class="metric-value">8</span>
+                                                        <span class="metric-label">Expired contracts</span>
+                                                        <span class="metric-value">0</span>
                                                     </div>
                                                     <div class="metric-row">
-                                                        <span class="metric-label">Avg contract length</span>
-                                                        <span class="metric-value">24 months</span>
+                                                        <span class="metric-label">Active contracts</span>
+                                                        <span class="metric-value">0</span>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <div class="dashboard-card">
                                                 <div class="card-header">
-                                                    <h4 class="card-title">Energy Usage Analytics</h4>
+                                                    <h4 class="card-title">Task Management</h4>
                                                     <div class="card-action">
                                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                             <polyline points="6,9 12,15 18,9"></polyline>
@@ -1202,181 +1228,25 @@
                                                 </div>
                                                 <div class="card-content">
                                                     <div class="metric-row">
-                                                        <span class="metric-label">Peak usage period</span>
-                                                        <span class="metric-value">2-4 PM</span>
+                                                        <span class="metric-label">Overdue tasks</span>
+                                                        <span class="metric-value">0</span>
                                                     </div>
                                                     <div class="metric-row">
-                                                        <span class="metric-label">Seasonal variance</span>
-                                                        <span class="metric-value">+23%</span>
+                                                        <span class="metric-label">Pending tasks</span>
+                                                        <span class="metric-value">0</span>
                                                     </div>
                                                     <div class="metric-row">
-                                                        <span class="metric-label">Cost savings delivered</span>
-                                                        <span class="metric-value">$847K</span>
-                                                    </div>
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Efficiency rating</span>
-                                                        <span class="metric-value">8.7/10</span>
+                                                        <span class="metric-label">Total tasks</span>
+                                                        <span class="metric-value">0</span>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <!-- Client Health & Performance -->
+                                    <!-- Client Segmentation -->
                                     <div class="dashboard-section">
-                                        <h3 class="section-title">Client Health & Performance</h3>
-                                        <div class="cards-grid">
-                                            <div class="dashboard-card">
-                                                <div class="card-header">
-                                                    <h4 class="card-title">Client Health Dashboard</h4>
-                                                    <div class="card-action">
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                            <polyline points="6,9 12,15 18,9"></polyline>
-                                                        </svg>
-                                                    </div>
-                                                </div>
-                                                <div class="card-content">
-                                                    <div class="health-metrics">
-                                                        <div class="health-metric">
-                                                            <div class="health-score excellent">9.2</div>
-                                                            <div class="health-label">Excellent Health</div>
-                                                            <div class="health-count">156 clients</div>
-                                                        </div>
-                                                        <div class="health-metric">
-                                                            <div class="health-score good">7.8</div>
-                                                            <div class="health-label">Good Health</div>
-                                                            <div class="health-count">67 clients</div>
-                                                        </div>
-                                                        <div class="health-metric">
-                                                            <div class="health-score warning">5.4</div>
-                                                            <div class="health-label">Needs Attention</div>
-                                                            <div class="health-count">24 clients</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div class="dashboard-card">
-                                                <div class="card-header">
-                                                    <h4 class="card-title">Client Satisfaction</h4>
-                                                    <div class="card-action">
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                            <polyline points="6,9 12,15 18,9"></polyline>
-                                                        </svg>
-                                                    </div>
-                                                </div>
-                                                <div class="card-content">
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Satisfaction Score</span>
-                                                        <span class="metric-value">4.7/5</span>
-                                                    </div>
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Support tickets</span>
-                                                        <span class="metric-value">23</span>
-                                                    </div>
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Avg response time</span>
-                                                        <span class="metric-value">2.3 hours</span>
-                                                    </div>
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Client feedback</span>
-                                                        <span class="metric-value">+12% this month</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Operational Management -->
-                                    <div class="dashboard-section">
-                                        <h3 class="section-title">Operational Management</h3>
-                                        <div class="cards-grid">
-                                            <div class="dashboard-card">
-                                                <div class="card-header">
-                                                    <h4 class="card-title">Client Communication</h4>
-                                                    <div class="card-action">
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                            <polyline points="6,9 12,15 18,9"></polyline>
-                                                        </svg>
-                                                    </div>
-                                                </div>
-                                                <div class="card-content">
-                                                    <div class="communication-stats">
-                                                        <div class="comm-stat">
-                                                            <div class="comm-icon">
-                                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                                                                </svg>
-                                                            </div>
-                                                            <div class="comm-details">
-                                                                <div class="comm-value">47</div>
-                                                                <div class="comm-label">Recent calls</div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="comm-stat">
-                                                            <div class="comm-icon">
-                                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                                                                    <polyline points="22,6 12,13 2,6"></polyline>
-                                                                </svg>
-                                                            </div>
-                                                            <div class="comm-details">
-                                                                <div class="comm-value">89%</div>
-                                                                <div class="comm-label">Email open rate</div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="comm-stat">
-                                                            <div class="comm-icon">
-                                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                                                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                                                                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                                                                    <line x1="3" y1="10" x2="21" y2="10"></line>
-                                                                </svg>
-                                                            </div>
-                                                            <div class="comm-details">
-                                                                <div class="comm-value">12</div>
-                                                                <div class="comm-label">Scheduled meetings</div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div class="dashboard-card">
-                                                <div class="card-header">
-                                                    <h4 class="card-title">Service Delivery</h4>
-                                                    <div class="card-action">
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                            <polyline points="6,9 12,15 18,9"></polyline>
-                                                        </svg>
-                                                    </div>
-                                                </div>
-                                                <div class="card-content">
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Active requests</span>
-                                                        <span class="metric-value">15</span>
-                                                    </div>
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">SLA compliance</span>
-                                                        <span class="metric-value">98.5%</span>
-                                                    </div>
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Avg resolution time</span>
-                                                        <span class="metric-value">4.2 days</span>
-                                                    </div>
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Escalation alerts</span>
-                                                        <span class="metric-value">2</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Strategic Management -->
-                                    <div class="dashboard-section">
-                                        <h3 class="section-title">Strategic Management</h3>
+                                        <h3 class="section-title">Client Segmentation</h3>
                                         <div class="cards-grid">
                                             <div class="dashboard-card">
                                                 <div class="card-header">
@@ -1392,53 +1262,70 @@
                                                         <div class="segment-item">
                                                             <div class="segment-bar enterprise"></div>
                                                             <div class="segment-info">
-                                                                <span class="segment-label">Enterprise</span>
-                                                                <span class="segment-value">45 clients</span>
+                                                                <span class="segment-label">Enterprise (1000+ employees)</span>
+                                                                <span class="segment-value">0 clients</span>
                                                             </div>
                                                         </div>
                                                         <div class="segment-item">
                                                             <div class="segment-bar midmarket"></div>
                                                             <div class="segment-info">
-                                                                <span class="segment-label">Mid-market</span>
-                                                                <span class="segment-value">128 clients</span>
+                                                                <span class="segment-label">Mid-market (100-999 employees)</span>
+                                                                <span class="segment-value">0 clients</span>
                                                             </div>
                                                         </div>
                                                         <div class="segment-item">
                                                             <div class="segment-bar smb"></div>
                                                             <div class="segment-info">
-                                                                <span class="segment-label">SMB</span>
-                                                                <span class="segment-value">74 clients</span>
+                                                                <span class="segment-label">SMB (<100 employees)</span>
+                                                                <span class="segment-value">0 clients</span>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
+                                        </div>
+                                    </div>
 
-                                            <div class="dashboard-card">
+                                    <!-- Client List -->
+                                    <div class="dashboard-section">
+                                        <h3 class="section-title">Client List</h3>
+                                        <div class="cards-grid">
+                                            <div class="dashboard-card full-width">
                                                 <div class="card-header">
-                                                    <h4 class="card-title">Growth Opportunities</h4>
-                                                    <div class="card-action">
-                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                            <polyline points="6,9 12,15 18,9"></polyline>
-                                                        </svg>
+                                                    <h4 class="card-title">Client List</h4>
+                                                    <div class="card-actions">
+                                                        <div class="filter-controls">
+                                                            <select class="filter-select" id="contract-status-filter">
+                                                                <option value="all">All Contract Status</option>
+                                                                <option value="expiring-soon">Expiring Soon (≤30 days)</option>
+                                                                <option value="expiring">Expiring (≤90 days)</option>
+                                                                <option value="expired">Expired</option>
+                                                                <option value="active">Active</option>
+                                                            </select>
+                                                            <select class="filter-select" id="client-size-filter">
+                                                                <option value="all">All Client Sizes</option>
+                                                                <option value="enterprise">Enterprise</option>
+                                                                <option value="midmarket">Mid-market</option>
+                                                                <option value="smb">SMB</option>
+                                                            </select>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div class="card-content">
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Upsell opportunities</span>
-                                                        <span class="metric-value">23</span>
-                                                    </div>
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Cross-sell potential</span>
-                                                        <span class="metric-value">$1.2M</span>
-                                                    </div>
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Referral opportunities</span>
-                                                        <span class="metric-value">8</span>
-                                                    </div>
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Expansion potential</span>
-                                                        <span class="metric-value">High</span>
+                                                    <div class="client-list">
+                                                        <!-- Client items will be populated by JavaScript -->
+                                                        <div class="empty-state">
+                                                            <div class="empty-icon">
+                                                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                                                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                                                    <circle cx="9" cy="7" r="4"></circle>
+                                                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                                                </svg>
+                                                            </div>
+                                                            <div class="empty-title">No clients found</div>
+                                                            <div class="empty-desc">Client data will appear here once loaded.</div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1470,6 +1357,200 @@
                                     <div id="account-details-empty" class="empty-state">
                                         <div class="empty-title">Account Details</div>
                                         <div class="empty-desc">Select an account to view details.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Agents Page -->
+                    <div class="page" id="agents-page" data-page="agents">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <h2 class="page-title">Agents</h2>
+                                    <div class="page-actions">
+                                        <button class="action-btn" id="add-agent-btn">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                            Add Agent
+                                        </button>
+                                        <button class="action-btn" id="refresh-agents-data">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="23,4 23,10 17,10"></polyline>
+                                                <polyline points="1,20 1,14 7,14"></polyline>
+                                                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+                                            </svg>
+                                            Refresh
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="agents-dashboard">
+                                <!-- Loading and Error States -->
+                                <div class="loading-spinner" id="agents-loading" style="display: none;">
+                                    <div class="spinner"></div>
+                                    <p>Loading agents data...</p>
+                                </div>
+                                
+                                <div class="error-message" id="agents-error" style="display: none;">
+                                    <p>Failed to load agents data. Please try again.</p>
+                                </div>
+                                
+                                <!-- Agent Performance Overview -->
+                                <div class="agents-overview">
+                                    <div class="metric-card">
+                                        <h3>Active Agents</h3>
+                                        <div class="metric-value" id="active-agents-count">0</div>
+                                    </div>
+                                    <div class="metric-card">
+                                        <h3>Total Calls Today</h3>
+                                        <div class="metric-value" id="total-calls-today">0</div>
+                                    </div>
+                                    <div class="metric-card">
+                                        <h3>Emails Sent Today</h3>
+                                        <div class="metric-value" id="total-emails-today">0</div>
+                                    </div>
+                                    <div class="metric-card">
+                                        <h3>Tasks Completed</h3>
+                                        <div class="metric-value" id="tasks-completed-today">0</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Agents Table -->
+                                <div class="agents-table-container">
+                                    <div class="table-header">
+                                        <h3>Agent Management</h3>
+                                        <div class="table-filters">
+                                            <select id="status-filter" class="filter-select">
+                                                <option value="all">All Status</option>
+                                                <option value="online">Online</option>
+                                                <option value="offline">Offline</option>
+                                                <option value="busy">Busy</option>
+                                            </select>
+                                            <select id="territory-filter" class="filter-select">
+                                                <option value="all">All Territories</option>
+                                                <option value="west_coast">West Coast</option>
+                                                <option value="east_coast">East Coast</option>
+                                                <option value="central">Central</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <table class="agents-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Agent</th>
+                                                <th>Status</th>
+                                                <th>Phone Number</th>
+                                                <th>Email Address</th>
+                                                <th>Calls Today</th>
+                                                <th>Emails Today</th>
+                                                <th>Tasks Completed</th>
+                                                <th>Current Activity</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="agents-table-body">
+                                            <!-- Populated by JavaScript -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Agent Detail Page -->
+                    <div class="page" id="agent-detail-page" data-page="agent-detail">
+                        <div class="page-container">
+                            <div class="page-header">
+                                <div class="page-title-section">
+                                    <button class="back-btn back-btn--icon" id="agent-detail-back-btn" aria-label="Back to Agents">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                                        </svg>
+                                    </button>
+                                    <h2 class="page-title" id="agent-detail-name">Agent Details</h2>
+                                    <div class="page-actions">
+                                        <button class="action-btn" id="edit-agent-btn">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                            </svg>
+                                            Edit Agent
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="page-content">
+                                <!-- Loading and Error States -->
+                                <div class="loading-spinner" style="display: none;">
+                                    <div class="spinner"></div>
+                                    <p>Loading agent data...</p>
+                                </div>
+                                
+                                <div class="error-message" style="display: none;">
+                                    <p>Failed to load agent data. Please try again.</p>
+                                </div>
+                                
+                                <!-- Agent Information -->
+                                <div class="agent-info-section">
+                                    <div class="agent-profile">
+                                        <div class="agent-avatar-large">
+                                            <span id="agent-avatar-text">A</span>
+                                        </div>
+                                        <div class="agent-details">
+                                            <h3 id="agent-detail-name">Agent Name</h3>
+                                            <p id="agent-detail-email">agent@powerchoosers.com</p>
+                                            <div class="agent-status">
+                                                <span class="status-badge" id="agent-detail-status">offline</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="agent-meta">
+                                        <div class="meta-item">
+                                            <label>Territory</label>
+                                            <span id="agent-detail-territory">Not assigned</span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <label>Role</label>
+                                            <span id="agent-detail-role">Sales Agent</span>
+                                        </div>
+                                        <div class="meta-item">
+                                            <label>Assigned Phone</label>
+                                            <div id="assigned-phone">
+                                                <span class="resource-value">Not assigned</span>
+                                                <button class="assign-btn small">Assign</button>
+                                            </div>
+                                        </div>
+                                        <div class="meta-item">
+                                            <label>Assigned Email</label>
+                                            <div id="assigned-email">
+                                                <span class="resource-value">Not assigned</span>
+                                                <button class="assign-btn small">Assign</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Performance Metrics -->
+                                <div class="performance-section">
+                                    <h3>Performance Metrics</h3>
+                                    <div id="performance-metrics">
+                                        <!-- Populated by JavaScript -->
+                                    </div>
+                                </div>
+                                
+                                <!-- Activities Timeline -->
+                                <div class="activities-section">
+                                    <h3>Recent Activity</h3>
+                                    <div id="activities-timeline">
+                                        <!-- Populated by JavaScript -->
                                     </div>
                                 </div>
                             </div>
@@ -2701,6 +2782,143 @@
         </div>
     </div>
 
+    <!-- Add Deal Modal -->
+    <div id="modal-add-deal" class="pc-modal" hidden>
+        <div class="pc-modal__backdrop" data-close="deal"></div>
+        <div class="pc-modal__dialog deal-modal-dialog">
+            <div class="pc-modal__header">
+                <h3 id="add-deal-title">Add Deal</h3>
+                <button class="pc-modal__close" data-close="deal" aria-label="Close">×</button>
+            </div>
+            
+            <!-- Step Indicator -->
+            <div class="deal-steps-indicator">
+                <div class="deal-step active" data-step="1">
+                    <div class="step-number">1</div>
+                    <div class="step-label">Account & Title</div>
+                </div>
+                <div class="deal-step" data-step="2">
+                    <div class="step-number">2</div>
+                    <div class="step-label">Energy & Contract</div>
+                </div>
+                <div class="deal-step" data-step="3">
+                    <div class="step-number">3</div>
+                    <div class="step-label">Deal Calculator</div>
+                </div>
+            </div>
+
+            <form id="form-add-deal" class="pc-modal__form">
+                <div class="pc-modal__body">
+                    
+                    <!-- Step 1: Account Search & Deal Title -->
+                    <div class="deal-step-content active" id="deal-step-1">
+                        <div class="form-row">
+                            <label style="position: relative;">Account
+                                <input type="text" name="accountName" class="input-dark" id="deal-account-search" placeholder="Search for account..." autocomplete="off" required />
+                                <input type="hidden" name="accountId" id="deal-account-id" />
+                                <div id="deal-account-dropdown" class="account-dropdown" style="display: none;"></div>
+                            </label>
+                        </div>
+                        <div class="form-row">
+                            <label>Deal Title<input type="text" name="dealTitle" class="input-dark" placeholder="Enter deal title..." required /></label>
+                        </div>
+                        <div class="form-row">
+                            <label>Initial Stage
+                                <select name="dealStage" class="input-dark" required>
+                                    <option value="interested">Interested</option>
+                                    <option value="call-scheduled">Call Scheduled</option>
+                                    <option value="invoice-received">Invoice Received</option>
+                                    <option value="proposal">Proposal</option>
+                                    <option value="negotiation">Negotiation</option>
+                                    <option value="won">Closed Won</option>
+                                    <option value="lost">Closed Lost</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Energy & Contract Details -->
+                    <div class="deal-step-content" id="deal-step-2">
+                        <div class="form-row">
+                            <label>Electricity Supplier<input type="text" name="electricitySupplier" class="input-dark" /></label>
+                            <label>Annual Usage (kWh)<input type="number" name="annualUsage" class="input-dark" /></label>
+                        </div>
+                        <div class="form-row">
+                            <label>Current Rate ($/kWh)<input type="number" name="currentRate" class="input-dark" step="0.001" /></label>
+                            <label>Contract End Date<input type="date" name="contractEndDate" class="input-dark" /></label>
+                        </div>
+                        <div class="form-row" style="grid-template-columns: 1fr;">
+                            <label>Service Addresses
+                                <div id="deal-service-addresses-container" style="display: flex; flex-direction: column; gap: 8px;">
+                                    <div class="service-address-input-row" style="display: flex; gap: 8px; align-items: center;">
+                                        <input type="text" name="serviceAddress_0" class="input-dark" placeholder="123 Main St, City, State" style="flex: 1;" />
+                                        <button type="button" class="remove-service-address-btn" style="background: var(--grey-600); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Remove this service address">-</button>
+                                        <button type="button" class="add-service-address-btn" style="background: var(--orange-primary); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Add another service address">+</button>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Deal Calculator -->
+                    <div class="deal-step-content" id="deal-step-3">
+                        <div class="form-row">
+                            <label>Annual Usage (kWh)<input type="text" name="calcAnnualUsage" class="input-dark" placeholder="Enter annual usage (kWh)" /></label>
+                            <label>Mills (Margin)<input type="number" name="mills" class="input-dark" placeholder="Enter mills (e.g., 8 for 0.008)" min="0" step="0.1" /></label>
+                        </div>
+                        <div class="form-row">
+                            <label>Contract Length (Years)<input type="number" name="contractLength" class="input-dark" placeholder="Enter contract length in years" min="0.5" step="0.5" /></label>
+                            <label>Projected Close Date<input type="date" name="projectedCloseDate" class="input-dark" /></label>
+                        </div>
+                        <div class="form-row">
+                            <label>Commission Type
+                                <div class="deal-radio-group" style="display: flex; gap: 16px; margin-top: 8px;">
+                                    <label class="deal-radio-label" style="display: flex; align-items: center; gap: 8px;">
+                                        <input type="radio" name="commissionType" value="annual" checked />
+                                        <span>Annual</span>
+                                    </label>
+                                    <label class="deal-radio-label" style="display: flex; align-items: center; gap: 8px;">
+                                        <input type="radio" name="commissionType" value="monthly" />
+                                        <span>Monthly</span>
+                                    </label>
+                                </div>
+                            </label>
+                        </div>
+                        
+                        <!-- Deal Calculator Results -->
+                        <div class="deal-calculator-results" id="deal-calculator-results" style="display: none;">
+                            <div class="deal-result-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+                                <div class="deal-result-item" style="background: var(--grey-700); padding: 12px; border-radius: 6px;">
+                                    <div class="deal-result-label" style="font-size: 0.875rem; color: var(--text-secondary);">Agency Yearly Value</div>
+                                    <div class="deal-result-value" id="deal-yearly-value" style="font-size: 1.25rem; font-weight: 600; color: var(--text-inverse);">$0</div>
+                                </div>
+                                <div class="deal-result-item" style="background: var(--grey-700); padding: 12px; border-radius: 6px;">
+                                    <div class="deal-result-label" style="font-size: 0.875rem; color: var(--text-secondary);">Agency Total Value</div>
+                                    <div class="deal-result-value" id="deal-total-value" style="font-size: 1.25rem; font-weight: 600; color: var(--orange-primary);">$0</div>
+                                </div>
+                                <div class="deal-result-item" style="background: var(--grey-700); padding: 12px; border-radius: 6px;">
+                                    <div class="deal-result-label" style="font-size: 0.875rem; color: var(--text-secondary);">Commission Per Year</div>
+                                    <div class="deal-result-value" id="deal-yearly-commission" style="font-size: 1.25rem; font-weight: 600; color: var(--text-inverse);">$0</div>
+                                </div>
+                                <div class="deal-result-item" id="deal-monthly-commission-item" style="background: var(--grey-700); padding: 12px; border-radius: 6px; display: none;">
+                                    <div class="deal-result-label" style="font-size: 0.875rem; color: var(--text-secondary);">Commission Per Month</div>
+                                    <div class="deal-result-value" id="deal-monthly-commission" style="font-size: 1.25rem; font-weight: 600; color: var(--text-inverse);">$0</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="pc-modal__footer">
+                    <button type="button" class="btn-text" data-close="deal">Cancel</button>
+                    <button type="button" class="btn-secondary" id="deal-prev-step" style="display: none;">Previous</button>
+                    <button type="button" class="btn-primary" id="deal-next-step">Next</button>
+                    <button type="submit" class="btn-primary" id="deal-create-btn" style="display: none;">Create Deal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Firebase Client Config (from Vercel env vars) -->
     <script>
         // Expose Firebase config to window for client-side auth
@@ -2851,6 +3069,12 @@
                 // settings.js now loaded as core script - removed from lazy load
                 'client-management': [
                     'scripts/pages/client-management.js'
+                ],
+                'agents': [
+                    'scripts/pages/agents.js'
+                ],
+                'agent-detail': [
+                    'scripts/pages/agent-detail.js'
                 ]
             };
             
