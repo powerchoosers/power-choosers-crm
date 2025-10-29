@@ -303,7 +303,7 @@
         saveToFirestore(toSave).catch((err) => console.warn('Failed to save sequence:', err));
         // Navigate to the new sequence in the builder
         if (window.SequenceBuilder && typeof window.SequenceBuilder.show === 'function') {
-          try { window.SequenceBuilder.show(seq); } catch (e) { /* noop */ }
+          try { window.SequenceBuilder.show(baseSeq); } catch (e) { /* noop */ }
         } else if (window.crm && typeof window.crm.navigateToPage === 'function') {
           try { window.crm.navigateToPage('sequence-builder'); } catch (e) { /* noop */ }
         }

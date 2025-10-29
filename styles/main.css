@@ -1528,18 +1528,19 @@ tbody.animating tr:nth-child(n+11) { animation-delay: 200ms; }
     padding: 10px 12px;
 }
 .contacts-modal .contact-row .left { display: flex; align-items: center; gap: var(--spacing-md); }
-.contacts-modal .contact-row .avatar {
+.contacts-modal .contact-row .avatar,
+.contacts-modal .contact-row .avatar-initials {
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background: var(--grey-700);
-    color: var(--text-inverse);
+    background: var(--orange-subtle);
+    color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 600;
     font-size: 0.85rem;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.5px;
 }
 .contacts-modal .contact-row .meta { display: flex; flex-direction: column; }
 .contacts-modal .contact-row .name { font-weight: 600; color: var(--text-inverse); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
@@ -3317,7 +3318,7 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
     padding: var(--spacing-base);
 }
 .preview-subject { font-weight: 600; margin-bottom: var(--spacing-sm); color: var(--text-primary); }
-.preview-body { color: var(--text-inverse); }
+.preview-body { color: var(--text-primary); }
 
 /* Preview Contact Picker (Email Preview tab) */
 .preview-contact-picker {
@@ -4199,6 +4200,16 @@ html, body {
 /* Also support JS-applied expanded class for hover intent */
 .sidebar.expanded {
     width: var(--sidebar-expanded);
+}
+
+/* Disable hover behavior after click - prevents immediate reopening */
+.sidebar.click-locked {
+    pointer-events: none;
+}
+
+.sidebar.click-locked.expanded {
+    width: var(--sidebar-width);
+    pointer-events: none;
 }
 
 .sidebar-content {
@@ -14643,14 +14654,105 @@ input.row-select[type="checkbox"]:focus-visible {
 }
 
 
-/* Responsive adjustments for compose window */
+/* Attachment Badge Styles */
+.attachment-badge {
+  margin-left: 16px;
+  padding: 8px 12px;
+  background: var(--bg-item);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  max-width: 300px;
+}
+
+.attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.attachment-item:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-medium);
+}
+
+.attachment-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.attachment-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.attachment-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+.attachment-size {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-top: 1px;
+}
+
+.attachment-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.attachment-remove:hover {
+  background: var(--red-subtle);
+  color: var(--red-primary);
+}
+
+/* Responsive attachment badge */
 @media (max-width: 768px) {
-    .compose-window {
-        right: 10px;
-        left: 10px;
-        width: auto;
-        max-width: none;
-    }
+  .attachment-badge {
+    margin-left: 8px;
+    max-width: 200px;
+  }
+  
+  .attachment-name {
+    max-width: 100px;
+  }
+  
+  .compose-window {
+    left: 10px;
+    width: auto;
+    max-width: none;
+  }
     
     .compose-window.maximized {
         right: 10px;
@@ -18315,4 +18417,11 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 .pagination .btn-sm:hover {
     background: var(--bg-hover);
     border-color: var(--border-dark);
+}
+
+/* Hide editor-only toolbar buttons when Preview tab is active */
+.step-card.preview-active .editor-toolbar .editor-only-btn,
+.step-card.preview-active .formatting-bar,
+.step-card.preview-active .link-bar {
+    display: none;
 }

@@ -178,6 +178,12 @@
     if (bccInput) bccInput.value = '';
     if (bodyInput) bodyInput.innerHTML = '';
     
+    // Clear attachments
+    if (window.emailAttachments) {
+      window.emailAttachments = [];
+      updateAttachmentBadge();
+    }
+    
     // Show compose window
     composeWindow.style.display = 'flex';
     setTimeout(() => {
@@ -380,7 +386,7 @@
   // ========== TOOLBAR FUNCTIONS (from emails.js) ==========
   
   // Main toolbar action dispatcher
-  function handleToolbarAction(action, btn, editor, formattingBar, linkBar) {
+  function handleToolbarAction(action, btn, editor, formattingBar, linkBar, composeWindow) {
     try {
       const composeWindow = editor?.closest?.('#compose-window') || document.getElementById('compose-window');
       const variablesBar = composeWindow?.querySelector('.variables-bar');
@@ -447,11 +453,15 @@
           break;
         }
         case 'attach': {
-          window.crm?.showToast('File attachment coming soon');
+          handleFileAttachment(editor);
           break;
         }
         case 'code': {
           toggleHtmlMode(composeWindow);
+          break;
+        }
+        case 'templates': {
+          window.crm?.showToast('Email templates coming soon');
           break;
         }
         default: {
@@ -965,8 +975,394 @@
     const formattingBar = document.querySelector('.formatting-bar');
     if (!formattingBar) return;
     
-    const isHidden = formattingBar.getAttribute('aria-hidden') === 'true';
-    formattingBar.setAttribute('aria-hidden', !isHidden);
+    const isOpen = formattingBar.classList.toggle('open');
+    formattingBar.setAttribute('aria-hidden', String(!isOpen));
+    
+    // Update the button's aria-expanded state
+    const formattingBtn = document.querySelector('[data-action="formatting"]');
+    if (formattingBtn) {
+      formattingBtn.setAttribute('aria-expanded', String(isOpen));
+    }
+    
+    console.log('[Formatting] Bar toggled:', isOpen ? 'open' : 'closed');
+  }
+
+  function toggleHtmlMode(composeWindow) {
+    console.log('[HTML Mode] toggleHtmlMode called with composeWindow:', composeWindow);
+    
+    if (!composeWindow) {
+      composeWindow = document.querySelector('#compose-window, .compose-window');
+      console.log('[HTML Mode] Found composeWindow:', composeWindow);
+    }
+    
+    if (!composeWindow) {
+      console.error('[HTML Mode] No compose window found');
+      return;
+    }
+    
+    const editor = composeWindow.querySelector('.body-input');
+    const codeBtn = composeWindow.querySelector('[data-action="code"]');
+    
+    console.log('[HTML Mode] Editor:', editor, 'Code button:', codeBtn);
+    
+    if (!editor || !codeBtn) {
+      console.error('[HTML Mode] Missing editor or code button');
+      return;
+    }
+    
+    // Check if we're in HTML mode using data-mode attribute (like the original)
+    const isHtmlMode = editor.getAttribute('data-mode') === 'html';
+    console.log('[HTML Mode] Current mode:', isHtmlMode ? 'HTML' : 'Rich text');
+    
+    if (isHtmlMode) {
+      // Exit HTML mode: render HTML
+      const raw = editor.textContent || '';
+      editor.removeAttribute('data-mode');
+      editor.innerHTML = raw;
+      editor.contentEditable = 'true';
+      
+      // Update button
+      codeBtn.textContent = '</>';
+      codeBtn.setAttribute('aria-label', 'Edit raw HTML');
+      codeBtn.classList.remove('is-active');
+      codeBtn.setAttribute('aria-pressed', 'false');
+      
+      console.log('[HTML Mode] Switched to rich text mode');
+    } else {
+      // Enter HTML mode: show raw HTML
+      const html = editor.innerHTML || '';
+      editor.setAttribute('data-mode', 'html');
+      editor.textContent = html;
+      editor.contentEditable = 'true';
+      
+      // Update button
+      codeBtn.textContent = 'Aa';
+      codeBtn.setAttribute('aria-label', 'Exit HTML mode');
+      codeBtn.classList.add('is-active');
+      codeBtn.setAttribute('aria-pressed', 'true');
+      
+      console.log('[HTML Mode] Switched to HTML mode');
+    }
+  }
+
+  function handleImageUpload(editor) {
+    console.log('[Image Upload] handleImageUpload called with editor:', editor);
+    
+    if (!editor) {
+      console.error('[Image Upload] No editor provided');
+      return;
+    }
+    
+    // Create a file input element
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.style.display = 'none';
+    
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      // Check file size (limit to 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        window.crm?.showToast('Image file too large. Please choose a file under 5MB.');
+        return;
+      }
+      
+      // Create a FileReader to convert image to data URL
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target.result;
+        
+        // Insert image into editor
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.style.maxWidth = '100%';
+        img.style.height = 'auto';
+        img.alt = file.name;
+        
+        // Insert at cursor position
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          range.deleteContents();
+          range.insertNode(img);
+          
+          // Move cursor after the image
+          range.setStartAfter(img);
+          range.setEndAfter(img);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        } else {
+          // If no selection, append to end
+          editor.appendChild(img);
+        }
+        
+        console.log('[Image Upload] Image inserted successfully');
+        window.crm?.showToast('Image uploaded successfully');
+      };
+      
+      reader.onerror = () => {
+        console.error('[Image Upload] Error reading file');
+        window.crm?.showToast('Error uploading image. Please try again.');
+      };
+      
+      reader.readAsDataURL(file);
+    });
+    
+    // Trigger file selection
+    document.body.appendChild(fileInput);
+    fileInput.click();
+    document.body.removeChild(fileInput);
+  }
+
+  function handleFileAttachment(editor) {
+    console.log('[File Attachment] handleFileAttachment called with editor:', editor);
+    
+    // Create a file input element
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.multiple = true; // Allow multiple files
+    fileInput.style.display = 'none';
+    
+    fileInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+      
+      // Check file sizes (limit to 10MB per file)
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      const oversizedFiles = files.filter(file => file.size > maxSize);
+      
+      if (oversizedFiles.length > 0) {
+        window.crm?.showToast(`Some files are too large. Maximum size is 10MB per file.`);
+        return;
+      }
+      
+      // Store files and update UI
+      files.forEach(file => {
+        addAttachment(file);
+      });
+      
+      console.log('[File Attachment] Added', files.length, 'files');
+      window.crm?.showToast(`Added ${files.length} file${files.length > 1 ? 's' : ''}`);
+    });
+    
+    // Trigger file selection
+    document.body.appendChild(fileInput);
+    fileInput.click();
+    document.body.removeChild(fileInput);
+  }
+
+  function addAttachment(file) {
+    // Store attachment data
+    if (!window.emailAttachments) {
+      window.emailAttachments = [];
+    }
+    
+    const attachment = {
+      id: `att_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // String ID to avoid precision issues
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      file: file,
+      icon: getFileIcon(file.type, file.name)
+    };
+    
+    console.log('[File Attachment] Adding attachment with ID:', attachment.id, 'Type:', typeof attachment.id);
+    
+    window.emailAttachments.push(attachment);
+    updateAttachmentBadge();
+  }
+
+  function removeAttachment(attachmentId) {
+    console.log('[File Attachment] removeAttachment called with ID:', attachmentId, 'Type:', typeof attachmentId);
+    console.log('[File Attachment] Current attachments:', window.emailAttachments);
+    
+    if (!window.emailAttachments) {
+      console.log('[File Attachment] No attachments array found');
+      return;
+    }
+    
+    const initialLength = window.emailAttachments.length;
+    
+    // Convert to string for consistent comparison
+    const stringId = String(attachmentId);
+    console.log('[File Attachment] Converting ID to string:', stringId);
+    
+    // Log each attachment ID and type for debugging
+    window.emailAttachments.forEach((att, index) => {
+      console.log(`[File Attachment] Attachment ${index}: ID=${att.id}, Type=${typeof att.id}, Match=${att.id === stringId}`);
+    });
+    
+    window.emailAttachments = window.emailAttachments.filter(att => {
+      const matches = att.id !== stringId;
+      console.log(`[File Attachment] Filtering attachment ${att.id}: ${matches ? 'KEEP' : 'REMOVE'}`);
+      return matches;
+    });
+    
+    const finalLength = window.emailAttachments.length;
+    
+    console.log('[File Attachment] Removed attachment. Before:', initialLength, 'After:', finalLength);
+    
+    updateAttachmentBadge();
+  }
+
+  function getFileIcon(mimeType, fileName) {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    
+    // Document types
+    if (mimeType.includes('pdf') || extension === 'pdf') {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14,2 14,8 20,8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10,9 9,9 8,9"/>
+      </svg>`;
+    }
+    
+    if (mimeType.includes('word') || extension === 'doc' || extension === 'docx') {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14,2 14,8 20,8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10,9 9,9 8,9"/>
+      </svg>`;
+    }
+    
+    if (mimeType.includes('excel') || extension === 'xls' || extension === 'xlsx') {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14,2 14,8 20,8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10,9 9,9 8,9"/>
+      </svg>`;
+    }
+    
+    if (mimeType.includes('powerpoint') || extension === 'ppt' || extension === 'pptx') {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14,2 14,8 20,8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10,9 9,9 8,9"/>
+      </svg>`;
+    }
+    
+    // Image types
+    if (mimeType.includes('image')) {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21,15 16,10 5,21"/>
+      </svg>`;
+    }
+    
+    // Archive types
+    if (mimeType.includes('zip') || extension === 'zip' || extension === 'rar' || extension === '7z') {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        <polyline points="3.27,6.96 12,12.01 20.73,6.96"/>
+        <line x1="12" y1="22.08" x2="12" y2="12"/>
+      </svg>`;
+    }
+    
+    // Text files
+    if (mimeType.includes('text') || extension === 'txt' || extension === 'csv') {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14,2 14,8 20,8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10,9 9,9 8,9"/>
+      </svg>`;
+    }
+    
+    // Default file icon
+    return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14,2 14,8 20,8"/>
+    </svg>`;
+  }
+
+  function updateAttachmentBadge() {
+    const composeFooter = document.querySelector('.compose-footer');
+    if (!composeFooter) {
+      console.log('[File Attachment] No compose footer found');
+      return;
+    }
+    
+    // Remove existing badge
+    const existingBadge = composeFooter.querySelector('.attachment-badge');
+    if (existingBadge) {
+      console.log('[File Attachment] Removing existing badge');
+      existingBadge.remove();
+    }
+    
+    // Don't show badge if no attachments
+    if (!window.emailAttachments || window.emailAttachments.length === 0) {
+      console.log('[File Attachment] No attachments to display');
+      return;
+    }
+    
+    console.log('[File Attachment] Creating badge for', window.emailAttachments.length, 'attachments');
+    
+    // Create attachment badge
+    const badge = document.createElement('div');
+    badge.className = 'attachment-badge';
+    badge.innerHTML = `
+      <div class="attachment-list">
+        ${window.emailAttachments.map(att => `
+          <div class="attachment-item" data-id="${att.id}">
+            <div class="attachment-icon">${att.icon}</div>
+            <div class="attachment-info">
+              <div class="attachment-name" title="${att.name}">${att.name}</div>
+              <div class="attachment-size">${formatFileSize(att.size)}</div>
+            </div>
+            <button class="attachment-remove" data-id="${att.id}" title="Remove attachment">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    
+    // Add click handler for remove buttons - use more specific targeting
+    badge.addEventListener('click', (e) => {
+      console.log('[File Attachment] Badge clicked, target:', e.target);
+      
+      // Check if the clicked element or its parent is a remove button
+      const removeBtn = e.target.closest('.attachment-remove');
+      if (removeBtn) {
+        const attachmentId = removeBtn.dataset.id; // Don't use parseInt for string IDs
+        console.log('[File Attachment] Remove button clicked for ID:', attachmentId);
+        e.preventDefault();
+        e.stopPropagation();
+        removeAttachment(attachmentId);
+      }
+    });
+    
+    // Insert badge after compose-actions
+    const composeActions = composeFooter.querySelector('.compose-actions');
+    if (composeActions) {
+      composeActions.insertAdjacentElement('afterend', badge);
+      console.log('[File Attachment] Badge inserted successfully');
+    } else {
+      console.error('[File Attachment] Could not find compose-actions element');
+    }
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
   function togglePreviewMode() {
@@ -1188,22 +1584,30 @@
     
     // Toolbar actions - DEDUPLICATED to prevent multiple listeners
     if (!document._composeToolbarClickBound) {
+      document._composeToolbarClickBound = true;
       document.addEventListener('click', (e) => {
         const btn = e.target.closest('.toolbar-btn');
         if (!btn) return;
         
         const action = btn.dataset.action;
         
-        if (action === 'ai') {
-          openAIPanel();
-        } else if (action === 'formatting') {
+        if (action === 'formatting') {
           toggleFormattingBar();
         } else if (action === 'preview') {
           togglePreviewMode();
+        } else {
+          // Handle all other toolbar actions
+          const composeWindow = document.querySelector('#compose-window, .compose-window');
+          const editor = composeWindow?.querySelector('.body-input');
+          const formattingBar = composeWindow?.querySelector('.formatting-bar');
+          const linkBar = composeWindow?.querySelector('.link-bar');
+          const variablesBar = composeWindow?.querySelector('.variables-bar');
+          
+          if (editor) {
+            handleToolbarAction(action, btn, editor, formattingBar, linkBar, composeWindow);
+          }
         }
-        // Other toolbar actions can be added here
       });
-      document._composeToolbarClickBound = true;
       console.log('[EmailCompose] Toolbar click listener bound (deduplicated)');
     }
     
@@ -3712,20 +4116,22 @@
    * Opens the AI Panel, delegating to the main email manager if available.
    */
   function openAIPanel() {
-    if (window.emailManager && typeof window.emailManager.toggleAIPanel === 'function') {
-      console.log('[EmailCompose] Delegating to emailManager.toggleAIPanel');
-      window.emailManager.toggleAIPanel();
-    } else {
-      // Fallback if the main manager is not loaded
-      const composeWindow = document.getElementById('compose-window');
-      const aiBar = composeWindow?.querySelector('.ai-bar');
-      if (aiBar) {
-        const isOpen = aiBar.classList.toggle('open');
-        aiBar.setAttribute('aria-hidden', String(!isOpen));
-        console.log('[EmailCompose] Toggled AI bar directly.');
-      } else {
-        console.error('[EmailCompose] AI panel not found.');
+    // Try to find the AI bar in any compose window
+    const composeWindow = document.querySelector('#compose-window, .compose-window');
+    const aiBar = composeWindow?.querySelector('.ai-bar');
+    
+    if (aiBar) {
+      // Ensure AI bar is rendered before toggling
+      if (!aiBar.dataset.rendered) {
+        console.log('[EmailCompose] Rendering AI bar before toggle...');
+        renderAIBar(aiBar);
       }
+      
+      const isOpen = aiBar.classList.toggle('open');
+      aiBar.setAttribute('aria-hidden', String(!isOpen));
+      console.log('[EmailCompose] Toggled AI bar directly. Open:', isOpen);
+    } else {
+      console.error('[EmailCompose] AI panel not found.');
     }
   }
 
@@ -3997,6 +4403,11 @@
       composeWindow.classList.remove('open');
       setTimeout(() => {
         composeWindow.style.display = 'none';
+        // Clear attachments when closing
+        if (window.emailAttachments) {
+          window.emailAttachments = [];
+          updateAttachmentBadge();
+        }
       }, 300);
     }
   }
