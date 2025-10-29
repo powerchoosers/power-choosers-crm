@@ -986,7 +986,12 @@ var console = {
       state.totalCount = accountsData.length;
       if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getTotalCount === 'function') {
         window.BackgroundAccountsLoader.getTotalCount()
-          .then((cnt) => { state.totalCount = cnt; console.log('[Accounts] Total accounts (async):', cnt); })
+          .then((cnt) => { 
+            state.totalCount = cnt; 
+            console.log('[Accounts] Total accounts (async):', cnt);
+            // Re-render pagination when total count is updated
+            renderPagination();
+          })
           .catch((error) => { console.warn('[Accounts] Failed to get total count, keeping loaded count:', error); });
       }
       
@@ -2436,19 +2441,30 @@ var console = {
   }
 
   function getTotalPages() { 
-    // In browse mode with more data available, calculate pages based on total count
-    // In search mode, use filtered results
-    const totalRecords = state.searchMode ? state.filtered.length : (state.totalCount || state.filtered.length);
+    // In browse mode, use total count from database; in search mode, use filtered results
+    const totalRecords = state.searchMode ? state.filtered.length : (state.totalCount || state.data.length);
     return Math.max(1, Math.ceil(totalRecords / state.pageSize)); 
   }
 
   function getPageItems() {
-    const total = state.filtered.length;
+    // In search mode, use filtered results; in browse mode, use loaded data
+    const total = state.searchMode ? state.filtered.length : state.data.length;
     const totalPages = getTotalPages();
     if (state.currentPage > totalPages) state.currentPage = totalPages;
     const start = (state.currentPage - 1) * state.pageSize;
     const end = Math.min(total, start + state.pageSize);
-    return state.filtered.slice(start, end);
+    
+    // Check if we need to load more data for this page
+    const neededIndex = (state.currentPage - 1) * state.pageSize + state.pageSize - 1;
+    if (neededIndex >= state.data.length && state.hasMore && !state.searchMode) {
+      // Trigger data loading (but don't await to keep function synchronous)
+      loadMoreAccounts().then(() => {
+        // Re-render after data is loaded
+        render();
+      });
+    }
+    
+    return state.searchMode ? state.filtered.slice(start, end) : state.data.slice(start, end);
   }
 
   function renderPagination() {

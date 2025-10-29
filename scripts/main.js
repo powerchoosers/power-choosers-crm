@@ -1247,7 +1247,7 @@ class PowerChoosersCRM {
             // Pointer-based hover inside the sidebar
             sidebar.addEventListener('pointerenter', () => {
                 pointerInside = true;
-                if (lockCollapse) return; // Do not schedule open while locked after click
+                if (lockCollapse) return; // Don't open if locked
                 if (closeTimer) clearTimeout(closeTimer);
                 // Small show delay to avoid accidental flicker
                 openTimer = setTimeout(openSidebar, 90);
@@ -1265,7 +1265,7 @@ class PowerChoosersCRM {
             // This improves discoverability without a dedicated DOM edge element
             const edgeWidth = 12; // px
             document.addEventListener('pointermove', (e) => {
-                if (lockCollapse) return;
+                if (lockCollapse || sidebar.classList.contains('click-locked')) return;
                 if (e.clientX <= edgeWidth) {
                     if (closeTimer) clearTimeout(closeTimer);
                     if (!sidebar.classList.contains('expanded')) {
@@ -1284,17 +1284,18 @@ class PowerChoosersCRM {
             navItems.forEach(item => {
                 if (!item._sidebarNavBound) {
                     item.addEventListener('click', () => {
+                        // Use CSS-based locking for more effective control
+                        sidebar.classList.add('click-locked');
                         lockCollapse = true;
                         pointerInside = false;
                         clearTimers();
                         sidebar.classList.remove('expanded');
 
-                        // Unlock on next pointerleave from sidebar, or after safety timeout
-                        const unlockOnLeave = () => {
+                        // Unlock after a longer delay to prevent immediate reopening
+                        setTimeout(() => {
+                            sidebar.classList.remove('click-locked');
                             lockCollapse = false;
-                            sidebar.removeEventListener('pointerleave', unlockOnLeave);
-                        };
-                        sidebar.addEventListener('pointerleave', unlockOnLeave);
+                        }, 800); // Longer delay to match CSS transition timing
                     });
                     item._sidebarNavBound = true;
                 }
@@ -1302,6 +1303,7 @@ class PowerChoosersCRM {
 
             // Also collapse on hashchange/navigation to ensure closed state during page load
             window.addEventListener('hashchange', () => {
+                sidebar.classList.add('click-locked');
                 lockCollapse = true;
                 clearTimers();
                 pointerInside = false;

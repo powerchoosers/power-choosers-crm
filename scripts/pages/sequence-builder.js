@@ -639,7 +639,7 @@ class FreeSequenceAutomation {
     }
   }
 
-  function addContactToSequence(contact) {
+  async function addContactToSequence(contact) {
     if (!state.currentSequence || !contact) return;
 
     // Check if contact is already added
@@ -664,18 +664,86 @@ class FreeSequenceAutomation {
       window.crm.showToast(`Added ${contact.name} to sequence`);
     }
 
-    // TODO: Persist to backend/Firebase
+    // Persist to Firebase: create sequenceMembers document AND update sequence
     try {
       const db = window.firebaseDB;
-      if (db && state.currentSequence?.id) {
-        // Update sequence with new contact
-        db.collection('sequences').doc(state.currentSequence.id).update({
-          contacts: state.contacts,
-          updatedAt: Date.now()
+      if (!db || !state.currentSequence?.id) return;
+      
+      // Get user email using the same method as sequences.js
+      const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+        ? window.DataManager.getCurrentUserEmail()
+        : ((window.currentUserEmail || '').toLowerCase());
+      
+      // Create sequenceMembers document (same pattern as contact-detail.js but with ownerId fields)
+      const memberDoc = {
+        sequenceId: state.currentSequence.id,
+        targetId: contact.id,
+        targetType: 'people',
+        ownerId: userEmail || 'unknown',
+        createdBy: userEmail || 'unknown',
+        assignedTo: userEmail || 'unknown'
+      };
+      
+      // Use server timestamps if available, otherwise use Date.now()
+      if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+        memberDoc.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
+        memberDoc.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+      } else {
+        const now = Date.now();
+        memberDoc.createdAt = now;
+        memberDoc.updatedAt = now;
+      }
+      
+      // Add the sequenceMembers document
+      await db.collection('sequenceMembers').add(memberDoc);
+      
+      // Increment sequence stats.active count (same as contact-detail.js)
+      if (window.firebase?.firestore?.FieldValue) {
+        await db.collection('sequences').doc(state.currentSequence.id).update({
+          "stats.active": window.firebase.firestore.FieldValue.increment(1)
         });
       }
+      
+      // Update sequence document with contacts array and recordCount
+      const updateData = {
+        contacts: state.contacts,
+        updatedAt: Date.now(),
+        recordCount: state.contacts.length
+      };
+      
+      // Use server timestamp if available
+      if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+        updateData.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+      }
+      
+      await db.collection('sequences').doc(state.currentSequence.id).update(updateData);
+      
+      // Update local sequence object
+      state.currentSequence.contacts = state.contacts;
+      state.currentSequence.recordCount = state.contacts.length;
+      
+      // Invalidate sequenceMembers cache so it refreshes next time
+      if (window._sequenceMembersCache) {
+        const cacheKey = `sequence-members-${state.currentSequence.id}`;
+        window._sequenceMembersCache.delete(cacheKey);
+      }
+      
+      // Update contact count display in UI
+      updateContactCountDisplay();
+      
     } catch (error) {
       console.error('Error saving contact to sequence:', error);
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast('Failed to save contact. Please try again.');
+      }
+    }
+  }
+  
+  function updateContactCountDisplay() {
+    // Update any UI elements that show contact count
+    const contactCountEl = document.querySelector('.contact-count-display');
+    if (contactCountEl) {
+      contactCountEl.textContent = `${state.contacts.length} contact${state.contacts.length !== 1 ? 's' : ''}`;
     }
   }
 
@@ -685,7 +753,8 @@ class FreeSequenceAutomation {
       return;
     }
     state.currentSequence = sequence;
-    // Initialize contacts from the sequence payload (persisted earlier by addContactToSequence)
+    
+    // Initialize contacts from sequence payload first (for immediate UI)
     try {
       state.contacts = Array.isArray(sequence.contacts) ? [...sequence.contacts] : [];
     } catch (_) { state.contacts = []; }
@@ -696,7 +765,211 @@ class FreeSequenceAutomation {
     }
 
     if (!initDomRefs()) return;
+    
+    // Render immediately with existing data
     render();
+    
+    // Then load contacts from sequenceMembers collection asynchronously (don't block render)
+    loadContactsFromSequenceMembers(sequence.id).catch(err => {
+      console.warn('Failed to load contacts from sequenceMembers:', err);
+    });
+  }
+  
+  async function loadContactsFromSequenceMembers(sequenceId) {
+    try {
+      const db = window.firebaseDB;
+      if (!db || !sequenceId) return;
+      
+      // Check cache first for sequenceMembers (avoid repeated Firebase queries)
+      let contactIds = [];
+      const cacheKey = `sequence-members-${sequenceId}`;
+      
+      // Try to get from memory cache first (per-session)
+      if (!window._sequenceMembersCache) {
+        window._sequenceMembersCache = new Map();
+      }
+      
+      if (window._sequenceMembersCache.has(cacheKey)) {
+        const cached = window._sequenceMembersCache.get(cacheKey);
+        const cacheAge = Date.now() - cached.timestamp;
+        if (cacheAge < 60000) { // 1 minute cache
+          contactIds = cached.contactIds;
+        } else {
+          window._sequenceMembersCache.delete(cacheKey);
+        }
+      }
+      
+      // If not in cache, query Firebase
+      if (contactIds.length === 0) {
+        const membersQuery = await db.collection('sequenceMembers')
+          .where('sequenceId', '==', sequenceId)
+          .where('targetType', '==', 'people')
+          .get();
+        
+        if (membersQuery.size === 0) {
+          // No members found, clear contacts
+          state.contacts = [];
+          return;
+        }
+        
+        // Extract contact IDs
+        membersQuery.forEach(doc => {
+          const data = doc.data();
+          if (data.targetId) contactIds.push(data.targetId);
+        });
+        
+        // Cache the result
+        window._sequenceMembersCache.set(cacheKey, {
+          contactIds: contactIds,
+          timestamp: Date.now()
+        });
+      }
+      
+      if (contactIds.length === 0) {
+        state.contacts = [];
+        return;
+      }
+      
+      // Load contact details: Priority 1 - BackgroundContactsLoader (cached, zero cost)
+      let loadedContacts = [];
+      if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+        const peopleData = window.BackgroundContactsLoader.getContactsData() || [];
+        loadedContacts = contactIds.map(id => {
+          return peopleData.find(p => p.id === id);
+        }).filter(Boolean);
+      }
+      
+      // Priority 2 - window.getPeopleData (if people.js is loaded)
+      if (loadedContacts.length < contactIds.length && typeof window.getPeopleData === 'function') {
+        const peopleData = window.getPeopleData() || [];
+        const missingIds = contactIds.filter(id => !loadedContacts.find(c => c.id === id));
+        const beforeCount = loadedContacts.length;
+        missingIds.forEach(id => {
+          const contact = peopleData.find(p => p.id === id);
+          if (contact) loadedContacts.push(contact);
+        });
+        // Additional contacts loaded from window.getPeopleData
+      }
+      
+      // Priority 3 - CacheManager (still cached, zero cost)
+      if (loadedContacts.length < contactIds.length && window.CacheManager && typeof window.CacheManager.get === 'function') {
+        try {
+          const cachedContacts = await window.CacheManager.get('contacts') || [];
+          const missingIds = contactIds.filter(id => !loadedContacts.find(c => c.id === id));
+          const beforeCount = loadedContacts.length;
+          missingIds.forEach(id => {
+            const contact = cachedContacts.find(p => p.id === id);
+            if (contact) loadedContacts.push(contact);
+          });
+          // Additional contacts loaded from CacheManager
+        } catch (err) {
+          console.warn('[SequenceBuilder] CacheManager read failed:', err);
+        }
+      }
+      
+      // Only fetch from Firebase if contacts are still missing (last resort - costs money)
+      if (loadedContacts.length < contactIds.length) {
+        const missingIds = contactIds.filter(id => !loadedContacts.find(c => c.id === id));
+        
+        try {
+          // Batch fetch missing contacts (more efficient than individual reads)
+          const contactPromises = missingIds.map(id => 
+            db.collection('contacts').doc(id).get().then(doc => {
+              if (doc.exists) {
+                const data = doc.data();
+                return { id: doc.id, ...data };
+              } else {
+                return null;
+              }
+            }).catch((err) => {
+              console.error(`[SequenceBuilder] Error fetching contact ${id}:`, err);
+              return null;
+            })
+          );
+          
+          const fetchedContacts = await Promise.all(contactPromises);
+          const validFetched = fetchedContacts.filter(Boolean);
+          
+            if (validFetched.length < missingIds.length) {
+              const notFound = missingIds.filter(id => !validFetched.find(c => c.id === id));
+              console.warn(`[SequenceBuilder] ${notFound.length} contacts not found in Firebase - may have been deleted`);
+              
+              // Optionally clean up orphaned sequenceMembers records
+              if (notFound.length > 0) {
+                console.log(`[SequenceBuilder] To clean up orphaned records, run: await cleanupOrphanedSequenceMembers('${sequenceId}')`);
+              }
+            }
+          
+          // Merge cached and fetched contacts
+          loadedContacts = [...loadedContacts, ...validFetched];
+          
+          // Update stats.active if we have orphaned records (contacts that don't exist)
+          if (loadedContacts.length < contactIds.length && state.currentSequence?.id) {
+            const orphanedCount = contactIds.length - loadedContacts.length;
+            console.warn(`[SequenceBuilder] Found ${orphanedCount} orphaned sequenceMembers records. stats.active may be incorrect.`);
+            
+            // Fix stats.active to match actual loaded contacts
+            try {
+              const currentStats = state.currentSequence.stats || {};
+              const currentActive = currentStats.active || 0;
+              const correctActive = loadedContacts.length;
+              
+              if (currentActive !== correctActive) {
+                await db.collection('sequences').doc(state.currentSequence.id).update({
+                  "stats.active": correctActive,
+                  recordCount: correctActive
+                });
+                state.currentSequence.stats = { ...currentStats, active: correctActive };
+                state.currentSequence.recordCount = correctActive;
+              }
+            } catch (err) {
+              console.warn('[SequenceBuilder] Failed to update stats.active:', err);
+            }
+          }
+        } catch (err) {
+          console.warn('[SequenceBuilder] Failed to fetch contacts from Firebase:', err);
+        }
+      }
+      
+      if (loadedContacts.length > 0) {
+        // Ensure all contacts have required fields
+        const validContacts = loadedContacts.filter(c => {
+          if (!c || !c.id) {
+            return false;
+          }
+          return true;
+        });
+        
+        state.contacts = validContacts;
+        // Re-render with updated contacts
+        render();
+      } else {
+        // No contacts found, update state
+        state.contacts = [];
+      }
+      
+      // Update sequence recordCount if it's incorrect
+      if (state.currentSequence && state.currentSequence.recordCount !== contactIds.length) {
+        try {
+          const updateData = {
+            recordCount: contactIds.length
+          };
+
+          if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+            updateData.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+          } else {
+            updateData.updatedAt = Date.now();
+          }
+
+          await db.collection('sequences').doc(sequenceId).update(updateData);
+          state.currentSequence.recordCount = contactIds.length;
+        } catch (err) {
+          console.warn('Failed to update recordCount:', err);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load contacts from sequenceMembers:', err);
+    }
   }
 
   function render() {
@@ -962,6 +1235,7 @@ class FreeSequenceAutomation {
     overlay.tabIndex = -1;
 
     const contacts = Array.isArray(state.contacts) ? state.contacts.slice() : [];
+    
     // Sort by name (case-insensitive), similar to Apollo list ordering
     contacts.sort((a, b) => {
       const an = (a.name || a.fullName || `${a.firstName || ''} ${a.lastName || ''}`).trim().toLowerCase();
@@ -988,11 +1262,12 @@ class FreeSequenceAutomation {
             const subtitle = (title && company) ? `${title} at ${company}` : (title || company);
             const initials = escapeHtml(getInitials(nameRaw));
             const cid = escapeHtml(c.id || '');
+            
             return `
               <div class="contact-row" role="listitem" data-id="${cid}">
                 <input type="checkbox" class="row-select" aria-label="Select contact" data-id="${cid}" />
                 <div class="left">
-                  <div class="avatar" aria-hidden="true">${initials}</div>
+                  <span class="avatar-initials" aria-hidden="true">${initials}</span>
                   <div class="meta">
                     <button type="button" class="name view-contact" data-id="${cid}">${name}</button>
                     ${subtitle ? `<div class="subtitle">${subtitle}</div>` : ''}
@@ -1039,14 +1314,28 @@ class FreeSequenceAutomation {
       const selAll = modal ? modal.querySelector('.select-all-contacts') : null;
       const selected = new Set();
 
-      const persist = () => {
+      const persist = async () => {
         try {
           const db = window.firebaseDB;
-          if (db && state.currentSequence?.id) {
-            db.collection('sequences').doc(state.currentSequence.id).update({ contacts: state.contacts, updatedAt: Date.now() })
-              .catch((err) => console.warn('Failed to persist contacts update:', err));
+          if (!db || !state.currentSequence?.id) return;
+          
+          const updateData = {
+            contacts: state.contacts,
+            recordCount: state.contacts.length,
+            updatedAt: Date.now()
+          };
+          
+          // Use server timestamp if available
+          if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+            updateData.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
           }
-        } catch (_) { /* noop */ }
+          
+          await db.collection('sequences').doc(state.currentSequence.id).update(updateData);
+          state.currentSequence.contacts = state.contacts;
+          state.currentSequence.recordCount = state.contacts.length;
+        } catch (err) {
+          console.warn('Failed to persist contacts update:', err);
+        }
       };
 
       const updateCounts = () => {
@@ -1069,12 +1358,49 @@ class FreeSequenceAutomation {
         }
       };
 
-      const removeOne = (id) => {
+      const removeOne = async (id) => {
         if (!id) return;
+        
+        // Delete sequenceMembers document from Firebase
+        try {
+          const db = window.firebaseDB;
+          if (db && state.currentSequence?.id) {
+            // Find and delete the sequenceMembers document
+            const membersQuery = await db.collection('sequenceMembers')
+              .where('sequenceId', '==', state.currentSequence.id)
+              .where('targetId', '==', id)
+              .where('targetType', '==', 'people')
+              .get();
+            
+            // Delete all matching documents (should be just one, but handle multiple)
+            const deletePromises = [];
+            membersQuery.forEach(doc => {
+              deletePromises.push(doc.ref.delete());
+            });
+            await Promise.all(deletePromises);
+            
+            // Decrement sequence stats.active count (same as contact-detail.js)
+            if (window.firebase?.firestore?.FieldValue && state.currentSequence?.id) {
+              await db.collection('sequences').doc(state.currentSequence.id).update({
+                "stats.active": window.firebase.firestore.FieldValue.increment(-1)
+              });
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to delete sequenceMembers document:', err);
+        }
+        
         // Update state
         const idx = state.contacts.findIndex(c => c.id === id);
         if (idx >= 0) state.contacts.splice(idx, 1);
-        persist();
+        await persist();
+        
+        // Invalidate sequenceMembers cache so it refreshes next time
+        if (window._sequenceMembersCache && state.currentSequence?.id) {
+          const cacheKey = `sequence-members-${state.currentSequence.id}`;
+          window._sequenceMembersCache.delete(cacheKey);
+        }
+        
         // Update DOM
         const row = list ? list.querySelector(`.contact-row[data-id="${CSS.escape(id)}"]`) : null;
         if (row) row.remove();
@@ -1555,7 +1881,7 @@ class FreeSequenceAutomation {
           </div>
           <div class="delay-connector"></div>
         </div>
-        <div class="step-card" data-id="${escapeHtml(step.id)}">
+        <div class="step-card${previewActive ? ' preview-active' : ''}" data-id="${escapeHtml(step.id)}">
           <div class="step-header">
             <button class="collapse-btn" aria-expanded="${expanded}">${expanded ? svgChevronDown() : svgChevronRight()}</button>
             <div class="step-title">
@@ -1584,38 +1910,39 @@ class FreeSequenceAutomation {
                 <div class="preview-results" role="listbox" aria-label="Contact results"></div>
               </div>
             </div>
+            <!-- Toolbar and AI bar accessible from both tabs -->
+            <div class="editor-toolbar" role="toolbar" aria-label="Email editor actions">
+              <button class="toolbar-btn toolbar-ai" type="button" data-action="ai" aria-label="Write with AI">
+                <span class="icon">${svgTextAI()}</span>
+                <span class="label">Write with AI</span>
+              </button>
+              <button class="toolbar-btn editor-only-btn" type="button" data-action="formatting" aria-label="Text formatting" ${htmlMode ? 'disabled aria-disabled="true"' : ''}>${svgTextTitleIcon()}</button>
+              <button class="toolbar-btn editor-only-btn" type="button" data-action="link" aria-label="Insert link">${svgChain()}</button>
+              <button class="toolbar-btn editor-only-btn" type="button" data-action="image" aria-label="Upload image">${svgImageIcon()}</button>
+              <button class="toolbar-btn editor-only-btn" type="button" data-action="attach" aria-label="Attach files">${svgPaperclip()}</button>
+              <button class="toolbar-btn editor-only-btn${htmlMode ? ' active' : ''}" type="button" data-action="code" aria-label="Edit raw HTML" aria-pressed="${htmlMode}">${svgCodeBrackets()}</button>
+              <button class="toolbar-btn editor-only-btn" type="button" data-action="templates" aria-label="Load templates">${svgDoc()}</button>
+              <button class="toolbar-btn editor-only-btn" type="button" data-action="variables" aria-label="Add dynamic variables">${svgBraces()}</button>
+            </div>
+            ${htmlMode ? '' : renderFormattingBar()}
+            <div class="link-bar" aria-hidden="true">
+              <div class="field">
+                <label class="fmt-label" for="link-text-${escapeHtml(step.id)}">Text</label>
+                <input id="link-text-${escapeHtml(step.id)}" class="input-dark" type="text" placeholder="Display text" data-link-text />
+              </div>
+              <div class="field">
+                <label class="fmt-label" for="link-url-${escapeHtml(step.id)}">URL</label>
+                <input id="link-url-${escapeHtml(step.id)}" class="input-dark" type="url" placeholder="https://" data-link-url />
+              </div>
+              <div class="actions">
+                <button class="fmt-btn" type="button" data-link-insert>Insert</button>
+                <button class="fmt-btn" type="button" data-link-cancel>Cancel</button>
+              </div>
+            </div>
             <div class="tab-panels">
               <div class="tab-panel ${editorActive ? '' : 'hidden'}" data-tab="editor">
                 <div class="form-row">
                   <input type="text" class="input-dark subject-input" placeholder="Subject" value="${escapeHtml(step.data?.subject || '')}">
-                </div>
-                <div class="editor-toolbar" role="toolbar" aria-label="Email editor actions">
-                  <button class="toolbar-btn toolbar-ai" type="button" data-action="ai" aria-label="Write with AI">
-                    <span class="icon">${svgTextAI()}</span>
-                    <span class="label">Write with AI</span>
-                  </button>
-                  <button class="toolbar-btn" type="button" data-action="formatting" aria-label="Text formatting" ${htmlMode ? 'disabled aria-disabled="true"' : ''}>${svgTextTitleIcon()}</button>
-                  <button class="toolbar-btn" type="button" data-action="link" aria-label="Insert link">${svgChain()}</button>
-                  <button class="toolbar-btn" type="button" data-action="image" aria-label="Upload image">${svgImageIcon()}</button>
-                  <button class="toolbar-btn" type="button" data-action="attach" aria-label="Attach files">${svgPaperclip()}</button>
-                  <button class="toolbar-btn${htmlMode ? ' active' : ''}" type="button" data-action="code" aria-label="Edit raw HTML" aria-pressed="${htmlMode}">${svgCodeBrackets()}</button>
-                  <button class="toolbar-btn" type="button" data-action="templates" aria-label="Load templates">${svgDoc()}</button>
-                  <button class="toolbar-btn" type="button" data-action="variables" aria-label="Add dynamic variables">${svgBraces()}</button>
-                </div>
-                ${htmlMode ? '' : renderFormattingBar()}
-                <div class="link-bar" aria-hidden="true">
-                  <div class="field">
-                    <label class="fmt-label" for="link-text-${escapeHtml(step.id)}">Text</label>
-                    <input id="link-text-${escapeHtml(step.id)}" class="input-dark" type="text" placeholder="Display text" data-link-text />
-                  </div>
-                  <div class="field">
-                    <label class="fmt-label" for="link-url-${escapeHtml(step.id)}">URL</label>
-                    <input id="link-url-${escapeHtml(step.id)}" class="input-dark" type="url" placeholder="https://" data-link-url />
-                  </div>
-                  <div class="actions">
-                    <button class="fmt-btn" type="button" data-link-insert>Insert</button>
-                    <button class="fmt-btn" type="button" data-link-cancel>Cancel</button>
-                  </div>
                 </div>
                 <div class="form-row">
                   ${htmlMode
@@ -2389,6 +2716,27 @@ class FreeSequenceAutomation {
           <line class="ql-stroke" x1="3" x2="3" y1="14" y2="14"></line>
         </svg>
       </button>
+      </div>
+      <div class="ai-bar" aria-hidden="true">
+        <div class="ai-inner">
+          <div class="ai-row">
+            <textarea class="ai-prompt input-dark" rows="3" 
+                      placeholder="Describe the email you want... (tone, goal, offer, CTA)"></textarea>
+          </div>
+          <div class="ai-row suggestions" role="list">
+            <button class="ai-suggestion" type="button" data-prompt="Write an immediate follow-up email after our phone conversation">Immediate follow-up</button>
+            <button class="ai-suggestion" type="button" data-prompt="Write a same-day check-in email to maintain momentum">Same day check-in</button>
+            <button class="ai-suggestion" type="button" data-prompt="Write a weekly touchpoint email to stay top of mind">Weekly touchpoint</button>
+            <button class="ai-suggestion" type="button" data-prompt="Write an introduction email as the first touchpoint in our sequence">First email introduction</button>
+            <button class="ai-suggestion" type="button" data-prompt="Write a nurture email that provides value and builds relationship">Middle sequence nurture</button>
+            <button class="ai-suggestion" type="button" data-prompt="Write a final email with a clear call-to-action and next steps">Final sequence ask</button>
+          </div>
+          <div class="ai-row actions">
+            <button class="fmt-btn ai-generate" data-mode="standard">Generate Standard</button>
+            <button class="fmt-btn ai-generate" data-mode="html">Generate HTML</button>
+            <div class="ai-status" aria-live="polite"></div>
+          </div>
+        </div>
       </div>`;
   }
 
@@ -2830,29 +3178,6 @@ class FreeSequenceAutomation {
             </div>
 
           ${isAuto ? `
-            <!-- AI Prompt Settings -->
-            <div class="email-settings-section">
-              <h4>AI Email Generation</h4>
-              <div class="form-group">
-                <label for="ai-prompt-${step.id}">AI Prompt for Email Generation</label>
-                <textarea id="ai-prompt-${step.id}" class="textarea-dark" rows="3" 
-                          placeholder="Describe the email you want AI to generate... (tone, goal, offer, CTA)"
-                          data-setting="aiPrompt">${settings.aiPrompt || ''}</textarea>
-                <div class="setting-description" style="margin-left: 0;">This prompt will be used to generate personalized emails for each contact in the sequence</div>
-              </div>
-              <div class="ai-suggestions-container">
-                <div class="ai-suggestions-header">Quick Suggestions:</div>
-                <div class="ai-suggestions" role="list">
-                  <button class="ai-suggestion" type="button" data-prompt="Write an immediate follow-up email after our phone conversation">Immediate follow-up</button>
-                  <button class="ai-suggestion" type="button" data-prompt="Write a same-day check-in email to maintain momentum">Same day check-in</button>
-                  <button class="ai-suggestion" type="button" data-prompt="Write a weekly touchpoint email to stay top of mind">Weekly touchpoint</button>
-                  <button class="ai-suggestion" type="button" data-prompt="Write an introduction email as the first touchpoint in our sequence">First email introduction</button>
-                  <button class="ai-suggestion" type="button" data-prompt="Write a nurture email that provides value and builds relationship">Middle sequence nurture</button>
-                  <button class="ai-suggestion" type="button" data-prompt="Write a final email with a clear call-to-action and next steps">Final sequence ask</button>
-                </div>
-              </div>
-            </div>
-
             <!-- Automation Settings -->
             <div class="email-settings-section">
               <h4>Automation & Timing</h4>
@@ -3097,8 +3422,8 @@ class FreeSequenceAutomation {
     const cancelBtn = pop.querySelector('.btn-cancel');
     const confirmBtn = pop.querySelector('.btn-confirm');
     cancelBtn?.addEventListener('click', () => closeAddContactPopover());
-    confirmBtn?.addEventListener('click', () => {
-      try { addContactToSequence(contact); } catch (_) {}
+    confirmBtn?.addEventListener('click', async () => {
+      try { await addContactToSequence(contact); } catch (_) {}
       closeAddContactPopover();
     });
 
@@ -3464,7 +3789,11 @@ class FreeSequenceAutomation {
     // Open contacts list modal
     const contactsBtn = document.getElementById('contacts-btn');
     if (contactsBtn) {
-      contactsBtn.addEventListener('click', () => {
+      contactsBtn.addEventListener('click', async () => {
+        // Refresh contacts from sequenceMembers before opening modal
+        if (state.currentSequence?.id) {
+          await loadContactsFromSequenceMembers(state.currentSequence.id);
+        }
         const overlay = createContactsListModal();
         document.body.appendChild(overlay);
         overlay.focus();
@@ -3638,7 +3967,16 @@ class FreeSequenceAutomation {
         const id = card?.getAttribute('data-id');
         const step = state.currentSequence.steps.find(s => s.id === id);
         if (!step) return;
-        step.activeTab = tab.getAttribute('data-tab') || 'editor';
+        const tabName = tab.getAttribute('data-tab') || 'editor';
+        step.activeTab = tabName;
+        
+        // Add/remove preview-active class for CSS targeting
+        if (tabName === 'preview') {
+          card.classList.add('preview-active');
+        } else {
+          card.classList.remove('preview-active');
+        }
+        
         render();
       });
     });
@@ -3901,7 +4239,27 @@ class FreeSequenceAutomation {
 
         switch (action) {
           case 'ai': {
-            try { window.crm && window.crm.showToast && window.crm.showToast('AI drafting coming soon'); } catch (_) {}
+            if (isHtml) break;
+            const aiBar = card.querySelector('.ai-bar');
+            if (aiBar) {
+              const isOpen = aiBar.classList.toggle('open');
+              aiBar.setAttribute('aria-hidden', String(!isOpen));
+              if (isOpen) {
+                // Close other bars when opening AI bar
+                const fmtBar = card.querySelector('.formatting-bar');
+                if (fmtBar && fmtBar.classList.contains('open')) {
+                  fmtBar.classList.remove('open');
+                  fmtBar.setAttribute('aria-hidden', 'true');
+                  fmtBar.querySelectorAll('.format-popover').forEach(p => p.classList.remove('open'));
+                  fmtBar.querySelectorAll('.fmt-group > .fmt-btn').forEach(b => b.setAttribute('aria-expanded', 'false'));
+                }
+                const linkBar = card.querySelector('.link-bar');
+                if (linkBar && linkBar.classList.contains('open')) {
+                  linkBar.classList.remove('open');
+                  linkBar.setAttribute('aria-hidden', 'true');
+                }
+              }
+            }
             break;
           }
           case 'formatting': {
@@ -4067,6 +4425,235 @@ class FreeSequenceAutomation {
             break;
         }
       });
+    });
+
+  // Helper functions for AI email formatting
+  function formatTemplatedEmail(result, recipient, templateType) {
+    try {
+      const subject = result.subject || 'Energy Solutions';
+      const html = result.output || result.html || '<p>Email content</p>';
+      return { subject, html };
+    } catch (error) {
+      console.error('Error formatting templated email:', error);
+      return { subject: 'Energy Solutions', html: '<p>Error generating email content.</p>' };
+    }
+  }
+
+  function formatGeneratedEmail(result, recipient, mode) {
+    try {
+      // Handle JSON response format
+      let jsonData = null;
+      try {
+        const jsonText = String(result || '').trim()
+          .replace(/^\s*```json\s*/i, '')
+          .replace(/^\s*```\s*/i, '')
+          .replace(/\s*```\s*$/i, '');
+        const match = jsonText.match(/\{[\s\S]*\}/);
+        if (match) {
+          jsonData = JSON.parse(match[0]);
+        }
+      } catch (_) {
+        // Not JSON, use as-is
+      }
+
+      if (jsonData) {
+        const subject = jsonData.subject || 'Energy Solutions';
+        const paragraphs = [];
+        if (jsonData.greeting) paragraphs.push(jsonData.greeting);
+        if (jsonData.paragraph1) paragraphs.push(jsonData.paragraph1);
+        if (jsonData.paragraph2) paragraphs.push(jsonData.paragraph2);
+        if (jsonData.paragraph3) paragraphs.push(jsonData.paragraph3);
+        
+        let body = paragraphs.join('\n\n');
+        if (jsonData.closing) {
+          let closing = jsonData.closing;
+          if (closing.includes('Best regards,') && !closing.includes('\n')) {
+            closing = closing.replace(/Best regards,\s*/i, 'Best regards,\n');
+          }
+          body += '\n\n' + closing;
+        }
+        
+        // Convert to HTML
+        const htmlBody = body
+          .split(/\n\n/)
+          .map(p => p.trim())
+          .filter(Boolean)
+          .map(p => {
+            const withLineBreaks = p.replace(/\n/g, '<br>');
+            return `<p style="margin: 0 0 16px 0;">${withLineBreaks}</p>`;
+          })
+          .join('');
+        
+        return { subject, html: htmlBody };
+      } else {
+        // Fallback: treat as plain text
+        const subject = 'Energy Solutions';
+        const html = '<p>' + (result || 'Email content').replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+        return { subject, html };
+      }
+    } catch (error) {
+      console.error('Error formatting generated email:', error);
+      return { subject: 'Energy Solutions', html: '<p>Error generating email content.</p>' };
+    }
+  }
+
+    // AI bar interactions (event delegation per step-card)
+    container.querySelectorAll('.step-card .ai-bar').forEach(bar => {
+      // Get card reference for this bar
+      const card = bar.closest('.step-card');
+      
+      // AI suggestion buttons
+      bar.querySelectorAll('.ai-suggestion').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const prompt = btn.getAttribute('data-prompt');
+          const textarea = bar.querySelector('.ai-prompt');
+          if (textarea && prompt) {
+            textarea.value = prompt;
+            textarea.focus();
+          }
+        });
+      });
+
+      // AI generate buttons
+      bar.querySelectorAll('.ai-generate').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const textarea = bar.querySelector('.ai-prompt');
+          const status = bar.querySelector('.ai-status');
+          const mode = btn.getAttribute('data-mode');
+          
+          if (!textarea) return;
+          
+          // Check if we're in Preview tab
+          const previewTab = card.querySelector('.tab[data-tab="preview"]');
+          const isPreviewActive = previewTab?.classList.contains('active');
+          
+          if (!isPreviewActive) {
+            if (status) status.textContent = 'Switch to Preview tab to generate';
+            return;
+          }
+          
+          // Get step data and selected contact
+          const stepId = card.getAttribute('data-id');
+          const step = state.currentSequence?.steps?.find(s => s.id === stepId);
+          const selectedContact = step?.data?.previewContact;
+          
+          if (!selectedContact) {
+            if (status) status.textContent = 'Please select a contact in Preview tab';
+            return;
+          }
+          
+          const prompt = textarea.value.trim();
+          if (!prompt) {
+            if (status) status.textContent = 'Please enter a prompt';
+            return;
+          }
+          
+          if (status) status.textContent = 'Generating preview...';
+          btn.disabled = true;
+          
+          try {
+            // Call AI generation API with selected contact data
+            const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+            const response = await fetch(`${base}/api/perplexity-email`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                prompt: prompt,
+                mode: mode,
+                recipient: {
+                  name: selectedContact.full_name || selectedContact.name || '',
+                  firstName: selectedContact.first_name || selectedContact.firstName || (selectedContact.name?.split(' ')[0] || ''),
+                  lastName: selectedContact.last_name || selectedContact.lastName || (selectedContact.name?.split(' ').slice(1).join(' ') || ''),
+                  company: selectedContact.company || selectedContact.accountName || '',
+                  email: selectedContact.email || '',
+                  title: selectedContact.title || selectedContact.job || ''
+                },
+                senderName: 'Power Choosers Team' // Could get from settings
+              })
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              
+              // Update PREVIEW, not editor
+              const previewBodyEl = card.querySelector('.preview-body');
+              const previewSubjectEl = card.querySelector('.preview-subject');
+              
+              // Format the result similar to email-compose-global.js
+              let html = '';
+              let subject = '';
+              
+              if (result.templateType) {
+                // HTML template format
+                const formatted = formatTemplatedEmail(result.output || result, selectedContact, result.templateType);
+                subject = formatted.subject;
+                html = formatted.html;
+              } else {
+                // Standard format
+                const formatted = formatGeneratedEmail(result.output || result, selectedContact, mode);
+                subject = formatted.subject;
+                html = formatted.html;
+              }
+              
+              if (previewBodyEl && html) {
+                previewBodyEl.innerHTML = html;
+              }
+              if (previewSubjectEl && subject) {
+                previewSubjectEl.textContent = subject;
+              }
+              
+              if (status) status.textContent = 'Preview generated!';
+            } else {
+              const errorData = await response.json().catch(() => ({}));
+              if (status) status.textContent = errorData.error || 'Generation failed';
+            }
+          } catch (error) {
+            console.error('AI generation error:', error);
+            if (status) status.textContent = 'Generation error: ' + error.message;
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+      
+      // Update AI bar status based on tab and contact selection
+      const updateAIBarStatus = () => {
+        const card = bar.closest('.step-card');
+        const previewTab = card?.querySelector('.tab[data-tab="preview"]');
+        const isPreviewActive = previewTab?.classList.contains('active');
+        const status = bar.querySelector('.ai-status');
+        const stepId = card?.getAttribute('data-id');
+        const step = state.currentSequence?.steps?.find(s => s.id === stepId);
+        const hasContact = step?.data?.previewContact;
+        
+        if (status) {
+          if (isPreviewActive) {
+            status.textContent = hasContact ? 'Ready to generate preview' : 'Select a contact to generate preview';
+          } else {
+            status.textContent = 'Switch to Preview tab to generate';
+          }
+        }
+      };
+      
+      // Watch for tab changes
+      card?.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          setTimeout(updateAIBarStatus, 100);
+        });
+      });
+      
+      // Watch for contact selection changes
+      const contactInput = card?.querySelector('.preview-contact-input');
+      if (contactInput) {
+        contactInput.addEventListener('input', () => {
+          setTimeout(updateAIBarStatus, 100);
+        });
+      }
+      
+      // Initial status update
+      setTimeout(updateAIBarStatus, 100);
     });
 
     // Formatting bar interactions (event delegation per step-card)
@@ -5179,34 +5766,6 @@ class FreeSequenceAutomation {
       font-weight: 500;
     }
     
-    .btn-primary {
-      background: #007bff;
-      color: white;
-    }
-    
-    .btn-secondary {
-      background: #6c757d;
-      color: white;
-    }
-    
-    .btn-outline {
-      background: transparent;
-      color: #007bff;
-      border: 1px solid #007bff;
-    }
-    
-    .btn-primary:hover {
-      background: #0056b3;
-    }
-    
-    .btn-secondary:hover {
-      background: #545b62;
-    }
-    
-    .btn-outline:hover {
-      background: #007bff;
-      color: white;
-    }
   `;
   document.head.appendChild(style);
 
@@ -5214,6 +5773,84 @@ class FreeSequenceAutomation {
   window.SequenceBuilder = {
     show,
     startSequenceForContact,
-    createTasksFromSequence
+    createTasksFromSequence,
+    cleanupOrphanedSequenceMembers: async (sequenceId) => {
+      // Cleanup function to remove orphaned sequenceMembers records (contacts that don't exist)
+      if (!sequenceId) {
+        console.error('[SequenceBuilder] cleanupOrphanedSequenceMembers requires a sequenceId');
+        console.log('[SequenceBuilder] Usage: await window.SequenceBuilder.cleanupOrphanedSequenceMembers("seq-1755363808050")');
+        return { cleaned: 0, errors: 0 };
+      }
+      
+      const db = window.firebaseDB;
+      if (!db) {
+        console.error('[SequenceBuilder] Firebase not available');
+        return { cleaned: 0, errors: 0 };
+      }
+      
+        try {
+          // Get all sequenceMembers for this sequence
+          const membersQuery = await db.collection('sequenceMembers')
+            .where('sequenceId', '==', sequenceId)
+            .where('targetType', '==', 'people')
+            .get();
+          
+          if (membersQuery.size === 0) {
+            return { cleaned: 0, errors: 0 };
+          }
+          
+          const orphanedIds = [];
+          const deletePromises = [];
+          
+          // Check each member to see if the contact exists
+          for (const memberDoc of membersQuery.docs) {
+            const memberData = memberDoc.data();
+            const targetId = memberData.targetId;
+            
+            if (!targetId) {
+              orphanedIds.push(memberDoc.id);
+              deletePromises.push(memberDoc.ref.delete());
+              continue;
+            }
+            
+            // Check if contact exists
+            const contactDoc = await db.collection('contacts').doc(targetId).get();
+            
+            if (!contactDoc.exists) {
+              orphanedIds.push(memberDoc.id);
+              deletePromises.push(memberDoc.ref.delete());
+            }
+          }
+          
+          // Delete all orphaned records
+          if (deletePromises.length > 0) {
+            await Promise.all(deletePromises);
+            
+            // Update stats.active and recordCount
+            const remainingMembers = membersQuery.size - deletePromises.length;
+            await db.collection('sequences').doc(sequenceId).update({
+              "stats.active": remainingMembers,
+              recordCount: remainingMembers
+            });
+            
+            return { cleaned: deletePromises.length, errors: 0 };
+          } else {
+            return { cleaned: 0, errors: 0 };
+          }
+      } catch (err) {
+        console.error('[SequenceBuilder] Cleanup failed:', err);
+        return { cleaned: 0, errors: 1 };
+      }
+    }
+  };
+  
+  // Also create a standalone global function for easier access
+  window.cleanupOrphanedSequenceMembers = async (sequenceId) => {
+    if (window.SequenceBuilder && typeof window.SequenceBuilder.cleanupOrphanedSequenceMembers === 'function') {
+      return await window.SequenceBuilder.cleanupOrphanedSequenceMembers(sequenceId);
+    } else {
+      console.error('[SequenceBuilder] SequenceBuilder not available. Make sure you are on the sequence builder page.');
+      return { cleaned: 0, errors: 1 };
+    }
   };
 })();

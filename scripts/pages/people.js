@@ -1832,7 +1832,11 @@
       state.totalCount = contactsData.length;
       if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getTotalCount === 'function') {
         window.BackgroundContactsLoader.getTotalCount()
-          .then((cnt) => { state.totalCount = cnt; })
+          .then((cnt) => { 
+            state.totalCount = cnt; 
+            // Re-render pagination when total count is updated
+            renderPagination();
+          })
           .catch((error) => { console.warn('[People] Failed to get total count, keeping loaded count:', error); });
       }
       
@@ -4579,8 +4583,8 @@
   }
 
   function getTotalPages() {
-    // In browse mode, use loaded data length; in search mode, use filtered results
-    const totalRecords = state.searchMode ? state.filtered.length : state.data.length;
+    // In browse mode, use total count from database; in search mode, use filtered results
+    const totalRecords = state.searchMode ? state.filtered.length : (state.totalCount || state.data.length);
     return Math.max(1, Math.ceil(totalRecords / state.pageSize));
   }
 
@@ -4591,6 +4595,17 @@
     if (state.currentPage > totalPages) state.currentPage = totalPages;
     const start = (state.currentPage - 1) * state.pageSize;
     const end = Math.min(total, start + state.pageSize);
+    
+    // Check if we need to load more data for this page
+    const neededIndex = (state.currentPage - 1) * state.pageSize + state.pageSize - 1;
+    if (neededIndex >= state.data.length && state.hasMore && !state.searchMode) {
+      // Trigger data loading (but don't await to keep function synchronous)
+      loadMoreContacts().then(() => {
+        // Re-render after data is loaded
+        render();
+      });
+    }
+    
     return state.searchMode ? state.filtered.slice(start, end) : state.data.slice(start, end);
   }
 
@@ -4599,8 +4614,8 @@
     const totalPages = getTotalPages();
     const current = Math.min(state.currentPage, totalPages);
     state.currentPage = current;
-    // Show count based on current mode
-    const total = state.searchMode ? state.filtered.length : state.data.length;
+    // Show total count from database, not just loaded data
+    const total = state.searchMode ? state.filtered.length : (state.totalCount || state.data.length);
     const start = total === 0 ? 0 : (current - 1) * state.pageSize + 1;
     const end = total === 0 ? 0 : Math.min(total, current * state.pageSize);
 
