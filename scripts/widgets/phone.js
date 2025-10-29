@@ -14,6 +14,64 @@
   // Business phone number for fallback calls
   const DEFAULT_BUSINESS_E164 = '+18176630380';
   const BUSINESS_PHONE = '817-663-0380'; // legacy fallback without formatting
+  
+  // Get selected phone number from settings (for caller ID)
+  function getSelectedPhoneNumber() {
+    try {
+      // First try to get from SettingsPage instance
+      if (window.SettingsPage && window.SettingsPage.instance) {
+        const settings = window.SettingsPage.instance.getSettings();
+        if (settings && settings.twilioNumbers && settings.twilioNumbers.length > 0) {
+          // Use the first number as default, or allow user selection later
+          const selectedNumber = settings.twilioNumbers[0].number;
+          if (selectedNumber) {
+            // Normalize to E.164 format if needed
+            const normalized = normalizeToE164(selectedNumber);
+            if (normalized) return normalized;
+          }
+        }
+      }
+      
+      // Fallback to static method
+      const settings = window.SettingsPage?.getSettings?.();
+      if (settings && settings.twilioNumbers && settings.twilioNumbers.length > 0) {
+        const selectedNumber = settings.twilioNumbers[0].number;
+        if (selectedNumber) {
+          const normalized = normalizeToE164(selectedNumber);
+          if (normalized) return normalized;
+        }
+      }
+      
+      // Fallback to localStorage
+      const savedSettings = localStorage.getItem('crm-settings');
+      if (savedSettings) {
+        try {
+          const parsed = JSON.parse(savedSettings);
+          if (parsed.twilioNumbers && parsed.twilioNumbers.length > 0) {
+            const selectedNumber = parsed.twilioNumbers[0].number;
+            if (selectedNumber) {
+              const normalized = normalizeToE164(selectedNumber);
+              if (normalized) return normalized;
+            }
+          }
+        } catch(_) {}
+      }
+    } catch(_) {}
+    
+    // Final fallback to default
+    return getBusinessNumberE164();
+  }
+  
+  // Normalize phone number to E.164 format
+  function normalizeToE164(phone) {
+    if (!phone) return null;
+    const cleaned = String(phone).replace(/\D/g, '');
+    if (cleaned.length === 10) return `+1${cleaned}`;
+    if (cleaned.length === 11 && cleaned.startsWith('1')) return `+${cleaned}`;
+    if (String(phone).startsWith('+')) return String(phone);
+    return null;
+  }
+  
   function getBusinessNumberE164(){
     try {
       const arr = (window.CRM_BUSINESS_NUMBERS || []).filter(Boolean);
@@ -1590,9 +1648,9 @@
   }
 
   function getBusinessNumber() {
-    // Get the current business number from environment or default
-    // This will be dynamic when more numbers are added
-    return '817-663-0380'; // Default number for now
+    // Get the selected phone number from settings and format it
+    const selected = getSelectedPhoneNumber();
+    return formatPhoneNumber(selected);
   }
 
   function formatPhoneNumber(phone) {
@@ -1613,13 +1671,16 @@
     card.id = WIDGET_ID;
 
     const businessNumber = getBusinessNumber();
-    const formattedNumber = formatPhoneNumber(businessNumber);
+    const formattedNumber = businessNumber; // Already formatted by getBusinessNumber()
 
     card.innerHTML = `
       <div class="widget-card-header">
         <div class="phone-title-container">
           <h4 class="widget-title">Phone</h4>
-          <span class="my-number-info">• My Number: ${formattedNumber}</span>
+          <div class="my-number-badge">
+            <div class="my-number-label">My Number</div>
+            <div class="my-number-value">${formattedNumber}</div>
+          </div>
         </div>
         <button type="button" class="btn-text notes-close phone-close" aria-label="Close" data-pc-title="Close" aria-describedby="pc-tooltip">×</button>
       </div>
@@ -2405,10 +2466,16 @@
           }
         }
         
+        // Get selected phone number from settings for caller ID
+        const selectedCallerId = getSelectedPhoneNumber();
+        console.debug('[Phone] Using caller ID:', selectedCallerId);
+        
         // Make the call with recording enabled via TwiML app
+        // Pass From parameter so TwiML webhook can use it as callerId
         currentCall = await device.connect({
           params: {
-            To: number
+            To: number,
+            From: selectedCallerId  // Pass selected Twilio number as caller ID
           }
         });
         // Store outbound connection globally for unified cleanup paths
@@ -2692,13 +2759,17 @@
       } else {
         // On CRM - use Twilio API to call your phone and connect to target
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        
+        // Get selected phone number from settings for caller ID
+        const selectedCallerId = getSelectedPhoneNumber();
+        
         const callData = {
-          from: BUSINESS_PHONE, // Your business number
+          from: selectedCallerId, // Use selected Twilio number from settings
           to: number, // Target number to call
           agent_phone: '+19728342317' // Your personal phone that will ring first
         };
         
-        console.debug('[Phone] Making CRM API call:', callData);
+        console.debug('[Phone] Making CRM API call with caller ID:', selectedCallerId, callData);
         
         const r = await fetch(`${base}/api/twilio/call`, {
           method: 'POST',
@@ -2734,9 +2805,9 @@
         const timestamp = new Date().toISOString();
         
         // For incoming calls, use the caller's number as 'from' and business number as 'to'
-        // For outgoing calls, use business number as 'from' and target number as 'to'
+        // For outgoing calls, use selected phone number as 'from' and target number as 'to'
         const isIncoming = callType === 'incoming';
-        const biz = getBusinessNumberE164();
+        const biz = isIncoming ? getBusinessNumberE164() : getSelectedPhoneNumber();
         const callFrom = isIncoming ? (fromNumber || phoneNumber) : biz;
         const callTo = isIncoming ? biz : phoneNumber;
         
