@@ -107,6 +107,7 @@ class SettingsPage {
                     autoRejectAbove: 7.0
                 },
                 twilioNumbers: [],
+                selectedPhoneNumber: null, // Currently selected phone number for calls
                 general: {
                     // Google-synced profile (auto-filled)
                     firstName: '',
@@ -333,6 +334,8 @@ class SettingsPage {
                 this.editPhoneNumber(e.target.closest('.phone-number-item'));
             } else if (e.target.matches('[data-action="remove"]')) {
                 this.removePhoneNumber(e.target.closest('.phone-number-item'));
+            } else if (e.target.matches('[data-action="select"]')) {
+                this.selectPhoneNumber(e.target.closest('.phone-number-item'));
             }
         });
 
@@ -889,18 +892,22 @@ class SettingsPage {
             return;
         }
 
-        phoneList.innerHTML = this.state.settings.twilioNumbers.map((phone, index) => `
-            <div class="phone-number-item" data-index="${index}">
-                <div class="phone-info">
-                    <span class="phone-number">${phone.number}</span>
-                    <span class="phone-label">${phone.label}</span>
+        phoneList.innerHTML = this.state.settings.twilioNumbers.map((phone, index) => {
+            const isSelected = this.state.settings.selectedPhoneNumber === phone.number;
+            return `
+                <div class="phone-number-item ${isSelected ? 'selected' : ''}" data-index="${index}">
+                    <div class="phone-info">
+                        <span class="phone-number">${phone.number}</span>
+                        <span class="phone-label">${phone.label}${isSelected ? ' (Current)' : ''}</span>
+                    </div>
+                    <div class="phone-actions">
+                        ${!isSelected ? `<button class="btn-small btn-primary" data-action="select">Set as Current</button>` : ''}
+                        <button class="btn-small btn-secondary" data-action="edit">Edit</button>
+                        <button class="btn-small btn-danger" data-action="remove">Remove</button>
+                    </div>
                 </div>
-                <div class="phone-actions">
-                    <button class="btn-small btn-secondary" data-action="edit">Edit</button>
-                    <button class="btn-small btn-danger" data-action="remove">Remove</button>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     async handleImageUpload(event) {
@@ -1245,9 +1252,29 @@ class SettingsPage {
         const phone = this.state.settings.twilioNumbers[index];
         
         if (confirm(`Are you sure you want to remove ${phone.label} (${phone.number})?`)) {
+            // If removing the selected number, clear the selection
+            if (this.state.settings.selectedPhoneNumber === phone.number) {
+                this.state.settings.selectedPhoneNumber = null;
+            }
+            
             this.state.settings.twilioNumbers.splice(index, 1);
             this.renderPhoneNumbers();
             this.markDirty();
+        }
+    }
+
+    selectPhoneNumber(phoneItem) {
+        const index = parseInt(phoneItem.dataset.index);
+        const phone = this.state.settings.twilioNumbers[index];
+        
+        // Set this number as the selected one
+        this.state.settings.selectedPhoneNumber = phone.number;
+        this.renderPhoneNumbers();
+        this.markDirty();
+        
+        // Show success message
+        if (window.showToast) {
+            window.showToast(`${phone.label} (${phone.number}) is now your current number`, 'success');
         }
     }
 

@@ -21,9 +21,12 @@
       // First try to get from SettingsPage instance
       if (window.SettingsPage && window.SettingsPage.instance) {
         const settings = window.SettingsPage.instance.getSettings();
-        if (settings && settings.twilioNumbers && settings.twilioNumbers.length > 0) {
-          // Use the first number as default, or allow user selection later
-          const selectedNumber = settings.twilioNumbers[0].number;
+        if (settings) {
+          // Use selectedPhoneNumber if set, otherwise fallback to first number
+          let selectedNumber = settings.selectedPhoneNumber;
+          if (!selectedNumber && settings.twilioNumbers && settings.twilioNumbers.length > 0) {
+            selectedNumber = settings.twilioNumbers[0].number;
+          }
           if (selectedNumber) {
             // Normalize to E.164 format if needed
             const normalized = normalizeToE164(selectedNumber);
@@ -34,8 +37,11 @@
       
       // Fallback to static method
       const settings = window.SettingsPage?.getSettings?.();
-      if (settings && settings.twilioNumbers && settings.twilioNumbers.length > 0) {
-        const selectedNumber = settings.twilioNumbers[0].number;
+      if (settings) {
+        let selectedNumber = settings.selectedPhoneNumber;
+        if (!selectedNumber && settings.twilioNumbers && settings.twilioNumbers.length > 0) {
+          selectedNumber = settings.twilioNumbers[0].number;
+        }
         if (selectedNumber) {
           const normalized = normalizeToE164(selectedNumber);
           if (normalized) return normalized;
@@ -47,12 +53,13 @@
       if (savedSettings) {
         try {
           const parsed = JSON.parse(savedSettings);
-          if (parsed.twilioNumbers && parsed.twilioNumbers.length > 0) {
-            const selectedNumber = parsed.twilioNumbers[0].number;
-            if (selectedNumber) {
-              const normalized = normalizeToE164(selectedNumber);
-              if (normalized) return normalized;
-            }
+          let selectedNumber = parsed.selectedPhoneNumber;
+          if (!selectedNumber && parsed.twilioNumbers && parsed.twilioNumbers.length > 0) {
+            selectedNumber = parsed.twilioNumbers[0].number;
+          }
+          if (selectedNumber) {
+            const normalized = normalizeToE164(selectedNumber);
+            if (normalized) return normalized;
           }
         } catch(_) {}
       }
