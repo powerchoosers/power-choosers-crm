@@ -13,11 +13,23 @@ export default async function handler(req, res) {
         // Read params from body (POST) or query (GET)
         const src = req.method === 'POST' ? (req.body || {}) : (req.query || {});
         const To = src.To || src.to; // For inbound, this is typically your Twilio number
-        const From = src.From || src.from; // For inbound, this is the caller's number
+        const From = src.From || src.from; // For inbound, this is the caller's number; for outbound, this is the selected caller ID
         const CallSid = src.CallSid || src.callSid;
         
-        // Your business phone number for caller ID
+        // Dynamic caller ID: Use From parameter if provided (for outbound calls), otherwise use fallback
+        // For inbound calls, From will be the caller's number, so we'll use businessNumber as fallback
         const businessNumber = process.env.TWILIO_PHONE_NUMBER || '+18176630380';
+        
+        // Determine caller ID: for outbound browser calls, From will be the selected Twilio number
+        // For inbound calls, From will be the caller's number, so we check if it matches our business number
+        const digits = (s) => (s || '').toString().replace(/\D/g, '');
+        const toDigits = digits(To);
+        const businessDigits = digits(businessNumber);
+        const isInboundToBusiness = toDigits && businessDigits && toDigits === businessDigits;
+        
+        // For outbound calls, use From as callerId (this is the selected Twilio number from settings)
+        // For inbound calls, use businessNumber as callerId when dialing to browser client
+        const callerIdForDial = isInboundToBusiness ? businessNumber : (From || businessNumber);
         
         // Ensure absolute base URL for Twilio callbacks (prefer headers)
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
@@ -25,12 +37,7 @@ export default async function handler(req, res) {
         const envBase = process.env.PUBLIC_BASE_URL || '';
         const base = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm-792458658491.us-south1.run.app');
 
-        const digits = (s) => (s || '').toString().replace(/\D/g, '');
-        const toDigits = digits(To);
-        const businessDigits = digits(businessNumber);
-
-        const isInboundToBusiness = toDigits && businessDigits && toDigits === businessDigits;
-        console.log(`[Voice Webhook] From: ${From || 'N/A'} To: ${To || 'N/A'} CallSid: ${CallSid || 'N/A'} inbound=${isInboundToBusiness}`);
+        console.log(`[Voice Webhook] From: ${From || 'N/A'} To: ${To || 'N/A'} CallSid: ${CallSid || 'N/A'} inbound=${isInboundToBusiness} callerId=${callerIdForDial}`);
 
         // Create TwiML response
         const twiml = new VoiceResponse();
@@ -69,8 +76,9 @@ export default async function handler(req, res) {
             console.log(`[Voice] Generated TwiML to dial <Client>agent</Client> with callerId: ${From || businessNumber}, originalCaller: ${From}`);
         } else if (To) {
             // OUTBOUND CALLBACK SCENARIO: Dial specific number provided
+            // Use dynamic caller ID from From parameter (selected Twilio number from settings)
             const dial = twiml.dial({
-                callerId: businessNumber,
+                callerId: callerIdForDial, // Use selected number from settings, fallback to businessNumber
                 timeout: 30,
                 answerOnBridge: true,
                 hangupOnStar: false,
@@ -85,12 +93,12 @@ export default async function handler(req, res) {
                 recordingStatusCallbackMethod: 'POST'
             });
             dial.number(To);
-            console.log(`[Voice] Generated TwiML to dial number: ${To}`);
+            console.log(`[Voice] Generated TwiML to dial number: ${To} with callerId: ${callerIdForDial}`);
         } else {
             // Fallback: no specific target
             twiml.say('Please hold while we try to connect you.');
             const dial = twiml.dial({
-                callerId: businessNumber,
+                callerId: callerIdForDial, // Use selected number from settings, fallback to businessNumber
                 timeout: 30,
                 answerOnBridge: true,
                 hangupOnStar: false,

@@ -33,7 +33,8 @@ const handler = async function handler(req, res) {
         // Twilio credentials from environment
         const accountSid = process.env.TWILIO_ACCOUNT_SID;
         const authToken = process.env.TWILIO_AUTH_TOKEN;
-        const twilioPhone = process.env.TWILIO_PHONE_NUMBER || '+18176630380';
+        // Use 'from' parameter if provided (selected Twilio number), otherwise fallback to env var
+        const twilioPhone = from || process.env.TWILIO_PHONE_NUMBER || '+18176630380';
         const agentPhone = agent_phone || '+19728342317'; // Your personal phone
         
         if (!accountSid || !authToken) {
@@ -51,10 +52,13 @@ const handler = async function handler(req, res) {
         // Always use production URL for webhooks to avoid preview-domain auth (401)
         const baseUrl = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
         
+        // Build bridge URL with target and callerId (selected Twilio number)
+        const bridgeUrl = `${baseUrl}/api/twilio/bridge?target=${encodeURIComponent(to)}&callerId=${encodeURIComponent(twilioPhone)}`;
+        
         const call = await client.calls.create({
             from: twilioPhone,
             to: agentPhone, // Call your phone first
-            url: `${baseUrl}/api/twilio/bridge?target=${encodeURIComponent(to)}`,
+            url: bridgeUrl,
             method: 'POST',
             statusCallback: `${baseUrl}/api/twilio/status`,
             statusCallbackMethod: 'POST',
