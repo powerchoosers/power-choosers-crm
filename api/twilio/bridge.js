@@ -13,10 +13,10 @@ export default async function handler(req, res) {
     }
     
     try {
-        const { target } = req.query;
+        const { target, callerId } = req.query; // Accept callerId from query params
         const { CallSid, From, To } = req.body;
         
-        console.log(`[Bridge] Connecting agent call to target: ${target}, CallSid: ${CallSid}`);
+        console.log(`[Bridge] Connecting agent call to target: ${target}, CallSid: ${CallSid}, callerId: ${callerId || 'default'}`);
         
         // Ensure absolute base URL for Twilio callbacks (prefer headers)
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
@@ -36,17 +36,19 @@ export default async function handler(req, res) {
             return;
         }
         
+        // Use dynamic caller ID: callerId from query param, fallback to env var
+        const dynamicCallerId = callerId || process.env.TWILIO_PHONE_NUMBER || '+18176630380';
+        
         // Seed the Calls API with correct phone context for this CallSid
         const apiCallStart = Date.now();
         try {
             const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
-            const twilioBiz = process.env.TWILIO_PHONE_NUMBER || '+18176630380';
-            const businessPhone = twilioBiz;
+            const businessPhone = dynamicCallerId;
             const target10 = norm(target);
             const payload = {
                 callSid: CallSid,
                 to: target,
-                from: twilioBiz,
+                from: dynamicCallerId, // Use dynamic caller ID
                 status: 'in-progress',
                 targetPhone: target10,
                 businessPhone
@@ -69,7 +71,7 @@ export default async function handler(req, res) {
         
         // Dial the target number immediately without any intro message
         const dial = twiml.dial({
-            callerId: process.env.TWILIO_PHONE_NUMBER || '+18176630380',
+            callerId: dynamicCallerId, // Use dynamic caller ID from query param
             timeout: 30,
             answerOnBridge: true,  // This ensures proper audio bridging
             hangupOnStar: false,
