@@ -1373,20 +1373,24 @@
           html += `<td>${title}</td>`;
           break;
         case 'company':
-          // Get domain for favicon (similar to people page logic)
-          const favDomain = (() => {
-            // Try to find the account for this company to get its domain
-            const account = state.dataAccounts.find(acc => acc.accountName === company || acc.name === company);
-            if (account) {
-              let d = String(account.domain || account.website || '').trim();
-              if (/^https?:\/\//i.test(d)) {
-                try { d = new URL(d).hostname; } catch(_) { d = d.replace(/^https?:\/\//i, '').split('/')[0]; }
-              }
-              return d ? d.replace(/^www\./i, '') : '';
+          // Build favicon/logo HTML with logoUrl priority and safe click behavior
+          const faviconHTML = (() => {
+            const acct = state.dataAccounts.find(acc => acc.accountName === company || acc.name === company) || {};
+            let domain = String(acct.domain || acct.website || '').trim();
+            if (/^https?:\/\//i.test(domain)) {
+              try { domain = new URL(domain).hostname; } catch(_) { domain = domain.replace(/^https?:\/\//i, '').split('/')[0]; }
+            }
+            domain = domain ? domain.replace(/^www\./i, '') : '';
+            const logoUrl = acct.logoUrl || acct.logoURL || '';
+            if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+              return window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
+            }
+            if (domain) {
+              return `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=${escapeHtml(domain)}" alt="" aria-hidden="true" referrerpolicy="no-referrer" loading="lazy" style="pointer-events:none" onerror="this.style.display='none'" />`;
             }
             return '';
           })();
-          html += `<td><a href="#" class="company-link" data-company-name="${escapeHtml(company)}"><span class="company-cell__wrap">${favDomain ? (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateFaviconHTML === 'function' ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 32) : `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=${escapeHtml(favDomain)}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.display='none'" />`) : ''}<span class="company-name">${company}</span></span></a></td>`;
+          html += `<td><a href="#" class="company-link" data-company-name="${escapeHtml(company)}"><span class="company-cell__wrap">${faviconHTML}<span class="company-name">${company}</span></span></a></td>`;
           break;
         case 'email':
           html += `<td class="email-link" data-email="${escapeHtml(email)}" data-name="${escapeHtml(fullName)}">${email}</td>`;

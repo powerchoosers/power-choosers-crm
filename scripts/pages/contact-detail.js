@@ -6780,7 +6780,9 @@ async function createContactSequenceThenAdd(name) {
           
           await db.collection('lists').doc(listId).update({
             recordCount: increment,
-            updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp || new Date()
+            updatedAt: (window.firebase?.firestore?.FieldValue?.serverTimestamp
+              ? window.firebase.firestore.FieldValue.serverTimestamp()
+              : new Date())
           });
           
           console.log('[ContactDetail] Updated list recordCount for', listId);
