@@ -219,13 +219,19 @@ function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory 
     out = out.replace(/your industry/gi, industry);
   }
 
-  // If size is not small, avoid "small business" assumptions
-  if (sizeCategory && sizeCategory !== 'small') {
+  // If size is unknown OR not small, avoid "small business" assumptions
+  if (!sizeCategory || sizeCategory !== 'small') {
+    const neutralGroup = industry ? `companies in ${industry}` : 'companies like yours';
     out = out
       .replace(/\bAs a small company\b/gi, 'As a team')
       .replace(/\bAs a small business\b/gi, 'As a team')
-      .replace(/\bsmall businesses like yours\b/gi, industry ? `companies in ${industry}` : 'teams like yours')
-      .replace(/\bsmall business like yours\b/gi, industry ? `companies in ${industry}` : 'teams like yours');
+      .replace(/\bfor a small company like yours\b/gi, `for ${neutralGroup}`)
+      .replace(/\bfor small businesses like yours\b/gi, `for ${neutralGroup}`)
+      .replace(/\bfor a small business like yours\b/gi, `for ${neutralGroup}`)
+      .replace(/\bsmall businesses like yours\b/gi, neutralGroup)
+      .replace(/\bsmall business like yours\b/gi, neutralGroup)
+      .replace(/\bfor small business\b/gi, 'for businesses')
+      .replace(/\bfor a small company\b/gi, 'for companies');
   }
 
   return out;
@@ -1679,6 +1685,8 @@ STYLE RULES:
   - Use first-person voice ("we"/"I") instead of brand-first phrasing.
   - Avoid starting any sentence with "At Power Choosers," or "Power Choosers helps".
   - Prefer "We help…" / "I help…".
+  - Avoid assumptions about company size. If size is unknown, use neutral language ("companies like yours") not "small business".
+  - If role and tenure are available (from LinkedIn), you may include them naturally (e.g., "In your 3 years as General Manager").
 
 SUBJECT LINE RULES:
 - Target: 3-4 words (sweet spot for engagement)
@@ -2175,6 +2183,15 @@ return;
           }
         }
         
+        // Final language polishing: de-salesify and personalize industry/size
+        const sizeCategory = (recipient?.account ? (recipient.account.annualUsage ? (recipient.account.annualUsage < 500000 ? 'small' : (recipient.account.annualUsage < 5000000 ? 'medium' : 'large')) : null) : null);
+        const personalizeCtx = { industry: recipient?.industry || null, companyName: recipient?.company || null, sizeCategory };
+        if (jsonData.greeting) jsonData.greeting = deSalesify(personalizeIndustryAndSize(jsonData.greeting, personalizeCtx));
+        if (jsonData.opening_hook) jsonData.opening_hook = deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx));
+        if (jsonData.value_proposition) jsonData.value_proposition = deSalesify(personalizeIndustryAndSize(jsonData.value_proposition, personalizeCtx));
+        if (jsonData.social_proof_optional) jsonData.social_proof_optional = deSalesify(personalizeIndustryAndSize(jsonData.social_proof_optional, personalizeCtx));
+        if (jsonData.cta_text) jsonData.cta_text = deSalesify(personalizeIndustryAndSize(jsonData.cta_text, personalizeCtx));
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ 
           ok: true, 
@@ -2198,9 +2215,13 @@ return;
     
     // Standard mode
     res.writeHead(200, { 'Content-Type': 'application/json' });
+    // Standard mode: de-salesify and personalize industry/size in the raw content string
+    const sizeCategoryStd = (recipient?.account ? (recipient.account.annualUsage ? (recipient.account.annualUsage < 500000 ? 'small' : (recipient.account.annualUsage < 5000000 ? 'medium' : 'large')) : null) : null);
+    const personalizeCtxStd = { industry: recipient?.industry || null, companyName: recipient?.company || null, sizeCategory: sizeCategoryStd };
+    const polished = deSalesify(personalizeIndustryAndSize(content, personalizeCtxStd));
     return res.end(JSON.stringify({ 
       ok: true, 
-      output: deSalesify(content),
+      output: polished,
       citations: citations
     }));
     
