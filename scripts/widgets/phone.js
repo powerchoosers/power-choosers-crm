@@ -911,6 +911,42 @@
       }
       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (base) {
+        // Try memoized successful route first to reduce extra calls/costs
+        try {
+          const memo = window.__pcPhoneSearchRoute;
+          if (memo && memo.url && memo.method) {
+            const primaryCandidate = candidates[0] || digits;
+            const url = memo.url.replace(/\{phone\}/g, encodeURIComponent(primaryCandidate));
+            const opt = memo.method === 'POST' ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(memo.bodyTemplate ? { ...memo.bodyTemplate, phone: primaryCandidate } : { phone: primaryCandidate }) } : undefined;
+            const resp = await fetch(url, opt);
+            if (resp && resp.ok) {
+              const j = await resp.json().catch(() => ({}));
+              if (j) {
+                let c = j.contact || (Array.isArray(j.contacts) && j.contacts[0]) || j.person || ((j.name || j.title || j.email) ? j : null);
+                let a = j.account || (Array.isArray(j.accounts) && j.accounts[0]) || j.company || ((j.company || j.accountName || j.domain) ? j : null);
+                if (c || a) {
+                  const resolved = {
+                    ...meta,
+                    name: (c && (c.name || ((c.firstName||c.first_name||'') + ' ' + (c.lastName||c.last_name||'')).trim())) || '',
+                    account: (a && (a.name || a.accountName || a.company || '')) || (c && (c.account || c.company || '')) || '',
+                    title: (c && (c.title || c.jobTitle || c.job_title)) || '',
+                    city: (c && c.city) || (a && a.city) || '',
+                    state: (c && c.state) || (a && a.state) || '',
+                    domain: (c && (c.domain || (c.email||'').split('@')[1])) || (a && (a.domain || a.website)) || '',
+                    logoUrl: (a && a.logoUrl) || '',
+                    contactId: (c && (c.id || c.contactId || c._id)) || null,
+                    accountId: (a && (a.id || a.accountId || a._id)) || null
+                  };
+                  console.debug('[Phone] Resolved metadata (memoized route):', { url, resolved });
+                  return resolved;
+                }
+              }
+            } else {
+              // Invalidate memo on failure
+              window.__pcPhoneSearchRoute = null;
+            }
+          }
+        } catch(_) { /* ignore memo errors */ }
         // Try multiple likely routes and payloads to avoid 404s when backend changes
         async function tryFetches() {
           const routes = [];
@@ -962,6 +998,15 @@
                   accountId: (a && (a.id || a.accountId || a._id)) || null
                 };
                 console.debug('[Phone] Resolved metadata from CRM (flex routes):', { route: r.url, resolved });
+                // Remember a winning route to reduce future attempts
+                try {
+                  if (r.method === 'GET') {
+                    // Store a template with a placeholder token to inject future phones
+                    window.__pcPhoneSearchRoute = { method: 'GET', url: r.url.replace(/(phone=)[^&]+/, '$1{phone}') };
+                  } else {
+                    window.__pcPhoneSearchRoute = { method: 'POST', url: r.url, bodyTemplate: (typeof r.body === 'object' && r.body && r.body.query) ? { query: {} } : {} };
+                  }
+                } catch(_) {}
                 return resolved;
               }
             } catch(_) { /* try next */ }
@@ -1710,10 +1755,7 @@
       <div class="widget-card-header">
         <div class="phone-title-container">
           <h4 class="widget-title">Phone</h4>
-          <div class="my-number-badge">
-            <div class="my-number-label">My Number</div>
-            <div class="my-number-value">${formattedNumber}</div>
-          </div>
+          <div class="my-number-badge">My Number · ${formattedNumber}</div>
         </div>
         <button type="button" class="btn-text notes-close phone-close" aria-label="Close" data-pc-title="Close" aria-describedby="pc-tooltip">×</button>
       </div>

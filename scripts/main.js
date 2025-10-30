@@ -1,6 +1,37 @@
 // Power Choosers CRM - Main JavaScript Functionality
 // Strategic navigation and interactive features
 
+(function suppressNoisyFirestoreHandshakeErrors() {
+	try {
+		const shouldSuppress = localStorage.getItem('pc-suppress-fs-400') !== 'false';
+		if (!shouldSuppress) return;
+		const originalConsoleError = window.console && window.console.error ? window.console.error.bind(window.console) : null;
+		if (originalConsoleError) {
+			window.console.error = function (...args) {
+				try {
+					const text = args.map((a) => {
+						if (a && a.message) return String(a.message);
+						if (a && a.stack) return String(a.stack);
+						return String(a);
+					}).join(' ');
+					// Hide Firestore WebChannel Listen/channel 400 noise only
+					if (/google\.firestore\.v1\.Firestore\/Listen\/channel|WebChannel.*400|Listen\/channel.*400/i.test(text)) return;
+				} catch (_) { /* noop */ }
+			return originalConsoleError.apply(this, args);
+			};
+		}
+		// Also prevent unhandledrejection spam from the same source (without masking real errors)
+		window.addEventListener('unhandledrejection', (e) => {
+			try {
+				const msg = String((e && e.reason && (e.reason.message || e.reason)) || '');
+				if (/google\.firestore\.v1\.Firestore\/Listen\/channel|WebChannel.*400|Listen\/channel.*400/i.test(msg)) {
+					e.preventDefault();
+				}
+			} catch (_) { /* noop */ }
+		}, { capture: true });
+	} catch (_) { /* noop */ }
+})();
+
 class PowerChoosersCRM {
     constructor() {
         this.currentPage = 'dashboard';
@@ -5033,12 +5064,17 @@ window.__pcFaviconHelper = {
             const img = document.getElementById(containerId);
             if (!img) return;
             const parent = img.parentNode;
-            const html = this.generateFaviconHTML(domain, size);
-            const div = document.createElement('div');
-            div.innerHTML = html;
-            const replacement = div.firstElementChild;
-            if (parent && replacement) parent.replaceChild(replacement, img);
-            else if (img) img.src = `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`;
+            const doReplace = () => {
+                const html = this.generateFaviconHTML(domain, size);
+                const div = document.createElement('div');
+                div.innerHTML = html;
+                const replacement = div.firstElementChild;
+                if (parent && replacement) parent.replaceChild(replacement, img);
+                else if (img) img.src = `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`;
+            };
+            // Fade out before replacement for smoother UX
+            try { img.classList.add('icon-unloading'); } catch(_) {}
+            setTimeout(doReplace, 120);
         } catch(_) {}
     },
     // Generate favicon HTML with multiple fallback sources
@@ -5092,30 +5128,37 @@ window.__pcFaviconHelper = {
 
         // Get current source index from data attribute
         let currentIndex = parseInt(img.dataset.sourceIndex || '0');
+        if (isNaN(currentIndex)) currentIndex = 0;
         currentIndex++;
 
         // Try next favicon source - same order as generateFaviconHTML
         const faviconSources = [
-            `https://logo.clearbit.com/${encodeURIComponent(domain)}`, // Best for company logos
-            `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`, // Google's service
-            `https://favicons.githubusercontent.com/${encodeURIComponent(domain)}`, // GitHub's service
-            `https://api.faviconkit.com/${encodeURIComponent(domain)}/${size}`, // FaviconKit API
-            `https://favicon.yandex.net/favicon/${encodeURIComponent(domain)}`, // Yandex service
-            `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`, // DuckDuckGo
-            `https://${domain}/favicon.ico` // Direct favicon
+            `https://logo.clearbit.com/${encodeURIComponent(domain)}`,
+            `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`,
+            `https://favicons.githubusercontent.com/${encodeURIComponent(domain)}`,
+            `https://api.faviconkit.com/${encodeURIComponent(domain)}/${size}`,
+            `https://favicon.yandex.net/favicon/${encodeURIComponent(domain)}`,
+            `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`,
+            `https://${domain}/favicon.ico`
         ];
 
         if (currentIndex < faviconSources.length) {
-            // Try next source
-            img.dataset.sourceIndex = currentIndex.toString();
-            img.src = faviconSources[currentIndex];
+            // Fade out then try next source for smoother transition
+            try { img.classList.add('icon-unloading'); } catch(_) {}
+            setTimeout(() => {
+                img.dataset.sourceIndex = currentIndex.toString();
+                img.src = faviconSources[currentIndex];
+                try { img.classList.remove('icon-unloading'); } catch(_) {}
+            }, 120);
         } else {
-            // All sources failed, show fallback icon
-            img.classList.add('favicon-failed');
-            img.style.display = 'none';
-            // Insert fallback icon after the failed image
-            const fallbackIcon = window.__pcAccountsIcon();
-            img.insertAdjacentHTML('afterend', fallbackIcon);
+            // All sources failed, show fallback icon with a graceful fade-out
+            try { img.classList.add('icon-unloading'); } catch(_) {}
+            setTimeout(() => {
+                img.classList.add('favicon-failed');
+                img.style.display = 'none';
+                const fallbackIcon = window.__pcAccountsIcon();
+                img.insertAdjacentHTML('afterend', fallbackIcon);
+            }, 120);
         }
     }
 };
@@ -5248,8 +5291,36 @@ window.__pcIconAnimator = {
 
 // Initialize on DOM ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => window.__pcIconAnimator.init());
+    document.addEventListener('DOMContentLoaded', () => {
+        // Inject minimal CSS for icon fade animations once
+        try {
+            if (!document.getElementById('pc-icon-animations')) {
+                const style = document.createElement('style');
+                style.id = 'pc-icon-animations';
+                style.textContent = `
+                    .company-favicon, .logo, .avatar-circle, .avatar-initials, .company-favicon-header { opacity: 0; transition: opacity 0.2s ease; }
+                    .icon-loaded { opacity: 1 !important; }
+                    .icon-unloading { opacity: 0 !important; }
+                `;
+                document.head.appendChild(style);
+            }
+        } catch(_) {}
+        window.__pcIconAnimator.init();
+    });
 } else {
+    // Inject minimal CSS for icon fade animations once
+    try {
+        if (!document.getElementById('pc-icon-animations')) {
+            const style = document.createElement('style');
+            style.id = 'pc-icon-animations';
+            style.textContent = `
+                .company-favicon, .logo, .avatar-circle, .avatar-initials, .company-favicon-header { opacity: 0; transition: opacity 0.2s ease; }
+                .icon-loaded { opacity: 1 !important; }
+                .icon-unloading { opacity: 0 !important; }
+            `;
+            document.head.appendChild(style);
+        }
+    } catch(_) {}
     window.__pcIconAnimator.init();
 }
 
