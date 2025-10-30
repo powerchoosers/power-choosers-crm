@@ -198,6 +198,17 @@ async function scrapeCompanyWebsite(domain, companyName) {
   }
 }
 
+// Lightweight sanitizer to remove brand-first phrasing and prefer first-person voice
+function deSalesify(text) {
+  if (!text) return text;
+  return String(text)
+    .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
+    .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
+    .replace(/\bPower Choosers helps\b/gi, 'We help')
+    .replace(/\bPower Choosers can help\b/gi, 'We can help')
+    .replace(/\bPower Choosers\b/gi, 'We');
+}
+
 // Enhanced manual prompt analysis and context extraction
 function analyzeManualPrompt(prompt) {
   const promptLower = String(prompt || '').toLowerCase();
@@ -250,8 +261,8 @@ function analyzeManualPrompt(prompt) {
   
   console.log('[Prompt Analysis] Extracted context:', analysis);
   return analysis;
-}
-
+  }
+  
 // Build conditional rules based on prompt analysis
 function buildConditionalRules(promptAnalysis, templateType) {
   let rules = [];
@@ -1562,7 +1573,7 @@ Generate text for these fields:
   * Education: Facility maintenance, student safety, budget optimization
   * Use company-specific data: current supplier, rate, contract timing, recent achievements
 IMPORTANT: Always reference ${company} specifically. Use qualitative language (rising, increasing, higher) NOT percentages (15-25%, 20-30%). Keep it natural and conversational.
-- value_proposition: How Power Choosers helps (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X annually", "helped similar companies achieve Y". Include role-specific benefits:
+- value_proposition: How we help (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X annually", "helped similar companies achieve Y". Include role-specific benefits:
   * CFOs: Budget predictability, cost reduction, risk mitigation
   * Facilities Managers: Operational efficiency, maintenance cost reduction
   * Procurement Managers: Vendor management, contract optimization
@@ -1641,6 +1652,11 @@ PREFERRED LANGUAGE:
 - "[Company]'s [industry] operations typically require significant energy consumption..."
 - "As a [industry] company, [company] is probably seeing electricity rate increases..."
 - "Current market conditions are driving up energy costs for [industry] operations..."
+
+STYLE RULES:
+  - Use first-person voice ("we"/"I") instead of brand-first phrasing.
+  - Avoid starting any sentence with "At Power Choosers," or "Power Choosers helps".
+  - Prefer "We help…" / "I help…".
 
 SUBJECT LINE RULES:
 - Target: 3-4 words (sweet spot for engagement)
@@ -1726,7 +1742,7 @@ CRITICAL RULES:
   }
 
   // Standard text mode (existing logic)
-  const identity = whoWeAre || `You are ${senderName}, an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.
+  const identity = whoWeAre || `You are ${senderName}, an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates. Write in first person ("we"/"I"). Do NOT use brand-first openers like "At Power Choosers," or "Power Choosers helps" — prefer "We help" or "I help".
 
 CONTEXT USAGE RULES:
 ${contractEndLabel ? '- The recipient\'s contract ends ' + contractEndLabel + ' - YOU MUST REFERENCE THIS' : ''}
@@ -2162,7 +2178,7 @@ return;
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ 
       ok: true, 
-      output: content,
+      output: deSalesify(content),
       citations: citations
     }));
     
