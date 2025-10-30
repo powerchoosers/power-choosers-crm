@@ -19,7 +19,11 @@ async function researchCompanyInfo(companyName, industry) {
   }
   
   try {
-    const researchPrompt = `Research ${companyName}${industry ? ', a ' + industry + ' company' : ''}. Provide a brief 1-2 sentence description of what they do, their business focus, and any relevant operational details for energy cost discussions. Focus on operations, not financials. Be specific and factual.`;
+    const researchPrompt = `Research ${companyName}${industry ? ', a ' + industry + ' company' : ''}.
+Provide a concise 2-paragraph description (2-3 sentences per paragraph) covering:
+- What they do and business focus
+- Facilities/operations, footprint, relevant energy context (usage intensity, locations, hours)
+Keep it factual, specific, and useful for an energy cost discussion.`;
     
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
@@ -1422,12 +1426,10 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
     }
   }
 
-  // Take first sentence or 80 characters, whichever is shorter
+  // For prompt brevity, summarize to ~220 chars without destroying saved description
   if (accountDescription) {
-    if (accountDescription.includes('.')) {
-      accountDescription = accountDescription.split('.')[0] + '.';
-    }
-    accountDescription = accountDescription.slice(0, 80).trim();
+    const trimmed = accountDescription.replace(/\s+/g, ' ').trim();
+    accountDescription = trimmed.length > 220 ? trimmed.slice(0, 217) + '…' : trimmed;
   }
   
   // Format contract end date
@@ -2065,7 +2067,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
       ...(mode === 'html' ? { response_format: getTemplateSchema(templateType, dynamicFields) } : {})
     };
 
-    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+    let response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -2074,14 +2076,34 @@ CRITICAL: Use these EXACT meeting times in your CTA.
       body: JSON.stringify(body)
     });
 
-    const data = await response.json();
+    let data = await response.json();
     
     if (!response.ok) {
-      const msg = data?.error?.message || data?.detail || 'API error';
-      console.error('[Perplexity] API error:', msg);
-      return res.writeHead(response.status, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: msg }));
-return;
+      // Fallback: retry WITHOUT response_format (schema) to salvage content for HTML mode callers
+      try {
+        const fallbackBody = {
+          model: 'sonar',
+          messages: [
+            { role: 'system', content: dateContext + (await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences })).prompt },
+            { role: 'user', content: prompt || 'Draft a professional email' }
+          ],
+          max_tokens: 600
+        };
+        response = await fetch('https://api.perplexity.ai/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(fallbackBody)
+        });
+        data = await response.json();
+      } catch (fallbackErr) {
+        const msg = data?.error?.message || data?.detail || 'API error';
+        console.error('[Perplexity] API error and fallback failed:', msg, fallbackErr);
+        return res.writeHead(500, { 'Content-Type': 'application/json' })
+          .end(JSON.stringify({ error: 'API error', detail: msg }));
+      }
     }
 
     let content = data?.choices?.[0]?.message?.content || '';
@@ -2207,9 +2229,15 @@ return;
           }
         }));
       } catch (e) {
-        console.error('[Perplexity] Failed to parse JSON:', e);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ error: 'Failed to parse AI response' }));
+        // Fallback for HTML mode: return plain text content so frontend can render standard email
+        console.warn('[Perplexity] JSON parse failed for HTML mode; returning plain text output fallback');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ 
+          ok: true,
+          output: data?.choices?.[0]?.message?.content || content || '',
+          templateType: null,
+          citations: data?.citations || []
+        }));
       }
     }
     
