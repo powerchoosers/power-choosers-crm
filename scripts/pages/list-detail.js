@@ -1383,12 +1383,13 @@
             domain = domain ? domain.replace(/^www\./i, '') : '';
             const logoUrl = acct.logoUrl || acct.logoURL || '';
             if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
-              return window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
+              const html = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
+              return html && String(html).trim() ? html : '<span class="company-favicon placeholder" aria-hidden="true"></span>';
             }
             if (domain) {
               return `<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=${escapeHtml(domain)}" alt="" aria-hidden="true" referrerpolicy="no-referrer" loading="lazy" style="pointer-events:none" onerror="this.style.display='none'" />`;
             }
-            return '';
+            return '<span class="company-favicon placeholder" aria-hidden="true"></span>';
           })();
           html += `<td><a href="#" class="company-link" data-company-name="${escapeHtml(company)}"><span class="company-cell__wrap">${faviconHTML}<span class="company-name">${company}</span></span></a></td>`;
           break;
@@ -1837,8 +1838,8 @@
           }
         }
         
-        // Restore page
-        if (page) {
+        // Restore page (accept 1 as valid; only skip if undefined/null)
+        if (page !== undefined && page !== null) {
           state.currentPage = Math.max(1, parseInt(page, 10));
         }
         
