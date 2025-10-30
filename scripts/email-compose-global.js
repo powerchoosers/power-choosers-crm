@@ -2292,7 +2292,7 @@
         proposal: aiTemplates.proposal || 'Proposal delivery with next steps',
         cold_email: aiTemplates.cold_email || 'Cold email outreach to energy procurement decision maker',
         invoice: aiTemplates.invoice || 'Standard Invoice Request',
-        who_we_are: aiTemplates.who_we_are || 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.',
+        who_we_are: aiTemplates.who_we_are || 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates. Write in first person ("we"/"I"). Avoid brand-first openers like "At Power Choosers," — use "We help" or "I help".',
         // NEW: Market Context
         marketContext: aiTemplates.marketContext || {
           enabled: true,
@@ -2319,9 +2319,9 @@
         follow_up: 'Follow-up with tailored value props',
         energy_health: 'Schedule an Energy Health Check',
         proposal: 'Proposal delivery with next steps',
-        cold_email: 'Cold email to a lead I could not reach by phone',
+        cold_email: 'Cold email outreach to energy procurement decision maker',
         invoice: 'Standard Invoice Request',
-        who_we_are: 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.',
+        who_we_are: 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates. Write in first person ("we"/"I"). Avoid brand-first openers like "At Power Choosers," — use "We help" or "I help".',
         marketContext: {
           enabled: true,
           rateIncrease: '15-25%',

@@ -4651,9 +4651,16 @@ class FreeSequenceAutomation {
   // Helper functions for AI email formatting
   function formatTemplatedEmail(result, recipient, templateType) {
     try {
-      const subject = result.subject || 'Energy Solutions';
+      const subject = (result.subject || 'Energy Solutions');
       const html = result.output || result.html || '<p>Email content</p>';
-      return { subject, html };
+      // Light de-salesify on subject only (avoid mutating structured HTML templates)
+      const cleanSubject = String(subject)
+        .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
+        .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
+        .replace(/\bPower Choosers helps\b/gi, 'We help')
+        .replace(/\bPower Choosers can help\b/gi, 'We can help')
+        .replace(/\bPower Choosers\b/gi, 'We');
+      return { subject: cleanSubject, html };
     } catch (error) {
       console.error('Error formatting templated email:', error);
       return { subject: 'Energy Solutions', html: '<p>Error generating email content.</p>' };
@@ -4681,7 +4688,12 @@ class FreeSequenceAutomation {
       }
 
       if (jsonData) {
-        const subject = jsonData.subject || 'Energy Solutions';
+        const subject = (jsonData.subject || 'Energy Solutions')
+          .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
+          .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
+          .replace(/\bPower Choosers helps\b/gi, 'We help')
+          .replace(/\bPower Choosers can help\b/gi, 'We can help')
+          .replace(/\bPower Choosers\b/gi, 'We');
         const paragraphs = [];
         if (jsonData.greeting) paragraphs.push(jsonData.greeting);
         if (jsonData.paragraph1) paragraphs.push(jsonData.paragraph1);
@@ -4692,7 +4704,13 @@ class FreeSequenceAutomation {
         const enforcedClosing = `Best regards,\n${senderFirst}`;
         paragraphs.push(enforcedClosing);
 
-        const body = paragraphs.join('\n\n');
+        // De-salesify body text (plain paragraphs only; not HTML templates)
+        const body = paragraphs.join('\n\n')
+          .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
+          .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
+          .replace(/\bPower Choosers helps\b/gi, 'We help')
+          .replace(/\bPower Choosers can help\b/gi, 'We can help')
+          .replace(/\bPower Choosers\b/gi, 'We');
 
         // Convert to HTML with readable color
         const htmlBody = body
@@ -4710,8 +4728,14 @@ class FreeSequenceAutomation {
         // Fallback: treat as plain text
         const subject = 'Energy Solutions';
         const raw = String(result || 'Email content');
-        const hasClosing = /best\s*regards[\s,]*$/i.test(raw.trim());
-        const appended = hasClosing ? raw : `${raw}\n\nBest regards,\n${senderFirst}`;
+        const sanitizedRaw = raw
+          .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
+          .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
+          .replace(/\bPower Choosers helps\b/gi, 'We help')
+          .replace(/\bPower Choosers can help\b/gi, 'We can help')
+          .replace(/\bPower Choosers\b/gi, 'We');
+        const hasClosing = /best\s*regards[\s,]*$/i.test(sanitizedRaw.trim());
+        const appended = hasClosing ? sanitizedRaw : `${sanitizedRaw}\n\nBest regards,\n${senderFirst}`;
         const html = '<p style="color:#222;">'
           + appended.replace(/\n\n/g, '</p><p style="color:#222;">').replace(/\n/g, '<br>')
           + '</p>';
