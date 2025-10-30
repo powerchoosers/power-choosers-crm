@@ -900,6 +900,8 @@
 
   async function resolvePhoneMeta(number) {
     const digits = (number || '').replace(/\D/g, '');
+    const e164 = digits && digits.length === 10 ? `+1${digits}` : (digits && digits.startsWith('1') && digits.length === 11 ? `+${digits}` : (String(number||'').startsWith('+') ? String(number) : ''));
+    const candidates = Array.from(new Set([digits, e164.replace(/\D/g,'')] )).filter(Boolean);
     const meta = { number, name: '', account: '', title: '', city: '', state: '', domain: '', logoUrl: '', contactId: null, accountId: null, callerIdImage: null };
     try {
       // App-provided resolver if available
@@ -907,67 +909,91 @@
         const out = await Promise.resolve(window.crm.resolvePhoneMeta(digits));
         if (out && typeof out === 'object') return { ...meta, ...out };
       }
-      // Try a generic public search endpoint if the app exposes one
       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
       if (base) {
-        // Try contacts first
-        console.debug('[Phone] Searching CRM for phone:', digits);
-        const r1 = await fetch(`${base}/api/search?phone=${encodeURIComponent(digits)}`).catch(() => null);
-        if (r1 && r1.ok) {
-          const j = await r1.json().catch(() => ({}));
-          console.debug('[Phone] CRM search response:', j);
-          if (j && (j.contact || j.account)) {
-            const c = j.contact || {};
-            const a = j.account || {};
-            const resolved = {
-              ...meta,
-              name: c.name || '',
-              account: a.name || c.account || '',
-              title: c.title || '',
-              city: c.city || a.city || '',
-              state: c.state || a.state || '',
-              domain: c.domain || a.domain || '',
-              logoUrl: a.logoUrl || '',
-              contactId: c.id || c.contactId || null,
-              accountId: a.id || a.accountId || null
-            };
-            console.debug('[Phone] Resolved metadata from CRM:', resolved);
-            return resolved;
+        // Try multiple likely routes and payloads to avoid 404s when backend changes
+        async function tryFetches() {
+          const routes = [];
+          // GET variants
+          candidates.forEach(p => {
+            routes.push({ url: `${base}/api/search?phone=${encodeURIComponent(p)}`, method: 'GET' });
+            routes.push({ url: `${base}/api/contacts/search?phone=${encodeURIComponent(p)}`, method: 'GET' });
+            routes.push({ url: `${base}/api/v1/search?phone=${encodeURIComponent(p)}`, method: 'GET' });
+          });
+          // POST variants
+          const bodies = candidates.map(p => ([
+            { phone: p },
+            { e164: (p.length===10?`+1${p}`:(p.startsWith('1')&&p.length===11?`+${p}`:`+${p}`)) },
+            { query: { phone: p } }
+          ])).flat();
+          ['search', 'contacts/search', 'v1/search', 'lookup/phone', 'contacts/lookup'].forEach(path => {
+            bodies.forEach(b => routes.push({ url: `${base}/api/${path}`, method: 'POST', body: b }));
+          });
+          for (const r of routes) {
+            try {
+              const resp = await fetch(r.url, r.method === 'POST' ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(r.body) } : undefined);
+              if (!resp || !resp.ok) { continue; }
+              const j = await resp.json().catch(() => ({}));
+              if (!j) continue;
+              // Accept several shapes
+              // { contact, account }
+              let c = j.contact || null;
+              let a = j.account || null;
+              // { contacts:[...], accounts:[...] }
+              if (!c && Array.isArray(j.contacts) && j.contacts.length) c = j.contacts[0];
+              if (!a && Array.isArray(j.accounts) && j.accounts.length) a = j.accounts[0];
+              // { person, company }
+              if (!c && j.person) c = j.person;
+              if (!a && j.company) a = j.company;
+              // Flat shape { name, company/account }
+              if (!c && (j.name || j.title || j.email)) c = j;
+              if (!a && (j.company || j.accountName || j.domain)) a = j;
+              if (c || a) {
+                const resolved = {
+                  ...meta,
+                  name: (c && (c.name || ((c.firstName||c.first_name||'') + ' ' + (c.lastName||c.last_name||'')).trim())) || '',
+                  account: (a && (a.name || a.accountName || a.company || '')) || (c && (c.account || c.company || '')) || '',
+                  title: (c && (c.title || c.jobTitle || c.job_title)) || '',
+                  city: (c && c.city) || (a && a.city) || '',
+                  state: (c && c.state) || (a && a.state) || '',
+                  domain: (c && (c.domain || (c.email||'').split('@')[1])) || (a && (a.domain || a.website)) || '',
+                  logoUrl: (a && a.logoUrl) || '',
+                  contactId: (c && (c.id || c.contactId || c._id)) || null,
+                  accountId: (a && (a.id || a.accountId || a._id)) || null
+                };
+                console.debug('[Phone] Resolved metadata from CRM (flex routes):', { route: r.url, resolved });
+                return resolved;
+              }
+            } catch(_) { /* try next */ }
           }
-        } else {
-          console.debug('[Phone] CRM search failed or returned no results');
+          return null;
         }
+        const found = await tryFetches();
+        if (found) return found;
         
         // If no contact found, try Twilio caller ID lookup
-        if (!meta.name) {
-          try {
-            const callerLookup = await fetch(`${base}/api/twilio/caller-lookup`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ phoneNumber: number })
-            });
-            
-            if (callerLookup.ok) {
-              const lookupData = await callerLookup.json();
-              if (lookupData.success && lookupData.data) {
-                const data = lookupData.data;
-                meta.name = data.callerName || '';
-                meta.carrier = data.carrier || '';
-                meta.countryCode = data.countryCode || '';
-                meta.nationalFormat = data.nationalFormat || '';
-                
-                // If we have a carrier, we can try to get a logo
-                if (data.carrier && data.carrier.name) {
-                  meta.carrierName = data.carrier.name;
-                  meta.carrierType = data.carrier.type;
-                }
+        try {
+          const callerLookup = await fetch(`${base}/api/twilio/caller-lookup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phoneNumber: number })
+          });
+          if (callerLookup.ok) {
+            const lookupData = await callerLookup.json();
+            if (lookupData.success && lookupData.data) {
+              const data = lookupData.data;
+              meta.name = data.callerName || '';
+              meta.carrier = data.carrier || '';
+              meta.countryCode = data.countryCode || '';
+              meta.nationalFormat = data.nationalFormat || '';
+              if (data.carrier && data.carrier.name) {
+                meta.carrierName = data.carrier.name;
+                meta.carrierType = data.carrier.type;
               }
             }
-          } catch (lookupError) {
-            console.warn('[Phone] Caller ID lookup failed:', lookupError);
           }
+        } catch (lookupError) {
+          console.warn('[Phone] Caller ID lookup failed:', lookupError);
         }
       }
     } catch (_) {}
