@@ -19,7 +19,12 @@
     try { if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin==='function') return window.DataManager.isCurrentUserAdmin(); return window.currentUserRole==='admin'; } catch(_) { return false; }
   };
   const getUserEmail = () => {
-    try { if (window.DataManager && typeof window.DataManager.getCurrentUserEmail==='function') return window.DataManager.getCurrentUserEmail(); return (window.currentUserEmail||'').toLowerCase(); } catch(_) { return (window.currentUserEmail||'').toLowerCase(); }
+    try {
+      if (window.DataManager && typeof window.DataManager.getCurrentUserEmail==='function') {
+        return (window.DataManager.getCurrentUserEmail() || '').toLowerCase();
+      }
+      return (window.currentUserEmail||'').toLowerCase();
+    } catch(_) { return (window.currentUserEmail||'').toLowerCase(); }
   };
   
   async function loadFromFirestore() {
@@ -35,9 +40,18 @@
         if (window.DataManager && typeof window.DataManager.queryWithOwnership==='function') {
           newSequences = await window.DataManager.queryWithOwnership('sequences');
         } else {
-          const email = window.currentUserEmail || '';
-          const snap = await window.firebaseDB.collection('sequences').where('ownerId','==',email).get();
-          newSequences = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+          const email = (window.currentUserEmail || '').toLowerCase();
+          const db = window.firebaseDB;
+          const [ownedSnap, assignedSnap, createdSnap] = await Promise.all([
+            db.collection('sequences').where('ownerId','==',email).get(),
+            db.collection('sequences').where('assignedTo','==',email).get(),
+            db.collection('sequences').where('createdBy','==',email).get()
+          ]);
+          const map = new Map();
+          ownedSnap.forEach(d=>map.set(d.id,{ id:d.id, ...d.data() }));
+          assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
+          createdSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
+          newSequences = Array.from(map.values());
         }
         newSequences.sort((a,b)=> new Date(b.updatedAt||0) - new Date(a.updatedAt||0));
         sequencesData = newSequences;
@@ -79,13 +93,27 @@
       try {
         const cached = await window.CacheManager.get('sequences');
         if (cached && Array.isArray(cached) && cached.length > 0) {
-          if (window.currentUserRole !== 'admin') {
-            const email = window.currentUserEmail || '';
-            sequencesData = (cached || []).filter(s => (s && s.ownerId === email));
-          } else {
+          const isAdminUser = (window.currentUserRole === 'admin');
+          if (isAdminUser) {
             sequencesData = cached;
+          } else {
+            const email = getUserEmail();
+            // Case-insensitive match across ownerId, assignedTo, createdBy
+            sequencesData = (cached || []).filter(s => {
+              if (!s) return false;
+              const owner = (s.ownerId || '').toLowerCase();
+              const assigned = (s.assignedTo || '').toLowerCase();
+              const created = (s.createdBy || '').toLowerCase();
+              return owner === email || assigned === email || created === email;
+            });
+            // If filter produced nothing but cache has data, trigger a background refresh now
+            if (sequencesData.length === 0 && cached.length > 0) {
+              console.log('[BackgroundSequencesLoader] Cache had data but none matched user; refreshing from Firestore');
+              await loadFromFirestore();
+              return;
+            }
           }
-          console.log('[BackgroundSequencesLoader] ✓ Loaded', sequencesData.length, 'sequences from cache (filtered)');
+          console.log('[BackgroundSequencesLoader] ✓ Loaded', sequencesData.length, 'sequences from cache', window.currentUserRole!=='admin' ? '(filtered)' : '(admin)');
           
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:sequences-loaded', { 
@@ -107,13 +135,24 @@
         if (window.CacheManager) {
           const cached = await window.CacheManager.get('sequences');
           if (cached && Array.isArray(cached) && cached.length > 0) {
-            if (window.currentUserRole !== 'admin') {
-              const email = window.currentUserEmail || '';
-              sequencesData = (cached || []).filter(s => (s && s.ownerId === email));
-            } else {
+            const isAdminUser = (window.currentUserRole === 'admin');
+            if (isAdminUser) {
               sequencesData = cached;
+            } else {
+              const email = getUserEmail();
+              sequencesData = (cached || []).filter(s => {
+                if (!s) return false;
+                const owner = (s.ownerId || '').toLowerCase();
+                const assigned = (s.assignedTo || '').toLowerCase();
+                const created = (s.createdBy || '').toLowerCase();
+                return owner === email || assigned === email || created === email;
+              });
+              if (sequencesData.length === 0 && cached.length > 0) {
+                await loadFromFirestore();
+                return;
+              }
             }
-            console.log('[BackgroundSequencesLoader] ✓ Loaded', sequencesData.length, 'sequences from cache (delayed, filtered)');
+            console.log('[BackgroundSequencesLoader] ✓ Loaded', sequencesData.length, 'sequences from cache (delayed)');
             document.dispatchEvent(new CustomEvent('pc:sequences-loaded', { 
               detail: { count: cached.length, cached: true } 
             }));

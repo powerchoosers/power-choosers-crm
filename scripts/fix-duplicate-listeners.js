@@ -192,7 +192,14 @@
     '_contactSequencesResizeBound',
     '_contactSequencesScrollBound',
     '_contactSequencesKeydownBound',
-    '_contactSequencesMousedownBound'
+    '_contactSequencesMousedownBound',
+
+    // Sequence Builder page (new)
+    '_sequenceContactsBtnBound',
+    '_sequencePreviewDocClickBound',
+    '_sequenceVarsPopoverDocClickBound',
+    '_sequenceDelayPopoverDocClickBound',
+    '_sequenceDeletePopoverDocClickBound'
     
     // NOTE: _composeToolbarClickBound removed - it was preventing the listener from being attached at all
     // The compose toolbar uses its own guard logic in setupToolbarEventListeners()
@@ -203,6 +210,38 @@
       document[guard] = true;
     }
   });
+
+  // De-duplicate stacked modal overlays/popovers that may have been created by duplicate listeners
+  function pruneDuplicateOverlays() {
+    try {
+      // Keep only the most recently added .modal-overlay
+      const overlays = Array.from(document.querySelectorAll('.modal-overlay'));
+      if (overlays.length > 1) {
+        overlays.slice(0, overlays.length - 1).forEach(el => {
+          try { el.parentNode && el.parentNode.removeChild(el); } catch (_) {}
+        });
+      }
+
+      // Also dedupe common anchored popovers used in sequence builder (keep last)
+      ['.delete-popover', '.delay-popover', '.vars-popover', '.add-contact-popover'].forEach(sel => {
+        const pops = Array.from(document.querySelectorAll(sel));
+        if (pops.length > 1) {
+          pops.slice(0, pops.length - 1).forEach(el => {
+            try { el.parentNode && el.parentNode.removeChild(el); } catch (_) {}
+          });
+        }
+      });
+    } catch (_) {}
+  }
+
+  // One-time cleanup now
+  pruneDuplicateOverlays();
+
+  // Observe DOM for new overlays and prune older ones immediately
+  try {
+    const observer = new MutationObserver(() => pruneDuplicateOverlays());
+    observer.observe(document.body, { childList: true, subtree: true });
+  } catch (_) {}
   
   // Optional: Monitor for rapid log generation
   let logCount = 0;

@@ -29,6 +29,7 @@
   const db = (typeof window !== 'undefined' && window.firebaseDB) ? window.firebaseDB : null;
   const sequencesCol = db ? db.collection('sequences') : null;
   let unsubscribe = null;
+  let onBackgroundLoaded = null;
 
   async function loadFromFirestore() {
     // Use BackgroundSequencesLoader (cache-first)
@@ -303,8 +304,10 @@
         saveToFirestore(toSave).catch((err) => console.warn('Failed to save sequence:', err));
         // Navigate to the new sequence in the builder
         if (window.SequenceBuilder && typeof window.SequenceBuilder.show === 'function') {
+          teardownBeforeNavigate();
           try { window.SequenceBuilder.show(baseSeq); } catch (e) { /* noop */ }
         } else if (window.crm && typeof window.crm.navigateToPage === 'function') {
+          teardownBeforeNavigate();
           try { window.crm.navigateToPage('sequence-builder'); } catch (e) { /* noop */ }
         }
       });
@@ -329,6 +332,7 @@
         if (!link) return;
         const id = link.getAttribute('data-id');
         const it = state.data.find(s => s.id === id);
+        teardownBeforeNavigate();
         if (it && window.SequenceBuilder && typeof window.SequenceBuilder.show === 'function') {
           try { window.SequenceBuilder.show(it); } catch (err) { /* noop */ }
         } else if (window.crm && typeof window.crm.navigateToPage === 'function') {
@@ -346,8 +350,10 @@
         switch (action) {
           case 'edit':
             if (window.SequenceBuilder && typeof window.SequenceBuilder.show === 'function') {
+              teardownBeforeNavigate();
               try { window.SequenceBuilder.show(it); } catch (e) { /* noop */ }
             } else if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              teardownBeforeNavigate();
               try { window.crm.navigateToPage('sequence-builder'); } catch (e2) { /* noop */ }
             }
             break;
@@ -529,12 +535,22 @@
     if (!initDomRefs()) return;
     attachEvents();
     
-    // Listen for background sequences loader events
-    document.addEventListener('pc:sequences-loaded', async () => {
-      console.log('[Sequences] Background sequences loaded, refreshing data...');
-      await loadFromFirestore();
-      applyFilters();
-    });
+    // Listen for background sequences loader events (bind once and only update if page is visible)
+    if (!document._sequencesLoadedBound) {
+      onBackgroundLoaded = async () => {
+        try {
+          const page = document.getElementById('sequences-page');
+          if (!page || page.offsetParent === null) return;
+          console.log('[Sequences] Background sequences loaded, refreshing data...');
+          await loadFromFirestore();
+          applyFilters();
+        } catch (e) {
+          console.warn('[Sequences] pc:sequences-loaded handler failed', e);
+        }
+      };
+      document.addEventListener('pc:sequences-loaded', onBackgroundLoaded);
+      document._sequencesLoadedBound = true;
+    }
     
     try {
       // Use background loader if available, otherwise fall back to direct Firestore
@@ -554,6 +570,25 @@
       console.warn('Failed to load sequences from Firestore:', err);
     }
     applyFilters();
+  }
+
+  // Clean up listeners and hide page before navigating away to builder to avoid flicker
+  function teardownBeforeNavigate() {
+    try {
+      if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+    } catch (_) {}
+    try {
+      if (onBackgroundLoaded) {
+        document.removeEventListener('pc:sequences-loaded', onBackgroundLoaded);
+        onBackgroundLoaded = null;
+        document._sequencesLoadedBound = false;
+      }
+    } catch (_) {}
+    // Do not force inline hiding here; some routers/show logic rely on
+    // existing display styles. Forcing inline styles can keep the page
+    // hidden after navigating back, resulting in a blank screen.
+    // If visual suppression is needed during navigation, rely on the
+    // navigation controller to handle visibility.
   }
 
   // Expose public API
