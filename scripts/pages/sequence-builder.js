@@ -759,14 +759,35 @@ class FreeSequenceAutomation {
       state.contacts = Array.isArray(sequence.contacts) ? [...sequence.contacts] : [];
     } catch (_) { state.contacts = []; }
 
+    // Minimize flicker: temporarily hide Sequences page while navigating
+    try { document.documentElement.classList.add('pc-hide-sequences'); } catch (_) {}
     // Navigate to the sequence-builder page using the CRM router
     if (window.crm && typeof window.crm.navigateToPage === 'function') {
       try { window.crm.navigateToPage('sequence-builder'); } catch (e) { /* noop */ }
     }
 
     if (!initDomRefs()) return;
+    // Reduce page flash/flicker: fade in after initial render
+    try {
+      const container = els.page ? els.page.querySelector('.page-container') : null;
+      if (container) {
+        container.style.opacity = '0';
+        container.style.transition = 'opacity 160ms ease';
+      }
+      // Render first, then fade in next frame
+      // Render immediately with existing data
+      render();
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (container) container.style.opacity = '1';
+        // Remove temporary hide class shortly after builder is visible
+        setTimeout(() => { try { document.documentElement.classList.remove('pc-hide-sequences'); } catch (_) {} }, 240);
+      }));
+      // Return early to avoid duplicate render below
+      // Note: following render() call removed to prevent double work
+      return;
+    } catch (_) {}
     
-    // Render immediately with existing data
+    // Fallback render if fade-in guard failed
     render();
     
     // Then load contacts from sequenceMembers collection asynchronously (don't block render)
@@ -1051,7 +1072,18 @@ class FreeSequenceAutomation {
     headerWrap.innerHTML = headerHtml;
     const headerEl = headerWrap.firstElementChild;
     if (pageHeader && headerEl && pageHeader.parentElement) {
-      pageHeader.replaceWith(headerEl);
+      // Diff-update inner content to avoid unmounting icons/header root
+      try {
+        const newSubtitle = headerEl.querySelector('.contact-subtitle');
+        const oldSubtitle = pageHeader.querySelector('.contact-subtitle');
+        if (newSubtitle && oldSubtitle) {
+          oldSubtitle.replaceWith(newSubtitle);
+        } else {
+          pageHeader.innerHTML = headerEl.innerHTML;
+        }
+      } catch (_) {
+        pageHeader.innerHTML = headerEl.innerHTML;
+      }
     } else if (pageContainer && headerEl) {
       pageContainer.prepend(headerEl);
     }
@@ -1085,7 +1117,12 @@ class FreeSequenceAutomation {
           data: {
             subject: '',
             body: '',
-            attachments: []
+            attachments: [],
+            // Compose mode + AI lifecycle defaults
+            mode: 'manual', // 'manual' | 'ai'
+            aiPrompt: '',
+            aiStatus: 'draft', // 'draft' | 'generated' | 'saved'
+            aiOutput: null
           }
         };
       } else if (type === 'phone-call') {
@@ -1231,7 +1268,7 @@ class FreeSequenceAutomation {
   // Modal: list all contacts in the current sequence
   function createContactsListModal() {
     const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
+    overlay.className = 'modal-overlay contacts-modal-overlay';
     overlay.tabIndex = -1;
 
     const contacts = Array.isArray(state.contacts) ? state.contacts.slice() : [];
@@ -1677,7 +1714,14 @@ class FreeSequenceAutomation {
       document.removeEventListener('click', onDocClick, true);
       document.removeEventListener('keydown', onEsc, true);
       try { anchorEl.setAttribute('aria-expanded', 'false'); } catch (_) {}
-      pop.remove();
+      try {
+        pop.classList.add('closing');
+        const removeNow = () => { try { pop.remove(); } catch (_) {} };
+        pop.addEventListener('animationend', removeNow, { once: true });
+        setTimeout(removeNow, 180);
+      } catch (_) {
+        try { pop.remove(); } catch (_) {}
+      }
     }
     // Expose cleanup for external toggles
     try { pop._cleanup = cleanup; } catch (_) {}
@@ -1865,6 +1909,7 @@ class FreeSequenceAutomation {
         <span class="label-desc">${labelDesc}</span>
       </span>`;
     const htmlMode = step.data?.editorMode === 'html';
+    const composeMode = (step.data?.mode === 'ai' || step.data?.mode === 'manual') ? step.data.mode : 'manual';
     // Compute preview subject/body with contact substitution if a contact is selected
     const selContact = step.data?.previewContact || null;
     const rawSubject = step.data?.subject || '';
@@ -1889,6 +1934,12 @@ class FreeSequenceAutomation {
               ${labelMarkup}
             </div>
             <div class="spacer"></div>
+            <div class="mode-toggle" role="group" aria-label="Compose mode">
+              <div class="mode-toggle-wrap" id="mode-toggle-${escapeHtml(step.id)}">
+                <button class="toggle-btn${composeMode==='manual' ? ' active' : ''}" data-mode="manual" aria-selected="${composeMode==='manual'}" title="Manual compose">Manual</button>
+                <button class="toggle-btn${composeMode==='ai' ? ' active' : ''}" data-mode="ai" aria-selected="${composeMode==='ai'}" title="AI compose">AI</button>
+              </div>
+            </div>
             <button class="icon-btn-sm settings-step" title="Email settings" aria-label="Email settings">${svgSettings()}</button>
             <button class="icon-btn-sm trash-step" title="Delete step" aria-label="Delete step">${svgTrash()}</button>
             <div class="step-status-toggle">
@@ -1910,12 +1961,9 @@ class FreeSequenceAutomation {
                 <div class="preview-results" role="listbox" aria-label="Contact results"></div>
               </div>
             </div>
-            <!-- Toolbar and AI bar accessible from both tabs -->
+            <!-- Editor toolbar: hidden in AI mode -->
+            ${composeMode==='ai' ? '' : `
             <div class="editor-toolbar" role="toolbar" aria-label="Email editor actions">
-              <button class="toolbar-btn toolbar-ai" type="button" data-action="ai" aria-label="Write with AI">
-                <span class="icon">${svgTextAI()}</span>
-                <span class="label">Write with AI</span>
-              </button>
               <button class="toolbar-btn editor-only-btn" type="button" data-action="formatting" aria-label="Text formatting" ${htmlMode ? 'disabled aria-disabled="true"' : ''}>${svgTextTitleIcon()}</button>
               <button class="toolbar-btn editor-only-btn" type="button" data-action="link" aria-label="Insert link">${svgChain()}</button>
               <button class="toolbar-btn editor-only-btn" type="button" data-action="image" aria-label="Upload image">${svgImageIcon()}</button>
@@ -1923,8 +1971,8 @@ class FreeSequenceAutomation {
               <button class="toolbar-btn editor-only-btn${htmlMode ? ' active' : ''}" type="button" data-action="code" aria-label="Edit raw HTML" aria-pressed="${htmlMode}">${svgCodeBrackets()}</button>
               <button class="toolbar-btn editor-only-btn" type="button" data-action="templates" aria-label="Load templates">${svgDoc()}</button>
               <button class="toolbar-btn editor-only-btn" type="button" data-action="variables" aria-label="Add dynamic variables">${svgBraces()}</button>
-            </div>
-            ${htmlMode ? '' : renderFormattingBar()}
+            </div>`}
+            ${composeMode==='ai' ? '' : (htmlMode ? '' : renderFormattingBar())}
             <div class="link-bar" aria-hidden="true">
               <div class="field">
                 <label class="fmt-label" for="link-text-${escapeHtml(step.id)}">Text</label>
@@ -1941,6 +1989,26 @@ class FreeSequenceAutomation {
             </div>
             <div class="tab-panels">
               <div class="tab-panel ${editorActive ? '' : 'hidden'}" data-tab="editor">
+                ${composeMode==='ai' ? `
+                <div class="ai-mode-note">
+                  <div class="ai-stars" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="264" height="264" role="img" focusable="false">
+                      <defs>
+                        <linearGradient id="pc-ai-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stop-color="#ff7a45"/>
+                          <stop offset="55%" stop-color="#ff6b35"/>
+                          <stop offset="100%" stop-color="#1b4ed8"/>
+                        </linearGradient>
+                      </defs>
+                      <path fill="url(#pc-ai-grad)" d="M23.426,31.911l-1.719,3.936c-0.661,1.513-2.754,1.513-3.415,0l-1.719-3.936	c-1.529-3.503-4.282-6.291-7.716-7.815l-4.73-2.1c-1.504-0.668-1.504-2.855,0-3.523l4.583-2.034	c3.522-1.563,6.324-4.455,7.827-8.077l1.741-4.195c0.646-1.557,2.797-1.557,3.443,0l1.741,4.195	c1.503,3.622,4.305,6.514,7.827,8.077l4.583,2.034c1.504,0.668,1.504,2.855,0,3.523l-4.73,2.1	C27.708,25.62,24.955,28.409,23.426,31.911z"></path>
+                      <path fill="url(#pc-ai-grad)" d="M38.423,43.248l-0.493,1.131c-0.361,0.828-1.507,0.828-1.868,0l-0.493-1.131	c-0.879-2.016-2.464-3.621-4.44-4.5l-1.52-0.675c-0.822-0.365-0.822-1.56,0-1.925l1.435-0.638c2.027-0.901,3.64-2.565,4.504-4.65	l0.507-1.222c0.353-0.852,1.531-0.852,1.884,0l0.507,1.222c0.864,2.085,2.477,3.749,4.504,4.65l1.435,0.638	c0.822,0.365,0.822,1.56,0,1.925l-1.52,0.675C40.887,39.627,39.303,41.232,38.423,43.248z"></path>
+                      <path fill="none" stroke="rgba(255,255,255,.35)" stroke-width="0.6" d="M23.426,31.911l-1.719,3.936c-0.661,1.513-2.754,1.513-3.415,0l-1.719-3.936c-1.529-3.503-4.282-6.291-7.716-7.815l-4.73-2.1c-1.504-0.668-1.504-2.855,0-3.523l4.583-2.034c3.522-1.563,6.324-4.455,7.827-8.077l1.741-4.195c0.646-1.557,2.797-1.557,3.443,0l1.741,4.195c1.503,3.622,4.305,6.514,7.827,8.077l4.583,2.034c1.504,0.668,1.504,2.855,0,3.523l-4.73,2.1C27.708,25.62,24.955,28.409,23.426,31.911z"/>
+                      <path fill="none" stroke="rgba(255,255,255,.35)" stroke-width="0.6" d="M38.423,43.248l-0.493,1.131c-0.361,0.828-1.507,0.828-1.868,0l-0.493-1.131c-0.879-2.016-2.464-3.621-4.44-4.5l-1.52-0.675c-0.822-0.365-0.822-1.56,0-1.925l1.435-0.638c2.027-0.901,3.64-2.565,4.504-4.65l0.507-1.222c0.353-0.852,1.531-0.852,1.884,0l0.507,1.222c0.864,2.085,2.477,3.749,4.504,4.65l1.435,0.638c0.822,0.365,0.822,1.56,0,1.925l-1.52,0.675C40.887,39.627,39.303,41.232,38.423,43.248z"/>
+                    </svg>
+                  </div>
+                  <div class="ai-note-text">AI Mode is enabled. Use Preview to compose and save with AI.</div>
+                </div>
+                ` : `
                 <div class="form-row">
                   <input type="text" class="input-dark subject-input" placeholder="Subject" value="${escapeHtml(step.data?.subject || '')}">
                 </div>
@@ -1948,7 +2016,7 @@ class FreeSequenceAutomation {
                   ${htmlMode
                     ? `<div class="html-editor-wrap"><div class="html-mode-badge" aria-hidden="true">HTML Mode</div><textarea class="textarea-dark body-input" data-editor="html" spellcheck="false">${escapeHtml(step.data?.body || '')}</textarea></div>`
                     : `<div class="textarea-dark body-input" contenteditable="true" role="textbox" aria-multiline="true" data-editor="rich">${step.data?.body || ''}</div>`}
-                </div>
+                </div>`}
                 ${step.data?.attachments && step.data.attachments.length ? `
                 <div class="attachments" role="group" aria-label="Attachments">
                   <div class="attach-title">Attachments</div>
@@ -1965,10 +2033,46 @@ class FreeSequenceAutomation {
                 ` : ''}
               </div>
               <div class="tab-panel ${previewActive ? '' : 'hidden'}" data-tab="preview">
+                ${composeMode==='ai' ? `
+                <div class="ai-compose">
+                  <div class="ai-bar open" aria-hidden="false" style="margin-bottom:12px;">
+                    <div class="ai-inner">
+                      <div class="ai-row">
+                        <textarea class="ai-prompt input-dark" rows="3" placeholder="Describe the email you want... (tone, goal, offer, CTA)">${escapeHtml(step.data?.aiPrompt || '')}</textarea>
+                      </div>
+                      <div class="ai-row suggestions" role="list">
+                        <button class="ai-suggestion" type="button" data-prompt="Write an immediate follow-up email after our phone conversation">Immediate follow-up</button>
+                        <button class="ai-suggestion" type="button" data-prompt="Write a same-day check-in email to maintain momentum">Same day check-in</button>
+                        <button class="ai-suggestion" type="button" data-prompt="Write a weekly touchpoint email to stay top of mind">Weekly touchpoint</button>
+                        <button class="ai-suggestion" type="button" data-prompt="Write an introduction email as the first touchpoint in our sequence">First email introduction</button>
+                        <button class="ai-suggestion" type="button" data-prompt="Write a nurture email that provides value and builds relationship">Middle sequence nurture</button>
+                        <button class="ai-suggestion" type="button" data-prompt="Write a final email with a clear call-to-action and next steps">Final sequence ask</button>
+                      </div>
+                      <div class="ai-row actions">
+                        <button class="fmt-btn ai-generate" data-mode="standard">Generate Standard</button>
+                        <button class="fmt-btn ai-generate" data-mode="html">Generate HTML</button>
+                        <div class="ai-status" aria-live="polite"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="email-preview">
+                    <div class="preview-subject">${escapeHtml((step.data?.aiOutput?.subject) || (previewSubject || '(no subject)'))}</div>
+                    <div class="preview-body">${(step.data?.aiOutput?.html) || (previewBodyHtml || '(empty)')}</div>
+                  </div>
+                  <div class="ai-footbar" style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px;">
+                    <div class="status-pill" aria-live="polite" style="font-size:12px; color: var(--text-secondary);">
+                      ${escapeHtml((step.data?.aiStatus || 'draft').toUpperCase())}
+                    </div>
+                    <div>
+                      <button class="btn-primary ai-save-to-step" ${step.data?.aiStatus==='generated' || step.data?.aiStatus==='draft' ? '' : 'disabled'}>Save to step</button>
+                    </div>
+                  </div>
+                </div>
+                ` : `
                 <div class="email-preview">
                   <div class="preview-subject">${previewSubject || '(no subject)'}</div>
                   <div class="preview-body">${previewBodyHtml || '(empty)'}</div>
-                </div>
+                </div>`}
               </div>
             </div>
             `}
@@ -2194,8 +2298,11 @@ class FreeSequenceAutomation {
     else saver();
   }
 
+  let _isSaving = false;
   async function saveStepToFirestore(stepId) {
     try {
+      if (_isSaving) return; // coalesce overlapping saves to reduce churn/flicker
+      _isSaving = true;
       const db = (typeof window !== 'undefined') ? window.firebaseDB : null;
       const seq = state.currentSequence;
       if (!db || !seq || !seq.id || !Array.isArray(seq.steps)) return;
@@ -2203,6 +2310,8 @@ class FreeSequenceAutomation {
       await db.collection('sequences').doc(seq.id).set({ steps: seq.steps }, { merge: true });
     } catch (err) {
       console.warn('Failed to persist step to Firestore:', err);
+    } finally {
+      _isSaving = false;
     }
   }
 
@@ -2235,6 +2344,38 @@ class FreeSequenceAutomation {
     const k = String(key || '');
     const label = map[s] && map[s][k];
     return label ? label : `${s}.${k}`;
+  }
+
+  // Resolve sender first name from multiple sources so it's always available
+  function getSenderFirstName() {
+    try {
+      const v = (window.SettingsPage && typeof window.SettingsPage.getSetting === 'function')
+        ? window.SettingsPage.getSetting('general.firstName')
+        : null;
+      if (v && String(v).trim()) return String(v).trim();
+    } catch (_) {}
+
+    try {
+      const v = window.SettingsPage?.instance?.state?.settings?.general?.firstName;
+      if (v && String(v).trim()) return String(v).trim();
+    } catch (_) {}
+
+    try {
+      const raw = localStorage.getItem('crm-settings');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const v = parsed?.general?.firstName;
+        if (v && String(v).trim()) return String(v).trim();
+      }
+    } catch (_) {}
+
+    try {
+      const u = window.firebase?.auth?.().currentUser;
+      const dn = u?.displayName || '';
+      if (dn && dn.trim()) return dn.trim().split(' ')[0] || '';
+    } catch (_) {}
+
+    return '';
   }
 
   function getContactField(contact, key) {
@@ -3437,7 +3578,14 @@ class FreeSequenceAutomation {
         document.removeEventListener('mousedown', onDocPointer, true);
         window.removeEventListener('resize', position);
         window.removeEventListener('scroll', position, true);
-        pop.remove();
+        try {
+          pop.classList.add('closing');
+          const removeNow = () => { try { pop.remove(); } catch (_) {} };
+          pop.addEventListener('animationend', removeNow, { once: true });
+          setTimeout(removeNow, 180);
+        } catch (_) {
+          try { pop.remove(); } catch (_) {}
+        }
         try { anchorEl.blur && anchorEl.blur(); } catch (_) {}
       }
     };
@@ -3539,7 +3687,14 @@ class FreeSequenceAutomation {
         document.removeEventListener('mousedown', onDocPointer, true);
         window.removeEventListener('resize', position);
         window.removeEventListener('scroll', position, true);
-        pop.remove();
+        try {
+          pop.classList.add('closing');
+          const removeNow = () => { try { pop.remove(); } catch (_) {} };
+          pop.addEventListener('animationend', removeNow, { once: true });
+          setTimeout(removeNow, 180);
+        } catch (_) {
+          try { pop.remove(); } catch (_) {}
+        }
         // Blur the trigger so any hover/focus-reveal actions hide after cancel
         try { anchorEl.blur && anchorEl.blur(); } catch (_) {}
       }
@@ -3752,7 +3907,16 @@ class FreeSequenceAutomation {
         document.removeEventListener('mousedown', onDocPointer, true);
         window.removeEventListener('resize', position);
         window.removeEventListener('scroll', position, true);
-        pop.remove();
+        // Play closing animation then remove
+        try {
+          pop.classList.add('closing');
+          const removeNow = () => { try { pop.remove(); } catch (_) {} };
+          pop.addEventListener('animationend', removeNow, { once: true });
+          // Safety timeout in case animationend doesn't fire
+          setTimeout(removeNow, 180);
+        } catch (_) {
+          try { pop.remove(); } catch (_) {}
+        }
         // Return focus to the anchor for accessibility
         try {
           anchorEl.setAttribute('aria-expanded', 'false');
@@ -3788,15 +3952,33 @@ class FreeSequenceAutomation {
 
     // Open contacts list modal
     const contactsBtn = document.getElementById('contacts-btn');
-    if (contactsBtn) {
+    if (contactsBtn && !contactsBtn.dataset.bound) {
+      contactsBtn.dataset.bound = '1';
       contactsBtn.addEventListener('click', async () => {
-        // Refresh contacts from sequenceMembers before opening modal
-        if (state.currentSequence?.id) {
-          await loadContactsFromSequenceMembers(state.currentSequence.id);
-        }
+        // Close any existing instance first (singleton)
+        document.querySelectorAll('.modal-overlay.contacts-modal-overlay').forEach(el => el.remove());
+
+        // Open immediately using current in-memory contacts
         const overlay = createContactsListModal();
+        overlay.classList.add('contacts-modal-overlay');
         document.body.appendChild(overlay);
         overlay.focus();
+
+        // Fire-and-forget background refresh; when done, re-render modal if still open
+        if (state.currentSequence?.id) {
+          try {
+            await loadContactsFromSequenceMembers(state.currentSequence.id);
+            const open = document.querySelector('.modal-overlay.contacts-modal-overlay');
+            if (open) {
+              const fresh = createContactsListModal();
+              fresh.classList.add('contacts-modal-overlay');
+              open.replaceWith(fresh);
+              fresh.focus();
+            }
+          } catch (err) {
+            console.warn('[SequenceBuilder] contacts modal refresh failed', err);
+          }
+        }
       });
     }
 
@@ -3991,6 +4173,45 @@ class FreeSequenceAutomation {
         const isActive = input.checked;
         step.paused = !isActive;
         try { scheduleStepSave(step.id, true); } catch (_) { /* noop */ }
+        render();
+      });
+    });
+
+    // Mode toggle (Manual / AI) using toggle-btn style
+    container.querySelectorAll('.step-card .mode-toggle .toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const card = btn.closest('.step-card');
+        const id = card?.getAttribute('data-id');
+        const step = state.currentSequence.steps.find(s => s.id === id);
+        if (!step) return;
+        const target = btn.getAttribute('data-mode') || 'manual';
+        if (!step.data) step.data = {};
+        step.data.mode = target === 'ai' ? 'ai' : 'manual';
+        if (step.data.mode === 'manual') {
+          // Do not discard aiOutput; simply leave it until user returns to AI
+        }
+        // Update active button visuals
+        const wrap = btn.parentElement;
+        if (wrap) {
+          wrap.querySelectorAll('.toggle-btn').forEach(b => {
+            const on = b === btn;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+          });
+        }
+        try { scheduleStepSave(step.id); } catch (_) {}
+        render();
+      });
+    });
+
+    // Go to Preview from AI editor notice
+    container.querySelectorAll('.step-card .go-to-preview').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const card = btn.closest('.step-card');
+        const id = card?.getAttribute('data-id');
+        const step = state.currentSequence.steps.find(s => s.id === id);
+        if (!step) return;
+        step.activeTab = 'preview';
         render();
       });
     });
@@ -4441,6 +4662,9 @@ class FreeSequenceAutomation {
 
   function formatGeneratedEmail(result, recipient, mode) {
     try {
+      // Resolve sender first name robustly
+      const senderFirst = getSenderFirstName();
+
       // Handle JSON response format
       let jsonData = null;
       try {
@@ -4463,32 +4687,34 @@ class FreeSequenceAutomation {
         if (jsonData.paragraph1) paragraphs.push(jsonData.paragraph1);
         if (jsonData.paragraph2) paragraphs.push(jsonData.paragraph2);
         if (jsonData.paragraph3) paragraphs.push(jsonData.paragraph3);
-        
-        let body = paragraphs.join('\n\n');
-        if (jsonData.closing) {
-          let closing = jsonData.closing;
-          if (closing.includes('Best regards,') && !closing.includes('\n')) {
-            closing = closing.replace(/Best regards,\s*/i, 'Best regards,\n');
-          }
-          body += '\n\n' + closing;
-        }
-        
-        // Convert to HTML
+
+        // Always enforce closing as "Best regards, <FirstName>"
+        const enforcedClosing = `Best regards,\n${senderFirst}`;
+        paragraphs.push(enforcedClosing);
+
+        const body = paragraphs.join('\n\n');
+
+        // Convert to HTML with readable color
         const htmlBody = body
           .split(/\n\n/)
           .map(p => p.trim())
           .filter(Boolean)
           .map(p => {
             const withLineBreaks = p.replace(/\n/g, '<br>');
-            return `<p style="margin: 0 0 16px 0;">${withLineBreaks}</p>`;
+            return `<p style="margin: 0 0 16px 0; color:#222;">${withLineBreaks}</p>`;
           })
           .join('');
-        
+
         return { subject, html: htmlBody };
       } else {
         // Fallback: treat as plain text
         const subject = 'Energy Solutions';
-        const html = '<p>' + (result || 'Email content').replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+        const raw = String(result || 'Email content');
+        const hasClosing = /best\s*regards[\s,]*$/i.test(raw.trim());
+        const appended = hasClosing ? raw : `${raw}\n\nBest regards,\n${senderFirst}`;
+        const html = '<p style="color:#222;">'
+          + appended.replace(/\n\n/g, '</p><p style="color:#222;">').replace(/\n/g, '<br>')
+          + '</p>';
         return { subject, html };
       }
     } catch (error) {
@@ -4497,7 +4723,7 @@ class FreeSequenceAutomation {
     }
   }
 
-    // AI bar interactions (event delegation per step-card)
+    // AI bar interactions (event delegation per step-card) – only present in AI mode in Preview
     container.querySelectorAll('.step-card .ai-bar').forEach(bar => {
       // Get card reference for this bar
       const card = bar.closest('.step-card');
@@ -4556,6 +4782,7 @@ class FreeSequenceAutomation {
           try {
             // Call AI generation API with selected contact data
             const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+            const senderFirst = getSenderFirstName();
             const response = await fetch(`${base}/api/perplexity-email`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -4570,7 +4797,7 @@ class FreeSequenceAutomation {
                   email: selectedContact.email || '',
                   title: selectedContact.title || selectedContact.job || ''
                 },
-                senderName: 'Power Choosers Team' // Could get from settings
+                senderName: senderFirst || ' '
               })
             });
             
@@ -4597,11 +4824,15 @@ class FreeSequenceAutomation {
                 html = formatted.html;
               }
               
-              if (previewBodyEl && html) {
-                previewBodyEl.innerHTML = html;
-              }
-              if (previewSubjectEl && subject) {
-                previewSubjectEl.textContent = subject;
+              if (previewBodyEl && html) { previewBodyEl.innerHTML = html; }
+              if (previewSubjectEl && subject) { previewSubjectEl.textContent = subject; }
+
+              // Update AI lifecycle state only – do not overwrite manual subject/body until saved
+              if (step) {
+                if (!step.data) step.data = {};
+                step.data.aiOutput = { subject, html };
+                step.data.aiStatus = 'generated';
+                try { scheduleStepSave(step.id); } catch (_) {}
               }
               
               if (status) status.textContent = 'Preview generated!';
@@ -4630,7 +4861,9 @@ class FreeSequenceAutomation {
         
         if (status) {
           if (isPreviewActive) {
-            status.textContent = hasContact ? 'Ready to generate preview' : 'Select a contact to generate preview';
+            const phase = step?.data?.aiStatus || 'draft';
+            const base = hasContact ? 'Ready to generate preview' : 'Select a contact to generate preview';
+            status.textContent = phase === 'generated' ? 'Generated - review and Save to step' : base;
           } else {
             status.textContent = 'Switch to Preview tab to generate';
           }
@@ -4654,6 +4887,34 @@ class FreeSequenceAutomation {
       
       // Initial status update
       setTimeout(updateAIBarStatus, 100);
+    });
+
+    // AI Save to step / revert handlers
+    container.querySelectorAll('.step-card .ai-save-to-step').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const card = btn.closest('.step-card');
+        const id = card?.getAttribute('data-id');
+        const step = state.currentSequence.steps.find(s => s.id === id);
+        if (!step || !step.data?.aiOutput) return;
+        if (!step.data) step.data = {};
+        step.data.subject = step.data.aiOutput.subject || step.data.subject || '';
+        step.data.body = step.data.aiOutput.html || step.data.body || '';
+        step.data.aiStatus = 'saved';
+        try { scheduleStepSave(step.id, true); } catch (_) {}
+        render();
+      });
+    });
+    container.querySelectorAll('.step-card .switch-to-manual').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const card = btn.closest('.step-card');
+        const id = card?.getAttribute('data-id');
+        const step = state.currentSequence.steps.find(s => s.id === id);
+        if (!step) return;
+        if (!step.data) step.data = {};
+        step.data.mode = 'manual';
+        try { scheduleStepSave(step.id); } catch (_) {}
+        render();
+      });
     });
 
     // Formatting bar interactions (event delegation per step-card)
@@ -5711,6 +5972,8 @@ class FreeSequenceAutomation {
   // Add CSS for approval notifications
   const style = document.createElement('style');
   style.textContent = `
+    /* Hide Sequences page during navigation into builder to avoid flash */
+    .pc-hide-sequences #sequences-page { display: none !important; }
     .email-approval-notification {
       position: fixed;
       top: 20px;
@@ -5749,7 +6012,144 @@ class FreeSequenceAutomation {
       max-height: 200px;
       overflow-y: auto;
       font-size: 12px;
+      color: #222; /* ensure readable text on light background */
     }
+    .email-preview .preview-subject { color:#222; font-weight:600; margin:0 0 8px 0; }
+    .email-preview .preview-body { color:#222; }
+
+    /* Icon stability to prevent flicker during updates */
+    svg, img { backface-visibility: hidden; transform: translateZ(0); will-change: opacity, transform; }
+
+    /* Mode toggle styling (match lists overview toggle look) */
+    .step-card .mode-toggle .mode-toggle-wrap {
+      display: inline-flex;
+      gap: 8px;
+      background: var(--grey-700);
+      border-radius: 999px; /* fully rounded to match inner pill */
+      padding: 2px;
+    }
+    .step-card .mode-toggle .toggle-btn {
+      background: transparent;
+      color: var(--text-primary);
+      border: none;
+      padding: 6px 12px;
+      border-radius: 999px; /* match container */
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    .step-card .mode-toggle .toggle-btn.active {
+      background: var(--orange-primary);
+      color: #fff;
+      border: 1px solid transparent;
+    }
+    .step-card .mode-toggle .toggle-btn.active:hover {
+      background: var(--orange-primary); /* stay orange on hover */
+      color: #fff;
+      border-color: #ffffff; /* white borderline on hover */
+    }
+    .step-card .mode-toggle .toggle-btn:hover:not(.active) {
+      background: transparent; /* no fill; keep grey container visible */
+      color: var(--text-primary);
+    }
+
+    /* AI mode centered note */
+    .step-card .ai-mode-note {
+      padding: 18px;
+      margin: 8px 0 14px 0;
+      text-align: center;
+      border: 1px solid var(--border-light);
+      border-radius: 10px;
+      background: var(--bg-secondary);
+    }
+    .step-card .ai-mode-note .ai-stars {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 10px;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));
+    }
+    .step-card .ai-mode-note .ai-stars svg {
+      width: 68px !important;
+      height: 68px !important;
+      display: block;
+    }
+    .step-card .ai-mode-note .ai-note-text {
+      color: var(--text-primary);
+      font-size: 14px;
+    }
+
+    /* Delay popover layout fixes */
+    .delay-popover .delay-popover-inner { max-width: 340px; }
+    .delay-popover .delay-options { display: grid; gap: 10px; }
+    .delay-popover .number-unit { display: flex; align-items: center; gap: 10px; justify-content: center; }
+    .delay-popover .number-unit .input-dark { width: 96px; text-align: center; }
+    .delay-popover .unit-select { min-width: 110px; }
+    .delay-popover .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; width: 100%; }
+    .delay-popover .btn-row .btn-cancel,
+    .delay-popover .btn-row .btn-apply { width: 100%; }
+
+    /* In/Out animations for delay popover */
+    @keyframes dpFadeIn {
+      0% { opacity: 0; transform: translateY(-6px) scale(0.98); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes dpFadeOut {
+      0% { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-6px) scale(0.98); }
+    }
+    .delay-popover,
+    .delete-popover,
+    .vars-popover,
+    .add-contact-popover { animation: dpFadeIn 160ms ease forwards; }
+    .delay-popover.closing,
+    .delete-popover.closing,
+    .vars-popover.closing,
+    .add-contact-popover.closing { animation: dpFadeOut 140ms ease forwards; }
+
+    /* Full-width buttons for other popovers */
+    .delete-popover .btn-row,
+    .add-contact-popover .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; width: 100%; }
+    .delete-popover .btn-row .btn-cancel,
+    .delete-popover .btn-row .btn-confirm,
+    .add-contact-popover .btn-row .btn-cancel,
+    .add-contact-popover .btn-row .btn-confirm { width: 100%; }
+
+    /* Editor toolbar + editor area visibility and spacing */
+    .step-card .editor-toolbar {
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      background: var(--bg-secondary);
+      padding: 6px 8px;
+      margin: 10px 0 8px 0; /* add space above/below (below separates from subject input) */
+    }
+    .step-card .editor-toolbar .toolbar-btn { border-radius: 6px; }
+
+    /* Make the rich/HTML editor area visible even when empty
+       Default: light grey like subject input; on focus: darker bg with orange border */
+    .step-card .textarea-dark.body-input,
+    .step-card .textarea-dark.body-input[contenteditable="true"] {
+      background: var(--bg-secondary); /* light grey, matches subject input */
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      min-height: 220px;
+      padding: 12px;
+      transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .step-card .textarea-dark.body-input:hover,
+    .step-card .textarea-dark.body-input[contenteditable="true"]:hover {
+      background: var(--bg-primary); /* darken on hover like subject */
+      border-color: #ffffff; /* match subject input hover */
+    }
+    .step-card .textarea-dark.body-input:focus,
+    .step-card .textarea-dark.body-input[contenteditable="true"]:focus {
+      outline: none;
+      background: var(--bg-primary); /* darker when active */
+      border-color: var(--orange-primary); /* match subject active state */
+      box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.35); /* subtle orange glow */
+    }
+    /* HTML textarea variant */
+    .html-editor-wrap textarea.textarea-dark.body-input { min-height: 220px; }
     
     .approval-buttons {
       display: flex;

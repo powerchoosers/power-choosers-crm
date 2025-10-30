@@ -1165,6 +1165,38 @@
       .list-card-meta {
         transition: opacity 0.2s ease;
       }
+
+      /* Toggle (People/Accounts) pill styling parity with Sequence Builder */
+      #lists-view-toggle {
+        display: inline-flex;
+        background: var(--grey-700);
+        border-radius: 999px;
+        padding: 2px;
+        gap: 8px;
+      }
+      #lists-view-toggle .toggle-btn {
+        background: transparent;
+        color: var(--text-primary);
+        border: none;
+        padding: 8px 14px;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+      }
+      #lists-view-toggle .toggle-btn.active {
+        background: var(--orange-primary);
+        color: #fff;
+        border: 1px solid transparent;
+      }
+      #lists-view-toggle .toggle-btn.active:hover {
+        background: var(--orange-primary);
+        color: #fff;
+        border-color: #ffffff; /* white outline on hover */
+      }
+      #lists-view-toggle .toggle-btn:hover:not(.active) {
+        background: transparent;
+        color: var(--text-primary);
+      }
     `;
     document.head.appendChild(style);
   }
