@@ -303,7 +303,7 @@ function readRawBody(req) {
 // Twilio Voice webhook (returns TwiML XML)
 async function handleApiTwilioVoice(req, res, parsedUrl) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Voice webhook for ${req.url}`);
+  logger.debug('Processing Twilio Voice webhook', 'TwilioWebhook', { correlationId, url: req.url });
   
   if (req.method === 'POST') {
     try {
@@ -340,7 +340,7 @@ async function handleApiTwilioVoice(req, res, parsedUrl) {
 // Twilio Recording status webhook
 async function handleApiTwilioRecording(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Recording webhook for ${req.url}`);
+  logger.debug('Processing Twilio Recording webhook', 'TwilioWebhook', { correlationId, url: req.url });
   
   if (req.method === 'POST') {
     try {
@@ -702,7 +702,9 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/email/stats' ||
     pathname === '/api/email/backfill-threads' ||
     pathname === '/api/email/unsubscribe' ||
-    pathname === '/api/recording'
+    pathname === '/api/recording' ||
+    // New: allow generic preflight for any API path (covers phone lookup/search variants)
+    pathname.startsWith('/api/')
   )) {
     res.writeHead(204);
     res.end();
@@ -762,6 +764,10 @@ const server = http.createServer(async (req, res) => {
     return handleApiEnergyNews(req, res);
   }
   if (pathname === '/api/search') {
+    return handleApiSearch(req, res, parsedUrl);
+  }
+  // Aliases for phone metadata lookups used by the softphone widget
+  if (pathname === '/api/contacts/search' || pathname === '/api/v1/search' || pathname === '/api/lookup/phone' || pathname === '/api/contacts/lookup') {
     return handleApiSearch(req, res, parsedUrl);
   }
   if (pathname === '/api/tx-price') {
@@ -1092,7 +1098,7 @@ async function handleApiCallsContact(req, res, parsedUrl) {
 // Additional Twilio handlers
 async function handleApiTwilioStatus(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Status webhook for ${req.url}`);
+  logger.debug('Processing Twilio Status webhook', 'TwilioWebhook', { correlationId, url: req.url });
   
   if (req.method === 'POST') {
     try {
@@ -1133,7 +1139,7 @@ async function handleApiTwilioStatus(req, res) {
 
 async function handleApiTwilioDialStatus(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Dial Status webhook for ${req.url}`);
+  logger.debug('Processing Twilio Dial Status webhook', 'TwilioWebhook', { correlationId, url: req.url });
   
   if (req.method === 'POST') {
     try {
@@ -1174,7 +1180,7 @@ async function handleApiTwilioDialStatus(req, res) {
 
 async function handleApiTwilioHangup(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Hangup webhook for ${req.url}`);
+  logger.debug('Processing Twilio Hangup webhook', 'TwilioWebhook', { correlationId, url: req.url });
   
   if (req.method === 'POST') {
     try {
@@ -1214,7 +1220,7 @@ async function handleApiTwilioHangup(req, res) {
 
 async function handleApiTwilioCallerId(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Caller ID webhook for ${req.url}`);
+  logger.debug('Processing Twilio Caller ID webhook', 'TwilioWebhook', { correlationId, url: req.url });
   
   if (req.method === 'POST') {
     try {
@@ -1254,7 +1260,7 @@ async function handleApiTwilioCallerId(req, res) {
 
 async function handleApiTwilioCheckTranscriptStatus(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Check Transcript Status for ${req.url}`);
+  logger.debug('Processing Twilio Check Transcript Status', 'TwilioWebhook', { correlationId, url: req.url });
   
   if (req.method === 'POST') {
     try {
@@ -1287,7 +1293,7 @@ async function handleApiTwilioCheckTranscriptStatus(req, res) {
 
 async function handleApiTwilioDialComplete(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Dial Complete for ${req.url}`);
+  logger.debug('Processing Twilio Dial Complete', 'TwilioWebhook', { correlationId, url: req.url });
   
   if (req.method === 'POST') {
     try {
@@ -1320,7 +1326,7 @@ async function handleApiTwilioDialComplete(req, res) {
 
 async function handleApiTwilioProcessExistingTranscripts(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Process Existing Transcripts for ${req.url}`);
+  logger.debug('Processing Twilio Process Existing Transcripts', 'TwilioWebhook', { correlationId, url: req.url });
   
   if (req.method === 'POST') {
     try {
@@ -1353,7 +1359,7 @@ async function handleApiTwilioProcessExistingTranscripts(req, res) {
 
 async function handleApiTwilioTranscribe(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Transcribe for ${req.url}`);
+  logger.debug('Processing Twilio Transcribe', 'TwilioWebhook', { correlationId, url: req.url });
   
   if (req.method === 'POST') {
     try {
@@ -1386,7 +1392,7 @@ async function handleApiTwilioTranscribe(req, res) {
 
 async function handleApiTwilioBridge(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Bridge webhook for ${req.url}`);
+  logger.debug('Processing Twilio Bridge webhook', 'TwilioWebhook', { correlationId, url: req.url });
   
   if (req.method === 'POST') {
     try {
@@ -1419,7 +1425,7 @@ async function handleApiTwilioBridge(req, res) {
 
 async function handleApiTwilioOperatorWebhook(req, res) {
   const correlationId = getCorrelationId(req);
-  console.log(`[${correlationId}] Processing Twilio Operator Webhook for ${req.url}`);
+  logger.debug('Processing Twilio Operator Webhook', 'TwilioWebhook', { correlationId, url: req.url });
   
   if (req.method === 'POST') {
     try {
@@ -1812,7 +1818,7 @@ async function handleApiSendGridSend(req, res) {
   }
 
   // Log environment status (masked for security)
-  console.log('[SendGrid] Environment check:', {
+  logger.debug('SendGrid environment check', 'SendGrid', {
     hasApiKey: !!process.env.SENDGRID_API_KEY,
     fromEmail: process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com',
     fromName: process.env.SENDGRID_FROM_NAME || 'Power Choosers CRM'
@@ -1852,10 +1858,10 @@ async function handleApiSendGridSend(req, res) {
       }
     };
 
-    console.log('[SendGrid] Sending email:', { to, subject, trackingId });
+    logger.debug('Sending email via SendGrid', 'SendGrid', { to, subject, trackingId });
 
     // Log payload details as recommended by Twilio AI
-    console.log('[SendGrid] Email payload:', {
+    logger.debug('SendGrid email payload', 'SendGrid', {
       to: emailData.to,
       subject: emailData.subject,
       from: emailData.from,
@@ -1915,7 +1921,7 @@ async function handleApiSendGridTest(req, res) {
       }
     };
 
-    console.log('[SendGrid] Test email payload:', testEmailData);
+    logger.debug('SendGrid test email payload', 'SendGrid', testEmailData);
 
     const { SendGridService } = await import('./api/email/sendgrid-service.js');
     const sendGridService = new SendGridService();
