@@ -209,6 +209,28 @@ function deSalesify(text) {
     .replace(/\bPower Choosers\b/gi, 'We');
 }
 
+// Industry/size-aware post-processor to avoid generic "your industry" and inaccurate size references
+function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory }) {
+  if (!text) return text;
+  let out = String(text);
+
+  // Replace generic "your industry" with specific industry when available
+  if (industry && /your industry/i.test(out)) {
+    out = out.replace(/your industry/gi, industry);
+  }
+
+  // If size is not small, avoid "small business" assumptions
+  if (sizeCategory && sizeCategory !== 'small') {
+    out = out
+      .replace(/\bAs a small company\b/gi, 'As a team')
+      .replace(/\bAs a small business\b/gi, 'As a team')
+      .replace(/\bsmall businesses like yours\b/gi, industry ? `companies in ${industry}` : 'teams like yours')
+      .replace(/\bsmall business like yours\b/gi, industry ? `companies in ${industry}` : 'teams like yours');
+  }
+
+  return out;
+}
+
 // Enhanced manual prompt analysis and context extraction
 function analyzeManualPrompt(prompt) {
   const promptLower = String(prompt || '').toLowerCase();
