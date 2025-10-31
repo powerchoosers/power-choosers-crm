@@ -108,6 +108,7 @@ class SettingsPage {
                 },
                 twilioNumbers: [],
                 selectedPhoneNumber: null, // Currently selected phone number for calls
+                bridgeToMobile: false, // Admin only: bridge calls to mobile phone (9728342317)
                 general: {
                     // Google-synced profile (auto-filled)
                     firstName: '',
@@ -577,6 +578,13 @@ class SettingsPage {
                 this.removePhoneNumber(e.target.closest('.phone-number-item'));
             } else if (e.target.matches('[data-action="select"]')) {
                 this.selectPhoneNumber(e.target.closest('.phone-number-item'));
+            }
+        });
+        
+        // Bridge to mobile toggle (admin only)
+        document.addEventListener('change', (e) => {
+            if (e.target && e.target.classList.contains('bridge-to-mobile-toggle')) {
+                this.handleBridgeToMobileToggle(e.target);
             }
         });
 
@@ -1440,8 +1448,13 @@ class SettingsPage {
             return;
         }
 
+        const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
+            ? window.DataManager.isCurrentUserAdmin()
+            : (window.currentUserRole === 'admin');
+        
         phoneList.innerHTML = this.state.settings.twilioNumbers.map((phone, index) => {
             const isSelected = this.state.settings.selectedPhoneNumber === phone.number;
+            const bridgeToMobile = this.state.settings.bridgeToMobile || false;
             return `
                 <div class="phone-number-item ${isSelected ? 'selected' : ''}" data-index="${index}">
                     <div class="phone-info">
@@ -1450,8 +1463,14 @@ class SettingsPage {
                     </div>
                     <div class="phone-actions">
                         ${!isSelected ? `<button class="btn-small btn-primary" data-action="select">Set as Current</button>` : ''}
-                        <button class="btn-small btn-secondary" data-action="edit">Edit</button>
-                        <button class="btn-small btn-danger" data-action="remove">Remove</button>
+                        ${isSelected && isAdmin ? `
+                            <label class="toggle-switch" title="Bridge to mobile phone (9728342317)">
+                                <input type="checkbox" class="bridge-to-mobile-toggle" ${bridgeToMobile ? 'checked' : ''} aria-label="Bridge calls to mobile phone">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        ` : ''}
+                        <button class="btn-small btn-secondary" data-action="edit" style="margin-left: ${isSelected && isAdmin ? '8px' : '0'};">Edit</button>
+                        <button class="btn-small btn-danger" data-action="remove" style="margin-left: 8px;">Remove</button>
                     </div>
                 </div>
             `;
@@ -1811,6 +1830,35 @@ class SettingsPage {
         }
     }
 
+    handleBridgeToMobileToggle(toggle) {
+        // Admin only feature - bridge calls to mobile phone (9728342317)
+        const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
+            ? window.DataManager.isCurrentUserAdmin()
+            : (window.currentUserRole === 'admin');
+        
+        if (!isAdmin) {
+            console.warn('[Settings] Bridge to mobile toggle is admin-only');
+            toggle.checked = false;
+            return;
+        }
+        
+        const bridgeToMobile = toggle.checked;
+        this.state.settings.bridgeToMobile = bridgeToMobile;
+        this.markDirty();
+        
+        console.log(`[Settings] Bridge to mobile ${bridgeToMobile ? 'enabled' : 'disabled'} (mobile: 9728342317)`);
+        
+        // Show success message
+        if (window.showToast) {
+            window.showToast(
+                bridgeToMobile 
+                    ? 'Calls will be bridged to mobile phone (9728342317)' 
+                    : 'Calls will use browser/desktop',
+                'success'
+            );
+        }
+    }
+    
     selectPhoneNumber(phoneItem) {
         const index = parseInt(phoneItem.dataset.index);
         const phone = this.state.settings.twilioNumbers[index];
