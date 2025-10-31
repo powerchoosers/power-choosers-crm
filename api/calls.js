@@ -138,6 +138,9 @@ async function upsertCallInFirestore(payload) {
     businessPhone: payload.businessPhone
   });
 
+  // Extract user email for ownership (from payload or agentEmail field)
+  const userEmail = (payload.userEmail || payload.agentEmail || '').toLowerCase().trim();
+
   // Strict policy: upsert by Call SID only; do not cross-merge by phone pair
   // Try exact doc first
   const currentSnap = await db.collection('calls').doc(callId).get();
@@ -176,6 +179,16 @@ async function upsertCallInFirestore(payload) {
     targetPhone: (payload.targetPhone != null ? payload.targetPhone : (current.targetPhone || context.targetPhone)) || '',
     businessPhone: (payload.businessPhone != null ? payload.businessPhone : (current.businessPhone || context.businessPhone)) || '',
     source: payload.source || current.source || 'unknown',
+    
+    // CRITICAL: Add ownership fields for Firestore security rules (only set if userEmail is provided)
+    // If userEmail exists, set ownership; otherwise preserve existing ownership or leave empty
+    ...(userEmail ? {
+      ownerId: userEmail,
+      assignedTo: userEmail,
+      createdBy: current.createdBy || userEmail,
+      agentEmail: userEmail // Also set agentEmail for compatibility
+    } : {}),
+    
     updatedAt: nowIso,
     createdAt: current.createdAt || nowIso
   };
