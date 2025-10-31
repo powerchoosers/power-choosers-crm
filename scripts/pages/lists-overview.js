@@ -384,7 +384,15 @@
       // Fallback to direct Firestore query
       if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
         // Primary query: filter by kind on server if available
+        const email = window.currentUserEmail || '';
         let query = window.firebaseDB.collection('lists');
+        
+        // CRITICAL: Add ownership filter FIRST for non-admin users (required by Firestore rules)
+        if (window.currentUserRole !== 'admin' && email) {
+          query = query.where('ownerId', '==', email);
+        }
+        
+        // Then add kind filter
         if (query.where) query = query.where('kind', '==', kind);
         let snap = await (query.limit ? query.limit(200).get() : query.get());
         let items = (snap && snap.docs) ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
@@ -463,58 +471,192 @@
   // Live updates for lists collection so cards refresh immediately
   let _unsubListsPeople = null;
   let _unsubListsAccounts = null;
+  let _peopleListenerRetries = 0;
+  let _accountsListenerRetries = 0;
+  
   function startLiveListsListeners() {
     try {
       if (!window.firebaseDB || !window.firebaseDB.collection) return;
       const col = window.firebaseDB.collection('lists');
-      // People lists
+      
+      // People lists - try filtered query first, fallback to unfiltered if it fails
       if (_unsubListsPeople) { try { _unsubListsPeople(); } catch(_) {} _unsubListsPeople = null; }
-      _unsubListsPeople = col.where ? col.where('kind', '==', 'people').onSnapshot(
-        (snap) => {
-          // Success handler
+      
+      const setupPeopleListener = (useFilter = true) => {
         try {
-          const items = [];
-          snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
-          state.peopleLists = items;
-          state.loadedPeople = true;
-            if (state.kind === 'people') renderFilteredItems(state.peopleLists);
-          } catch (e) {
-            console.error('[ListsOverview] People lists snapshot error:', e);
+          let query = col;
+          if (useFilter && col.where) {
+            query = col.where('kind', '==', 'people');
           }
-        },
-        (error) => {
-          // Error handler - prevents 400 errors from crashing the app
-          console.error('[ListsOverview] People lists live listener error:', error);
-          if (_unsubListsPeople) {
-            _unsubListsPeople();
-            _unsubListsPeople = null;
-          }
+          
+          _unsubListsPeople = query.onSnapshot(
+            (snap) => {
+              // Success handler
+              try {
+                let items = [];
+                snap.forEach((d) => {
+                  const data = d.data();
+                  // Filter client-side if using unfiltered query
+                  if (!useFilter) {
+                    const kind = (data.kind || '').toLowerCase();
+                    if (kind !== 'people' && kind !== 'person' && kind !== 'contacts' && kind !== 'contact') {
+                      return; // Skip this item
+                    }
+                  }
+                  items.push({ id: d.id, ...data });
+                });
+                
+                // CRITICAL FIX: Always merge with existing lists instead of replacing
+                // This prevents losing lists if the listener query has issues or returns incomplete data
+                const existingCount = state.peopleLists.length;
+                
+                // If we have existing lists but listener returns empty, preserve existing
+                if (existingCount > 0 && items.length === 0) {
+                  console.warn('[ListsOverview] Live listener returned empty but we have existing lists, preserving them');
+                  return; // Don't overwrite with empty data
+                }
+                
+                // If this is the first load (no existing data), do full replacement
+                if (existingCount === 0) {
+                  state.peopleLists = items;
+                  console.log(`[ListsOverview] First load: set ${items.length} lists`);
+                } else {
+                  // ALWAYS merge when we have existing data - never full replace
+                  // This prevents losing lists from BackgroundListsLoader that aren't in the listener's result
+                  const existingMap = new Map(state.peopleLists.map(l => [l.id, l]));
+                  items.forEach(item => {
+                    existingMap.set(item.id, item); // Update or add
+                  });
+                  // Keep ALL existing items, updating only those that appear in the listener's result
+                  state.peopleLists = Array.from(existingMap.values());
+                  console.log(`[ListsOverview] Merged ${items.length} items from listener with ${existingCount} existing lists (total: ${existingMap.size})`);
+                }
+                
+                state.loadedPeople = true;
+                if (state.kind === 'people') renderFilteredItems(state.peopleLists);
+                _peopleListenerRetries = 0; // Reset retry counter on success
+              } catch (e) {
+                console.error('[ListsOverview] People lists snapshot error:', e);
+              }
+            },
+            (error) => {
+              // Error handler - try fallback instead of unsubscribing
+              console.error('[ListsOverview] People lists live listener error:', error);
+              
+              // If filtered query failed and we haven't tried fallback yet, retry with unfiltered
+              if (useFilter && _peopleListenerRetries < 2) {
+                _peopleListenerRetries++;
+                console.log('[ListsOverview] Retrying people lists listener with fallback query...');
+                setTimeout(() => {
+                  if (_unsubListsPeople) {
+                    try { _unsubListsPeople(); } catch(_) {}
+                    _unsubListsPeople = null;
+                  }
+                  setupPeopleListener(false); // Try without filter
+                }, 1000);
+              } else {
+                // After retries, don't unsubscribe - keep existing data visible
+                console.warn('[ListsOverview] People lists listener failed, keeping existing data');
+                // Don't clear state or unsubscribe - preserve what we have
+              }
+            }
+          );
+        } catch (e) {
+          console.error('[ListsOverview] Failed to setup people listener:', e);
         }
-      ) : null;
-      // Account lists
+      };
+      
+      setupPeopleListener(true); // Start with filtered query
+      
+      // Account lists - same fallback pattern
       if (_unsubListsAccounts) { try { _unsubListsAccounts(); } catch(_) {} _unsubListsAccounts = null; }
-      _unsubListsAccounts = col.where ? col.where('kind', '==', 'accounts').onSnapshot(
-        (snap) => {
-          // Success handler
+      
+      const setupAccountsListener = (useFilter = true) => {
         try {
-          const items = [];
-          snap.forEach((d) => items.push({ id: d.id, ...d.data() }));
-          state.accountLists = items;
-          state.loadedAccounts = true;
-            if (state.kind === 'accounts') renderFilteredItems(state.accountLists);
-          } catch (e) {
-            console.error('[ListsOverview] Account lists snapshot error:', e);
+          let query = col;
+          if (useFilter && col.where) {
+            query = col.where('kind', '==', 'accounts');
           }
-        },
-        (error) => {
-          // Error handler - prevents 400 errors from crashing the app
-          console.error('[ListsOverview] Account lists live listener error:', error);
-          if (_unsubListsAccounts) {
-            _unsubListsAccounts();
-            _unsubListsAccounts = null;
-          }
+          
+          _unsubListsAccounts = query.onSnapshot(
+            (snap) => {
+              // Success handler
+              try {
+                let items = [];
+                snap.forEach((d) => {
+                  const data = d.data();
+                  // Filter client-side if using unfiltered query
+                  if (!useFilter) {
+                    const kind = (data.kind || '').toLowerCase();
+                    if (kind !== 'accounts' && kind !== 'account' && kind !== 'companies' && kind !== 'company') {
+                      return; // Skip this item
+                    }
+                  }
+                  items.push({ id: d.id, ...data });
+                });
+                
+                // CRITICAL FIX: Always merge with existing lists instead of replacing
+                // This prevents losing lists if the listener query has issues or returns incomplete data
+                const existingCount = state.accountLists.length;
+                
+                // If we have existing lists but listener returns empty, preserve existing
+                if (existingCount > 0 && items.length === 0) {
+                  console.warn('[ListsOverview] Live listener returned empty but we have existing lists, preserving them');
+                  return; // Don't overwrite with empty data
+                }
+                
+                // If this is the first load (no existing data), do full replacement
+                if (existingCount === 0) {
+                  state.accountLists = items;
+                  console.log(`[ListsOverview] First load: set ${items.length} account lists`);
+                } else {
+                  // ALWAYS merge when we have existing data - never full replace
+                  // This prevents losing lists from BackgroundListsLoader that aren't in the listener's result
+                  const existingMap = new Map(state.accountLists.map(l => [l.id, l]));
+                  items.forEach(item => {
+                    existingMap.set(item.id, item); // Update or add
+                  });
+                  // Keep ALL existing items, updating only those that appear in the listener's result
+                  state.accountLists = Array.from(existingMap.values());
+                  console.log(`[ListsOverview] Merged ${items.length} items from listener with ${existingCount} existing account lists (total: ${existingMap.size})`);
+                }
+                
+                state.loadedAccounts = true;
+                if (state.kind === 'accounts') renderFilteredItems(state.accountLists);
+                _accountsListenerRetries = 0; // Reset retry counter on success
+              } catch (e) {
+                console.error('[ListsOverview] Account lists snapshot error:', e);
+              }
+            },
+            (error) => {
+              // Error handler - try fallback instead of unsubscribing
+              console.error('[ListsOverview] Account lists live listener error:', error);
+              
+              // If filtered query failed and we haven't tried fallback yet, retry with unfiltered
+              if (useFilter && _accountsListenerRetries < 2) {
+                _accountsListenerRetries++;
+                console.log('[ListsOverview] Retrying account lists listener with fallback query...');
+                setTimeout(() => {
+                  if (_unsubListsAccounts) {
+                    try { _unsubListsAccounts(); } catch(_) {}
+                    _unsubListsAccounts = null;
+                  }
+                  setupAccountsListener(false); // Try without filter
+                }, 1000);
+              } else {
+                // After retries, don't unsubscribe - keep existing data visible
+                console.warn('[ListsOverview] Account lists listener failed, keeping existing data');
+                // Don't clear state or unsubscribe - preserve what we have
+              }
+            }
+          );
+        } catch (e) {
+          console.error('[ListsOverview] Failed to setup account listener:', e);
         }
-      ) : null;
+      };
+      
+      setupAccountsListener(true); // Start with filtered query
+      
     } catch (e) {
       console.warn('[ListsOverview] Failed to start live listeners', e);
     }

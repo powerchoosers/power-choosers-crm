@@ -320,7 +320,11 @@
 
     // Quick search
     if (els.quickSearch) {
-      els.quickSearch.addEventListener('input', () => applyFilters());
+      const debounce = (fn, delay = 120) => {
+        let t; return function(){ clearTimeout(t); const args = arguments; t = setTimeout(() => fn.apply(this, args), delay); };
+      };
+      const debouncedFilter = debounce(() => applyFilters(), 120);
+      els.quickSearch.addEventListener('input', debouncedFilter);
     }
 
     // View toggle removed - list detail now shows only the list's designated type (people or accounts)
@@ -1013,9 +1017,9 @@
     }
     
     if (console.timeEnd) console.timeEnd('[ListDetail] loadDataOnce');
-    renderTableHead();
     buildSuggestionPools();
-    applyFilters();
+    // Don't render here during initial load - let init() handle the final render after all data is ready
+    // This prevents duplicate renders that cause flicker
   }
 
   async function fetchMembers(listId) {
@@ -1173,7 +1177,10 @@
       state.filtered = base;
     }
 
-    state.currentPage = 1;
+    // Only reset to first page when not restoring/preserving pagination
+    if (!state.suppressPageReset) {
+      state.currentPage = 1;
+    }
     render();
 
     const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -1786,10 +1793,7 @@
       state.listName = context.listName;
       state.listKind = context.listKind;
       state.view = context.listKind || 'people';
-      // Prevent flicker: clear previous rows immediately when switching lists
-      if (els.tbody) {
-        els.tbody.innerHTML = '';
-      }
+      // Avoid clearing tbody immediately to prevent flicker; it will be replaced on first render
     }
     
     // Check if we're restoring from back navigation
@@ -1810,6 +1814,31 @@
 
     attachEvents();
     injectListDetailBulkStyles();
+    
+    // Only hide table body if this is a fresh load (not a restore)
+    // If restoring, data should already be visible, so skip the opacity hide
+    const isRestoring = window.__restoringListDetail && window._listDetailReturn;
+    
+    // Check for cached data from BackgroundLoaders (faster check)
+    const hasPeopleData = (state.dataPeople && state.dataPeople.length > 0) || 
+                         (window.BackgroundContactsLoader && window.BackgroundContactsLoader.getContactsData && 
+                          window.BackgroundContactsLoader.getContactsData().length > 0);
+    const hasAccountsData = (state.dataAccounts && state.dataAccounts.length > 0) || 
+                           (window.BackgroundAccountsLoader && window.BackgroundAccountsLoader.getAccountsData && 
+                            window.BackgroundAccountsLoader.getAccountsData().length > 0);
+    const hasCachedData = state.listId && 
+                         ((state.view === 'people' && hasPeopleData) || 
+                          (state.view === 'accounts' && hasAccountsData));
+    
+    if (!isRestoring && !hasCachedData && els.tbody) {
+      // Only hide for fresh loads without cached data
+      els.tbody.style.opacity = '0';
+      els.tbody.style.transition = 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+    } else if (els.tbody && (isRestoring || hasCachedData)) {
+      // If restoring or have cached data, ensure it's visible and transition is set
+      els.tbody.style.transition = 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+      els.tbody.style.opacity = '1'; // Keep visible if we have data
+    }
     
     // Listen for restoration event from back navigation (with guard to prevent duplicates)
     if (!window._listDetailRestoreListenerBound) {
@@ -1859,8 +1888,24 @@
         // Re-render table header for correct columns (people vs accounts)
         renderTableHead();
         
-        // Re-render with restored state
+        // Re-render with restored state without resetting pagination
+        state.suppressPageReset = true;
         applyFilters();
+        // Release suppression next tick
+        setTimeout(() => { try { state.suppressPageReset = false; } catch(_) {} }, 0);
+        
+        // Ensure table is visible after restore with smooth transition
+        if (els.tbody) {
+          // Set transition for smooth appearance
+          els.tbody.style.transition = 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+          // Ensure it's visible immediately (should already be if cached data was used)
+          requestAnimationFrame(() => {
+            void els.tbody.offsetHeight;
+            if (parseFloat(els.tbody.style.opacity) < 1) {
+              els.tbody.style.opacity = '1';
+            }
+          });
+        }
         
         // Re-initialize drag and drop after restoration
         setTimeout(() => {
@@ -1903,30 +1948,11 @@
       window._listDetailRestoreListenerBound = true;
     }
     
-    // Instant paint: draw header and render cached data if available
+    // Instant paint: draw header (but don't render table body until data is ready)
     renderTableHead();
-    // Force a synchronous style/layout update to avoid flashing previous content
-    if (els.tbody) { void els.tbody.offsetHeight; }
     
-    // Try to render cached data immediately to avoid empty state flash
-    try {
-      if (state.listId && window.listMembersCache && window.listMembersCache[state.listId]?.loaded) {
-        const cache = window.listMembersCache[state.listId];
-        state.membersPeople = new Set(cache.people || []);
-        state.membersAccounts = new Set(cache.accounts || []);
-        
-        // If we have cached data, try to render it immediately
-        if (state.view === 'people' && state.dataPeople.length > 0) {
-          const filtered = state.dataPeople.filter(c => state.membersPeople.has(c.id));
-          state.filtered = filtered;
-          render();
-        } else if (state.view === 'accounts' && state.dataAccounts.length > 0) {
-          const filtered = state.dataAccounts.filter(a => state.membersAccounts.has(a.id));
-          state.filtered = filtered;
-          render();
-        }
-      }
-    } catch (_) {}
+    // Skip cached render during initial load to prevent flicker; wait for full data load instead
+    // This prevents showing empty state or incomplete data that causes flicker
     
     // Extra guard: if restoring hint is set but stale, clear it
     if (window.__restoringListDetailUntil && Date.now() > window.__restoringListDetailUntil) {
@@ -1946,12 +1972,9 @@
       fetchMembers(state.listId)
     ]);
     
-    // Re-render with loaded data
+    // Re-render with loaded data - batch all DOM updates in a single frame
     renderTableHead();
-    // Avoid repaint jump by batching DOM updates after data is ready
-    if (els.tbody) {
-      els.tbody.style.visibility = 'hidden';
-    }
+    
     // Render chip DOM from internal state (if pre-set)
     try {
       window.__listDetailState = window.__listDetailState || {};
@@ -1970,11 +1993,27 @@
       renderIndustryChips();
       renderVisitorDomainChips();
     } catch(_) {}
+    
+    // Apply filters and render table body, then fade it in smoothly
     applyFilters();
-    if (els.tbody) {
-      // ensure the rows are present before showing
-      void els.tbody.offsetHeight;
-      els.tbody.style.visibility = '';
+    
+    // Only fade in if table was hidden (fresh load)
+    // If restoring or data was cached, it should already be visible
+    const shouldFadeIn = !isRestoring && !hasCachedData && els.tbody && parseFloat(els.tbody.style.opacity) === 0;
+    
+    if (shouldFadeIn && els.tbody) {
+      // Use requestAnimationFrame to ensure DOM is ready before showing
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // Force layout calculation to ensure rows are painted
+          void els.tbody.offsetHeight;
+          // Fade in smoothly with the transition we set earlier
+          els.tbody.style.opacity = '1';
+        });
+      });
+    } else if (els.tbody && (isRestoring || hasCachedData)) {
+      // If restoring or cached, just ensure it's visible immediately
+      els.tbody.style.opacity = '1';
     }
     
     // Initialize drag and drop after everything is rendered
@@ -2561,6 +2600,18 @@ function injectListDetailBulkStyles() {
   style.textContent = `
     /* Match People page bulk actions styling */
     #list-detail-page .table-container { position: relative; overflow: visible; }
+    
+    /* Scroll smoothness improvements - SAME AS PEOPLE PAGE */
+    #list-detail-page .table-scroll {
+      scrollbar-gutter: stable both-edges;
+      overscroll-behavior: contain;
+      overflow-anchor: none;
+      will-change: transform;
+      transform: translateZ(0);
+      backface-visibility: hidden;
+      contain: paint layout;
+    }
+    
     #list-detail-bulk-actions.bulk-actions-modal {
       position: absolute; left: 50%; transform: translateX(-50%); top: 8px;
       width: max-content; max-width: none; background: var(--bg-card); color: var(--text-primary);
@@ -2576,6 +2627,11 @@ function injectListDetailBulkStyles() {
     }
     #list-detail-bulk-actions .action-btn-sm:hover { background: var(--grey-700); }
     #list-detail-bulk-actions .action-btn-sm.danger { background: var(--red-muted); border-color: var(--red-subtle); color: var(--text-inverse); }
+    
+    /* Smooth fade-in transition for table body */
+    #list-detail-page tbody {
+      transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
   `;
   document.head.appendChild(style);
 }

@@ -1336,6 +1336,17 @@ var console = {
       }, 400);
     }
     
+    // Trigger badge fade-in animations after render
+    requestAnimationFrame(() => {
+      const badges = els.tbody.querySelectorAll('.status-badge:not(.badge-visible)');
+      badges.forEach((badge, index) => {
+        // Stagger animations slightly for visual appeal
+        setTimeout(() => {
+          badge.classList.add('badge-visible');
+        }, index * 50); // 50ms delay between each badge
+      });
+    });
+    
     updateRowsCheckedState();
     updateSelectAllState();
     renderPagination();
@@ -1521,19 +1532,62 @@ var console = {
         background: var(--bg-container) !important;
       }
       
-      /* Status badges */
+      /* Status badges with smooth fade-in and slide animation */
       .status-badge {
         display: inline-flex;
         align-items: center;
         padding: 2px 8px;
-        margin-left: 8px;
+        margin-left: 0;
         font-size: 0.7rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         border-radius: 3px;
         white-space: nowrap;
+        opacity: 0;
+        max-width: 0;
+        overflow: hidden;
+        transform: translateX(-8px) scale(0.8);
+        transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+                    transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                    max-width 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                    margin-left 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        vertical-align: middle;
+        pointer-events: none;
       }
+      
+      .status-badge.badge-visible {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+        max-width: 200px;
+        margin-left: 8px;
+        pointer-events: auto;
+      }
+      
+      /* Smooth column width transition to prevent jumping */
+      #accounts-page table {
+        table-layout: auto;
+        border-collapse: separate;
+        border-spacing: 0;
+      }
+      
+      /* Enable smooth expansion for name column cells */
+      #accounts-page .name-cell {
+        transition: min-width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        min-width: 0;
+        width: auto;
+      }
+      
+      /* Smooth expansion for name cell wrapper */
+      #accounts-page .name-cell .company-cell__wrap {
+        display: inline-flex;
+        align-items: center;
+        transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                    min-width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        min-width: fit-content;
+        width: fit-content;
+      }
+      
       
       .status-badge-new {
         background: #10b981;
@@ -1676,12 +1730,18 @@ var console = {
                   const existingBadges = nameCell.querySelectorAll('.status-badge');
                   existingBadges.forEach(badge => badge.remove());
                   
-                  // Add new badge if needed
+                  // Add new badge if needed with smooth fade-in
                   if (!isNew && hasNoCallsNow) {
                     const badgeSpan = document.createElement('span');
                     badgeSpan.className = 'status-badge status-badge-no-calls';
                     badgeSpan.textContent = 'No Calls';
                     accountName.parentNode.appendChild(badgeSpan);
+                    // Trigger fade-in animation after a brief delay
+                    requestAnimationFrame(() => {
+                      requestAnimationFrame(() => {
+                        badgeSpan.classList.add('badge-visible');
+                      });
+                    });
                   }
                 }
               }

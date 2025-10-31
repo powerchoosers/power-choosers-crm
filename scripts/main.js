@@ -1,3 +1,4 @@
+
 // Power Choosers CRM - Main JavaScript Functionality
 // Strategic navigation and interactive features
 
@@ -511,6 +512,11 @@ class PowerChoosersCRM {
               try { data.phone = this.normalizePhone(data.phone); } catch(_) {}
             }
 
+            // Get user email for ownership fields
+            const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+              ? window.DataManager.getCurrentUserEmail()
+              : ((window.currentUserEmail || '').toLowerCase());
+
             const doc = {
               // Known account fields (flexible)
               accountName: data.accountName || data.name || 'New Account',
@@ -532,17 +538,26 @@ class PowerChoosersCRM {
               linkedin: data.linkedin || '',
               // Branding
               logoUrl: data.logoUrl || '',
+              // Ownership fields (required for Firestore rules)
+              ownerId: userEmail || '',
+              assignedTo: userEmail || '',
+              createdBy: userEmail || '',
               // Timestamps
               createdAt: now,
               updatedAt: now,
             };
 
+            // Use DataManager.addOwnership if available for server timestamps
+            const finalDoc = (window.DataManager && typeof window.DataManager.addOwnership === 'function')
+              ? window.DataManager.addOwnership(doc)
+              : doc;
+
             // Add service addresses if any
             if (serviceAddresses.length > 0) {
-              doc.serviceAddresses = serviceAddresses;
+              finalDoc.serviceAddresses = serviceAddresses;
             }
 
-            const ref = await db.collection('accounts').add(doc);
+            const ref = await db.collection('accounts').add(finalDoc);
 
             // Create UI document for notifications and navigation
             const uiDoc = Object.assign({}, doc, { createdAt: new Date(), updatedAt: new Date() });
@@ -752,6 +767,11 @@ class PowerChoosersCRM {
             if (data.workDirectPhone) { try { normalized.workDirectPhone = this.normalizePhone(data.workDirectPhone); } catch(_) { normalized.workDirectPhone = data.workDirectPhone; } }
             if (data.otherPhone) { try { normalized.otherPhone = this.normalizePhone(data.otherPhone); } catch(_) { normalized.otherPhone = data.otherPhone; } }
 
+            // Get user email for ownership fields
+            const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+              ? window.DataManager.getCurrentUserEmail()
+              : ((window.currentUserEmail || '').toLowerCase());
+
             const doc = {
               // Known contact fields
               firstName: data.firstName || '',
@@ -770,6 +790,10 @@ class PowerChoosersCRM {
               seniority: data.seniority || '',
               department: data.department || '',
               linkedin: data.linkedin || '',
+              // Ownership fields (required for Firestore rules)
+              ownerId: userEmail || '',
+              assignedTo: userEmail || '',
+              createdBy: userEmail || '',
               // Timestamps
               createdAt: now,
               updatedAt: now,
@@ -801,7 +825,12 @@ class PowerChoosersCRM {
             }
           } catch (_) { /* noop */ }
 
-            const ref = await db.collection('contacts').add(doc);
+            // Use DataManager.addOwnership if available for server timestamps
+            const finalDoc = (window.DataManager && typeof window.DataManager.addOwnership === 'function')
+              ? window.DataManager.addOwnership(doc)
+              : doc;
+
+            const ref = await db.collection('contacts').add(finalDoc);
 
             // Broadcast for optional listeners (e.g., People page refresh)
             // Use UI-friendly timestamps so the table doesn't show N/A while serverTimestamp resolves
@@ -3769,16 +3798,31 @@ class PowerChoosersCRM {
                             } catch (_) { /* noop */ }
                         } else {
                             // Create new record
+                            // Get user email for ownership fields
+                            const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+                              ? window.DataManager.getCurrentUserEmail()
+                              : ((window.currentUserEmail || '').toLowerCase());
+                            
                             doc.createdAt = now;
                             doc.updatedAt = now;
                             doc.importedAt = now;
+                            
+                            // Add ownership fields (required for Firestore rules)
+                            doc.ownerId = userEmail || '';
+                            doc.assignedTo = userEmail || '';
+                            doc.createdBy = userEmail || '';
                             
                             // For contacts, check if we need to create/update an account
                             if (modal._importType === 'contacts' && doc.companyName) {
                                 await this.handleAccountCreationForContact(db, doc, now);
                             }
                             
-                            const ref = await db.collection(collection).add(doc);
+                            // Use DataManager.addOwnership if available for server timestamps
+                            const finalDoc = (window.DataManager && typeof window.DataManager.addOwnership === 'function')
+                              ? window.DataManager.addOwnership(doc)
+                              : doc;
+                            
+                            const ref = await db.collection(collection).add(finalDoc);
                             imported++;
 
                             // Collect for batch list assignment
@@ -4455,10 +4499,44 @@ class PowerChoosersCRM {
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         
+        // Helper functions for ownership filtering
+        const getUserEmail = () => {
+            try {
+                if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                    return window.DataManager.getCurrentUserEmail();
+                }
+                return (window.currentUserEmail || '').toLowerCase();
+            } catch(_) {
+                return (window.currentUserEmail || '').toLowerCase();
+            }
+        };
+        const isAdmin = () => {
+            try {
+                if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+                    return window.DataManager.isCurrentUserAdmin();
+                }
+                return window.currentUserRole === 'admin';
+            } catch(_) {
+                return window.currentUserRole === 'admin';
+            }
+        };
+        
         // Load localStorage tasks first for immediate rendering
         let localTasks = [];
         try {
             localTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+            
+            // CRITICAL: Filter by ownership for non-admin users (localStorage bypasses Firestore rules)
+            if (!isAdmin() && localTasks.length > 0) {
+                const email = getUserEmail();
+                localTasks = localTasks.filter(t => {
+                    if (!t) return false;
+                    const ownerId = (t.ownerId || '').toLowerCase();
+                    const assignedTo = (t.assignedTo || '').toLowerCase();
+                    const createdBy = (t.createdBy || '').toLowerCase();
+                    return ownerId === email || assignedTo === email || createdBy === email;
+                });
+            }
         } catch (_) { localTasks = []; }
 
         // Always render immediately from localStorage cache first
@@ -4468,7 +4546,63 @@ class PowerChoosersCRM {
         if (!skipFirebase) {
             try {
                 if (window.firebaseDB) {
-                    const snapshot = await window.firebaseDB.collection('tasks')
+                    let query = window.firebaseDB.collection('tasks');
+                    
+                    // CRITICAL: Add ownership filters for non-admin users
+                    if (!isAdmin()) {
+                        const email = getUserEmail();
+                        if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+                            // Use DataManager helper if available
+                            const firebaseTasks = await window.DataManager.queryWithOwnership('tasks');
+                            const mergedTasksMap = new Map();
+                            localTasks.forEach(t => { if (t && t.id) mergedTasksMap.set(t.id, t); });
+                            firebaseTasks.forEach(t => { if (t && t.id && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t); });
+                            const mergedTasks = Array.from(mergedTasksMap.values());
+                            try {
+                                localStorage.setItem('userTasks', JSON.stringify(mergedTasks));
+                            } catch (e) {
+                                console.warn('Could not save merged tasks to localStorage cache:', e);
+                            }
+                            this.renderTodaysTasks(mergedTasks, parseDateStrict, parseTimeToMinutes, today);
+                            this._tasksLoading = false;
+                            return;
+                        } else if (email) {
+                            // Fallback: two separate queries and merge client-side
+                            const [ownedSnap, assignedSnap] = await Promise.all([
+                                window.firebaseDB.collection('tasks').where('ownerId', '==', email).orderBy('timestamp', 'desc').limit(200).get(),
+                                window.firebaseDB.collection('tasks').where('assignedTo', '==', email).orderBy('timestamp', 'desc').limit(200).get()
+                            ]);
+                            const tasksMap = new Map();
+                            ownedSnap.docs.forEach(doc => {
+                                const data = doc.data() || {};
+                                const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
+                                tasksMap.set(doc.id, { ...data, id: doc.id, createdAt, status: data.status || 'pending' });
+                            });
+                            assignedSnap.docs.forEach(doc => {
+                                if (!tasksMap.has(doc.id)) {
+                                    const data = doc.data() || {};
+                                    const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
+                                    tasksMap.set(doc.id, { ...data, id: doc.id, createdAt, status: data.status || 'pending' });
+                                }
+                            });
+                            const firebaseTasks = Array.from(tasksMap.values());
+                            const mergedTasksMap = new Map();
+                            localTasks.forEach(t => { if (t && t.id) mergedTasksMap.set(t.id, t); });
+                            firebaseTasks.forEach(t => { if (t && t.id && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t); });
+                            const mergedTasks = Array.from(mergedTasksMap.values());
+                            try {
+                                localStorage.setItem('userTasks', JSON.stringify(mergedTasks));
+                            } catch (e) {
+                                console.warn('Could not save merged tasks to localStorage cache:', e);
+                            }
+                            this.renderTodaysTasks(mergedTasks, parseDateStrict, parseTimeToMinutes, today);
+                            this._tasksLoading = false;
+                            return;
+                        }
+                    }
+                    
+                    // Admin path: unrestricted query
+                    const snapshot = await query
                         .orderBy('timestamp', 'desc')
                         .limit(200)
                         .get();
@@ -5065,12 +5199,12 @@ window.__pcFaviconHelper = {
             if (!img) return;
             const parent = img.parentNode;
             const doReplace = () => {
-                const html = this.generateFaviconHTML(domain, size);
-                const div = document.createElement('div');
-                div.innerHTML = html;
-                const replacement = div.firstElementChild;
-                if (parent && replacement) parent.replaceChild(replacement, img);
-                else if (img) img.src = `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`;
+            const html = this.generateFaviconHTML(domain, size);
+            const div = document.createElement('div');
+            div.innerHTML = html;
+            const replacement = div.firstElementChild;
+            if (parent && replacement) parent.replaceChild(replacement, img);
+            else if (img) img.src = `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`;
             };
             // Fade out before replacement for smoother UX
             try { img.classList.add('icon-unloading'); } catch(_) {}
@@ -5146,18 +5280,18 @@ window.__pcFaviconHelper = {
             // Fade out then try next source for smoother transition
             try { img.classList.add('icon-unloading'); } catch(_) {}
             setTimeout(() => {
-                img.dataset.sourceIndex = currentIndex.toString();
-                img.src = faviconSources[currentIndex];
+            img.dataset.sourceIndex = currentIndex.toString();
+            img.src = faviconSources[currentIndex];
                 try { img.classList.remove('icon-unloading'); } catch(_) {}
             }, 120);
         } else {
             // All sources failed, show fallback icon with a graceful fade-out
             try { img.classList.add('icon-unloading'); } catch(_) {}
             setTimeout(() => {
-                img.classList.add('favicon-failed');
-                img.style.display = 'none';
-                const fallbackIcon = window.__pcAccountsIcon();
-                img.insertAdjacentHTML('afterend', fallbackIcon);
+            img.classList.add('favicon-failed');
+            img.style.display = 'none';
+            const fallbackIcon = window.__pcAccountsIcon();
+            img.insertAdjacentHTML('afterend', fallbackIcon);
             }, 120);
         }
     }

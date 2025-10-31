@@ -237,9 +237,14 @@
   // One-time cleanup now
   pruneDuplicateOverlays();
 
-  // Observe DOM for new overlays and prune older ones immediately
+  // Observe DOM for new overlays and prune older ones with throttling to reduce overhead
   try {
-    const observer = new MutationObserver(() => pruneDuplicateOverlays());
+    let scheduled = false;
+    const observer = new MutationObserver(() => {
+      if (scheduled) return;
+      scheduled = true;
+      setTimeout(() => { try { pruneDuplicateOverlays(); } catch(_) {} scheduled = false; }, 200);
+    });
     observer.observe(document.body, { childList: true, subtree: true });
   } catch (_) {}
   

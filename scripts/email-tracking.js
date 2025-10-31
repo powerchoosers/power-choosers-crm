@@ -855,13 +855,31 @@ class EmailTrackingManager {
      */
     async saveEmailRecord(emailData) {
         try {
-            const { id, to, subject, content, from, sendgridMessageId, gmailMessageId, sentAt, sentVia, provider } = emailData;
+            const { id, to, subject, content, from, sendgridMessageId, gmailMessageId, sentAt, sentVia, provider, userEmail } = emailData;
             
             // Determine provider (default to sendgrid)
             const emailProvider = provider || sentVia || 'sendgrid';
             
             // Use the provided tracking ID or generate a new one based on provider
             const trackingId = id || `${emailProvider === 'gmail' || emailProvider === 'gmail_api' ? 'gmail' : 'sendgrid'}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Get user email for ownership (required by Firestore rules)
+            let ownerEmail = null;
+            if (userEmail) {
+                ownerEmail = String(userEmail).toLowerCase();
+            } else {
+                // Try to get from global state (client-side only)
+                try {
+                    if (typeof window !== 'undefined') {
+                        const dm = window.DataManager;
+                        if (dm && typeof dm.getCurrentUserEmail === 'function') {
+                            ownerEmail = dm.getCurrentUserEmail();
+                        } else if (window.currentUserEmail) {
+                            ownerEmail = (window.currentUserEmail || '').toLowerCase();
+                        }
+                    }
+                } catch (_) {}
+            }
             
             // Create email record with provider-specific fields
             const emailRecord = {
@@ -878,7 +896,16 @@ class EmailTrackingManager {
                 replyCount: 0,
                 status: 'sent',
                 provider: emailProvider, // Track email provider (sendgrid or gmail)
-                sentVia: emailProvider
+                sentVia: emailProvider,
+                type: 'sent',              // Required for email filtering
+                emailType: 'sent',         // Alternative field for filtering
+                isSentEmail: true,         // Additional flag for filtering
+                // Ownership fields (required for Firestore rules)
+                ownerId: ownerEmail || '',
+                assignedTo: ownerEmail || '',
+                createdBy: ownerEmail || '',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
             };
             
             // Add provider-specific message IDs (only if they exist)

@@ -233,6 +233,28 @@
     let userTasks = [];
     let firebaseTasks = [];
     
+    // Helper to get user email and role
+    const getUserEmail = () => {
+      try {
+        if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+          return window.DataManager.getCurrentUserEmail();
+        }
+        return (window.currentUserEmail || '').toLowerCase();
+      } catch(_) {
+        return (window.currentUserEmail || '').toLowerCase();
+      }
+    };
+    const isAdmin = () => {
+      try {
+        if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+          return window.DataManager.isCurrentUserAdmin();
+        }
+        return window.currentUserRole === 'admin';
+      } catch(_) {
+        return window.currentUserRole === 'admin';
+      }
+    };
+    
     // Load from localStorage (namespaced by user email; fallback to legacy key)
     try {
       const key = getUserTasksKey();
@@ -243,6 +265,18 @@
         // Fallback migration from legacy key
         const legacy = localStorage.getItem('userTasks');
         userTasks = legacy ? JSON.parse(legacy) : [];
+      }
+      
+      // CRITICAL: Filter by ownership for non-admin users (localStorage bypasses Firestore rules)
+      if (!isAdmin() && userTasks.length > 0) {
+        const email = getUserEmail();
+        userTasks = userTasks.filter(t => {
+          if (!t) return false;
+          const ownerId = (t.ownerId || '').toLowerCase();
+          const assignedTo = (t.assignedTo || '').toLowerCase();
+          const createdBy = (t.createdBy || '').toLowerCase();
+          return ownerId === email || assignedTo === email || createdBy === email;
+        });
       }
     } catch(_) { userTasks = []; }
     

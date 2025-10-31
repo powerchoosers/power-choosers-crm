@@ -2404,6 +2404,10 @@
             company: person.company || account?.accountName || account?.name || '',
             title: person.title || person.job || person.role || '',
             phone: person.phone || person.mobile || '',
+            linkedin: person.linkedin || person.linkedinUrl || '',
+            linkedinUrl: person.linkedin || person.linkedinUrl || '',
+            seniority: person.seniority || '',
+            department: person.department || '',
             account: account ? {
               id: account.id,
               name: account.accountName || account.name || '',
@@ -2444,7 +2448,11 @@
           fullName: person.fullName || person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim(),
           company: person.company || person.accountName || '',
           title: person.title || person.job || person.role || '',
-          phone: person.phone || person.mobile || ''
+          phone: person.phone || person.mobile || '',
+          linkedin: person.linkedin || person.linkedinUrl || '',
+          linkedinUrl: person.linkedin || person.linkedinUrl || '',
+          seniority: person.seniority || '',
+          department: person.department || ''
         };
       }
       
@@ -2537,10 +2545,15 @@
           shortDescription: acct.shortDescription || acct.short_desc || acct.descriptionShort || acct.description || '',
           logoUrl: acct.logoUrl || '',
           phone: acct.phone || acct.companyPhone || '',
-          annualUsage: acct.annualUsage || '',
+          annualUsage: acct.annualUsage || acct.annualKilowattUsage || acct.annual_usage || '',
           electricitySupplier: acct.electricitySupplier || '',
           currentRate: acct.currentRate || '',
-          contractEndDate: acct.contractEndDate || ''
+          contractEndDate: acct.contractEndDate || acct.contractEnd || acct.contract_end_date || '',
+          linkedin: acct.linkedin || acct.linkedinUrl || acct.companyLinkedin || '',
+          linkedinUrl: acct.linkedin || acct.linkedinUrl || acct.companyLinkedin || '',
+          employees: acct.employees || acct.companyEmployees || null,
+          squareFootage: acct.squareFootage || acct.square_footage || acct.companySquareFootage || null,
+          occupancyPct: acct.occupancyPct || acct.occupancy_pct || acct.companyOccupancyPct || null
         };
         
         let rate = String(acctEnergy.currentRate || '').trim();
