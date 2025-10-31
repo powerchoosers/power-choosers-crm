@@ -115,11 +115,17 @@ class AuthManager {
                 });
                 
                 console.log(`[Auth] Created ${role} profile for ${emailLower}`);
+                
+                // Auto-create agent record for PowerChoosers users
+                await this.ensureAgentRecord(user, emailLower);
             } else {
                 // Update last login
                 await userRef.update({
                     lastLoginAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+                
+                // Ensure agent record exists (in case it was deleted or never created)
+                await this.ensureAgentRecord(user, emailLower);
             }
             
             // Get and store role globally
@@ -135,6 +141,65 @@ class AuthManager {
             const emailLower = user.email.toLowerCase();
             window.currentUserEmail = emailLower;
             window.currentUserRole = (emailLower === 'l.patterson@powerchoosers.com') ? 'admin' : 'employee';
+        }
+    }
+    
+    async ensureAgentRecord(user, emailLower) {
+        // Only create agent records for PowerChoosers domain users
+        if (!emailLower.endsWith('@powerchoosers.com')) {
+            return;
+        }
+        
+        try {
+            const db = firebase.firestore();
+            const agentRef = db.collection('agents').doc(emailLower);
+            const agentDoc = await agentRef.get();
+            
+            if (!agentDoc.exists) {
+                // Auto-create agent record with defaults
+                const userName = user.displayName || emailLower.split('@')[0];
+                const agentData = {
+                    name: userName,
+                    email: emailLower,
+                    territory: '', // Admin can assign later
+                    skills: [], // Admin can add later
+                    status: 'offline',
+                    role: 'sales_agent',
+                    goals: {
+                        callsPerDay: 50,
+                        emailsPerDay: 20,
+                        dealsPerMonth: 5
+                    },
+                    performance: {
+                        totalCalls: 0,
+                        totalEmails: 0,
+                        dealsClosed: 0,
+                        conversionRate: 0
+                    },
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+                    autoCreated: true // Flag to indicate auto-creation
+                };
+                
+                await agentRef.set(agentData);
+                console.log(`[Auth] Auto-created agent record for ${emailLower}`);
+            } else {
+                // Agent exists - just update lastActive timestamp if needed
+                const agentData = agentDoc.data();
+                if (!agentData.name || agentData.name === emailLower.split('@')[0]) {
+                    // Update name if it's missing or just the email prefix
+                    const userName = user.displayName || emailLower.split('@')[0];
+                    if (userName && userName !== emailLower.split('@')[0]) {
+                        await agentRef.update({
+                            name: userName,
+                            lastActive: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            // Log error but don't block login if agent creation fails
+            console.warn('[Auth] Could not ensure agent record (this is okay for first-time setup):', error);
         }
     }
 
