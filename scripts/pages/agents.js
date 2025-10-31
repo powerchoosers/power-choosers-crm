@@ -184,26 +184,28 @@ const state = {
     showLoading();
     
     try {
-      // 1. Try cache first (free, instant)
-      const cachedAgents = await window.CacheManager?.getCachedData('agents');
-      if (cachedAgents && cachedAgents.length > 0) {
-        console.log('[Agents] Loading from cache (free)');
-        state.agents = cachedAgents;
-        state.loadedFromCache = true;
-        
-        // Load activities from cache
-        await loadActivitiesFromCache();
-        
-        // Load Twilio/SendGrid from cache
-        await loadTwilioNumbers();
-        await loadSendGridEmails();
-        
-        renderAgentsDashboard();
-        hideLoading();
-        
-        // Schedule background refresh (non-blocking)
-        scheduleBackgroundRefresh();
-        return;
+      // 1. Try cache first (free, instant) - use get() which checks freshness automatically
+      if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+        const cachedAgents = await window.CacheManager.get('agents');
+        if (cachedAgents && cachedAgents.length > 0) {
+          console.log('[Agents] Loading from cache (free)');
+          state.agents = cachedAgents;
+          state.loadedFromCache = true;
+          
+          // Load activities from cache
+          await loadActivitiesFromCache();
+          
+          // Load Twilio/SendGrid from cache
+          await loadTwilioNumbers();
+          await loadSendGridEmails();
+          
+          renderAgentsDashboard();
+          hideLoading();
+          
+          // Schedule background refresh (non-blocking)
+          scheduleBackgroundRefresh();
+          return;
+        }
       }
       
       // 2. Cache miss - load from Firestore
@@ -253,10 +255,11 @@ const state = {
 
   // Load activities from cache
   async function loadActivitiesFromCache() {
-    if (!window.CacheManager) return;
+    if (!window.CacheManager || typeof window.CacheManager.get !== 'function') return;
     
     try {
-      const cachedActivities = await window.CacheManager.getCachedData('agent_activities');
+      // Use get() which checks freshness, or getFromCache() for direct access
+      const cachedActivities = await window.CacheManager.get('agent_activities');
       if (cachedActivities && cachedActivities.length > 0) {
         state.activities = cachedActivities;
         console.log('[Agents] Loaded activities from cache');
