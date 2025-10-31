@@ -287,23 +287,61 @@
         state.hasMore = window.BackgroundTasksLoader.hasMore();
         console.log('[Tasks] Loaded', firebaseTasks.length, 'tasks from BackgroundTasksLoader');
       } else {
-        // Fallback to direct Firestore query if background loader not available
+        // Fallback to direct Firestore query if background loader not available (with ownership filters)
         if (window.firebaseDB) {
-          const snapshot = await window.firebaseDB.collection('tasks')
-            .orderBy('timestamp', 'desc')
-            .limit(100)
-            .get();
-          firebaseTasks = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id, 
-              ...data,
-              // Ensure we have the required fields with proper fallbacks
-              createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
-              // Ensure status is set
-            status: data.status || 'pending'
-          };
-        });
+          if (!isAdmin()) {
+            // Non-admin: use ownership-aware query
+            const email = getUserEmail();
+            if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+              firebaseTasks = await window.DataManager.queryWithOwnership('tasks');
+              firebaseTasks = firebaseTasks.slice(0, 100); // Limit for fallback
+            } else if (email) {
+              // Fallback: two separate queries
+              const [ownedSnap, assignedSnap] = await Promise.all([
+                window.firebaseDB.collection('tasks').where('ownerId', '==', email).orderBy('timestamp', 'desc').limit(100).get(),
+                window.firebaseDB.collection('tasks').where('assignedTo', '==', email).orderBy('timestamp', 'desc').limit(100).get()
+              ]);
+              const tasksMap = new Map();
+              ownedSnap.docs.forEach(doc => {
+                const data = doc.data();
+                tasksMap.set(doc.id, {
+                  id: doc.id,
+                  ...data,
+                  createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
+                  status: data.status || 'pending'
+                });
+              });
+              assignedSnap.docs.forEach(doc => {
+                if (!tasksMap.has(doc.id)) {
+                  const data = doc.data();
+                  tasksMap.set(doc.id, {
+                    id: doc.id,
+                    ...data,
+                    createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
+                    status: data.status || 'pending'
+                  });
+                }
+              });
+              firebaseTasks = Array.from(tasksMap.values());
+            }
+          } else {
+            // Admin: unrestricted query
+            const snapshot = await window.firebaseDB.collection('tasks')
+              .orderBy('timestamp', 'desc')
+              .limit(100)
+              .get();
+            firebaseTasks = snapshot.docs.map(doc => {
+              const data = doc.data();
+              return {
+                id: doc.id, 
+                ...data,
+                // Ensure we have the required fields with proper fallbacks
+                createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
+                // Ensure status is set
+                status: data.status || 'pending'
+              };
+            });
+          }
         }
       }
     } catch (error) {

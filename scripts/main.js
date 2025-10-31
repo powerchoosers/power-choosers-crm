@@ -261,24 +261,106 @@ class PowerChoosersCRM {
                 const tasksData = window.tasksModule.getTasksData();
                 window._essentialTasksData = tasksData;
                 console.log('[CRM] ✓ Pre-loaded', tasksData.length, 'tasks from tasks module');
+            } else if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function') {
+                // Use BackgroundTasksLoader if available (already handles ownership)
+                window._essentialTasksData = window.BackgroundTasksLoader.getTasksData() || [];
+                console.log('[CRM] ✓ Pre-loaded', window._essentialTasksData.length, 'tasks from BackgroundTasksLoader');
             } else if (window.firebaseDB) {
-                // Fallback: load directly from Firebase
-                const snapshot = await window.firebaseDB.collection('tasks')
-                    .orderBy('timestamp', 'desc')
-                    .limit(100)
-                    .get();
-                const tasksData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Fallback: load directly from Firebase with ownership filters
+                let tasksData = [];
                 
-                // Merge with localStorage
+                // Helper functions
+                const getUserEmail = () => {
+                    try {
+                        if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                            return window.DataManager.getCurrentUserEmail();
+                        }
+                        return (window.currentUserEmail || '').toLowerCase();
+                    } catch(_) {
+                        return (window.currentUserEmail || '').toLowerCase();
+                    }
+                };
+                const isAdmin = () => {
+                    try {
+                        if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+                            return window.DataManager.isCurrentUserAdmin();
+                        }
+                        return window.currentUserRole === 'admin';
+                    } catch(_) {
+                        return window.currentUserRole === 'admin';
+                    }
+                };
+                
                 try {
-                    const localTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-                    const existingIds = new Set(tasksData.map(t => t.id));
-                    const newLocalTasks = localTasks.filter(t => !existingIds.has(t.id));
-                    window._essentialTasksData = [...tasksData, ...newLocalTasks];
-                } catch(e) {
-                    window._essentialTasksData = tasksData;
+                    if (!isAdmin()) {
+                        // Non-admin: use ownership-aware query
+                        const email = getUserEmail();
+                        if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+                            tasksData = await window.DataManager.queryWithOwnership('tasks');
+                            tasksData = tasksData.slice(0, 100); // Limit for preload
+                        } else if (email) {
+                            // Fallback: two separate queries
+                            const [ownedSnap, assignedSnap] = await Promise.all([
+                                window.firebaseDB.collection('tasks').where('ownerId', '==', email).orderBy('timestamp', 'desc').limit(100).get(),
+                                window.firebaseDB.collection('tasks').where('assignedTo', '==', email).orderBy('timestamp', 'desc').limit(100).get()
+                            ]);
+                            const tasksMap = new Map();
+                            ownedSnap.docs.forEach(doc => tasksMap.set(doc.id, { id: doc.id, ...doc.data() }));
+                            assignedSnap.docs.forEach(doc => {
+                                if (!tasksMap.has(doc.id)) tasksMap.set(doc.id, { id: doc.id, ...doc.data() });
+                            });
+                            tasksData = Array.from(tasksMap.values());
+                        }
+                    } else {
+                        // Admin: unrestricted query
+                        const snapshot = await window.firebaseDB.collection('tasks')
+                            .orderBy('timestamp', 'desc')
+                            .limit(100)
+                            .get();
+                        tasksData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    }
+                    
+                    // Merge with localStorage (filtered by ownership for non-admin)
+                    try {
+                        let localTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+                        if (!isAdmin() && localTasks.length > 0) {
+                            const email = getUserEmail();
+                            localTasks = localTasks.filter(t => {
+                                if (!t) return false;
+                                const ownerId = (t.ownerId || '').toLowerCase();
+                                const assignedTo = (t.assignedTo || '').toLowerCase();
+                                const createdBy = (t.createdBy || '').toLowerCase();
+                                return ownerId === email || assignedTo === email || createdBy === email;
+                            });
+                        }
+                        const existingIds = new Set(tasksData.map(t => t.id));
+                        const newLocalTasks = localTasks.filter(t => !existingIds.has(t.id));
+                        window._essentialTasksData = [...tasksData, ...newLocalTasks];
+                    } catch(e) {
+                        window._essentialTasksData = tasksData;
+                    }
+                    console.log('[CRM] ✓ Pre-loaded', window._essentialTasksData.length, 'tasks from Firebase');
+                } catch (error) {
+                    console.warn('[CRM] Could not pre-load tasks from Firebase:', error);
+                    // Fallback to localStorage only
+                    try {
+                        let localTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+                        if (!isAdmin() && localTasks.length > 0) {
+                            const email = getUserEmail();
+                            localTasks = localTasks.filter(t => {
+                                if (!t) return false;
+                                const ownerId = (t.ownerId || '').toLowerCase();
+                                const assignedTo = (t.assignedTo || '').toLowerCase();
+                                const createdBy = (t.createdBy || '').toLowerCase();
+                                return ownerId === email || assignedTo === email || createdBy === email;
+                            });
+                        }
+                        window._essentialTasksData = localTasks;
+                        console.log('[CRM] ✓ Pre-loaded', window._essentialTasksData.length, 'tasks from localStorage fallback');
+                    } catch(e) {
+                        window._essentialTasksData = [];
+                    }
                 }
-                console.log('[CRM] ✓ Pre-loaded', window._essentialTasksData.length, 'tasks from Firebase');
             }
             
             console.log('[CRM] ✓✓✓ All essential data pre-loaded successfully');

@@ -229,10 +229,54 @@ class CacheManager {
     }
 
     try {
-      // Special handling for settings (single document)
+      // Special handling for settings (per-user documents)
       if (collection === 'settings') {
-        const doc = await window.firebaseDB.collection('settings').doc('user-settings').get();
-        return doc.exists ? [{ id: 'user-settings', ...doc.data() }] : [];
+        try {
+          // Try per-user settings doc first (employees), then fallback to 'user-settings' (admin/legacy)
+          const email = (window.currentUserEmail || '').toLowerCase();
+          const isAdmin = window.currentUserRole === 'admin';
+          
+          let doc = null;
+          let docId = null;
+          
+          if (!isAdmin && email) {
+            docId = `user-settings-${email}`;
+            try {
+              doc = await window.firebaseDB.collection('settings').doc(docId).get();
+            } catch (err) {
+              console.warn('[CacheManager] Error loading per-user settings, trying legacy:', err);
+            }
+          }
+          
+          // Fallback to legacy 'user-settings' if per-user doc doesn't exist or user is admin
+          if (!doc || !doc.exists || isAdmin) {
+            docId = 'user-settings';
+            doc = await window.firebaseDB.collection('settings').doc(docId).get();
+          }
+          
+          if (doc.exists) {
+            const data = doc.data();
+            // Check ownership for non-admin users (only needed for legacy 'user-settings')
+            if (!isAdmin && docId === 'user-settings') {
+              const ownerId = (data.ownerId || '').toLowerCase();
+              const userId = data.userId;
+              const currentUserId = window.firebase && window.firebase.auth && window.firebase.auth().currentUser ? window.firebase.auth().currentUser.uid : null;
+              if (ownerId !== email && userId !== currentUserId) {
+                // User doesn't own this settings doc, return empty
+                return [];
+              }
+            }
+            return [{ id: docId, ...data }];
+          }
+          return [];
+        } catch (error) {
+          // Permission errors are expected for non-admin users accessing settings they don't own
+          if (error.code === 'permission-denied' || error.message.includes('permission')) {
+            console.warn('[CacheManager] Permission denied for settings (expected for non-admin), returning empty');
+            return [];
+          }
+          throw error;
+        }
       }
 
       // Use DataManager for ownership-aware queries if available
