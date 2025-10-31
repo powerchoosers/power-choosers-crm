@@ -797,19 +797,62 @@
       #people-sequence-panel .btn:focus, #people-lists-panel .btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(255,139,0,.35); }
       #people-sequence-panel .btn-primary, #people-lists-panel .btn-primary { background: var(--primary-700); border-color: var(--primary-600); color: #fff; }
       
-      /* Status badges */
+      /* Status badges with smooth fade-in and slide animation */
       .status-badge {
         display: inline-flex;
         align-items: center;
         padding: 2px 8px;
-        margin-left: 8px;
+        margin-left: 0;
         font-size: 0.7rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         border-radius: 3px;
         white-space: nowrap;
+        opacity: 0;
+        max-width: 0;
+        overflow: hidden;
+        transform: translateX(-8px) scale(0.8);
+        transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+                    transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                    max-width 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                    margin-left 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        vertical-align: middle;
+        pointer-events: none;
       }
+      
+      .status-badge.badge-visible {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+        max-width: 200px;
+        margin-left: 8px;
+        pointer-events: auto;
+      }
+      
+      /* Smooth column width transition to prevent jumping */
+      #people-page table {
+        table-layout: auto;
+        border-collapse: separate;
+        border-spacing: 0;
+      }
+      
+      /* Enable smooth expansion for name column cells */
+      #people-page .name-cell {
+        transition: min-width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        min-width: 0;
+        width: auto;
+      }
+      
+      /* Smooth expansion for name cell wrapper */
+      #people-page .name-cell .name-cell__wrap {
+        display: inline-flex;
+        align-items: center;
+        transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                    min-width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        min-width: fit-content;
+        width: fit-content;
+      }
+      
       
       .status-badge-new {
         background: #10b981;
@@ -2596,6 +2639,17 @@
       }, 400);
     }
     
+    // Trigger badge fade-in animations after render
+    requestAnimationFrame(() => {
+      const badges = els.tbody.querySelectorAll('.status-badge:not(.badge-visible)');
+      badges.forEach((badge, index) => {
+        // Stagger animations slightly for visual appeal
+        setTimeout(() => {
+          badge.classList.add('badge-visible');
+        }, index * 50); // 50ms delay between each badge
+      });
+    });
+    
     // After render, sync select-all and row selections
     updateRowsCheckedState();
     updateSelectAllState();
@@ -2897,12 +2951,18 @@
                   const existingBadges = nameWrap.querySelectorAll('.status-badge');
                   existingBadges.forEach(badge => badge.remove());
                   
-                  // Add new badge if needed
+                  // Add new badge if needed with smooth fade-in
                   if (!isNew && hasNoCallsNow) {
                     const badgeSpan = document.createElement('span');
                     badgeSpan.className = 'status-badge status-badge-no-calls';
                     badgeSpan.textContent = 'No Calls';
                     nameWrap.appendChild(badgeSpan);
+                    // Trigger fade-in animation after a brief delay
+                    requestAnimationFrame(() => {
+                      requestAnimationFrame(() => {
+                        badgeSpan.classList.add('badge-visible');
+                      });
+                    });
                   }
                 }
               }
@@ -3059,7 +3119,7 @@
       select: `<td class="col-select"><input type="checkbox" class="row-select" data-id="${escapeHtml(c.id)}" aria-label="Select contact"${checked}></td>`,
       name: `<td class="name-cell" data-contact-id="${escapeHtml(c.id)}"><div class="name-cell__wrap"><span class="avatar-initials" aria-hidden="true">${escapeHtml(initials)}</span><span class="name-text">${escapeHtml(fullName)}</span>${badges}</div></td>`,
       title: `<td>${escapeHtml(title)}</td>`,
-      company: `<td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${(() => { try { const accounts = (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function' && window.BackgroundAccountsLoader.getAccountsData()) || (typeof window.getAccountsData === 'function' && window.getAccountsData()) || []; const acct = accounts.find(a => a.accountName === company || a.name === company) || {}; let dom = String(acct.domain || acct.website || favDomain || '').trim(); if (/^https?:\/\//i.test(dom)) { try { dom = new URL(dom).hostname; } catch(_) { dom = dom.replace(/^https?:\/\//i, '').split('/')[0]; } } dom = dom ? dom.replace(/^www\./i, '') : ''; const logoUrl = acct.logoUrl || acct.logoURL || ''; if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') { const html = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain: dom, size: 32 }); return html && String(html).trim() ? html : '<span class="company-favicon placeholder" aria-hidden="true"></span>'; } if (dom && window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateFaviconHTML === 'function') { const html = window.__pcFaviconHelper.generateFaviconHTML(dom, 32); return html && String(html).trim() ? html : '<span class="company-favicon placeholder" aria-hidden="true"></span>'; } if (dom) { return \`<img class=\"company-favicon\" src=\"https://www.google.com/s2/favicons?sz=32&domain=\${encodeURIComponent(dom)}\" alt=\"\" aria-hidden=\"true\" referrerpolicy=\"no-referrer\" loading=\"lazy\" style=\"pointer-events:none\" onerror=\"this.style.display='none'\" />\`; } return '<span class="company-favicon placeholder" aria-hidden="true"></span>'; } catch(_) { return '<span class=\"company-favicon placeholder\" aria-hidden=\"true\"></span>'; } })()}<span class="company-name">${escapeHtml(company)}</span></span></a></td>`,
+      company: `<td><a href="#account-details" class="company-link" data-company="${escapeHtml(company)}" data-domain="${escapeHtml(favDomain)}"><span class="company-cell__wrap">${(() => { try { const accounts = (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function' && window.BackgroundAccountsLoader.getAccountsData()) || (typeof window.getAccountsData === 'function' && window.getAccountsData()) || []; const acct = accounts.find(a => a.accountName === company || a.name === company) || {}; let dom = String(acct.domain || acct.website || favDomain || '').trim(); if (/^https?:\/\//i.test(dom)) { try { dom = new URL(dom).hostname; } catch(_) { dom = dom.replace(/^https?:\/\//i, '').split('/')[0]; } } dom = dom ? dom.replace(/^www\./i, '') : ''; const logoUrl = acct.logoUrl || acct.logoURL || ''; if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') { const html = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain: dom, size: 32 }); return html && String(html).trim() ? html : '<span class="company-favicon placeholder" aria-hidden="true"></span>'; } if (dom && window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateFaviconHTML === 'function') { const html = window.__pcFaviconHelper.generateFaviconHTML(dom, 32); return html && String(html).trim() ? html : '<span class="company-favicon placeholder" aria-hidden="true"></span>'; } if (dom) { return '<img class="company-favicon" src="https://www.google.com/s2/favicons?sz=32&domain=' + encodeURIComponent(dom) + '" alt="" aria-hidden="true" referrerpolicy="no-referrer" loading="lazy" style="pointer-events:none" onerror="this.style.display=\'none\'" />'; } return '<span class="company-favicon placeholder" aria-hidden="true"></span>'; } catch(_) { return '<span class="company-favicon placeholder" aria-hidden="true"></span>'; } })()}<span class="company-name">${escapeHtml(company)}</span></span></a></td>`,
       email: `<td>${escapeHtml(email)}</td>`,
       phone: `<td class="phone-cell" data-phone="${escapeHtml(phone)}">${phone ? `<span class="phone-link">${escapeHtml(formatPhoneForDisplay(phone))}</span>` : ''}</td>`,
       location: `<td>${location}</td>`,

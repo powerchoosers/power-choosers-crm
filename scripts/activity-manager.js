@@ -373,15 +373,66 @@ class ActivityManager {
     try {
       let contacts = [];
       
+      // Helper functions
+      const getUserEmail = () => {
+        try {
+          if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+            return window.DataManager.getCurrentUserEmail();
+          }
+          return (window.currentUserEmail || '').toLowerCase();
+        } catch(_) {
+          return (window.currentUserEmail || '').toLowerCase();
+        }
+      };
+      const isAdmin = () => {
+        try {
+          if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+            return window.DataManager.isCurrentUserAdmin();
+          }
+          return window.currentUserRole === 'admin';
+        } catch(_) {
+          return window.currentUserRole === 'admin';
+        }
+      };
+      
       // Try Firebase first
       if (window.firebaseDB) {
-        const snapshot = await window.firebaseDB.collection('contacts')
-          .where('notes', '>', '')
-          .orderBy('notes')
-          .orderBy('notesUpdatedAt', 'desc')
-          .limit(50)
-          .get();
-        contacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (!isAdmin()) {
+          // Non-admin: filter by ownership
+          const email = getUserEmail();
+          if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+            // Use DataManager helper
+            const allContacts = await window.DataManager.queryWithOwnership('contacts');
+            contacts = allContacts.filter(c => c.notes && c.notes.trim()).slice(0, 50);
+          } else if (email) {
+            // Fallback: try single query with ownerId filter
+            try {
+              const snapshot = await window.firebaseDB.collection('contacts')
+                .where('ownerId', '==', email)
+                .where('notes', '>', '')
+                .orderBy('notes')
+                .orderBy('notesUpdatedAt', 'desc')
+                .limit(50)
+                .get();
+              contacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            } catch (error) {
+              // If query fails (missing index), return empty array for non-admin
+              console.warn('Error fetching contacts with notes (non-admin query):', error);
+              return [];
+            }
+          } else {
+            return [];
+          }
+        } else {
+          // Admin: unrestricted query
+          const snapshot = await window.firebaseDB.collection('contacts')
+            .where('notes', '>', '')
+            .orderBy('notes')
+            .orderBy('notesUpdatedAt', 'desc')
+            .limit(50)
+            .get();
+          contacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        }
       }
       
       // Also check localStorage for contacts with notes
@@ -412,15 +463,66 @@ class ActivityManager {
     try {
       let accounts = [];
       
+      // Helper functions
+      const getUserEmail = () => {
+        try {
+          if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+            return window.DataManager.getCurrentUserEmail();
+          }
+          return (window.currentUserEmail || '').toLowerCase();
+        } catch(_) {
+          return (window.currentUserEmail || '').toLowerCase();
+        }
+      };
+      const isAdmin = () => {
+        try {
+          if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+            return window.DataManager.isCurrentUserAdmin();
+          }
+          return window.currentUserRole === 'admin';
+        } catch(_) {
+          return window.currentUserRole === 'admin';
+        }
+      };
+      
       // Try Firebase first
       if (window.firebaseDB) {
-        const snapshot = await window.firebaseDB.collection('accounts')
-          .where('notes', '>', '')
-          .orderBy('notes')
-          .orderBy('notesUpdatedAt', 'desc')
-          .limit(50)
-          .get();
-        accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (!isAdmin()) {
+          // Non-admin: filter by ownership
+          const email = getUserEmail();
+          if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+            // Use DataManager helper
+            const allAccounts = await window.DataManager.queryWithOwnership('accounts');
+            accounts = allAccounts.filter(a => a.notes && a.notes.trim()).slice(0, 50);
+          } else if (email) {
+            // Fallback: try single query with ownerId filter
+            try {
+              const snapshot = await window.firebaseDB.collection('accounts')
+                .where('ownerId', '==', email)
+                .where('notes', '>', '')
+                .orderBy('notes')
+                .orderBy('notesUpdatedAt', 'desc')
+                .limit(50)
+                .get();
+              accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            } catch (error) {
+              // If query fails (missing index), return empty array for non-admin
+              console.warn('Error fetching accounts with notes (non-admin query):', error);
+              return [];
+            }
+          } else {
+            return [];
+          }
+        } else {
+          // Admin: unrestricted query
+          const snapshot = await window.firebaseDB.collection('accounts')
+            .where('notes', '>', '')
+            .orderBy('notes')
+            .orderBy('notesUpdatedAt', 'desc')
+            .limit(50)
+            .get();
+          accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        }
       }
       
       // Also check localStorage for accounts with notes
@@ -549,21 +651,84 @@ class ActivityManager {
     try {
       let tasks = [];
       
+      // Helper functions
+      const getUserEmail = () => {
+        try {
+          if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+            return window.DataManager.getCurrentUserEmail();
+          }
+          return (window.currentUserEmail || '').toLowerCase();
+        } catch(_) {
+          return (window.currentUserEmail || '').toLowerCase();
+        }
+      };
+      const isAdmin = () => {
+        try {
+          if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+            return window.DataManager.isCurrentUserAdmin();
+          }
+          return window.currentUserRole === 'admin';
+        } catch(_) {
+          return window.currentUserRole === 'admin';
+        }
+      };
+      
       // Try Firebase first
       if (window.firebaseDB) {
-        const snapshot = await window.firebaseDB.collection('tasks')
-          .orderBy('timestamp', 'desc')
-          .limit(50)
-          .get();
-        tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (!isAdmin()) {
+          // Non-admin: filter by ownership
+          const email = getUserEmail();
+          if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+            // Use DataManager helper
+            tasks = await window.DataManager.queryWithOwnership('tasks');
+            tasks = tasks.slice(0, 50);
+          } else if (email) {
+            // Fallback: two separate queries and merge client-side
+            try {
+              const [ownedSnap, assignedSnap] = await Promise.all([
+                window.firebaseDB.collection('tasks').where('ownerId', '==', email).orderBy('timestamp', 'desc').limit(50).get(),
+                window.firebaseDB.collection('tasks').where('assignedTo', '==', email).orderBy('timestamp', 'desc').limit(50).get()
+              ]);
+              const tasksMap = new Map();
+              ownedSnap.docs.forEach(doc => tasksMap.set(doc.id, { id: doc.id, ...doc.data() }));
+              assignedSnap.docs.forEach(doc => {
+                if (!tasksMap.has(doc.id)) tasksMap.set(doc.id, { id: doc.id, ...doc.data() });
+              });
+              tasks = Array.from(tasksMap.values());
+            } catch (error) {
+              console.warn('Error fetching tasks (non-admin query):', error);
+              return [];
+            }
+          } else {
+            return [];
+          }
+        } else {
+          // Admin: unrestricted query
+          const snapshot = await window.firebaseDB.collection('tasks')
+            .orderBy('timestamp', 'desc')
+            .limit(50)
+            .get();
+          tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        }
       }
       
-      // Also check localStorage for additional tasks
+      // Also check localStorage for additional tasks (CRITICAL: filter by ownership for non-admin)
       try {
         const localTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+        let filteredLocalTasks = localTasks;
+        if (!isAdmin()) {
+          const email = getUserEmail();
+          filteredLocalTasks = localTasks.filter(t => {
+            if (!t) return false;
+            const ownerId = (t.ownerId || '').toLowerCase();
+            const assignedTo = (t.assignedTo || '').toLowerCase();
+            const createdBy = (t.createdBy || '').toLowerCase();
+            return ownerId === email || assignedTo === email || createdBy === email;
+          });
+        }
         // Merge local tasks that aren't already in Firebase
         const existingIds = new Set(tasks.map(t => t.id));
-        const newLocalTasks = localTasks.filter(t => !existingIds.has(t.id));
+        const newLocalTasks = filteredLocalTasks.filter(t => !existingIds.has(t.id));
         tasks = [...tasks, ...newLocalTasks];
       } catch (error) {
         console.warn('Error loading tasks from localStorage:', error);

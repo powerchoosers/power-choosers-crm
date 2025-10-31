@@ -358,15 +358,52 @@ class SettingsPage {
 
     async loadSettings() {
         try {
+            // Helper functions
+            const getUserEmail = () => {
+                try {
+                    if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                        return window.DataManager.getCurrentUserEmail();
+                    }
+                    return (window.currentUserEmail || '').toLowerCase();
+                } catch(_) {
+                    return (window.currentUserEmail || '').toLowerCase();
+                }
+            };
+            const isAdmin = () => {
+                try {
+                    if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+                        return window.DataManager.isCurrentUserAdmin();
+                    }
+                    return window.currentUserRole === 'admin';
+                } catch(_) {
+                    return window.currentUserRole === 'admin';
+                }
+            };
+            
             // First try to load from CacheManager (cache-first)
             if (window.CacheManager) {
                 try {
                     const cachedSettings = await window.CacheManager.get('settings');
                     if (cachedSettings && cachedSettings.length > 0) {
                         const settingsData = cachedSettings[0];
-                        this.state.settings = { ...this.state.settings, ...settingsData };
-                        console.log('[Settings] Loaded from CacheManager cache');
-                        return;
+                        // Check ownership for non-admin users
+                        if (!isAdmin()) {
+                            const email = getUserEmail();
+                            const settingsOwnerId = (settingsData.ownerId || '').toLowerCase();
+                            const settingsUserId = settingsData.userId;
+                            const currentUserId = window.firebase && window.firebase.auth && window.firebase.auth().currentUser ? window.firebase.auth().currentUser.uid : null;
+                            if (settingsOwnerId !== email && settingsUserId !== currentUserId) {
+                                console.warn('[Settings] Cached settings not owned by current user, skipping cache');
+                            } else {
+                                this.state.settings = { ...this.state.settings, ...settingsData };
+                                console.log('[Settings] Loaded from CacheManager cache');
+                                return;
+                            }
+                        } else {
+                            this.state.settings = { ...this.state.settings, ...settingsData };
+                            console.log('[Settings] Loaded from CacheManager cache');
+                            return;
+                        }
                     }
                 } catch (error) {
                     console.warn('[Settings] CacheManager load failed:', error);
@@ -375,20 +412,56 @@ class SettingsPage {
             
             // Fallback to Firebase if cache miss
             if (window.firebaseDB) {
-                const settingsDoc = await window.firebaseDB.collection('settings').doc('user-settings').get();
-                if (settingsDoc.exists) {
-                    const firebaseSettings = settingsDoc.data();
-                    this.state.settings = { ...this.state.settings, ...firebaseSettings };
-                    console.log('[Settings] Loaded from Firebase');
-                    
-                    // Cache the settings for future use
-                    if (window.CacheManager) {
-                        try {
-                            await window.CacheManager.set('settings', [{ id: 'user-settings', ...firebaseSettings }]);
-                            console.log('[Settings] Cached settings for future use');
-                        } catch (error) {
-                            console.warn('[Settings] Failed to cache settings:', error);
+                try {
+                    const settingsDoc = await window.firebaseDB.collection('settings').doc('user-settings').get();
+                    if (settingsDoc.exists) {
+                        const firebaseSettings = settingsDoc.data();
+                        // Check ownership for non-admin users
+                        if (!isAdmin()) {
+                            const email = getUserEmail();
+                            const settingsOwnerId = (firebaseSettings.ownerId || '').toLowerCase();
+                            const settingsUserId = firebaseSettings.userId;
+                            const currentUserId = window.firebase && window.firebase.auth && window.firebase.auth().currentUser ? window.firebase.auth().currentUser.uid : null;
+                            if (settingsOwnerId !== email && settingsUserId !== currentUserId) {
+                                console.warn('[Settings] Firebase settings not owned by current user, using defaults');
+                                // Continue to localStorage fallback
+                            } else {
+                                this.state.settings = { ...this.state.settings, ...firebaseSettings };
+                                console.log('[Settings] Loaded from Firebase');
+                                
+                                // Cache the settings for future use
+                                if (window.CacheManager) {
+                                    try {
+                                        await window.CacheManager.set('settings', [{ id: 'user-settings', ...firebaseSettings }]);
+                                        console.log('[Settings] Cached settings for future use');
+                                    } catch (error) {
+                                        console.warn('[Settings] Failed to cache settings:', error);
+                                    }
+                                }
+                                return;
+                            }
+                        } else {
+                            this.state.settings = { ...this.state.settings, ...firebaseSettings };
+                            console.log('[Settings] Loaded from Firebase');
+                            
+                            // Cache the settings for future use
+                            if (window.CacheManager) {
+                                try {
+                                    await window.CacheManager.set('settings', [{ id: 'user-settings', ...firebaseSettings }]);
+                                    console.log('[Settings] Cached settings for future use');
+                                } catch (error) {
+                                    console.warn('[Settings] Failed to cache settings:', error);
+                                }
+                            }
+                            return;
                         }
+                    }
+                } catch (error) {
+                    // Permission errors are expected for non-admin users accessing settings they don't own
+                    if (error.code === 'permission-denied' || error.message.includes('permission')) {
+                        console.warn('[Settings] Permission denied loading from Firebase (user may not own settings doc), using defaults');
+                    } else {
+                        console.error('[Settings] Error loading from Firebase:', error);
                     }
                 }
             }
@@ -520,12 +593,26 @@ class SettingsPage {
 
             // Save to Firebase first
             if (window.firebaseDB) {
-                await window.firebaseDB.collection('settings').doc('user-settings').set({
+                // Get user email for ownership (required by Firestore rules)
+                const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+                  ? window.DataManager.getCurrentUserEmail()
+                  : ((window.currentUserEmail || '').toLowerCase());
+                
+                const user = firebase.auth().currentUser;
+                const userId = user ? user.uid : null;
+                
+                // Use per-user doc ID for multi-tenant support (or keep 'user-settings' if single shared doc)
+                const docId = 'user-settings'; // Could be changed to `user-settings-${userEmail}` for per-user settings
+                
+                await window.firebaseDB.collection('settings').doc(docId).set({
                     ...this.state.settings,
+                    // Ownership fields (required by Firestore rules)
+                    ownerId: userEmail || '',
+                    userId: userId || null,
                     lastUpdated: new Date().toISOString(),
                     updatedBy: 'user'
                 });
-                console.log('[Settings] Saved to Firebase');
+                console.log('[Settings] Saved to Firebase with ownership');
             }
             
             // Also save to localStorage as backup

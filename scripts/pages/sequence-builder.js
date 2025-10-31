@@ -4813,14 +4813,67 @@ class FreeSequenceAutomation {
               body: JSON.stringify({
                 prompt: prompt,
                 mode: mode,
-                recipient: {
-                  name: selectedContact.full_name || selectedContact.name || '',
-                  firstName: selectedContact.first_name || selectedContact.firstName || (selectedContact.name?.split(' ')[0] || ''),
-                  lastName: selectedContact.last_name || selectedContact.lastName || (selectedContact.name?.split(' ').slice(1).join(' ') || ''),
-                  company: selectedContact.company || selectedContact.accountName || '',
-                  email: selectedContact.email || '',
-                  title: selectedContact.title || selectedContact.job || ''
-                },
+                recipient: (() => {
+                  // Build enriched recipient object with account data
+                  const recipient = {
+                    name: selectedContact.full_name || selectedContact.name || '',
+                    firstName: selectedContact.first_name || selectedContact.firstName || (selectedContact.name?.split(' ')[0] || ''),
+                    lastName: selectedContact.last_name || selectedContact.lastName || (selectedContact.name?.split(' ').slice(1).join(' ') || ''),
+                    company: selectedContact.company || selectedContact.accountName || '',
+                    email: selectedContact.email || '',
+                    title: selectedContact.title || selectedContact.job || selectedContact.role || '',
+                    linkedin: selectedContact.linkedin || selectedContact.linkedinUrl || '',
+                    linkedinUrl: selectedContact.linkedin || selectedContact.linkedinUrl || '',
+                    seniority: selectedContact.seniority || '',
+                    department: selectedContact.department || ''
+                  };
+                  
+                  // Add account data if available
+                  if (selectedContact.account || selectedContact.account_id) {
+                    const accountId = selectedContact.account?.id || selectedContact.account_id;
+                    // Try to get account from cache
+                    let account = null;
+                    if (window.BackgroundAccountsLoader) {
+                      const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+                      account = accounts.find(a => a.id === accountId) || null;
+                    }
+                    
+                    if (account) {
+                      recipient.account = {
+                        id: account.id,
+                        name: account.accountName || account.name || '',
+                        industry: account.industry || '',
+                        domain: account.domain || account.website || '',
+                        city: account.city || account.billingCity || account.locationCity || '',
+                        state: account.state || account.billingState || account.region || '',
+                        shortDescription: account.shortDescription || account.short_desc || account.descriptionShort || account.description || '',
+                        linkedin: account.linkedin || account.linkedinUrl || account.companyLinkedin || '',
+                        linkedinUrl: account.linkedin || account.linkedinUrl || account.companyLinkedin || '',
+                        employees: account.employees || account.companyEmployees || null,
+                        squareFootage: account.squareFootage || account.square_footage || account.companySquareFootage || null,
+                        occupancyPct: account.occupancyPct || account.occupancy_pct || account.companyOccupancyPct || null,
+                        annualUsage: account.annualUsage || account.annualKilowattUsage || account.annual_usage || '',
+                        electricitySupplier: account.electricitySupplier || '',
+                        currentRate: account.currentRate || '',
+                        contractEndDate: account.contractEndDate || account.contractEnd || account.contract_end_date || ''
+                      };
+                      
+                      recipient.energy = {
+                        supplier: account.electricitySupplier || '',
+                        currentRate: account.currentRate || '',
+                        usage: account.annualUsage || '',
+                        contractEnd: account.contractEndDate || account.contractEnd || ''
+                      };
+                    }
+                  }
+                  
+                  // Also include account data directly from contact if present
+                  if (selectedContact.account) {
+                    recipient.account = { ...selectedContact.account };
+                  }
+                  
+                  return recipient;
+                })(),
                 senderName: senderFirst || ' '
               })
             });
