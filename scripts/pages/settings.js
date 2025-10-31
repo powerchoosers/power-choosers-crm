@@ -142,41 +142,231 @@ class SettingsPage {
         this.setupEventListeners();
         injectModernStyles();
         
+        // Set up auth state listener BEFORE rendering
+        this.setupAuthStateListener();
+        
         // Ensure Google user data is populated before rendering
         await this.ensureGoogleUserData();
         
+        // Render settings (this will also populate fields during render)
         this.renderSettings();
+        
+        // Force update input fields after render completes (ensures DOM elements exist)
+        setTimeout(() => {
+            this.forceUpdateProfileFields();
+        }, 300);
+        
         setupCollapseFunctionality();
         
         // Convert existing data URL signatures to hosted URLs
         await this.convertDataUrlSignature();
+        
+        // One final update after everything loads (in case auth was delayed)
+        setTimeout(() => {
+            this.forceUpdateProfileFields();
+        }, 1000);
+    }
+    
+    setupAuthStateListener() {
+        // Listen for Firebase Auth state changes - triggers immediately if user already logged in
+        if (firebase && firebase.auth) {
+            this.authStateListener = firebase.auth().onAuthStateChanged((user) => {
+                if (user) {
+                    console.log('[Settings] Auth state changed - user logged in:', user.email);
+                    // Update profile fields immediately when auth state changes
+                    this.forceUpdateProfileFields();
+                }
+            });
+        }
+    }
+    
+    cleanup() {
+        // Remove auth state listener when settings page is destroyed
+        if (this.authStateListener && firebase && firebase.auth) {
+            firebase.auth().onAuthStateChanged(this.authStateListener); // This actually removes it
+            this.authStateListener = null;
+        }
+    }
+    
+    async forceUpdateProfileFields() {
+        // Get user from multiple sources with fallback strategy
+        let user = null;
+        let firstName = '';
+        let lastName = '';
+        let email = '';
+        
+        // Strategy 1: Try authManager first (most reliable)
+        if (window.authManager && window.authManager.getCurrentUser && typeof window.authManager.getCurrentUser === 'function') {
+            user = window.authManager.getCurrentUser();
+        }
+        
+        // Strategy 2: Fallback to Firebase auth currentUser
+        if (!user) {
+            user = firebase.auth().currentUser;
+        }
+        
+        // Strategy 3: If still no user, wait and retry
+        if (!user) {
+            // Wait a bit for auth to initialize
+            await new Promise(resolve => setTimeout(resolve, 200));
+            if (window.authManager && window.authManager.getCurrentUser) {
+                user = window.authManager.getCurrentUser();
+            }
+            if (!user) {
+                user = firebase.auth().currentUser;
+            }
+        }
+        
+        if (user) {
+            // Extract from user object
+            email = (user.email || '').toLowerCase().trim();
+            const displayName = user.displayName || '';
+            
+            // Parse displayName
+            const nameParts = displayName.trim().split(' ').filter(p => p);
+            firstName = nameParts[0] || '';
+            lastName = nameParts.slice(1).join(' ') || '';
+            
+            // Strategy 4: If displayName is missing, try to get from users collection
+            if (!firstName && email && window.firebaseDB) {
+                try {
+                    const userDoc = await window.firebaseDB.collection('users').doc(email).get();
+                    if (userDoc.exists) {
+                        const userData = userDoc.data();
+                        const userName = userData.name || '';
+                        if (userName) {
+                            const namePartsFromDB = userName.trim().split(' ').filter(p => p);
+                            firstName = namePartsFromDB[0] || firstName;
+                            lastName = namePartsFromDB.slice(1).join(' ') || lastName;
+                        }
+                    }
+                } catch (err) {
+                    console.warn('[Settings] Could not fetch user profile from Firestore:', err);
+                }
+            }
+            
+            // Strategy 5: Last resort - parse from email
+            if (!firstName && email) {
+                const emailPrefix = email.split('@')[0];
+                // Try common patterns: first.last or firstlast
+                if (emailPrefix.includes('.')) {
+                    const parts = emailPrefix.split('.');
+                    firstName = parts[0] || '';
+                    lastName = parts.slice(1).join(' ') || '';
+                } else {
+                    firstName = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
+                }
+            }
+        } else {
+            console.warn('[Settings] forceUpdateProfileFields: No user found after all attempts');
+            return;
+        }
+        
+        // Update state
+        if (firstName) {
+            this.state.settings.general.firstName = firstName;
+        }
+        if (lastName) {
+            this.state.settings.general.lastName = lastName;
+        }
+        if (email) {
+            this.state.settings.general.email = email;
+        }
+        
+        // Force update input fields directly (overrides placeholder)
+        const firstNameEl = document.getElementById('user-first-name');
+        if (firstNameEl && firstName) {
+            firstNameEl.value = firstName;
+            firstNameEl.classList.remove('placeholder');
+            // Trigger input event to ensure UI updates
+            firstNameEl.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        
+        const lastNameEl = document.getElementById('user-last-name');
+        if (lastNameEl && lastName) {
+            lastNameEl.value = lastName;
+            lastNameEl.classList.remove('placeholder');
+            lastNameEl.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        
+        const emailEl = document.getElementById('user-email');
+        if (emailEl && email) {
+            emailEl.value = email;
+            emailEl.classList.remove('placeholder');
+            emailEl.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        
+        console.log('[Settings] forceUpdateProfileFields completed:', {
+            firstName,
+            lastName,
+            email,
+            firstNameElUpdated: !!firstNameEl && firstNameEl.value === firstName,
+            lastNameElUpdated: !!lastNameEl && lastNameEl.value === lastName,
+            emailElUpdated: !!emailEl && emailEl.value === email,
+            source: window.authManager ? 'authManager' : 'firebase.auth'
+        });
     }
     
     async ensureGoogleUserData() {
-        // If settings couldn't be loaded from Firebase (permission denied), ensure Google data is populated
-        const user = firebase.auth().currentUser;
+        // Get user from multiple sources (auth manager or Firebase auth)
+        let user = null;
+        
+        // Try auth manager first (most reliable)
+        if (window.authManager && window.authManager.getCurrentUser && typeof window.authManager.getCurrentUser === 'function') {
+            user = window.authManager.getCurrentUser();
+        }
+        
+        // Fallback to Firebase auth currentUser
+        if (!user) {
+            user = firebase.auth().currentUser;
+        }
+        
+        // If still no user, wait for auth state to change (up to 2 seconds)
+        if (!user) {
+            let attempts = 0;
+            const maxAttempts = 20; // 2 seconds total (20 * 100ms)
+            while (!user && attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                if (window.authManager && window.authManager.getCurrentUser) {
+                    user = window.authManager.getCurrentUser();
+                }
+                if (!user) {
+                    user = firebase.auth().currentUser;
+                }
+                attempts++;
+            }
+        }
+        
         if (user) {
-            const nameParts = (user.displayName || '').trim().split(' ').filter(p => p);
+            // Extract name and email from user object
+            const displayName = user.displayName || '';
+            const email = (user.email || '').toLowerCase().trim();
+            const nameParts = displayName.trim().split(' ').filter(p => p);
             const firstName = nameParts[0] || '';
             const lastName = nameParts.slice(1).join(' ') || '';
-            const userEmail = (user.email || '').toLowerCase().trim();
             
-            // Force populate if empty
-            if (!this.state.settings.general.firstName && firstName) {
+            // ALWAYS populate from Google if available (even if settings were loaded)
+            // This ensures profile info is always fresh from Google
+            if (firstName) {
                 this.state.settings.general.firstName = firstName;
             }
-            if (!this.state.settings.general.lastName && lastName) {
+            if (lastName) {
                 this.state.settings.general.lastName = lastName;
             }
-            if (!this.state.settings.general.email && userEmail) {
-                this.state.settings.general.email = userEmail;
+            if (email) {
+                this.state.settings.general.email = email;
             }
             
             console.log('[Settings] Ensured Google user data:', {
+                displayName: displayName,
+                email: email,
                 firstName: this.state.settings.general.firstName,
                 lastName: this.state.settings.general.lastName,
-                email: this.state.settings.general.email
+                emailField: this.state.settings.general.email,
+                source: window.authManager ? 'authManager' : 'firebase.auth'
             });
+        } else {
+            console.warn('[Settings] No current user found for Google data population after waiting');
         }
     }
 
@@ -478,21 +668,37 @@ class SettingsPage {
                         docId = `user-settings-${email}`;
                         try {
                             settingsDoc = await window.firebaseDB.collection('settings').doc(docId).get();
+                            // If document doesn't exist (for new employees), that's fine - we'll create it on save
+                            if (!settingsDoc.exists) {
+                                console.log('[Settings] Per-user settings document does not exist yet (will be created on first save)');
+                                settingsDoc = null; // Clear so we skip to defaults + Google data
+                            }
                         } catch (err) {
-                            console.warn('[Settings] Error loading per-user settings, trying legacy:', err);
+                            // Permission errors are expected if document doesn't exist or user doesn't own it
+                            if (err.code === 'permission-denied') {
+                                console.log('[Settings] Cannot access per-user settings (not created yet or permission denied), will create on save');
+                            } else {
+                                console.warn('[Settings] Error loading per-user settings, trying legacy:', err);
+                            }
+                            settingsDoc = null; // Clear so we skip to defaults
                         }
                     }
                     
                     // Fallback to legacy 'user-settings' if per-user doc doesn't exist or user is admin
-                    if (!settingsDoc || !settingsDoc.exists || isAdminUser) {
+                    if ((!settingsDoc || !settingsDoc.exists) && isAdminUser) {
                         docId = 'user-settings';
-                        settingsDoc = await window.firebaseDB.collection('settings').doc(docId).get();
+                        try {
+                            settingsDoc = await window.firebaseDB.collection('settings').doc(docId).get();
+                        } catch (err) {
+                            console.warn('[Settings] Cannot load legacy settings doc:', err);
+                            settingsDoc = null;
+                        }
                     }
                     
-                    if (settingsDoc.exists) {
+                    if (settingsDoc && settingsDoc.exists) {
                         const firebaseSettings = settingsDoc.data();
-                        // Check ownership for non-admin users
-                        if (!isAdmin()) {
+                        // Check ownership for non-admin users (only for legacy 'user-settings' doc)
+                        if (!isAdmin() && docId === 'user-settings') {
                             const email = getUserEmail();
                             const settingsOwnerId = (firebaseSettings.ownerId || '').toLowerCase();
                             const settingsUserId = firebaseSettings.userId;
@@ -580,21 +786,16 @@ class SettingsPage {
             const currentEmail = (this.state.settings.general.email || '').trim().toLowerCase();
             
             // Always populate from Google if field is empty or has placeholder
-            // Only skip if user has explicitly set a custom value
-            if (!currentFirstName || currentFirstName === 'From Google' || (firstName && currentFirstName !== firstName)) {
-                if (firstName) {
-                    this.state.settings.general.firstName = firstName;
-                }
+            // ALWAYS populate from Google if available (overrides any stored values)
+            // This ensures profile info always matches Google login
+            if (firstName) {
+                this.state.settings.general.firstName = firstName;
             }
-            if (!currentLastName || currentLastName === 'From Google' || (lastName && currentLastName !== lastName)) {
-                if (lastName) {
-                    this.state.settings.general.lastName = lastName;
-                }
+            if (lastName) {
+                this.state.settings.general.lastName = lastName;
             }
-            if (!currentEmail || currentEmail === 'From Google' || (userEmail && currentEmail !== userEmail)) {
-                if (userEmail) {
-                    this.state.settings.general.email = userEmail;
-                }
+            if (userEmail) {
+                this.state.settings.general.email = userEmail;
             }
             if (user.photoURL && !this.state.settings.general.photoURL) {
                 this.state.settings.general.photoURL = user.photoURL;
@@ -898,42 +1099,114 @@ class SettingsPage {
         // Render profile information fields (Google login + editable)
         const g = this.state.settings.general || {};
         
-        // If fields are still empty after load, try to populate from Google user now
-        const user = firebase.auth().currentUser;
-        if (user && (!g.firstName || !g.lastName || !g.email)) {
-            const nameParts = (user.displayName || '').trim().split(' ').filter(p => p);
-            if (nameParts.length > 0 && !g.firstName) {
-                g.firstName = nameParts[0];
-                this.state.settings.general.firstName = nameParts[0];
+        // ALWAYS populate from Google user during render (ensures fields show even if loadSettings failed)
+        let user = null;
+        
+        // Try multiple sources for user object
+        if (window.authManager && window.authManager.getCurrentUser && typeof window.authManager.getCurrentUser === 'function') {
+            user = window.authManager.getCurrentUser();
+        }
+        if (!user) {
+            user = firebase.auth().currentUser;
+        }
+        
+        if (user) {
+            // Extract from user object (try displayName first, then email)
+            const displayName = user.displayName || '';
+            const email = (user.email || '').toLowerCase().trim();
+            const nameParts = displayName.trim().split(' ').filter(p => p);
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+            
+            // Force populate from Google (overrides any stored values and placeholders)
+            if (firstName) {
+                g.firstName = firstName;
+                this.state.settings.general.firstName = firstName;
             }
-            if (nameParts.length > 1 && !g.lastName) {
-                g.lastName = nameParts.slice(1).join(' ');
-                this.state.settings.general.lastName = nameParts.slice(1).join(' ');
+            if (lastName) {
+                g.lastName = lastName;
+                this.state.settings.general.lastName = lastName;
             }
-            if (user.email && !g.email) {
-                g.email = user.email.toLowerCase();
-                this.state.settings.general.email = user.email.toLowerCase();
+            if (email) {
+                g.email = email;
+                this.state.settings.general.email = email;
             }
+            
             console.log('[Settings] Populated from Google during render:', {
+                displayName: displayName,
+                email: email,
                 firstName: g.firstName,
                 lastName: g.lastName,
-                email: g.email
+                emailField: g.email,
+                source: window.authManager ? 'authManager' : 'firebase.auth'
             });
+        } else {
+            console.warn('[Settings] No user available during render for profile population');
+            // Try one more time with a delay
+            setTimeout(() => {
+                const retryUser = (window.authManager && window.authManager.getCurrentUser) 
+                    ? window.authManager.getCurrentUser() 
+                    : firebase.auth().currentUser;
+                if (retryUser && (!g.firstName || !g.lastName || !g.email)) {
+                    const nameParts = (retryUser.displayName || '').trim().split(' ').filter(p => p);
+                    if (nameParts[0]) {
+                        g.firstName = nameParts[0];
+                        this.state.settings.general.firstName = nameParts[0];
+                        const firstNameEl = document.getElementById('user-first-name');
+                        if (firstNameEl) firstNameEl.value = nameParts[0];
+                    }
+                    if (nameParts.slice(1).join(' ')) {
+                        g.lastName = nameParts.slice(1).join(' ');
+                        this.state.settings.general.lastName = nameParts.slice(1).join(' ');
+                        const lastNameEl = document.getElementById('user-last-name');
+                        if (lastNameEl) lastNameEl.value = nameParts.slice(1).join(' ');
+                    }
+                    if (retryUser.email) {
+                        g.email = retryUser.email.toLowerCase();
+                        this.state.settings.general.email = retryUser.email.toLowerCase();
+                        const emailEl = document.getElementById('user-email');
+                        if (emailEl) emailEl.value = retryUser.email.toLowerCase();
+                    }
+                    console.log('[Settings] Retry populated from Google:', {
+                        firstName: g.firstName,
+                        lastName: g.lastName,
+                        email: g.email
+                    });
+                }
+            }, 500);
         }
         
         const userFirstName = document.getElementById('user-first-name');
         if (userFirstName) {
-            userFirstName.value = g.firstName || '';
+            // Always set the actual value, never placeholder text
+            const firstNameValue = g.firstName || '';
+            userFirstName.value = firstNameValue;
+            // Update state to match input
+            if (firstNameValue && !this.state.settings.general.firstName) {
+                this.state.settings.general.firstName = firstNameValue;
+            }
         }
         
         const userLastName = document.getElementById('user-last-name');
         if (userLastName) {
-            userLastName.value = g.lastName || '';
+            // Always set the actual value, never placeholder text
+            const lastNameValue = g.lastName || '';
+            userLastName.value = lastNameValue;
+            // Update state to match input
+            if (lastNameValue && !this.state.settings.general.lastName) {
+                this.state.settings.general.lastName = lastNameValue;
+            }
         }
         
         const userEmail = document.getElementById('user-email');
         if (userEmail) {
-            userEmail.value = g.email || '';
+            // Always set the actual value, never placeholder text
+            const emailValue = g.email || '';
+            userEmail.value = emailValue;
+            // Update state to match input
+            if (emailValue && !this.state.settings.general.email) {
+                this.state.settings.general.email = emailValue;
+            }
         }
         
         const userJobTitle = document.getElementById('user-job-title');
@@ -2662,8 +2935,33 @@ function initVoicemailRecording() {
 async function initSettings() {
     // Only initialize if we're on the settings page
     if (document.getElementById('settings-page')) {
+        // Wait for auth to be ready before initializing settings (if needed)
+        let authReady = false;
+        if (window.authManager && window.authManager.isAuthenticated && window.authManager.isAuthenticated()) {
+            authReady = true;
+        } else if (firebase && firebase.auth && firebase.auth().currentUser) {
+            authReady = true;
+        } else {
+            // Wait a bit for auth to initialize (max 2 seconds)
+            for (let i = 0; i < 20; i++) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                if ((window.authManager && window.authManager.isAuthenticated && window.authManager.isAuthenticated()) ||
+                    (firebase && firebase.auth && firebase.auth().currentUser)) {
+                    authReady = true;
+                    break;
+                }
+            }
+        }
+        
         window.SettingsPage = new SettingsPage();
         window.SettingsPage.instance = window.SettingsPage;
+        
+        // Force update profile fields after initialization completes
+        if (window.SettingsPage && typeof window.SettingsPage.forceUpdateProfileFields === 'function') {
+            setTimeout(() => {
+                window.SettingsPage.forceUpdateProfileFields();
+            }, 500);
+        }
     }
 }
 

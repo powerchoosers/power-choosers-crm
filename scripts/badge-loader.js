@@ -36,6 +36,7 @@ class BadgeLoader {
         response = await fetch(`${base}/api/call-status`, {
           method: 'POST',
           headers,
+          credentials: 'include', // Include cookies for authentication
           body: JSON.stringify({
             phones: phones,
             accountIds: accountIds,
@@ -56,10 +57,24 @@ class BadgeLoader {
           const user = window.firebase && window.firebase.auth && window.firebase.auth().currentUser;
           if (user) {
             const token = await user.getIdToken();
-            headers['Authorization'] = `Bearer ${token}`;
+            if (token) {
+              headers['Authorization'] = `Bearer ${token}`;
+            }
           }
-        } catch(_) {}
-        response = await fetch(url, { headers });
+        } catch(err) {
+          console.warn('[BadgeLoader] Failed to get auth token:', err);
+        }
+        
+        // If no token, skip the request rather than getting 401
+        if (!headers['Authorization']) {
+          console.warn('[BadgeLoader] No auth token available, skipping call status check');
+          return {};
+        }
+        
+        response = await fetch(url, { 
+          headers,
+          credentials: 'include' // Include cookies for authentication
+        });
       }
       
       if (response.ok) {

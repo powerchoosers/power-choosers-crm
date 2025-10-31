@@ -243,15 +243,31 @@ class CacheManager {
             docId = `user-settings-${email}`;
             try {
               doc = await window.firebaseDB.collection('settings').doc(docId).get();
+              // Document doesn't exist yet - that's fine, will be created on first save
+              if (!doc.exists) {
+                return [];
+              }
             } catch (err) {
-              console.warn('[CacheManager] Error loading per-user settings, trying legacy:', err);
+              // Permission errors are expected if document doesn't exist yet or user doesn't have access
+              if (err.code === 'permission-denied') {
+                // Expected for new employees - document will be created on first save
+                return [];
+              }
+              console.warn('[CacheManager] Error loading per-user settings:', err);
+              // Don't fallback to legacy for employees - they should have their own doc
+              return [];
             }
           }
           
-          // Fallback to legacy 'user-settings' if per-user doc doesn't exist or user is admin
-          if (!doc || !doc.exists || isAdmin) {
+          // Only fallback to legacy 'user-settings' for admin users
+          if (isAdmin) {
             docId = 'user-settings';
-            doc = await window.firebaseDB.collection('settings').doc(docId).get();
+            try {
+              doc = await window.firebaseDB.collection('settings').doc(docId).get();
+            } catch (err) {
+              console.warn('[CacheManager] Error loading legacy settings:', err);
+              return [];
+            }
           }
           
           if (doc.exists) {

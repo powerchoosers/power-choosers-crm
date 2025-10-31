@@ -56,16 +56,26 @@
   try {
     if (window.firebase) {
       window.firebaseDB = window.firebase.firestore();
-      // Quick connectivity smoke test (non-blocking)
+      // Quick connectivity smoke test (non-blocking, with ownership filter for employees)
       try {
         const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-        window.firebaseDB.collection('lists').limit(1).get()
+        let testQuery = window.firebaseDB.collection('lists');
+        // Add ownership filter for non-admin users (required by Firestore rules)
+        if (window.currentUserRole !== 'admin' && window.currentUserEmail) {
+          testQuery = testQuery.where('ownerId', '==', window.currentUserEmail);
+        }
+        testQuery.limit(1).get()
           .then(snap => {
             const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
             console.log('[Firebase] Firestore reachable', { projectId: window.firebaseProjectId, listsSample: snap?.size || 0, tookMs: Math.round(t1 - t0) });
           })
           .catch(err => {
-            console.warn('[Firebase] Firestore lists read failed', err);
+            // Expected for employees if they don't have lists - not a real error
+            if (err.code === 'permission-denied' && window.currentUserRole !== 'admin') {
+              console.log('[Firebase] Firestore reachable (no lists access for employee, expected)');
+            } else {
+              console.warn('[Firebase] Firestore lists read failed', err);
+            }
           });
       } catch (_) {}
     }
