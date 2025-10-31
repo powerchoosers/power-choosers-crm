@@ -644,13 +644,23 @@ class SettingsPage {
                             if (settingsOwnerId !== email && settingsUserId !== currentUserId) {
                                 console.warn('[Settings] Cached settings not owned by current user, skipping cache');
                             } else {
-                                this.state.settings = { ...this.state.settings, ...settingsData };
-                                console.log('[Settings] Loaded from CacheManager cache');
+                                // Merge settings, ensuring bridgeToMobile is preserved as boolean
+                                this.state.settings = { 
+                                    ...this.state.settings, 
+                                    ...settingsData,
+                                    bridgeToMobile: settingsData.bridgeToMobile === true // Ensure boolean
+                                };
+                                console.log('[Settings] Loaded from CacheManager cache', { bridgeToMobile: this.state.settings.bridgeToMobile });
                                 return;
                             }
                         } else {
-                            this.state.settings = { ...this.state.settings, ...settingsData };
-                            console.log('[Settings] Loaded from CacheManager cache');
+                            // Merge settings, ensuring bridgeToMobile is preserved as boolean
+                            this.state.settings = { 
+                                ...this.state.settings, 
+                                ...settingsData,
+                                bridgeToMobile: settingsData.bridgeToMobile === true // Ensure boolean
+                            };
+                            console.log('[Settings] Loaded from CacheManager cache', { bridgeToMobile: this.state.settings.bridgeToMobile });
                             return;
                         }
                     }
@@ -724,6 +734,10 @@ class SettingsPage {
                     
                     if (settingsDoc && settingsDoc.exists) {
                         const firebaseSettings = settingsDoc.data();
+                        
+                        // Log loaded bridgeToMobile value for debugging
+                        console.log('[Settings] Loaded from Firebase - bridgeToMobile:', firebaseSettings.bridgeToMobile);
+                        
                         // Check ownership for non-admin users (only for legacy 'user-settings' doc)
                         if (!isAdmin() && docId === 'user-settings') {
                             const email = getUserEmail();
@@ -734,8 +748,13 @@ class SettingsPage {
                                 console.warn('[Settings] Firebase settings not owned by current user, using defaults');
                                 // Continue to localStorage fallback
                             } else {
-                                this.state.settings = { ...this.state.settings, ...firebaseSettings };
-                                console.log('[Settings] Loaded from Firebase');
+                                // Merge settings, ensuring bridgeToMobile is preserved as boolean
+                                this.state.settings = { 
+                                    ...this.state.settings, 
+                                    ...firebaseSettings,
+                                    bridgeToMobile: firebaseSettings.bridgeToMobile === true // Ensure boolean
+                                };
+                                console.log('[Settings] Loaded from Firebase', { bridgeToMobile: this.state.settings.bridgeToMobile });
                                 
                                 // Cache the settings for future use
                                 if (window.CacheManager) {
@@ -749,8 +768,13 @@ class SettingsPage {
                                 return;
                             }
                         } else {
-                            this.state.settings = { ...this.state.settings, ...firebaseSettings };
-                            console.log('[Settings] Loaded from Firebase');
+                            // Merge settings, ensuring bridgeToMobile is preserved as boolean
+                            this.state.settings = { 
+                                ...this.state.settings, 
+                                ...firebaseSettings,
+                                bridgeToMobile: firebaseSettings.bridgeToMobile === true // Ensure boolean
+                            };
+                            console.log('[Settings] Loaded from Firebase', { bridgeToMobile: this.state.settings.bridgeToMobile });
                             
                             // Cache the settings for future use
                             if (window.CacheManager) {
@@ -779,8 +803,14 @@ class SettingsPage {
             const savedSettings = localStorage.getItem('crm-settings');
             if (savedSettings) {
                 try {
-                    this.state.settings = { ...this.state.settings, ...JSON.parse(savedSettings) };
-                    console.log('[Settings] Loaded from localStorage');
+                    const parsed = JSON.parse(savedSettings);
+                    // Merge settings, ensuring bridgeToMobile is preserved as boolean
+                    this.state.settings = { 
+                        ...this.state.settings, 
+                        ...parsed,
+                        bridgeToMobile: parsed.bridgeToMobile === true // Ensure boolean
+                    };
+                    console.log('[Settings] Loaded from localStorage', { bridgeToMobile: this.state.settings.bridgeToMobile });
                 } catch (error) {
                     console.error('Error loading settings from localStorage:', error);
                     }
@@ -792,7 +822,14 @@ class SettingsPage {
             const savedSettings = localStorage.getItem('crm-settings');
             if (savedSettings) {
                 try {
-                    this.state.settings = { ...this.state.settings, ...JSON.parse(savedSettings) };
+                    const parsed = JSON.parse(savedSettings);
+                    // Merge settings, ensuring bridgeToMobile is preserved as boolean
+                    this.state.settings = { 
+                        ...this.state.settings, 
+                        ...parsed,
+                        bridgeToMobile: parsed.bridgeToMobile === true // Ensure boolean
+                    };
+                    console.log('[Settings] Loaded from localStorage (error fallback)', { bridgeToMobile: this.state.settings.bridgeToMobile });
                 } catch (parseError) {
                     console.error('Error parsing localStorage settings:', parseError);
                 }
@@ -962,16 +999,30 @@ class SettingsPage {
                 
                 // Use set() which creates if doesn't exist, updates if it does
                 // Firestore rules will allow this if ownerId/userId matches
-                await window.firebaseDB.collection('settings').doc(docId).set({
+                const settingsToSave = {
                     ...this.state.settings,
                     // Ownership fields (required by Firestore rules)
                     ownerId: userEmail || '',
                     userId: userId || null,
                     lastUpdated: new Date().toISOString(),
                     updatedBy: 'user'
-                }, { merge: false }); // Use set() not merge() to ensure ownership fields are set
+                };
                 
-                console.log('[Settings] Saved to Firebase with ownership', { docId, userEmail, isAdmin });
+                // Ensure bridgeToMobile is explicitly saved (boolean, not undefined)
+                settingsToSave.bridgeToMobile = this.state.settings.bridgeToMobile === true;
+                
+                console.log('[Settings] Saving to Firebase:', { 
+                    docId, 
+                    userEmail, 
+                    isAdmin,
+                    bridgeToMobile: settingsToSave.bridgeToMobile,
+                    twilioNumbers: settingsToSave.twilioNumbers?.length || 0,
+                    selectedPhoneNumber: settingsToSave.selectedPhoneNumber
+                });
+                
+                await window.firebaseDB.collection('settings').doc(docId).set(settingsToSave, { merge: false });
+                
+                console.log('[Settings] Saved to Firebase successfully');
             }
             
             // Also save to localStorage as backup
@@ -1454,7 +1505,14 @@ class SettingsPage {
         
         phoneList.innerHTML = this.state.settings.twilioNumbers.map((phone, index) => {
             const isSelected = this.state.settings.selectedPhoneNumber === phone.number;
-            const bridgeToMobile = this.state.settings.bridgeToMobile || false;
+            // Ensure bridgeToMobile is boolean (not undefined/null)
+            const bridgeToMobile = this.state.settings.bridgeToMobile === true;
+            
+            // Debug log for troubleshooting
+            if (isSelected && isAdmin) {
+                console.log(`[Settings] Rendering phone ${phone.number}, bridgeToMobile:`, bridgeToMobile, 'state:', this.state.settings.bridgeToMobile);
+            }
+            
             return `
                 <div class="phone-number-item ${isSelected ? 'selected' : ''}" data-index="${index}">
                     <div class="phone-info">
@@ -1847,6 +1905,10 @@ class SettingsPage {
         this.markDirty();
         
         console.log(`[Settings] Bridge to mobile ${bridgeToMobile ? 'enabled' : 'disabled'} (mobile: 9728342317)`);
+        console.log(`[Settings] Current state.bridgeToMobile:`, this.state.settings.bridgeToMobile);
+        
+        // Re-render phone numbers to update UI immediately
+        this.renderPhoneNumbers();
         
         // Show success message
         if (window.showToast) {
