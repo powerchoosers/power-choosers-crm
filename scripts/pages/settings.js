@@ -138,30 +138,49 @@ class SettingsPage {
     }
 
     async init() {
-        await this.loadSettings();
-        this.setupEventListeners();
+        // IMMEDIATE: Set up UI first (styles, collapse buttons, save button) - don't wait for settings
         injectModernStyles();
+        setupCollapseFunctionality();
+        this.setupEventListeners();
         
-        // Set up auth state listener BEFORE rendering
+        // Initialize save button immediately (visible and styled, but disabled until changes)
+        this.updateSaveButton();
+        
+        // Set up auth state listener
         this.setupAuthStateListener();
         
-        // Ensure Google user data is populated before rendering
-        await this.ensureGoogleUserData();
+        // CRITICAL: Populate profile info IMMEDIATELY from Google Auth (don't wait for settings)
+        // This ensures profile fields show right away for all users
+        this.ensureGoogleUserData().then(() => {
+            // Render settings UI immediately (even if data isn't loaded yet)
+            this.renderSettings();
+            
+            // Force update profile fields right away
+            this.forceUpdateProfileFields();
+        });
         
-        // Render settings (this will also populate fields during render)
-        this.renderSettings();
+        // Load settings in background (non-blocking) and update when ready
+        this.loadSettings().then(() => {
+            // After settings load, re-render to populate all other fields
+            this.renderSettings();
+            
+            // Update profile fields one more time (in case settings had different values)
+            this.forceUpdateProfileFields();
+            
+            // Convert data URL signatures (non-critical)
+            this.convertDataUrlSignature();
+        }).catch(error => {
+            console.error('[Settings] Error during initialization:', error);
+            // Still render with defaults even if load fails
+            this.renderSettings();
+        });
         
-        // Force update input fields after render completes (ensures DOM elements exist)
+        // Force update profile fields after a delay (fallback to ensure they populate)
         setTimeout(() => {
             this.forceUpdateProfileFields();
-        }, 300);
+        }, 500);
         
-        setupCollapseFunctionality();
-        
-        // Convert existing data URL signatures to hosted URLs
-        await this.convertDataUrlSignature();
-        
-        // One final update after everything loads (in case auth was delayed)
+        // One more update after everything should be ready (1 second)
         setTimeout(() => {
             this.forceUpdateProfileFields();
         }, 1000);
@@ -1018,8 +1037,23 @@ class SettingsPage {
     updateSaveButton() {
         const saveBtn = document.getElementById('save-settings-btn');
         if (saveBtn) {
+            // Always show button - orange when there are changes, greyed when saved
             saveBtn.disabled = !this.state.isDirty;
             saveBtn.textContent = this.state.isDirty ? 'Save Changes' : 'All Changes Saved';
+            
+            // Ensure button is visible and styled correctly
+            saveBtn.style.display = 'block';
+            saveBtn.style.visibility = 'visible';
+            
+            // Apply orange styling (should already be in CSS, but ensure it's applied)
+            if (this.state.isDirty) {
+                saveBtn.classList.remove('disabled');
+                saveBtn.style.opacity = '1';
+                saveBtn.style.cursor = 'pointer';
+            } else {
+                saveBtn.style.opacity = '0.6';
+                saveBtn.style.cursor = 'not-allowed';
+            }
         }
     }
 
@@ -2021,10 +2055,20 @@ class SettingsPage {
 // Inject modern styles for settings page only
 function injectModernStyles() {
     // Only inject if we're on the settings page
-    if (!document.getElementById('settings-page')) return;
+    if (!document.getElementById('settings-page')) {
+        // Retry if DOM not ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', injectModernStyles);
+        }
+        return;
+    }
+    
+    // Check if styles already injected
+    if (document.getElementById('settings-modern-styles')) return;
     
     // Create style element with scoped styles
     const style = document.createElement('style');
+    style.id = 'settings-modern-styles';
     style.textContent = `
         /* Modern Settings Page Styles - Scoped to #settings-page */
         #settings-page .settings-sections {
@@ -2317,27 +2361,36 @@ function injectModernStyles() {
         }
         
         #settings-page #save-settings-btn {
-            background: linear-gradient(135deg, var(--orange-primary) 0%, #ff8c42 100%);
-            border: none;
+            background: linear-gradient(135deg, var(--orange-primary) 0%, #ff8c42 100%) !important;
+            border: none !important;
             border-radius: 8px;
             padding: 12px 24px;
             font-size: 14px;
             font-weight: 600;
-            color: white;
+            color: white !important;
             box-shadow: 0 2px 8px rgba(255, 140, 0, 0.3);
             transition: all 0.2s ease;
+            display: block !important;
+            visibility: visible !important;
         }
         
         #settings-page #save-settings-btn:hover:not(:disabled) {
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(255, 140, 0, 0.4);
+            background: linear-gradient(135deg, #e55a2b 0%, #ff8c42 100%) !important;
         }
         
         #settings-page #save-settings-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
+            opacity: 0.6 !important;
+            cursor: not-allowed !important;
             transform: none;
             box-shadow: 0 2px 8px rgba(255, 140, 0, 0.2);
+            background: linear-gradient(135deg, var(--orange-primary) 0%, #ff8c42 100%) !important;
+        }
+        
+        #settings-page #save-settings-btn:not(:disabled) {
+            opacity: 1 !important;
+            cursor: pointer !important;
         }
         
         /* Voicemail Styles */
@@ -2617,10 +2670,14 @@ function injectModernStyles() {
     // Inject the styles into the head
     document.head.appendChild(style);
     
-    // Update section titles and add voicemail section
+    // Update section titles and add voicemail section (run immediately)
     updateSectionTitles();
     addVoicemailSection();
+    
+    // Add collapse buttons immediately (with retry logic)
     addCollapseButtons();
+    
+    console.log('[Settings] Modern styles and UI elements initialized');
 }
 
 function updateSectionTitles() {
@@ -2695,47 +2752,91 @@ function addVoicemailSection() {
 }
 
 function addCollapseButtons() {
-    // Add collapse buttons to all section titles
-    const sectionTitles = document.querySelectorAll('#settings-page .settings-section-title');
-    sectionTitles.forEach(title => {
-        // Check if collapse button already exists
-        if (title.querySelector('.collapse-btn')) return;
+    // Add collapse buttons to all section titles - run immediately, retry if DOM not ready
+    const tryAddButtons = () => {
+        const sectionTitles = document.querySelectorAll('#settings-page .settings-section-title');
+        if (sectionTitles.length === 0) {
+            // DOM not ready yet, retry after a short delay
+            setTimeout(tryAddButtons, 100);
+            return;
+        }
         
-        // Create collapse button
-        const collapseBtn = document.createElement('button');
-        collapseBtn.className = 'collapse-btn';
-        collapseBtn.innerHTML = `
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-        `;
-        collapseBtn.setAttribute('aria-label', 'Collapse section');
+        sectionTitles.forEach(title => {
+            // Check if collapse button already exists
+            if (title.querySelector('.collapse-btn')) return;
+            
+            // Create collapse button
+            const collapseBtn = document.createElement('button');
+            collapseBtn.className = 'collapse-btn';
+            collapseBtn.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            `;
+            collapseBtn.setAttribute('aria-label', 'Collapse section');
+            
+            // Insert at the beginning of the title
+            title.insertBefore(collapseBtn, title.firstChild);
+        });
         
-        // Insert at the beginning of the title
-        title.insertBefore(collapseBtn, title.firstChild);
-    });
+        console.log('[Settings] Collapse buttons added to', sectionTitles.length, 'sections');
+    };
+    
+    // Try immediately, and if DOM not ready, retry
+    tryAddButtons();
 }
 
 function setupCollapseFunctionality() {
-    // Add collapse/expand functionality to all sections
-    const sections = document.querySelectorAll('#settings-page .settings-section');
-    sections.forEach(section => {
-        const title = section.querySelector('.settings-section-title');
-        const collapseBtn = section.querySelector('.collapse-btn');
-        
-        if (title && collapseBtn) {
-            // Make the entire title clickable
-            title.addEventListener('click', () => {
-                toggleSectionCollapse(section);
-            });
-            
-            // Prevent button click from bubbling to title
-            collapseBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                toggleSectionCollapse(section);
-            });
+    // Add collapse/expand functionality - run immediately, retry if DOM not ready
+    const trySetupCollapse = () => {
+        const sections = document.querySelectorAll('#settings-page .settings-section');
+        if (sections.length === 0) {
+            // DOM not ready yet, retry after a short delay
+            setTimeout(trySetupCollapse, 100);
+            return;
         }
-    });
+        
+        sections.forEach(section => {
+            // Skip if already set up
+            if (section.dataset.collapseSetup === 'true') return;
+            
+            const title = section.querySelector('.settings-section-title');
+            let collapseBtn = section.querySelector('.collapse-btn');
+            
+            // If collapse button doesn't exist yet, wait for it or create it
+            if (!collapseBtn && title) {
+                // Wait a bit for addCollapseButtons to run
+                setTimeout(() => {
+                    collapseBtn = section.querySelector('.collapse-btn');
+                    if (collapseBtn) {
+                        setupSectionCollapse(section, title, collapseBtn);
+                        section.dataset.collapseSetup = 'true';
+                    }
+                }, 150);
+            } else if (title && collapseBtn) {
+                setupSectionCollapse(section, title, collapseBtn);
+                section.dataset.collapseSetup = 'true';
+            }
+        });
+        
+        console.log('[Settings] Collapse functionality set up for', sections.length, 'sections');
+    };
+    
+    const setupSectionCollapse = (section, title, collapseBtn) => {
+        // Make the entire title clickable
+        title.addEventListener('click', () => {
+            toggleSectionCollapse(section);
+        });
+        
+        // Prevent button click from bubbling to title
+        collapseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleSectionCollapse(section);
+        });
+    };
+    
+    // Try immediately, and if DOM not ready, retry
+    trySetupCollapse();
 }
 
 function toggleSectionCollapse(section) {
