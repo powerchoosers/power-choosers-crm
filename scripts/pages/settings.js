@@ -141,11 +141,43 @@ class SettingsPage {
         await this.loadSettings();
         this.setupEventListeners();
         injectModernStyles();
+        
+        // Ensure Google user data is populated before rendering
+        await this.ensureGoogleUserData();
+        
         this.renderSettings();
         setupCollapseFunctionality();
         
         // Convert existing data URL signatures to hosted URLs
         await this.convertDataUrlSignature();
+    }
+    
+    async ensureGoogleUserData() {
+        // If settings couldn't be loaded from Firebase (permission denied), ensure Google data is populated
+        const user = firebase.auth().currentUser;
+        if (user) {
+            const nameParts = (user.displayName || '').trim().split(' ').filter(p => p);
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+            const userEmail = (user.email || '').toLowerCase().trim();
+            
+            // Force populate if empty
+            if (!this.state.settings.general.firstName && firstName) {
+                this.state.settings.general.firstName = firstName;
+            }
+            if (!this.state.settings.general.lastName && lastName) {
+                this.state.settings.general.lastName = lastName;
+            }
+            if (!this.state.settings.general.email && userEmail) {
+                this.state.settings.general.email = userEmail;
+            }
+            
+            console.log('[Settings] Ensured Google user data:', {
+                firstName: this.state.settings.general.firstName,
+                lastName: this.state.settings.general.lastName,
+                email: this.state.settings.general.email
+            });
+        }
     }
 
     setupEventListeners() {
@@ -413,7 +445,50 @@ class SettingsPage {
             // Fallback to Firebase if cache miss
             if (window.firebaseDB) {
                 try {
-                    const settingsDoc = await window.firebaseDB.collection('settings').doc('user-settings').get();
+                    // Try per-user settings first (for employees), then fallback to 'user-settings' (admin/legacy)
+                    const getUserEmail = () => {
+                        try {
+                            if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                                return window.DataManager.getCurrentUserEmail();
+                            }
+                            return (window.currentUserEmail || '').toLowerCase();
+                        } catch(_) {
+                            return (window.currentUserEmail || '').toLowerCase();
+                        }
+                    };
+                    const isAdmin = () => {
+                        try {
+                            if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+                                return window.DataManager.isCurrentUserAdmin();
+                            }
+                            return window.currentUserRole === 'admin';
+                        } catch(_) {
+                            return window.currentUserRole === 'admin';
+                        }
+                    };
+                    
+                    const email = getUserEmail();
+                    const isAdminUser = isAdmin();
+                    
+                    // Try per-user settings doc first (employees), then fallback to 'user-settings' (admin/legacy)
+                    let settingsDoc = null;
+                    let docId = null;
+                    
+                    if (!isAdminUser && email) {
+                        docId = `user-settings-${email}`;
+                        try {
+                            settingsDoc = await window.firebaseDB.collection('settings').doc(docId).get();
+                        } catch (err) {
+                            console.warn('[Settings] Error loading per-user settings, trying legacy:', err);
+                        }
+                    }
+                    
+                    // Fallback to legacy 'user-settings' if per-user doc doesn't exist or user is admin
+                    if (!settingsDoc || !settingsDoc.exists || isAdminUser) {
+                        docId = 'user-settings';
+                        settingsDoc = await window.firebaseDB.collection('settings').doc(docId).get();
+                    }
+                    
                     if (settingsDoc.exists) {
                         const firebaseSettings = settingsDoc.data();
                         // Check ownership for non-admin users
@@ -491,26 +566,52 @@ class SettingsPage {
             }
         }
         
-        // Auto-populate from Google login
+        // Auto-populate from Google login (force populate if empty or only has placeholder)
         const user = firebase.auth().currentUser;
         if (user) {
-            const nameParts = (user.displayName || '').trim().split(' ');
+            const nameParts = (user.displayName || '').trim().split(' ').filter(p => p);
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+            const userEmail = (user.email || '').toLowerCase().trim();
             
-            // Only set if not already customized
-            if (!this.state.settings.general.firstName) {
-                this.state.settings.general.firstName = nameParts[0] || '';
+            // Force populate if empty, whitespace-only, or placeholder text
+            const currentFirstName = (this.state.settings.general.firstName || '').trim();
+            const currentLastName = (this.state.settings.general.lastName || '').trim();
+            const currentEmail = (this.state.settings.general.email || '').trim().toLowerCase();
+            
+            // Always populate from Google if field is empty or has placeholder
+            // Only skip if user has explicitly set a custom value
+            if (!currentFirstName || currentFirstName === 'From Google' || (firstName && currentFirstName !== firstName)) {
+                if (firstName) {
+                    this.state.settings.general.firstName = firstName;
+                }
             }
-            if (!this.state.settings.general.lastName) {
-                this.state.settings.general.lastName = nameParts.slice(1).join(' ') || '';
+            if (!currentLastName || currentLastName === 'From Google' || (lastName && currentLastName !== lastName)) {
+                if (lastName) {
+                    this.state.settings.general.lastName = lastName;
+                }
             }
-            if (!this.state.settings.general.email) {
-                this.state.settings.general.email = user.email || '';
+            if (!currentEmail || currentEmail === 'From Google' || (userEmail && currentEmail !== userEmail)) {
+                if (userEmail) {
+                    this.state.settings.general.email = userEmail;
+                }
             }
             if (user.photoURL && !this.state.settings.general.photoURL) {
                 this.state.settings.general.photoURL = user.photoURL;
                 // Trigger re-hosting to Imgur
                 await this.hostGoogleAvatar(user.photoURL);
             }
+            
+            // Debug logging
+            console.log('[Settings] Auto-populated from Google:', {
+                displayName: user.displayName,
+                email: userEmail,
+                firstName: this.state.settings.general.firstName,
+                lastName: this.state.settings.general.lastName,
+                emailSet: this.state.settings.general.email
+            });
+        } else {
+            console.warn('[Settings] No current user found, cannot auto-populate profile');
         }
     }
 
@@ -601,9 +702,38 @@ class SettingsPage {
                 const user = firebase.auth().currentUser;
                 const userId = user ? user.uid : null;
                 
-                // Use per-user doc ID for multi-tenant support (or keep 'user-settings' if single shared doc)
-                const docId = 'user-settings'; // Could be changed to `user-settings-${userEmail}` for per-user settings
+                // Use per-user doc ID so each employee has their own settings
+                // Admin uses 'user-settings' (legacy), employees use 'user-settings-{email}'
+                const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
+                  ? window.DataManager.isCurrentUserAdmin()
+                  : (window.currentUserRole === 'admin');
                 
+                const docId = isAdmin ? 'user-settings' : `user-settings-${userEmail}`;
+                
+                // Check if document exists and if employee owns it (for update)
+                let canUpdate = false;
+                if (!isAdmin) {
+                    try {
+                        const existingDoc = await window.firebaseDB.collection('settings').doc(docId).get();
+                        if (existingDoc.exists) {
+                            const existingData = existingDoc.data();
+                            const existingOwnerId = (existingData.ownerId || '').toLowerCase();
+                            const existingUserId = existingData.userId;
+                            if (existingOwnerId === userEmail || existingUserId === userId) {
+                                canUpdate = true;
+                            }
+                        } else {
+                            // Document doesn't exist, will create (allowed by create rule)
+                            canUpdate = true;
+                        }
+                    } catch (error) {
+                        console.warn('[Settings] Error checking existing document:', error);
+                        // Try to create anyway
+                    }
+                }
+                
+                // Use set() which creates if doesn't exist, updates if it does
+                // Firestore rules will allow this if ownerId/userId matches
                 await window.firebaseDB.collection('settings').doc(docId).set({
                     ...this.state.settings,
                     // Ownership fields (required by Firestore rules)
@@ -611,8 +741,9 @@ class SettingsPage {
                     userId: userId || null,
                     lastUpdated: new Date().toISOString(),
                     updatedBy: 'user'
-                });
-                console.log('[Settings] Saved to Firebase with ownership');
+                }, { merge: false }); // Use set() not merge() to ensure ownership fields are set
+                
+                console.log('[Settings] Saved to Firebase with ownership', { docId, userEmail, isAdmin });
             }
             
             // Also save to localStorage as backup
@@ -766,6 +897,29 @@ class SettingsPage {
 
         // Render profile information fields (Google login + editable)
         const g = this.state.settings.general || {};
+        
+        // If fields are still empty after load, try to populate from Google user now
+        const user = firebase.auth().currentUser;
+        if (user && (!g.firstName || !g.lastName || !g.email)) {
+            const nameParts = (user.displayName || '').trim().split(' ').filter(p => p);
+            if (nameParts.length > 0 && !g.firstName) {
+                g.firstName = nameParts[0];
+                this.state.settings.general.firstName = nameParts[0];
+            }
+            if (nameParts.length > 1 && !g.lastName) {
+                g.lastName = nameParts.slice(1).join(' ');
+                this.state.settings.general.lastName = nameParts.slice(1).join(' ');
+            }
+            if (user.email && !g.email) {
+                g.email = user.email.toLowerCase();
+                this.state.settings.general.email = user.email.toLowerCase();
+            }
+            console.log('[Settings] Populated from Google during render:', {
+                firstName: g.firstName,
+                lastName: g.lastName,
+                email: g.email
+            });
+        }
         
         const userFirstName = document.getElementById('user-first-name');
         if (userFirstName) {

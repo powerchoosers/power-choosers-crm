@@ -2886,6 +2886,11 @@
         const callFrom = isIncoming ? (fromNumber || phoneNumber) : biz;
         const callTo = isIncoming ? biz : phoneNumber;
         
+        // Get current user email for ownership tracking
+        const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+          ? window.DataManager.getCurrentUserEmail()
+          : ((window.currentUserEmail || '').toLowerCase());
+        
         const response = await fetch(`${base}/api/calls`, {
           method: 'POST',
           headers: {
@@ -2899,6 +2904,9 @@
             callType: callType,
             callTime: timestamp,
             timestamp: timestamp,
+            // CRITICAL: Add userEmail for ownership tracking (allows employees to see their own calls)
+            userEmail: userEmail || null,
+            agentEmail: userEmail || null,
             // include call context (avoid stale fallback name in company-call mode)
             accountId: currentCallContext.accountId || null,
             accountName: currentCallContext.accountName || currentCallContext.company || null,
@@ -2950,6 +2958,11 @@
         const callFrom = isIncoming ? (fromNumber || phoneNumber) : biz;
         const callTo = isIncoming ? biz : phoneNumber;
         
+        // Get current user email for ownership tracking
+        const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+          ? window.DataManager.getCurrentUserEmail()
+          : ((window.currentUserEmail || '').toLowerCase());
+        
         const payload = {
           callSid: callSid,
           to: callTo,
@@ -2959,6 +2972,9 @@
           durationSec: duration,
           callTime: timestamp,
           timestamp: timestamp,
+          // CRITICAL: Add userEmail for ownership tracking (allows employees to see their own calls)
+          userEmail: userEmail || null,
+          agentEmail: userEmail || null,
           // include call context (avoid stale fallback name in company-call mode)
           accountId: currentCallContext.accountId || null,
           accountName: currentCallContext.accountName || currentCallContext.company || null,
