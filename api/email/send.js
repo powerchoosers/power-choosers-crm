@@ -26,6 +26,10 @@ export default async function handler(req, res) {
     // Use original content without custom tracking pixel (SendGrid native tracking will handle this)
     const emailContent = content;
 
+    // Get user email from request body for ownership (required by Firestore rules)
+    const { userEmail: requestUserEmail } = req.body;
+    const userEmail = requestUserEmail ? String(requestUserEmail).toLowerCase() : null;
+    
     // Store email record in database
     const emailRecord = {
       id: trackingId,
@@ -45,6 +49,10 @@ export default async function handler(req, res) {
       isSentEmail: true,         // Additional flag for filtering
       provider: 'sendgrid',      // Identify the email provider
       sendgridMessageId: null,   // Will be updated when SendGrid responds
+      // Ownership fields (required for Firestore rules)
+      ownerId: userEmail || '',
+      assignedTo: userEmail || '',
+      createdBy: userEmail || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };

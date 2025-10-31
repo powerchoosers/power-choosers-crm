@@ -8,6 +8,9 @@ import { cors } from './_cors.js';
 const companyResearchCache = new Map();
 const linkedinResearchCache = new Map();
 const websiteResearchCache = new Map();
+const contactLinkedinCache = new Map();
+const recentActivityCache = new Map();
+const locationContextCache = new Map();
 
 async function researchCompanyInfo(companyName, industry) {
   if (!companyName) return null;
@@ -202,6 +205,170 @@ async function scrapeCompanyWebsite(domain, companyName) {
   }
 }
 
+async function researchContactLinkedIn(linkedinUrl, contactName, companyName) {
+  if (!linkedinUrl) {
+    console.log(`[Contact LinkedIn] No LinkedIn URL for ${contactName}`);
+    return null;
+  }
+  
+  const cacheKey = linkedinUrl;
+  if (contactLinkedinCache.has(cacheKey)) {
+    console.log(`[Contact LinkedIn] Using cached data for ${contactName}`);
+    return contactLinkedinCache.get(cacheKey);
+  }
+  
+  try {
+    const linkedinPrompt = `Research the LinkedIn personal profile at ${linkedinUrl} for ${contactName}${companyName ? ' at ' + companyName : ''}. Extract:
+    - Current role and tenure in position (e.g., "3 years as General Manager")
+    - Career background and recent moves
+    - Recent posts or content that shows their priorities
+    - Skills or endorsements relevant to energy/procurement
+    - Any mutual connections (if possible)
+    Provide a concise 2-3 sentence summary focusing on role tenure, recent activity, and professional context relevant to energy procurement discussions.`;
+    
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'sonar',
+        messages: [{ role: 'user', content: linkedinPrompt }],
+        max_tokens: 200,
+        temperature: 0.3
+      })
+    });
+    
+    if (!response.ok) {
+      console.error(`[Contact LinkedIn] API error: ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    const contactData = data.choices?.[0]?.message?.content || null;
+    
+    if (contactData) {
+      console.log(`[Contact LinkedIn] Found data for ${contactName}`);
+      contactLinkedinCache.set(cacheKey, contactData);
+    }
+    
+    return contactData;
+  } catch (error) {
+    console.error('[Contact LinkedIn] Research failed:', error);
+    return null;
+  }
+}
+
+async function researchRecentCompanyActivity(companyName, industry, city, state) {
+  if (!companyName) return null;
+  
+  const cacheKey = `${companyName}_${industry || ''}_${city || ''}`;
+  if (recentActivityCache.has(cacheKey)) {
+    console.log(`[Recent Activity] Using cached data for ${companyName}`);
+    return recentActivityCache.get(cacheKey);
+  }
+  
+  try {
+    const activityPrompt = `Research recent news, announcements, or activity for ${companyName}${industry ? ', a ' + industry + ' company' : ''}${city && state ? ' in ' + city + ', ' + state : ''}.
+    Look for:
+    - Recent expansion, new facilities, or growth announcements
+    - Funding rounds, acquisitions, or major investments
+    - Recent hires or leadership changes
+    - Facility additions or operational changes
+    - Industry news affecting their business
+    - Regulatory changes in their market
+    Focus on events from the past 6 months that would be relevant context for an energy procurement discussion.
+    Provide a concise 2-3 sentence summary if you find recent activity, otherwise return null.`;
+    
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'sonar',
+        messages: [{ role: 'user', content: activityPrompt }],
+        max_tokens: 200,
+        temperature: 0.3
+      })
+    });
+    
+    if (!response.ok) {
+      console.error(`[Recent Activity] API error: ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    const activityData = data.choices?.[0]?.message?.content || null;
+    
+    // Only cache if we found actual activity
+    if (activityData && !activityData.toLowerCase().includes('no recent') && !activityData.toLowerCase().includes('unable to find')) {
+      console.log(`[Recent Activity] Found activity for ${companyName}`);
+      recentActivityCache.set(cacheKey, activityData);
+      return activityData;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('[Recent Activity] Research failed:', error);
+    return null;
+  }
+}
+
+async function researchLocationContext(city, state, industry) {
+  if (!city || !state) return null;
+  
+  const cacheKey = `${city}_${state}_${industry || ''}`;
+  if (locationContextCache.has(cacheKey)) {
+    console.log(`[Location Context] Using cached data for ${city}, ${state}`);
+    return locationContextCache.get(cacheKey);
+  }
+  
+  try {
+    const locationPrompt = `Research energy market context for ${city}, ${state}${industry ? ' for ' + industry + ' companies' : ''}.
+    Focus on:
+    - Regional energy market trends and competitive landscape
+    - Local supplier landscape and market dynamics
+    - Regional rate trends or regulatory changes
+    - Energy procurement patterns in this area
+    Provide a concise 2-3 sentence summary focusing on what would be relevant for a business energy procurement discussion.`;
+    
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'sonar',
+        messages: [{ role: 'user', content: locationPrompt }],
+        max_tokens: 200,
+        temperature: 0.3
+      })
+    });
+    
+    if (!response.ok) {
+      console.error(`[Location Context] API error: ${response.status}`);
+      return null;
+    }
+    
+    const data = await response.json();
+    const locationData = data.choices?.[0]?.message?.content || null;
+    
+    if (locationData) {
+      console.log(`[Location Context] Found data for ${city}, ${state}`);
+      locationContextCache.set(cacheKey, locationData);
+    }
+    
+    return locationData;
+  } catch (error) {
+    console.error('[Location Context] Research failed:', error);
+    return null;
+  }
+}
+
 // Lightweight sanitizer to remove brand-first phrasing and prefer first-person voice
 function deSalesify(text) {
   if (!text) return text;
@@ -223,20 +390,35 @@ function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory 
     out = out.replace(/your industry/gi, industry);
   }
 
-  // If size is unknown OR not small, avoid "small business" assumptions
-  if (!sizeCategory || sizeCategory !== 'small') {
-    const neutralGroup = industry ? `companies in ${industry}` : 'companies like yours';
-    out = out
-      .replace(/\bAs a small company\b/gi, 'As a team')
-      .replace(/\bAs a small business\b/gi, 'As a team')
-      .replace(/\bfor a small company like yours\b/gi, `for ${neutralGroup}`)
-      .replace(/\bfor small businesses like yours\b/gi, `for ${neutralGroup}`)
-      .replace(/\bfor a small business like yours\b/gi, `for ${neutralGroup}`)
-      .replace(/\bsmall businesses like yours\b/gi, neutralGroup)
-      .replace(/\bsmall business like yours\b/gi, neutralGroup)
-      .replace(/\bfor small business\b/gi, 'for businesses')
-      .replace(/\bfor a small company\b/gi, 'for companies');
-  }
+  // Remove ALL size assumptions - "small company/business" can be insulting to business owners
+  // Use neutral, empowering language regardless of actual size
+  const neutralGroup = industry ? `companies in ${industry}` : 'companies like yours';
+  
+  // Aggressive removal of "small" language - assume nothing about company size
+  out = out
+    .replace(/\bAs CEO of a small business\b/gi, 'As CEO')
+    .replace(/\bAs CEO of your company\b/gi, 'As CEO')
+    .replace(/\bAs a small company\b/gi, 'As a team')
+    .replace(/\bAs a small business\b/gi, 'As a team')
+    .replace(/\bof a small company\b/gi, '')
+    .replace(/\bof a small business\b/gi, '')
+    .replace(/\ba small company\b/gi, 'companies')
+    .replace(/\ba small business\b/gi, 'businesses')
+    .replace(/\bsmall companies\b/gi, 'companies')
+    .replace(/\bsmall businesses\b/gi, 'businesses')
+    .replace(/\bfor a small company like yours\b/gi, `for ${neutralGroup}`)
+    .replace(/\bfor small businesses like yours\b/gi, `for ${neutralGroup}`)
+    .replace(/\bfor a small business like yours\b/gi, `for ${neutralGroup}`)
+    .replace(/\bsmall businesses like yours\b/gi, neutralGroup)
+    .replace(/\bsmall business like yours\b/gi, neutralGroup)
+    .replace(/\bwith limited resources\b/gi, 'with operational efficiency in mind')
+    .replace(/\blimited resources\b/gi, 'operational efficiency')
+    .replace(/\bfor small business\b/gi, 'for businesses')
+    .replace(/\bfor a small company\b/gi, 'for companies')
+    .replace(/\bsmall business operators\b/gi, 'business operators')
+    .replace(/\bsmall business owners\b/gi, 'business owners')
+    .replace(/\boperators like you\b/gi, industry ? `operators in ${industry}` : 'operators')
+    .replace(/\bespecially those with limited resources\b/gi, 'especially those focused on efficiency');
 
   return out;
 }
@@ -1394,35 +1576,100 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
     .replace(/\s+/g, ' ') // Normalize whitespace
     .trim();
 
-  // If no description and we have company name, do enhanced research
+  // Enhanced research with all personalization data sources
   let researchData = null;
   let linkedinContext = null;
   let websiteContext = null;
+  let contactLinkedinContext = null;
+  let recentActivityContext = null;
+  let locationContextData = null;
 
+  // Get location data for context
+  const city = r.account?.city || r.city || '';
+  const state = r.account?.state || r.state || '';
+  
+  // Get contact LinkedIn URL for personal profile research
+  const contactLinkedinUrl = r.linkedin || r.linkedinUrl || null;
+  const contactFullName = firstName + (r.lastName || r.last_name ? ' ' + (r.lastName || r.last_name) : '');
+
+  // Always run research in parallel for comprehensive personalization
+  const researchPromises = [];
+  
+  // Company research (only if no description exists)
   if (!accountDescription && company) {
     console.log(`[Research] No description for ${company}, starting enhanced research...`);
     
-    // Get LinkedIn URL from account or recipient
-    const linkedinUrl = r.account?.linkedin || r.account?.linkedinUrl || r.linkedin || null;
-    
-    // Get domain from account
+    const linkedinUrl = r.account?.linkedin || r.account?.linkedinUrl || null;
     const domain = r.account?.domain || r.account?.website || null;
     
-    // Run all research in parallel for speed
-    const [basicResearch, linkedinResearch, websiteResearch] = await Promise.all([
-      researchCompanyInfo(company, industry),
-      researchLinkedInCompany(linkedinUrl, company),
-      scrapeCompanyWebsite(domain, company)
-    ]);
+    researchPromises.push(
+      researchCompanyInfo(company, industry).then(result => ({ type: 'company', data: result })),
+      researchLinkedInCompany(linkedinUrl, company).then(result => ({ type: 'companyLinkedin', data: result })),
+      scrapeCompanyWebsite(domain, company).then(result => ({ type: 'website', data: result }))
+    );
+  } else {
+    // Still get company LinkedIn and website if we have URLs
+    const linkedinUrl = r.account?.linkedin || r.account?.linkedinUrl || null;
+    const domain = r.account?.domain || r.account?.website || null;
+    if (linkedinUrl) {
+      researchPromises.push(researchLinkedInCompany(linkedinUrl, company).then(result => ({ type: 'companyLinkedin', data: result })));
+    }
+    if (domain) {
+      researchPromises.push(scrapeCompanyWebsite(domain, company).then(result => ({ type: 'website', data: result })));
+    }
+  }
+
+  // Contact LinkedIn research (personal profile)
+  if (contactLinkedinUrl && contactFullName) {
+    researchPromises.push(
+      researchContactLinkedIn(contactLinkedinUrl, contactFullName, company).then(result => ({ type: 'contactLinkedin', data: result }))
+    );
+  }
+
+  // Recent company activity research
+  if (company) {
+    researchPromises.push(
+      researchRecentCompanyActivity(company, industry, city, state).then(result => ({ type: 'recentActivity', data: result }))
+    );
+  }
+
+  // Location context research
+  if (city && state) {
+    researchPromises.push(
+      researchLocationContext(city, state, industry).then(result => ({ type: 'location', data: result }))
+    );
+  }
+
+  // Run all research in parallel
+  if (researchPromises.length > 0) {
+    const results = await Promise.all(researchPromises);
     
-    // Use basic research as primary description
-    accountDescription = basicResearch;
-    linkedinContext = linkedinResearch;
-    websiteContext = websiteResearch;
-    
-    // Save basic description to Firestore if we found something
-    if (accountDescription && r.account?.id) {
-      researchData = await saveAccountDescription(r.account.id, accountDescription);
+    for (const { type, data } of results) {
+      switch (type) {
+        case 'company':
+          if (data) {
+            accountDescription = data;
+            if (r.account?.id) {
+              researchData = await saveAccountDescription(r.account.id, accountDescription);
+            }
+          }
+          break;
+        case 'companyLinkedin':
+          linkedinContext = data;
+          break;
+        case 'website':
+          websiteContext = data;
+          break;
+        case 'contactLinkedin':
+          contactLinkedinContext = data;
+          break;
+        case 'recentActivity':
+          recentActivityContext = data;
+          break;
+        case 'location':
+          locationContextData = data;
+          break;
+      }
     }
   }
 
@@ -1467,17 +1714,52 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   // Get deep personalization
   const deepPersonalization = getDeepPersonalization(r.account || {}, recipient);
   
+  // Extract tenure from contact LinkedIn if available
+  let tenure = null;
+  if (contactLinkedinContext) {
+    const tenureMatch = contactLinkedinContext.match(/(\d+)\s+years?\s+(?:as|in|at|with)/i) || 
+                       contactLinkedinContext.match(/tenure.*?(\d+)\s+years?/i);
+    if (tenureMatch) {
+      tenure = tenureMatch[1] + ' years';
+    }
+  }
+  
+  // Get operational details from account
+  const employees = r.account?.employees || null;
+  const squareFootage = r.account?.squareFootage || r.account?.square_footage || null;
+  const occupancyPct = r.account?.occupancyPct || r.account?.occupancy_pct || null;
+  const annualUsage = r.account?.annualUsage || r.account?.annualKilowattUsage || r.account?.annual_usage || null;
+  
   const recipientContext = `
 RECIPIENT INFORMATION:
 - Name: ${firstName || 'there'} ${company ? 'at ' + company : ''}
 ${job ? '- Role: ' + job + ' (focus on ' + (roleContext?.language || 'business operations') + ')' : ''}
+${tenure ? '- Tenure: ' + tenure + ' in current role (use naturally: "In your ' + tenure + ' as ' + job + '...")' : ''}
+${r.seniority ? '- Seniority Level: ' + r.seniority : ''}
+${r.department ? '- Department: ' + r.department : ''}
 ${industry ? '- Industry: ' + industry : ''}
 ${accountDescription ? '- Company Description: ' + accountDescription : ''}
-${linkedinContext ? '- LinkedIn Insights: ' + linkedinContext : ''}
-${websiteContext ? '- Company Website Info: ' + websiteContext : ''}
+${city && state ? '- Location: ' + city + ', ' + state : ''}
+
+OPERATIONAL DETAILS:
+${employees ? '- Facility Scale: ' + employees + ' employees' : ''}
+${squareFootage ? '- Facility Size: ' + squareFootage.toLocaleString() + ' sq ft' : ''}
+${occupancyPct ? '- Occupancy: ' + occupancyPct + '%' : ''}
+${annualUsage ? '- Annual Usage: ' + annualUsage.toLocaleString() + ' kWh' : ''}
+
+RESEARCH DATA:
+${linkedinContext ? '- Company LinkedIn: ' + linkedinContext : ''}
+${websiteContext ? '- Company Website: ' + websiteContext : ''}
+${contactLinkedinContext ? '- Contact LinkedIn Profile: ' + contactLinkedinContext + ' (use for tenure, career background, recent posts)' : ''}
+${recentActivityContext ? '- Recent Company Activity: ' + recentActivityContext + ' (reference naturally: "I noticed..." or "I saw...")' : ''}
+${locationContextData ? '- Regional Energy Market: ' + locationContextData + ' (use for location-specific context)' : ''}
+
+ENERGY DATA:
 ${energy.supplier ? '- Current Supplier: ' + energy.supplier : ''}
 ${energy.currentRate ? '- Current Rate: ' + energy.currentRate + '/kWh' : ''}
 ${contractEndLabel ? '- Contract Ends: ' + contractEndLabel : ''}
+
+HISTORICAL CONTEXT:
 ${transcript ? '- Call Notes: ' + transcript : ''}
 ${notes ? '- Additional Notes: ' + notes : ''}
 
@@ -1602,7 +1884,7 @@ Generate text for these fields:
   * Hospitality: Guest comfort, operational costs, seasonal planning
   * Education: Facility maintenance, student safety, budget optimization
   * Use company-specific data: current supplier, rate, contract timing, recent achievements
-IMPORTANT: Always reference ${company} specifically. Use qualitative language (rising, increasing, higher) NOT percentages (15-25%, 20-30%). Keep it natural and conversational.
+IMPORTANT: Always reference ${company} specifically. Use qualitative language (rising, increasing, higher) NOT percentages (15-25%, 20-30%). Keep it natural and conversational. NEVER mention company size ("small company", "small business") - focus on role, industry, and operational challenges instead.
 - value_proposition: How we help (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X annually", "helped similar companies achieve Y". Include role-specific benefits:
   * CFOs: Budget predictability, cost reduction, risk mitigation
   * Facilities Managers: Operational efficiency, maintenance cost reduction
@@ -1617,6 +1899,49 @@ ${ctaPattern ? `
 - cta_text: Create a professional call-to-action question (under 12 words, ending with proper punctuation).
 - cta_type: Return "qualifying"
 `}
+
+HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
+- Write like a knowledgeable energy expert who researched their company deeply
+- Show you did homework: When you have specific data, use phrases like:
+  * "I noticed ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail]'}" (if account description available)
+  * "I saw ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}" (if recent activity found)
+  * "On your website, I noticed..." (if website context available)
+  * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." (if location context available)
+- Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? 'your contract ending ' + contractEndLabel : '[specific situation]'}..."
+- Include micro-observations: Reference their website, recent posts, industry trends they'd recognize
+- Vary sentence length: Mix short punchy statements with longer explanatory ones
+- Use conversational connectors: "Here's the thing...", "The reality is...", "What I've found..."
+- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", or other template phrases
+- Show expertise subtly: "In my experience with ${industry || '[industry]'} companies", "I've noticed ${industryContent ? industryContent.painPoints[0] : '[specific trend]'}"
+${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\'ve likely seen..." (if tenure available)' : ''}
+${contactLinkedinContext ? '- Reference contact profile: Use insights from their LinkedIn profile naturally' : ''}
+
+EVIDENCE OF RESEARCH (Show You Know Their Business):
+${accountDescription ? '✓ Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally in opening hook' : ''}
+${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements' : ''}
+${websiteContext ? '✓ Use website info: "On your website, I noticed..." to show you visited' : ''}
+${recentActivityContext ? '✓ Use recent activity: "I saw ${company} recently..." + ' + recentActivityContext.substring(0, 60) + '...' : ''}
+${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
+${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
+${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant for context' : ''}
+
+CONVERSATIONAL FLOW PATTERNS:
+✓ GOOD: "I noticed ${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
+✓ GOOD: "Given your role as ${job || '[role]'}, you're probably dealing with ${roleContext?.painPoints[0] || '[pain point]'}. Here's what I've found..."
+✓ GOOD: "${industry || '[Industry]'} companies are facing ${industryContent?.painPoints[0] || '[specific challenge]'}. ${company || '[Company]'} likely sees this in..."
+✓ GOOD: "Companies in ${industry || '[industry]'}" (not "your industry")
+✓ GOOD: "As ${job || '[role]'}" (not "As CEO of a small business")
+✗ BAD: "I wanted to reach out about..."
+✗ BAD: "I hope this email finds you well..."
+✗ BAD: "I'm reaching out because..."
+
+KNOWLEDGE DEMONSTRATION:
+- Reference specific operational details: ${accountDescription ? '"As ' + accountDescription.substring(0, 80) + '..."' : 'Company-specific details'}
+- Mention industry-specific challenges: ${industryContent ? industryContent.painPoints.join(', ') : 'Industry pain points'} (not generic "operational costs")
+- Show understanding of their role's pain points: ${roleContext?.painPoints.join(', ') || '[role pain points]'}
+${locationContextData ? '- Include location context: ' + locationContextData.substring(0, 80) + '...' : ''}
+${contractEndLabel ? '- Reference contract timing: "With your contract ending ' + contractEndLabel + '..."' : ''}
+${energy.supplier ? '- Reference current supplier: "With ' + energy.supplier + ' as your current supplier..."' : ''}
 
 CRITICAL QUALITY RULES:
 - PROBLEM AWARENESS: Lead with industry-specific problem or market condition
@@ -1687,7 +2012,8 @@ STYLE RULES:
   - Use first-person voice ("we"/"I") instead of brand-first phrasing.
   - Avoid starting any sentence with "At Power Choosers," or "Power Choosers helps".
   - Prefer "We help…" / "I help…".
-  - Avoid assumptions about company size. If size is unknown, use neutral language ("companies like yours") not "small business".
+  - NEVER assume company size. DO NOT use "small company", "small business", "limited resources", or similar phrases - these can be insulting to business owners. Use neutral language: "companies in ${industry}", "companies like yours", or focus on role/industry instead.
+  - Focus on role and industry specifics: "As CEO" (not "As CEO of a small business"), "companies in manufacturing" (not "small manufacturing companies").
   - If role and tenure are available (from LinkedIn), you may include them naturally (e.g., "In your 3 years as General Manager").
 
 SUBJECT LINE RULES:
@@ -1829,9 +2155,43 @@ CRITICAL QUALITY RULES:
 - USE ACCOUNT DESCRIPTION: ${accountDescription ? 'Must naturally reference: "' + accountDescription + '"' : 'Reference their specific business'}
 - NATURAL LANGUAGE: Write like a real person researching their company
 - COMPANY SPECIFICITY: ALWAYS reference ${company} specifically. NEVER mention other companies by name in this email.
+- NO SIZE ASSUMPTIONS: NEVER use "small company", "small business", "limited resources" - these can insult business owners. Use role/industry focus instead: "As CEO", "companies in ${industry}"
 - COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
 - SINGLE CTA: Generate exactly ONE call to action per email
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
+
+HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
+- Write like a knowledgeable energy expert who researched ${company || 'their company'} deeply
+- Show you did homework: When you have specific data, use phrases like:
+  * "I noticed ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail]'}" ${accountDescription ? '(you have account description)' : ''}
+  * "I saw ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}" ${recentActivityContext ? '(you have recent activity)' : ''}
+  * "On your website, I noticed..." ${websiteContext ? '(you have website context)' : ''}
+  * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." ${city ? '(you have location)' : ''}
+- Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? 'your contract ending ' + contractEndLabel : '[specific situation]'}..."
+- Include micro-observations: Reference their website, recent posts, industry trends they'd recognize
+- Vary sentence length: Mix short punchy statements with longer explanatory ones
+- Use conversational connectors: "Here's the thing...", "The reality is...", "What I've found..."
+- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", or other template phrases
+- Show expertise subtly: "In my experience with ${industry || '[industry]'} companies", "I've noticed [specific trend]"
+${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\'ve likely seen..." (tenure available)' : ''}
+
+EVIDENCE OF RESEARCH (Show You Know Their Business):
+${accountDescription ? '✓ Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally' : ''}
+${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements' : ''}
+${websiteContext ? '✓ Use website info: "On your website, I noticed..." to show you visited' : ''}
+${recentActivityContext ? '✓ Use recent activity: "I saw ${company} recently..." + ' + recentActivityContext.substring(0, 60) + '...' : ''}
+${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
+${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
+${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant' : ''}
+
+CONVERSATIONAL FLOW PATTERNS:
+✓ GOOD: "I noticed ${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
+✓ GOOD: "Given your role as ${job || '[role]'}, you're probably dealing with ${roleContext?.painPoints[0] || '[pain point]'}. Here's what I've found..."
+✓ GOOD: "${industry || '[Industry]'} companies are facing [specific challenge]. ${company || '[Company]'} likely sees this in..."
+✓ GOOD: "Companies in ${industry || '[industry]'}" (not "your industry")
+✗ BAD: "I wanted to reach out about..."
+✗ BAD: "I hope this email finds you well..."
+✗ BAD: "I'm reaching out because..."
 
 PARAGRAPH STRUCTURE (CRITICAL):
 Paragraph 1 (Opening Hook - 1-2 sentences):
