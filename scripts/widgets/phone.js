@@ -69,6 +69,38 @@
     return getBusinessNumberE164();
   }
   
+  // Check if bridge to mobile is enabled (admin only feature)
+  function isBridgeToMobileEnabled() {
+    try {
+      // First try to get from SettingsPage instance
+      if (window.SettingsPage && window.SettingsPage.instance) {
+        const settings = window.SettingsPage.instance.getSettings();
+        if (settings && settings.bridgeToMobile === true) {
+          return true;
+        }
+      }
+      
+      // Fallback to static method
+      const settings = window.SettingsPage?.getSettings?.();
+      if (settings && settings.bridgeToMobile === true) {
+        return true;
+      }
+      
+      // Fallback to localStorage
+      const savedSettings = localStorage.getItem('crm-settings');
+      if (savedSettings) {
+        try {
+          const parsed = JSON.parse(savedSettings);
+          if (parsed.bridgeToMobile === true) {
+            return true;
+          }
+        } catch(_) {}
+      }
+    } catch(_) {}
+    
+    return false;
+  }
+  
   // Normalize phone number to E.164 format
   function normalizeToE164(phone) {
     if (!phone) return null;
@@ -3392,6 +3424,22 @@
               console.debug('[Phone] Aborting: user canceled after permission but before placing call');
               return;
             }
+            
+            // Check if bridge to mobile is enabled - if so, skip browser call and go straight to server call
+            const bridgeToMobile = isBridgeToMobileEnabled();
+            if (bridgeToMobile) {
+              console.debug('[Phone] Bridge to mobile enabled - using server call (mobile phone)');
+              try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) {}
+              try {
+                await fallbackServerCall(normalized.value);
+              } catch (e2) {
+                console.error('[Phone] Server call failed:', e2?.message || e2);
+                try { window.crm?.showToast && window.crm.showToast(`Call failed: ${e2?.message || 'Error'}`); } catch (_) {}
+              }
+              return; // Exit early - server call attempted
+            }
+            
+            // Bridge to mobile is OFF - try browser call first
             const call = await placeBrowserCall(normalized.value, normalized.extension);
             console.debug('[Phone] Browser call successful, no fallback needed');
             // Note: initial call logging is already done in placeBrowserCall()
@@ -3408,13 +3456,22 @@
             }
           }
         } else {
-          // Using server-based calling (browser calling disabled)
+          // No microphone permission or browser calling disabled
+          // Check if bridge to mobile is enabled (even without mic permission, we can still bridge)
+          const bridgeToMobile = isBridgeToMobileEnabled();
           if (!isCallInProgress) {
             console.debug('[Phone] Aborting: user canceled before server call');
             return;
           }
-          console.debug('[Phone] Using server-based calling');
-          try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) {}
+          
+          if (bridgeToMobile) {
+            console.debug('[Phone] Using server-based calling (bridge to mobile enabled)');
+            try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) {}
+          } else {
+            console.debug('[Phone] Using server-based calling (no mic permission)');
+            try { window.crm?.showToast && window.crm.showToast(`Calling ${normalized.value} - your phone will ring first...`); } catch (_) {}
+          }
+          
           try {
             await fallbackServerCall(normalized.value);
           } catch (e2) {
