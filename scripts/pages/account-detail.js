@@ -5251,7 +5251,15 @@ var console = {
       let listsSnapshot;
       try {
         // Primary query: filter by kind on server
+        const email = window.currentUserEmail || '';
         let query = db.collection('lists');
+        
+        // CRITICAL: Add ownership filter FIRST for non-admin users (required by Firestore rules)
+        if (window.currentUserRole !== 'admin' && email) {
+          query = query.where('ownerId', '==', email);
+        }
+        
+        // Then add kind filter
         if (query.where) query = query.where('kind', '==', 'accounts');
         listsSnapshot = await (query.limit ? query.limit(200).get() : query.get());
       } catch (e) {

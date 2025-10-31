@@ -6561,8 +6561,16 @@ async function createContactSequenceThenAdd(name) {
       let existing = new Set();
       const existingMap = new Map(); // listId -> listMemberDocId
       if (db && typeof db.collection === 'function') {
-        // Load lists (people kind)
+        // Load lists (people kind) with ownership filter for non-admin users
+        const email = window.currentUserEmail || '';
         let q = db.collection('lists');
+        
+        // CRITICAL: Add ownership filter FIRST for non-admin users (required by Firestore rules)
+        if (window.currentUserRole !== 'admin' && email) {
+          q = q.where('ownerId', '==', email);
+        }
+        
+        // Then add kind filter
         if (q.where) q = q.where('kind', '==', 'people');
         const snap = await (q.limit ? q.limit(200).get() : q.get());
         lists = (snap && snap.docs) ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
