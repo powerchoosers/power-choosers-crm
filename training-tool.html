@@ -372,6 +372,7 @@
             background: var(--bg-card);
             border: 1px solid var(--border-light);
             border-radius: var(--border-radius);
+            cursor: default;
         }
 
         .phase-btn {
@@ -886,17 +887,82 @@
                 padding: 12px 16px;
             }
 
+            /* Mobile Phase Carousel */
             .phase-navigation {
+                display: flex;
                 overflow-x: auto;
+                overflow-y: hidden;
                 -webkit-overflow-scrolling: touch;
-                padding-bottom: 8px;
+                scroll-snap-type: x mandatory;
+                scroll-padding: 0 80px;
+                padding: 16px 60px;
                 margin-bottom: 16px;
+                gap: 0;
+                position: relative;
+                scroll-behavior: smooth;
+            }
+            
+            /* Gradient shadows for 3D effect */
+            .phase-navigation::before,
+            .phase-navigation::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                width: 60px;
+                z-index: 10;
+                pointer-events: none;
+            }
+            
+            .phase-navigation::before {
+                left: 0;
+                background: linear-gradient(to right, var(--bg-card) 0%, transparent 100%);
+            }
+            
+            .phase-navigation::after {
+                right: 0;
+                background: linear-gradient(to left, var(--bg-card) 0%, transparent 100%);
             }
 
             .phase-btn {
-                font-size: 0.8rem;
-                padding: 8px 12px;
+                flex: 0 0 auto;
+                min-width: 180px;
+                width: 180px;
+                padding: 12px 16px;
+                font-size: 0.85rem;
                 white-space: nowrap;
+                scroll-snap-align: center;
+                position: relative;
+                transform: scale(1);
+                opacity: 1;
+                transition: transform 0.3s ease, opacity 0.3s ease, box-shadow 0.3s ease;
+                z-index: 1;
+            }
+            
+            /* Current phase - prominent and centered */
+            .phase-btn.active {
+                transform: scale(1.1);
+                z-index: 3;
+                box-shadow: 0 6px 20px rgba(255, 107, 53, 0.5);
+            }
+            
+            /* Previous phase - visible on left */
+            .phase-btn.prev-phase {
+                transform: scale(0.85) translateX(-10px);
+                opacity: 0.5;
+                z-index: 2;
+            }
+            
+            /* Next phase - visible on right */
+            .phase-btn.next-phase {
+                transform: scale(0.85) translateX(10px);
+                opacity: 0.5;
+                z-index: 2;
+            }
+            
+            /* All other phases - hidden but still scrollable */
+            .phase-btn:not(.active):not(.prev-phase):not(.next-phase) {
+                opacity: 0.2;
             }
 
             /* Tips Panel Mobile */
@@ -1875,6 +1941,7 @@
 
             navEl.innerHTML = '';
             const currentPhase = getCurrentPhase();
+            const isMobile = window.innerWidth <= 767;
             
             // If we've moved to a new phase, mark previous as completed
             if (lastPhase && currentPhase && lastPhase !== currentPhase) {
@@ -1893,6 +1960,9 @@
                 lastPhase = currentPhase;
             }
             
+            // Find current phase index for mobile carousel
+            const currentIndex = currentPhase ? PHASES.findIndex(p => p.name === currentPhase) : -1;
+            
             PHASES.forEach((phase, index) => {
                 const btn = document.createElement('button');
                 btn.className = 'phase-btn';
@@ -1903,6 +1973,15 @@
                 // Check if this phase is active
                 if (currentPhase === phase.name) {
                     btn.classList.add('active');
+                }
+                
+                // For mobile carousel: mark previous and next phases
+                if (isMobile && currentIndex >= 0) {
+                    if (index === currentIndex - 1) {
+                        btn.classList.add('prev-phase');
+                    } else if (index === currentIndex + 1) {
+                        btn.classList.add('next-phase');
+                    }
                 }
 
                 // Check if this phase is completed
@@ -1936,6 +2015,87 @@
                 });
 
                 navEl.appendChild(btn);
+            });
+            
+            // Auto-scroll to active phase on mobile
+            if (isMobile && currentIndex >= 0) {
+                setTimeout(() => {
+                    const activeBtn = navEl.querySelector('.phase-btn.active');
+                    if (activeBtn) {
+                        activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                    }
+                }, 150);
+            }
+        }
+        
+        // Mobile phase carousel swipe support
+        function initPhaseCarousel() {
+            const phaseNav = document.getElementById('phase-navigation');
+            if (!phaseNav) return;
+            
+            // Only enable on mobile
+            if (window.innerWidth > 767) return;
+            
+            let startX = 0;
+            let scrollLeft = 0;
+            let isDown = false;
+            
+            phaseNav.addEventListener('mousedown', (e) => {
+                isDown = true;
+                startX = e.pageX - phaseNav.offsetLeft;
+                scrollLeft = phaseNav.scrollLeft;
+                phaseNav.style.cursor = 'grabbing';
+            });
+            
+            phaseNav.addEventListener('mouseleave', () => {
+                isDown = false;
+                phaseNav.style.cursor = 'grab';
+            });
+            
+            phaseNav.addEventListener('mouseup', () => {
+                isDown = false;
+                phaseNav.style.cursor = 'grab';
+            });
+            
+            phaseNav.addEventListener('mousemove', (e) => {
+                if (!isDown) return;
+                e.preventDefault();
+                const x = e.pageX - phaseNav.offsetLeft;
+                const walk = (x - startX) * 2;
+                phaseNav.scrollLeft = scrollLeft - walk;
+            });
+            
+            // Touch events for mobile swipe
+            let touchStartX = 0;
+            let touchScrollLeft = 0;
+            
+            phaseNav.addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].pageX - phaseNav.offsetLeft;
+                touchScrollLeft = phaseNav.scrollLeft;
+            }, { passive: true });
+            
+            phaseNav.addEventListener('touchmove', (e) => {
+                if (!touchStartX) return;
+                const x = e.touches[0].pageX - phaseNav.offsetLeft;
+                const walk = (x - touchStartX) * 1.5;
+                phaseNav.scrollLeft = touchScrollLeft - walk;
+            }, { passive: true });
+            
+            // Auto-scroll to active phase when it changes
+            const observer = new MutationObserver(() => {
+                const activeBtn = phaseNav.querySelector('.phase-btn.active');
+                if (activeBtn && window.innerWidth <= 767) {
+                    setTimeout(() => {
+                        activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                    }, 100);
+                }
+            });
+            
+            observer.observe(phaseNav, { 
+                childList: true, 
+                subtree: true, 
+                attributes: true, 
+                attributeFilter: ['class'] 
             });
         }
 
@@ -2180,6 +2340,20 @@
         
         // Build opener selector on load
         buildOpenerSelector();
+        
+        // Initialize mobile phase carousel
+        initPhaseCarousel();
+        
+        // Re-initialize carousel on resize
+        let carouselResizeTimeout;
+        window.addEventListener('resize', function() {
+            clearTimeout(carouselResizeTimeout);
+            carouselResizeTimeout = setTimeout(function() {
+                initPhaseCarousel();
+                // Rebuild navigation if switching between mobile/desktop
+                buildPhaseNavigation();
+            }, 250);
+        });
     </script>
 </body>
 </html>
