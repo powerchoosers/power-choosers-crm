@@ -92,6 +92,45 @@
             margin-bottom: var(--spacing-md);
         }
 
+        /* Custom Scrollbar Styling - Desktop Only */
+        @media (min-width: 768px) {
+            /* Webkit browsers (Chrome, Safari, Edge) */
+            .script-display::-webkit-scrollbar,
+            .tips-panel::-webkit-scrollbar,
+            .main-content::-webkit-scrollbar {
+                width: 8px;
+            }
+            
+            .script-display::-webkit-scrollbar-track,
+            .tips-panel::-webkit-scrollbar-track,
+            .main-content::-webkit-scrollbar-track {
+                background: var(--bg-container);
+                border-radius: 4px;
+            }
+            
+            .script-display::-webkit-scrollbar-thumb,
+            .tips-panel::-webkit-scrollbar-thumb,
+            .main-content::-webkit-scrollbar-thumb {
+                background: #3a3a3a;
+                border-radius: 4px;
+                border: 1px solid var(--bg-container);
+            }
+            
+            .script-display::-webkit-scrollbar-thumb:hover,
+            .tips-panel::-webkit-scrollbar-thumb:hover,
+            .main-content::-webkit-scrollbar-thumb:hover {
+                background: #4a4a4a;
+            }
+            
+            /* Firefox */
+            .script-display,
+            .tips-panel,
+            .main-content {
+                scrollbar-width: thin;
+                scrollbar-color: #3a3a3a var(--bg-container);
+            }
+        }
+
         .script-display {
             background: var(--bg-card);
             border: 1px solid var(--border-light);
@@ -373,6 +412,48 @@
             border: 1px solid var(--border-light);
             border-radius: var(--border-radius);
             cursor: default;
+            position: relative;
+            overflow: hidden;
+            min-height: 54px;
+            height: 54px;
+            align-items: center;
+            box-sizing: border-box;
+        }
+        
+        /* Desktop: Gradient overlay on navigation bar behind active button */
+        @media (min-width: 768px) {
+            .phase-navigation::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: linear-gradient(
+                    90deg,
+                    transparent 0%,
+                    rgba(255, 107, 53, 0.08) 15%,
+                    rgba(255, 107, 53, 0.12) 30%,
+                    rgba(255, 107, 53, 0.15) 50%,
+                    rgba(255, 107, 53, 0.12) 70%,
+                    rgba(255, 107, 53, 0.08) 85%,
+                    transparent 100%
+                );
+                pointer-events: none;
+                z-index: 0;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            }
+            
+            .phase-navigation:has(.phase-btn.active)::before {
+                opacity: 1;
+            }
+            
+            /* Ensure buttons are above gradient */
+            .phase-btn {
+                position: relative;
+                z-index: 1;
+            }
         }
 
         .phase-btn {
@@ -388,6 +469,12 @@
             transition: var(--transition-fast);
             white-space: nowrap;
             min-width: 0;
+            min-height: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
         }
 
         .phase-btn:hover {
@@ -962,6 +1049,14 @@
                 box-shadow: 0 6px 20px rgba(255, 107, 53, 0.5);
                 min-width: 200px;
                 width: 200px;
+                background: var(--orange-primary);
+                /* Remove any gradient from button itself on mobile */
+                background-image: none;
+            }
+            
+            /* Mobile: Remove gradient effect entirely to avoid issues */
+            .phase-navigation::after {
+                display: none;
             }
             
             /* Previous phase - visible on left */
@@ -2035,31 +2130,37 @@
                 navEl.appendChild(btn);
             });
             
-            // Auto-scroll to appropriate phase on mobile
+            // Auto-scroll to appropriate phase on mobile - robust approach
             if (isMobile) {
-                setTimeout(() => {
-                    // If there's an active phase, scroll to it
-                    // Otherwise, scroll to first phase (for initial load/restart)
-                    const activeBtn = navEl.querySelector('.phase-btn.active');
-                    const firstBtn = navEl.querySelector('.phase-btn:first-child');
-                    const targetBtn = activeBtn || firstBtn;
-                    
-                    if (targetBtn) {
-                        // Use instant scroll for initial positioning, smooth for changes
-                        const isInitialPosition = !navEl.dataset.hasScrolled;
-                        navEl.dataset.hasScrolled = 'true';
+                // Use requestAnimationFrame for more reliable timing
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        const activeBtn = navEl.querySelector('.phase-btn.active');
+                        const firstBtn = navEl.querySelector('.phase-btn:first-child');
+                        const targetBtn = activeBtn || firstBtn;
                         
-                        const containerWidth = navEl.offsetWidth;
-                        const buttonWidth = targetBtn.offsetWidth;
-                        const buttonLeft = targetBtn.offsetLeft;
-                        const scrollPosition = buttonLeft - (containerWidth / 2) + (buttonWidth / 2);
-                        
-                        navEl.scrollTo({
-                            left: scrollPosition,
-                            behavior: isInitialPosition ? 'auto' : 'smooth'
-                        });
-                    }
-                }, 200);
+                        if (targetBtn) {
+                            // Check if already scrolled to avoid unnecessary movement
+                            const containerWidth = navEl.offsetWidth;
+                            const buttonWidth = targetBtn.offsetWidth;
+                            const buttonLeft = targetBtn.offsetLeft;
+                            const targetScroll = buttonLeft - (containerWidth / 2) + (buttonWidth / 2);
+                            const currentScroll = navEl.scrollLeft;
+                            const scrollDiff = Math.abs(targetScroll - currentScroll);
+                            
+                            // Only scroll if we're not already close to the target (within 10px)
+                            if (scrollDiff > 10) {
+                                const isInitialPosition = !navEl.dataset.hasScrolled;
+                                navEl.dataset.hasScrolled = 'true';
+                                
+                                navEl.scrollTo({
+                                    left: targetScroll,
+                                    behavior: isInitialPosition ? 'auto' : 'smooth'
+                                });
+                            }
+                        }
+                    });
+                });
             }
         }
         
@@ -2118,29 +2219,46 @@
             
             // Track previous active phase to avoid unnecessary scrolling
             let previousActivePhase = null;
+            let isScrolling = false;
             
-            // Auto-scroll to active phase when it changes - direct scroll, not from beginning
+            // Auto-scroll to active phase when it changes - robust approach
             const observer = new MutationObserver(() => {
                 const activeBtn = phaseNav.querySelector('.phase-btn.active');
-                if (activeBtn && window.innerWidth <= 767) {
+                if (activeBtn && window.innerWidth <= 767 && !isScrolling) {
                     const currentActivePhase = activeBtn.dataset.phase;
                     
                     // Only scroll if phase actually changed
                     if (currentActivePhase !== previousActivePhase) {
                         previousActivePhase = currentActivePhase;
+                        isScrolling = true;
                         
-                        setTimeout(() => {
-                            // Direct scroll to target - don't scroll from beginning
-                            const containerWidth = phaseNav.offsetWidth;
-                            const buttonWidth = activeBtn.offsetWidth;
-                            const buttonLeft = activeBtn.offsetLeft;
-                            const scrollPosition = buttonLeft - (containerWidth / 2) + (buttonWidth / 2);
-                            
-                            phaseNav.scrollTo({
-                                left: scrollPosition,
-                                behavior: 'smooth'
+                        // Use requestAnimationFrame for smooth, reliable scrolling
+                        requestAnimationFrame(() => {
+                            requestAnimationFrame(() => {
+                                const containerWidth = phaseNav.offsetWidth;
+                                const buttonWidth = activeBtn.offsetWidth;
+                                const buttonLeft = activeBtn.offsetLeft;
+                                const targetScroll = buttonLeft - (containerWidth / 2) + (buttonWidth / 2);
+                                
+                                // Check if already close to target
+                                const currentScroll = phaseNav.scrollLeft;
+                                const scrollDiff = Math.abs(targetScroll - currentScroll);
+                                
+                                if (scrollDiff > 10) {
+                                    phaseNav.scrollTo({
+                                        left: targetScroll,
+                                        behavior: 'smooth'
+                                    });
+                                    
+                                    // Reset scrolling flag after animation completes
+                                    setTimeout(() => {
+                                        isScrolling = false;
+                                    }, 400);
+                                } else {
+                                    isScrolling = false;
+                                }
                             });
-                        }, 150);
+                        });
                     }
                 }
             });
@@ -2297,8 +2415,30 @@
             const selector = document.getElementById('opener-selector');
             if (!selector) return;
 
-            // Always show - available from the beginning
-            selector.style.display = 'flex';
+            const isMobile = window.innerWidth <= 767;
+            const currentPhase = getCurrentPhase();
+            
+            // On mobile: hide if we're past the Opening stage
+            if (isMobile) {
+                // Show if we're at start, Pre-Call, or Opening stage
+                // Hide if we're past Opening (Situation, Problem, etc.)
+                if (currentPhase === null || 
+                    currentPhase === 'Pre-Call' || 
+                    currentPhase === 'Opening' ||
+                    state.current === 'start' ||
+                    state.current === 'pre_call_qualification' ||
+                    state.current === 'dialing' ||
+                    state.current === 'hook' ||
+                    state.current === 'pattern_interrupt_opening' ||
+                    state.current.startsWith('opener_')) {
+                    selector.style.display = 'flex';
+                } else {
+                    selector.style.display = 'none';
+                }
+            } else {
+                // Desktop: always show
+                selector.style.display = 'flex';
+            }
         }
 
         // Event listeners
