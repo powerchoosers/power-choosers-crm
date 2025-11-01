@@ -894,15 +894,20 @@
                 overflow-y: hidden;
                 -webkit-overflow-scrolling: touch;
                 scroll-snap-type: x mandatory;
-                scroll-padding: 0 80px;
-                padding: 16px 60px;
+                scroll-padding: 0 100px;
+                padding: 20px 100px 20px 100px;
                 margin-bottom: 16px;
+                margin-left: -16px;
+                margin-right: -16px;
+                width: calc(100% + 32px);
                 gap: 0;
                 position: relative;
                 scroll-behavior: smooth;
+                align-items: center;
+                justify-content: flex-start;
             }
             
-            /* Gradient shadows for 3D effect */
+            /* Gradient shadows for 3D effect - removed black gradient issue */
             .phase-navigation::before,
             .phase-navigation::after {
                 content: '';
@@ -916,19 +921,25 @@
             
             .phase-navigation::before {
                 left: 0;
-                background: linear-gradient(to right, var(--bg-card) 0%, transparent 100%);
+                background: linear-gradient(to right, var(--bg-container) 0%, transparent 100%);
             }
             
             .phase-navigation::after {
                 right: 0;
-                background: linear-gradient(to left, var(--bg-card) 0%, transparent 100%);
+                background: linear-gradient(to left, var(--bg-container) 0%, transparent 100%);
+            }
+            
+            /* Remove any black gradient blocks inside phase buttons */
+            .phase-btn::before,
+            .phase-btn::after {
+                display: none !important;
             }
 
             .phase-btn {
                 flex: 0 0 auto;
-                min-width: 180px;
-                width: 180px;
-                padding: 12px 16px;
+                min-width: 200px;
+                width: 200px;
+                padding: 12px 20px;
                 font-size: 0.85rem;
                 white-space: nowrap;
                 scroll-snap-align: center;
@@ -937,13 +948,20 @@
                 opacity: 1;
                 transition: transform 0.3s ease, opacity 0.3s ease, box-shadow 0.3s ease;
                 z-index: 1;
+                box-sizing: border-box;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: auto;
             }
             
-            /* Current phase - prominent and centered */
+            /* Current phase - prominent and centered, fully visible */
             .phase-btn.active {
-                transform: scale(1.1);
+                transform: scale(1.08);
                 z-index: 3;
                 box-shadow: 0 6px 20px rgba(255, 107, 53, 0.5);
+                min-width: 200px;
+                width: 200px;
             }
             
             /* Previous phase - visible on left */
@@ -2017,14 +2035,31 @@
                 navEl.appendChild(btn);
             });
             
-            // Auto-scroll to active phase on mobile
-            if (isMobile && currentIndex >= 0) {
+            // Auto-scroll to appropriate phase on mobile
+            if (isMobile) {
                 setTimeout(() => {
+                    // If there's an active phase, scroll to it
+                    // Otherwise, scroll to first phase (for initial load/restart)
                     const activeBtn = navEl.querySelector('.phase-btn.active');
-                    if (activeBtn) {
-                        activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                    const firstBtn = navEl.querySelector('.phase-btn:first-child');
+                    const targetBtn = activeBtn || firstBtn;
+                    
+                    if (targetBtn) {
+                        // Use instant scroll for initial positioning, smooth for changes
+                        const isInitialPosition = !navEl.dataset.hasScrolled;
+                        navEl.dataset.hasScrolled = 'true';
+                        
+                        const containerWidth = navEl.offsetWidth;
+                        const buttonWidth = targetBtn.offsetWidth;
+                        const buttonLeft = targetBtn.offsetLeft;
+                        const scrollPosition = buttonLeft - (containerWidth / 2) + (buttonWidth / 2);
+                        
+                        navEl.scrollTo({
+                            left: scrollPosition,
+                            behavior: isInitialPosition ? 'auto' : 'smooth'
+                        });
                     }
-                }, 150);
+                }, 200);
             }
         }
         
@@ -2081,13 +2116,32 @@
                 phaseNav.scrollLeft = touchScrollLeft - walk;
             }, { passive: true });
             
-            // Auto-scroll to active phase when it changes
+            // Track previous active phase to avoid unnecessary scrolling
+            let previousActivePhase = null;
+            
+            // Auto-scroll to active phase when it changes - direct scroll, not from beginning
             const observer = new MutationObserver(() => {
                 const activeBtn = phaseNav.querySelector('.phase-btn.active');
                 if (activeBtn && window.innerWidth <= 767) {
-                    setTimeout(() => {
-                        activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-                    }, 100);
+                    const currentActivePhase = activeBtn.dataset.phase;
+                    
+                    // Only scroll if phase actually changed
+                    if (currentActivePhase !== previousActivePhase) {
+                        previousActivePhase = currentActivePhase;
+                        
+                        setTimeout(() => {
+                            // Direct scroll to target - don't scroll from beginning
+                            const containerWidth = phaseNav.offsetWidth;
+                            const buttonWidth = activeBtn.offsetWidth;
+                            const buttonLeft = activeBtn.offsetLeft;
+                            const scrollPosition = buttonLeft - (containerWidth / 2) + (buttonWidth / 2);
+                            
+                            phaseNav.scrollTo({
+                                left: scrollPosition,
+                                behavior: 'smooth'
+                            });
+                        }, 150);
+                    }
                 }
             });
             
@@ -2113,6 +2167,11 @@
         // Render function
         function render() {
             const node = FLOW[state.current] || FLOW.start;
+            
+            // Track previous stage to prevent re-animation on same stage
+            const previousStage = display && display.dataset.currentStage ? display.dataset.currentStage : null;
+            const currentStage = node.stage || state.current;
+            const isSameStage = previousStage === currentStage;
 
             // Update hook to use current opener
             updateHookOpener();
@@ -2131,39 +2190,48 @@
                 const isInitialLoad = !display.classList.contains('has-content');
                 display.classList.add('has-content');
                 
-                // Only animate on content updates (not initial load to avoid conflicts)
-                if (!isInitialLoad) {
+                // Store current stage for next comparison
+                display.dataset.currentStage = currentStage;
+                
+                // Only animate on content updates if stage actually changed
+                if (!isInitialLoad && !isSameStage) {
                     display.classList.add('updating');
+                    
+                    // Remove update animation class after it completes
+                    setTimeout(() => {
+                        display.classList.remove('updating');
+                    }, 300);
                 }
                 
                 // Render content
                 const html = renderTemplate(node.text || '', 'text');
                 display.innerHTML = html;
                 
-                // Remove update animation class after it completes
-                if (!isInitialLoad) {
-                    setTimeout(() => {
-                        display.classList.remove('updating');
-                    }, 300);
+                // Smooth scroll to top of script display (only if stage changed)
+                if (!isSameStage) {
+                    requestAnimationFrame(() => {
+                        display.scrollTop = 0;
+                    });
                 }
-                
-                // Smooth scroll to top of script display
-                requestAnimationFrame(() => {
-                    display.scrollTop = 0;
-                });
             }
 
             if (responses) {
-                // Track if buttons already exist to prevent re-animation
+                // Track if buttons already exist and if we're on the same stage
                 const existingButtons = responses.querySelectorAll('.response-btn, .dial-btn');
                 const hadButtons = existingButtons.length > 0;
+                const previousResponses = responses.dataset.responseLabels || '';
+                const currentResponseLabels = (node.responses || []).map(r => r.label).join(',');
+                const sameResponses = previousResponses === currentResponseLabels && hadButtons;
+                
+                // Store current response labels for next comparison
+                responses.dataset.responseLabels = currentResponseLabels;
                 
                 responses.innerHTML = '';
                 responses.classList.remove('full-width');
 
                 if (state.current === 'start') {
                     const btn = document.createElement('button');
-                    btn.className = hadButtons ? 'dial-btn animated' : 'dial-btn';
+                    btn.className = (hadButtons || sameResponses) ? 'dial-btn animated' : 'dial-btn';
                     btn.type = 'button';
                     btn.textContent = 'Dial';
                     btn.addEventListener('click', () => go('pre_call_qualification'));
@@ -2172,7 +2240,7 @@
                 } else {
                     (node.responses || []).forEach(r => {
                         const b = document.createElement('button');
-                        b.className = hadButtons ? 'response-btn animated' : 'response-btn';
+                        b.className = (hadButtons || sameResponses) ? 'response-btn animated' : 'response-btn';
                         b.type = 'button';
                         b.textContent = r.label;
                         b.addEventListener('click', () => go(r.next));
@@ -2213,6 +2281,13 @@
                 OPENER_CONFIGS.transparent,
                 OPENER_CONFIGS.social_proof
             ];
+            
+            // Reset phase navigation scroll tracking for mobile
+            const phaseNav = document.getElementById('phase-navigation');
+            if (phaseNav) {
+                phaseNav.dataset.hasScrolled = '';
+            }
+            
             // Hook will be updated automatically via updateHookOpener() in render()
             render();
         }
