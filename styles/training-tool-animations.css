@@ -295,14 +295,16 @@
 }
 
 /* Desktop: pulse effect on active phase */
-.phase-btn.active {
-    animation: phaseActivePulse 2s ease-in-out infinite;
+@media (min-width: 768px) {
+    .phase-btn.active {
+        animation: phaseActivePulse 2s ease-in-out infinite;
+    }
 }
 
-/* Mobile: disable pulse to prevent reanimation issues */
+/* Mobile: disable pulse animation - no distracting animations */
 @media (max-width: 767px) {
     .phase-btn.active {
-        animation: none;
+        animation: none !important;
     }
 }
 
