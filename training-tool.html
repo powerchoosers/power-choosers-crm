@@ -2443,40 +2443,15 @@
                     if (toolbarContainer) toolbarContainer.classList.remove('has-exiting-opener');
                     if (mainContent) {
                         mainContent.classList.remove('has-exiting-opener');
-                        // Reset margin-top on content when showing opener again
-                        const phaseNav = document.getElementById('phase-navigation');
-                        const scriptDisplay = document.getElementById('script-display');
-                        const responseContainer = document.querySelector('.response-buttons-container');
-                        if (phaseNav) phaseNav.style.marginTop = '';
-                        if (scriptDisplay) scriptDisplay.style.marginTop = '';
-                        if (responseContainer) responseContainer.style.marginTop = '';
                     }
                 } else {
                     // Check if already hidden/exiting to avoid re-triggering animation
                     if (!selector.classList.contains('exiting') && !selector.classList.contains('exited')) {
-                        // Calculate exact space that will be freed when opener collapses
-                        // Get the full height including padding, margin, border
-                        const selectorRect = selector.getBoundingClientRect();
-                        const selectorHeight = selectorRect.height;
-                        
-                        // On mobile, toolbar-with-openers uses flexbox column with 12px gap
-                        const computedStyle = window.getComputedStyle(toolbarContainer);
-                        const gap = parseFloat(computedStyle.gap) || 12;
-                        
-                        // Total space to free = opener height + gap between toolbar and opener
-                        const totalHeight = selectorHeight + gap;
-                        
-                        // Store height as CSS variable for animation
-                        if (mainContent) {
-                            mainContent.style.setProperty('--opener-height', `${totalHeight}px`);
-                        }
-                        
-                        // Start exit animation
+                        // Start exit animation - let natural layout flow handle content movement
                         selector.classList.add('exiting');
                         if (toolbarContainer) toolbarContainer.classList.add('has-exiting-opener');
-                        if (mainContent) mainContent.classList.add('has-exiting-opener');
                         
-                        // After animation completes, hide it
+                        // After animation completes, hide it completely
                         setTimeout(() => {
                             selector.classList.remove('exiting');
                             selector.classList.add('exited');
