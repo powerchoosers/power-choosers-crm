@@ -610,30 +610,30 @@
         transform: none !important;
     }
     
-    /* Only slide up content AFTER toolbar-with-openers (phase-navigation, script-display, response-buttons) */
-    /* Use specific selectors to target only these elements, not toolbar */
+    /* Only slide up content AFTER toolbar-with-openers using margin-top negative */
+    /* This respects natural layout flow better than translateY */
     .main-content.has-exiting-opener #phase-navigation,
     .main-content.has-exiting-opener .phase-navigation {
-        transition: transform 0.4s ease-in-out;
-        transform: translateY(calc(-1 * var(--opener-height, 80px)));
+        transition: margin-top 0.4s ease-in-out;
+        margin-top: calc(-1 * var(--opener-height, 80px));
     }
     
     .main-content.has-exiting-opener #script-display,
     .main-content.has-exiting-opener .script-display {
-        transition: transform 0.4s ease-in-out;
-        transform: translateY(calc(-1 * var(--opener-height, 80px)));
+        transition: margin-top 0.4s ease-in-out;
+        margin-top: calc(-1 * var(--opener-height, 80px));
     }
     
     .main-content.has-exiting-opener .response-buttons-container {
-        transition: transform 0.4s ease-in-out;
-        transform: translateY(calc(-1 * var(--opener-height, 80px)));
+        transition: margin-top 0.4s ease-in-out;
+        margin-top: calc(-1 * var(--opener-height, 80px));
     }
     
-    /* Ensure smooth transitions for content elements, but NOT toolbar */
+    /* Ensure smooth transitions for content elements */
     .phase-navigation,
     .script-display,
     .response-buttons-container {
-        transition: transform 0.4s ease-in-out;
+        transition: margin-top 0.4s ease-in-out;
     }
     
     /* Explicitly prevent toolbar from being affected */
