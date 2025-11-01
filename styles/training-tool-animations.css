@@ -599,15 +599,15 @@
         margin-bottom: 0;
     }
     
-    /* Phase navigation and script display slide up smoothly */
+    /* Phase navigation and script display slide up smoothly by exact opener height */
     .main-content.has-exiting-opener .phase-navigation {
         transition: transform 0.4s ease-in-out;
-        transform: translateY(-80px);
+        transform: translateY(calc(-1 * var(--opener-height, 80px)));
     }
     
     .main-content.has-exiting-opener .script-display {
         transition: transform 0.4s ease-in-out;
-        transform: translateY(-80px);
+        transform: translateY(calc(-1 * var(--opener-height, 80px)));
     }
     
     /* Ensure smooth transitions for content elements */
