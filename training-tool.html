@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Call Scripts Training - Power Choosers CRM</title>
+    <link rel="stylesheet" href="styles/training-tool-animations.css">
     <style>
         :root {
             --orange-primary: #ff6b35;
@@ -28,6 +29,14 @@
             --elevation-card: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
 
+        html {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -39,25 +48,30 @@
             background: var(--bg-container);
             color: var(--text-primary);
             line-height: 1.5;
-            overflow-x: hidden;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
         }
 
         .training-container {
             display: flex;
-            min-height: 100vh;
+            height: 100vh;
             width: 100vw;
-            overflow-x: hidden;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
         }
 
         /* Main Content Area */
         .main-content {
             flex: 1;
             padding: var(--spacing-lg);
-            padding-bottom: 0; /* Remove bottom padding, buttons will handle it */
+            padding-bottom: 0;
             display: flex;
             flex-direction: column;
-            min-height: 100vh;
+            height: 100vh;
             overflow-y: auto;
+            overflow-x: hidden;
             width: 100%;
         }
 
@@ -83,14 +97,14 @@
             border: 1px solid var(--border-light);
             border-radius: var(--border-radius);
             padding: var(--spacing-md);
-            flex: 1;
+            flex: 1 1 auto;
             overflow-y: auto;
             line-height: 1.6;
             color: var(--text-primary);
             font-size: 1.15rem;
             margin-bottom: var(--spacing-md);
             transition: height 0.3s ease;
-            min-height: 200px;
+            min-height: 0;
         }
 
         .script-display .script-highlight {
@@ -141,15 +155,115 @@
 
         .tone-marker {
             display: inline-block;
-            background: rgba(255, 107, 53, 0.15);
-            color: var(--orange-primary);
-            border-left: 3px solid var(--orange-primary);
-            padding: 2px 8px;
+            padding: 3px 8px;
             font-size: 0.85em;
             font-weight: 600;
-            font-style: italic;
             margin: 0 4px;
-            border-radius: 3px;
+            border-radius: 4px;
+            border: 1px solid;
+            vertical-align: baseline;
+        }
+
+        /* Color-coded tone badges */
+        .tone-marker.curious {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6;
+            border-color: #3b82f6;
+        }
+
+        .tone-marker.concerned {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border-color: #ef4444;
+        }
+
+        .tone-marker.confident {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border-color: #10b981;
+        }
+
+        .tone-marker.serious {
+            background: rgba(139, 92, 246, 0.15);
+            color: #8b5cf6;
+            border-color: #8b5cf6;
+        }
+
+        .tone-marker.understanding {
+            background: rgba(251, 191, 36, 0.15);
+            color: #fbbf24;
+            border-color: #fbbf24;
+        }
+
+        .tone-marker.hopeful {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border-color: #22c55e;
+        }
+
+        .tone-marker.professional {
+            background: rgba(107, 114, 128, 0.15);
+            color: #6b7280;
+            border-color: #6b7280;
+        }
+
+        .tone-marker.friendly {
+            background: rgba(249, 115, 22, 0.15);
+            color: #f97316;
+            border-color: #f97316;
+        }
+
+        /* Tone badge for guide */
+        .tone-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin: 0 4px 4px 0;
+            border-radius: 4px;
+            border: 1px solid;
+        }
+
+        .tone-badge.curious {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6;
+            border-color: #3b82f6;
+        }
+
+        .tone-badge.concerned {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border-color: #ef4444;
+        }
+
+        .tone-badge.confident {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border-color: #10b981;
+        }
+
+        .tone-badge.serious {
+            background: rgba(139, 92, 246, 0.15);
+            color: #8b5cf6;
+            border-color: #8b5cf6;
+        }
+
+        .tone-badge.understanding {
+            background: rgba(251, 191, 36, 0.15);
+            color: #fbbf24;
+            border-color: #fbbf24;
+        }
+
+        .tone-badge.professional {
+            background: rgba(107, 114, 128, 0.15);
+            color: #6b7280;
+            border-color: #6b7280;
+        }
+
+        .tone-badge.friendly {
+            background: rgba(249, 115, 22, 0.15);
+            color: #f97316;
+            border-color: #f97316;
         }
 
         .pause-indicator {
@@ -171,14 +285,15 @@
         .response-buttons-container {
             position: sticky;
             bottom: 0;
-            background: var(--bg-main);
+            background: var(--bg-container);
             border-top: 1px solid var(--border-light);
-            padding: var(--spacing-md);
+            padding: var(--spacing-md) var(--spacing-lg);
             margin-top: auto;
             margin-left: calc(-1 * var(--spacing-lg));
             margin-right: calc(-1 * var(--spacing-lg));
             padding-left: var(--spacing-lg);
             padding-right: var(--spacing-lg);
+            flex-shrink: 0;
         }
 
         .response-buttons {
@@ -218,10 +333,7 @@
             transform: translateY(-1px);
         }
 
-        .dial-btn:active,
-        .response-btn:active {
-            transform: translateY(0);
-        }
+        /* Click animation removed - keeping only hover effects */
 
         .toolbar {
             display: flex;
@@ -372,8 +484,7 @@
             padding: var(--spacing-md);
             overflow-y: auto;
             height: 100vh;
-            position: sticky;
-            top: 0;
+            flex-shrink: 0;
         }
 
         .tips-header {
@@ -437,6 +548,36 @@
             margin-top: var(--spacing-xs);
         }
 
+        /* Tonality Guide Specific Styles */
+        .tonality-guide {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .tone-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            min-width: 0;
+        }
+
+        .tone-item .tone-badge {
+            flex-shrink: 0;
+            margin: 0;
+        }
+
+        .tone-desc {
+            flex: 1;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
         .tip-category {
             display: inline-block;
             font-size: 0.7rem;
@@ -497,21 +638,35 @@
             .training-container {
                 display: flex;
                 flex-direction: row;
-                min-height: 100vh;
+                height: 100vh;
+                width: 100vw;
+                overflow: hidden;
                 gap: 0;
             }
             
             .main-content {
                 flex: 1;
-                max-width: 1000px;
+                max-width: none;
+                height: 100vh;
                 padding: var(--spacing-lg);
+                padding-bottom: 0;
+                overflow-y: auto;
             }
             
             .tips-panel {
                 width: 320px;
                 display: block;
+                height: 100vh;
                 border-left: 1px solid var(--border-light);
                 border-top: none;
+                flex-shrink: 0;
+                overflow-y: auto;
+                margin-left: 0;
+            }
+            
+            .training-container {
+                margin: 0;
+                padding: 0;
             }
         }
 
@@ -554,6 +709,12 @@
                 order: 1;
                 height: auto;
                 min-height: calc(100vh - 60px);
+                overflow-y: auto;
+            }
+            
+            .training-container {
+                height: 100vh;
+                overflow: hidden;
             }
             
             .tips-panel {
@@ -684,6 +845,13 @@
             .tone-marker {
                 font-size: 0.85em;
                 margin: 1px 2px;
+                padding: 2px 6px;
+            }
+            
+            .tone-badge {
+                font-size: 0.8em;
+                padding: 2px 6px;
+                margin: 0 3px 3px 0;
             }
 
             /* Buttons - Touch Friendly */
@@ -949,12 +1117,15 @@
                     </svg>
                     <div class="tip-title">Tonality Guide</div>
                 </div>
-                <div class="tip-content">
-                    <strong>[curious tone]</strong> — Higher pitch, genuine interest<br>
-                    <strong>[concerned tone]</strong> — Lower pitch, empathetic<br>
-                    <strong>[confident tone]</strong> — Steady, declarative (authority)<br>
-                    <strong>[serious tone]</strong> — Lower, slower (consequences)<br>
-                    <strong>Pause indicators:</strong> Use pauses for authority & emphasis
+                <div class="tip-content tonality-guide">
+                    <div class="tone-item"><span class="tone-badge curious">curious</span><span class="tone-desc">Higher pitch, genuine</span></div>
+                    <div class="tone-item"><span class="tone-badge concerned">concerned</span><span class="tone-desc">Lower pitch, empathetic</span></div>
+                    <div class="tone-item"><span class="tone-badge confident">confident</span><span class="tone-desc">Steady, authoritative</span></div>
+                    <div class="tone-item"><span class="tone-badge serious">serious</span><span class="tone-desc">Lower, slower pace</span></div>
+                    <div class="tone-item"><span class="tone-badge understanding">understanding</span><span class="tone-desc">Empathetic, patient</span></div>
+                    <div class="tone-item"><span class="tone-badge professional">professional</span><span class="tone-desc">Formal, respectful</span></div>
+                    <div class="tone-item"><span class="tone-badge friendly">friendly</span><span class="tone-desc">Warm, approachable</span></div>
+                    <div style="margin-top: 12px;"><strong>Pause indicators:</strong> Use pauses for authority & emphasis</div>
                 </div>
                 <span class="tip-category">Delivery</span>
             </div>
@@ -1161,7 +1332,7 @@
             },
             opener_transparent_bad_time: {
                 stage: 'Opening',
-                text: "<span class=\"tone-marker\">[understanding tone]</span> Totally get it. <span class=\"pause-indicator\"></span> When would be a better time to chat? <span class=\"pause-indicator\"></span> Or would you prefer I just send you some information first?",
+                text: "<span class=\"tone-marker understanding\">understanding tone</span> Totally get it. <span class=\"pause-indicator\"></span> When would be a better time to chat? <span class=\"pause-indicator\"></span> Or would you prefer I just send you some information first?",
                 responses: [
                     { label: 'Send me information', next: 'email_first' },
                     { label: 'Try later today', next: 'schedule_followup' },
@@ -1180,7 +1351,7 @@
             },
             opener_social_proof_skeptical: {
                 stage: 'Opening',
-                text: "<span class=\"tone-marker\">[curious tone]</span> I totally understand. <span class=\"pause-indicator\"></span> Can I ask <span class=\"pause-indicator\"></span> are you aware of how much electricity rates have gone up in the last 4 years? <span class=\"pause-indicator\"></span> The market has moved significantly.",
+                text: "<span class=\"tone-marker curious\">curious tone</span> I totally understand. <span class=\"pause-indicator\"></span> Can I ask <span class=\"pause-indicator\"></span> are you aware of how much electricity rates have gone up in the last 4 years? <span class=\"pause-indicator\"></span> The market has moved significantly.",
                 responses: [
                     { label: 'I\'ve heard about rate increases', next: 'market_context' },
                     { label: 'Not really aware', next: 'market_context' },
@@ -1189,7 +1360,7 @@
             },
             situation_discovery: {
                 stage: 'Discovery - Situation',
-                text: "<span class=\"tone-marker\">[curious tone]</span> <span class=\"pause-indicator\"></span> Got it. <span class=\"pause-indicator\"></span> So... walk me through your current setup real quick. <span class=\"pause-indicator\"></span> Roughly how much are you spending monthly on electricity?",
+                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Got it. <span class=\"pause-indicator\"></span> So... walk me through your current setup real quick. <span class=\"pause-indicator\"></span> Roughly how much are you spending monthly on electricity?",
                 responses: [
                     { label: 'Spending $1K - $5K monthly', next: 'situation_monthly_spend' },
                     { label: 'Spending $5K - $20K monthly', next: 'situation_monthly_spend' },
@@ -1199,7 +1370,7 @@
             },
             situation_monthly_spend: {
                 stage: 'Discovery - Situation',
-                text: "<span class=\"tone-marker\">[curious tone]</span> <span class=\"pause-indicator\"></span> Okay, so that gives me context. <span class=\"pause-indicator\"></span> And do you know roughly what rate you're paying per kWh right now?",
+                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Okay, so that gives me context. <span class=\"pause-indicator\"></span> And do you know roughly what rate you're paying per kWh right now?",
                 responses: [
                     { label: 'Know the rate (X.X cents/kWh)', next: 'situation_supplier_name' },
                     { label: "Don't know it", next: 'situation_supplier_name' }
@@ -1207,7 +1378,7 @@
             },
             situation_supplier_name: {
                 stage: 'Discovery - Situation',
-                text: "<span class=\"tone-marker\">[curious tone]</span> <span class=\"pause-indicator\"></span> Got it. <span class=\"pause-indicator\"></span> And who is your current electricity supplier?",
+                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Got it. <span class=\"pause-indicator\"></span> And who is your current electricity supplier?",
                 responses: [
                     { label: 'Named a supplier', next: 'situation_contract_expiry' },
                     { label: "Not sure / Don't remember", next: 'situation_contract_expiry' }
@@ -1215,7 +1386,7 @@
             },
             situation_contract_expiry: {
                 stage: 'Discovery - Situation',
-                text: "<span class=\"tone-marker\">[curious tone]</span> And do you happen to know when your current contract expires? <span class=\"pause-indicator\"></span> This helps us understand the timing for reserving competitive rates.",
+                text: "<span class=\"tone-marker curious\">curious tone</span> And do you happen to know when your current contract expires? <span class=\"pause-indicator\"></span> This helps us understand the timing for reserving competitive rates.",
                 responses: [
                     { label: 'Within 3 months - HOT', next: 'situation_decision_process_urgent' },
                     { label: '3-6 months out', next: 'situation_decision_process' },
@@ -1226,7 +1397,7 @@
             },
             situation_decision_process: {
                 stage: 'Discovery - Situation',
-                text: "<span class=\"tone-marker\">[curious tone]</span> One more thing... <span class=\"pause-indicator\"></span> walk me through how your company typically makes decisions about energy suppliers or contracts. <span class=\"pause-indicator\"></span> Is it just you, or does it involve others like CFO or finance?",
+                text: "<span class=\"tone-marker curious\">curious tone</span> One more thing... <span class=\"pause-indicator\"></span> walk me through how your company typically makes decisions about energy suppliers or contracts. <span class=\"pause-indicator\"></span> Is it just you, or does it involve others like CFO or finance?",
                 responses: [
                     { label: 'Just me / I decide', next: 'problem_discovery' },
                     { label: 'Involves CFO / Finance', next: 'problem_discovery' },
@@ -1236,7 +1407,7 @@
             },
             situation_decision_process_urgent: {
                 stage: 'Discovery - Situation',
-                text: "<span class=\"tone-marker\">[concerned tone]</span> That's really tight timing. <span class=\"pause-indicator\"></span> That's actually perfect because we can help you lock in competitive rates NOW before the market moves. <span class=\"pause-indicator\"></span><br><br>Who else needs to be involved in the decision besides you?",
+                text: "<span class=\"tone-marker concerned\">concerned tone</span> That's really tight timing. <span class=\"pause-indicator\"></span> That's actually perfect because we can help you lock in competitive rates NOW before the market moves. <span class=\"pause-indicator\"></span><br><br>Who else needs to be involved in the decision besides you?",
                 responses: [
                     { label: 'Just me / I decide', next: 'problem_discovery' },
                     { label: 'Involves CFO / Finance', next: 'problem_discovery' },
@@ -1245,7 +1416,7 @@
             },
             market_context: {
                 stage: 'Discovery - Problem',
-                text: "<span class=\"tone-marker\">[concerned tone]</span> That's perfect timing actually. <span class=\"pause-indicator\"></span> Here's something most people don't know: <span class=\"pause-indicator\"></span> electricity prices have doubled in the last 4 years because of data centers and AI. <span class=\"pause-indicator\"></span><br><br>When you renew, you're shopping into that market. <span class=\"pause-indicator\"></span> What would it cost {{account.name}} if your rates go up another 15-20%?",
+                text: "<span class=\"tone-marker concerned\">concerned tone</span> That's perfect timing actually. <span class=\"pause-indicator\"></span> Here's something most people don't know: <span class=\"pause-indicator\"></span> electricity prices have doubled in the last 4 years because of data centers and AI. <span class=\"pause-indicator\"></span><br><br>When you renew, you're shopping into that market. <span class=\"pause-indicator\"></span> What would it cost {{account.name}} if your rates go up another 15-20%?",
                 responses: [
                     { label: 'That would hurt our budget', next: 'consequence_discovery' },
                     { label: "Not sure about the impact", next: 'consequence_discovery' },
@@ -1254,7 +1425,7 @@
             },
             problem_discovery: {
                 stage: 'Discovery - Problem',
-                text: "<span class=\"tone-marker\">[curious tone]</span> <span class=\"pause-indicator\"></span> Okay, so that context helps. <span class=\"pause-indicator\"></span> Now here's what I want to understand... <span class=\"pause-indicator\"></span> what's been the most frustrating part about managing your electricity costs for {{account.name}}?",
+                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Okay, so that context helps. <span class=\"pause-indicator\"></span> Now here's what I want to understand... <span class=\"pause-indicator\"></span> what's been the most frustrating part about managing your electricity costs for {{account.name}}?",
                 responses: [
                     { label: 'Costs are too high', next: 'probe_problem_costs' },
                     { label: 'Complexity / too many options', next: 'probe_problem_complexity' },
@@ -1264,7 +1435,7 @@
             },
             probe_problem_costs: {
                 stage: 'Discovery - Problem',
-                text: "<span class=\"tone-marker\">[curious tone]</span> <span class=\"pause-indicator\"></span> Tell me more about that... <span class=\"pause-indicator\"></span> When did you first notice the costs going up?",
+                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Tell me more about that... <span class=\"pause-indicator\"></span> When did you first notice the costs going up?",
                 responses: [
                     { label: 'Last year', next: 'probe_cost_impact' },
                     { label: 'This quarter / Recently', next: 'probe_cost_impact' },
@@ -1273,7 +1444,7 @@
             },
             probe_cost_impact: {
                 stage: 'Discovery - Problem',
-                text: "<span class=\"tone-marker\">[curious tone]</span> <span class=\"pause-indicator\"></span> And how has that impacted your ability to plan your budget? <span class=\"pause-indicator\"></span> Has leadership noticed this too?",
+                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> And how has that impacted your ability to plan your budget? <span class=\"pause-indicator\"></span> Has leadership noticed this too?",
                 responses: [
                     { label: 'Significant budget impact', next: 'consequence_discovery' },
                     { label: 'Some impact on planning', next: 'consequence_discovery' },
@@ -1282,7 +1453,7 @@
             },
             probe_problem_complexity: {
                 stage: 'Discovery - Problem',
-                text: "<span class=\"tone-marker\">[curious tone]</span> <span class=\"pause-indicator\"></span> I hear that a lot. <span class=\"pause-indicator\"></span> What specifically makes it complex? <span class=\"pause-indicator\"></span> Is it comparing all the options, or understanding the contracts?",
+                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> I hear that a lot. <span class=\"pause-indicator\"></span> What specifically makes it complex? <span class=\"pause-indicator\"></span> Is it comparing all the options, or understanding the contracts?",
                 responses: [
                     { label: 'Too many options to compare', next: 'consequence_discovery' },
                     { label: 'Contracts are confusing', next: 'consequence_discovery' },
@@ -1291,7 +1462,7 @@
             },
             probe_problem_budget: {
                 stage: 'Discovery - Problem',
-                text: "<span class=\"tone-marker\">[curious tone]</span> <span class=\"pause-indicator\"></span> Budget uncertainty is a real pain point. <span class=\"pause-indicator\"></span> How long has that been an issue? <span class=\"pause-indicator\"></span> What impact does that have on your planning?",
+                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Budget uncertainty is a real pain point. <span class=\"pause-indicator\"></span> How long has that been an issue? <span class=\"pause-indicator\"></span> What impact does that have on your planning?",
                 responses: [
                     { label: 'Makes planning difficult', next: 'consequence_discovery' },
                     { label: 'Can\'t predict costs', next: 'consequence_discovery' },
@@ -1300,7 +1471,7 @@
             },
             probe_problem_generic: {
                 stage: 'Discovery - Problem',
-                text: "<span class=\"tone-marker\">[curious tone]</span> <span class=\"pause-indicator\"></span> Tell me more about what's challenging for you... <span class=\"pause-indicator\"></span> Is it the cost, the complexity, or something else?",
+                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Tell me more about what's challenging for you... <span class=\"pause-indicator\"></span> Is it the cost, the complexity, or something else?",
                 responses: [
                     { label: 'Cost is the issue', next: 'probe_problem_costs' },
                     { label: 'Complexity is the issue', next: 'probe_problem_complexity' },
@@ -1309,7 +1480,7 @@
             },
             consequence_discovery: {
                 stage: 'Discovery - Consequence',
-                text: "<span class=\"tone-marker\">[serious tone]</span> <span class=\"pause-indicator\"></span> I hear that from most companies right now. <span class=\"pause-indicator\"></span> So here's what I want you to think about... <span class=\"pause-indicator\"></span> if nothing changes over the next 12 months <span class=\"pause-indicator\"></span> and this stays the way it is <span class=\"pause-indicator\"></span> what does that actually cost {{account.name}}?",
+                text: "<span class=\"tone-marker serious\">serious tone</span> <span class=\"pause-indicator\"></span> I hear that from most companies right now. <span class=\"pause-indicator\"></span> So here's what I want you to think about... <span class=\"pause-indicator\"></span> if nothing changes over the next 12 months <span class=\"pause-indicator\"></span> and this stays the way it is <span class=\"pause-indicator\"></span> what does that actually cost {{account.name}}?",
                 responses: [
                     { label: 'That would be significant', next: 'consequence_urgency' },
                     { label: "Haven't calculated it", next: 'consequence_urgency' },
@@ -1318,7 +1489,7 @@
             },
             consequence_urgency: {
                 stage: 'Discovery - Consequence',
-                text: "<span class=\"tone-marker\">[serious tone]</span> And here's the thing about electricity markets right now... <span class=\"pause-indicator\"></span> Between 2023-2024, rates went up 50% because data centers and AI are consuming massive power. <span class=\"pause-indicator\"></span><br><br>If your contract renewal deadline comes and you miss it <span class=\"pause-indicator\"></span> you could get auto-enrolled at variable rates 50-100% higher than what's available today. <span class=\"pause-indicator\"></span><br><br>What does that look like financially for {{account.name}} if that happens?",
+                text: "<span class=\"tone-marker serious\">serious tone</span> And here's the thing about electricity markets right now... <span class=\"pause-indicator\"></span> Between 2023-2024, rates went up 50% because data centers and AI are consuming massive power. <span class=\"pause-indicator\"></span><br><br>If your contract renewal deadline comes and you miss it <span class=\"pause-indicator\"></span> you could get auto-enrolled at variable rates 50-100% higher than what's available today. <span class=\"pause-indicator\"></span><br><br>What does that look like financially for {{account.name}} if that happens?",
                 responses: [
                     { label: 'That would be catastrophic', next: 'solution_discovery' },
                     { label: 'We need to avoid that', next: 'solution_discovery' },
@@ -1327,7 +1498,7 @@
             },
             consequence_renewal_risk: {
                 stage: 'Discovery - Consequence',
-                text: "<span class=\"tone-marker\">[serious tone]</span> I get it. <span class=\"pause-indicator\"></span> But here's what most people don't realize... <span class=\"pause-indicator\"></span> if your contract expires without renewal, some suppliers auto-renew you at variable rates that can spike 50-100% higher than market rates. <span class=\"pause-indicator\"></span><br><br>That's why we help companies RESERVE competitive rates BEFORE the renewal deadline, so you're not caught off-guard. <span class=\"pause-indicator\"></span> Does that risk concern you?",
+                text: "<span class=\"tone-marker serious\">serious tone</span> I get it. <span class=\"pause-indicator\"></span> But here's what most people don't realize... <span class=\"pause-indicator\"></span> if your contract expires without renewal, some suppliers auto-renew you at variable rates that can spike 50-100% higher than market rates. <span class=\"pause-indicator\"></span><br><br>That's why we help companies RESERVE competitive rates BEFORE the renewal deadline, so you're not caught off-guard. <span class=\"pause-indicator\"></span> Does that risk concern you?",
                 responses: [
                     { label: 'Yes, that concerns me', next: 'solution_discovery' },
                     { label: "We'll handle it", next: 'objection_not_priority' },
@@ -1336,7 +1507,7 @@
             },
             solution_discovery: {
                 stage: 'Discovery - Solution',
-                text: "<span class=\"tone-marker\">[hopeful tone]</span> <span class=\"pause-indicator\"></span> That's significant. <span class=\"pause-indicator\"></span> So... if we could actually fix this and get that money back into your budget <span class=\"pause-indicator\"></span> what would matter most to you in a solution? <span class=\"pause-indicator\"></span><br><br>Is it getting access to competitive rates from 100+ suppliers so you're not stuck with one option? <span class=\"pause-indicator\"></span> Having budget certainty by reserving rates before market moves? <span class=\"pause-indicator\"></span> Having someone handle the complexity so you don't have to? <span class=\"pause-indicator\"></span> Or all of the above?",
+                text: "<span class=\"tone-marker hopeful\">hopeful tone</span> <span class=\"pause-indicator\"></span> That's significant. <span class=\"pause-indicator\"></span> So... if we could actually fix this and get that money back into your budget <span class=\"pause-indicator\"></span> what would matter most to you in a solution? <span class=\"pause-indicator\"></span><br><br>Is it getting access to competitive rates from 100+ suppliers so you're not stuck with one option? <span class=\"pause-indicator\"></span> Having budget certainty by reserving rates before market moves? <span class=\"pause-indicator\"></span> Having someone handle the complexity so you don't have to? <span class=\"pause-indicator\"></span> Or all of the above?",
                 responses: [
                     { label: 'Access to competitive rates', next: 'trial_close_1' },
                     { label: 'Budget certainty', next: 'trial_close_1' },
@@ -1346,7 +1517,7 @@
             },
             trial_close_1: {
                 stage: 'Closing - Trial Close',
-                text: "<span class=\"tone-marker\">[confident tone]</span> <span class=\"pause-indicator\"></span> Perfect. <span class=\"pause-indicator\"></span> So if I'm hearing you right, the real issue is [reference their specific pain - high costs / complexity / budget uncertainty]. <span class=\"pause-indicator\"></span> And if there was a way to solve that by locking in competitive rates BEFORE market prices go up <span class=\"pause-indicator\"></span> that would be worth exploring, right?",
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Perfect. <span class=\"pause-indicator\"></span> So if I'm hearing you right, the real issue is [reference their specific pain - high costs / complexity / budget uncertainty]. <span class=\"pause-indicator\"></span> And if there was a way to solve that by locking in competitive rates BEFORE market prices go up <span class=\"pause-indicator\"></span> that would be worth exploring, right?",
                 responses: [
                     { label: 'Yes, that would be worth exploring', next: 'trial_close_2' },
                     { label: 'Maybe / I need to think', next: 'trial_close_hesitation' },
@@ -1355,7 +1526,7 @@
             },
             trial_close_2: {
                 stage: 'Closing - Confirm Value',
-                text: "<span class=\"tone-marker\">[confident tone]</span> <span class=\"pause-indicator\"></span> Great. <span class=\"pause-indicator\"></span> And the reason that matters is because if we don't act soon <span class=\"pause-indicator\"></span> [reference consequence they mentioned - rate increases / renewal risk / budget impact]. <span class=\"pause-indicator\"></span> Correct?",
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Great. <span class=\"pause-indicator\"></span> And the reason that matters is because if we don't act soon <span class=\"pause-indicator\"></span> [reference consequence they mentioned - rate increases / renewal risk / budget impact]. <span class=\"pause-indicator\"></span> Correct?",
                 responses: [
                     { label: 'Yes, that\'s correct', next: 'close_meeting' },
                     { label: 'Partially / Sort of', next: 'close_meeting' },
@@ -1364,7 +1535,7 @@
             },
             trial_close_hesitation: {
                 stage: 'Closing - Handle Hesitation',
-                text: "<span class=\"tone-marker\">[understanding tone]</span> <span class=\"pause-indicator\"></span> Totally fair. <span class=\"pause-indicator\"></span> What would you want me to have prepared so you can make a good decision? <span class=\"pause-indicator\"></span> Is it market rate comparison? <span class=\"pause-indicator\"></span> How our process works? <span class=\"pause-indicator\"></span> Or understanding what rates are available right now before market moves?",
+                text: "<span class=\"tone-marker understanding\">understanding tone</span> <span class=\"pause-indicator\"></span> Totally fair. <span class=\"pause-indicator\"></span> What would you want me to have prepared so you can make a good decision? <span class=\"pause-indicator\"></span> Is it market rate comparison? <span class=\"pause-indicator\"></span> How our process works? <span class=\"pause-indicator\"></span> Or understanding what rates are available right now before market moves?",
                 responses: [
                     { label: 'Market rate comparison', next: 'email_first' },
                     { label: 'How your process works', next: 'email_first' },
@@ -1373,7 +1544,7 @@
             },
             close_meeting: {
                 stage: 'Closing',
-                text: "<span class=\"tone-marker\">[confident tone]</span> <span class=\"pause-indicator\"></span> Perfect. So what you're really looking for is [REFLECT THEIR ANSWER - competitive rates / budget certainty / handling complexity]. <span class=\"pause-indicator\"></span> Here's what that means... <span class=\"pause-indicator\"></span> we need to schedule a quick 15-minute analysis where I show you exactly what's available in the market right now versus what you're paying. <span class=\"pause-indicator\"></span> This helps you RESERVE competitive rates before market prices move. <span class=\"pause-indicator\"></span> No obligation <span class=\"pause-indicator\"></span> just so you have all the information to make the best decision. <span class=\"pause-indicator\"></span><br><br>Would Tuesday or Wednesday work better for you?",
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Perfect. So what you're really looking for is [REFLECT THEIR ANSWER - competitive rates / budget certainty / handling complexity]. <span class=\"pause-indicator\"></span> Here's what that means... <span class=\"pause-indicator\"></span> we need to schedule a quick 15-minute analysis where I show you exactly what's available in the market right now versus what you're paying. <span class=\"pause-indicator\"></span> This helps you RESERVE competitive rates before market prices move. <span class=\"pause-indicator\"></span> No obligation <span class=\"pause-indicator\"></span> just so you have all the information to make the best decision. <span class=\"pause-indicator\"></span><br><br>Would Tuesday or Wednesday work better for you?",
                 responses: [
                     { label: 'Tuesday works', next: 'meeting_scheduled' },
                     { label: 'Wednesday works', next: 'meeting_scheduled' },
@@ -1383,7 +1554,7 @@
             },
             close_prep_question: {
                 stage: 'Closing',
-                text: "<span class=\"tone-marker\">[confident tone]</span> Great question. <span class=\"pause-indicator\"></span> I'd pull competitive rates from 100+ suppliers in your market, compare them to your current rate, and show you what you could save by reserving those rates before market moves. <span class=\"pause-indicator\"></span><br><br>Plus I'd explain how our process works - we handle everything, you just approve the best option. <span class=\"pause-indicator\"></span> Sound good? <span class=\"pause-indicator\"></span> Tuesday or Wednesday?",
+                text: "<span class=\"tone-marker confident\">confident tone</span> Great question. <span class=\"pause-indicator\"></span> I'd pull competitive rates from 100+ suppliers in your market, compare them to your current rate, and show you what you could save by reserving those rates before market moves. <span class=\"pause-indicator\"></span><br><br>Plus I'd explain how our process works - we handle everything, you just approve the best option. <span class=\"pause-indicator\"></span> Sound good? <span class=\"pause-indicator\"></span> Tuesday or Wednesday?",
                 responses: [
                     { label: 'Tuesday works', next: 'meeting_scheduled' },
                     { label: 'Wednesday works', next: 'meeting_scheduled' },
@@ -1399,7 +1570,7 @@
             },
             email_first: {
                 stage: 'Objection Handling',
-                text: "<span class=\"tone-marker\">[understanding tone]</span> Happy to. <span class=\"pause-indicator\"></span> Before I do though <span class=\"pause-indicator\"></span> just so I send something actually relevant to you... <span class=\"pause-indicator\"></span> What would you want me to include?",
+                text: "<span class=\"tone-marker understanding\">understanding tone</span> Happy to. <span class=\"pause-indicator\"></span> Before I do though <span class=\"pause-indicator\"></span> just so I send something actually relevant to you... <span class=\"pause-indicator\"></span> What would you want me to include?",
                 responses: [
                     { label: 'Market rate comparison', next: 'email_follow_up' },
                     { label: 'How your process works', next: 'email_follow_up' },
@@ -1409,7 +1580,7 @@
             },
             email_follow_up: {
                 stage: 'Objection Handling',
-                text: "<span class=\"tone-marker\">[confident tone]</span> Perfect. <span class=\"pause-indicator\"></span> And when you get that... <span class=\"pause-indicator\"></span> when should I follow up with you? <span class=\"pause-indicator\"></span> End of this week? <span class=\"pause-indicator\"></span> Next week?",
+                text: "<span class=\"tone-marker confident\">confident tone</span> Perfect. <span class=\"pause-indicator\"></span> And when you get that... <span class=\"pause-indicator\"></span> when should I follow up with you? <span class=\"pause-indicator\"></span> End of this week? <span class=\"pause-indicator\"></span> Next week?",
                 responses: [
                     { label: 'End of this week', next: 'email_scheduled' },
                     { label: 'Next week', next: 'email_scheduled' },
@@ -1425,7 +1596,7 @@
             },
             objection_not_interested: {
                 stage: 'Objection Handling',
-                text: "<span class=\"tone-marker\">[understanding tone]</span> I totally understand. <span class=\"pause-indicator\"></span> Can I ask though <span class=\"pause-indicator\"></span> is it because you've already got a solution that's working great <span class=\"pause-indicator\"></span> or is it more that this just isn't a priority right now?",
+                text: "<span class=\"tone-marker understanding\">understanding tone</span> I totally understand. <span class=\"pause-indicator\"></span> Can I ask though <span class=\"pause-indicator\"></span> is it because you've already got a solution that's working great <span class=\"pause-indicator\"></span> or is it more that this just isn't a priority right now?",
                 responses: [
                     { label: 'Already have solution', next: 'objection_happy_supplier' },
                     { label: 'Not a priority', next: 'objection_not_priority' },
@@ -1434,7 +1605,7 @@
             },
             objection_happy_supplier: {
                 stage: 'Objection Handling',
-                text: "<span class=\"tone-marker\">[confident tone]</span> That's fair. <span class=\"pause-indicator\"></span> And just so you know, we work with ALL suppliers - we're not trying to switch you. <span class=\"pause-indicator\"></span><br><br>What we do is run competitive events across 100+ suppliers so you can RESERVE the best rate available BEFORE market prices move. <span class=\"pause-indicator\"></span><br><br>Quick question though: <span class=\"pause-indicator\"></span> have you shopped the market in the last 12 months to make sure you're getting the best rate available?",
+                text: "<span class=\"tone-marker confident\">confident tone</span> That's fair. <span class=\"pause-indicator\"></span> And just so you know, we work with ALL suppliers - we're not trying to switch you. <span class=\"pause-indicator\"></span><br><br>What we do is run competitive events across 100+ suppliers so you can RESERVE the best rate available BEFORE market prices move. <span class=\"pause-indicator\"></span><br><br>Quick question though: <span class=\"pause-indicator\"></span> have you shopped the market in the last 12 months to make sure you're getting the best rate available?",
                 responses: [
                     { label: 'Yes, recently shopped', next: 'probe_deeper' },
                     { label: 'Not recently', next: 'objection_market_moved' },
@@ -1443,7 +1614,7 @@
             },
             objection_market_moved: {
                 stage: 'Objection Handling',
-                text: "<span class=\"tone-marker\">[concerned tone]</span> Here's something important... <span class=\"pause-indicator\"></span> the market has moved significantly in the last 12-24 months. <span class=\"pause-indicator\"></span><br><br>Between 2023-2024, electricity rates went up 50% because data centers and AI are consuming massive power. <span class=\"pause-indicator\"></span><br><br>When your contract renews, that's the market you're shopping into. <span class=\"pause-indicator\"></span> The question isn't 'should we shop?' - it's 'when should we lock in competitive rates BEFORE prices go higher?' <span class=\"pause-indicator\"></span><br><br>Does that make sense?",
+                text: "<span class=\"tone-marker concerned\">concerned tone</span> Here's something important... <span class=\"pause-indicator\"></span> the market has moved significantly in the last 12-24 months. <span class=\"pause-indicator\"></span><br><br>Between 2023-2024, electricity rates went up 50% because data centers and AI are consuming massive power. <span class=\"pause-indicator\"></span><br><br>When your contract renews, that's the market you're shopping into. <span class=\"pause-indicator\"></span> The question isn't 'should we shop?' - it's 'when should we lock in competitive rates BEFORE prices go higher?' <span class=\"pause-indicator\"></span><br><br>Does that make sense?",
                 responses: [
                     { label: 'Yes, that makes sense', next: 'close_meeting' },
                     { label: 'We\'ll handle it ourselves', next: 'objection_not_priority' },
@@ -1452,7 +1623,7 @@
             },
             probe_deeper: {
                 stage: 'Discovery',
-                text: "<span class=\"tone-marker\">[curious tone]</span> Interesting. <span class=\"pause-indicator\"></span> And were the rates you're paying now better or worse than what's available in the market right now?",
+                text: "<span class=\"tone-marker curious\">curious tone</span> Interesting. <span class=\"pause-indicator\"></span> And were the rates you're paying now better or worse than what's available in the market right now?",
                 responses: [
                     { label: "We're competitive", next: 'respect_decision' },
                     { label: 'Rates went up', next: 'close_meeting' }
@@ -1460,7 +1631,7 @@
             },
             objection_not_priority: {
                 stage: 'Objection Handling',
-                text: "<span class=\"tone-marker\">[understanding tone]</span> I get it. <span class=\"pause-indicator\"></span> Here's what I'd suggest: <span class=\"pause-indicator\"></span> when your contract comes up for renewal in the next 6-12 months, that's when we should talk. <span class=\"pause-indicator\"></span><br><br>Do you know roughly when that is?",
+                text: "<span class=\"tone-marker understanding\">understanding tone</span> I get it. <span class=\"pause-indicator\"></span> Here's what I'd suggest: <span class=\"pause-indicator\"></span> when your contract comes up for renewal in the next 6-12 months, that's when we should talk. <span class=\"pause-indicator\"></span><br><br>Do you know roughly when that is?",
                 responses: [
                     { label: 'Yes, I know the date', next: 'schedule_followup' },
                     { label: 'Not sure', next: 'respect_decision' }
@@ -1483,14 +1654,14 @@
             },
             respect_decision: {
                 stage: 'Closing',
-                text: "<span class=\"tone-marker\">[professional tone]</span> Fair enough. <span class=\"pause-indicator\"></span> I appreciate the time. <span class=\"pause-indicator\"></span> If anything changes or you want to explore options <span class=\"pause-indicator\"></span> you know how to reach me. <span class=\"pause-indicator\"></span> Have a great day!",
+                text: "<span class=\"tone-marker professional\">professional tone</span> Fair enough. <span class=\"pause-indicator\"></span> I appreciate the time. <span class=\"pause-indicator\"></span> If anything changes or you want to explore options <span class=\"pause-indicator\"></span> you know how to reach me. <span class=\"pause-indicator\"></span> Have a great day!",
                 responses: [
                     { label: 'End Call', next: 'call_success' }
                 ]
             },
             gatekeeper_intro: {
                 stage: 'Gatekeeper',
-                text: "<span class=\"tone-marker\">[friendly tone]</span> No problem. <span class=\"pause-indicator\"></span> Who would be the right person handling electricity decisions at {{account.name}}?",
+                text: "<span class=\"tone-marker friendly\">friendly tone</span> No problem. <span class=\"pause-indicator\"></span> Who would be the right person handling electricity decisions at {{account.name}}?",
                 responses: [
                     { label: 'They gave name', next: 'asked_to_speak' },
                     { label: "Not sure / won't say", next: 'voicemail' },
@@ -1507,7 +1678,7 @@
             },
             voicemail: {
                 stage: 'Voicemail',
-                text: "<span class=\"tone-marker\">[professional tone]</span> Voicemail detected. What would you say?<br><br><em>Tip: Keep it brief (20 seconds), mention specific reason for call, and give them permission to not call back.</em>",
+                text: "<span class=\"tone-marker professional\">professional tone</span> Voicemail detected. What would you say?<br><br><em>Tip: Keep it brief (20 seconds), mention specific reason for call, and give them permission to not call back.</em>",
                 responses: [
                     { label: 'Generic voicemail', next: 'vm_feedback1' },
                     { label: 'Specific value voicemail', next: 'vm_feedback2' },
@@ -1612,6 +1783,10 @@
             const container = document.querySelector('.opener-buttons-container');
             if (!container) return;
 
+            // Check if buttons already exist to prevent re-animation
+            const existingButtons = container.querySelectorAll('.opener-btn');
+            const hadButtons = existingButtons.length > 0;
+
             // Clear existing buttons
             container.innerHTML = '';
 
@@ -1621,7 +1796,7 @@
             // Create buttons for all openers
             allOpeners.forEach(opener => {
                 const btn = document.createElement('button');
-                btn.className = 'opener-btn';
+                btn.className = hadButtons ? 'opener-btn animated' : 'opener-btn';
                 btn.textContent = opener.label;
                 btn.dataset.openerKey = opener.key;
                 btn.dataset.openerState = opener.state;
@@ -1792,17 +1967,43 @@
             buildOpenerSelector();
 
             if (display) {
+                // Check if this is initial load or update
+                const isInitialLoad = !display.classList.contains('has-content');
+                display.classList.add('has-content');
+                
+                // Only animate on content updates (not initial load to avoid conflicts)
+                if (!isInitialLoad) {
+                    display.classList.add('updating');
+                }
+                
+                // Render content
                 const html = renderTemplate(node.text || '', 'text');
                 display.innerHTML = html;
+                
+                // Remove update animation class after it completes
+                if (!isInitialLoad) {
+                    setTimeout(() => {
+                        display.classList.remove('updating');
+                    }, 300);
+                }
+                
+                // Smooth scroll to top of script display
+                requestAnimationFrame(() => {
+                    display.scrollTop = 0;
+                });
             }
 
             if (responses) {
+                // Track if buttons already exist to prevent re-animation
+                const existingButtons = responses.querySelectorAll('.response-btn, .dial-btn');
+                const hadButtons = existingButtons.length > 0;
+                
                 responses.innerHTML = '';
                 responses.classList.remove('full-width');
 
                 if (state.current === 'start') {
                     const btn = document.createElement('button');
-                    btn.className = 'dial-btn';
+                    btn.className = hadButtons ? 'dial-btn animated' : 'dial-btn';
                     btn.type = 'button';
                     btn.textContent = 'Dial';
                     btn.addEventListener('click', () => go('pre_call_qualification'));
@@ -1811,7 +2012,7 @@
                 } else {
                     (node.responses || []).forEach(r => {
                         const b = document.createElement('button');
-                        b.className = 'response-btn';
+                        b.className = hadButtons ? 'response-btn animated' : 'response-btn';
                         b.type = 'button';
                         b.textContent = r.label;
                         b.addEventListener('click', () => go(r.next));

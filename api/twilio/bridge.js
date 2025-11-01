@@ -17,10 +17,16 @@ export default async function handler(req, res) {
     }
     
     try {
-        const { target, callerId } = req.query; // Accept callerId from query params
+        // Decode URL-encoded query parameters (Twilio support recommendation)
+        let { target, callerId } = req.query;
+        if (target) target = decodeURIComponent(target);
+        if (callerId) callerId = decodeURIComponent(callerId);
+        
         const { CallSid, From, To } = req.body;
         
-        console.log(`[Bridge] Connecting agent call to target: ${target}, CallSid: ${CallSid}, callerId: ${callerId || 'default'}`);
+        console.log(`[Bridge] Raw params - target: ${req.query.target}, callerId: ${req.query.callerId}`);
+        console.log(`[Bridge] Decoded params - target: ${target}, callerId: ${callerId || 'none'}`);
+        console.log(`[Bridge] Body - CallSid: ${CallSid}, From: ${From || 'none'}, To: ${To || 'none'}`);
         
         // Ensure absolute base URL for Twilio callbacks (prefer headers)
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
@@ -40,8 +46,41 @@ export default async function handler(req, res) {
             return;
         }
         
-        // Use dynamic caller ID: callerId from query param, fallback to env var
-        const dynamicCallerId = callerId || process.env.TWILIO_PHONE_NUMBER || '+18176630380';
+        // Validate E.164 format helper
+        const isValidE164 = (num) => {
+            if (!num || typeof num !== 'string') return false;
+            // E.164: starts with +, followed by 1-15 digits
+            return /^\+[1-9]\d{1,14}$/.test(num.trim());
+        };
+        
+        // Determine dynamic caller ID: prioritize callerId from query, then From in body, then env var
+        // From in body is the Twilio number that initiated the call to the agent (always valid)
+        let dynamicCallerId = callerId || From || process.env.TWILIO_PHONE_NUMBER || '+18176630380';
+        
+        // Normalize callerId to E.164 if needed (if it's not already)
+        if (dynamicCallerId && !dynamicCallerId.startsWith('+')) {
+            const digits = dynamicCallerId.replace(/\D/g, '');
+            if (digits.length === 10) {
+                dynamicCallerId = `+1${digits}`;
+            } else if (digits.length === 11 && digits.startsWith('1')) {
+                dynamicCallerId = `+${digits}`;
+            }
+        }
+        
+        // Validate callerId format (must be E.164)
+        if (!isValidE164(dynamicCallerId)) {
+            console.error(`[Bridge] Invalid callerId format: ${dynamicCallerId} (must be E.164 like +15551234567)`);
+            const errorTwiml = new VoiceResponse();
+            errorTwiml.say('Sorry, there was an error. Invalid caller ID format.');
+            errorTwiml.hangup();
+            const xml = errorTwiml.toString();
+            res.setHeader('Content-Type', 'text/xml');
+            res.writeHead(200);
+            res.end(xml);
+            return;
+        }
+        
+        console.log(`[Bridge] Using callerId: ${dynamicCallerId} (source: ${callerId ? 'query param' : From ? 'body From' : 'env/fallback'})`);
         
         // Seed the Calls API with correct phone context for this CallSid
         const apiCallStart = Date.now();
@@ -122,10 +161,33 @@ export default async function handler(req, res) {
             }
         }
         
-        console.log(`[Bridge] Normalized target number: ${normalizedTarget} (from: ${target})`);
+        // Validate target number is E.164 format
+        if (!isValidE164(normalizedTarget)) {
+            console.error(`[Bridge] Invalid target number format: ${normalizedTarget} (from original: ${target})`);
+            const errorTwiml = new VoiceResponse();
+            errorTwiml.say('Sorry, there was an error. Invalid phone number format.');
+            errorTwiml.hangup();
+            const xml = errorTwiml.toString();
+            res.setHeader('Content-Type', 'text/xml');
+            res.writeHead(200);
+            res.end(xml);
+            return;
+        }
         
-        // Add the target number with no retry logic
-        dial.number(normalizedTarget);
+        // Log exact values before TwiML generation (per Twilio support recommendation)
+        console.log(`[Bridge] Final values before TwiML generation:`);
+        console.log(`  - callerId: ${dynamicCallerId} (E.164: ${isValidE164(dynamicCallerId) ? 'YES' : 'NO'})`);
+        console.log(`  - target: ${normalizedTarget} (E.164: ${isValidE164(normalizedTarget) ? 'YES' : 'NO'})`);
+        console.log(`  - CallSid: ${CallSid}`);
+        
+        // Add the target number to dial
+        try {
+            dial.number(normalizedTarget);
+            console.log(`[Bridge] Successfully added number ${normalizedTarget} to dial with callerId ${dynamicCallerId}`);
+        } catch (dialError) {
+            console.error(`[Bridge] Error adding number to dial:`, dialError);
+            throw dialError; // Re-throw to be caught by outer catch block
+        }
         
         // action already set in Dial options
         
@@ -146,6 +208,8 @@ export default async function handler(req, res) {
     } catch (error) {
         const errorTime = Date.now() - startTime;
         console.error(`[Bridge] Error after ${errorTime}ms:`, error);
+        console.error(`[Bridge] Error message:`, error.message);
+        console.error(`[Bridge] Error code:`, error.code || 'N/A');
         console.error(`[Bridge] Error stack:`, error.stack);
         console.error(`[Bridge] Request details:`, {
             method: req.method,
@@ -155,11 +219,31 @@ export default async function handler(req, res) {
             headers: req.headers
         });
         
+        // Check for specific Twilio error codes (per support recommendations)
+        const errorCode = error.code || error.status || '';
+        let errorMessage = 'Sorry, there was an error connecting your call. Please try again.';
+        
+        // Common Twilio error codes for Dial/callerId issues:
+        // 13214: Invalid callerId value
+        // 13223: Invalid phone number format
+        // 13247: Number on do-not-originate list
+        // 13248: Invalid callerId format
+        if (errorCode === 13214 || errorCode === 13248) {
+            errorMessage = 'Sorry, the caller ID number is not valid. Please check your settings.';
+            console.error(`[Bridge] Twilio Error ${errorCode}: Invalid callerId - number must be owned/verified by your Twilio account`);
+        } else if (errorCode === 13223) {
+            errorMessage = 'Sorry, the phone number format is invalid.';
+            console.error(`[Bridge] Twilio Error ${errorCode}: Invalid phone number format`);
+        } else if (errorCode === 13247) {
+            errorMessage = 'Sorry, this number cannot be used for calls.';
+            console.error(`[Bridge] Twilio Error ${errorCode}: Number on do-not-originate list`);
+        }
+        
         // Return error TwiML - MUST return 200 status for Twilio to process it
         // Returning 500 causes Twilio to show "application error" message
         try {
             const twiml = new VoiceResponse();
-            twiml.say('Sorry, there was an error connecting your call. Please try again.');
+            twiml.say(errorMessage);
             twiml.hangup();
             
             const xml = twiml.toString();
