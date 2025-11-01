@@ -2146,10 +2146,47 @@
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                     navEl.dataset.isRebuilding = 'false';
+                    // Center active phase after rebuild completes
+                    if (isMobile) {
+                        setTimeout(() => {
+                            centerActivePhase();
+                        }, 50);
+                    }
                 });
             });
         }
         
+        // Function to center active phase in mobile carousel
+        function centerActivePhase() {
+            const phaseNav = document.getElementById('phase-navigation');
+            if (!phaseNav || window.innerWidth > 767) return;
+            
+            // Wait for layout to complete
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    const activeBtn = phaseNav.querySelector('.phase-btn.active');
+                    if (!activeBtn) return;
+                    
+                    const containerWidth = phaseNav.offsetWidth;
+                    const buttonWidth = activeBtn.offsetWidth;
+                    const buttonLeft = activeBtn.offsetLeft;
+                    const targetScroll = buttonLeft - (containerWidth / 2) + (buttonWidth / 2);
+                    
+                    // Check if already close to target
+                    const currentScroll = phaseNav.scrollLeft;
+                    const scrollDiff = Math.abs(targetScroll - currentScroll);
+                    
+                    // Only scroll if we're not already close (within 5px for more precision)
+                    if (scrollDiff > 5) {
+                        phaseNav.scrollTo({
+                            left: targetScroll,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+        }
+
         // Mobile phase carousel swipe support
         function initPhaseCarousel() {
             const phaseNav = document.getElementById('phase-navigation');
@@ -2207,50 +2244,19 @@
             let previousActivePhase = null;
             let isScrolling = false;
             
-            // Auto-scroll to active phase when it changes - robust approach
+            // Auto-scroll to active phase when it changes - robust approach (backup to direct call)
             const observer = new MutationObserver(() => {
                 // Don't scroll if we're currently rebuilding (prevents duplicate scroll handlers)
                 if (phaseNav.dataset.isRebuilding === 'true') {
                     return;
                 }
                 
-                const activeBtn = phaseNav.querySelector('.phase-btn.active');
-                if (activeBtn && window.innerWidth <= 767 && !isScrolling) {
-                    const currentActivePhase = activeBtn.dataset.phase;
-                    
-                    // Only scroll if phase actually changed
-                    if (currentActivePhase !== previousActivePhase) {
-                        previousActivePhase = currentActivePhase;
-                        isScrolling = true;
-                        
-                        // Use requestAnimationFrame for smooth, reliable scrolling
-                        requestAnimationFrame(() => {
-                            requestAnimationFrame(() => {
-                                const containerWidth = phaseNav.offsetWidth;
-                                const buttonWidth = activeBtn.offsetWidth;
-                                const buttonLeft = activeBtn.offsetLeft;
-                                const targetScroll = buttonLeft - (containerWidth / 2) + (buttonWidth / 2);
-                                
-                                // Check if already close to target
-                                const currentScroll = phaseNav.scrollLeft;
-                                const scrollDiff = Math.abs(targetScroll - currentScroll);
-                                
-                                if (scrollDiff > 10) {
-                                    phaseNav.scrollTo({
-                                        left: targetScroll,
-                                        behavior: 'smooth'
-                                    });
-                                    
-                                    // Reset scrolling flag after animation completes
-                                    setTimeout(() => {
-                                        isScrolling = false;
-                                    }, 400);
-                                } else {
-                                    isScrolling = false;
-                                }
-                            });
-                        });
-                    }
+                // Use the centralized centering function
+                if (window.innerWidth <= 767) {
+                    // Small delay to ensure layout is complete
+                    setTimeout(() => {
+                        centerActivePhase();
+                    }, 100);
                 }
             });
             
@@ -2287,6 +2293,11 @@
 
             // Update phase navigation
             buildPhaseNavigation();
+            
+            // Center active phase on mobile after navigation is built
+            if (window.innerWidth <= 767) {
+                centerActivePhase();
+            }
 
             // Update opener selector (only show when in opening phase or about to be)
             updateOpenerSelectorVisibility();
@@ -2441,6 +2452,14 @@
                 } else {
                     // Check if already hidden/exiting to avoid re-triggering animation
                     if (!selector.classList.contains('exiting') && !selector.classList.contains('exited')) {
+                        // Calculate actual height of opener selector to slide content up by exact amount
+                        const selectorHeight = selector.offsetHeight;
+                        
+                        // Store height as CSS variable for animation
+                        if (mainContent) {
+                            mainContent.style.setProperty('--opener-height', `${selectorHeight}px`);
+                        }
+                        
                         // Start exit animation
                         selector.classList.add('exiting');
                         if (toolbarContainer) toolbarContainer.classList.add('has-exiting-opener');
