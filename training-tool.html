@@ -2052,9 +2052,15 @@
             const navEl = document.getElementById('phase-navigation');
             if (!navEl) return;
 
+            // PRESERVE SCROLL POSITION before clearing (prevents jump to beginning)
+            const currentScroll = navEl.scrollLeft;
+            const isMobile = window.innerWidth <= 767;
+            
+            // Mark that we're rebuilding to prevent MutationObserver from interfering
+            navEl.dataset.isRebuilding = 'true';
+
             navEl.innerHTML = '';
             const currentPhase = getCurrentPhase();
-            const isMobile = window.innerWidth <= 767;
             
             // If we've moved to a new phase, mark previous as completed
             if (lastPhase && currentPhase && lastPhase !== currentPhase) {
@@ -2130,38 +2136,18 @@
                 navEl.appendChild(btn);
             });
             
-            // Auto-scroll to appropriate phase on mobile - robust approach
-            if (isMobile) {
-                // Use requestAnimationFrame for more reliable timing
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        const activeBtn = navEl.querySelector('.phase-btn.active');
-                        const firstBtn = navEl.querySelector('.phase-btn:first-child');
-                        const targetBtn = activeBtn || firstBtn;
-                        
-                        if (targetBtn) {
-                            // Check if already scrolled to avoid unnecessary movement
-                            const containerWidth = navEl.offsetWidth;
-                            const buttonWidth = targetBtn.offsetWidth;
-                            const buttonLeft = targetBtn.offsetLeft;
-                            const targetScroll = buttonLeft - (containerWidth / 2) + (buttonWidth / 2);
-                            const currentScroll = navEl.scrollLeft;
-                            const scrollDiff = Math.abs(targetScroll - currentScroll);
-                            
-                            // Only scroll if we're not already close to the target (within 10px)
-                            if (scrollDiff > 10) {
-                                const isInitialPosition = !navEl.dataset.hasScrolled;
-                                navEl.dataset.hasScrolled = 'true';
-                                
-                                navEl.scrollTo({
-                                    left: targetScroll,
-                                    behavior: isInitialPosition ? 'auto' : 'smooth'
-                                });
-                            }
-                        }
-                    });
-                });
+            // RESTORE SCROLL POSITION immediately after rebuilding (prevents jump to beginning)
+            if (isMobile && currentScroll > 0) {
+                // Restore scroll position synchronously to prevent visible jump
+                navEl.scrollLeft = currentScroll;
             }
+            
+            // Clear the rebuilding flag after layout completes to allow MutationObserver to work
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    navEl.dataset.isRebuilding = 'false';
+                });
+            });
         }
         
         // Mobile phase carousel swipe support
@@ -2223,6 +2209,11 @@
             
             // Auto-scroll to active phase when it changes - robust approach
             const observer = new MutationObserver(() => {
+                // Don't scroll if we're currently rebuilding (prevents duplicate scroll handlers)
+                if (phaseNav.dataset.isRebuilding === 'true') {
+                    return;
+                }
+                
                 const activeBtn = phaseNav.querySelector('.phase-btn.active');
                 if (activeBtn && window.innerWidth <= 767 && !isScrolling) {
                     const currentActivePhase = activeBtn.dataset.phase;
@@ -2413,16 +2404,18 @@
         // Show/hide opener selector based on current state
         function updateOpenerSelectorVisibility() {
             const selector = document.getElementById('opener-selector');
+            const toolbarContainer = selector?.closest('.toolbar-with-openers');
+            const mainContent = selector?.closest('.main-content');
             if (!selector) return;
 
             const isMobile = window.innerWidth <= 767;
             const currentPhase = getCurrentPhase();
             
-            // On mobile: hide if we're past the Opening stage
+            // On mobile: hide if we're past the Opening stage with animation
             if (isMobile) {
                 // Show if we're at start, Pre-Call, or Opening stage
                 // Hide if we're past Opening (Situation, Problem, etc.)
-                if (currentPhase === null || 
+                const shouldShow = currentPhase === null || 
                     currentPhase === 'Pre-Call' || 
                     currentPhase === 'Opening' ||
                     state.current === 'start' ||
@@ -2430,14 +2423,42 @@
                     state.current === 'dialing' ||
                     state.current === 'hook' ||
                     state.current === 'pattern_interrupt_opening' ||
-                    state.current.startsWith('opener_')) {
+                    state.current.startsWith('opener_');
+                
+                if (shouldShow) {
+                    // Show opener selector - remove exit classes and reset display
+                    selector.classList.remove('exiting', 'exited');
                     selector.style.display = 'flex';
+                    if (toolbarContainer) toolbarContainer.classList.remove('has-exiting-opener');
+                    if (mainContent) {
+                        mainContent.classList.remove('has-exiting-opener');
+                        // Reset transforms on content when showing opener again
+                        const phaseNav = document.getElementById('phase-navigation');
+                        const scriptDisplay = document.getElementById('script-display');
+                        if (phaseNav) phaseNav.style.transform = '';
+                        if (scriptDisplay) scriptDisplay.style.transform = '';
+                    }
                 } else {
-                    selector.style.display = 'none';
+                    // Check if already hidden/exiting to avoid re-triggering animation
+                    if (!selector.classList.contains('exiting') && !selector.classList.contains('exited')) {
+                        // Start exit animation
+                        selector.classList.add('exiting');
+                        if (toolbarContainer) toolbarContainer.classList.add('has-exiting-opener');
+                        if (mainContent) mainContent.classList.add('has-exiting-opener');
+                        
+                        // After animation completes, hide it
+                        setTimeout(() => {
+                            selector.classList.remove('exiting');
+                            selector.classList.add('exited');
+                        }, 400); // Match animation duration
+                    }
                 }
             } else {
                 // Desktop: always show
+                selector.classList.remove('exiting', 'exited');
                 selector.style.display = 'flex';
+                if (toolbarContainer) toolbarContainer.classList.remove('has-exiting-opener');
+                if (mainContent) mainContent.classList.remove('has-exiting-opener');
             }
         }
 
