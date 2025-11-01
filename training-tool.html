@@ -2446,18 +2446,23 @@
                         // Reset transforms on content when showing opener again
                         const phaseNav = document.getElementById('phase-navigation');
                         const scriptDisplay = document.getElementById('script-display');
+                        const responseContainer = document.querySelector('.response-buttons-container');
                         if (phaseNav) phaseNav.style.transform = '';
                         if (scriptDisplay) scriptDisplay.style.transform = '';
+                        if (responseContainer) responseContainer.style.transform = '';
                     }
                 } else {
                     // Check if already hidden/exiting to avoid re-triggering animation
                     if (!selector.classList.contains('exiting') && !selector.classList.contains('exited')) {
-                        // Calculate actual height of opener selector to slide content up by exact amount
+                        // Calculate actual height of opener selector plus gap to slide content up by exact amount
                         const selectorHeight = selector.offsetHeight;
+                        // On mobile, there's a 12px gap between toolbar and opener-selector
+                        const gapHeight = 12;
+                        const totalHeight = selectorHeight + gapHeight;
                         
                         // Store height as CSS variable for animation
                         if (mainContent) {
-                            mainContent.style.setProperty('--opener-height', `${selectorHeight}px`);
+                            mainContent.style.setProperty('--opener-height', `${totalHeight}px`);
                         }
                         
                         // Start exit animation
