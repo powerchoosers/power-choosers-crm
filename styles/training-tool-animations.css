@@ -585,35 +585,61 @@
         overflow: hidden;
     }
     
-    /* After animation completes, hide the opener selector */
+    /* After animation completes, hide the opener selector and collapse its space */
     .opener-selector.exited {
         display: none !important;
-        max-height: 0;
+        max-height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
+        overflow: hidden;
     }
     
-    /* Everything else slides up smoothly when opener exits */
+    /* Toolbar (Back/Restart buttons) ALWAYS stays in place - NEVER transform */
+    .toolbar-with-openers.has-exiting-opener .toolbar,
+    .toolbar {
+        transform: none !important;
+        position: relative;
+        z-index: 10;
+    }
+    
+    /* Collapse the gap in toolbar-with-openers when opener exits */
     .toolbar-with-openers.has-exiting-opener {
-        transition: margin-bottom 0.4s ease-in-out;
-        margin-bottom: 0;
+        transition: gap 0.4s ease-in-out;
+        gap: 0;
+        /* Ensure toolbar-with-openers container itself doesn't move */
+        transform: none !important;
     }
     
-    /* Phase navigation and script display slide up smoothly by exact opener height */
+    /* Only slide up content AFTER toolbar-with-openers (phase-navigation, script-display, response-buttons) */
+    /* Use specific selectors to target only these elements, not toolbar */
+    .main-content.has-exiting-opener #phase-navigation,
     .main-content.has-exiting-opener .phase-navigation {
         transition: transform 0.4s ease-in-out;
         transform: translateY(calc(-1 * var(--opener-height, 80px)));
     }
     
+    .main-content.has-exiting-opener #script-display,
     .main-content.has-exiting-opener .script-display {
         transition: transform 0.4s ease-in-out;
         transform: translateY(calc(-1 * var(--opener-height, 80px)));
     }
     
-    /* Ensure smooth transitions for content elements */
-    .phase-navigation,
-    .script-display {
+    .main-content.has-exiting-opener .response-buttons-container {
         transition: transform 0.4s ease-in-out;
+        transform: translateY(calc(-1 * var(--opener-height, 80px)));
+    }
+    
+    /* Ensure smooth transitions for content elements, but NOT toolbar */
+    .phase-navigation,
+    .script-display,
+    .response-buttons-container {
+        transition: transform 0.4s ease-in-out;
+    }
+    
+    /* Explicitly prevent toolbar from being affected */
+    .toolbar,
+    .toolbar * {
+        transform: none !important;
     }
 }
 
