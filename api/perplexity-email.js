@@ -4,6 +4,86 @@
 
 import { cors } from './_cors.js';
 
+// ========== SUBJECT LINE VARIANTS ==========
+// Multiple subject line options that randomly select to reduce template-like appearance
+const SUBJECT_LINE_VARIANTS = {
+  'cold-email': {
+    ceo: [
+      '[contact_name], contract timing question',
+      '[contact_name], energy renewal strategy',
+      '[contact_name], rate lock opportunity',
+      '[contact_name], energy budget question',
+      '[company] contract renewal timing'
+    ],
+    finance: [
+      '[contact_name], budget question about energy renewal',
+      '[contact_name], rate lock timing question',
+      '[contact_name], cost predictability question',
+      '[contact_name], energy budget cycle question'
+    ],
+    operations: [
+      '[contact_name], facility renewal timing question',
+      '[contact_name], energy operations question',
+      '[contact_name], facility rate lock timing',
+      '[company] facility renewal timing'
+    ],
+    default: [
+      '[contact_name], contract timing question',
+      '[contact_name], energy renewal timing',
+      '[contact_name], rate lock timing question',
+      '[company] contract renewal question',
+      '[contact_name], energy renewal strategy'
+    ]
+  }
+};
+
+// Get random subject line based on email type and role
+function getRandomSubjectLine(type = 'cold-email', role = 'default', firstName = '', company = '') {
+  const roleKey = role === 'ceo' || role === 'executive' || role === 'owner' ? 'ceo' :
+                  role === 'finance' || role === 'controller' || role === 'cfo' || role === 'accounting' ? 'finance' :
+                  role === 'operations' || role === 'facilities' || role === 'logistics' ? 'operations' :
+                  'default';
+  
+  const variants = SUBJECT_LINE_VARIANTS[type]?.[roleKey] || SUBJECT_LINE_VARIANTS[type]?.default;
+  if (!variants || variants.length === 0) {
+    return `${firstName || 'there'}, contract timing question`;
+  }
+  
+  const selected = variants[Math.floor(Math.random() * variants.length)];
+  
+  // Replace placeholders
+  return selected
+    .replace(/\[contact_name\]/g, firstName || 'there')
+    .replace(/\[company\]/g, company || 'your company');
+}
+
+// ========== EMAIL GENERATION MODES ==========
+// Different email tones to reduce template-like appearance
+const EMAIL_GENERATION_MODES = {
+  consultative: { 
+    tone: 'Discovery-focused, asking questions, low pressure',
+    approach: 'Ask discovery questions to understand their situation',
+    ctaStyle: 'Soft qualifying questions'
+  },
+  direct: { 
+    tone: 'Confident, specific, value upfront, assertive',
+    approach: 'Lead with specific insights and concrete value',
+    ctaStyle: 'Direct questions about their process'
+  },
+  balanced: { 
+    tone: 'Professional mix of insight + value, peer-to-peer',
+    approach: 'Combine observation with specific value proposition',
+    ctaStyle: 'Balanced between discovery and action'
+  }
+};
+
+// Get random generation mode
+function getRandomGenerationMode() {
+  const modes = Object.keys(EMAIL_GENERATION_MODES);
+  const random = modes[Math.floor(Math.random() * modes.length)];
+  return random;
+}
+
 // Company research cache (session-level)
 const companyResearchCache = new Map();
 const linkedinResearchCache = new Map();
@@ -1739,6 +1819,21 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   // Get role-specific context
   const roleContext = job ? getRoleSpecificLanguage(job) : null;
   
+  // Determine role category for variant selection
+  const roleCategory = !job ? 'default' :
+                      /ceo|president|owner|founder|executive|chief/i.test(job) ? 'ceo' :
+                      /finance|cfo|controller|accounting|treasurer/i.test(job) ? 'finance' :
+                      /operations|facilities|logistics|maintenance|procurement/i.test(job) ? 'operations' :
+                      'default';
+  
+  // Get email generation mode (random selection for variety)
+  const generationMode = getRandomGenerationMode();
+  const modeInstructions = EMAIL_GENERATION_MODES[generationMode];
+  
+  // Get subject line variant (for suggestions in prompt)
+  const suggestedSubject = templateType === 'cold_email' ? 
+    getRandomSubjectLine('cold-email', roleCategory, firstName, company) : null;
+  
   // Get industry-specific content (prefer settings if provided)
   const industryContent = industry ? getIndustrySpecificContentFromSettings(industry, industrySegmentation) : null;
   
@@ -1947,7 +2042,7 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
   * "I saw ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}" (if recent activity found)
   * "On your website, I noticed..." (if website context available)
   * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." (if location context available)
-- Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? 'your contract ending ' + contractEndLabel : '[specific situation]'}..."
+- Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : '[specific situation]'}..."
 - Include micro-observations: Reference their website, recent posts, industry trends they'd recognize
 - Vary sentence length: Mix short punchy statements with longer explanatory ones
 - Use conversational connectors: "Here's the thing...", "The reality is...", "What I've found..."
@@ -2056,22 +2151,55 @@ STYLE RULES:
   - Focus on role and industry specifics: "As CEO" (not "As CEO of a small business"), "companies in manufacturing" (not "small manufacturing companies").
   - If role and tenure are available (from LinkedIn), you may include them naturally (e.g., "In your 3 years as General Manager").
 
-SUBJECT LINE RULES:
-- Target: 3-4 words (sweet spot for engagement)
-- Maximum: 41 characters (ensures full display on mobile - 52% of emails opened on mobile in 2025)
-- Choose ONE pattern and customize naturally (42-45% open rates):
-  * "Hi ${firstName}" (45% open rate - ultra-personal)
-  * "${firstName}, made this for you" (43% open rate - curiosity-driven)
-  * "Thoughts, ${firstName}?" (43% open rate - casual, engaging)
-  * "${firstName}, ${mutualConnection} referred me" (43% open rate - social proof, conditional)
-  * "${company} - 2025 energy planning question" (42% open rate - industry-specific)
-  * "${company}'s electricity rate question" (42% open rate - specific pain point)
-  * "Re: ${company}'s contract renewal" (42% open rate - familiarity + urgency)
-- Use question marks to increase curiosity
-- Include company name for personalization when possible
+EMAIL GENERATION MODE: ${generationMode.toUpperCase()}
+${modeInstructions ? `
+- Tone: ${modeInstructions.tone}
+- Approach: ${modeInstructions.approach}
+- CTA Style: ${modeInstructions.ctaStyle}
+${generationMode === 'consultative' ? `
+  * Focus on discovery questions to understand their situation
+  * Use softer language: "I'm curious..." "Out of curiosity..." "How do you typically..."
+  * Lower pressure: Ask about their process rather than demanding action
+  * Example CTA: "How do you typically handle your energy renewals?"` : ''}
+${generationMode === 'direct' ? `
+  * Lead with specific insights and concrete value upfront
+  * Use confident language: "Here's what I found..." "The reality is..." "Quick question—"
+  * Assertive but respectful: Present facts and ask direct questions
+  * Example CTA: "When does your contract renew? That timing difference is usually worth 15-20%."` : ''}
+${generationMode === 'balanced' ? `
+  * Combine observation with specific value proposition
+  * Professional but conversational: "I noticed..." followed by "Here's what I've found..."
+  * Balanced approach: Show expertise without being pushy
+  * Example CTA: "Question for you—what's your renewal timeline?"` : ''}
+` : ''}
+
+SUBJECT LINE RULES (CRITICAL - MUST BE SPECIFIC, NOT VAGUE):
+${suggestedSubject ? `- SUGGESTED SUBJECT (use this pattern or similar): "${suggestedSubject}"` : ''}
+- Target: 4-6 words (specific questions get 30% higher open rates than vague statements)
+- Maximum: 50 characters (ensures full display on mobile)
+- MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
+- REQUIRED PATTERNS (use these, customize naturally):
+  * "${firstName}, contract timing question" (specific, role-agnostic)
+  * "${firstName}, rate lock timing question" (specific to rate procurement)
+  * "${firstName}, budget question about energy renewal" (for Controllers/CFO)
+  * "${firstName}, facility renewal timing question" (for Operations/Facilities)
+  * "${company} contract renewal question" (company-specific)
+  * "${company} energy renewal timing" (specific and actionable)
+- FORBIDDEN VAGUE PATTERNS (DO NOT USE):
+  * "thoughts on energy planning" (too vague)
+  * "insight to ease costs" (too vague)
+  * "thoughts on energy strategy" (too vague)
+  * "${firstName}, thoughts on..." (permission-based, weak)
+- Role-specific variations:
+  * Controllers/CFO: "${firstName}, budget question about energy renewal timing"
+  * Operations/Facilities: "${firstName}, facility renewal timing question"
+  * CEOs/Owners: "${firstName}, contract timing question" or "${company} energy renewal timing"
+- Focus on: contract renewal, rate lock timing, budget cycle, facility renewal
+- Use question format when possible (increases curiosity)
+- Include firstName or company name for personalization
 - NO statistics or percentages in subject lines
+- NO generic "thoughts on" or "insights" language
 - Return the style you chose in subject_style field
-- INDUSTRY-SPECIFIC: Use industry pain points in subject when relevant (e.g., "Manufacturing energy costs?", "Healthcare budget pressure?")
 
 EMAIL STRUCTURE FRAMEWORKS (Choose ONE):
 1. PROBLEM-AGITATE-SOLUTION (PAS) - Best for cold outreach:
@@ -2215,8 +2343,8 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
   * "I saw ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}" ${recentActivityContext ? '(you have recent activity - USE THIS)' : ''}
   * "On your website, I noticed..." ${websiteContext ? '(you have website context - USE THIS)' : ''}
   * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." ${city && marketContext?.enabled ? '(you have location)' : '(skip if market context disabled)'}
-  ${!marketContext?.enabled ? '* "With ${contractEndLabel ? 'your contract ending ' + contractEndLabel : 'your current energy setup'}..." (use contract timing if available)' : ''}
-- Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? 'your contract ending ' + contractEndLabel : '[specific situation]'}..."
+  ${!marketContext?.enabled ? '* "With ' + (contractEndLabel ? 'your contract ending ' + contractEndLabel : 'your current energy setup') + '..." (use contract timing if available)' : ''}
+- Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : '[specific situation]'}..."
 - Include micro-observations: Reference their website, recent posts, industry trends they'd recognize
 - Vary sentence length: Mix short punchy statements with longer explanatory ones
 - Use conversational connectors: "Here's the thing...", "The reality is...", "What I've found..."
@@ -2276,7 +2404,7 @@ Lead with SPECIFIC OBSERVATION about ${company} FIRST, then optionally reference
 - "${industry || 'Your industry'} companies like ${company} are facing [specific challenge]. I've noticed..."` : `
 Lead with SPECIFIC OBSERVATION about ${company} - NO generic market statistics:
 - "I noticed ${company} operates ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'with facilities in ' + (city || '[location]')}..."
-- "With ${contractEndLabel ? 'your contract ending ' + contractEndLabel : 'your current energy setup'}, you're likely dealing with..."
+- "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : 'your current energy setup'}, you're likely dealing with..."
 - "${company} likely sees energy as [specific to their situation] given [specific detail about their operations]"
 - "Companies with ${industryContent?.painPoints[0] || '[specific pain point]'} typically benefit from early planning"
 DO NOT mention: "rates rising 15-25%", "data center demand", generic market statistics`}
@@ -2292,24 +2420,68 @@ VALUE PROPOSITION (1-2 sentences MINIMUM):
 - ALWAYS include a complete value proposition - never skip this field
 - THIS FIELD IS MANDATORY - NEVER LEAVE BLANK
 
-CTA:
-${ctaPattern ? 'Use qualifying question or soft ask: "' + ctaPattern.template + '"' : 'Create a professional qualifying question or soft ask'}
-- Qualifying questions work best: "When does your contract expire?", "Would you be open to discussing your energy setup?"
-- Avoid requesting specific meeting times in first email
-- Keep under 12 words
+CTA (ASSERTIVE, NOT PERMISSION-BASED):
+${ctaPattern ? 'Use assertive question pattern: "' + ctaPattern.template + '"' : 'Create an assertive qualifying question'}
+- ASSERTIVE PATTERNS (use these - they assume conversation is happening):
+  * "When does your current contract renew? And how often do you typically review your rates?"
+  * "Quick question—are you locking in 6 months early or waiting closer to renewal?"
+  * "Out of curiosity—when you renew your contract, do you shop around or just renew what you had?"
+  * "Question for you—what's your renewal timeline? That timing difference is usually worth 15-20%."
+  * "Real question—does energy cost predictability matter for your budget planning?" (for finance roles)
+- FORBIDDEN PERMISSION-BASED PATTERNS (DO NOT USE):
+  * "Would you be open to a conversation?" (asking permission, weak)
+  * "Are you interested in learning more?" (permission-based)
+  * "Would you like to schedule a call?" (meeting request too early)
+  * "Open to discussing your energy setup?" (permission-based)
+- MUST: Assume the conversation is happening - don't ask for permission to talk
+- YES: Ask specific question about their contract, timing, or process
+- Role-specific CTAs:
+  * Finance roles (CFO, Controller): Focus on predictability, budget cycles, timing
+  * Operations roles: Focus on renewal timing, early lock-in, facility operations
+  * Executive roles: Focus on contract timing, strategic planning
+- Keep under 15 words
+- Complete sentence with proper punctuation (? or .)
 - MUST be complete sentence with proper ending punctuation
 - NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .)
 - Generate ONLY ONE CTA
 
-SUBJECT LINE:
-- Under 50 characters
-- Natural and specific to them
-- NO numbers or percentages
-- Examples: "Quick question about ${company}'s energy strategy", "${firstName}, thoughts on energy planning?"
+EMAIL GENERATION MODE: ${generationMode.toUpperCase()}
+${modeInstructions ? `
+Tone: ${modeInstructions.tone}
+Approach: ${modeInstructions.approach}
+CTA Style: ${modeInstructions.ctaStyle}
+${generationMode === 'consultative' ? `
+* Use discovery questions: "I'm curious..." "How do you typically..." "What matters more to you..."
+* Lower pressure approach - understand their situation first` : ''}
+${generationMode === 'direct' ? `
+* Lead with specific insights: "Here's what I found..." "The reality is..." "Quick question—"
+* Assertive but respectful - present facts and ask direct questions` : ''}
+${generationMode === 'balanced' ? `
+* Combine observation + value: "I noticed..." followed by "Here's what I've found..."
+* Professional but conversational - show expertise without being pushy` : ''}
+` : ''}
 
-TOTAL LENGTH: 65-85 words (INCLUDING the CTA)
-CTA LENGTH: 8-12 words maximum, must be complete
-TONE: Problem-aware, consultative, and value-focused
+SUBJECT LINE (MUST BE SPECIFIC, NOT VAGUE):
+${suggestedSubject ? `SUGGESTED SUBJECT: "${suggestedSubject}" (use this pattern or similar)` : ''}
+- Under 50 characters
+- MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
+- REQUIRED PATTERNS (use these):
+  * "${firstName}, contract timing question" (specific)
+  * "${firstName}, rate lock timing question" (specific)
+  * "${firstName}, budget question about energy renewal" (for Controllers/CFO)
+  * "${company} contract renewal question" (company-specific)
+- FORBIDDEN: "thoughts on energy planning", "insight to ease costs", "${firstName}, thoughts on..."
+- NO numbers or percentages
+- Role-specific: Controllers/CFO = "budget question", Operations = "facility renewal timing"
+
+TOTAL LENGTH: 100-130 words (scannable, not overwhelming - 2-3 short paragraphs)
+CTA LENGTH: 8-15 words maximum, must be complete and assertive
+TONE: Write like a 29-year-old Texas business pro - conversational, confident, direct, peer-to-peer
+- Use contractions: "we're," "don't," "it's," "you're," "I'm"
+- Vary sentence length: Short. Medium sentence. Longer explanation when needed.
+- AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy"
+- Sound like: colleague who knows their industry and has talked to others like them
+- Use casual confidence: "Quick question—" "Real question—" "Out of curiosity—"
 `;
 
     return { 
