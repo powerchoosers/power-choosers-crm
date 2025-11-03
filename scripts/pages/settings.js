@@ -85,6 +85,17 @@ class SettingsPage {
                         }
                     }
                 },
+                // NEW: Cold Email Configuration
+                coldEmailSettings: {
+                    useMarketContext: false,  // Turn OFF market context for cold emails (user preference)
+                    useHardcodedMeetings: false,  // Turn OFF meeting requests for cold emails (user preference)
+                    industrySegmentationEnabled: true,  // Use industry rules from industrySegmentation
+                    requireObservationBased: true,  // Enforce observation-based opens
+                    avoidAIPhrases: true,  // Remove ChatGPT patterns
+                    varySubjectLineFormat: true,  // Multiple subject line options
+                    maxEmailLength: 120,  // Keep emails short
+                    requireLowCommitmentCTA: true  // Ask for chat, not meeting
+                },
                 emailDeliverability: {
                     // SendGrid Settings
                     enableTracking: true,        // SendGrid Open Tracking (tracks email opens)
@@ -565,6 +576,48 @@ class SettingsPage {
                     case 'include-physical-address': this.state.settings.emailDeliverability.includePhysicalAddress = v; break;
                     case 'gdpr-compliant': this.state.settings.emailDeliverability.gdprCompliant = v; break;
                     case 'spam-score-check': this.state.settings.emailDeliverability.spamScoreCheck = v; break;
+                }
+                this.markDirty();
+            });
+        });
+
+        // Cold email settings event listeners
+        const coldEmailFields = [
+            'cold-email-industry-segment',
+            'cold-email-observation',
+            'cold-email-avoid-ai',
+            'cold-email-vary-subject',
+            'cold-email-low-commitment',
+            'cold-email-max-length'
+        ];
+        coldEmailFields.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('change', () => {
+                const v = el.type === 'checkbox' ? !!el.checked : el.value;
+                // Initialize coldEmailSettings if it doesn't exist
+                if (!this.state.settings.coldEmailSettings) {
+                    this.state.settings.coldEmailSettings = {};
+                }
+                switch(id){
+                    case 'cold-email-industry-segment': 
+                        this.state.settings.coldEmailSettings.industrySegmentationEnabled = v; 
+                        break;
+                    case 'cold-email-observation': 
+                        this.state.settings.coldEmailSettings.requireObservationBased = v; 
+                        break;
+                    case 'cold-email-avoid-ai': 
+                        this.state.settings.coldEmailSettings.avoidAIPhrases = v; 
+                        break;
+                    case 'cold-email-vary-subject': 
+                        this.state.settings.coldEmailSettings.varySubjectLineFormat = v; 
+                        break;
+                    case 'cold-email-low-commitment': 
+                        this.state.settings.coldEmailSettings.requireLowCommitmentCTA = v; 
+                        break;
+                    case 'cold-email-max-length': 
+                        this.state.settings.coldEmailSettings.maxEmailLength = parseInt(v) || 120; 
+                        break;
                 }
                 this.markDirty();
             });
@@ -1409,6 +1462,26 @@ class SettingsPage {
         if (gdpr) gdpr.checked = !!d.gdprCompliant;
         const spam = document.getElementById('spam-score-check');
         if (spam) spam.checked = !!d.spamScoreCheck;
+
+        // Render cold email settings
+        const cold = this.state.settings.coldEmailSettings || {};
+        const industrySegment = document.getElementById('cold-email-industry-segment');
+        if (industrySegment) industrySegment.checked = cold.industrySegmentationEnabled !== false; // Default true
+        
+        const observation = document.getElementById('cold-email-observation');
+        if (observation) observation.checked = cold.requireObservationBased !== false; // Default true
+        
+        const avoidAI = document.getElementById('cold-email-avoid-ai');
+        if (avoidAI) avoidAI.checked = cold.avoidAIPhrases !== false; // Default true
+        
+        const varySubject = document.getElementById('cold-email-vary-subject');
+        if (varySubject) varySubject.checked = cold.varySubjectLineFormat !== false; // Default true
+        
+        const lowCommitment = document.getElementById('cold-email-low-commitment');
+        if (lowCommitment) lowCommitment.checked = cold.requireLowCommitmentCTA !== false; // Default true
+        
+        const maxLength = document.getElementById('cold-email-max-length');
+        if (maxLength) maxLength.value = cold.maxEmailLength || 120;
 
         this.updateSaveButton();
     }

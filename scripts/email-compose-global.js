@@ -2608,7 +2608,7 @@
         console.warn('[AI] Failed to lookup recipient:', error);
       }
 
-      // Get sender name from settings
+      // Get settings once
       const settings = (window.SettingsPage?.getSettings?.()) || {};
       const g = settings?.general || {};
       const senderName = (g.firstName && g.lastName) 
@@ -2619,6 +2619,9 @@
       const aiTemplates = getAITemplatesFromSettings();
       const whoWeAre = aiTemplates.who_we_are || 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.';
 
+      // Get industry segmentation from settings
+      const industrySegmentation = settings?.industrySegmentation || null;
+      
       // Call the API
       const response = await fetch(genUrl, {
         method: 'POST',
@@ -2632,7 +2635,9 @@
           // NEW: Pass market context
           marketContext: aiTemplates.marketContext,
           // NEW: Pass meeting preferences
-          meetingPreferences: aiTemplates.meetingPreferences
+          meetingPreferences: aiTemplates.meetingPreferences,
+          // NEW: Pass industry segmentation
+          industrySegmentation: industrySegmentation
         })
       });
 
@@ -2676,6 +2681,21 @@
         let cleanSubject = subject;
         if (cleanSubject.startsWith('Re: ')) {
           cleanSubject = cleanSubject.substring(4);
+        }
+        
+        // For cold emails, enhance subject with observation-based generator if it seems generic
+        const isColdEmail = templateType === 'cold_email' || /cold.*email/i.test(prompt);
+        if (isColdEmail && recipient) {
+          const industry = recipient?.industry || recipient?.account?.industry || '';
+          const observation = recipient?.account?.shortDescription || recipient?.account?.descriptionShort || '';
+          // Use observation-based subject if API returned generic subject
+          const apiSubject = cleanSubject.toLowerCase();
+          const isGenericSubject = apiSubject.includes('hi') || apiSubject.includes('hello') || 
+                                  apiSubject.includes('i can help') || apiSubject.length < 20;
+          if (isGenericSubject) {
+            cleanSubject = generateColdEmailSubject(recipient, industry, observation);
+            console.log('[AI] Using observation-based subject line for cold email');
+          }
         }
         
         // Animate subject line with typewriter effect
@@ -2744,6 +2764,185 @@
   }
 
   // ========== TEMPLATE BUILDER FUNCTIONS ==========
+  
+  // Get industry-specific value props from settings
+  function getIndustryValueProps(industry, jobTitle) {
+    const settings = (window.SettingsPage?.getSettings?.()) || {};
+    const industryData = settings?.industrySegmentation?.rules?.[industry?.toLowerCase()] || {};
+    
+    // Check for exact match first
+    const industryKey = industry?.toLowerCase() || '';
+    
+    // Try to find matching industry rule
+    let matchedRule = null;
+    if (settings?.industrySegmentation?.rules) {
+      // Exact match
+      if (settings.industrySegmentation.rules[industryKey]) {
+        matchedRule = settings.industrySegmentation.rules[industryKey];
+      } else {
+        // Partial match
+        for (const [key, rule] of Object.entries(settings.industrySegmentation.rules)) {
+          if (industryKey.includes(key) || key.includes(industryKey)) {
+            matchedRule = rule;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Manufacturing-specific value props
+    if (industry?.toLowerCase()?.includes('manufacturing') || industryKey === 'manufacturing') {
+      return [
+        'Production schedules protected through renewals',
+        'Equipment uptime guaranteed with cost certainty',
+        'Avoid peak-season supplier rush'
+      ];
+    }
+    
+    // Healthcare-specific
+    if (industry?.toLowerCase()?.includes('healthcare') || industry?.toLowerCase()?.includes('hospital') || industryKey === 'healthcare') {
+      return [
+        'Budget predictability for annual cycles',
+        'Compliance-ready procurement process',
+        'Cost control without impacting patient care'
+      ];
+    }
+    
+    // Hospitality-specific
+    if (industry?.toLowerCase()?.includes('hotel') || industry?.toLowerCase()?.includes('hospitality') || industryKey === 'hospitality') {
+      return [
+        'Multi-property cost management',
+        'Seasonal demand planning with locked rates',
+        'Guest experience maintained with reliable utilities'
+      ];
+    }
+    
+    // Food Production-specific
+    if (industry?.toLowerCase()?.includes('food') || industry?.toLowerCase()?.includes('production') || industryKey === 'food') {
+      return [
+        'Temperature-controlled operations secured',
+        'Production efficiency protected',
+        'Operational continuity through renewals'
+      ];
+    }
+    
+    // Nonprofit-specific
+    if (industry?.toLowerCase()?.includes('nonprofit') || industry?.toLowerCase()?.includes('charity') || industryKey === 'nonprofit') {
+      return [
+        'More budget for your mission',
+        'Predictable operational costs',
+        'Compliance handled professionally'
+      ];
+    }
+    
+    // Retail-specific
+    if (industry?.toLowerCase()?.includes('retail') || industryKey === 'retail') {
+      return [
+        'Multi-location cost management',
+        'Seasonal demand handled with predictable rates',
+        'Centralized procurement for all locations'
+      ];
+    }
+    
+    // Education-specific
+    if (industry?.toLowerCase()?.includes('education') || industryKey === 'education') {
+      return [
+        'Budget optimization for academic cycles',
+        'Facility maintenance costs predictable',
+        'Student safety maintained with reliable power'
+      ];
+    }
+    
+    // Generic fallback
+    return [
+      'Competitive market analysis vs. current spend',
+      'Early planning advantage before renewal season',
+      'Transparent pricing without hidden fees'
+    ];
+  }
+  
+  // Generate observation-based cold email subject lines
+  function generateColdEmailSubject(recipient, industry, observation) {
+    const company = recipient?.company || recipient?.accountName || 'your organization';
+    const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    
+    // Observation-based subjects (highest open rate)
+    const subjectTemplates = {
+      manufacturing: [
+        `Question about ${company}'s renewal timing`,
+        `Noticed ${company} expanded operations`,
+        `Production continuity + energy - quick question`,
+        `${company} operations - question`
+      ],
+      healthcare: [
+        `Budget planning question for ${company}`,
+        `${company} 2025 budget cycle`,
+        `Question about your facility costs`,
+        `Quick question re: your renewal timing`
+      ],
+      hospitality: [
+        `Question about your multi-property costs`,
+        `${company} portfolio - quick note`,
+        `Your properties + renewal timing`,
+        `Question on ${company} operations`
+      ],
+      food: [
+        `Question about ${company} operations`,
+        `Production continuity + cost certainty`,
+        `Your production schedule - quick question`,
+        `${company} + operational efficiency`
+      ],
+      nonprofit: [
+        `Budget question for ${company}`,
+        `More resources for your mission?`,
+        `${company} budget cycle planning`,
+        `Quick question about your operational costs`
+      ],
+      retail: [
+        `Question about ${company}'s multi-location costs`,
+        `${company} locations + renewal timing`,
+        `Quick question on your energy strategy`,
+        `${company} operations question`
+      ],
+      education: [
+        `Budget question for ${company}`,
+        `${company} facility costs`,
+        `Academic cycle planning question`,
+        `Quick question about your operational costs`
+      ],
+      generic: [
+        `Quick question about ${company}'s energy strategy`,
+        `${firstName}, thoughts on energy planning?`,
+        `Question about ${company} operations`,
+        `${company} + energy costs - quick question`
+      ]
+    };
+    
+    const industryKey = industry?.toLowerCase() || 'generic';
+    let templates = subjectTemplates.generic;
+    
+    // Find matching industry templates
+    for (const [key, templateList] of Object.entries(subjectTemplates)) {
+      if (industryKey.includes(key) || key.includes(industryKey)) {
+        templates = templateList;
+        break;
+      }
+    }
+    
+    // If specific templates found, use them; otherwise use generic
+    if (templates.length > 0) {
+      const subject = templates[Math.floor(Math.random() * templates.length)];
+      
+      // Replace variables
+      return subject
+        .replace(/\[company\]/gi, company)
+        .replace(/\[first_name\]/gi, firstName)
+        .replace(/\[job_title\]/gi, recipient?.title || recipient?.job || 'leader');
+    }
+    
+    // Final fallback
+    return `Quick question about ${company}'s energy strategy`;
+  }
   
   // Build sender profile signature once for all HTML templates
   function getSenderProfile() {
@@ -3274,7 +3473,12 @@
   function buildColdEmailHtml(data, recipient, fromEmail) {
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const industry = recipient?.industry || recipient?.account?.industry || '';
     const s = getSenderProfile();
+    
+    // Get industry-specific value props if available
+    const industryValueProps = getIndustryValueProps(industry, recipient?.title || recipient?.job);
+    const valueProps = data.value_props || industryValueProps || [];
     
     return `
 <!DOCTYPE html>
@@ -3348,7 +3552,13 @@
     </div>
     <div class="solution-box">
       <h3>✓ How Power Choosers Helps</h3>
-      <p>${data.value_proposition || 'We help businesses like yours reduce energy costs through competitive procurement and efficiency solutions. Our team handles the entire process—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>'}</p>
+      <p>${data.value_proposition || (industry ? `We help ${industry} companies like ${company} reduce energy costs through competitive procurement. Our team handles the entire process—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>` : 'We help businesses like yours reduce energy costs through competitive procurement and efficiency solutions. Our team handles the entire process—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>')}</p>
+      ${valueProps.length > 0 ? `
+      <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #d1fae5;">
+        <ul style="margin: 0; padding-left: 20px; list-style: none;">
+          ${valueProps.slice(0, 3).map(prop => `<li style="padding: 4px 0; color: #1f2937; font-size: 14px;">• ${prop}</li>`).join('')}
+        </ul>
+      </div>` : ''}
     </div>
     ${data.social_proof_optional ? `<div class="social-proof"><p>${data.social_proof_optional}</p></div>` : ''}
     <div class="cta-container">

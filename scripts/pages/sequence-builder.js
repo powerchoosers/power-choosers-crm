@@ -2044,7 +2044,48 @@ class FreeSequenceAutomation {
                         <button class="ai-suggestion" type="button" data-prompt="Write an immediate follow-up email after our phone conversation">Immediate follow-up</button>
                         <button class="ai-suggestion" type="button" data-prompt="Write a same-day check-in email to maintain momentum">Same day check-in</button>
                         <button class="ai-suggestion" type="button" data-prompt="Write a weekly touchpoint email to stay top of mind">Weekly touchpoint</button>
-                        <button class="ai-suggestion" type="button" data-prompt="Write an introduction email as the first touchpoint in our sequence">First email introduction</button>
+                        <button class="ai-suggestion" type="button" data-prompt="Write a cold introduction email that MUST:
+
+1. OPEN WITH OBSERVATION
+   - Reference something SPECIFIC about [contact_company]
+   - Use [contact_linkedin_recent_activity] if available
+   - If no specific data: reference their industry/role pattern
+   - NEVER: 'I hope you're well' or 'I wanted to reach out'
+
+2. ACKNOWLEDGE THEIR SITUATION
+   - For [company_industry], show you understand: [industry_specific_context]
+   - Reference: their role ([contact_job_title]) and what that typically involves
+   - Make it about THEM, not about us
+
+3. ONE INSIGHT
+   - Provide ONE observation about why this matters to them NOW
+   - NOT: 'Companies save 10-20%'
+   - YES: 'With 4 facilities in Texas, timing is critical'
+
+4. TONE REQUIREMENTS
+   - Use contractions: 'we're,' 'don't,' 'it's'
+   - Vary sentence length: short. Medium sentence. Longer explanation.
+   - Avoid: dive into, unleash, synergy, leverage, solution, at Power Choosers
+   - Sound like: colleague who knows their industry
+
+5. CALL TO ACTION
+   - NO: 'Let's schedule a call'
+   - YES: 'Open to a quick conversation?'
+   - NO: Ask for commitment
+   - YES: Ask for permission to continue
+
+6. FORMAT
+   - 100-130 words max
+   - 2-3 short paragraphs
+   - Scannable on mobile
+   - One CTA at end
+   
+7. PERSONALIZATION
+   - Include [contact_first_name]
+   - Reference [company_name] specifically
+   - For [company_industry], use industry-specific language naturally
+
+ABSOLUTELY AVOID sounding like ChatGPT. You should sound like their peer.">First email introduction</button>
                         <button class="ai-suggestion" type="button" data-prompt="Write a nurture email that provides value and builds relationship">Middle sequence nurture</button>
                         <button class="ai-suggestion" type="button" data-prompt="Write a final email with a clear call-to-action and next steps">Final sequence ask</button>
                       </div>
@@ -2868,7 +2909,48 @@ class FreeSequenceAutomation {
             <button class="ai-suggestion" type="button" data-prompt="Write an immediate follow-up email after our phone conversation">Immediate follow-up</button>
             <button class="ai-suggestion" type="button" data-prompt="Write a same-day check-in email to maintain momentum">Same day check-in</button>
             <button class="ai-suggestion" type="button" data-prompt="Write a weekly touchpoint email to stay top of mind">Weekly touchpoint</button>
-            <button class="ai-suggestion" type="button" data-prompt="Write an introduction email as the first touchpoint in our sequence">First email introduction</button>
+            <button class="ai-suggestion" type="button" data-prompt="Write a cold introduction email that MUST:
+
+1. OPEN WITH OBSERVATION
+   - Reference something SPECIFIC about [contact_company]
+   - Use [contact_linkedin_recent_activity] if available
+   - If no specific data: reference their industry/role pattern
+   - NEVER: 'I hope you're well' or 'I wanted to reach out'
+
+2. ACKNOWLEDGE THEIR SITUATION
+   - For [company_industry], show you understand: [industry_specific_context]
+   - Reference: their role ([contact_job_title]) and what that typically involves
+   - Make it about THEM, not about us
+
+3. ONE INSIGHT
+   - Provide ONE observation about why this matters to them NOW
+   - NOT: 'Companies save 10-20%'
+   - YES: 'With 4 facilities in Texas, timing is critical'
+
+4. TONE REQUIREMENTS
+   - Use contractions: 'we're,' 'don't,' 'it's'
+   - Vary sentence length: short. Medium sentence. Longer explanation.
+   - Avoid: dive into, unleash, synergy, leverage, solution, at Power Choosers
+   - Sound like: colleague who knows their industry
+
+5. CALL TO ACTION
+   - NO: 'Let's schedule a call'
+   - YES: 'Open to a quick conversation?'
+   - NO: Ask for commitment
+   - YES: Ask for permission to continue
+
+6. FORMAT
+   - 100-130 words max
+   - 2-3 short paragraphs
+   - Scannable on mobile
+   - One CTA at end
+   
+7. PERSONALIZATION
+   - Include [contact_first_name]
+   - Reference [company_name] specifically
+   - For [company_industry], use industry-specific language naturally
+
+ABSOLUTELY AVOID sounding like ChatGPT. You should sound like their peer.">First email introduction</button>
             <button class="ai-suggestion" type="button" data-prompt="Write a nurture email that provides value and builds relationship">Middle sequence nurture</button>
             <button class="ai-suggestion" type="button" data-prompt="Write a final email with a clear call-to-action and next steps">Final sequence ask</button>
           </div>
@@ -4807,6 +4889,13 @@ class FreeSequenceAutomation {
             // Call AI generation API with selected contact data
             const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
             const senderFirst = getSenderFirstName();
+            // Get settings for industry segmentation and market context
+            const settings = (window.SettingsPage?.getSettings?.()) || {};
+            const industrySegmentation = settings?.industrySegmentation || null;
+            const aiTemplates = settings?.aiTemplates || {};
+            const marketContext = aiTemplates.marketContext || { enabled: false };
+            const meetingPreferences = aiTemplates.meetingPreferences || { enabled: false };
+            
             const response = await fetch(`${base}/api/perplexity-email`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -4825,7 +4914,8 @@ class FreeSequenceAutomation {
                     linkedin: selectedContact.linkedin || selectedContact.linkedinUrl || '',
                     linkedinUrl: selectedContact.linkedin || selectedContact.linkedinUrl || '',
                     seniority: selectedContact.seniority || '',
-                    department: selectedContact.department || ''
+                    department: selectedContact.department || '',
+                    industry: selectedContact.industry || selectedContact.account?.industry || ''
                   };
                   
                   // Add account data if available
@@ -4864,17 +4954,28 @@ class FreeSequenceAutomation {
                         usage: account.annualUsage || '',
                         contractEnd: account.contractEndDate || account.contractEnd || ''
                       };
+                      
+                      // Set industry from account if not already set
+                      if (!recipient.industry && account.industry) {
+                        recipient.industry = account.industry;
+                      }
                     }
                   }
                   
                   // Also include account data directly from contact if present
                   if (selectedContact.account) {
                     recipient.account = { ...selectedContact.account };
+                    if (selectedContact.account.industry && !recipient.industry) {
+                      recipient.industry = selectedContact.account.industry;
+                    }
                   }
                   
                   return recipient;
                 })(),
-                senderName: senderFirst || ' '
+                senderName: senderFirst || ' ',
+                marketContext: marketContext,
+                meetingPreferences: meetingPreferences,
+                industrySegmentation: industrySegmentation
               })
             });
             
