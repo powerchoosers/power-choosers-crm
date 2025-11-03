@@ -1409,6 +1409,10 @@ async function handleApiTwilioBridge(req, res) {
     }
   }
   
+  // Parse query parameters (req.query doesn't exist in raw Node.js HTTP)
+  const parsed = url.parse(req.url, true);
+  req.query = { ...parsed.query };
+  
   try {
     await twilioBridgeHandler(req, res);
   } catch (error) {
