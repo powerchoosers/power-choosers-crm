@@ -2245,6 +2245,82 @@
                                         </div>
                                     </div>
 
+                                    <!-- Cold Email Configuration Section -->
+                                    <div class="settings-section">
+                                        <h3 class="settings-section-title">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                                            </svg>
+                                            Cold Email Configuration
+                                        </h3>
+                                        <div class="settings-content">
+                                            <p class="settings-hint">Configure AI behavior specifically for cold email outreach. These settings optimize for human-sounding, observation-based emails that get better response rates.</p>
+                                            
+                                            <div class="settings-group">
+                                                <h4 class="settings-group-title">Content & Personalization</h4>
+                                                
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="cold-email-industry-segment" checked>
+                                                        <span class="checkmark"></span>
+                                                        <span>Use Industry-Specific Value Props</span>
+                                                    </label>
+                                                    <p class="settings-hint">When enabled, AI uses industry-specific pain points and benefits from your Industry Segmentation settings. This makes emails more relevant to each recipient's industry.</p>
+                                                </div>
+                                                
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="cold-email-observation" checked>
+                                                        <span class="checkmark"></span>
+                                                        <span>Require Observation-Based Opens</span>
+                                                    </label>
+                                                    <p class="settings-hint">Forces AI to start emails with specific observations about the recipient's company, not generic market facts. This dramatically improves open rates.</p>
+                                                </div>
+                                                
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="cold-email-avoid-ai" checked>
+                                                        <span class="checkmark"></span>
+                                                        <span>Avoid AI-Sounding Phrases</span>
+                                                    </label>
+                                                    <p class="settings-hint">Filters out common ChatGPT patterns like "dive into," "unleash," "synergy," "leverage," and other corporate jargon that makes emails sound AI-generated.</p>
+                                                </div>
+                                                
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="cold-email-vary-subject" checked>
+                                                        <span class="checkmark"></span>
+                                                        <span>Vary Subject Line Format</span>
+                                                    </label>
+                                                    <p class="settings-hint">Uses multiple subject line templates per industry to avoid repetition and improve open rates through format variety.</p>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="settings-group" style="margin-top: 24px;">
+                                                <h4 class="settings-group-title">Email Length & Structure</h4>
+                                                
+                                                <div class="settings-field">
+                                                    <label for="cold-email-max-length">Maximum Email Length (words)</label>
+                                                    <input type="number" id="cold-email-max-length" class="settings-input" placeholder="120" value="120" min="50" max="300">
+                                                    <p class="settings-hint">Keep cold emails short and scannable. Recommended: 100-130 words for mobile-friendly reading.</p>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="settings-group" style="margin-top: 24px;">
+                                                <h4 class="settings-group-title">Call to Action</h4>
+                                                
+                                                <div class="settings-field">
+                                                    <label class="checkbox-label">
+                                                        <input type="checkbox" id="cold-email-low-commitment" checked>
+                                                        <span class="checkmark"></span>
+                                                        <span>Require Low-Commitment CTAs</span>
+                                                    </label>
+                                                    <p class="settings-hint">Asks for permission to continue ("Open to a quick message?") instead of requesting meetings ("Schedule a call"). Cold prospects respond better to low-commitment requests.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <!-- Deliverability & Tracking Section (SendGrid Optimized) -->
                                     <div class="settings-section">
                                         <h3 class="settings-section-title">

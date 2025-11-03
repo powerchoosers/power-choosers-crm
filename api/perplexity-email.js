@@ -1316,6 +1316,10 @@ function getTemplateSchema(templateType, dynamicFields = []) {
 
 // Industry-Specific Content Function
 function getIndustrySpecificContent(industry) {
+  // Try to get industry segmentation from settings first (client-side settings passed via marketContext.meetingPreferences)
+  // Note: This is called server-side, so we'll need to accept industrySegmentation as a parameter
+  // For now, use hardcoded fallback that matches settings structure
+  
   const industryMap = {
     manufacturing: {
       painPoints: ['production downtime', 'energy-intensive operations', 'equipment reliability'],
@@ -1354,6 +1358,42 @@ function getIndustrySpecificContent(industry) {
     }
   };
   return industryMap[industry?.toLowerCase()] || industryMap.manufacturing;
+}
+
+// Enhanced version that accepts industrySegmentation from settings
+function getIndustrySpecificContentFromSettings(industry, industrySegmentation) {
+  // Check if industrySegmentation is provided from settings
+  if (industrySegmentation?.enabled && industrySegmentation?.rules) {
+    const industryKey = industry?.toLowerCase() || '';
+    
+    // Try exact match first
+    if (industrySegmentation.rules[industryKey]) {
+      const rule = industrySegmentation.rules[industryKey];
+      return {
+        painPoints: rule.painPoints || [],
+        avgSavings: rule.avgSavings || '10-20%',
+        keyBenefit: rule.keyBenefit || 'cost savings',
+        urgencyDrivers: rule.urgencyDrivers || [],
+        language: `${rule.keyBenefit || 'cost savings'} for ${industry} companies`
+      };
+    }
+    
+    // Try partial match (e.g., "healthcare facilities" contains "healthcare")
+    for (const [key, rule] of Object.entries(industrySegmentation.rules)) {
+      if (industryKey.includes(key) || key.includes(industryKey)) {
+        return {
+          painPoints: rule.painPoints || [],
+          avgSavings: rule.avgSavings || '10-20%',
+          keyBenefit: rule.keyBenefit || 'cost savings',
+          urgencyDrivers: rule.urgencyDrivers || [],
+          language: `${rule.keyBenefit || 'cost savings'} for ${industry} companies`
+        };
+      }
+    }
+  }
+  
+  // Fallback to hardcoded values
+  return getIndustrySpecificContent(industry);
 }
 
 // Company Size Context Function
@@ -1547,7 +1587,7 @@ function getRoleSpecificLanguage(role) {
   };
 }
 
-async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, marketContext, meetingPreferences }) {
+async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation }) {
   // Analyze manual prompt for enhanced context understanding
   const promptAnalysis = analyzeManualPrompt(prompt);
   
@@ -1699,8 +1739,8 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   // Get role-specific context
   const roleContext = job ? getRoleSpecificLanguage(job) : null;
   
-  // Get industry-specific content
-  const industryContent = industry ? getIndustrySpecificContent(industry) : null;
+  // Get industry-specific content (prefer settings if provided)
+  const industryContent = industry ? getIndustrySpecificContentFromSettings(industry, industrySegmentation) : null;
   
   // Get company size context
   const companySizeContext = getCompanySizeContext(r.account || {});
@@ -2146,7 +2186,14 @@ GREETING (MANDATORY - MUST BE FIRST LINE):
 ✓ Greeting must be on its own line with blank line after
 
 CRITICAL QUALITY RULES:
-- PROBLEM AWARENESS: Lead with industry-specific problem or market condition
+- OBSERVATION-BASED OPENING: MUST start with SPECIFIC observation about ${company || 'their company'}, NOT generic market facts
+  ${marketContext?.enabled ? `
+  - Market context is ENABLED - you may reference general market trends if relevant
+  - BUT: Still lead with specific observation about ${company} first` : `
+  - Market context is DISABLED - DO NOT use generic market statistics like "rates rising 15-25%"
+  - DO NOT mention "data center demand" or generic rate increases
+  - Focus ONLY on ${company}'s specific situation, industry challenges they face, or operational details
+  - Use phrases like "I noticed ${company} operates..." or "With ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'your facilities'}..."`}
 - SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
 - MEASURABLE CLAIMS: "save ${marketContext?.typicalClientSavings || '10-20%'}" or "$X annually" NOT "significant savings"
 - COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
@@ -2162,17 +2209,20 @@ CRITICAL QUALITY RULES:
 
 HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Write like a knowledgeable energy expert who researched ${company || 'their company'} deeply
+- ${marketContext?.enabled ? 'Market context is ENABLED, but still lead with specific observation' : 'Market context is DISABLED - focus on THEIR specific situation only'}
 - Show you did homework: When you have specific data, use phrases like:
-  * "I noticed ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail]'}" ${accountDescription ? '(you have account description)' : ''}
-  * "I saw ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}" ${recentActivityContext ? '(you have recent activity)' : ''}
-  * "On your website, I noticed..." ${websiteContext ? '(you have website context)' : ''}
-  * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." ${city ? '(you have location)' : ''}
+  * "I noticed ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail about their company]'}" ${accountDescription ? '(you have account description - USE THIS)' : ''}
+  * "I saw ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}" ${recentActivityContext ? '(you have recent activity - USE THIS)' : ''}
+  * "On your website, I noticed..." ${websiteContext ? '(you have website context - USE THIS)' : ''}
+  * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." ${city && marketContext?.enabled ? '(you have location)' : '(skip if market context disabled)'}
+  ${!marketContext?.enabled ? '* "With ${contractEndLabel ? 'your contract ending ' + contractEndLabel : 'your current energy setup'}..." (use contract timing if available)' : ''}
 - Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? 'your contract ending ' + contractEndLabel : '[specific situation]'}..."
 - Include micro-observations: Reference their website, recent posts, industry trends they'd recognize
 - Vary sentence length: Mix short punchy statements with longer explanatory ones
 - Use conversational connectors: "Here's the thing...", "The reality is...", "What I've found..."
-- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", or other template phrases
-- Show expertise subtly: "In my experience with ${industry || '[industry]'} companies", "I've noticed [specific trend]"
+- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", "I've been tracking how companies..." or other template phrases
+${marketContext?.enabled ? '- You may reference general market trends, but lead with specific observation first' : '- DO NOT mention generic market statistics - focus on their specific situation'}
+- Show expertise subtly: "In my experience with ${industry || '[industry]'} companies", "I've noticed [specific trend about their company]"
 ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\'ve likely seen..." (tenure available)' : ''}
 
 EVIDENCE OF RESEARCH (Show You Know Their Business):
@@ -2219,11 +2269,17 @@ FORMATTING REQUIREMENTS:
 OPENING (1-2 sentences):
 Style: ${openingStyle.type}
 ${openingStyle.prompt}
-Lead with PROBLEM AWARENESS or MARKET CONDITION relevant to ${company}
-Examples: 
-- "Companies in ${industry || 'your industry'} are facing [specific challenge]"
-- "With contracts renewing in 2025, ${company} is likely seeing [specific impact]"
-- "${industry || 'Your industry'} operations are experiencing [market condition]"
+${marketContext?.enabled ? `
+Lead with SPECIFIC OBSERVATION about ${company} FIRST, then optionally reference market context:
+- "I noticed ${company} operates in ${city || '[location]'}. With contracts renewing in 2025, you're likely seeing..."
+- "Given ${accountDescription ? accountDescription.substring(0, 60) + '...' : company + '\'s operations'}, energy costs are probably..."
+- "${industry || 'Your industry'} companies like ${company} are facing [specific challenge]. I've noticed..."` : `
+Lead with SPECIFIC OBSERVATION about ${company} - NO generic market statistics:
+- "I noticed ${company} operates ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'with facilities in ' + (city || '[location]')}..."
+- "With ${contractEndLabel ? 'your contract ending ' + contractEndLabel : 'your current energy setup'}, you're likely dealing with..."
+- "${company} likely sees energy as [specific to their situation] given [specific detail about their operations]"
+- "Companies with ${industryContent?.painPoints[0] || '[specific pain point]'} typically benefit from early planning"
+DO NOT mention: "rates rising 15-25%", "data center demand", generic market statistics`}
 IMPORTANT: Always reference ${company} specifically, not other companies.
 
 VALUE PROPOSITION (1-2 sentences MINIMUM):
@@ -2373,7 +2429,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext, meetingPreferences } = req.body || {};
+    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext, meetingPreferences, industrySegmentation } = req.body || {};
     
     // Detect template type for both HTML and standard modes
     const templateType = getTemplateType(prompt);
@@ -2412,7 +2468,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences });
+    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation });
     const fullSystemPrompt = dateContext + systemPrompt;
     
     // Call Perplexity API
@@ -2444,7 +2500,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         const fallbackBody = {
           model: 'sonar',
           messages: [
-            { role: 'system', content: dateContext + (await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences })).prompt },
+            { role: 'system', content: dateContext + (await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation })).prompt },
             { role: 'user', content: prompt || 'Draft a professional email' }
           ],
           max_tokens: 600

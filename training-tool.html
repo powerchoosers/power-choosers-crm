@@ -1524,7 +1524,7 @@
             },
             ack_defensive: {
                 stage: 'Discovery - Transition',
-                text: "<span class=\"tone-marker friendly\">honest, disarming tone</span> <span class=\"pause-indicator\"></span> Yeah, totally fair question. <span class=\"pause-indicator\"></span> I'm just trying to understand your situation before I spend your time with something that might not be relevant. <span class=\"pause-indicator\"></span> Most companies I talk to don't have a strategy around this, and it's costing them. <span class=\"pause-indicator\"></span> So I wanted to see if that's even something worth exploring with you. <span class=\"pause-indicator\"></span> Fair enough?",
+                text: "<span class=\"tone-marker friendly\">honest, disarming tone</span> <span class=\"pause-indicator\"></span> Yeah, totally fair question. <span class=\"pause-indicator\"></span> I'm just trying to understand your situation before I spend your time with something that might not be relevant. <span class=\"pause-indicator\"></span> Most companies I talk to don't have a strategy around this, and it's costing them. <span class=\"pause-indicator\"></span> So I wanted to see if that's even something worth exploring with you. <span class=\"pause-indicator\"></span> Is that fair?",
                 responses: [
                     { label: "Fair enough, go ahead", next: 'situation_discovery' },
                     { label: "I hear you, but what exactly?", next: 'value_proposition' },
@@ -1553,10 +1553,10 @@
             },
             value_proposition: {
                 stage: 'Value - Explanation',
-                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Sure, happy to explain. <span class=\"pause-indicator\"></span> Most companies I talk to don't have a strategy around electricity renewals - they wait until 60-90 days before contract expiry to start shopping. <span class=\"pause-indicator\"></span><br><br>The problem is that's peak season when suppliers are busy, rates are less negotiable, and you've got limited time. <span class=\"pause-indicator\"></span> Plus, your current supplier typically charges you MORE on renewal than they'd offer a new customer - that's the loyalty penalty.<br><br>What we do is help you shop 6-12 months ahead when suppliers are competing for business, so you lock in the best rates available. <span class=\"pause-indicator\"></span> Does that make sense?",
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Sure, happy to explain. <span class=\"pause-indicator\"></span> Most companies I talk to don't have a strategy around electricity renewals - they wait until 60-90 days before contract expiry to start shopping. <span class=\"pause-indicator\"></span><br><br>The problem is that's peak season when suppliers are busy, rates are less negotiable, and you've got limited time. <span class=\"pause-indicator\"></span><br><br>What we do is help you shop 6-12 months ahead when suppliers are competing for business, so you lock in the best rates available. <span class=\"pause-indicator\"></span> Does that make sense?",
                 responses: [
                     { label: 'Yes, that makes sense', next: 'situation_discovery' },
-                    { label: 'Tell me more about the process', next: 'solution_discovery' },
+                    { label: 'Tell me more about the process', next: 'solution_faq_process' },
                     { label: "Still not sure what this is about", next: 'value_justification' },
                     { label: "Not interested", next: 'objection_not_interested' }
                 ]
@@ -1566,6 +1566,7 @@
                 text: "<span class=\"tone-marker understanding\">understanding tone</span> Totally get it. <span class=\"pause-indicator\"></span> When would be a better time to chat? <span class=\"pause-indicator\"></span> Or would you prefer I just send you some information first so you can look it over when it's convenient?",
                 responses: [
                     { label: 'Send me information', next: 'email_first' },
+                    { label: 'What\'s the market context?', next: 'market_context' },
                     { label: 'Try later today', next: 'schedule_followup' },
                     { label: 'Try next week', next: 'schedule_followup' },
                     { label: "Just forget it", next: 'respect_decision' }
@@ -1708,10 +1709,37 @@
             },
             situation_monthly_spend: {
                 stage: 'Discovery - Situation',
-                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Okay, that helps. <span class=\"pause-indicator\"></span> So do you know roughly what rate you're paying per kWh right now?",
+                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Okay, that helps. <span class=\"pause-indicator\"></span> So let me calculate this real quick - if you're spending roughly {{monthly_spend}} monthly, that's about {{annual_spend}} annually. <span class=\"pause-indicator\"></span> With the way rates are moving and most companies overpaying by 20-30% on renewal, we could be talking {{potential_savings}} annually in potential savings. <span class=\"pause-indicator\"></span><br><br>Does that kind of impact matter to you?",
                 responses: [
-                    { label: 'Know the rate (X.X cents/kWh)', next: 'situation_supplier_name' },
-                    { label: "Don't know it", next: 'situation_supplier_name' }
+                    { label: 'Yes, that matters', next: 'situation_rate_check' },
+                    { label: "That's too much to estimate", next: 'situation_rate_check' },
+                    { label: "Not really a priority", next: 'objection_not_priority' }
+                ]
+            },
+            situation_rate_check: {
+                stage: 'Discovery - Situation',
+                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Fair. <span class=\"pause-indicator\"></span> So do you know roughly what rate you're paying per kWh right now?",
+                responses: [
+                    { label: 'Know the rate (X.X cents/kWh)', next: 'situation_decision_committee' },
+                    { label: "Don't know it", next: 'situation_decision_committee' }
+                ]
+            },
+            situation_decision_committee: {
+                stage: 'Discovery - Situation',
+                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Got it. <span class=\"pause-indicator\"></span> So before we go deeper - is this just you, or do other people need to be involved in electricity decisions? <span class=\"pause-indicator\"></span> Like your CFO or finance team?",
+                responses: [
+                    { label: 'Just me', next: 'situation_supplier_name' },
+                    { label: 'CFO / Finance team involved', next: 'situation_team_decision' },
+                    { label: 'Multiple people involved', next: 'situation_team_decision' }
+                ]
+            },
+            situation_team_decision: {
+                stage: 'Discovery - Situation',
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Smart. <span class=\"pause-indicator\"></span> Should we loop them in on this conversation, or do you want to review first and then bring them in later?",
+                responses: [
+                    { label: 'Let\'s loop them in now', next: 'situation_supplier_name' },
+                    { label: 'I\'ll review first', next: 'situation_supplier_name' },
+                    { label: 'We\'ll include them when ready', next: 'situation_supplier_name' }
                 ]
             },
             situation_supplier_name: {
@@ -1727,20 +1755,10 @@
                 text: "<span class=\"tone-marker curious\">curious tone</span> And do you happen to know when your contract expires? <span class=\"pause-indicator\"></span> Just helps me understand the timing for when we'd want to lock in competitive rates, you know?",
                 responses: [
                     { label: 'Within 3 months - HOT', next: 'situation_decision_process_urgent' },
-                    { label: '3-6 months out', next: 'situation_decision_process' },
-                    { label: '6-12 months out', next: 'situation_decision_process' },
-                    { label: 'Not sure / Don\'t know', next: 'situation_decision_process' },
-                    { label: 'Just renewed recently', next: 'situation_decision_process' }
-                ]
-            },
-            situation_decision_process: {
-                stage: 'Discovery - Situation',
-                text: "<span class=\"tone-marker curious\">curious tone</span> So - when you guys are making a decision on energy contracts, <span class=\"pause-indicator\"></span> walk me through that. <span class=\"pause-indicator\"></span> Is it just you making the call, or does it involve other people? <span class=\"pause-indicator\"></span> Who else needs to be involved before you can move forward?",
-                responses: [
-                    { label: 'Just me / I decide', next: 'problem_discovery' },
-                    { label: 'Involves CFO / Finance', next: 'problem_discovery' },
-                    { label: 'Multiple stakeholders', next: 'problem_discovery' },
-                    { label: "Not sure yet", next: 'problem_discovery' }
+                    { label: '3-6 months out', next: 'problem_discovery' },
+                    { label: '6-12 months out', next: 'problem_discovery' },
+                    { label: 'Not sure / Don\'t know', next: 'problem_discovery' },
+                    { label: 'Just renewed recently', next: 'problem_discovery' }
                 ]
             },
             situation_decision_process_urgent: {
@@ -1775,20 +1793,11 @@
             },
             probe_problem_costs: {
                 stage: 'Discovery - Problem',
-                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Tell me more about that... <span class=\"pause-indicator\"></span> When did you first notice the costs going up? Like, was it recent or has it been going on for a while?",
+                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Tell me more about that... <span class=\"pause-indicator\"></span> When did you first notice the costs going up? <span class=\"pause-indicator\"></span> Like, was it recent or has it been going on for a while? <span class=\"pause-indicator\"></span> And how has that impacted your ability to plan your budget? <span class=\"pause-indicator\"></span> Has leadership noticed this too?",
                 responses: [
-                    { label: 'Last year', next: 'probe_cost_impact' },
-                    { label: 'This quarter / Recently', next: 'probe_cost_impact' },
-                    { label: 'Ongoing issue for a while', next: 'probe_cost_impact' }
-                ]
-            },
-            probe_cost_impact: {
-                stage: 'Discovery - Problem',
-                text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> And how has that impacted your ability to plan your budget? <span class=\"pause-indicator\"></span> Has leadership noticed this too?",
-                responses: [
-                    { label: 'Significant budget impact', next: 'consequence_variant_rates' },
-                    { label: 'Some impact on planning', next: 'consequence_variant_rates' },
-                    { label: 'Leadership is aware', next: 'consequence_variant_rates' }
+                    { label: 'Recent increase, significant budget impact', next: 'consequence_variant_rates' },
+                    { label: 'Ongoing issue, some impact on planning', next: 'consequence_variant_rates' },
+                    { label: 'Long-term problem, leadership is aware', next: 'consequence_variant_rates' }
                 ]
             },
             probe_problem_complexity: {
@@ -1820,9 +1829,9 @@
             },
             consequence_discovery: {
                 stage: 'Discovery - Consequence (2-Layer)',
-                text: "<span class=\"tone-marker serious\">serious but conversational tone</span> <span class=\"pause-indicator\"></span> Okay, so here's what I'm seeing with most companies. <span class=\"pause-indicator\"></span> They wait until like 90 days before renewal to start shopping. Bad move - that's peak season, suppliers are slammed, you got no leverage. <span class=\"pause-indicator\"></span><br><br>But here's the real trap - when your current supplier sends the renewal quote, it LOOKS reasonable, right? Compared to what you're paying now. So you sign it. <span class=\"pause-indicator\"></span> But they're actually charging you MORE than they'd quote a brand new customer. It's the loyalty penalty. <span class=\"pause-indicator\"></span><br><br>So you're getting double-hit - poor timing AND the supplier premium. <span class=\"pause-indicator\"></span> What's that actually costing you annually?",
+                text: "<span class=\"tone-marker serious\">pause, then real tone</span> <span class=\"pause-indicator\"></span> Look - most companies wait until 90 days before renewal to shop. <span class=\"pause-indicator\"></span> That's a bad play. <span class=\"pause-indicator\"></span> Rates have typically gone up, and suppliers know you don't have much time before your contract expires, so they'll give you a higher quote. <span class=\"pause-indicator\"></span><br><br>It's almost like booking a plane ticket <span class=\"pause-indicator\"></span> - when you go on a flight, do you reserve that flight months in advance or the week before? <span class=\"pause-indicator\"></span><br><br>Exactly. <span class=\"pause-indicator\"></span> The more seats available on the plane, the cheaper the ticket. <span class=\"pause-indicator\"></span><br><br>Electricity works the same way but on a massive scale. <span class=\"pause-indicator\"></span> The earlier you reserve your price, the more supply is actually available. <span class=\"pause-indicator\"></span> And with electricity prices rising right now, that gap is huge - we're seeing companies forced to pay 30%, 50%, sometimes 100% more. <span class=\"pause-indicator\"></span><br><br>Companies are being forced to pay that premium just because of timing. <span class=\"pause-indicator\"></span><br><br>What do you think?",
                 responses: [
-                    { label: 'That would be significant / $20K-$40K', next: 'solution_discovery' },
+                    { label: 'That would be significant / $20K-$40K', next: 'solution_variant_rates' },
                     { label: "We always shop the market", next: 'probe_timing_strategy' },
                     { label: "We're locked in another year", next: 'schedule_future_planning' },
                     { label: 'Seems expensive / complicated', next: 'value_justification' }
@@ -1861,7 +1870,7 @@
             },
             consequence_variant_happy: {
                 stage: 'Discovery - Consequence (Hidden Cost)',
-                text: "<span class=\"tone-marker curious\">curious but straight tone</span> <span class=\"pause-indicator\"></span> I get that you're happy. But here's the thing - are you happy because it's a solid deal, or just because you don't know what else is out there? <span class=\"pause-indicator\"></span><br><br>Real quick - when a NEW company comes to your supplier, they get quoted 20-30% lower than you do. Loyalty penalty. <span class=\"pause-indicator\"></span><br><br>So you might be overpaying 20-30% annually without even knowing it. <span class=\"pause-indicator\"></span> Just no frame of reference. <span class=\"pause-indicator\"></span> Does that track?",
+                text: "<span class=\"tone-marker curious\">curious but straight tone</span> <span class=\"pause-indicator\"></span> I get that you're happy. But here's the thing - are you happy because it's a solid deal, or just because you don't know what else is out there? <span class=\"pause-indicator\"></span><br><br>Real quick - when a NEW company comes to your supplier, they get quoted 20-30% lower than you do. <span class=\"pause-indicator\"></span><br><br>So you might be overpaying 20-30% annually without even knowing it. <span class=\"pause-indicator\"></span> Just no frame of reference. <span class=\"pause-indicator\"></span> Does that track?",
                 responses: [
                     { label: 'That could be $15K-$25K', next: 'solution_variant_happy' },
                     { label: 'That seems high but possible', next: 'solution_variant_happy' },
@@ -1871,7 +1880,7 @@
             },
             consequence_variant_lockedin: {
                 stage: 'Discovery - Consequence (Future Planning)',
-                text: "<span class=\"tone-marker understanding\">understanding, not pushy</span> <span class=\"pause-indicator\"></span> I get it - you're locked in, so this isn't urgent right now. That's fair. <span class=\"pause-indicator\"></span><br><br>But real talk - when you locked in, did you actually shop around or just renew with who you had? <span class=\"pause-indicator\"></span><br><br>If you just renewed, you probably got hit with a loyalty penalty. <span class=\"pause-indicator\"></span> Could be $50K-$100K overpaid over the next few years. <span class=\"pause-indicator\"></span><br><br>Not asking you to do anything now. Just want you to think about approaching it differently next time renewal comes up. <span class=\"pause-indicator\"></span> Make sense?",
+                text: "<span class=\"tone-marker understanding\">understanding, not pushy</span> <span class=\"pause-indicator\"></span> I get it - you're locked in, so this isn't urgent right now. That's fair. <span class=\"pause-indicator\"></span><br><br>But real talk - when you locked in, did you actually shop around or just renew with who you had? <span class=\"pause-indicator\"></span><br><br>If you just renewed without shopping, you're probably paying rates that were locked in during peak season. <span class=\"pause-indicator\"></span> Could be $50K-$100K overpaid over the next few years. <span class=\"pause-indicator\"></span><br><br>Not asking you to do anything now. Just want you to think about approaching it differently next time renewal comes up. <span class=\"pause-indicator\"></span> Make sense?",
                 responses: [
                     { label: "That makes sense - reach out in 6 months", next: 'future_opportunity' },
                     { label: "Yeah, I want to avoid that", next: 'solution_variant_lockedin' },
@@ -1891,9 +1900,9 @@
                 stage: 'Discovery - Consequence',
                 text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> That's great, actually. <span class=\"pause-indicator\"></span> So you already get how important timing is. <span class=\"pause-indicator\"></span><br><br>So I gotta ask - when do you typically START shopping? <span class=\"pause-indicator\"></span> Like 90 days out? <span class=\"pause-indicator\"></span> Or are you thinking 6 months ahead?<br><br>Because what I'm seeing with the companies getting the best rates - they're shopping 6-12 months out. <span class=\"pause-indicator\"></span> And here's the key - they're not just comparing their current supplier's renewal offer, you know? They're getting quotes from 5-6 different competitors. That creates real pricing pressure. <span class=\"pause-indicator\"></span> You're making them compete.<br><br>So is that what you're doing, or do you think there's room to optimize that timing?",
                 responses: [
-                    { label: 'We shop 6+ months ahead', next: 'solution_discovery' },
-                    { label: 'We shop 90 days out', next: 'solution_discovery' },
-                    { label: 'Not sure when we shop', next: 'solution_discovery' }
+                    { label: 'We shop 6+ months ahead', next: 'solution_variant_rates' },
+                    { label: 'We shop 90 days out', next: 'solution_variant_rates' },
+                    { label: 'Not sure when we shop', next: 'solution_variant_rates' }
                 ]
             },
             schedule_future_planning: {
@@ -1901,13 +1910,13 @@
                 text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Perfect. <span class=\"pause-indicator\"></span> So we actually have TIME to do this right, you know? <span class=\"pause-indicator\"></span><br><br>Here's what I usually do with companies in your situation... <span class=\"pause-indicator\"></span> About 6 months before your contract expires, we start getting market quotes. That gives us real leverage, right? And we're not scrambling at the last minute.<br><br>Plus, we can check if your current supplier will give you early renewal incentives to lock you in now. <span class=\"pause-indicator\"></span> Sometimes that actually works out really well for you.<br><br>So when does your contract actually expire? <span class=\"pause-indicator\"></span> Let's get that date, and then mark 6 months before on the calendar. That's when we start this process.",
                 responses: [
                     { label: 'I know the expiration date', next: 'followup_scheduled' },
-                    { label: 'Not sure of exact date', next: 'solution_discovery' },
+                    { label: 'Not sure of exact date', next: 'solution_variant_lockedin' },
                     { label: 'Let me check and get back to you', next: 'email_first' }
                 ]
             },
             value_justification: {
                 stage: 'Discovery - Consequence',
-                text: "<span class=\"tone-marker understanding\">understanding tone</span> <span class=\"pause-indicator\"></span> I totally get that, you know? <span class=\"pause-indicator\"></span> And honestly, here's why I think this is worth looking at...<br><br>Most companies THINK they're handling this well because they renew on time. <span class=\"pause-indicator\"></span> But what they don't realize is they're still overpaying. The timing thing, plus that loyalty penalty - it adds up.<br><br>So it's not about what you're paying NOW, right? <span class=\"pause-indicator\"></span> It's about what you COULD be paying if we planned this out properly. <span class=\"pause-indicator\"></span><br><br>We're talking $30K-$50K over 3 years. <span class=\"pause-indicator\"></span> That's not an expense - that's money you could be keeping. That's savings.<br><br>Would it be worth 15 minutes to see what that gap actually looks like for {{account.name}}? <span class=\"pause-indicator\"></span> No pressure, just so you know what's possible. Make sense?",
+                text: "<span class=\"tone-marker understanding\">understanding tone</span> <span class=\"pause-indicator\"></span> I totally get that, you know? <span class=\"pause-indicator\"></span> And honestly, here's why I think this is worth looking at...<br><br>Most companies THINK they're handling this well because they renew on time. <span class=\"pause-indicator\"></span> Here's what I've found though - they're still overpaying because of the timing piece. <span class=\"pause-indicator\"></span> It adds up.<br><br>So it's not about what you're paying NOW, right? <span class=\"pause-indicator\"></span> It's about what you COULD be paying if we planned this out properly. <span class=\"pause-indicator\"></span><br><br>We're talking $30K-$50K over 3 years. <span class=\"pause-indicator\"></span> That's not an expense - that's money you could be keeping. That's savings.<br><br>Would it be worth 15 minutes to see what that gap actually looks like for {{account.name}}? <span class=\"pause-indicator\"></span> No pressure, just so you know what's possible. Make sense?",
                 responses: [
                     { label: 'Yes, let\'s see the gap', next: 'close_meeting' },
                     { label: 'Send me something first', next: 'email_first' },
@@ -1916,60 +1925,60 @@
             },
             solution_variant_rates: {
                 stage: 'Discovery - Solution (Rates)',
-                text: "<span class=\"tone-marker hopeful\">hopeful but real tone</span> <span class=\"pause-indicator\"></span> Okay, so if we could fix that timing issue and get you competitive quotes from multiple suppliers RIGHT NOW - before the market goes up more - would that be worth exploring? <span class=\"pause-indicator\"></span><br><br>Here's what I'm thinking... <span class=\"pause-indicator\"></span> we pull quotes from 100+ suppliers across our network, you see exactly what's available in the market right now versus what you're locked into. Then you decide if it makes sense to lock something in early. <span class=\"pause-indicator\"></span><br><br>No pressure, no long-term commitments - just data so you're not flying blind. <span class=\"pause-indicator\"></span><br><br>Does that make sense?",
+                text: "<span class=\"tone-marker confident\">direct, action-oriented tone</span> <span class=\"pause-indicator\"></span> Okay, so we've talked about the timing piece. <span class=\"pause-indicator\"></span> Here's what we do different. <span class=\"pause-indicator\"></span><br><br>We don't wait for your renewal deadline. <span class=\"pause-indicator\"></span> We actually START early - like 6 months before your contract ends. <span class=\"pause-indicator\"></span> Why? Suppliers give their BEST rates during off-peak seasons, not during crunch time when they're slammed. <span class=\"pause-indicator\"></span><br><br>We pull quotes from 100+ suppliers in that window when prices are actually competitive. <span class=\"pause-indicator\"></span> Then you lock in early before rates go higher. <span class=\"pause-indicator\"></span><br><br>That timing advantage alone is typically worth 15-25% savings compared to waiting till 90 days before. <span class=\"pause-indicator\"></span><br><br>Does getting ahead of rate increases matter to you?",
                 responses: [
-                    { label: "Yeah, let's see what's available", next: 'close_meeting' },
-                    { label: "How does your process actually work?", next: 'solution_discovery' },
+                    { label: "Yeah, that matters", next: 'close_variant_rates' },
+                    { label: "How does your process actually work?", next: 'solution_faq_process' },
                     { label: "Need to think about it", next: 'email_first' },
                     { label: "Not interested right now", next: 'respect_decision' }
                 ]
             },
             solution_variant_complicated: {
                 stage: 'Discovery - Solution (Simplify)',
-                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> So here's what most companies don't realize - they don't HAVE to figure this out themselves. <span class=\"pause-indicator\"></span><br><br>What we do is pull quotes from 100+ suppliers, standardize them into the same format so you can actually compare apples to apples, and then we present you with the 3-5 best options. <span class=\"pause-indicator\"></span> You just pick which one works best. <span class=\"pause-indicator\"></span><br><br>No hours spent comparing confusing quotes. No headache. Just clear options and competitive rates. <span class=\"pause-indicator\"></span><br><br>That sound better than trying to figure it out on your own?",
+                text: "<span class=\"tone-marker confident\">confident, clarifying tone</span> <span class=\"pause-indicator\"></span> So we heard you on the confusion piece - that's actually why we do this. <span class=\"pause-indicator\"></span><br><br>What we do is pull quotes from multiple suppliers BUT we standardize them. <span class=\"pause-indicator\"></span> Same format, same terms, same fields. <span class=\"pause-indicator\"></span> So you're actually comparing apples to apples. <span class=\"pause-indicator\"></span><br><br>We send you like 3-5 options side by side where it's OBVIOUS which one's the best deal for what you need. <span class=\"pause-indicator\"></span> No decoding. No guessing. <span class=\"pause-indicator\"></span><br><br>You literally just look at three options and pick one. <span class=\"pause-indicator\"></span> That's your job. <span class=\"pause-indicator\"></span><br><br>Think that's easier than trying to figure it out yourself?",
                 responses: [
-                    { label: "Yeah, that's way better", next: 'close_meeting' },
-                    { label: "What would you actually show us?", next: 'solution_discovery' },
+                    { label: "Yeah, that's way easier", next: 'close_variant_complicated' },
+                    { label: "How does your process actually work?", next: 'solution_faq_process' },
                     { label: "Seems too good to be true", next: 'value_justification' },
                     { label: "Not interested", next: 'respect_decision' }
                 ]
             },
             solution_variant_notime: {
                 stage: 'Discovery - Solution (Done For You)',
-                text: "<span class=\"tone-marker understanding\">understanding tone</span> <span class=\"pause-indicator\"></span> I totally get it - you've got too much on your plate already. <span class=\"pause-indicator\"></span><br><br>That's actually perfect because we HANDLE this stuff for you. <span class=\"pause-indicator\"></span> We pull the quotes, compare them, deal with all the back-and-forth with suppliers, and bring you the best 3-5 options with our recommendation. <span class=\"pause-indicator\"></span><br><br>Your job is literally just to say yes or no to one of them. <span class=\"pause-indicator\"></span><br><br>And here's the thing - the earlier we lock something in, the better the rate. <span class=\"pause-indicator\"></span> So this actually SAVES you time down the road by avoiding a crisis renewal. <span class=\"pause-indicator\"></span><br><br>How does that sound?",
+                text: "<span class=\"tone-marker understanding\">understanding, solution-focused tone</span> <span class=\"pause-indicator\"></span> Here's the good news - you don't have to make this a priority. <span class=\"pause-indicator\"></span> We do. <span class=\"pause-indicator\"></span><br><br>We handle the whole shopping process. <span class=\"pause-indicator\"></span> We pull quotes, we compare, we negotiate with suppliers, we manage the paperwork. <span class=\"pause-indicator\"></span> Everything. <span class=\"pause-indicator\"></span><br><br>Your part? <span class=\"pause-indicator\"></span> Literally just review 3-5 options and say yes to one of them. <span class=\"pause-indicator\"></span> That's 15 minutes of your time, not months of back and forth. <span class=\"pause-indicator\"></span><br><br>And by doing it NOW instead of later, you actually avoid the crisis situation when your renewal's in 90 days and rates are already up again. <span class=\"pause-indicator\"></span><br><br>Worth 15 minutes to avoid that headache?",
                 responses: [
-                    { label: "Yeah, handle it for us", next: 'close_meeting' },
-                    { label: "How much time are we talking?", next: 'solution_discovery' },
+                    { label: "Yeah, that's worth it", next: 'close_variant_notime' },
+                    { label: "How much time are we talking?", next: 'solution_faq_timeline' },
                     { label: "Need to think about it", next: 'email_first' },
                     { label: "Still too busy right now", next: 'respect_decision' }
                 ]
             },
             solution_variant_happy: {
                 stage: 'Discovery - Solution (Reality Check)',
-                text: "<span class=\"tone-marker confident\">confident, peer tone</span> <span class=\"pause-indicator\"></span> Okay, so here's what I'd suggest - and no pressure on this. <span class=\"pause-indicator\"></span><br><br>We run a quick, free rate analysis for you. <span class=\"pause-indicator\"></span> Takes 15 minutes. <span class=\"pause-indicator\"></span> We pull what the market is currently quoting, compare it to what you're paying, and show you the gap. <span class=\"pause-indicator\"></span><br><br>If there IS a gap, you'll know it. If you're actually getting a good deal, you'll know that too. <span class=\"pause-indicator\"></span> Either way, you've got real data. <span class=\"pause-indicator\"></span><br><br>No obligation, no strings attached. <span class=\"pause-indicator\"></span> Just so you're not assuming you're in a good spot if the market has actually moved. <span class=\"pause-indicator\"></span><br><br>Fair enough?",
+                text: "<span class=\"tone-marker curious\">respectful, curious tone</span> <span class=\"pause-indicator\"></span> Look, I'm not here to convince you there's a problem if there isn't one. <span class=\"pause-indicator\"></span><br><br>But here's what I'd suggest - let us do a quick rate analysis. <span class=\"pause-indicator\"></span> We pull what you're currently paying versus what the market's actually quoting right now. <span class=\"pause-indicator\"></span><br><br>If you're genuinely getting a good deal, you'll KNOW it because you've seen the alternatives. <span class=\"pause-indicator\"></span> If there IS a gap, now you can do something about it. <span class=\"pause-indicator\"></span><br><br>Either way, you're not guessing anymore. <span class=\"pause-indicator\"></span> You've got real data. <span class=\"pause-indicator\"></span><br><br>Worth 15 minutes to actually KNOW where you stand?",
                 responses: [
-                    { label: "Yeah, let's run the analysis", next: 'close_meeting' },
-                    { label: "What would that analysis include?", next: 'solution_discovery' },
-                    { label: "I'm skeptical but curious", next: 'close_meeting' },
+                    { label: "Yeah, let's run the analysis", next: 'close_variant_happy' },
+                    { label: "What would that analysis include?", next: 'solution_faq_process' },
+                    { label: "I'm skeptical but curious", next: 'close_variant_happy' },
                     { label: "Not interested", next: 'respect_decision' }
                 ]
             },
             solution_variant_lockedin: {
                 stage: 'Discovery - Solution (Future Proofing)',
-                text: "<span class=\"tone-marker confident\">confident but patient tone</span> <span class=\"pause-indicator\"></span> Perfect. So here's what I suggest - we mark about 6 months BEFORE your next renewal, and we start pulling quotes early. <span class=\"pause-indicator\"></span><br><br>That gives you massive leverage with suppliers because they're competing for business during off-peak periods. Plus, you're not scrambling at the last minute. <span class=\"pause-indicator\"></span><br><br>Between now and then, we'll keep an eye on the market too - if rates drop, we can potentially get you early renewal incentives. <span class=\"pause-indicator\"></span> If they keep going up, we locked you in early. <span class=\"pause-indicator\"></span><br><br>It's all good options. <span class=\"pause-indicator\"></span><br><br>So when does your contract actually expire so we can mark this on the calendar?",
+                text: "<span class=\"tone-marker confident\">patient, strategic tone</span> <span class=\"pause-indicator\"></span> I hear you - you're locked in and that's fine. <span class=\"pause-indicator\"></span> This isn't about NOW. <span class=\"pause-indicator\"></span><br><br>But here's what smart companies do - mark your calendar for 6 months BEFORE your next renewal. <span class=\"pause-indicator\"></span> We start pulling quotes early when you actually have leverage. <span class=\"pause-indicator\"></span><br><br>That way you're not scrambling when renewal hits. <span class=\"pause-indicator\"></span> You already know what competitive rates look like. <span class=\"pause-indicator\"></span> You've got options queued up. <span class=\"pause-indicator\"></span><br><br>We literally just put it on the calendar now. <span class=\"pause-indicator\"></span> No urgency, no pressure. <span class=\"pause-indicator\"></span><br><br>So when does your contract actually expire?",
                 responses: [
-                    { label: "I know the date - [date]", next: 'schedule_future_planning' },
+                    { label: "I know the date - [date]", next: 'close_variant_lockedin' },
                     { label: "Not sure, I'll check", next: 'email_first' },
-                    { label: "Sounds good, reach out in 6 months", next: 'schedule_future_planning' },
+                    { label: "Sounds good, reach out in 6 months", next: 'close_variant_lockedin' },
                     { label: "Not interested", next: 'respect_decision' }
                 ]
             },
             solution_variant_triedbefore: {
                 stage: 'Discovery - Solution (Do It Right)',
-                text: "<span class=\"tone-marker confident\">confident, empowering tone</span> <span class=\"pause-indicator\"></span> Okay, so here's the difference this time. <span class=\"pause-indicator\"></span><br><br>Last time you probably reached out to random suppliers who each sent different quote formats. <span class=\"pause-indicator\"></span> That's where the nightmare happens. <span class=\"pause-indicator\"></span><br><br>What we do is different - we coordinate across 100+ suppliers and we standardize the quotes. <span class=\"pause-indicator\"></span> So everything comes in the same format, same terms, easy to compare. <span class=\"pause-indicator\"></span> We do the heavy lifting, you just see the results. <span class=\"pause-indicator\"></span><br><br>Plus, since we run multiple quotes simultaneously, suppliers KNOW they're competing, so they actually give you better rates. <span class=\"pause-indicator\"></span><br><br>It's not like DIY shopping. It's structured. <span class=\"pause-indicator\"></span><br><br>Would it be worth 15 minutes to see what we can actually pull together for you?",
+                text: "<span class=\"tone-marker confident\">empowering, different tone</span> <span class=\"pause-indicator\"></span> Okay, so here's where it's different this time. <span class=\"pause-indicator\"></span><br><br>Last time you probably reached out to random suppliers who each quote differently. <span class=\"pause-indicator\"></span> That's where it falls apart. <span class=\"pause-indicator\"></span> We coordinate across 100+ suppliers SIMULTANEOUSLY and standardize the quotes. <span class=\"pause-indicator\"></span><br><br>That's not DIY shopping anymore. <span class=\"pause-indicator\"></span> That's structured, competitive event. <span class=\"pause-indicator\"></span> Suppliers know they're competing, so they actually quote you REAL rates, not inflated stuff. <span class=\"pause-indicator\"></span><br><br>It's not a nightmare because we've eliminated the chaos. <span class=\"pause-indicator\"></span><br><br>Would it be worth trying again if we took out all the nightmare parts?",
                 responses: [
-                    { label: "Yeah, let's try it right", next: 'close_meeting' },
-                    { label: "How is this different from last time?", next: 'solution_discovery' },
+                    { label: "Yeah, let's try it right", next: 'close_variant_triedbefore' },
+                    { label: "How is this different from last time?", next: 'solution_faq_process' },
                     { label: "Still skeptical", next: 'value_justification' },
                     { label: "Not interested", next: 'respect_decision' }
                 ]
@@ -2011,6 +2020,151 @@
                     { label: 'See what rates are available now', next: 'close_meeting' }
                 ]
             },
+            close_variant_rates: {
+                stage: 'Closing (Rates)',
+                text: "<span class=\"tone-marker confident\">calm, peer-to-peer tone</span> <span class=\"pause-indicator\"></span> Okay, so here's what makes sense. <span class=\"pause-indicator\"></span> We've identified that timing is your leverage. <span class=\"pause-indicator\"></span> The earlier you lock something in, the better rates you get. <span class=\"pause-indicator\"></span><br><br>So here's what I'm thinking - we could do a quick 15-minute video walkthrough right now where I show you exactly how the process works. <span class=\"pause-indicator\"></span> Then you'll KNOW what you're getting into before we schedule the full analysis. <span class=\"pause-indicator\"></span> Or we can set up a quick 30-minute call where I walk you through exactly what we pulled from the market right now. <span class=\"pause-indicator\"></span><br><br>No pressure, no commitment - just data so you can make an informed decision. <span class=\"pause-indicator\"></span><br><br>What works better - video walkthrough now or scheduled call?",
+                responses: [
+                    { label: 'Video walkthrough now', next: 'video_walkthrough' },
+                    { label: 'Friday works for call', next: 'close_meeting_scheduled' },
+                    { label: 'Tomorrow works for call', next: 'close_meeting_scheduled' },
+                    { label: 'I need to check with my team first', next: 'close_meeting_team_involved' },
+                    { label: 'Let me think about it', next: 'close_meeting_think_about_it' },
+                    { label: 'Send me something first', next: 'email_first' }
+                ]
+            },
+            close_variant_complicated: {
+                stage: 'Closing (Simplify)',
+                text: "<span class=\"tone-marker confident\">confident, demystifying tone</span> <span class=\"pause-indicator\"></span> So what I'm going to do is pull quotes from our network - and I mean I'll standardize them so you see them all in the same format. <span class=\"pause-indicator\"></span> Same columns, same terms, same everything. <span class=\"pause-indicator\"></span><br><br>Then I'll show you like 3-5 options side by side. <span class=\"pause-indicator\"></span> You just look at them and pick which one looks best for you. <span class=\"pause-indicator\"></span><br><br>That's literally it. <span class=\"pause-indicator\"></span> No confusion, no comparing apples to oranges. <span class=\"pause-indicator\"></span><br><br>We could do a quick 15-minute video walkthrough right now where I show you exactly what that looks like. <span class=\"pause-indicator\"></span> Then you'll KNOW what you're getting into. <span class=\"pause-indicator\"></span> Or we can set up a call Thursday. <span class=\"pause-indicator\"></span><br><br>What works better - video walkthrough now or Thursday afternoon call?",
+                responses: [
+                    { label: 'Video walkthrough now', next: 'video_walkthrough' },
+                    { label: 'Thursday 2 PM works', next: 'close_meeting_scheduled' },
+                    { label: 'Thursday afternoon works', next: 'close_meeting_scheduled' },
+                    { label: 'What if I don\'t like any of them?', next: 'close_meeting_scheduled' },
+                    { label: 'I don\'t want to waste your time', next: 'close_meeting_scheduled' },
+                    { label: 'Send me something first', next: 'email_first' }
+                ]
+            },
+            close_variant_notime: {
+                stage: 'Closing (Done For You)',
+                text: "<span class=\"tone-marker confident\">efficient, action-focused tone</span> <span class=\"pause-indicator\"></span> Here's what we do - we handle all of this. <span class=\"pause-indicator\"></span> You literally just review the options and pick one. <span class=\"pause-indicator\"></span><br><br>So here's the plan. <span class=\"pause-indicator\"></span> We could do a quick 15-minute video walkthrough right now where I show you exactly how the process works - then you'll KNOW what we're handling for you. <span class=\"pause-indicator\"></span> Or I'll pull quotes from our network - takes us 3-4 days. <span class=\"pause-indicator\"></span> Then I'll call you back with like 3 options I think are best for you. <span class=\"pause-indicator\"></span><br><br>That's your whole job. <span class=\"pause-indicator\"></span> 30 minutes, and you've got competitive quotes locked in while you focus on your actual business. <span class=\"pause-indicator\"></span><br><br>What works better - video walkthrough now or book Friday at 2 PM for me to show you those options?",
+                responses: [
+                    { label: 'Video walkthrough now', next: 'video_walkthrough' },
+                    { label: 'Friday works', next: 'close_meeting_scheduled' },
+                    { label: 'Thursday works', next: 'close_meeting_scheduled' },
+                    { label: 'I need to talk to my finance team first', next: 'close_meeting_team_involved' },
+                    { label: 'Can you just send me options?', next: 'close_meeting_send_options' },
+                    { label: 'Send me something first', next: 'email_first' }
+                ]
+            },
+            close_variant_happy: {
+                stage: 'Closing (Reality Check)',
+                text: "<span class=\"tone-marker curious\">non-threatening, validation tone</span> <span class=\"pause-indicator\"></span> So here's what I propose - let me run a quick rate analysis. <span class=\"pause-indicator\"></span> I'll pull what the market's actually quoting right now, compare it to what you're paying, and show you if there's a gap. <span class=\"pause-indicator\"></span><br><br>No obligation, no strings. <span class=\"pause-indicator\"></span> Just data. <span class=\"pause-indicator\"></span> If you're actually getting a good deal, I'll tell you that too. <span class=\"pause-indicator\"></span><br><br>We could do a quick 15-minute video walkthrough right now where I show you exactly how the analysis works. <span class=\"pause-indicator\"></span> Then you'll KNOW what you're getting into. <span class=\"pause-indicator\"></span> Or takes me about 3 days to pull everything, then we hop on a quick call and I show you what I found. <span class=\"pause-indicator\"></span><br><br>What works better - video walkthrough now or Thursday afternoon call?",
+                responses: [
+                    { label: 'Video walkthrough now', next: 'video_walkthrough' },
+                    { label: 'Thursday works', next: 'close_meeting_scheduled' },
+                    { label: 'Thursday afternoon works', next: 'close_meeting_scheduled' },
+                    { label: 'What\'s this going to cost me?', next: 'close_meeting_cost_question' },
+                    { label: 'Seems like a lot of work', next: 'close_meeting_work_concern' },
+                    { label: 'Send me something first', next: 'email_first' }
+                ]
+            },
+            close_variant_lockedin: {
+                stage: 'Closing (Future Proofing)',
+                text: "<span class=\"tone-marker confident\">patient, strategic tone</span> <span class=\"pause-indicator\"></span> I get it - you just renewed and you're not looking to do anything now. <span class=\"pause-indicator\"></span> That's fine. <span class=\"pause-indicator\"></span><br><br>But here's what I'm thinking. <span class=\"pause-indicator\"></span> Let's mark your calendar for 6 months BEFORE your next renewal. <span class=\"pause-indicator\"></span> That's when you actually have leverage with suppliers. <span class=\"pause-indicator\"></span><br><br>So what date is your contract up? <span class=\"pause-indicator\"></span> Let me just put a note on our side too so when that 6-month mark hits, I reach out and we start pulling quotes when you're in the best negotiating position. <span class=\"pause-indicator\"></span><br><br>When does your contract expire?",
+                responses: [
+                    { label: 'I know the date - [date]', next: 'future_opportunity_marked' },
+                    { label: 'That seems far away', next: 'future_opportunity_marked' },
+                    { label: 'Just call me when it gets closer', next: 'future_opportunity_marked' },
+                    { label: 'Send me something first', next: 'email_first' }
+                ]
+            },
+            close_variant_triedbefore: {
+                stage: 'Closing (Redemption)',
+                text: "<span class=\"tone-marker confident\">empowering, redemption tone</span> <span class=\"pause-indicator\"></span> So here's the deal - last time you probably reached out to a bunch of suppliers individually and they all quoted different. <span class=\"pause-indicator\"></span> We're different. <span class=\"pause-indicator\"></span><br><br>We pull 100+ suppliers at ONCE. <span class=\"pause-indicator\"></span> They all know they're competing so they quote real rates. <span class=\"pause-indicator\"></span> We standardize everything so you can actually compare. <span class=\"pause-indicator\"></span><br><br>It's not a nightmare because we eliminate the chaos. <span class=\"pause-indicator\"></span><br><br>We could do a quick 15-minute video walkthrough right now where I show you exactly how the process works this time. <span class=\"pause-indicator\"></span> You'll see it's way different. <span class=\"pause-indicator\"></span> Or we can set up a call Thursday. <span class=\"pause-indicator\"></span><br><br>What works better - video walkthrough now or Thursday 2 PM call?",
+                responses: [
+                    { label: 'Video walkthrough now', next: 'video_walkthrough' },
+                    { label: 'Thursday 2 PM works', next: 'close_meeting_scheduled' },
+                    { label: 'Thursday works', next: 'close_meeting_scheduled' },
+                    { label: 'But last time it still didn\'t work out', next: 'close_meeting_scheduled' },
+                    { label: 'I\'m still skeptical', next: 'close_meeting_scheduled' },
+                    { label: 'Send me something first', next: 'email_first' }
+                ]
+            },
+            close_meeting_scheduled: {
+                stage: 'Closing',
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Perfect. <span class=\"pause-indicator\"></span> I'll send you a calendar invite right now so we block it in. <span class=\"pause-indicator\"></span> This way I can have your numbers pulled and ready to go. <span class=\"pause-indicator\"></span><br><br>Looking forward to showing you what we found.",
+                responses: [
+                    { label: 'Great, looking forward to it', next: 'meeting_scheduled' },
+                    { label: 'Sounds good', next: 'meeting_scheduled' }
+                ]
+            },
+            video_walkthrough: {
+                stage: 'Closing - Video Walkthrough',
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Perfect. <span class=\"pause-indicator\"></span> So I'm going to share my screen right now and walk you through exactly how this works. <span class=\"pause-indicator\"></span> It's a quick 15-minute overview - you'll see the process, see what we pull from the market, and then you'll KNOW exactly what you're getting into before we schedule the full analysis. <span class=\"pause-indicator\"></span><br><br>After this walkthrough, if it makes sense, we can book time to actually pull your quotes. <span class=\"pause-indicator\"></span> If not, no worries at all. <span class=\"pause-indicator\"></span><br><br>Ready when you are - I'm sharing my screen now.",
+                responses: [
+                    { label: 'Makes sense, let\'s pull quotes', next: 'close_meeting_scheduled' },
+                    { label: 'I have questions first', next: 'solution_faq_hub' },
+                    { label: 'Need to think about it', next: 'email_first' }
+                ]
+            },
+            close_meeting_team_involved: {
+                stage: 'Closing',
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Totally fair. <span class=\"pause-indicator\"></span> This is actually a good conversation to include them in - we'll show both of you exactly what's available in the market. <span class=\"pause-indicator\"></span> Why don't we schedule for tomorrow afternoon and you loop them in? <span class=\"pause-indicator\"></span> That way everyone sees it together.",
+                responses: [
+                    { label: 'Tomorrow afternoon works', next: 'close_meeting_scheduled' },
+                    { label: 'Friday works better', next: 'close_meeting_scheduled' },
+                    { label: 'Send me something first', next: 'email_first' }
+                ]
+            },
+            close_meeting_think_about_it: {
+                stage: 'Closing',
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> I get it. <span class=\"pause-indicator\"></span> But here's the thing - the earlier we pull those quotes, the better your position. <span class=\"pause-indicator\"></span> How about we lock in 30 minutes Friday and I just walk you through what's out there? <span class=\"pause-indicator\"></span> You might be surprised. <span class=\"pause-indicator\"></span> Then you have all the info to think about it.",
+                responses: [
+                    { label: 'Friday works', next: 'close_meeting_scheduled' },
+                    { label: 'Thursday works', next: 'close_meeting_scheduled' },
+                    { label: 'Send me something first', next: 'email_first' }
+                ]
+            },
+            close_meeting_send_options: {
+                stage: 'Closing',
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> I could, but it's better if I walk you through them - I can explain the trade-offs. <span class=\"pause-indicator\"></span> Plus, if you have questions, I'm right there. <span class=\"pause-indicator\"></span> Trust me, 30 minutes on Friday is worth it. <span class=\"pause-indicator\"></span> 2 PM good?",
+                responses: [
+                    { label: 'Friday 2 PM works', next: 'close_meeting_scheduled' },
+                    { label: 'Send me something first', next: 'email_first' }
+                ]
+            },
+            close_meeting_cost_question: {
+                stage: 'Closing',
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> It's free - that's the point. <span class=\"pause-indicator\"></span> We get paid by suppliers, not by you. <span class=\"pause-indicator\"></span> You get the analysis for free, and if you decide to move forward with someone we bring you, then they pay us. <span class=\"pause-indicator\"></span> No cost to you either way.",
+                responses: [
+                    { label: 'Thursday works then', next: 'close_meeting_scheduled' },
+                    { label: 'Send me something first', next: 'email_first' }
+                ]
+            },
+            close_meeting_work_concern: {
+                stage: 'Closing',
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> It's not a lot of work for us - we literally do this 100+ times a month. <span class=\"pause-indicator\"></span> And for you it's just one 30-minute call. <span class=\"pause-indicator\"></span> Easiest way to actually know where you stand is to compare apples to apples. <span class=\"pause-indicator\"></span> Thursday 2 PM?",
+                responses: [
+                    { label: 'Thursday 2 PM works', next: 'close_meeting_scheduled' },
+                    { label: 'Send me something first', next: 'email_first' }
+                ]
+            },
+            future_opportunity_marked: {
+                stage: 'Closing',
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Perfect. <span class=\"pause-indicator\"></span> So November 2025 is when we start pulling quotes. <span class=\"pause-indicator\"></span> I'm putting that on my calendar right now, and I'll reach out then. <span class=\"pause-indicator\"></span><br><br>What's the best email to send you a calendar reminder 60 days before? <span class=\"pause-indicator\"></span> That way you don't have to remember - I'll ping you.",
+                responses: [
+                    { label: '[Provides email]', next: 'email_captured' },
+                    { label: 'Just call me when it\'s time', next: 'future_opportunity_email_sent' }
+                ]
+            },
+            future_opportunity_email_sent: {
+                stage: 'Closing',
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Got it. <span class=\"pause-indicator\"></span> I'll reach out November 2025. <span class=\"pause-indicator\"></span> In the meantime, let me send you a quick breakdown of what market rates are doing - just so you've got context for when we reconnect.",
+                responses: [
+                    { label: 'Sounds good, thanks', next: 'email_captured' },
+                    { label: 'Looking forward to it', next: 'email_captured' }
+                ]
+            },
             close_meeting: {
                 stage: 'Closing',
                 text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Perfect. So what you're really looking for is [REFLECT THEIR ANSWER - competitive rates / budget certainty / handling complexity]. <span class=\"pause-indicator\"></span> Here's what I'm thinking - we schedule a quick 15-minute call where I show you exactly what's available in the market right now versus what you're paying. <span class=\"pause-indicator\"></span> This helps you lock in competitive rates before the market moves, you know? <span class=\"pause-indicator\"></span> No pressure, no obligation - just so you have all the information to make the best decision.<br><br>What works better for you - Tuesday or Wednesday?",
@@ -2038,13 +2192,77 @@
                 ]
             },
             email_first: {
-                stage: 'Objection Handling',
-                text: "<span class=\"tone-marker understanding\">understanding tone</span> Happy to, absolutely. <span class=\"pause-indicator\"></span> Before I do though <span class=\"pause-indicator\"></span> just so I send something actually useful to you... <span class=\"pause-indicator\"></span> what would you want me to include?",
+                stage: 'Solution - Email First',
+                text: "<span class=\"tone-marker understanding\">understanding tone</span> Totally get it - no pressure. <span class=\"pause-indicator\"></span><br><br>Let me do this... I'll shoot you an email with a quick summary of what we talked about and what the next step would look like. <span class=\"pause-indicator\"></span> That way you've got it in writing and you can think it over. <span class=\"pause-indicator\"></span><br><br>If it makes sense after you think about it, just reply to that email and we'll get the quotes pulled. <span class=\"pause-indicator\"></span> If not, no worries at all. <span class=\"pause-indicator\"></span><br><br>Fair? <span class=\"pause-indicator\"></span><br><br>What's the best email to send that to?",
                 responses: [
-                    { label: 'Market rate comparison', next: 'email_follow_up' },
-                    { label: 'How your process works', next: 'email_follow_up' },
-                    { label: 'Case study / ROI info', next: 'email_follow_up' },
-                    { label: 'All of the above', next: 'email_follow_up' }
+                    { label: "Sure, it's [email]", next: 'email_captured' },
+                    { label: "Just send it to my work email", next: 'email_captured' },
+                    { label: "Actually, let's just do it now", next: 'close_meeting' },
+                    { label: "I don't want to give my email", next: 'respect_decision' }
+                ]
+            },
+            email_captured: {
+                stage: 'Solution - Email Captured',
+                text: "<span class=\"tone-marker confident\">professional, upbeat tone</span> <span class=\"pause-indicator\"></span> Perfect. <span class=\"pause-indicator\"></span> I'll send that over in the next hour. <span class=\"pause-indicator\"></span><br><br>Just so you know what to expect - it'll have a quick recap of what we talked about, the potential savings we discussed, and the next step if you want to move forward. <span class=\"pause-indicator\"></span><br><br>No spam, no constant follow-ups - just that one email. <span class=\"pause-indicator\"></span> If you want to move forward, reply. <span class=\"pause-indicator\"></span> If not, no worries. <span class=\"pause-indicator\"></span><br><br>Appreciate your time today, {{contact.first_name}}. <span class=\"pause-indicator\"></span> Anything else you want to ask before I let you go?",
+                responses: [
+                    { label: "Nope, that's it", next: 'end_call_email_sent' },
+                    { label: "Actually, one more question...", next: 'solution_faq_hub' },
+                    { label: "Actually, let's just schedule it now", next: 'close_meeting' }
+                ]
+            },
+            end_call_email_sent: {
+                stage: 'End - Email Sent',
+                text: "<span class=\"tone-marker friendly\">friendly tone</span> <span class=\"pause-indicator\"></span> Perfect. <span class=\"pause-indicator\"></span> Email on the way. <span class=\"pause-indicator\"></span> Have a good one, {{contact.first_name}}!",
+                responses: [
+                    { label: 'Start New Call', next: 'start' }
+                ]
+            },
+            solution_faq_hub: {
+                stage: 'Solution - FAQ Hub',
+                text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Sure, what do you want to know? <span class=\"pause-indicator\"></span><br><br>Is it about how the process works, how long it takes, what it costs, or something else?",
+                responses: [
+                    { label: 'How does your process work?', next: 'solution_faq_process' },
+                    { label: 'How long does this take?', next: 'solution_faq_timeline' },
+                    { label: 'What does this cost?', next: 'solution_faq_cost' },
+                    { label: 'What if I don\'t like the options?', next: 'solution_faq_no_obligation' },
+                    { label: 'Something else', next: 'email_first' }
+                ]
+            },
+            solution_faq_process: {
+                stage: 'Solution - Process FAQ',
+                text: "<span class=\"tone-marker confident\">confident, clear tone</span> <span class=\"pause-indicator\"></span> Yeah, it's pretty straightforward actually. <span class=\"pause-indicator\"></span><br><br>We pull quotes from 100+ suppliers across our network - all at once. <span class=\"pause-indicator\"></span> We tell them they're competing, so they give you actual competitive rates, not the jacked-up renewal quotes they usually send. <span class=\"pause-indicator\"></span><br><br>Then we standardize everything into the same format so you can actually compare apples to apples. <span class=\"pause-indicator\"></span> No confusing terms, no hidden fees. <span class=\"pause-indicator\"></span><br><br>We send you the top 3-5 options with our recommendation based on what you told us matters most - could be price, could be contract flexibility, whatever. <span class=\"pause-indicator\"></span><br><br>You pick which one you want, or you say no to all of them. <span class=\"pause-indicator\"></span> That's it. <span class=\"pause-indicator\"></span><br><br>We handle everything - the back and forth with suppliers, the paperwork, the onboarding. <span class=\"pause-indicator\"></span> Your job is literally just to say yes or no. <span class=\"pause-indicator\"></span><br><br>So it's not like you're doing the shopping yourself. <span class=\"pause-indicator\"></span> We're doing it FOR you. <span class=\"pause-indicator\"></span><br><br>Does that answer it, or you got other questions?",
+                responses: [
+                    { label: "That makes sense, let's do it", next: 'close_meeting' },
+                    { label: "How long does this take?", next: 'solution_faq_timeline' },
+                    { label: "What's the catch?", next: 'solution_faq_cost' },
+                    { label: "Still need to think about it", next: 'email_first' }
+                ]
+            },
+            solution_faq_timeline: {
+                stage: 'Solution - Timeline FAQ',
+                text: "<span class=\"tone-marker confident\">direct tone</span> <span class=\"pause-indicator\"></span> From start to finish? <span class=\"pause-indicator\"></span> About 2 weeks max. <span class=\"pause-indicator\"></span><br><br>Here's the breakdown - we pull quotes in 2-3 days. <span class=\"pause-indicator\"></span> You review them, pick one you like, takes you maybe 15 minutes. <span class=\"pause-indicator\"></span> Then we handle the onboarding and contract paperwork, which is another week or so. <span class=\"pause-indicator\"></span><br><br>But here's the thing - the actual TIME you spend on this is like 30 minutes total. <span class=\"pause-indicator\"></span> One call with me to go over options, you make a decision, done. <span class=\"pause-indicator\"></span><br><br>Everything else happens in the background while you're doing your actual job. <span class=\"pause-indicator\"></span><br><br>So yeah, 2 weeks calendar time, but 30 minutes of YOUR time. <span class=\"pause-indicator\"></span><br><br>That work for you?",
+                responses: [
+                    { label: "Yeah, that's not bad", next: 'close_meeting' },
+                    { label: "What happens if I don't like any quotes?", next: 'solution_faq_no_obligation' },
+                    { label: "Still thinking about it", next: 'email_first' }
+                ]
+            },
+            solution_faq_cost: {
+                stage: 'Solution - Cost FAQ',
+                text: "<span class=\"tone-marker confident\">straightforward tone</span> <span class=\"pause-indicator\"></span> No catch. <span class=\"pause-indicator\"></span> We get paid by the suppliers, not you. <span class=\"pause-indicator\"></span><br><br>When you sign with one of the suppliers we bring you, they pay us a referral fee. <span class=\"pause-indicator\"></span> You pay the same rate whether you go direct or through us - we just handle all the legwork. <span class=\"pause-indicator\"></span><br><br>So there's no fee to you, no hidden costs, nothing like that. <span class=\"pause-indicator\"></span> You're just getting the quotes and the service for free. <span class=\"pause-indicator\"></span><br><br>The only way we make money is if you actually pick one of the options we bring you. <span class=\"pause-indicator\"></span> If you don't, we don't get paid. <span class=\"pause-indicator\"></span> So we're motivated to bring you good options. <span class=\"pause-indicator\"></span><br><br>That's the whole model. <span class=\"pause-indicator\"></span><br><br>Clear?",
+                responses: [
+                    { label: "Okay, that makes sense", next: 'close_meeting' },
+                    { label: "Sounds good, let's do it", next: 'close_meeting' },
+                    { label: "Still not sure", next: 'email_first' }
+                ]
+            },
+            solution_faq_no_obligation: {
+                stage: 'Solution - No Obligation FAQ',
+                text: "<span class=\"tone-marker confident\">honest tone</span> <span class=\"pause-indicator\"></span> Then you say no. <span class=\"pause-indicator\"></span> That's it. <span class=\"pause-indicator\"></span><br><br>No obligation, no pressure, no long-term commitment. <span class=\"pause-indicator\"></span> We pull the quotes, you see what's out there, and if nothing makes sense, you stick with what you got. <span class=\"pause-indicator\"></span><br><br>The only thing that changes is now you KNOW what the market looks like. <span class=\"pause-indicator\"></span> So you're not flying blind anymore. <span class=\"pause-indicator\"></span><br><br>Most companies actually DO find something better because we're pulling from 100+ suppliers. <span class=\"pause-indicator\"></span> But if you're genuinely getting a good deal already, we'll tell you that too. <span class=\"pause-indicator\"></span><br><br>We're not here to force you into something worse just to make a sale. <span class=\"pause-indicator\"></span> That's not how this works. <span class=\"pause-indicator\"></span><br><br>Make sense?",
+                responses: [
+                    { label: "Okay, let's see what you can pull", next: 'close_meeting' },
+                    { label: "What do you charge for this?", next: 'solution_faq_cost' },
+                    { label: "I'll think about it", next: 'email_first' }
                 ]
             },
             email_follow_up: {
@@ -2069,6 +2287,7 @@
                 responses: [
                     { label: 'Already have solution', next: 'objection_happy_supplier' },
                     { label: 'Not a priority', next: 'objection_not_priority' },
+                    { label: 'What\'s the market context?', next: 'market_context' },
                     { label: 'Just not interested', next: 'respect_decision' }
                 ]
             },
@@ -2103,6 +2322,7 @@
                 text: "<span class=\"tone-marker understanding\">understanding tone</span> I get it. <span class=\"pause-indicator\"></span> Here's what I'd suggest: <span class=\"pause-indicator\"></span> when your contract comes up for renewal in the next 6-12 months, that's when we should talk. <span class=\"pause-indicator\"></span><br><br>Do you know roughly when that is?",
                 responses: [
                     { label: 'Yes, I know the date', next: 'schedule_followup' },
+                    { label: 'What\'s the market context?', next: 'market_context' },
                     { label: 'Not sure', next: 'respect_decision' }
                 ]
             },
@@ -2182,6 +2402,22 @@
             call_success: {
                 stage: 'Complete',
                 text: '📞 <strong>Call Ended</strong><br><br>Call Summary:<br>• Duration: ~4-6 minutes<br>• Outcome: Professional close<br>• Key Learning: Not every call closes, but professional respect opens doors for future opportunities.<br><br>Ready for the next prospect?',
+                responses: [
+                    { label: 'Start New Call', next: 'start' }
+                ]
+            },
+            email_captured: {
+                stage: 'Solution - Email Captured',
+                text: "<span class=\"tone-marker confident\">professional, upbeat tone</span> <span class=\"pause-indicator\"></span> Perfect. <span class=\"pause-indicator\"></span> I'll send that over in the next hour. <span class=\"pause-indicator\"></span><br><br>Just so you know what to expect - it'll have a quick recap of what we talked about, the potential savings we discussed, and the next step if you want to move forward. <span class=\"pause-indicator\"></span><br><br>No spam, no constant follow-ups - just that one email. <span class=\"pause-indicator\"></span> If you want to move forward, reply. If not, no worries. <span class=\"pause-indicator\"></span><br><br>Appreciate your time today, {{contact.first_name}}. <span class=\"pause-indicator\"></span> Anything else you want to ask before I let you go?",
+                responses: [
+                    { label: "Nope, that's it", next: 'end_call_email_sent' },
+                    { label: "Actually, one more question...", next: 'solution_faq_process' },
+                    { label: "Actually, let's just schedule it now", next: 'close_meeting' }
+                ]
+            },
+            end_call_email_sent: {
+                stage: 'End - Email Sent',
+                text: "<span class=\"tone-marker friendly\">friendly tone</span> <span class=\"pause-indicator\"></span> Perfect. <span class=\"pause-indicator\"></span> Email on the way. <span class=\"pause-indicator\"></span> Have a good one, {{contact.first_name}}!",
                 responses: [
                     { label: 'Start New Call', next: 'start' }
                 ]
