@@ -55,7 +55,7 @@ export default async function handler(req, res) {
                 action: `${base}/api/twilio/dial-complete`,
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
-                statusCallbackMethod: 'POST',
+                // Note: statusCallbackMethod is not a valid attribute for Dial verb
                 // Dual-channel from answer
                 record: 'record-from-answer-dual',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
@@ -86,7 +86,7 @@ export default async function handler(req, res) {
                 action: `${base}/api/twilio/dial-complete`,
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
-                statusCallbackMethod: 'POST',
+                // Note: statusCallbackMethod is not a valid attribute for Dial verb
                 // Dual-channel from answer
                 record: 'record-from-answer-dual',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
@@ -107,7 +107,7 @@ export default async function handler(req, res) {
                 action: `${base}/api/twilio/dial-complete`,
                 statusCallback: `${base}/api/twilio/dial-status`,
                 statusCallbackEvent: 'initiated ringing answered completed',
-                statusCallbackMethod: 'POST',
+                // Note: statusCallbackMethod is not a valid attribute for Dial verb
                 // Dual-channel from answer
                 record: 'record-from-answer-dual',
                 recordingStatusCallback: `${base}/api/twilio/recording`,
