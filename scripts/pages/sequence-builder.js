@@ -16,9 +16,25 @@ class FreeSequenceAutomation {
     try {
       console.log('[FreeSequence] Starting sequence:', sequence.name);
       
+      // Get current user email for ownership
+      const getUserEmail = () => {
+        try {
+          if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+            return window.DataManager.getCurrentUserEmail().toLowerCase();
+          }
+          return (window.currentUserEmail || '').toLowerCase();
+        } catch (_) {
+          return (window.currentUserEmail || '').toLowerCase();
+        }
+      };
+      const userEmail = getUserEmail();
+      
       // Create scheduled email records for all auto-email steps
       const emailSteps = sequence.steps.filter(step => step.type === 'auto-email');
       let scheduledEmailCount = 0;
+      
+      // Get Firebase database reference
+      const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
       
       for (let i = 0; i < emailSteps.length; i++) {
         const step = emailSteps[i];
@@ -36,29 +52,55 @@ class FreeSequenceAutomation {
           sendTime = this.calculateSendTime(previousStepTime, step.delay);
         }
         
-        // Create scheduled email record
+        // Generate unique ID
+        const emailId = `free_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Create scheduled email record with proper ownership fields
         const scheduledEmail = {
-          id: `free_${Date.now()}_${i}`,
+          id: emailId,
           type: 'scheduled',
           status: 'not_generated',
           scheduledSendTime: sendTime,
+          date: new Date(sendTime).toISOString(), // For display in emails list
           contactId: contactData.id || contactData.email,
           contactName: contactData.name,
           contactCompany: contactData.company,
           to: contactData.email,
+          from: userEmail || 'noreply@powerchoosers.com',
+          subject: '', // Will be generated
+          html: '', // Will be generated
+          text: '', // Will be generated
           sequenceId: sequence.id,
           sequenceName: sequence.name,
           stepIndex: i,
           totalSteps: emailSteps.length,
           aiPrompt: step.emailSettings?.aiPrompt || step.data?.aiPrompt || 'Write a professional follow-up email',
-          createdAt: new Date(),
-          ownerId: window.currentUser?.uid || 'unknown',
+          // Ownership fields for Firestore rules
+          ownerId: userEmail || '',
+          assignedTo: userEmail || '',
+          createdBy: userEmail || '',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
           // Free automation flag
-          freeAutomation: true
+          freeAutomation: true,
+          deleted: false,
+          unread: true
         };
         
-        // Store in memory (no database writes for free version)
+        // Store in memory for client-side checks
         this.scheduledEmails.set(scheduledEmail.id, scheduledEmail);
+        
+        // Save to Firebase with proper ownership fields
+        if (db) {
+          try {
+            await db.collection('emails').doc(emailId).set(scheduledEmail);
+            console.log(`[FreeSequence] Saved scheduled email to Firebase: ${emailId}`);
+          } catch (error) {
+            console.error('[FreeSequence] Failed to save scheduled email to Firebase:', error);
+            // Continue even if Firebase save fails
+          }
+        }
+        
         scheduledEmailCount++;
         
         // Schedule client-side check
@@ -66,6 +108,9 @@ class FreeSequenceAutomation {
       }
       
       console.log(`[FreeSequence] Created ${scheduledEmailCount} scheduled emails`);
+      
+      // Dispatch event to refresh emails page
+      window.dispatchEvent(new CustomEvent('pc:emails-updated'));
       
       // Start the free automation loop
       this.startFreeAutomation();
@@ -168,8 +213,19 @@ class FreeSequenceAutomation {
     try {
       console.log(`[FreeSequence] Generating content for ${email.id}`);
       
-      // Update status to generating
+      // Update status to generating (in memory and Firebase)
       email.status = 'generating';
+      const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+      if (db) {
+        try {
+          await db.collection('emails').doc(email.id).update({
+            status: 'generating',
+            updatedAt: new Date().toISOString()
+          });
+        } catch (error) {
+          console.error('[FreeSequence] Failed to update email status in Firebase:', error);
+        }
+      }
       
       // Call your AI service (this would be your existing AI endpoint)
       const response = await fetch('/api/generate-email-content', {
@@ -190,16 +246,63 @@ class FreeSequenceAutomation {
         email.status = 'pending_approval';
         email.generatedAt = Date.now();
         
+        // Update Firebase with generated content and status
+        if (db) {
+          try {
+            await db.collection('emails').doc(email.id).update({
+              subject: result.subject,
+              html: result.html,
+              text: result.text,
+              status: 'pending_approval',
+              generatedAt: email.generatedAt,
+              updatedAt: new Date().toISOString()
+            });
+            console.log(`[FreeSequence] Updated email in Firebase with generated content: ${email.id}`);
+            
+            // Dispatch event to refresh emails page
+            window.dispatchEvent(new CustomEvent('pc:emails-updated'));
+          } catch (error) {
+            console.error('[FreeSequence] Failed to update email in Firebase:', error);
+          }
+        }
+        
         console.log(`[FreeSequence] Generated content for ${email.id}`);
       } else {
         email.status = 'error';
         email.errorMessage = 'Failed to generate content';
+        
+        // Update Firebase with error status
+        if (db) {
+          try {
+            await db.collection('emails').doc(email.id).update({
+              status: 'error',
+              errorMessage: email.errorMessage,
+              updatedAt: new Date().toISOString()
+            });
+          } catch (error) {
+            console.error('[FreeSequence] Failed to update error status in Firebase:', error);
+          }
+        }
       }
       
     } catch (error) {
       console.error(`[FreeSequence] Error generating content:`, error);
       email.status = 'error';
       email.errorMessage = error.message;
+      
+      // Update Firebase with error status
+      const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+      if (db) {
+        try {
+          await db.collection('emails').doc(email.id).update({
+            status: 'error',
+            errorMessage: error.message,
+            updatedAt: new Date().toISOString()
+          });
+        } catch (err) {
+          console.error('[FreeSequence] Failed to update error status in Firebase:', err);
+        }
+      }
     }
   }
 
@@ -244,6 +347,23 @@ class FreeSequenceAutomation {
       email.status = 'approved';
       email.approvedAt = Date.now();
       
+      // Update Firebase
+      const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+      if (db) {
+        try {
+          await db.collection('emails').doc(emailId).update({
+            status: 'approved',
+            approvedAt: email.approvedAt,
+            updatedAt: new Date().toISOString()
+          });
+          
+          // Dispatch event to refresh emails page
+          window.dispatchEvent(new CustomEvent('pc:emails-updated'));
+        } catch (error) {
+          console.error('[FreeSequence] Failed to update approval status in Firebase:', error);
+        }
+      }
+      
       // Remove notification
       const notification = document.querySelector('.email-approval-notification');
       if (notification) notification.remove();
@@ -256,11 +376,28 @@ class FreeSequenceAutomation {
   /**
    * Reject an email
    */
-  rejectEmail(emailId) {
+  async rejectEmail(emailId) {
     const email = this.scheduledEmails.get(emailId);
     if (email) {
       email.status = 'rejected';
       email.rejectedAt = Date.now();
+      
+      // Update Firebase
+      const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+      if (db) {
+        try {
+          await db.collection('emails').doc(emailId).update({
+            status: 'rejected',
+            rejectedAt: email.rejectedAt,
+            updatedAt: new Date().toISOString()
+          });
+          
+          // Dispatch event to refresh emails page
+          window.dispatchEvent(new CustomEvent('pc:emails-updated'));
+        } catch (error) {
+          console.error('[FreeSequence] Failed to update rejection status in Firebase:', error);
+        }
+      }
       
       // Remove notification
       const notification = document.querySelector('.email-approval-notification');
@@ -2044,48 +2181,9 @@ class FreeSequenceAutomation {
                         <button class="ai-suggestion" type="button" data-prompt="Write an immediate follow-up email after our phone conversation">Immediate follow-up</button>
                         <button class="ai-suggestion" type="button" data-prompt="Write a same-day check-in email to maintain momentum">Same day check-in</button>
                         <button class="ai-suggestion" type="button" data-prompt="Write a weekly touchpoint email to stay top of mind">Weekly touchpoint</button>
-                        <button class="ai-suggestion" type="button" data-prompt="Write a cold introduction email that MUST:
-
-1. OPEN WITH OBSERVATION
-   - Reference something SPECIFIC about [contact_company]
-   - Use [contact_linkedin_recent_activity] if available
-   - If no specific data: reference their industry/role pattern
-   - NEVER: 'I hope you're well' or 'I wanted to reach out'
-
-2. ACKNOWLEDGE THEIR SITUATION
-   - For [company_industry], show you understand: [industry_specific_context]
-   - Reference: their role ([contact_job_title]) and what that typically involves
-   - Make it about THEM, not about us
-
-3. ONE INSIGHT
-   - Provide ONE observation about why this matters to them NOW
-   - NOT: 'Companies save 10-20%'
-   - YES: 'With 4 facilities in Texas, timing is critical'
-
-4. TONE REQUIREMENTS
-   - Use contractions: 'we're,' 'don't,' 'it's'
-   - Vary sentence length: short. Medium sentence. Longer explanation.
-   - Avoid: dive into, unleash, synergy, leverage, solution, at Power Choosers
-   - Sound like: colleague who knows their industry
-
-5. CALL TO ACTION
-   - NO: 'Let's schedule a call'
-   - YES: 'Open to a quick conversation?'
-   - NO: Ask for commitment
-   - YES: Ask for permission to continue
-
-6. FORMAT
-   - 100-130 words max
-   - 2-3 short paragraphs
-   - Scannable on mobile
-   - One CTA at end
-   
-7. PERSONALIZATION
-   - Include [contact_first_name]
-   - Reference [company_name] specifically
-   - For [company_industry], use industry-specific language naturally
-
-ABSOLUTELY AVOID sounding like ChatGPT. You should sound like their peer.">First email introduction</button>
+                        <button class="ai-suggestion" type="button" 
+                          data-prompt-template="first-email-intro"
+                          data-cta-variant="true">First email introduction</button>
                         <button class="ai-suggestion" type="button" data-prompt="Write a nurture email that provides value and builds relationship">Middle sequence nurture</button>
                         <button class="ai-suggestion" type="button" data-prompt="Write a final email with a clear call-to-action and next steps">Final sequence ask</button>
                       </div>
@@ -2098,11 +2196,13 @@ ABSOLUTELY AVOID sounding like ChatGPT. You should sound like their peer.">First
                   </div>
                   <div class="email-preview">
                     <div class="preview-subject">${escapeHtml((step.data?.aiOutput?.subject) || (previewSubject || '(no subject)'))}</div>
-                    <div class="preview-body">${(step.data?.aiOutput?.html) || (previewBodyHtml || '(empty)')}</div>
+                    <div class="preview-body">${(step.data?.aiOutput?.html) || (previewBodyHtml || '(empty)')}${getSignatureForPreview(step, isAuto)}</div>
                   </div>
                   <div class="ai-footbar" style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px;">
                     <div class="status-pill" aria-live="polite" style="font-size:12px; color: var(--text-secondary);">
-                      ${escapeHtml((step.data?.aiStatus || 'draft').toUpperCase())}
+                      ${step.data?.aiStatus === 'saved' && step.data?.savedAt 
+                        ? `SAVED at ${new Date(step.data.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
+                        : escapeHtml((step.data?.aiStatus || 'draft').toUpperCase())}
                     </div>
                     <div>
                       <button class="btn-primary ai-save-to-step" ${step.data?.aiStatus==='generated' || step.data?.aiStatus==='draft' ? '' : 'disabled'}>Save to step</button>
@@ -2112,7 +2212,7 @@ ABSOLUTELY AVOID sounding like ChatGPT. You should sound like their peer.">First
                 ` : `
                 <div class="email-preview">
                   <div class="preview-subject">${previewSubject || '(no subject)'}</div>
-                  <div class="preview-body">${previewBodyHtml || '(empty)'}</div>
+                  <div class="preview-body">${previewBodyHtml || '(empty)'}${getSignatureForPreview(step, isAuto)}</div>
                 </div>`}
               </div>
             </div>
@@ -2385,6 +2485,157 @@ ABSOLUTELY AVOID sounding like ChatGPT. You should sound like their peer.">First
     const k = String(key || '');
     const label = map[s] && map[s][k];
     return label ? label : `${s}.${k}`;
+  }
+
+  // ========== COLD EMAIL CTA VARIANTS ==========
+  // Multiple call-to-action options for first email introductions
+  // System randomly selects one per generation based on role
+  const COLD_EMAIL_CTA_VARIANTS = [
+    {
+      id: 'direct-question',
+      text: 'When does your current contract renew? And how often do you typically review your rates?',
+      role: 'all'
+    },
+    {
+      id: 'discovery-question',
+      text: 'Out of curiosity—when you renew your contract, do you shop around or just renew what you had?',
+      role: 'all'
+    },
+    {
+      id: 'timing-insight',
+      text: 'Quick question—are you locking in 6 months early or waiting closer to renewal?',
+      role: 'all'
+    },
+    {
+      id: 'permission-context',
+      text: 'If you ever want a second opinion on your setup, I can spend 10 minutes looking at your situation.',
+      role: 'all'
+    },
+    {
+      id: 'timeline-risk',
+      text: 'Question for you—what\'s your renewal timeline? That timing difference is usually worth 15-20%.',
+      role: 'finance'
+    },
+    {
+      id: 'problem-validation',
+      text: 'Real question—does energy cost predictability matter for your budget planning?',
+      role: 'finance'
+    }
+  ];
+
+  // Get a random CTA based on role (all = show all, finance = show finance + all)
+  function getRandomCTA(role = 'all') {
+    const filtered = COLD_EMAIL_CTA_VARIANTS.filter(cta => 
+      cta.role === 'all' || cta.role === role
+    );
+    if (filtered.length === 0) return COLD_EMAIL_CTA_VARIANTS[0].text;
+    const random = filtered[Math.floor(Math.random() * filtered.length)];
+    return random.text;
+  }
+
+  // Build improved first email introduction prompt with dynamic CTA
+  function buildFirstEmailIntroPrompt(ctaVariant = true, role = 'all') {
+    const cta = ctaVariant ? getRandomCTA(role) : COLD_EMAIL_CTA_VARIANTS[0].text;
+    
+    return `Write a cold introduction email that MUST:
+
+1. OPEN WITH OBSERVATION (CRITICAL - THIS IS THE MOST IMPORTANT PART)
+   - Reference something SPECIFIC about [contact_company] (location, facility count, operational model, recent activity)
+   - Use [contact_linkedin_recent_activity] if available - reference naturally ("I noticed..." or "I saw...")
+   - Use [company_website] insights if available - show you actually researched
+   - If no specific data: reference their industry/role pattern with peer context ("I've been talking to [role]s across [state], and...")
+   - NEVER: "I hope you're well" or "I wanted to reach out" or "I hope this email finds you well"
+   - MUST: Prove you researched - include specific details (location, facility size, operations type)
+
+2. ACKNOWLEDGE THEIR SITUATION (ROLE-SPECIFIC)
+   - For [contact_job_title]: Show you understand what they actually deal with daily
+   - For [company_industry]: Reference industry-specific pain points naturally (not generic)
+   - Use their role language (CFOs care about predictability/budgets, Operations care about uptime/reliability)
+   - Make it about THEM, not about us (don't lead with "We help...")
+
+3. ONE INSIGHT (SPECIFIC, NOT GENERIC)
+   - Provide ONE concrete observation about why this matters to them NOW
+   - Use SPECIFIC numbers and timing: "6 months early = 15-20% savings" NOT "thousands annually"
+   - NOT: "Companies save 10-20%" (too generic)
+   - YES: "With 4 facilities in Texas, timing is critical - locking in 6 months out vs 90 days is usually 15-20% difference"
+   - Include timing context: early renewal (6 months) vs late (90 days) = money difference
+
+4. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
+   - Write like a peer, not a salesperson (conversational, confident, direct)
+   - Use contractions: "we're," "don't," "it's," "you're," "I'm"
+   - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
+   - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy," "dive into," "solution," "at Power Choosers"
+   - Sound like: colleague who knows their industry and has talked to others like them
+   - Use casual confidence: "Quick question—" "Real question—" "Out of curiosity—"
+   - NO: "Would you be open to..." (permission-based, weak)
+   - YES: Ask specific questions that assume conversation is happening
+
+5. CALL TO ACTION (ASSERTIVE, NOT PERMISSION-BASED)
+   - Use THIS specific CTA (don't change it, use exactly as written):
+   "${cta}"
+   - MUST: Assume the conversation is happening - don't ask for permission to talk
+   - NO: "Would you be open to a conversation?" or "Let's schedule a call"
+   - YES: Ask specific question about their contract, timing, or process
+
+6. SUBJECT LINE (SPECIFIC, NOT VAGUE)
+   - MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
+   - Examples: "[FirstName], contract timing question" or "[FirstName], rate lock timing question"
+   - NOT generic: "thoughts on energy planning" or "insight to ease costs" or "thoughts on energy strategy"
+   - Focus on: contract renewal, rate lock timing, budget cycle, facility renewal
+   - Role-specific: For Controllers/CFO: "budget question about energy renewal timing"
+   - For Operations/Facilities: "facility renewal timing question"
+
+7. FORMAT
+   - 100-130 words max (scannable, not overwhelming)
+   - 2-3 short paragraphs (break up visually)
+   - Scannable on mobile (short lines, clear breaks)
+   - One CTA at end (the specific CTA provided above)
+
+8. PERSONALIZATION
+   - Include [contact_first_name] naturally in greeting
+   - Reference [company_name] specifically (not "your company")
+   - For [company_industry], use industry-specific language naturally
+   - Reference location if available ([city], [state]) for regional context
+
+9. PROOF OF RESEARCH
+   - Include at least ONE specific detail that proves you researched (not just role description)
+   - Examples: "4 locations across Texas," "24/7 operations," "both electricity and natural gas"
+   - This makes you stand out from generic templates
+
+ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should sound like their peer—a 29-year-old Texas business pro who knows the industry and has talked to others in their situation. Be conversational, confident, and direct.`;
+  }
+
+  // Get signature HTML for preview if settings allow it
+  function getSignatureForPreview(step, isAuto) {
+    try {
+      // Get email settings (step-specific or default)
+      const emailSettings = step.emailSettings || getDefaultEmailSettings(isAuto);
+      
+      // Check if signature should be included
+      if (!emailSettings?.content?.includeSignature) {
+        return '';
+      }
+      
+      // Get signature from settings
+      const signature = window.getEmailSignature ? window.getEmailSignature() : '';
+      if (!signature) return '';
+      
+      // Check if signature image should be included
+      const settings = (window.SettingsPage?.getSettings?.()) || {};
+      const deliver = settings?.emailDeliverability || {};
+      
+      // If signature image is disabled in settings, remove it from signature
+      let signatureHtml = signature;
+      if (deliver.signatureImageEnabled === false) {
+        signatureHtml = signature.replace(/<img[^>]*alt=["']Signature["'][\s\S]*?>/gi, '');
+      }
+      
+      // Return signature HTML (will be appended to preview body)
+      return signatureHtml || '';
+    } catch (error) {
+      console.warn('[SequenceBuilder] Error getting signature for preview:', error);
+      return '';
+    }
   }
 
   // Resolve sender first name from multiple sources so it's always available
@@ -2909,48 +3160,9 @@ ABSOLUTELY AVOID sounding like ChatGPT. You should sound like their peer.">First
             <button class="ai-suggestion" type="button" data-prompt="Write an immediate follow-up email after our phone conversation">Immediate follow-up</button>
             <button class="ai-suggestion" type="button" data-prompt="Write a same-day check-in email to maintain momentum">Same day check-in</button>
             <button class="ai-suggestion" type="button" data-prompt="Write a weekly touchpoint email to stay top of mind">Weekly touchpoint</button>
-            <button class="ai-suggestion" type="button" data-prompt="Write a cold introduction email that MUST:
-
-1. OPEN WITH OBSERVATION
-   - Reference something SPECIFIC about [contact_company]
-   - Use [contact_linkedin_recent_activity] if available
-   - If no specific data: reference their industry/role pattern
-   - NEVER: 'I hope you're well' or 'I wanted to reach out'
-
-2. ACKNOWLEDGE THEIR SITUATION
-   - For [company_industry], show you understand: [industry_specific_context]
-   - Reference: their role ([contact_job_title]) and what that typically involves
-   - Make it about THEM, not about us
-
-3. ONE INSIGHT
-   - Provide ONE observation about why this matters to them NOW
-   - NOT: 'Companies save 10-20%'
-   - YES: 'With 4 facilities in Texas, timing is critical'
-
-4. TONE REQUIREMENTS
-   - Use contractions: 'we're,' 'don't,' 'it's'
-   - Vary sentence length: short. Medium sentence. Longer explanation.
-   - Avoid: dive into, unleash, synergy, leverage, solution, at Power Choosers
-   - Sound like: colleague who knows their industry
-
-5. CALL TO ACTION
-   - NO: 'Let's schedule a call'
-   - YES: 'Open to a quick conversation?'
-   - NO: Ask for commitment
-   - YES: Ask for permission to continue
-
-6. FORMAT
-   - 100-130 words max
-   - 2-3 short paragraphs
-   - Scannable on mobile
-   - One CTA at end
-   
-7. PERSONALIZATION
-   - Include [contact_first_name]
-   - Reference [company_name] specifically
-   - For [company_industry], use industry-specific language naturally
-
-ABSOLUTELY AVOID sounding like ChatGPT. You should sound like their peer.">First email introduction</button>
+            <button class="ai-suggestion" type="button" 
+              data-prompt-template="first-email-intro"
+              data-cta-variant="true">First email introduction</button>
             <button class="ai-suggestion" type="button" data-prompt="Write a nurture email that provides value and builds relationship">Middle sequence nurture</button>
             <button class="ai-suggestion" type="button" data-prompt="Write a final email with a clear call-to-action and next steps">Final sequence ask</button>
           </div>
@@ -3802,7 +4014,33 @@ ABSOLUTELY AVOID sounding like ChatGPT. You should sound like their peer.">First
         aiSuggestions.forEach(btn => {
           btn.addEventListener('click', (e) => {
             e.preventDefault();
-            const prompt = btn.getAttribute('data-prompt');
+            
+            // Check if this button uses dynamic CTA variants
+            const isVariant = btn.getAttribute('data-cta-variant') === 'true';
+            const template = btn.getAttribute('data-prompt-template');
+            
+            let prompt;
+            
+            if (isVariant && template === 'first-email-intro') {
+              // Build prompt with random CTA
+              // Try to detect role from step or contact if available
+              const stepId = stepCard.getAttribute('data-step-id');
+              const step = state.currentSequence?.steps?.find(s => s.id === stepId);
+              const contactRole = step?.data?.previewContact?.title || step?.data?.previewContact?.job || 'all';
+              
+              // Determine if finance role for CTA selection
+              const role = (contactRole && typeof contactRole === 'string' && 
+                           (contactRole.toLowerCase().includes('finance') || 
+                            contactRole.toLowerCase().includes('cfo') || 
+                            contactRole.toLowerCase().includes('controller') ||
+                            contactRole.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
+              
+              prompt = buildFirstEmailIntroPrompt(true, role);
+            } else {
+              // Use static prompt
+              prompt = btn.getAttribute('data-prompt');
+            }
+            
             const textarea = stepCard.querySelector('[data-setting="aiPrompt"]');
             if (textarea && prompt) {
               textarea.value = prompt;
@@ -4838,7 +5076,34 @@ ABSOLUTELY AVOID sounding like ChatGPT. You should sound like their peer.">First
       bar.querySelectorAll('.ai-suggestion').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
-          const prompt = btn.getAttribute('data-prompt');
+          
+          // Check if this button uses dynamic CTA variants
+          const isVariant = btn.getAttribute('data-cta-variant') === 'true';
+          const template = btn.getAttribute('data-prompt-template');
+          
+          let prompt;
+          
+          if (isVariant && template === 'first-email-intro') {
+            // Build prompt with random CTA
+            // Try to detect role from selected contact if available
+            const stepId = card?.getAttribute('data-id');
+            const step = state.currentSequence?.steps?.find(s => s.id === stepId);
+            const selectedContact = step?.data?.previewContact;
+            const contactRole = selectedContact?.title || selectedContact?.job || selectedContact?.role || 'all';
+            
+            // Determine if finance role for CTA selection
+            const role = (contactRole && typeof contactRole === 'string' && 
+                         (contactRole.toLowerCase().includes('finance') || 
+                          contactRole.toLowerCase().includes('cfo') || 
+                          contactRole.toLowerCase().includes('controller') ||
+                          contactRole.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
+            
+            prompt = buildFirstEmailIntroPrompt(true, role);
+          } else {
+            // Use static prompt
+            prompt = btn.getAttribute('data-prompt');
+          }
+          
           const textarea = bar.querySelector('.ai-prompt');
           if (textarea && prompt) {
             textarea.value = prompt;
@@ -5002,7 +5267,15 @@ ABSOLUTELY AVOID sounding like ChatGPT. You should sound like their peer.">First
                 html = formatted.html;
               }
               
-              if (previewBodyEl && html) { previewBodyEl.innerHTML = html; }
+              // Get signature for preview
+              const stepId = card.getAttribute('data-id');
+              const step = state.currentSequence?.steps?.find(s => s.id === stepId);
+              const isAuto = step?.type === 'auto-email';
+              const signature = step ? getSignatureForPreview(step, isAuto) : '';
+              
+              if (previewBodyEl && html) { 
+                previewBodyEl.innerHTML = html + signature; 
+              }
               if (previewSubjectEl && subject) { previewSubjectEl.textContent = subject; }
 
               // Update AI lifecycle state only – do not overwrite manual subject/body until saved
@@ -5078,7 +5351,19 @@ ABSOLUTELY AVOID sounding like ChatGPT. You should sound like their peer.">First
         step.data.subject = step.data.aiOutput.subject || step.data.subject || '';
         step.data.body = step.data.aiOutput.html || step.data.body || '';
         step.data.aiStatus = 'saved';
+        step.data.savedAt = Date.now(); // Store timestamp
         try { scheduleStepSave(step.id, true); } catch (_) {}
+        
+        // Show toast notification
+        if (window.crm && typeof window.crm.showToast === 'function') {
+          const timeStr = new Date().toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+          });
+          window.crm.showToast(`AI prompt saved at ${timeStr}`);
+        }
+        
         render();
       });
     });
@@ -5455,12 +5740,15 @@ ABSOLUTELY AVOID sounding like ChatGPT. You should sound like their peer.">First
         const bodyEl = card.querySelector('.preview-body');
         const subjRaw = (step?.data?.subject || '');
         const bodyRaw = (step?.data?.body || '');
+        const isAuto = step?.type === 'auto-email';
+        const signature = getSignatureForPreview(step, isAuto);
+        
         if (contact) {
           subjEl && (subjEl.innerHTML = substituteContactTokensInText(subjRaw, contact) || '(no subject)');
-          bodyEl && (bodyEl.innerHTML = processBodyHtmlWithContact(bodyRaw, contact) || '(empty)');
+          bodyEl && (bodyEl.innerHTML = (processBodyHtmlWithContact(bodyRaw, contact) || '(empty)') + signature);
         } else {
           subjEl && (subjEl.textContent = subjRaw || '(no subject)');
-          bodyEl && (bodyEl.innerHTML = bodyRaw || '(empty)');
+          bodyEl && (bodyEl.innerHTML = (bodyRaw || '(empty)') + signature);
         }
       };
 
