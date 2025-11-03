@@ -7347,7 +7347,7 @@ html, body {
 #call-scripts-page .page-content {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md); /* keep global rhythm; responses will add explicit 25px margin */
+  gap: var(--spacing-sm); /* Reduced gap to bring elements closer */
   flex: 1 1 auto;
   min-height: 0; /* allow flex child to shrink */
   overflow: visible; /* Allow search suggestions to be visible */
@@ -7355,6 +7355,27 @@ html, body {
 }
 #call-scripts-page #call-scripts-display {
   flex: 1 1 auto;
+  max-height: calc(100vh - 400px); /* Limit height, account for header/nav/buttons */
+  overflow-y: auto;
+  overflow-x: hidden;
+  word-wrap: break-word;
+  scrollbar-width: thin;
+  scrollbar-color: var(--grey-600) var(--bg-main);
+}
+/* Webkit scrollbar styling for call scripts display */
+#call-scripts-page #call-scripts-display::-webkit-scrollbar {
+  width: 8px;
+}
+#call-scripts-page #call-scripts-display::-webkit-scrollbar-track {
+  background: var(--bg-main);
+  border-radius: 4px;
+}
+#call-scripts-page #call-scripts-display::-webkit-scrollbar-thumb {
+  background: var(--grey-600);
+  border-radius: 4px;
+}
+#call-scripts-page #call-scripts-display::-webkit-scrollbar-thumb:hover {
+  background: var(--grey-500);
 }
 #call-scripts-page #call-scripts-responses {
   position: sticky;
@@ -7377,6 +7398,250 @@ html, body {
 #call-scripts-page #call-scripts-responses.full-width .response-btn {
   width: 100%;
   display: block;
+}
+
+/* === Call Scripts: Pause Indicator === */
+@keyframes pausePulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+}
+
+#call-scripts-page .pause-indicator {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--orange-primary);
+  margin: 0 3px;
+  animation: pausePulse 1.5s ease-in-out infinite;
+  vertical-align: middle;
+}
+
+#call-scripts-page .pause-indicator:nth-of-type(1) { animation-delay: 0s; }
+#call-scripts-page .pause-indicator:nth-of-type(2) { animation-delay: 0.2s; }
+#call-scripts-page .pause-indicator:nth-of-type(3) { animation-delay: 0.4s; }
+#call-scripts-page .pause-indicator:nth-of-type(4) { animation-delay: 0.6s; }
+#call-scripts-page .pause-indicator:nth-of-type(5) { animation-delay: 0.8s; }
+
+/* === Call Scripts: Phase Navigation & Opener Selector === */
+/* Phase navigation container - match training-tool style */
+#call-scripts-page .phase-navigation {
+  display: flex;
+  gap: 8px; /* Explicit spacing between buttons */
+  margin-bottom: var(--spacing-xs); /* Reduced to bring opener selector closer */
+  flex-wrap: nowrap;
+  padding: var(--spacing-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--border-radius);
+  align-items: center;
+  min-height: 54px;
+  box-sizing: border-box;
+}
+
+/* Phase buttons - expand to fill container with borders */
+#call-scripts-page .phase-navigation .action-btn {
+  flex: 1;
+  padding: 8px 14px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-radius: var(--border-radius);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+  min-width: 0;
+  min-height: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+#call-scripts-page .phase-navigation .action-btn:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--orange-primary);
+}
+
+#call-scripts-page .phase-navigation .action-btn.active {
+  background: var(--orange-primary);
+  color: var(--text-inverse);
+  border-color: var(--orange-primary);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+/* Remove completed state - don't orange out previous phases */
+
+/* Opener selector container */
+#call-scripts-page .opener-selector {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: var(--spacing-xs);
+  padding-bottom: var(--spacing-xs);
+}
+
+#call-scripts-page .opener-selector-label {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  padding-right: var(--spacing-sm);
+  border-right: 1px solid var(--border-light);
+  margin-right: var(--spacing-sm);
+}
+
+/* Opener buttons - match phase navigation darker style and height */
+#call-scripts-page .opener-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  padding: 8px 14px;
+  border-radius: var(--border-radius);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  text-align: center;
+  white-space: nowrap;
+  min-height: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+#call-scripts-page .opener-btn:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--orange-primary);
+}
+
+#call-scripts-page .opener-btn.active {
+  background: var(--orange-primary);
+  color: var(--text-inverse);
+  border-color: var(--orange-primary);
+  font-weight: 600;
+}
+
+#call-scripts-page .opener-buttons {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+/* === Call Scripts: Tone Markers (Color-coded) === */
+#call-scripts-page .tone-marker {
+  display: inline-block;
+  padding: 3px 8px;
+  font-size: 0.85em;
+  font-weight: 600;
+  margin: 0 4px;
+  border-radius: 4px;
+  border: 1px solid;
+  vertical-align: baseline;
+}
+
+/* Color-coded tone badges - matching training-tool.html */
+#call-scripts-page .tone-marker.curious {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+#call-scripts-page .tone-marker.concerned {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+#call-scripts-page .tone-marker.confident {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-color: #10b981;
+}
+
+#call-scripts-page .tone-marker.serious {
+  background: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+#call-scripts-page .tone-marker.understanding {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border-color: #fbbf24;
+}
+
+#call-scripts-page .tone-marker.hopeful {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border-color: #22c55e;
+}
+
+#call-scripts-page .tone-marker.professional {
+  background: rgba(107, 114, 128, 0.15);
+  color: #6b7280;
+  border-color: #6b7280;
+}
+
+#call-scripts-page .tone-marker.friendly {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+  border-color: #f97316;
+}
+
+/* === Call Scripts: Badges (Contact & Name) === */
+#call-scripts-page .name-badge {
+  display: inline-block;
+  background: var(--orange-muted);
+  color: var(--orange-primary);
+  border: 1px solid var(--orange-primary);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.9em;
+  font-weight: 600;
+  margin: 0 2px;
+  vertical-align: baseline;
+}
+
+#call-scripts-page .badge.contact {
+  display: inline-block;
+  background: var(--orange-muted);
+  color: var(--orange-primary);
+  border: 1px solid var(--orange-primary);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.9em;
+  font-weight: 600;
+  margin: 0 2px;
+  vertical-align: baseline;
+}
+
+#call-scripts-page .badge.company {
+  display: inline-block;
+  background: var(--orange-muted);
+  color: var(--orange-primary);
+  border: 1px solid var(--orange-primary);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.9em;
+  font-weight: 600;
+  margin: 0 2px;
+  vertical-align: baseline;
 }
 
 /* Ensure grid items naturally fill available width without extra gutters */

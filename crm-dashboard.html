@@ -3285,7 +3285,8 @@
                 'scripts/shared-ci-processor.js',
                 'scripts/global-search.js',
                 'scripts/toast-manager.js',        // MOVED - load before phone.js for incoming call notifications
-                'scripts/widgets/phone.js',
+                'scripts/pages/call-scripts.js',   // NEW - load call-scripts BEFORE phone.js so FLOW is available
+                'scripts/widgets/phone.js',        // Load after call-scripts.js so FLOW is available
                 'scripts/widgets/notes.js',
                 'scripts/widgets/health.js',
                 'scripts/widgets/deal.js',
@@ -3361,7 +3362,7 @@
                     'scripts/pages/lists-overview.js'
                 ],
                 'call-scripts': [
-                    'scripts/pages/call-scripts.js'
+                    // call-scripts.js now loaded as core script - no need to lazy load
                 ],
                 // settings.js now loaded as core script - removed from lazy load
                 'client-management': [

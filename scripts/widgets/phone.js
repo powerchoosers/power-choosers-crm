@@ -1852,7 +1852,7 @@
       const style = document.createElement('style');
       style.id = 'phone-mini-scripts-styles';
       style.textContent = `
-        .mini-scripts { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 10px; padding: 10px; margin-top: 10px; opacity: 0; transform: translateY(-4px); transition: opacity 250ms ease, transform 250ms ease; }
+        .mini-scripts { background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 10px; padding: 10px; margin-top: 10px; max-height: 600px; overflow-y: auto; overflow-x: hidden; opacity: 0; transform: translateY(-4px); transition: opacity 250ms ease, transform 250ms ease; }
         .mini-scripts.--show { opacity: 1; transform: translateY(0); }
         .mini-scripts .ms-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
         .mini-scripts .ms-search { position: relative; display: flex; align-items: center; gap: 8px; flex: 1; }
@@ -1863,12 +1863,22 @@
         .mini-scripts .ms-suggest .item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; cursor: pointer; }
         .mini-scripts .ms-suggest .item:hover { background: var(--bg-subtle); }
         .mini-scripts .ms-suggest .glyph { width: 20px; height: 20px; border-radius: 50%; background: var(--orange-subtle); color: #fff; display:flex; align-items:center; justify-content:center; font-size: 11px; font-weight: 700; }
-        .mini-scripts .ms-row { display: flex; gap: 8px; margin: 8px 0 0 0; }
-        .mini-scripts .ms-row .btn-secondary { flex: 1; padding: 10px 0; border-radius: 10px; background: var(--bg-item); color: var(--text-primary); border: 1px solid var(--border-light); box-shadow: var(--elevation-card); cursor: pointer; font-size: 14px; font-weight: 500; transition: transform 120ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease; }
-        .mini-scripts .ms-row .btn-secondary:hover { background: var(--grey-600); transform: translateY(-1px); }
-        .mini-scripts .ms-row .btn-secondary:active { transform: translateY(0); filter: brightness(0.98); }
-        .mini-scripts .ms-row.--single { justify-content: stretch; }
-        .mini-scripts .ms-display { color: var(--text-primary); line-height: 1.4; background: var(--bg-main); border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; margin: 8px 0; min-height: 60px; opacity: 0; transition: opacity 200ms ease; }
+        .mini-scripts .ms-stage-nav { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+        .mini-scripts .ms-stage-btn { flex: 1; min-width: 80px; padding: 10px 14px; border-radius: 8px; background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border-light); cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: transform 120ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease; text-align: center; }
+        .mini-scripts .ms-stage-btn:hover { background: var(--grey-600); transform: translateY(-1px); }
+        .mini-scripts .ms-stage-btn:active { transform: translateY(0); filter: brightness(0.98); }
+        .mini-scripts .ms-stage-btn.active { background: var(--orange-primary); color: var(--text-inverse); border-color: var(--orange-primary); box-shadow: 0 2px 8px rgba(255, 107, 53, 0.25); }
+        .mini-scripts .ms-display { color: var(--text-primary); line-height: 1.4; background: var(--bg-main); border: 1px solid var(--border-light); border-radius: 8px; padding: 10px; margin: 8px 0; min-height: 60px; max-height: 300px; overflow-y: auto; overflow-x: hidden; word-wrap: break-word; opacity: 0; transition: opacity 200ms ease; scrollbar-width: thin; scrollbar-color: var(--grey-600) var(--bg-main); }
+        .mini-scripts .ms-display::-webkit-scrollbar { width: 6px; }
+        .mini-scripts .ms-display::-webkit-scrollbar-track { background: var(--bg-main); border-radius: 4px; }
+        .mini-scripts .ms-display::-webkit-scrollbar-thumb { background: var(--grey-600); border-radius: 4px; }
+        .mini-scripts .ms-display::-webkit-scrollbar-thumb:hover { background: var(--grey-500); }
+        /* Scrollbar for mini-scripts container */
+        .mini-scripts { scrollbar-width: thin; scrollbar-color: var(--grey-600) var(--bg-card); }
+        .mini-scripts::-webkit-scrollbar { width: 6px; }
+        .mini-scripts::-webkit-scrollbar-track { background: var(--bg-card); border-radius: 4px; }
+        .mini-scripts::-webkit-scrollbar-thumb { background: var(--grey-600); border-radius: 4px; }
+        .mini-scripts::-webkit-scrollbar-thumb:hover { background: var(--grey-500); }
         .mini-scripts .ms-display.--visible { opacity: 1; }
         .mini-scripts .ms-display:empty { display: none; }
         .mini-scripts .ms-responses { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 8px; }
@@ -1882,6 +1892,95 @@
         .mini-scripts .icon-btn:hover { background: var(--grey-600); transform: translateY(-1px); }
         .mini-scripts .icon-btn:active { transform: translateY(0); filter: brightness(0.98); }
         .mini-scripts .icon-btn svg { display: block; overflow: visible; }
+        
+        /* === Tone Markers (Color-coded) - Same as call-scripts page === */
+        .mini-scripts .tone-marker {
+          display: inline-block;
+          padding: 3px 8px;
+          font-size: 0.85em;
+          font-weight: 600;
+          margin: 0 4px;
+          border-radius: 4px;
+          border: 1px solid;
+          vertical-align: baseline;
+        }
+        
+        .mini-scripts .tone-marker.curious {
+          background: rgba(59, 130, 246, 0.15);
+          color: #3b82f6;
+          border-color: #3b82f6;
+        }
+        
+        .mini-scripts .tone-marker.concerned {
+          background: rgba(239, 68, 68, 0.15);
+          color: #ef4444;
+          border-color: #ef4444;
+        }
+        
+        .mini-scripts .tone-marker.confident {
+          background: rgba(16, 185, 129, 0.15);
+          color: #10b981;
+          border-color: #10b981;
+        }
+        
+        .mini-scripts .tone-marker.serious {
+          background: rgba(139, 92, 246, 0.15);
+          color: #8b5cf6;
+          border-color: #8b5cf6;
+        }
+        
+        .mini-scripts .tone-marker.understanding {
+          background: rgba(251, 191, 36, 0.15);
+          color: #fbbf24;
+          border-color: #fbbf24;
+        }
+        
+        .mini-scripts .tone-marker.hopeful {
+          background: rgba(34, 197, 94, 0.15);
+          color: #22c55e;
+          border-color: #22c55e;
+        }
+        
+        .mini-scripts .tone-marker.professional {
+          background: rgba(107, 114, 128, 0.15);
+          color: #6b7280;
+          border-color: #6b7280;
+        }
+        
+        .mini-scripts .tone-marker.friendly {
+          background: rgba(249, 115, 22, 0.15);
+          color: #f97316;
+          border-color: #f97316;
+        }
+        
+        /* === Pause Indicator (Pulsing) - Same as call-scripts page === */
+        @keyframes pausePulse {
+          0%, 100% {
+            opacity: 0.4;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 1;
+            transform: scale(1.3);
+          }
+        }
+        
+        .mini-scripts .pause-indicator {
+          display: inline-block;
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--orange-primary);
+          margin: 0 3px;
+          animation: pausePulse 1.5s ease-in-out infinite;
+          vertical-align: middle;
+        }
+        
+        .mini-scripts .pause-indicator:nth-of-type(1) { animation-delay: 0s; }
+        .mini-scripts .pause-indicator:nth-of-type(2) { animation-delay: 0.2s; }
+        .mini-scripts .pause-indicator:nth-of-type(3) { animation-delay: 0.4s; }
+        .mini-scripts .pause-indicator:nth-of-type(4) { animation-delay: 0.6s; }
+        .mini-scripts .pause-indicator:nth-of-type(5) { animation-delay: 0.8s; }
       `;
       document.head.appendChild(style);
     }
@@ -1911,13 +2010,7 @@
             </button>
           </div>
         </div>
-        <div class="ms-row">
-          <button type="button" class="btn-secondary ms-gk">Gate Keeper</button>
-          <button type="button" class="btn-secondary ms-vm">Voicemail</button>
-        </div>
-        <div class="ms-row --single">
-          <button type="button" class="btn-secondary ms-dm">Decision Maker</button>
-        </div>
+        <div class="ms-stage-nav"></div>
         <div class="ms-display" aria-live="polite"></div>
         <div class="ms-responses"></div>
       `;
@@ -1933,11 +2026,84 @@
       function normName(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim(); }
       function getPeopleCache(){ try { return (typeof window.getPeopleData==='function' ? (window.getPeopleData()||[]) : []); } catch(_) { return []; } }
       function getAccountsCache(){ try { return (typeof window.getAccountsData==='function' ? (window.getAccountsData()||[]) : []); } catch(_) { return []; } }
-      function formatDateMDY(v){ try { const d = new Date(v); if (!isFinite(+d)) return String(v||''); const mm = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0'); const yyyy = d.getFullYear(); return `${mm}/${dd}/${yyyy}`; } catch(_) { return String(v||''); } }
-      function toMDY(v){ try { const d = new Date(v); if (!isFinite(+d)) return String(v||''); const mm = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0'); const yyyy = d.getFullYear(); return `${mm}/${dd}/${yyyy}`; } catch(_) { return String(v||''); } }
+      function formatDateMDY(v){
+        try {
+          if (!v) return '';
+          const str = String(v).trim();
+          let d;
+          if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+            const parts = str.split('-');
+            d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+          } else {
+            const mdy = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
+            if (mdy) {
+              d = new Date(parseInt(mdy[3], 10), parseInt(mdy[1], 10) - 1, parseInt(mdy[2], 10));
+            } else {
+              d = new Date(str + 'T00:00:00');
+            }
+          }
+          if (isNaN(d.getTime())) return String(v);
+          const mm = String(d.getMonth()+1).padStart(2,'0');
+          const dd = String(d.getDate()).padStart(2,'0');
+          const yyyy = d.getFullYear();
+          return `${mm}/${dd}/${yyyy}`;
+        } catch(_) { return String(v||''); }
+      }
+      function toMDY(v){
+        try {
+          if (!v) return '';
+          const str = String(v).trim();
+          let d;
+          if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+            const parts = str.split('-');
+            d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+          } else {
+            const mdy = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
+            if (mdy) {
+              d = new Date(parseInt(mdy[3], 10), parseInt(mdy[1], 10) - 1, parseInt(mdy[2], 10));
+            } else {
+              d = new Date(str + 'T00:00:00');
+            }
+          }
+          if (isNaN(d.getTime())) return String(v);
+          const mm = String(d.getMonth()+1).padStart(2,'0');
+          const dd = String(d.getDate()).padStart(2,'0');
+          const yyyy = d.getFullYear();
+          return `${mm}/${dd}/${yyyy}`;
+        } catch(_) { return String(v||''); }
+      }
 
       function normalizeAccount(a){ const obj = a ? { ...a } : {}; obj.supplier = obj.supplier || obj.currentSupplier || obj.current_supplier || obj.energySupplier || obj.electricitySupplier || obj.supplierName || ''; const end = obj.contractEnd || obj.contract_end || obj.renewalDate || obj.renewal_date || obj.contractEndDate || obj.contract_end_date || obj.contractExpiry || obj.expiration || obj.expirationDate || obj.expiresOn || ''; obj.contract_end = end || ''; obj.contractEnd = end || obj.contractEnd || ''; obj.name = obj.name || obj.accountName || obj.companyName || ''; obj.industry = obj.industry || ''; obj.city = obj.city || obj.locationCity || obj.billingCity || ''; obj.state = obj.state || obj.region || obj.billingState || ''; obj.website = obj.website || obj.domain || ''; obj.accountId = obj.accountId || obj.account_id || obj.account || obj.companyId || ''; return obj; }
-      function normalizeContact(c){ const obj = c ? { ...c } : {}; const nameGuess = obj.name || ((obj.firstName||obj.first_name||'') + ' ' + (obj.lastName||obj.last_name||'')).trim(); const sp = splitName(nameGuess); obj.firstName = obj.firstName || obj.first_name || sp.first; obj.lastName = obj.lastName || obj.last_name || sp.last; obj.full_name = obj.full_name || sp.full; obj.first_name = obj.firstName; obj.last_name = obj.lastName; obj.email = obj.email || obj.work_email || obj.personal_email || ''; obj.title = obj.title || obj.jobTitle || obj.job_title || ''; obj.company = obj.company || obj.companyName || ''; obj.accountId = obj.accountId || obj.account_id || obj.account || obj.companyId || ''; return obj; }
+      function normalizeContact(c){
+        const obj = c ? { ...c } : {};
+        const nameGuess = obj.name || ((obj.firstName||obj.first_name||'') + ' ' + (obj.lastName||obj.last_name||'')).trim();
+        const sp = splitName(nameGuess);
+        obj.firstName = obj.firstName || obj.first_name || sp.first;
+        obj.lastName = obj.lastName || obj.last_name || sp.last;
+        obj.fullName = obj.fullName || obj.full_name || nameGuess;
+        obj.company = obj.company || obj.companyName || obj.accountName || obj.account_name || '';
+        try {
+          const pref = (obj.preferredPhoneField || '').trim();
+          if (pref && obj[pref]) {
+            obj.phone = obj[pref];
+          } else {
+            obj.phone = obj.phone || obj.workDirectPhone || obj.mobile || obj.otherPhone || obj.mobile_phone || '';
+          }
+        } catch(_) {
+          obj.phone = obj.phone || obj.workDirectPhone || obj.mobile || obj.otherPhone || obj.mobile_phone || '';
+        }
+        obj.mobile = obj.mobile || obj.mobile_phone || '';
+        obj.email = obj.email || obj.work_email || obj.personal_email || '';
+        obj.title = obj.title || obj.jobTitle || obj.job_title || '';
+        obj.supplier = obj.supplier || obj.currentSupplier || obj.current_supplier || '';
+        const cEnd = obj.contractEnd || obj.contract_end || obj.renewalDate || obj.renewal_date || '';
+        obj.contract_end = obj.contract_end || cEnd || '';
+        obj.industry = obj.industry || '';
+        obj.city = obj.city || obj.locationCity || obj.billingCity || '';
+        obj.state = obj.state || obj.region || obj.billingState || '';
+        obj.accountId = obj.accountId || obj.account_id || obj.account || obj.companyId || '';
+        return obj;
+      }
 
       function findAccountForContact(contact){ if (!contact) return {}; const accounts = getAccountsCache(); try { if (contact.accountId) { const hitById = accounts.find(a => String(a.id||a.accountId||'') === String(contact.accountId)); if (hitById) return hitById; } } catch(_) {} const clean = (s)=> String(s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g,' ').replace(/\s+/g,' ').trim(); const comp = clean(contact.company||contact.companyName||''); if (comp) { const hit = accounts.find(a=> { const nm = clean(a.accountName||a.name||a.companyName||''); return nm && nm === comp; }); if (hit) return hit; } const domain = normDomain(contact.email||''); if (domain) { const match = accounts.find(a=> { const d = String(a.domain||a.website||'').toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0]; return d && (domain.endsWith(d) || d.endsWith(domain)); }); if (match) return match; } return {}; }
 
@@ -1947,23 +2113,80 @@
         // Build from current call context + optional override contact
         const ctx = currentCallContext || {};
         let contact = null; let account = null;
-        // Prefer override contact if selected
+        
+        // Priority 1: Prefer override contact if manually selected
         try {
           if (state.overrideContactId) {
             const people = getPeopleCache();
-            contact = people.find(p => String(p.id||p.contactId||p._id||'') === String(state.overrideContactId)) || null;
+            const found = people.find(p => {
+              const pid = String(p.id||'');
+              const alt1 = String(p.contactId||'');
+              const alt2 = String(p._id||'');
+              const target = String(state.overrideContactId||'');
+              return pid === target || alt1 === target || alt2 === target;
+            });
+            if (found) {
+              contact = found;
+            }
           }
         } catch(_) {}
-        // If not selected, try to infer from context name
-        if (!contact && ctx && ctx.name) {
+        
+        // Priority 2: If phone widget has contactId in context, use that (direct contact call)
+        if (!contact && ctx.contactId) {
           try {
             const people = getPeopleCache();
-            const nm = normName(ctx.name);
-            contact = people.find(p => normName(p.name || ((p.firstName||'') + ' ' + (p.lastName||''))) === nm) || null;
+            const found = people.find(p => {
+              const pid = String(p.id||'');
+              const alt1 = String(p.contactId||'');
+              const alt2 = String(p._id||'');
+              const target = String(ctx.contactId||'');
+              return pid === target || alt1 === target || alt2 === target;
+            });
+            if (found) {
+              contact = found;
+            }
           } catch(_) {}
         }
-        // Resolve account from contact or context
+        
+        // Priority 3: If not selected, try to infer from context name or number
+        if (!contact && ctx) {
+          try {
+            const people = getPeopleCache();
+            if (ctx.name) {
+            const nm = normName(ctx.name);
+            contact = people.find(p => normName(p.name || ((p.firstName||'') + ' ' + (p.lastName||''))) === nm) || null;
+            }
+            // If still no contact, try by number
+            if (!contact && ctx.number) {
+              const n10 = normPhone(ctx.number);
+              contact = people.find(p => {
+                const candidates = [p.workDirectPhone, p.mobile, p.otherPhone, p.phone];
+                return candidates.some(ph => normPhone(ph) === n10);
+              }) || null;
+            }
+          } catch(_) {}
+        }
+        // Resolve account - prefer accountId from context, then from contact
+        if (ctx.accountId) {
+          try {
+            const accounts = getAccountsCache();
+            const found = accounts.find(a => {
+              const aid = String(a.id||'');
+              const alt1 = String(a.accountId||'');
+              const alt2 = String(a._id||'');
+              const target = String(ctx.accountId||'');
+              return aid === target || alt1 === target || alt2 === target;
+            });
+            if (found) account = found;
+          } catch(_) {}
+        }
+        
+        // If no account found via accountId, try finding from contact
+        if (!account) {
         try { account = findAccountForContact(contact) || {}; } catch(_) { account = {}; }
+        }
+        
+        // If still no account, try by company name from context
         if (!account || !account.name) {
           const accounts = getAccountsCache();
           const nm = String(ctx.company||'').trim();
@@ -1991,6 +2214,12 @@
         if (!account.supplier && contact.supplier) account.supplier = contact.supplier;
         if (!account.contract_end && contact.contract_end) account.contract_end = contact.contract_end;
         if (!account.contractEnd && contact.contract_end) account.contractEnd = contact.contract_end;
+        
+        // If no account found, fall back to using the selected contact's company for {{account.name}}
+        if (!account.name && (contact.company || contact.companyName)) {
+          account.name = contact.company || contact.companyName;
+        }
+        if (!account.name && ctx && ctx.company) account.name = ctx.company;
 
         return { contact, account };
       }
@@ -2039,70 +2268,315 @@
 
       function renderTemplateValues(str){
         if (!str) return '';
+        const dp = dayPart();
         const data = getLiveData();
+        
         const values = {
-          'day.part': dayPart(),
-          'contact.first_name': data.contact.firstName || data.contact.first_name || '',
-          'contact.last_name': data.contact.lastName || data.contact.last_name || '',
-          'contact.full_name': data.contact.full_name || ((data.contact.firstName||'') + ' ' + (data.contact.lastName||'')),
+          'day.part': dp,
+          'contact.first_name': data.contact.firstName || data.contact.first_name || splitName(data.contact.name || '').first || splitName(data.contact.fullName || '').first || '',
+          'contact.last_name': data.contact.lastName || data.contact.last_name || splitName(data.contact.name || '').last || splitName(data.contact.fullName || '').last || '',
+          'contact.full_name': data.contact.fullName || data.contact.name || (data.contact.firstName && data.contact.lastName ? `${data.contact.firstName} ${data.contact.lastName}` : (data.contact.firstName || data.contact.lastName || '')),
           'contact.phone': data.contact.workDirectPhone || data.contact.mobile || data.contact.otherPhone || data.contact.phone || '',
           'contact.mobile': data.contact.mobile || '',
           'contact.email': data.contact.email || '',
           'contact.title': data.contact.title || data.contact.jobTitle || '',
-          'account.name': data.account.name || data.account.accountName || data.account.companyName || '',
-          'account.industry': data.account.industry || '',
-          'account.city': data.account.city || '',
-          'account.state': data.account.state || data.account.region || data.account.billingState || '',
+          'account.name': data.account.accountName || data.account.name || data.contact.company || '',
+          'account.industry': data.account.industry || data.contact.industry || '',
+          'account.city': data.account.city || data.account.billingCity || data.account.locationCity || data.contact.city || 'Texas',
+          'account.state': data.account.state || data.account.region || data.account.billingState || data.contact.state || '',
           'account.website': data.account.website || data.account.domain || normDomain(data.contact.email) || '',
           'account.supplier': data.account.supplier || data.account.currentSupplier || data.contact.supplier || data.contact.currentSupplier || '',
           'account.contract_end': formatDateMDY(data.account.contractEnd || data.account.contract_end || data.account.renewalDate || data.contact.contract_end || data.contact.contractEnd || '')
         };
+        
         let result = String(str);
+        
+        // Replace {{variable}} placeholders with actual values
         for (const [key, value] of Object.entries(values)) {
-          const pattern = new RegExp(`\\{\\{\\s*${key.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*\\}}`, 'gi');
+          const pattern = new RegExp(`\\{\\{\\s*${key.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\s*\\}\\}`, 'gi');
           result = result.replace(pattern, escapeHtml(value || ''));
         }
+        
+        // Handle badge placeholders - replace (contact name) etc. with actual data if available
+        // Use the actual contact data from getLiveData() for better accuracy
+        const actualContact = data.contact || {};
+        const actualAccount = data.account || {};
+        // For contact name, prefer first_name for badges, fallback to full_name
+        const contactName = values['contact.first_name'] || actualContact.firstName || actualContact.first_name || splitName(actualContact.name || '').first || splitName(actualContact.fullName || '').first || '';
+        // For company name, try account first, then contact company
+        const companyName = values['account.name'] || actualAccount.name || actualAccount.accountName || actualAccount.companyName || actualContact.company || actualContact.companyName || '';
+        
+        // Get your name from settings (first name only from general settings)
+        // Use synchronous method to avoid async issues
+        let yourName = '';
+        try {
+          if (window.SettingsPage && typeof window.SettingsPage.getSettings === 'function') {
+            const settings = window.SettingsPage.getSettings();
+            if (settings && settings.general) {
+              yourName = settings.general.firstName || '';
+            }
+          }
+        } catch (_) {
+          // Fallback if settings not available
+          yourName = '';
+        }
+        
+        // Replace badge placeholders - handle both HTML-wrapped and plain text versions
+        // Plain text placeholders: (contact name), (your name), (company name)
+        if (contactName) {
+          // HTML-wrapped versions
+          result = result.replace(/<span class="badge contact">\(contact name\)<\/span>/gi, escapeHtml(contactName));
+          result = result.replace(/<span class="name-badge">\(contact name\)<\/span>/gi, escapeHtml(contactName));
+          // Plain text version (no HTML)
+          result = result.replace(/\(contact name\)/gi, escapeHtml(contactName));
+        }
+        if (yourName) {
+          // HTML-wrapped versions
+          result = result.replace(/<span class="name-badge">\(your name\)<\/span>/gi, escapeHtml(yourName));
+          // Plain text version (no HTML)
+          result = result.replace(/\(your name\)/gi, escapeHtml(yourName));
+        } else {
+          // If your name not found, replace with empty string
+          result = result.replace(/\(your name\)/gi, '');
+        }
+        if (companyName) {
+          // HTML-wrapped versions
+          result = result.replace(/<span class="badge company">\(company name\)<\/span>/gi, escapeHtml(companyName));
+          // Plain text version (no HTML)
+          result = result.replace(/\(company name\)/gi, escapeHtml(companyName));
+        }
+        
+        // Tone markers and pause indicators are kept as-is (they're already properly formatted HTML)
+        // No additional processing needed - they render correctly
+        
         return result;
       }
 
-      // Flow: prefer scripts page FLOW if exported; fallback to local subset
-      const FLOW = (window.callScriptsModule && window.callScriptsModule.FLOW) || {
-        hook: { text: 'Good {{day.part}}, is this {{contact.first_name}}?', responses: [ { label: 'Yes, this is', next: 'awesome_told_to_speak' }, { label: 'Speaking', next: 'awesome_told_to_speak' }, { label: "Who's calling?", next: 'main_script_start' }, { label: 'Not me', next: 'gatekeeper_intro' } ] },
-        awesome_told_to_speak: { text: 'Awesome I was actually told to speak with you — do you have a quick minute?', responses: [ { label: 'Yes', next: 'main_script_start' }, { label: 'What is this about?', next: 'main_script_start' } ] },
-        main_script_start: { text: "Perfect — So, my name is Lewis and — I understand you're responsible for utility expenses and contracts for {{account.name}}. Is that still accurate?", responses: [ { label: "Yes, that's me / I handle that", next: 'utility_discovery' }, { label: 'That would be someone else / not the right person', next: 'gatekeeper_intro' }, { label: 'We both handle it / team decision', next: 'utility_discovery' } ] },
-        utility_discovery: { text: "Gotcha. So most companies we work with — their main expenses tend to be electricity and water — we help companies reduce these expenses by any means necessary. <br><br>What would you say — is the biggest reoccurring cost for {{account.name}}?", responses: [ { label: 'Electricity', next: 'electricity_spending_question' }, { label: 'Water', next: 'water_confirm' }, { label: 'Other', next: 'pathA' } ] },
-        electricity_spending_question: { text: "How much are you guys typically spending on energy on a monthly basis?", responses: [ { label: 'Share amount ($X/month)', next: 'electricity_confirm' }, { label: 'Not sure / need to check', next: 'electricity_confirm' }, { label: 'Too high / struggling', next: 'electricity_confirm' } ] },
-        electricity_confirm: { text: "Now {{contact.first_name}}, if you could reduce your annual energy expenses, would you?", responses: [ { label: 'Yes', next: 'pathA' }, { label: 'Maybe / tell me more', next: 'pathA' }, { label: 'Not interested', next: 'voicemail' } ] },
-        water_confirm: { text: "Now {{contact.first_name}}, if you could reduce your annual water expenses, would you?", responses: [ { label: 'Yes', next: 'water_savings_pitch' }, { label: 'Maybe / tell me more', next: 'water_savings_pitch' }, { label: 'Not interested', next: 'voicemail' } ] },
-        water_savings_pitch: { text: "We have been able to guarantee 10% in savings on water bills for the year, and in most cases — our clients end up saving anywhere between 20%-30% — annually. <br><br>How much are you guys spending on water expenses on a monthly basis?", responses: [ { label: 'Share amount ($X/month)', next: 'water_calculate_savings' }, { label: 'Not sure / need to check', next: 'water_appointment_offer' }, { label: 'Too high / struggling', next: 'water_calculate_savings' } ] },
-        water_calculate_savings: { text: "Got it — so if we could save {{account.name}} even just 15% on that, we're talking real money back in your budget every year. Would it make sense to set up a quick 10-minute call where I can show you exactly how we do it?", responses: [ { label: 'Yes, schedule it', next: 'water_book_appointment' }, { label: 'Send me details first', next: 'water_send_details' }, { label: 'Not now', next: 'voicemail' } ] },
-        water_appointment_offer: { text: "No problem — most companies don't have that number off the top of their head. What works best for you, {{contact.first_name}} — a quick 10-minute call today or tomorrow where I can walk you through our water savings program and we can pull those numbers together?", responses: [ { label: 'Book on calendar', next: 'water_book_appointment' }, { label: 'Email me the details', next: 'water_send_details' }, { label: 'Not interested', next: 'voicemail' } ] },
-        water_book_appointment: { text: "Perfect — I'll get that on the calendar for you. I'll bring some case studies from similar {{account.industry}} companies in {{account.city}} so you can see the exact savings we've achieved. Sound good?", responses: [ { label: 'Sounds good', next: 'start' }, { label: 'What do I need to prepare?', next: 'water_prep_info' }, { label: 'Back', next: 'water_calculate_savings' } ] },
-        water_send_details: { text: "No problem — I'll send over a quick overview with our water savings case studies and next steps for {{account.name}}. Should I send it to {{contact.email}} or is there a better email?", responses: [ { label: 'Send to that email', next: 'start' }, { label: 'Use a different email', next: 'start' }, { label: 'Back', next: 'water_calculate_savings' } ] },
-        water_prep_info: { text: "Just have your most recent water bill handy — that's it. We'll walk through the numbers together and I can show you where the savings come from. I'll send a calendar invite right after this call.", responses: [ { label: 'Perfect, talk soon', next: 'start' }, { label: 'Back', next: 'water_book_appointment' } ] },
-        gatekeeper_intro: { text: 'Good {{day.part}}. I\'m actually needin\' to speak with someone over utility expenses and contracts for {{account.name}} — do you know who would be responsible for that?', responses: [ { label: "What's this about?", next: 'gatekeeper_whats_about' }, { label: "I'll connect you", next: 'transfer_dialing' }, { label: "They're not available / take a message", next: 'voicemail' } ] },
-        gatekeeper_whats_about: { text: 'My name is Lewis with PowerChoosers.com and I am looking to speak with someone about the future electricity agreements for {{account.name}}. Who would be the best person for that?', responses: [ { label: "I'll connect you", next: 'transfer_dialing' }, { label: "They're not available / take a message", next: 'voicemail' }, { label: 'I can help you', next: 'pathA' } ] },
-        transfer_dialing: { text: 'Connecting... Ringing...', responses: [ { label: 'Call connected', next: 'hook' }, { label: 'Not connected', next: 'voicemail' } ] },
-        voicemail: { text: 'Good {{day.part}}, this is Lewis. Please call me back at 817-663-0380. I also sent a short email explaining why I am reaching out today. Thank you and have a great day.', responses: [ { label: 'End call / start new call', next: 'start' } ] },
-        pathA: { text: "Got it. now {{contact.first_name}}, I work directly with NRG, TXU, APG & E — and they've all let us know in advance that rates are about to go up next year... <br><br><span class=\"script-highlight\">How are <em>you</em> guys handling these — sharp increases for your future renewals?</span>", responses: [ { label: "It's tough / struggling", next: 'discovery' }, { label: 'Have not renewed / contract not up yet', next: 'pathA_not_renewed' }, { label: 'Locked in / just renewed', next: 'pathA_locked_in' }, { label: 'Shopping around / looking at options', next: 'pathA_shopping' }, { label: 'Have someone handling it / work with broker', next: 'pathA_broker' }, { label: "Haven't thought about it / what rate increase?", next: 'pathA_unaware' } ] },
-        pathA_not_renewed: { text: "Makes sense — when it comes to getting the best price, it's pretty easy to renew at the wrong time and end up overpaying. When does your contract expire? Do you know who your supplier is? <br><br>Awesome — we work directly with {{account.supplier}} as well as over 30 suppliers here in Texas. I can give you access to future pricing data directly from ERCOT — that way you lock in a number you like, not one you’re forced to take. <br><br><span class=\"script-highlight\">Would you be open to a quick, free energy health check so you can see how this would work?</span>", responses: [ { label: 'Yes — schedule health check', next: 'schedule_health_check' }, { label: 'Send me details by email', next: 'send_details_email' } ] },
-        discovery: { text: 'Great — let me grab a few details for {{account.name}} so we can give you an accurate baseline.', responses: [ { label: 'Continue', next: 'schedule_health_check' } ] },
-        schedule_health_check: { text: "Perfect — I’ll set up a quick energy health check. What works best for you, {{contact.first_name}} — a 10-minute call today or tomorrow? I’ll bring ERCOT forward pricing so you can see it live for {{account.name}}.", responses: [ { label: 'Book on calendar', next: 'start' }, { label: 'Text me times', next: 'start' } ] },
-        send_details_email: { text: "No problem — I’ll send a quick overview with ERCOT forward pricing and next steps for {{account.name}}. Do you want me to send it to {{contact.full_name}} at {{contact.email}} or is there a better address?", responses: [ { label: 'Send now', next: 'start' } ] },
-        pathA_locked_in: { text: "Good to hear you’re covered. Quick sanity check — did you lock pre-increase or after the jump? If after, there may be a chance to re-rate or layer a future-start at a better position if the market relaxes. Want me to take a quick look at what’s possible for {{account.name}}?", responses: [ { label: 'Sure, take a look', next: 'discovery' }, { label: 'We’re fine as-is', next: 'voicemail' } ] },
-        pathA_shopping: { text: "Great — then let’s make sure you have leverage. Other {{account.industry}} accounts in {{account.city}} are comparing fixed vs. hybrid structures and watching forward curves. I can send a clean apples-to-apples view for {{account.name}} so you’re not guessing. Want me to spin that up?", responses: [ { label: 'Yes, send apples-to-apples', next: 'discovery' }, { label: 'Already have options', next: 'discovery' }, { label: 'Circle back next week', next: 'voicemail' } ] },
-        pathA_broker: { text: "All good — we work alongside existing brokers often. My angle is purely market timing and contract mechanics so {{account.name}} doesn’t overpay. If I spot a price window that beats what you’re seeing, I’ll flag it. Want me to keep an eye out and share any meaningful dips?", responses: [ { label: 'Yes, keep me posted', next: 'discovery' }, { label: 'We’re set with our broker', next: 'voicemail' }, { label: 'What would you need?', next: 'discovery' } ] },
-        pathA_unaware: { text: "Fair question — rates stepped up across most markets this year, and many {{account.industry}} accounts in {{account.city}} only feel it at renewal. My role is to get ahead of that so {{account.name}} isn’t surprised. Quick baseline: when roughly is your next expiration, and do you prefer fixed or a blended approach?", responses: [ { label: 'Share expiration month', next: 'discovery' }, { label: 'Not sure / need to check', next: 'discovery' }, { label: 'We’ll deal with it later', next: 'voicemail' } ] },
-        start: { text: "Click 'Dial' to begin the call.", responses: [ { label: 'Back to beginning', next: 'start' } ] }
+      // Opener management - same as call-scripts.js
+      const OPENER_CONFIGS = {
+        default: {
+          key: 'pattern_interrupt_opening',
+          label: 'Bold Direct (Default)',
+          state: 'pattern_interrupt_opening'
+        },
+        direct_question: {
+          key: 'opener_direct_question',
+          label: 'Direct Question',
+          state: 'opener_direct_question'
+        },
+        transparent: {
+          key: 'opener_transparent',
+          label: 'Transparent',
+          state: 'opener_transparent'
+        },
+        social_proof: {
+          key: 'opener_social_proof',
+          label: 'Social Proof',
+          state: 'opener_social_proof'
+        }
       };
+
+      let currentOpener = OPENER_CONFIGS.default;
+      let availableOpeners = [
+        OPENER_CONFIGS.direct_question,
+        OPENER_CONFIGS.transparent,
+        OPENER_CONFIGS.social_proof
+      ];
+
+      // Firebase persistence for opener selection
+      async function loadSavedOpener() {
+        try {
+          if (!window.firebaseDB) return;
+          const getUserEmail = () => {
+            try {
+              if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                return window.DataManager.getCurrentUserEmail();
+              }
+              return (window.currentUserEmail || '').toLowerCase();
+            } catch(_) {
+              return (window.currentUserEmail || '').toLowerCase();
+            }
+          };
+          const email = getUserEmail();
+          if (!email) return;
+          
+          // Use per-user document like settings.js
+          const docId = `call-scripts-${email}`;
+          const doc = await window.firebaseDB.collection('settings').doc(docId).get();
+          
+          if (doc.exists) {
+            const data = doc.data();
+            if (data && data.openerKey) {
+              const savedOpener = Object.values(OPENER_CONFIGS).find(o => o.key === data.openerKey);
+              if (savedOpener) {
+                // Update currentOpener
+                const oldDefault = currentOpener;
+                currentOpener = savedOpener;
+                
+                // Update availableOpeners - remove saved opener, add old default back
+                availableOpeners = availableOpeners.filter(o => o.key !== savedOpener.key);
+                if (oldDefault && oldDefault.key !== savedOpener.key) {
+                  // Only add old default if it's different
+                  availableOpeners.push(oldDefault);
+                }
+                
+                // Sync with call-scripts module if available
+                if (window.callScriptsModule) {
+                  try {
+                    window.callScriptsModule.currentOpener = currentOpener;
+                    window.callScriptsModule.availableOpeners = availableOpeners;
+                  } catch(_) {}
+                }
+                
+                updateHookOpener();
+              }
+            }
+          }
+        } catch(err) {
+          console.warn('[Phone Widget] Could not load saved opener:', err);
+        }
+      }
+
+      async function saveOpenerSelection(openerKey) {
+        try {
+          if (!window.firebaseDB) return;
+          const getUserEmail = () => {
+            try {
+              if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                return window.DataManager.getCurrentUserEmail();
+              }
+              return (window.currentUserEmail || '').toLowerCase();
+            } catch(_) {
+              return (window.currentUserEmail || '').toLowerCase();
+            }
+          };
+          const getCurrentUserId = () => {
+            try {
+              if (window.firebase && window.firebase.auth && window.firebase.auth().currentUser) {
+                return window.firebase.auth().currentUser.uid;
+              }
+            } catch(_) {}
+            return null;
+          };
+          
+          const email = getUserEmail();
+          const userId = getCurrentUserId();
+          if (!email) return;
+          
+          // Use per-user document pattern from settings.js
+          const docId = `call-scripts-${email}`;
+          const docRef = window.firebaseDB.collection('settings').doc(docId);
+          
+          const updateData = {
+            openerKey: openerKey,
+            ownerId: email,
+            updatedAt: window.firebase.firestore.FieldValue.serverTimestamp()
+          };
+          if (userId) updateData.userId = userId;
+          
+          // Check if document exists
+          const doc = await docRef.get();
+          if (doc.exists) {
+            await docRef.update(updateData);
+          } else {
+            // Create new document with proper ownerId
+            await docRef.set({
+              ...updateData,
+              createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
+            });
+          }
+        } catch(err) {
+          console.warn('[Phone Widget] Could not save opener selection:', err);
+        }
+      }
+
+      // Update hook responses to use current opener
+      function updateHookOpener() {
+        const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
+        if (FLOW && FLOW.hook && FLOW.hook.responses) {
+          FLOW.hook.responses.forEach(response => {
+            if (response.label === 'Yes, speaking' || response.label === "Who's calling?") {
+              response.next = currentOpener.state;
+            }
+          });
+        }
+      }
+
+      // Flow: ALWAYS use scripts page FLOW (must be exported from call-scripts.js)
+      // Note: call-scripts.js loads before phone.js, so FLOW should be available
+      // But we'll handle the case where it's not ready yet gracefully
+      const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
+      if (!FLOW) {
+        // call-scripts.js may still be loading - this is OK, FLOW will be available when scripts button is clicked
+        console.warn('[Phone Widget] FLOW not available yet (call-scripts.js may still be loading) - will retry when scripts button is clicked');
+        // Don't return - continue building the UI structure, just scripts won't work until FLOW loads
+      }
 
       const display = el.querySelector('.ms-display');
       const responses = el.querySelector('.ms-responses');
 
+      // Load saved opener FIRST - phone widget loads independently so it works immediately
+      // This ensures the saved opener is ready when user clicks scripts button
+      let openerLoadPromise = loadSavedOpener().then(() => {
+        // After loading, sync with call-scripts module if it exists
+        if (window.callScriptsModule) {
+          try {
+            window.callScriptsModule.currentOpener = currentOpener;
+            window.callScriptsModule.availableOpeners = availableOpeners;
+          } catch(_) {}
+        }
+        // Wait a bit for FLOW to be available from call-scripts.js
+        setTimeout(() => {
+          updateHookOpener();
+        }, 300);
+      }).catch(() => {
+        // If load fails, just use default
+        updateHookOpener();
+      });
+      
+      // Also sync with call-scripts module if it's already loaded (eager load)
+      if (window.callScriptsModule && window.callScriptsModule.currentOpener) {
+        const csOpener = window.callScriptsModule.currentOpener;
+        if (csOpener && csOpener.key !== OPENER_CONFIGS.default.key) {
+          // call-scripts module has the saved opener already loaded, use it
+          currentOpener = csOpener;
+          availableOpeners = window.callScriptsModule.availableOpeners || availableOpeners;
+        }
+      }
+
       function renderNode(){
+        // Ensure FLOW is available - get fresh reference each time
+        let FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
+        if (!FLOW) {
+          console.warn('[Phone Widget] FLOW not available yet, waiting for call-scripts.js...');
+          if (display) {
+            display.innerHTML = '<p style="color: var(--text-muted); padding: var(--spacing-md);">Loading scripts...</p>';
+          }
+          if (responses) responses.innerHTML = '';
+          // Retry after a short delay
+          setTimeout(() => {
+            FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
+            if (FLOW) {
+              renderNode();
+            } else {
+              if (display) {
+                display.innerHTML = '<p style="color: var(--text-error); padding: var(--spacing-md);">Scripts not available. Please refresh the page.</p>';
+              }
+            }
+          }, 500);
+          return;
+        }
+        
         const key = state.current;
+        // Ensure hook is updated before rendering
+        if (key === 'hook' || (FLOW && FLOW[key] && FLOW[key].stage === 'Opening')) {
+          updateHookOpener();
+        }
         const node = FLOW[key];
-        if (!node) { display.innerHTML = ''; responses.innerHTML = ''; return; }
+        if (!node) { display.innerHTML = ''; responses.innerHTML = ''; buildStageNavigation(); return; }
+        
+        // Update stage navigation
+        buildStageNavigation();
         
         // Measure current height before changes
         const currentHeight = card.getBoundingClientRect().height;
@@ -2115,7 +2589,10 @@
         // Update DOM after brief fade
         setTimeout(() => {
           const live = (function(){ try { return hasActiveCall() || (currentCallContext && currentCallContext.isActive); } catch(_) { return false; } })();
-          display.innerHTML = live ? renderTemplateValues(node.text || '') : renderTemplateChips(node.text || '');
+          // Always render with values when contact is selected, even if not in live call
+          const hasSelectedContact = !!(state.overrideContactId);
+          const shouldRenderValues = live || hasSelectedContact;
+          display.innerHTML = shouldRenderValues ? renderTemplateValues(node.text || '') : renderTemplateChips(node.text || '');
           responses.innerHTML = '';
           (node.responses || []).forEach(r => {
             const b = document.createElement('button');
@@ -2210,10 +2687,54 @@
         }, 80);
       }
 
+      // Phase definitions (same as call-scripts.js)
+      const PHASES = [
+        { name: 'Pre-Call', stagePattern: 'Pre-Call Prep', entryPoint: 'pre_call_qualification' },
+        { name: 'Opening', stagePattern: 'Opening', entryPoint: 'hook' },
+        { name: 'Situation', stagePattern: 'Discovery - Situation', entryPoint: 'situation_discovery' },
+        { name: 'Problem', stagePattern: 'Discovery - Problem', entryPoint: 'problem_discovery' },
+        { name: 'Consequence', stagePattern: 'Discovery - Consequence', entryPoint: 'consequence_discovery' },
+        { name: 'Solution', stagePattern: 'Discovery - Solution', entryPoint: 'solution_discovery' },
+        { name: 'Closing', stagePattern: 'Closing', entryPoint: 'trial_close_1' },
+        { name: 'Objections', stagePattern: 'Objection Handling', entryPoint: 'objection_not_interested' },
+        { name: 'Success', stagePattern: 'Success', entryPoint: 'meeting_scheduled' }
+      ];
+
+      // Build stage navigation
+      function buildStageNavigation() {
+        const stageNav = el.querySelector('.ms-stage-nav');
+        if (!stageNav) return;
+        
+        // Get fresh FLOW reference each time
+        const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
+        if (!FLOW) {
+          console.warn('[Phone Widget] buildStageNavigation: FLOW not available yet');
+          return;
+        }
+
+        const node = FLOW[state.current] || FLOW.start;
+        const currentStage = node.stage || '';
+        const currentPhaseName = PHASES.find(p => currentStage.includes(p.stagePattern))?.name || '';
+
+        stageNav.innerHTML = PHASES.map(phase => {
+          const isActive = currentPhaseName === phase.name;
+          let classes = 'btn-secondary ms-stage-btn';
+          if (isActive) classes += ' active';
+          return `<button type="button" class="${classes}" data-phase="${phase.name}" data-entry="${phase.entryPoint}">${phase.name}</button>`;
+        }).join('');
+
+        // Attach click handlers
+        stageNav.querySelectorAll('.ms-stage-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const entryPoint = btn.getAttribute('data-entry');
+            if (entryPoint && FLOW[entryPoint]) {
+              startAt(entryPoint);
+            }
+          });
+        });
+      }
+
       // Buttons
-      el.querySelector('.ms-gk').addEventListener('click', () => startAt('gatekeeper_intro'));
-      el.querySelector('.ms-vm').addEventListener('click', () => startAt('voicemail'));
-      el.querySelector('.ms-dm').addEventListener('click', () => startAt('hook'));
       el.querySelector('.ms-back').addEventListener('click', goBack);
       el.querySelector('.ms-reset').addEventListener('click', resetAll);
 
@@ -2256,13 +2777,68 @@
       // Re-render on call state changes (e.g., connected -> substitute values)
       try { card.addEventListener('callStateChanged', () => renderNode()); } catch(_) {}
 
-      // Initialize empty
+      // Initialize empty and build stage navigation
       state.current = '';
+      // Ensure opener is loaded and FLOW is available before first render
+      openerLoadPromise.then(() => {
+        // Check FLOW is available before building navigation
+        const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
+        if (FLOW) {
+          buildStageNavigation();
+        } else {
+          // FLOW not ready yet, wait a bit and retry
+          setTimeout(() => {
+            const retryFLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
+            if (retryFLOW) {
+              buildStageNavigation();
+            } else {
+              console.warn('[Phone Widget] FLOW not available during initialization, will build navigation when scripts button is clicked');
+            }
+          }, 500);
+        }
+      }).catch(() => {
+        // On error, still try to build navigation if FLOW is available
+        const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
+        if (FLOW) {
+          buildStageNavigation();
+        }
+      });
     }
 
     function toggleMiniScripts(card){
       const wrap = card.querySelector('.mini-scripts-wrap');
       if (!wrap) return;
+      
+      // If scripts UI hasn't been built yet, build it now
+      // This ensures FLOW is available when scripts button is clicked
+      const miniScripts = wrap.querySelector('.mini-scripts');
+      if (!miniScripts) {
+        // Wait a moment to ensure call-scripts.js has finished loading
+        setTimeout(() => {
+          buildMiniScriptsUI(card);
+        }, 100);
+        return;
+      }
+      
+      // Ensure FLOW is available before showing scripts
+      const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
+      if (!FLOW) {
+        console.warn('[Phone Widget] FLOW not available yet, waiting...');
+        // Wait a bit and retry
+        setTimeout(() => {
+          const retryFLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
+          if (retryFLOW) {
+            toggleMiniScripts(card); // Retry toggle
+          } else {
+            console.error('[Phone Widget] FLOW still not available after wait');
+            if (display) {
+              display.innerHTML = '<p style="color: var(--text-error); padding: var(--spacing-md);">Scripts not available. Please refresh the page.</p>';
+            }
+          }
+        }, 500);
+        return;
+      }
+      
       const isHidden = wrap.hasAttribute('hidden');
       
       if (isHidden) {
@@ -4038,6 +4614,14 @@
 
     // Grouped helper
     window.Call = { server: window.callServer, browser: window.callBrowser, ensureDevice: TwilioRTC.ensureDevice };
+    
+    // Expose currentCallContext globally so call-scripts.js can access contact/account IDs
+    Object.defineProperty(window, 'currentCallContext', {
+      get: () => currentCallContext,
+      set: (val) => { currentCallContext = val; },
+      configurable: true,
+      enumerable: true
+    });
     
     // Debug helper to check Twilio configuration
     window.debugTwilio = async function() {
