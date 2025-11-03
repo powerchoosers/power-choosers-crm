@@ -1782,30 +1782,40 @@
           }
           
           // Insert single line break for single spacing (like Gmail/Outlook)
+          // Use a cleaner approach that doesn't compound with CSS line-height
           try {
-            // Insert single <br> for single spacing
-            document.execCommand('insertHTML', false, '<br>');
-            console.log('[Enter] Single line break inserted via execCommand');
+            // Get current selection and range
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return;
+            
+            const range = selection.getRangeAt(0);
+            
+            // Insert a single <br> with proper spacing control
+            // This creates a clean line break without compounding margins
+            const br = document.createElement('br');
+            range.deleteContents();
+            range.insertNode(br);
+            
+            // Create a zero-width space node after br to ensure proper cursor positioning
+            const textNode = document.createTextNode('\u200B'); // Zero-width space
+            range.setStartAfter(br);
+            range.insertNode(textNode);
+            
+            // Move cursor after the text node
+            range.setStartAfter(textNode);
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            console.log('[Enter] Single line break inserted with proper spacing');
           } catch (error) {
-            console.error('[Enter] execCommand failed:', error);
-            // Try alternative approach
+            console.error('[Enter] Failed to insert line break:', error);
+            // Fallback: try execCommand but it may have spacing issues
             try {
-              const selection = window.getSelection();
-              const range = selection.getRangeAt(0);
-              range.deleteContents();
-              
-              // Insert single <br> tag for single spacing
-              const br = document.createElement('br');
-              range.insertNode(br);
-              
-              // Move cursor after the break
-              range.setStartAfter(br);
-              range.collapse(true);
-              selection.removeAllRanges();
-              selection.addRange(range);
-              console.log('[Enter] Single line break inserted via DOM manipulation');
+              document.execCommand('insertHTML', false, '<br>');
+              console.log('[Enter] Fallback: Single line break inserted via execCommand');
             } catch (fallbackError) {
-              console.error('[Enter] DOM manipulation also failed:', fallbackError);
+              console.error('[Enter] All methods failed:', fallbackError);
             }
           }
         }
@@ -2975,19 +2985,24 @@
       email: s.email
     });
     
+    // Use separate divs for each line instead of <br> tags to ensure proper line breaks
     return `
       <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-        <div style="display:flex; gap:12px; align-items:center;">
-          ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width:48px; height:48px; border-radius:50%; object-fit:cover;">` : ''}
-          <div>
-            <p style="margin: 0; font-size: 14px;">
-              <strong>${s.name}</strong><br>
-              ${s.title}<br>
-              ${s.company}<br>
-              ${s.location ? `${s.location}<br>` : ''}
-              ${s.phone ? `Phone: ${s.phone}<br>` : ''}
-              Email: ${s.email}
-            </p>
+        <div style="display:flex; gap:12px; align-items:flex-start;">
+          ${s.avatar ? `<img src="${s.avatar}" alt="${s.name}" style="width:48px; height:48px; border-radius:50%; object-fit:cover; flex-shrink:0;">` : ''}
+          <div style="flex:1;">
+            <div style="font-weight: 600; font-size: 15px; color: #1e3a8a; margin: 0; line-height: 1.3;">
+              ${s.name}
+            </div>
+            <div style="font-size: 13px; color: #1e40af; opacity: 0.9; margin: 2px 0; line-height: 1.3;">
+              ${s.title}
+            </div>
+            <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+              ${s.location ? `<div style="margin: 0; line-height: 1.3;">${s.location}</div>` : ''}
+              ${s.phone ? `<div style="margin: 2px 0 0 0; line-height: 1.3;">Phone: ${s.phone}</div>` : ''}
+              <div style="margin: 2px 0 0 0; line-height: 1.3;">Email: ${s.email}</div>
+              <div style="margin: 2px 0 0 0; line-height: 1.3;">${s.company}</div>
+            </div>
           </div>
         </div>
       </div>`;
@@ -3075,10 +3090,10 @@
           <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
         </div>
       </div>
-      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
-        ${s.location ? `${s.location}<br>` : ''}
-        ${s.phone ? `${s.phone}<br>` : ''}
-        ${s.company}
+      <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+        ${s.location ? `<div style="margin: 0; line-height: 1.3;">${s.location}</div>` : ''}
+        ${s.phone ? `<div style="margin: 2px 0 0 0; line-height: 1.3;">${s.phone}</div>` : ''}
+        <div style="margin: 2px 0 0 0; line-height: 1.3;">${s.company}</div>
       </div>
     </div>
     <div class="footer">
@@ -3200,10 +3215,10 @@
           <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
         </div>
       </div>
-      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
-        ${s.location ? `${s.location}<br>` : ''}
-        ${s.phone ? `${s.phone}<br>` : ''}
-        ${s.company}
+      <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+        ${s.location ? `<div style="margin: 0; line-height: 1.3;">${s.location}</div>` : ''}
+        ${s.phone ? `<div style="margin: 2px 0 0 0; line-height: 1.3;">${s.phone}</div>` : ''}
+        <div style="margin: 2px 0 0 0; line-height: 1.3;">${s.company}</div>
       </div>
     </div>
     <div class="footer">
@@ -3318,10 +3333,10 @@
           <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
         </div>
       </div>
-      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
-        ${s.location ? `${s.location}<br>` : ''}
-        ${s.phone ? `${s.phone}<br>` : ''}
-        ${s.company}
+      <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+        ${s.location ? `<div style="margin: 0; line-height: 1.3;">${s.location}</div>` : ''}
+        ${s.phone ? `<div style="margin: 2px 0 0 0; line-height: 1.3;">${s.phone}</div>` : ''}
+        <div style="margin: 2px 0 0 0; line-height: 1.3;">${s.company}</div>
       </div>
     </div>
     <div class="footer">
@@ -3454,10 +3469,10 @@
           <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
         </div>
       </div>
-      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
-        ${s.location ? `${s.location}<br>` : ''}
-        ${s.phone ? `${s.phone}<br>` : ''}
-        ${s.company}
+      <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+        ${s.location ? `<div style="margin: 0; line-height: 1.3;">${s.location}</div>` : ''}
+        ${s.phone ? `<div style="margin: 2px 0 0 0; line-height: 1.3;">${s.phone}</div>` : ''}
+        <div style="margin: 2px 0 0 0; line-height: 1.3;">${s.company}</div>
       </div>
     </div>
     <div class="footer">
@@ -3575,10 +3590,10 @@
           <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
         </div>
       </div>
-      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
-        ${s.location ? `${s.location}<br>` : ''}
-        ${s.phone ? `${s.phone}<br>` : ''}
-        ${s.company}
+      <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+        ${s.location ? `<div style="margin: 0; line-height: 1.3;">${s.location}</div>` : ''}
+        ${s.phone ? `<div style="margin: 2px 0 0 0; line-height: 1.3;">${s.phone}</div>` : ''}
+        <div style="margin: 2px 0 0 0; line-height: 1.3;">${s.company}</div>
       </div>
     </div>
     <div class="footer">
@@ -3721,10 +3736,10 @@
           <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
         </div>
       </div>
-      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
-        ${s.location ? `${s.location}<br>` : ''}
-        ${s.phone ? `${s.phone}<br>` : ''}
-        ${s.company}
+      <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+        ${s.location ? `<div style="margin: 0; line-height: 1.3;">${s.location}</div>` : ''}
+        ${s.phone ? `<div style="margin: 2px 0 0 0; line-height: 1.3;">${s.phone}</div>` : ''}
+        <div style="margin: 2px 0 0 0; line-height: 1.3;">${s.company}</div>
       </div>
     </div>
     <div class="footer">
@@ -3831,10 +3846,10 @@
           <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${s.title}</div>
         </div>
       </div>
-      <div style="font-size: 14px; color: #1e40af; line-height: 1.5;">
-        ${s.location ? `${s.location}<br>` : ''}
-        ${s.phone ? `${s.phone}<br>` : ''}
-        ${s.company}
+      <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+        ${s.location ? `<div style="margin: 0; line-height: 1.3;">${s.location}</div>` : ''}
+        ${s.phone ? `<div style="margin: 2px 0 0 0; line-height: 1.3;">${s.phone}</div>` : ''}
+        <div style="margin: 2px 0 0 0; line-height: 1.3;">${s.company}</div>
       </div>
     </div>
     <div class="footer">
@@ -3871,17 +3886,21 @@
         ${sonarGeneratedHtml}
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-          <div style="display:flex; gap:12px; align-items:center;">
-            ${senderAvatar ? `<img src="${senderAvatar}" alt="${senderName}" style="width:48px; height:48px; border-radius:50%; object-fit:cover;">` : ''}
-            <div>
-              <p style="margin: 0; font-size: 14px;">
-                <strong>${senderName}</strong><br>
-                ${senderTitle}<br>
-                ${senderCompany}<br>
-                ${senderLocation ? `${senderLocation}<br>` : ''}
-                ${senderPhone ? `Phone: ${senderPhone}<br>` : ''}
-                Email: ${senderEmail}
-              </p>
+          <div style="display:flex; gap:12px; align-items:flex-start;">
+            ${senderAvatar ? `<img src="${senderAvatar}" alt="${senderName}" style="width:48px; height:48px; border-radius:50%; object-fit:cover; flex-shrink:0;">` : ''}
+            <div style="flex:1;">
+              <div style="font-weight: 600; font-size: 15px; color: #1e3a8a; margin: 0; line-height: 1.3;">
+                ${senderName}
+              </div>
+              <div style="font-size: 13px; color: #1e40af; opacity: 0.9; margin: 2px 0; line-height: 1.3;">
+                ${senderTitle}
+              </div>
+              <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+                ${senderLocation ? `<div style="margin: 0; line-height: 1.3;">${senderLocation}</div>` : ''}
+                ${senderPhone ? `<div style="margin: 2px 0 0 0; line-height: 1.3;">Phone: ${senderPhone}</div>` : ''}
+                <div style="margin: 2px 0 0 0; line-height: 1.3;">Email: ${senderEmail}</div>
+                <div style="margin: 2px 0 0 0; line-height: 1.3;">${senderCompany}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -4167,20 +4186,28 @@
         // Add closing as its OWN paragraph so it renders separately
         if (jsonData.closing) {
           // Ensure closing has proper line breaks (e.g., "Best regards,\nLewis")
-          // If AI returns "Best regards, Lewis" on one line, split it
-          let closing = jsonData.closing;
+          // Handle both escaped \n (from JSON) and actual newlines
+          let closing = String(jsonData.closing || '');
+          
+          // CRITICAL FIX: Convert escaped \n (literal string "\\n") to actual newline first
+          // This handles cases where Perplexity returns "Best regards,\nLewis" as escaped string
+          closing = closing.replace(/\\n/g, '\n');
           
           // Handle different closing formats and ensure proper line break
-          if (closing.includes('Best regards,') && !closing.includes('\n')) {
-            // Replace "Best regards, Name" with "Best regards,\nName"
-            closing = closing.replace(/Best regards,\s*/i, 'Best regards,\n');
-          } else if (closing.includes('Sincerely,') && !closing.includes('\n')) {
-            closing = closing.replace(/Sincerely,\s*/i, 'Sincerely,\n');
-          } else if (closing.includes('Regards,') && !closing.includes('\n')) {
-            closing = closing.replace(/Regards,\s*/i, 'Regards,\n');
-          } else if (closing.includes('Best regards,') && closing.includes('\\n')) {
-            // Handle escaped newline \\n from API (convert to actual newline)
-            closing = closing.replace(/\\n/g, '\n');
+          if (closing.includes('Best regards,')) {
+            // Check if there's already a newline after the comma
+            if (!closing.match(/Best regards,\s*\n/i)) {
+              // Replace "Best regards, Name" with "Best regards,\nName"
+              closing = closing.replace(/Best regards,\s*/i, 'Best regards,\n');
+            }
+          } else if (closing.includes('Sincerely,')) {
+            if (!closing.match(/Sincerely,\s*\n/i)) {
+              closing = closing.replace(/Sincerely,\s*/i, 'Sincerely,\n');
+            }
+          } else if (closing.includes('Regards,')) {
+            if (!closing.match(/Regards,\s*\n/i)) {
+              closing = closing.replace(/Regards,\s*/i, 'Regards,\n');
+            }
           }
           
           body += '\n\n' + closing;
@@ -4220,6 +4247,15 @@
           if (/^(\s*[•\-]\s+)/m.test(p)) {
             return String(p).replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim();
           }
+          // CRITICAL FIX: Preserve newlines in closing paragraphs (e.g., "Best regards,\nLewis")
+          // Check if this paragraph contains closing signatures (with newline anywhere in it)
+          const isClosing = /^(Best regards|Sincerely|Regards|Thanks|Thank you)/mi.test(p) && /\n/.test(p);
+          if (isClosing) {
+            // Preserve the newline structure in closing (don't convert \n to spaces)
+            // This ensures "Best regards,\nLewis" stays as two lines
+            return String(p).replace(/\r/g, '').trim();
+          }
+          // For regular paragraphs, convert single newlines to spaces
           return p.replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
         })
         .filter(Boolean)
