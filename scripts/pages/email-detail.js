@@ -19,6 +19,7 @@
     els.replyBtn = document.getElementById('reply-btn');
     els.forwardBtn = document.getElementById('forward-btn');
     els.deleteBtn = document.getElementById('delete-email-btn');
+    els.actionBar = els.page ? els.page.querySelector('.action-buttons') : null;
     
     return els.page;
   }
@@ -81,11 +82,21 @@
         date: emailData.date || emailData.sentAt || emailData.receivedAt || emailData.createdAt || new Date(),
         starred: emailData.starred || false,
         deleted: emailData.deleted || false,
-        unread: emailData.unread !== false
+        unread: emailData.unread !== false,
+        // Scheduled email fields
+        type: emailData.type || 'received',
+        status: emailData.status,
+        scheduledSendTime: emailData.scheduledSendTime,
+        aiPrompt: emailData.aiPrompt
       };
 
       // Populate email details
       populateEmailDetails(state.currentEmail);
+      
+      // Add approve/reject buttons for scheduled emails
+      if (state.currentEmail.type === 'scheduled' && state.currentEmail.status === 'pending_approval') {
+        addScheduledEmailActions();
+      }
       
       // Mark as read
       await markAsRead(emailId);
@@ -153,6 +164,38 @@
         contentHtml = decodedText.replace(/\n/g, '<br>');
       } else {
         contentHtml = '<p>No content available</p>';
+      }
+      
+      // Add signature if email should have one (scheduled/sent emails from sequences)
+      // Check if email is from a sequence or has type that suggests it should include signature
+      const shouldShowSignature = email.type === 'scheduled' || 
+                                   email.type === 'auto-email' || 
+                                   email.type === 'manual-email' ||
+                                   email.sequenceId ||
+                                   (email.status && email.status !== 'received');
+      
+      if (shouldShowSignature) {
+        try {
+          const signature = window.getEmailSignature ? window.getEmailSignature() : '';
+          if (signature) {
+            // Check settings for signature image
+            const settings = (window.SettingsPage?.getSettings?.()) || {};
+            const deliver = settings?.emailDeliverability || {};
+            let signatureHtml = signature;
+            
+            // Remove signature image if disabled
+            if (deliver.signatureImageEnabled === false) {
+              signatureHtml = signature.replace(/<img[^>]*alt=["']Signature["'][\s\S]*?>/gi, '');
+            }
+            
+            // Only add if content doesn't already include signature
+            if (signatureHtml && !contentHtml.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;')) {
+              contentHtml += signatureHtml;
+            }
+          }
+        } catch (error) {
+          console.warn('[EmailDetail] Error adding signature:', error);
+        }
       }
       
       els.emailContent.innerHTML = contentHtml;
@@ -240,6 +283,174 @@
 
     } catch (error) {
       console.error('Failed to delete email:', error);
+    }
+  }
+
+  // Add approve/reject/regenerate buttons for scheduled emails
+  function addScheduledEmailActions() {
+    if (!els.actionBar || !state.currentEmail) return;
+
+    // Remove any existing scheduled email buttons
+    const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .regenerate-btn');
+    existingBtns.forEach(btn => btn.remove());
+
+    // Create approve button
+    const approveBtn = document.createElement('button');
+    approveBtn.className = 'btn-primary approve-btn';
+    approveBtn.textContent = 'Approve';
+    approveBtn.addEventListener('click', () => approveScheduledEmail(state.currentEmail.id));
+    els.actionBar.insertBefore(approveBtn, els.deleteBtn);
+
+    // Create reject button
+    const rejectBtn = document.createElement('button');
+    rejectBtn.className = 'btn-secondary reject-btn';
+    rejectBtn.textContent = 'Reject';
+    rejectBtn.addEventListener('click', () => rejectScheduledEmail(state.currentEmail.id));
+    els.actionBar.insertBefore(rejectBtn, els.deleteBtn);
+
+    // Create regenerate button
+    const regenerateBtn = document.createElement('button');
+    regenerateBtn.className = 'btn-secondary regenerate-btn';
+    regenerateBtn.textContent = 'Regenerate';
+    regenerateBtn.addEventListener('click', () => regenerateScheduledEmail(state.currentEmail.id));
+    els.actionBar.insertBefore(regenerateBtn, els.deleteBtn);
+
+    // Hide reply/forward buttons for scheduled emails
+    if (els.replyBtn) els.replyBtn.style.display = 'none';
+    if (els.forwardBtn) els.forwardBtn.style.display = 'none';
+  }
+
+  // Approve scheduled email
+  async function approveScheduledEmail(emailId) {
+    try {
+      // Update via FreeSequenceAutomation if available
+      if (window.freeSequenceAutomation && typeof window.freeSequenceAutomation.approveEmail === 'function') {
+        await window.freeSequenceAutomation.approveEmail(emailId);
+      } else {
+        // Fallback: update Firebase directly
+        const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+        if (db) {
+          await db.collection('emails').doc(emailId).update({
+            status: 'approved',
+            approvedAt: Date.now(),
+            updatedAt: new Date().toISOString()
+          });
+        }
+      }
+
+      // Show success message
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Email approved and will be sent at scheduled time');
+      }
+
+      // Go back to emails page
+      goBack();
+    } catch (error) {
+      console.error('[EmailDetail] Failed to approve email:', error);
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Failed to approve email');
+      }
+    }
+  }
+
+  // Reject scheduled email
+  async function rejectScheduledEmail(emailId) {
+    if (!confirm('Are you sure you want to reject this scheduled email?')) {
+      return;
+    }
+
+    try {
+      // Update via FreeSequenceAutomation if available
+      if (window.freeSequenceAutomation && typeof window.freeSequenceAutomation.rejectEmail === 'function') {
+        await window.freeSequenceAutomation.rejectEmail(emailId);
+      } else {
+        // Fallback: update Firebase directly
+        const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+        if (db) {
+          await db.collection('emails').doc(emailId).update({
+            status: 'rejected',
+            rejectedAt: Date.now(),
+            updatedAt: new Date().toISOString()
+          });
+        }
+      }
+
+      // Show success message
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Email rejected');
+      }
+
+      // Go back to emails page
+      goBack();
+    } catch (error) {
+      console.error('[EmailDetail] Failed to reject email:', error);
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Failed to reject email');
+      }
+    }
+  }
+
+  // Regenerate scheduled email
+  async function regenerateScheduledEmail(emailId) {
+    try {
+      const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+      if (!db) {
+        throw new Error('Firebase not available');
+      }
+
+      // Get email data
+      const emailDoc = await db.collection('emails').doc(emailId).get();
+      if (!emailDoc.exists) {
+        throw new Error('Email not found');
+      }
+
+      const emailData = emailDoc.data();
+
+      // Update status to generating
+      await db.collection('emails').doc(emailId).update({
+        status: 'generating',
+        updatedAt: new Date().toISOString()
+      });
+
+      // Call AI generation API
+      const response = await fetch('/api/generate-email-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: emailData.aiPrompt || 'Write a professional follow-up email',
+          contactName: emailData.contactName || '',
+          contactCompany: emailData.contactCompany || ''
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Update email with new generated content
+        await db.collection('emails').doc(emailId).update({
+          subject: result.subject,
+          html: result.html,
+          text: result.text,
+          status: 'pending_approval',
+          generatedAt: Date.now(),
+          updatedAt: new Date().toISOString()
+        });
+
+        // Show success message
+        if (window.crm && window.crm.showToast) {
+          window.crm.showToast('Email regenerated');
+        }
+
+        // Reload email detail
+        await show(emailId);
+      } else {
+        throw new Error('Failed to generate email content');
+      }
+    } catch (error) {
+      console.error('[EmailDetail] Failed to regenerate email:', error);
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Failed to regenerate email');
+      }
     }
   }
 

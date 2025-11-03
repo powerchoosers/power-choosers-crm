@@ -402,7 +402,18 @@
                 <circle cx="12" cy="12" r="3"/>
               </svg>
             </button>
-            ${email.isSentEmail ? `
+            ${email.type === 'scheduled' && email.status === 'pending_approval' ? `
+              <button class="qa-btn" data-action="approve" data-email-id="${email.id}" title="Approve" style="color: #28a745;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 6L9 17l-5-5"/>
+                </svg>
+              </button>
+              <button class="qa-btn" data-action="reject" data-email-id="${email.id}" title="Reject" style="color: #dc3545;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            ` : email.isSentEmail ? `
               <button class="qa-btn" data-action="clicks" data-email-id="${email.id}" title="View clicks">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
@@ -462,6 +473,10 @@
           showClickDetails(emailId);
         } else if (action === 'reply') {
           replyToEmail(emailId);
+        } else if (action === 'approve') {
+          approveScheduledEmail(emailId);
+        } else if (action === 'reject') {
+          rejectScheduledEmail(emailId);
         }
       });
     });
@@ -490,6 +505,82 @@
     if (email) {
       // Open compose modal with reply data
       openComposeModal(email);
+    }
+  }
+
+  // Approve scheduled email
+  async function approveScheduledEmail(emailId) {
+    const email = state.data.find(e => e.id === emailId);
+    if (!email || email.type !== 'scheduled') return;
+
+    try {
+      // Update via FreeSequenceAutomation if available
+      if (window.freeSequenceAutomation && typeof window.freeSequenceAutomation.approveEmail === 'function') {
+        await window.freeSequenceAutomation.approveEmail(emailId);
+      } else {
+        // Fallback: update Firebase directly
+        const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+        if (db) {
+          await db.collection('emails').doc(emailId).update({
+            status: 'approved',
+            approvedAt: Date.now(),
+            updatedAt: new Date().toISOString()
+          });
+        }
+      }
+
+      // Show success message
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Email approved and will be sent at scheduled time');
+      }
+
+      // Reload emails
+      await loadData();
+    } catch (error) {
+      console.error('[EmailsPage] Failed to approve email:', error);
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Failed to approve email');
+      }
+    }
+  }
+
+  // Reject scheduled email
+  async function rejectScheduledEmail(emailId) {
+    const email = state.data.find(e => e.id === emailId);
+    if (!email || email.type !== 'scheduled') return;
+
+    if (!confirm('Are you sure you want to reject this scheduled email?')) {
+      return;
+    }
+
+    try {
+      // Update via FreeSequenceAutomation if available
+      if (window.freeSequenceAutomation && typeof window.freeSequenceAutomation.rejectEmail === 'function') {
+        await window.freeSequenceAutomation.rejectEmail(emailId);
+      } else {
+        // Fallback: update Firebase directly
+        const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+        if (db) {
+          await db.collection('emails').doc(emailId).update({
+            status: 'rejected',
+            rejectedAt: Date.now(),
+            updatedAt: new Date().toISOString()
+          });
+        }
+      }
+
+      // Show success message
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Email rejected');
+      }
+
+      // Reload emails
+      await loadData();
+    } catch (error) {
+      console.error('[EmailsPage] Failed to reject email:', error);
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Failed to reject email');
+      }
     }
   }
 
