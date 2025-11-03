@@ -1,4 +1,5 @@
 import twilio from 'twilio';
+import { URL } from 'url';
 import { cors } from '../_cors.js';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
@@ -17,14 +18,52 @@ export default async function handler(req, res) {
     }
     
     try {
-        // Decode URL-encoded query parameters (Twilio support recommendation)
-        let { target, callerId } = req.query;
+        // Log raw URL to confirm query parameters are present
+        console.log('[Bridge] Raw Request URL:', req.url);
+        console.log('[Bridge] Request Host:', req.headers.host);
+        
+        // Get query parameters (server.js should populate req.query, but fallback to manual parsing)
+        let target, callerId;
+        if (req.query && typeof req.query === 'object') {
+            // Use req.query from server.js if available
+            target = req.query.target;
+            callerId = req.query.callerId;
+            console.log('[Bridge] Using req.query from server.js');
+        } else {
+            // Fallback: manually parse query parameters from req.url
+            try {
+                const protocol = req.headers['x-forwarded-proto'] || 'https';
+                const host = req.headers.host || req.headers['x-forwarded-host'] || '';
+                const requestUrl = new URL(req.url, `${protocol}://${host}`);
+                
+                target = requestUrl.searchParams.get('target');
+                callerId = requestUrl.searchParams.get('callerId');
+                console.log('[Bridge] Manually parsed from req.url (fallback)');
+            } catch (parseError) {
+                console.error('[Bridge] Error parsing URL query parameters:', parseError.message);
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Invalid query parameters', details: parseError.message }));
+                return;
+            }
+        }
+        
+        // Decode URL-encoded parameters if present
         if (target) target = decodeURIComponent(target);
         if (callerId) callerId = decodeURIComponent(callerId);
         
-        const { CallSid, From, To } = req.body;
+        console.log('[Bridge] Parsed target:', target);
+        console.log('[Bridge] Parsed callerId:', callerId);
         
-        console.log(`[Bridge] Raw params - target: ${req.query.target}, callerId: ${req.query.callerId}`);
+        // Use req.body that was already parsed by server.js (avoid re-reading stream)
+        // If req.body doesn't exist (shouldn't happen with server.js), fallback to empty object
+        const parsedBody = req.body || {};
+        
+        console.log('[Bridge] Body parameters (from server.js):', parsedBody);
+        
+        const CallSid = parsedBody.CallSid;
+        const From = parsedBody.From;
+        const To = parsedBody.To;
+        
         console.log(`[Bridge] Decoded params - target: ${target}, callerId: ${callerId || 'none'}`);
         console.log(`[Bridge] Body - CallSid: ${CallSid}, From: ${From || 'none'}, To: ${To || 'none'}`);
         
@@ -214,8 +253,6 @@ export default async function handler(req, res) {
         console.error(`[Bridge] Request details:`, {
             method: req.method,
             url: req.url,
-            query: req.query,
-            body: req.body,
             headers: req.headers
         });
         
