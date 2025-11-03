@@ -2016,7 +2016,7 @@
       `;
       wrap.appendChild(el);
 
-      const state = { current: '', history: [], overrideContactId: null };
+      const state = { current: '', history: [], overrideContactId: null, monthlySpend: null };
 
       // Data helpers (subset from scripts page)
       function escapeHtml(str){ if (str == null) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
@@ -2271,6 +2271,24 @@
         const dp = dayPart();
         const data = getLiveData();
         
+        // Calculate savings based on monthly spend from state
+        let monthlySpend = 0;
+        let annualSpend = 0;
+        let potentialSavings = 0;
+        
+        // Use stored monthly spend value if available
+        if (state.monthlySpend && state.monthlySpend > 0) {
+          monthlySpend = state.monthlySpend;
+          annualSpend = monthlySpend * 12;
+          potentialSavings = Math.round(annualSpend * 0.25); // 25% savings estimate
+        }
+        
+        // Format numbers with commas
+        const formatCurrency = (num) => {
+          if (num === 0 || !num) return 'an estimated amount';
+          return '$' + num.toLocaleString();
+        };
+        
         const values = {
           'day.part': dp,
           'contact.first_name': data.contact.firstName || data.contact.first_name || splitName(data.contact.name || '').first || splitName(data.contact.fullName || '').first || '',
@@ -2286,7 +2304,10 @@
           'account.state': data.account.state || data.account.region || data.account.billingState || data.contact.state || '',
           'account.website': data.account.website || data.account.domain || normDomain(data.contact.email) || '',
           'account.supplier': data.account.supplier || data.account.currentSupplier || data.contact.supplier || data.contact.currentSupplier || '',
-          'account.contract_end': formatDateMDY(data.account.contractEnd || data.account.contract_end || data.account.renewalDate || data.contact.contract_end || data.contact.contractEnd || '')
+          'account.contract_end': formatDateMDY(data.account.contractEnd || data.account.contract_end || data.account.renewalDate || data.contact.contract_end || data.contact.contractEnd || ''),
+          'monthly_spend': formatCurrency(monthlySpend),
+          'annual_spend': formatCurrency(annualSpend),
+          'potential_savings': formatCurrency(potentialSavings)
         };
         
         let result = String(str);
@@ -2594,14 +2615,99 @@
           const shouldRenderValues = live || hasSelectedContact;
           display.innerHTML = shouldRenderValues ? renderTemplateValues(node.text || '') : renderTemplateChips(node.text || '');
           responses.innerHTML = '';
-          (node.responses || []).forEach(r => {
-            const b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'btn-secondary';
-            b.textContent = r.label || '';
-            b.addEventListener('click', () => { if (r.next && FLOW[r.next]) { state.history.push(state.current); state.current = r.next; renderNode(); } });
-            responses.appendChild(b);
-          });
+          
+          // Special handling for situation_discovery and all acknowledgment states that ask about monthly spending - show input field
+          if (key === 'situation_discovery' || 
+              key === 'ack_confident_handle' || 
+              key === 'ack_struggling' || 
+              key === 'ack_no_idea' ||
+              key === 'ack_dq_confident' ||
+              key === 'ack_dq_struggling') {
+            const inputWrap = document.createElement('div');
+            inputWrap.className = 'monthly-spend-input-wrap';
+            inputWrap.style.cssText = 'width: 100%; margin-bottom: 12px;';
+            
+            const label = document.createElement('label');
+            label.textContent = 'Monthly Spend:';
+            label.style.cssText = 'display: block; margin-bottom: 6px; color: var(--text-primary); font-size: 14px;';
+            inputWrap.appendChild(label);
+            
+            const inputContainer = document.createElement('div');
+            inputContainer.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+            
+            const dollarSign = document.createElement('span');
+            dollarSign.textContent = '$';
+            dollarSign.style.cssText = 'color: var(--text-primary); font-size: 16px; font-weight: 500;';
+            inputContainer.appendChild(dollarSign);
+            
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.placeholder = 'Enter amount (e.g., 5000)';
+            input.min = '0';
+            input.step = '100';
+            input.className = 'monthly-spend-input';
+            input.style.cssText = 'flex: 1; padding: 10px 12px; border: 1px solid var(--border-light); border-radius: 6px; background: var(--bg-main); color: var(--text-primary); font-size: 16px;';
+            if (state.monthlySpend) {
+              input.value = state.monthlySpend;
+            }
+            inputContainer.appendChild(input);
+            inputWrap.appendChild(inputContainer);
+            responses.appendChild(inputWrap);
+            
+            const nextBtn = document.createElement('button');
+            nextBtn.type = 'button';
+            nextBtn.className = 'btn-secondary';
+            nextBtn.textContent = 'Continue';
+            nextBtn.style.cssText = 'width: 100%; margin-bottom: 8px;';
+            const handleContinue = () => {
+              const value = parseFloat(input.value);
+              if (value && value > 0) {
+                state.monthlySpend = value;
+                if (FLOW['situation_monthly_spend']) {
+                  state.history.push(state.current);
+                  state.current = 'situation_monthly_spend';
+                  renderNode();
+                }
+              } else {
+                alert('Please enter a valid monthly spend amount.');
+              }
+            };
+            nextBtn.addEventListener('click', handleContinue);
+            input.addEventListener('keypress', (e) => {
+              if (e.key === 'Enter') {
+                handleContinue();
+              }
+            });
+            responses.appendChild(nextBtn);
+            
+            // Add "Don't know offhand" button (different labels based on state)
+            const dontKnowLabel = key === 'ack_no_idea' ? "Honestly don't have a guess" : 
+                                  key === 'ack_confident_handle' || key === 'ack_dq_confident' || key === 'ack_dq_struggling' ? "Don't know exact amount" :
+                                  "Don't know offhand";
+            const dontKnowBtn = document.createElement('button');
+            dontKnowBtn.type = 'button';
+            dontKnowBtn.className = 'btn-secondary';
+            dontKnowBtn.textContent = dontKnowLabel;
+            dontKnowBtn.style.cssText = 'width: 100%;';
+            dontKnowBtn.addEventListener('click', () => {
+              state.monthlySpend = null;
+              if (FLOW['situation_monthly_spend']) {
+                state.history.push(state.current);
+                state.current = 'situation_monthly_spend';
+                renderNode();
+              }
+            });
+            responses.appendChild(dontKnowBtn);
+          } else {
+            (node.responses || []).forEach(r => {
+              const b = document.createElement('button');
+              b.type = 'button';
+              b.className = 'btn-secondary';
+              b.textContent = r.label || '';
+              b.addEventListener('click', () => { if (r.next && FLOW[r.next]) { state.history.push(state.current); state.current = r.next; renderNode(); } });
+              responses.appendChild(b);
+            });
+          }
           
           // Let CSS transition handle height smoothly
           requestAnimationFrame(() => {
@@ -2643,7 +2749,8 @@
         // Smooth animation when resetting
         state.current = ''; 
         state.history = []; 
-        state.overrideContactId = null; 
+        state.overrideContactId = null;
+        state.monthlySpend = null; 
         inputEl.value = ''; 
         closeSuggest();
         

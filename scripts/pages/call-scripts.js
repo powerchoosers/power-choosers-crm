@@ -333,20 +333,31 @@
     let annualSpend = 0;
     let potentialSavings = 0;
     
-    // Try to extract monthly spend from state history
-    const currentState = state.current;
-    const historyItem = Array.isArray(state.history) 
-      ? state.history.find(h => (typeof h === 'object' ? h.current === 'situation_discovery' : h === 'situation_discovery'))
-      : null;
-    if (historyItem) {
-      const responseLabel = (typeof historyItem === 'object' ? historyItem.responseLabel : '') || '';
-      // Parse ranges from response labels
-      if (responseLabel.includes('$1K - $5K')) {
-        monthlySpend = 3000; // Middle of range
-      } else if (responseLabel.includes('$5K - $20K')) {
-        monthlySpend = 12500; // Middle of range
-      } else if (responseLabel.includes('$20K+')) {
-        monthlySpend = 30000; // Conservative estimate
+    // Use stored monthly spend value if available
+    if (state.monthlySpend && state.monthlySpend > 0) {
+      monthlySpend = state.monthlySpend;
+    } else {
+      // Fallback: Try to extract monthly spend from state history
+      const currentState = state.current;
+      const historyItem = Array.isArray(state.history) 
+        ? state.history.find(h => (typeof h === 'object' ? h.current === 'situation_discovery' : h === 'situation_discovery'))
+        : null;
+      if (historyItem) {
+        const responseLabel = (typeof historyItem === 'object' ? historyItem.responseLabel : '') || '';
+        // Try to parse dollar amount from response label (e.g., "Spending $5,000 monthly")
+        const dollarMatch = responseLabel.match(/\$[\d,]+/);
+        if (dollarMatch) {
+          monthlySpend = parseFloat(dollarMatch[0].replace(/[$,]/g, '')) || 0;
+        } else {
+          // Parse ranges from response labels (fallback)
+          if (responseLabel.includes('$1K - $5K')) {
+            monthlySpend = 3000; // Middle of range
+          } else if (responseLabel.includes('$5K - $20K')) {
+            monthlySpend = 12500; // Middle of range
+          } else if (responseLabel.includes('$20K+')) {
+            monthlySpend = 30000; // Conservative estimate
+          }
+        }
       }
     }
     
@@ -357,7 +368,7 @@
     
     // Format numbers with commas
     const formatCurrency = (num) => {
-      if (num === 0) return 'an estimated amount';
+      if (num === 0 || !num) return 'an estimated amount';
       return '$' + num.toLocaleString();
     };
     
@@ -491,32 +502,17 @@
     ack_confident_handle: {
       stage: 'Discovery - Transition',
       text: "<span class=\"tone-marker confident\">positive, respecting tone</span> <span class=\"pause-indicator\"></span> Okay, perfect. So you're on top of it - that's good to hear. <span class=\"pause-indicator\"></span> Let me ask though, roughly how much are you spending monthly on electricity? <span class=\"pause-indicator\"></span> Just want to see if there's any opportunity we might be missing.",
-      responses: [
-        { label: 'Spending $1K - $5K monthly', next: 'situation_monthly_spend' },
-        { label: 'Spending $5K - $20K monthly', next: 'situation_monthly_spend' },
-        { label: 'Spending $20K+ monthly', next: 'situation_monthly_spend' },
-        { label: "Don't know exact amount", next: 'situation_monthly_spend' }
-      ]
+      responses: [] // Special handling - will render input field in render() function
     },
     ack_struggling: {
       stage: 'Discovery - Transition',
       text: "<span class=\"tone-marker understanding\">empathetic, normalizing tone</span> <span class=\"pause-indicator\"></span> Okay, so it's been a challenge - I hear that a lot actually. <span class=\"pause-indicator\"></span> Most companies I talk to are in the same boat. <span class=\"pause-indicator\"></span> Help me understand, roughly how much are you spending monthly?",
-      responses: [
-        { label: 'Spending $1K - $5K monthly', next: 'situation_monthly_spend' },
-        { label: 'Spending $5K - $20K monthly', next: 'situation_monthly_spend' },
-        { label: 'Spending $20K+ monthly', next: 'situation_monthly_spend' },
-        { label: "Don't know exact amount", next: 'situation_monthly_spend' }
-      ]
+      responses: [] // Special handling - will render input field in render() function
     },
     ack_no_idea: {
       stage: 'Discovery - Transition',
       text: "<span class=\"tone-marker understanding\">non-judgmental, reassuring tone</span> <span class=\"pause-indicator\"></span> Fair enough - most people don't, to be honest. <span class=\"pause-indicator\"></span> You're not alone on that one. <span class=\"pause-indicator\"></span> So let me ask, roughly how much are you spending monthly? <span class=\"pause-indicator\"></span> Even a ballpark estimate is fine.",
-      responses: [
-        { label: 'Spending $1K - $5K monthly', next: 'situation_monthly_spend' },
-        { label: 'Spending $5K - $20K monthly', next: 'situation_monthly_spend' },
-        { label: 'Spending $20K+ monthly', next: 'situation_monthly_spend' },
-        { label: "Honestly don't have a guess", next: 'situation_monthly_spend' }
-      ]
+      responses: [] // Special handling - will render input field in render() function
     },
     ack_vendor_handling: {
       stage: 'Discovery - Transition',
@@ -602,22 +598,12 @@
     ack_dq_confident: {
       stage: 'Discovery - Transition',
       text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Cool - that's good to hear. <span class=\"pause-indicator\"></span> So roughly, how much are you spending monthly just so I understand the scope?",
-      responses: [
-        { label: 'Spending $1K - $5K monthly', next: 'situation_monthly_spend' },
-        { label: 'Spending $5K - $20K monthly', next: 'situation_monthly_spend' },
-        { label: 'Spending $20K+ monthly', next: 'situation_monthly_spend' },
-        { label: "Don't know exact amount", next: 'situation_monthly_spend' }
-      ]
+      responses: [] // Special handling - will render input field in render() function
     },
     ack_dq_struggling: {
       stage: 'Discovery - Transition',
       text: "<span class=\"tone-marker understanding\">empathetic tone</span> <span class=\"pause-indicator\"></span> Yeah, I hear that all the time - you're not alone. <span class=\"pause-indicator\"></span> Help me understand though, roughly what are you spending monthly?",
-      responses: [
-        { label: 'Spending $1K - $5K monthly', next: 'situation_monthly_spend' },
-        { label: 'Spending $5K - $20K monthly', next: 'situation_monthly_spend' },
-        { label: 'Spending $20K+ monthly', next: 'situation_monthly_spend' },
-        { label: "Don't know exact amount", next: 'situation_monthly_spend' }
-      ]
+      responses: [] // Special handling - will render input field in render() function
     },
     ack_dq_delegated: {
       stage: 'Discovery - Transition',
@@ -706,12 +692,7 @@
     situation_discovery: {
       stage: 'Discovery - Situation',
       text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Got it. <span class=\"pause-indicator\"></span> So help me understand - roughly how much are you spending monthly on electricity?",
-      responses: [
-        { label: 'Spending $1K - $5K monthly', next: 'situation_monthly_spend' },
-        { label: 'Spending $5K - $20K monthly', next: 'situation_monthly_spend' },
-        { label: 'Spending $20K+ monthly', next: 'situation_monthly_spend' },
-        { label: "Don't know offhand", next: 'situation_monthly_spend' }
-      ]
+      responses: [] // Special handling - will render input field in render() function
     },
     situation_monthly_spend: {
       stage: 'Discovery - Situation',
@@ -1418,7 +1399,8 @@
     current: 'start',
     history: [],
     overrideContactId: null,
-    problemPath: null  // Track which problem path was taken for dynamic consequence routing
+    problemPath: null,  // Track which problem path was taken for dynamic consequence routing
+    monthlySpend: null  // Store entered monthly spend value
   };
 
   // Phase definitions with entry points
@@ -1850,6 +1832,81 @@
           btn.addEventListener('click', () => go('pre_call_qualification'));
           responses.appendChild(btn);
           responses.classList.add('full-width');
+        } else if (state.current === 'situation_discovery' || 
+                   state.current === 'ack_confident_handle' || 
+                   state.current === 'ack_struggling' || 
+                   state.current === 'ack_no_idea' ||
+                   state.current === 'ack_dq_confident' ||
+                   state.current === 'ack_dq_struggling') {
+          // Special handling for monthly spend input - all states that ask about monthly spending
+          const inputWrap = document.createElement('div');
+          inputWrap.className = 'monthly-spend-input-wrap';
+          inputWrap.style.cssText = 'width: 100%; margin-bottom: 12px;';
+          
+          const label = document.createElement('label');
+          label.textContent = 'Monthly Spend:';
+          label.style.cssText = 'display: block; margin-bottom: 6px; color: var(--text-primary); font-size: 14px;';
+          inputWrap.appendChild(label);
+          
+          const inputContainer = document.createElement('div');
+          inputContainer.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+          
+          const dollarSign = document.createElement('span');
+          dollarSign.textContent = '$';
+          dollarSign.style.cssText = 'color: var(--text-primary); font-size: 16px; font-weight: 500;';
+          inputContainer.appendChild(dollarSign);
+          
+          const input = document.createElement('input');
+          input.type = 'number';
+          input.placeholder = 'Enter amount (e.g., 5000)';
+          input.min = '0';
+          input.step = '100';
+          input.className = 'monthly-spend-input';
+          input.style.cssText = 'flex: 1; padding: 10px 12px; border: 1px solid var(--border-light); border-radius: 6px; background: var(--bg-main); color: var(--text-primary); font-size: 16px;';
+          if (state.monthlySpend) {
+            input.value = state.monthlySpend;
+          }
+          inputContainer.appendChild(input);
+          inputWrap.appendChild(inputContainer);
+          responses.appendChild(inputWrap);
+          
+          const nextBtn = document.createElement('button');
+          nextBtn.className = 'response-btn';
+          nextBtn.type = 'button';
+          nextBtn.textContent = 'Continue';
+          nextBtn.style.cssText = 'width: 100%; margin-bottom: 8px;';
+          const handleContinue = () => {
+            const value = parseFloat(input.value);
+            if (value && value > 0) {
+              state.monthlySpend = value;
+              go('situation_monthly_spend', `Spending $${value.toLocaleString()} monthly`);
+            } else {
+              alert('Please enter a valid monthly spend amount.');
+            }
+          };
+          nextBtn.addEventListener('click', handleContinue);
+          input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+              handleContinue();
+            }
+          });
+          responses.appendChild(nextBtn);
+          
+          // Add "Don't know offhand" button (different labels based on state)
+          const dontKnowLabel = state.current === 'ack_no_idea' ? "Honestly don't have a guess" : 
+                                state.current === 'ack_confident_handle' || state.current === 'ack_dq_confident' || state.current === 'ack_dq_struggling' ? "Don't know exact amount" :
+                                "Don't know offhand";
+          const dontKnowBtn = document.createElement('button');
+          dontKnowBtn.className = 'response-btn';
+          dontKnowBtn.type = 'button';
+          dontKnowBtn.textContent = dontKnowLabel;
+          dontKnowBtn.style.cssText = 'width: 100%;';
+          dontKnowBtn.addEventListener('click', () => {
+            state.monthlySpend = null;
+            go('situation_monthly_spend', dontKnowLabel);
+          });
+          responses.appendChild(dontKnowBtn);
+          responses.classList.add('full-width');
         } else {
           (node.responses || []).forEach(r => {
             const b = document.createElement('button');
@@ -1901,6 +1958,7 @@
   function restart(){
     state.current = 'start';
     state.history = [];
+    state.monthlySpend = null;
     completedPhases.clear();
     lastPhase = null;
     // Don't reset currentOpener here - it should persist from loadSavedOpener()
