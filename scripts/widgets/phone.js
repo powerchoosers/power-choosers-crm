@@ -712,18 +712,38 @@
                   setInCallUI(false);
                   console.debug('[Phone] DISCONNECT: UI cleanup complete, call should show as ended');
                   
-                  // Fire-and-forget termination of any active server-side call to avoid UI stall
+                  // Fire-and-forget termination of all related call legs
+                  const callSidsToTerminate = [];
                   if (window.currentServerCallSid) {
+                    callSidsToTerminate.push(window.currentServerCallSid);
+                  }
+                  try {
+                    const browserCallSid = twilioCallSid || (currentCall?.parameters?.CallSid || currentCall?.parameters?.callSid);
+                    if (browserCallSid && !callSidsToTerminate.includes(browserCallSid)) {
+                      callSidsToTerminate.push(browserCallSid);
+                    }
+                  } catch(_) {}
+                  try {
+                    if (window.storedDialCallSids && Array.isArray(window.storedDialCallSids)) {
+                      window.storedDialCallSids.forEach(sid => {
+                        if (sid && !callSidsToTerminate.includes(sid)) {
+                          callSidsToTerminate.push(sid);
+                        }
+                      });
+                    }
+                  } catch(_) {}
+                  
+                  if (callSidsToTerminate.length > 0) {
                     try {
                       const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-                      const sid = window.currentServerCallSid;
-                      console.debug('[Phone] DISCONNECT: Terminating server call SID (async):', sid);
+                      console.debug('[Phone] DISCONNECT: Terminating all call legs:', callSidsToTerminate);
                       fetch(`${base}/api/twilio/hangup`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ callSid: sid })
+                        body: JSON.stringify({ callSids: callSidsToTerminate })
                       }).catch(()=>{});
                     } catch (_) {}
                     window.currentServerCallSid = null;
+                    window.storedDialCallSids = null;
                   }
                   
                   // [REMOVED] Audio device release - was causing UI freeze on hangup
@@ -3407,19 +3427,55 @@
           setInCallUI(false);
           console.debug('[Phone] DISCONNECT: UI cleanup complete, call should show as ended');
           
-          // CRITICAL: Terminate any active server-side call without blocking UI
+          // CRITICAL: Terminate all related call legs BEFORE disconnecting browser client
+          // Collect all CallSids: server call, browser call, and any stored child SIDs
+          const callSidsToTerminate = [];
+          
+          // Add server-side call SID (parent call from API)
           if (window.currentServerCallSid) {
-            const sidToTerminate = window.currentServerCallSid;
-            window.currentServerCallSid = null;
+            callSidsToTerminate.push(window.currentServerCallSid);
+          }
+          
+          // Add browser client CallSid if available
+          try {
+            if (currentCall && currentCall.parameters) {
+              const browserCallSid = currentCall.parameters.CallSid || currentCall.parameters.callSid;
+              if (browserCallSid && !callSidsToTerminate.includes(browserCallSid)) {
+                callSidsToTerminate.push(browserCallSid);
+              }
+            }
+            if (TwilioRTC.state?.connection?.parameters) {
+              const connCallSid = TwilioRTC.state.connection.parameters.CallSid || TwilioRTC.state.connection.parameters.callSid;
+              if (connCallSid && !callSidsToTerminate.includes(connCallSid)) {
+                callSidsToTerminate.push(connCallSid);
+              }
+            }
+          } catch(_) {}
+          
+          // Add any stored child CallSids (from status callbacks)
+          try {
+            if (window.storedDialCallSids && Array.isArray(window.storedDialCallSids)) {
+              window.storedDialCallSids.forEach(sid => {
+                if (sid && !callSidsToTerminate.includes(sid)) {
+                  callSidsToTerminate.push(sid);
+                }
+              });
+            }
+          } catch(_) {}
+          
+          // Terminate all call legs BEFORE disconnecting browser client (per Twilio recommendation)
+          if (callSidsToTerminate.length > 0) {
             try {
               const base = (window.API_BASE_URL || '').replace(/\/$/, '');
-              console.debug('[Phone] DISCONNECT: Terminating server call SID (non-blocking):', sidToTerminate);
+              console.debug('[Phone] DISCONNECT: Terminating all call legs before browser disconnect:', callSidsToTerminate);
               // Fire-and-forget; do not await
               fetch(`${base}/api/twilio/hangup`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ callSid: sidToTerminate })
+                body: JSON.stringify({ callSids: callSidsToTerminate })
               }).catch(()=>{});
             } catch(_) { /* ignore */ }
+            window.currentServerCallSid = null;
+            window.storedDialCallSids = null;
           }
           
           // [REMOVED] Audio device release - was causing UI freeze on hangup
@@ -3883,6 +3939,57 @@
           
         } catch(e) {
           console.error('[Phone] Error during manual hangup:', e);
+        }
+        
+        // CRITICAL: Terminate all related call legs BEFORE clearing state
+        // Collect all CallSids: server call, browser call, and any stored child SIDs
+        const callSidsToTerminate = [];
+        
+        // Add server-side call SID
+        if (window.currentServerCallSid) {
+          callSidsToTerminate.push(window.currentServerCallSid);
+        }
+        
+        // Add browser client CallSids
+        try {
+          if (currentCall && currentCall.parameters) {
+            const browserCallSid = currentCall.parameters.CallSid || currentCall.parameters.callSid;
+            if (browserCallSid && !callSidsToTerminate.includes(browserCallSid)) {
+              callSidsToTerminate.push(browserCallSid);
+            }
+          }
+          if (TwilioRTC.state?.connection?.parameters) {
+            const connCallSid = TwilioRTC.state.connection.parameters.CallSid || TwilioRTC.state.connection.parameters.callSid;
+            if (connCallSid && !callSidsToTerminate.includes(connCallSid)) {
+              callSidsToTerminate.push(connCallSid);
+            }
+          }
+        } catch(_) {}
+        
+        // Add stored child CallSids
+        try {
+          if (window.storedDialCallSids && Array.isArray(window.storedDialCallSids)) {
+            window.storedDialCallSids.forEach(sid => {
+              if (sid && !callSidsToTerminate.includes(sid)) {
+                callSidsToTerminate.push(sid);
+              }
+            });
+          }
+        } catch(_) {}
+        
+        // Terminate all call legs BEFORE disconnecting browser client (per Twilio recommendation)
+        if (callSidsToTerminate.length > 0) {
+          try {
+            const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+            console.debug('[Phone] Manual hangup - terminating all call legs:', callSidsToTerminate);
+            fetch(`${base}/api/twilio/hangup`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ callSids: callSidsToTerminate })
+            }).catch(() => {});
+          } catch(_) {}
+          window.currentServerCallSid = null;
+          window.storedDialCallSids = null;
         }
         
         // Force clear ALL state immediately

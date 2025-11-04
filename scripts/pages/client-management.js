@@ -6,8 +6,8 @@
     loaded: false,
     loading: false,
     eventsInitialized: false, // Add this flag
-    userEmail: window.currentUserEmail || '',
-    isAdmin: window.currentUserRole === 'admin',
+    userEmail: '', // Will be set after auth is ready
+    isAdmin: false, // Will be set after auth is ready
     data: {
       accounts: [],
       contacts: [],
@@ -130,14 +130,51 @@
     return 'smb';
   }
 
+  // Wait for auth to be ready
+  async function waitForAuth() {
+    // Check if auth is already ready
+    if (window.currentUserEmail && window.currentUserRole) {
+      return true;
+    }
+    
+    // Wait for auth (max 3 seconds)
+    for (let i = 0; i < 30; i++) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if (window.currentUserEmail && window.currentUserRole) {
+        return true;
+      }
+    }
+    
+    // Check Firebase auth directly as fallback
+    if (window.firebase && window.firebase.auth && window.firebase.auth().currentUser) {
+      const user = window.firebase.auth().currentUser;
+      if (user && user.email) {
+        const emailLower = user.email.toLowerCase();
+        window.currentUserEmail = emailLower;
+        window.currentUserRole = (emailLower === 'l.patterson@powerchoosers.com') ? 'admin' : 'employee';
+        state.userEmail = emailLower;
+        state.isAdmin = window.currentUserRole === 'admin';
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
   // Load real data from cache-first approach
   async function loadClientData() {
     const startTime = performance.now();
     
-    if (!state.userEmail) {
-      showError('User authentication required');
+    // Wait for auth to be ready
+    const authReady = await waitForAuth();
+    if (!authReady) {
+      showError('User authentication required. Please log in.');
       return;
     }
+    
+    // Update state from global variables (in case they changed)
+    state.userEmail = window.currentUserEmail || '';
+    state.isAdmin = window.currentUserRole === 'admin';
 
     showLoading();
 
@@ -147,11 +184,14 @@
       const cachedContacts = await window.CacheManager?.get('contacts') || [];
       const cachedTasks = await window.CacheManager?.get('tasks') || [];
       
-      // 2. Filter by ownership if not admin
+      // BackgroundAccountsLoader already filters accounts based on role
+      // Admin sees all accounts, employees see only their own
+      // So we can trust the cached data is already filtered correctly
+      state.data.accounts = cachedAccounts;
+      
+      // Filter contacts and tasks by ownership if not admin
+      // (These are not pre-filtered by their loaders)
       if (!state.isAdmin && state.userEmail) {
-        state.data.accounts = cachedAccounts.filter(acc => 
-          acc.ownerId === state.userEmail || acc.assignedTo === state.userEmail
-        );
         state.data.contacts = cachedContacts.filter(contact => 
           contact.ownerId === state.userEmail || contact.assignedTo === state.userEmail
         );
@@ -159,7 +199,6 @@
           task.ownerId === state.userEmail || task.assignedTo === state.userEmail
         );
       } else {
-        state.data.accounts = cachedAccounts;
         state.data.contacts = cachedContacts;
         state.data.tasks = cachedTasks;
       }
@@ -211,18 +250,35 @@
 
   // Real-time event listeners for live updates
   function setupRealTimeUpdates() {
+    // Listen for auth state changes (user logs in/out)
+    if (window.firebase && window.firebase.auth) {
+      window.firebase.auth().onAuthStateChanged(async (user) => {
+        if (user && user.email) {
+          const emailLower = user.email.toLowerCase();
+          state.userEmail = emailLower;
+          state.isAdmin = window.currentUserRole === 'admin';
+          
+          // Reload data when user logs in
+          if (!state.loaded) {
+            await loadClientData();
+          }
+        } else {
+          // User logged out
+          state.userEmail = '';
+          state.isAdmin = false;
+          state.loaded = false;
+          showError('User authentication required. Please log in.');
+        }
+      });
+    }
+    
     // Listen for account updates
     document.addEventListener('pc:accounts-loaded', (event) => {
       console.log('[ClientManagement] Accounts updated, refreshing...');
+      // BackgroundAccountsLoader already filters accounts based on role
+      // Admin sees all, employees see only their own
       const accounts = window.BackgroundAccountsLoader?.getAccountsData() || [];
-      
-      if (!state.isAdmin && state.userEmail) {
-        state.data.accounts = accounts.filter(acc => 
-          acc.ownerId === state.userEmail || acc.assignedTo === state.userEmail
-        );
-      } else {
-        state.data.accounts = accounts;
-      }
+      state.data.accounts = accounts;
       
       if (state.loaded) {
         renderClientList();
@@ -739,14 +795,19 @@
     // Data will be updated via event listeners automatically
   }
 
-  function show() {
+  async function show() {
     if (!initDomRefs()) return;
     
-    // Check if user is authenticated
-    if (!state.userEmail) {
+    // Wait for auth to be ready before checking
+    const authReady = await waitForAuth();
+    if (!authReady) {
       showError('User authentication required. Please log in.');
       return;
     }
+    
+    // Update state from global variables
+    state.userEmail = window.currentUserEmail || '';
+    state.isAdmin = window.currentUserRole === 'admin';
 
     // Set up real-time updates (only once)
     if (!state.eventsInitialized) {
@@ -758,7 +819,7 @@
     
     // Load data if not already loaded
     if (!state.loaded) {
-      loadClientData();
+      await loadClientData();
     } else {
       // Already loaded, just render
       renderDashboard();

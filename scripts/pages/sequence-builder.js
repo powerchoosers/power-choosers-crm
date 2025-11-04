@@ -2178,14 +2178,27 @@ class FreeSequenceAutomation {
                         <textarea class="ai-prompt input-dark" rows="3" placeholder="Describe the email you want... (tone, goal, offer, CTA)">${escapeHtml(step.data?.aiPrompt || '')}</textarea>
                       </div>
                       <div class="ai-row suggestions" role="list">
-                        <button class="ai-suggestion" type="button" data-prompt="Write an immediate follow-up email after our phone conversation">Immediate follow-up</button>
-                        <button class="ai-suggestion" type="button" data-prompt="Write a same-day check-in email to maintain momentum">Same day check-in</button>
-                        <button class="ai-suggestion" type="button" data-prompt="Write a weekly touchpoint email to stay top of mind">Weekly touchpoint</button>
                         <button class="ai-suggestion" type="button" 
                           data-prompt-template="first-email-intro"
                           data-cta-variant="true">First email introduction</button>
-                        <button class="ai-suggestion" type="button" data-prompt="Write a nurture email that provides value and builds relationship">Middle sequence nurture</button>
-                        <button class="ai-suggestion" type="button" data-prompt="Write a final email with a clear call-to-action and next steps">Final sequence ask</button>
+                        <button class="ai-suggestion" type="button" 
+                          data-prompt-template="follow-up-value">Follow-up #1 - Value Add (No Response)</button>
+                        <button class="ai-suggestion" type="button" 
+                          data-prompt-template="follow-up-curiosity">Follow-up #2 - Curiosity Angle</button>
+                        <button class="ai-suggestion" type="button" 
+                          data-prompt-template="nurture-value">Nurture - Industry Insight</button>
+                        <button class="ai-suggestion" type="button" 
+                          data-prompt-template="post-convo-recap">Post-Call Recap & Next Steps</button>
+                        <button class="ai-suggestion" type="button" 
+                          data-prompt-template="info-request-bill">Request - Bill/Energy Data</button>
+                        <button class="ai-suggestion" type="button" 
+                          data-prompt-template="final-ask-close">Final Close - Strong Ask</button>
+                        <button class="ai-suggestion" type="button" 
+                          data-prompt-template="objection-all-set">Response - "We're All Set"</button>
+                        <button class="ai-suggestion" type="button" 
+                          data-prompt-template="objection-interested">Response - They Show Interest</button>
+                        <button class="ai-suggestion" type="button" 
+                          data-prompt-template="objection-not-interested">Response - Not Interested</button>
                       </div>
                       <div class="ai-row actions">
                         <button class="fmt-btn ai-generate" data-mode="standard">Generate Standard</button>
@@ -2533,6 +2546,96 @@ class FreeSequenceAutomation {
     return random.text;
   }
 
+  // ========== FOLLOW-UP CTA VARIANTS ==========
+  
+  // CTA variants for Follow-up #1 (Value Add - No Response)
+  const FOLLOWUP_CTA_VARIANTS_STEP2 = [
+    {
+      id: 'competitive-review',
+      text: 'How often do you review if you\'re still competitive?',
+      role: 'all'
+    },
+    {
+      id: 'problem-frustration',
+      text: 'What\'s been the most frustrating part about energy procurement?',
+      role: 'all'
+    },
+    {
+      id: 'lock-in-timing',
+      text: 'Are you planning to lock in rates this quarter or wait?',
+      role: 'controller'
+    },
+    {
+      id: 'peer-reference',
+      text: 'I\'ve seen companies like yours do [X]—worth exploring?',
+      role: 'all'
+    },
+    {
+      id: 'decision-process',
+      text: 'When you renew, do you typically shop 6 months early or wait?',
+      role: 'all'
+    },
+    {
+      id: 'budget-planning',
+      text: 'How does energy cost predictability factor into your budget planning?',
+      role: 'finance'
+    }
+  ];
+
+  // CTA variants for Follow-up #2 (Curiosity Angle)
+  const FOLLOWUP_CTA_VARIANTS_STEP3 = [
+    {
+      id: 'timing-question',
+      text: 'Quick question—when you renew, do you shop 6 months early?',
+      role: 'all'
+    },
+    {
+      id: 'values-question',
+      text: 'What would matter most in a new supplier?',
+      role: 'all'
+    },
+    {
+      id: 'discovery-question',
+      text: 'Have you ever done a rate comparison?',
+      role: 'all'
+    },
+    {
+      id: 'future-focused',
+      text: 'How are you thinking about the upcoming renewal?',
+      role: 'all'
+    },
+    {
+      id: 'process-question',
+      text: 'How do you typically evaluate suppliers when shopping?',
+      role: 'all'
+    },
+    {
+      id: 'budget-question',
+      text: 'Does rate lock timing affect your budget planning?',
+      role: 'finance'
+    }
+  ];
+
+  // Get random CTA for follow-up #1
+  function getRandomFollowUpCTA1(role = 'all') {
+    const filtered = FOLLOWUP_CTA_VARIANTS_STEP2.filter(cta => 
+      cta.role === 'all' || cta.role === role
+    );
+    if (filtered.length === 0) return FOLLOWUP_CTA_VARIANTS_STEP2[0].text;
+    const random = filtered[Math.floor(Math.random() * filtered.length)];
+    return random.text;
+  }
+
+  // Get random CTA for follow-up #2
+  function getRandomFollowUpCTA2(role = 'all') {
+    const filtered = FOLLOWUP_CTA_VARIANTS_STEP3.filter(cta => 
+      cta.role === 'all' || cta.role === role
+    );
+    if (filtered.length === 0) return FOLLOWUP_CTA_VARIANTS_STEP3[0].text;
+    const random = filtered[Math.floor(Math.random() * filtered.length)];
+    return random.text;
+  }
+
   // Build improved first email introduction prompt with dynamic CTA
   function buildFirstEmailIntroPrompt(ctaVariant = true, role = 'all') {
     const cta = ctaVariant ? getRandomCTA(role) : COLD_EMAIL_CTA_VARIANTS[0].text;
@@ -2604,6 +2707,381 @@ class FreeSequenceAutomation {
 
 ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should sound like their peer—a 29-year-old Texas business pro who knows the industry and has talked to others in their situation. Be conversational, confident, and direct.`;
   }
+
+  // ========== FOLLOW-UP PROMPT BUILDERS ==========
+
+  function buildFollowUpValuePrompt(ctaVariant = true, role = 'all') {
+    const cta = ctaVariant ? getRandomFollowUpCTA1(role) : FOLLOWUP_CTA_VARIANTS_STEP2[0].text;
+    
+    return `Write a follow-up email after the initial cold introduction received no response.
+
+KEY DIFFERENCES FROM FIRST EMAIL:
+- SHORTER: 40-50% shorter than initial (50-80 words max)
+- NEW ANGLE: introduce a different observation or insight they haven't seen
+- VALUE FOCUSED: provide something helpful, not just "did you see my email?"
+- NEW INSIGHT: reference a peer insight or industry trend they'd care about
+- SINGLE CTA: one ask only
+
+STRUCTURE:
+1. Open with OBSERVATION - something specific to their business/role (different from first email)
+2. Include INSIGHT - 1-2 sentences about a common mistake companies are making
+3. Provide VALUE - quick tip, stat, or resource relevant to their situation
+4. Close with SOFT CTA - Use THIS specific CTA (don't change it, use exactly as written):
+   "${cta}"
+
+TONE: Consultative, not pushy. Genuinely curious, not following up just because you have to.
+
+AVOID:
+- "Didn't see my last email..."
+- "Just checking in..."
+- "Wanted to follow up"
+- Generic "I can help you save money"
+
+SOUND LIKE: 29-year-old Texas professional, peer-to-peer, not salesy
+- Use contractions (I'm, you're, don't)
+- Short sentences mixed with normal ones
+- Real observation, not corporate speak
+
+EMAIL DETAILS:
+- To: [contact_name] at [company_name]
+- Role: [contact_job_title]
+- Industry: [company_industry]
+- Location: [company_location]
+
+LENGTH: 50-80 words max
+PURPOSE: Keep conversation alive with new angle`;
+  }
+
+  function buildFollowUpCuriosityPrompt(ctaVariant = true, role = 'all') {
+    const cta = ctaVariant ? getRandomFollowUpCTA2(role) : FOLLOWUP_CTA_VARIANTS_STEP3[0].text;
+    
+    return `Write a second follow-up email with a DIFFERENT angle than the first.
+
+KEY PRINCIPLE: People respond to curiosity questions more than asks.
+
+STRUCTURE:
+1. OBSERVATION - reference something new they might not have considered
+2. STORY/STAT - share what you're seeing with similar companies
+3. DIRECT QUESTION - ask them something that makes THEM think about their situation
+4. SOFT CTA - Use THIS specific question (don't change it, use exactly as written):
+   "${cta}"
+
+FOR ENERGY CONTEXT:
+- If they haven't responded to contract/pricing angle:
+  - Ask about HOW they make decisions (not IF they want to meet)
+  - Reference decision-making process other CEOs/Controllers use
+  - Use their decision-making as conversation starter
+
+TONE: Genuine curiosity, not another pitch attempt
+
+AVOID:
+- Repeating the same value prop
+- "Just wanted to follow up again"
+- Being pushy about meeting
+
+SOUND LIKE: Natural, conversational
+
+EMAIL DETAILS:
+- To: [contact_name] at [company_name]
+- Role: [contact_job_title]
+- Industry: [company_industry]
+
+LENGTH: 60-90 words max`;
+  }
+
+  function buildNurtureValuePrompt() {
+    return `Write a nurture email focused on STAYING TOP-OF-MIND with genuine value.
+
+KEY PRINCIPLE: This is NOT a sales email. This is "I'm sharing something useful" email.
+
+STRUCTURE:
+1. NO SUBJECT CHANGE - reference previous conversation naturally
+2. SHORT INTRO - 1 sentence
+3. INSIGHT OR RESOURCE - share 1 valuable thing (stat, article, case study, tip)
+4. WHY IT MATTERS - 1 sentence on why this is relevant to THEM specifically
+5. SOFT TOUCH - "thought you'd want to see this" or "saw this and thought of your situation"
+6. LIGHT CTA - "let me know if this sparks ideas" or "happy to discuss if you want"
+
+VALUE IDEAS:
+- Market data: "X% of companies in [industry] facing Y trend"
+- Case study: "Company similar to yours handled this by..."
+- Stat: "Latest research shows [relevant finding]"
+- Tip: "One thing I've noticed with companies like yours..."
+- Article: "Came across this, thought it might be useful"
+
+FOR ENERGY INDUSTRY:
+- Share Q4 energy market trends
+- Reference upcoming contract renewal season timing
+- Share budget planning insight
+- Mention industry rate changes
+
+TONE: Helpful professional, not salesy
+
+EMAIL DETAILS:
+- To: [contact_name] at [company_name]
+- Industry: [company_industry]
+
+LENGTH: 50-75 words max`;
+  }
+
+  function buildPostConvoRecapPrompt() {
+    return `Write a follow-up email AFTER a phone conversation.
+
+This is NOT cold anymore. You've talked. Now document and move forward.
+
+STRUCTURE:
+1. WARM OPENING - thank them for their time, mention something specific they said
+2. RECAP - 2-3 sentences summarizing what you discussed (shows you were listening)
+3. KEY TAKEAWAYS - bullet the 2-3 main problems/needs they shared
+4. YOUR THINKING - 1 sentence on how you could help
+5. NEXT STEPS - SPECIFIC: "I'll send [X by date]" or "Let's [ask] by [date]"
+6. CLOSING - low pressure, confident
+
+RECAP EXAMPLE:
+"Thanks for the call this morning. I really appreciated how you broke down the timing challenge—especially the part about renewals hitting during peak season."
+
+KEY TAKEAWAYS (bullet format):
+- Need: Lock in rates earlier to avoid peak-season markup
+- Challenge: Current supplier doesn't give visibility until 60 days out
+- Goal: Simplify process so you're not scrambling
+
+NEXT STEPS OPTIONS:
+- "I'll send you a breakdown of how timing affects savings by Friday"
+- "Let's schedule 20 min next week to walk through market options"
+- "I'll pull market data specific to your facilities and send Tuesday"
+
+TONE: Grateful, professional, action-oriented
+
+EMAIL DETAILS:
+- To: [contact_name] at [company_name]
+
+LENGTH: 80-120 words max`;
+  }
+
+  function buildInfoRequestBillPrompt() {
+    return `Write an email requesting a recent energy bill copy.
+
+KEY PRINCIPLE: Make it EASY and LOW-PRESSURE. You need ONE recent bill from the last 6 months to show real savings.
+
+STRUCTURE:
+1. WARM REFERENCE - mention recent conversation naturally
+2. PURPOSE - explain why you need this (analysis, comparison quotes, etc.)
+3. REASSURANCE - address concerns: "just for analysis," "confidential," "no commitment"
+4. MAKE IT EASY - tell them EXACTLY what to send (ONE recent bill from last 6 months)
+5. OPTIONAL PICKUP - ONLY offer pickup if account location is Fort Worth, TX or Dallas, TX (check [account_city] and [account_state])
+6. DEADLINE - specific date ("by EOD Thursday") not vague
+7. CLOSING - friendly, low pressure
+
+PURPOSE OPTIONS:
+- "So I can analyze current rates and show competitive quotes"
+- "To run with other suppliers and get actual comparison numbers"
+- "So we can identify quick wins specific to your usage"
+
+MAKE IT EASY:
+- "Just forward ONE recent bill from the last 6 months"
+- "Can be PDF, image, or whatever's easiest"
+- "Takes 2 minutes to scan and send"
+- ONLY IF LOCATION IS FORT WORTH OR DALLAS, TX: "Or if easier, I can arrange to pick it up [specific day/time]"
+
+IMPORTANT PICKUP RULES:
+- Check [account_city] and [account_state] from account information
+- ONLY offer pickup if: ([account_city] contains "Fort Worth" OR "Dallas") AND [account_state] is "TX" or "Texas"
+- If NOT in Fort Worth/Dallas, TX: DO NOT mention pickup at all
+- If pickup is offered, be specific: "I can arrange to pick it up [specific day] afternoon"
+
+REASSURANCE:
+- "This is just for analysis—no commitment"
+- "Data kept completely confidential"
+- "Just comparing against current market rates"
+
+TONE: Low pressure, professional, helpful
+
+EMAIL DETAILS:
+- To: [contact_name] at [company_name]
+- Account Location: [account_city], [account_state] (use this to determine if pickup offer applies)
+
+LENGTH: 80-100 words max`;
+  }
+
+  function buildFinalAskClosePrompt() {
+    return `Write a closing email with a clear, strong call-to-action.
+
+KEY PRINCIPLE: Move from exploration to decision. Be confident and specific.
+
+STRUCTURE:
+1. CONTEXT REMINDER - briefly reference the journey
+2. WHAT YOU'VE LEARNED - 1-2 sentences on their specific situation
+3. YOUR RECOMMENDATION - state clearly what you suggest (not wishy-washy)
+4. SPECIFIC VALUE - remind them of 1 key benefit/savings
+5. CLEAR CTA - not "let me know," use specific action
+6. TIMELINE - specific and urgent but realistic
+7. BACKUP CTA - alternative if main one doesn't work
+
+STRONG CTA EXAMPLES:
+- "Here's what I need: Send me [X] and I'll have quotes by [DATE]"
+- "Next step: Let's do 20 min [specific time] to walk through proposal"
+- "I have competitive analysis ready. First step: Lock in [DATE] to review"
+- "I'm confident we can get you [X benefit]. First step: [DATE] to review options"
+
+AVOID (Weak CTAs):
+- "Let me know if you want to proceed"
+- "Would you be interested in discussing further?"
+- "Feel free to reach out if you have questions"
+- "We should probably talk next week"
+
+VALUE REMINDER:
+- 15-20% savings based on current market
+- Locked-in rates = budget certainty
+- Simplified process vs. current supplier
+- Better terms because shopping early
+
+TIMELINE:
+- "I can have quotes by [SPECIFIC DATE]"
+- "Let's schedule [SPECIFIC DAY/TIME], 30 min"
+- "Decision needed by [DATE] to lock in window"
+
+BACKUP CTA:
+Always give one option back: "If [MAIN] doesn't work, [ALTERNATIVE]"
+
+TONE: Confident, specific, not pushy. You know what should happen next.
+
+EMAIL DETAILS:
+- To: [contact_name] at [company_name]
+
+LENGTH: 100-130 words max`;
+  }
+
+  // ========== OBJECTION HANDLING PROMPT BUILDERS ==========
+
+  function buildObjectionAllSetPrompt() {
+    return `Write an email response to a prospect who says "We're all set with our current supplier."
+
+DO NOT:
+- Challenge them or doubt them
+- Go hard on sales
+- Repeat your initial pitch
+
+DO:
+- Acknowledge their position positively
+- Reframe to optimization/future-proofing
+- Ask consultative question that makes them think
+- Leave door open for future
+
+STRUCTURE:
+1. VALIDATION - "That's great you've got a setup that works"
+2. OBSERVATION - "What I'm seeing this quarter though is..."
+3. QUESTION - ask something about their process/decision-making
+4. INSIGHT - 1 thing they might not be considering
+5. SOFT OFFER - "Would it be worth a quick look?" or "Worth staying connected?"
+
+QUESTION EXAMPLES:
+- "How often do you review if your current rates are still competitive?"
+- "When your contract renews, how far out do you typically start shopping?"
+- "Does your current supplier give you transparency into market rates?"
+- "Have you run a competitive analysis recently?"
+
+INSIGHT EXAMPLES:
+- "Most companies I talk to don't realize renewal timing costs them 15-20%"
+- "Lock-in timing is when you actually save money—not just best price"
+- "Your supplier probably doesn't tell you when rate changes are coming"
+
+TONE: Respectful, consultative, peer-to-peer
+
+GOAL: Keep relationship alive, position for future renewal when they DO shop
+
+EMAIL DETAILS:
+- To: [contact_name] at [company_name]
+- Role: [contact_job_title]
+
+LENGTH: 70-100 words max`;
+  }
+
+  function buildObjectionInterestedPrompt() {
+    return `Write an email response to a prospect showing genuine interest (asked questions, wants more info).
+
+THIS IS HIGH INTENT - move fast but stay professional.
+
+STRUCTURE:
+1. ENTHUSIASM - acknowledge their interest (not over the top)
+2. ANSWER - directly address their question/request
+3. PROVIDE WHAT THEY ASKED FOR - specific, useful
+4. NEXT STEP - move toward conversation or information exchange
+5. TIMELINE - give them a specific next date/action
+
+ANSWER EXAMPLES:
+If they ask "How much could we save?"
+→ "Based on companies similar to yours in [industry], typically 15-20% on renewal. I'd need to see your current bill to give you exact numbers."
+
+If they ask "How does this work?"
+→ "Simply put: [step 1], [step 2], [step 3]. Takes 30 days from analysis to locked-in rates."
+
+If they ask "Who else have you worked with?"
+→ "Recent wins include [similar company], [competitor], [same industry]. Happy to share specifics on a call."
+
+NEXT STEP - Be specific:
+- "Can we lock in 20 min Tuesday at [TIME] to walk through your specific situation?"
+- "Send me your current bill and I'll have a preliminary analysis to you by [DATE]"
+- "Let's schedule a brief call this week—I'm available [OPTIONS]"
+
+TONE: Helpful, professional, moving momentum forward
+
+GOAL: Convert interest into action (meeting, data sharing, etc.)
+
+EMAIL DETAILS:
+- To: [contact_name] at [company_name]
+- Role: [contact_job_title]
+
+LENGTH: 80-120 words max`;
+  }
+
+  function buildObjectionNotInterestedPrompt() {
+    return `Write an email response to a prospect who says they're not interested.
+
+DO NOT:
+- Try to convince them they're wrong
+- Go harder on sales
+- Get defensive
+
+DO:
+- Thank them professionally
+- Acknowledge their decision
+- Leave door genuinely open
+- Position for future
+
+STRUCTURE:
+1. RESPECT - "I appreciate you being direct"
+2. BRIEF REASON - "I get it, you've got things dialed in"
+3. STAY CURIOUS - "One question though..."
+4. FINAL OFFER - "If anything changes..." or "When [event] happens..."
+5. GRACEFUL EXIT - leave them with your info for future
+
+EXAMPLES:
+
+For "not interested now":
+"Totally understand. Just so you know, renewal cycle is usually when things shift. Would it be worth staying connected when that window opens?"
+
+For "already shopping":
+"That makes sense. If you'd like a third option when you're comparing, I'm here. No pressure."
+
+For "too expensive":
+"I get it, budget is real. What often happens is when you factor in time saved + rate difference, the math changes. Worth circling back in Q1?"
+
+FINAL OFFER:
+- "I'll stay in touch when renewal season starts"
+- "Feel free to reach out when you're ready to shop"
+- "Happy to be a resource down the line"
+
+TONE: Professional, respectful, genuine
+
+GOAL: Not force the sale, but stay in their orbit for when they DO need you
+
+EMAIL DETAILS:
+- To: [contact_name] at [company_name]
+
+LENGTH: 60-90 words max`;
+  }
+
+  // ========== END OBJECTION HANDLING PROMPT BUILDERS ==========
 
   // Get signature HTML for preview if settings allow it
   function getSignatureForPreview(step, isAuto) {
@@ -3157,14 +3635,27 @@ ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should s
                       placeholder="Describe the email you want... (tone, goal, offer, CTA)"></textarea>
           </div>
           <div class="ai-row suggestions" role="list">
-            <button class="ai-suggestion" type="button" data-prompt="Write an immediate follow-up email after our phone conversation">Immediate follow-up</button>
-            <button class="ai-suggestion" type="button" data-prompt="Write a same-day check-in email to maintain momentum">Same day check-in</button>
-            <button class="ai-suggestion" type="button" data-prompt="Write a weekly touchpoint email to stay top of mind">Weekly touchpoint</button>
             <button class="ai-suggestion" type="button" 
               data-prompt-template="first-email-intro"
               data-cta-variant="true">First email introduction</button>
-            <button class="ai-suggestion" type="button" data-prompt="Write a nurture email that provides value and builds relationship">Middle sequence nurture</button>
-            <button class="ai-suggestion" type="button" data-prompt="Write a final email with a clear call-to-action and next steps">Final sequence ask</button>
+            <button class="ai-suggestion" type="button" 
+              data-prompt-template="follow-up-value">Follow-up #1 - Value Add (No Response)</button>
+            <button class="ai-suggestion" type="button" 
+              data-prompt-template="follow-up-curiosity">Follow-up #2 - Curiosity Angle</button>
+            <button class="ai-suggestion" type="button" 
+              data-prompt-template="nurture-value">Nurture - Industry Insight</button>
+            <button class="ai-suggestion" type="button" 
+              data-prompt-template="post-convo-recap">Post-Call Recap & Next Steps</button>
+            <button class="ai-suggestion" type="button" 
+              data-prompt-template="info-request-bill">Request - Bill/Energy Data</button>
+            <button class="ai-suggestion" type="button" 
+              data-prompt-template="final-ask-close">Final Close - Strong Ask</button>
+            <button class="ai-suggestion" type="button" 
+              data-prompt-template="objection-all-set">Response - "We're All Set"</button>
+            <button class="ai-suggestion" type="button" 
+              data-prompt-template="objection-interested">Response - They Show Interest</button>
+            <button class="ai-suggestion" type="button" 
+              data-prompt-template="objection-not-interested">Response - Not Interested</button>
           </div>
           <div class="ai-row actions">
             <button class="fmt-btn ai-generate" data-mode="standard">Generate Standard</button>
@@ -4015,27 +4506,96 @@ ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should s
           btn.addEventListener('click', (e) => {
             e.preventDefault();
             
-            // Check if this button uses dynamic CTA variants
+            // Check if this button uses dynamic templates
             const isVariant = btn.getAttribute('data-cta-variant') === 'true';
             const template = btn.getAttribute('data-prompt-template');
             
             let prompt;
             
-            if (isVariant && template === 'first-email-intro') {
-              // Build prompt with random CTA
-              // Try to detect role from step or contact if available
-              const stepId = stepCard.getAttribute('data-step-id');
-              const step = state.currentSequence?.steps?.find(s => s.id === stepId);
-              const contactRole = step?.data?.previewContact?.title || step?.data?.previewContact?.job || 'all';
-              
-              // Determine if finance role for CTA selection
-              const role = (contactRole && typeof contactRole === 'string' && 
-                           (contactRole.toLowerCase().includes('finance') || 
-                            contactRole.toLowerCase().includes('cfo') || 
-                            contactRole.toLowerCase().includes('controller') ||
-                            contactRole.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
-              
-              prompt = buildFirstEmailIntroPrompt(true, role);
+            if (template) {
+              // Handle template-based prompts
+              switch (template) {
+                case 'first-email-intro':
+                  // Build prompt with random CTA
+                  // Try to detect role from step or contact if available
+                  const stepId = stepCard.getAttribute('data-step-id');
+                  const step = state.currentSequence?.steps?.find(s => s.id === stepId);
+                  const contactRole = step?.data?.previewContact?.title || step?.data?.previewContact?.job || 'all';
+                  
+                  // Determine if finance role for CTA selection
+                  const role = (contactRole && typeof contactRole === 'string' && 
+                               (contactRole.toLowerCase().includes('finance') || 
+                                contactRole.toLowerCase().includes('cfo') || 
+                                contactRole.toLowerCase().includes('controller') ||
+                                contactRole.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
+                  
+                  prompt = buildFirstEmailIntroPrompt(true, role);
+                  break;
+                  
+                case 'follow-up-value':
+                  // Try to detect role from step or contact if available
+                  const stepId2 = stepCard.getAttribute('data-step-id');
+                  const step2 = state.currentSequence?.steps?.find(s => s.id === stepId2);
+                  const contactRole2 = step2?.data?.previewContact?.title || step2?.data?.previewContact?.job || 'all';
+                  
+                  // Determine if finance role for CTA selection
+                  const role2 = (contactRole2 && typeof contactRole2 === 'string' && 
+                               (contactRole2.toLowerCase().includes('finance') || 
+                                contactRole2.toLowerCase().includes('cfo') || 
+                                contactRole2.toLowerCase().includes('controller') ||
+                                contactRole2.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
+                  
+                  prompt = buildFollowUpValuePrompt(true, role2);
+                  break;
+                  
+                case 'follow-up-curiosity':
+                  // Try to detect role from step or contact if available
+                  const stepId3 = stepCard.getAttribute('data-step-id');
+                  const step3 = state.currentSequence?.steps?.find(s => s.id === stepId3);
+                  const contactRole3 = step3?.data?.previewContact?.title || step3?.data?.previewContact?.job || 'all';
+                  
+                  // Determine if finance role for CTA selection
+                  const role3 = (contactRole3 && typeof contactRole3 === 'string' && 
+                               (contactRole3.toLowerCase().includes('finance') || 
+                                contactRole3.toLowerCase().includes('cfo') || 
+                                contactRole3.toLowerCase().includes('controller') ||
+                                contactRole3.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
+                  
+                  prompt = buildFollowUpCuriosityPrompt(true, role3);
+                  break;
+                  
+                case 'nurture-value':
+                  prompt = buildNurtureValuePrompt();
+                  break;
+                  
+                case 'post-convo-recap':
+                  prompt = buildPostConvoRecapPrompt();
+                  break;
+                  
+                case 'info-request-bill':
+                  prompt = buildInfoRequestBillPrompt();
+                  break;
+                  
+                case 'final-ask-close':
+                  prompt = buildFinalAskClosePrompt();
+                  break;
+                  
+                case 'objection-all-set':
+                  prompt = buildObjectionAllSetPrompt();
+                  break;
+                  
+                case 'objection-interested':
+                  prompt = buildObjectionInterestedPrompt();
+                  break;
+                  
+                case 'objection-not-interested':
+                  prompt = buildObjectionNotInterestedPrompt();
+                  break;
+                  
+                default:
+                  // Fallback to static prompt
+                  prompt = btn.getAttribute('data-prompt');
+              }
             } else {
               // Use static prompt
               prompt = btn.getAttribute('data-prompt');
@@ -5077,28 +5637,99 @@ ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should s
         btn.addEventListener('click', (e) => {
           e.preventDefault();
           
-          // Check if this button uses dynamic CTA variants
+          // Check if this button uses dynamic templates
           const isVariant = btn.getAttribute('data-cta-variant') === 'true';
           const template = btn.getAttribute('data-prompt-template');
           
           let prompt;
           
-          if (isVariant && template === 'first-email-intro') {
-            // Build prompt with random CTA
-            // Try to detect role from selected contact if available
-            const stepId = card?.getAttribute('data-id');
-            const step = state.currentSequence?.steps?.find(s => s.id === stepId);
-            const selectedContact = step?.data?.previewContact;
-            const contactRole = selectedContact?.title || selectedContact?.job || selectedContact?.role || 'all';
-            
-            // Determine if finance role for CTA selection
-            const role = (contactRole && typeof contactRole === 'string' && 
-                         (contactRole.toLowerCase().includes('finance') || 
-                          contactRole.toLowerCase().includes('cfo') || 
-                          contactRole.toLowerCase().includes('controller') ||
-                          contactRole.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
-            
-            prompt = buildFirstEmailIntroPrompt(true, role);
+          if (template) {
+            // Handle template-based prompts
+            switch (template) {
+              case 'first-email-intro':
+                // Build prompt with random CTA
+                // Try to detect role from selected contact if available
+                const stepId = card?.getAttribute('data-id');
+                const step = state.currentSequence?.steps?.find(s => s.id === stepId);
+                const selectedContact = step?.data?.previewContact;
+                const contactRole = selectedContact?.title || selectedContact?.job || selectedContact?.role || 'all';
+                
+                // Determine if finance role for CTA selection
+                const role = (contactRole && typeof contactRole === 'string' && 
+                             (contactRole.toLowerCase().includes('finance') || 
+                              contactRole.toLowerCase().includes('cfo') || 
+                              contactRole.toLowerCase().includes('controller') ||
+                              contactRole.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
+                
+                prompt = buildFirstEmailIntroPrompt(true, role);
+                break;
+                
+              case 'follow-up-value':
+                // Try to detect role from selected contact if available
+                const stepId2 = card?.getAttribute('data-id');
+                const step2 = state.currentSequence?.steps?.find(s => s.id === stepId2);
+                const selectedContact2 = step2?.data?.previewContact;
+                const contactRole2 = selectedContact2?.title || selectedContact2?.job || selectedContact2?.role || 'all';
+                
+                // Determine if finance role for CTA selection
+                const role2 = (contactRole2 && typeof contactRole2 === 'string' && 
+                             (contactRole2.toLowerCase().includes('finance') || 
+                              contactRole2.toLowerCase().includes('cfo') || 
+                              contactRole2.toLowerCase().includes('controller') ||
+                              contactRole2.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
+                
+                prompt = buildFollowUpValuePrompt(true, role2);
+                break;
+                
+              case 'follow-up-curiosity':
+                // Try to detect role from selected contact if available
+                const stepId3 = card?.getAttribute('data-id');
+                const step3 = state.currentSequence?.steps?.find(s => s.id === stepId3);
+                const selectedContact3 = step3?.data?.previewContact;
+                const contactRole3 = selectedContact3?.title || selectedContact3?.job || selectedContact3?.role || 'all';
+                
+                // Determine if finance role for CTA selection
+                const role3 = (contactRole3 && typeof contactRole3 === 'string' && 
+                             (contactRole3.toLowerCase().includes('finance') || 
+                              contactRole3.toLowerCase().includes('cfo') || 
+                              contactRole3.toLowerCase().includes('controller') ||
+                              contactRole3.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
+                
+                prompt = buildFollowUpCuriosityPrompt(true, role3);
+                break;
+                
+              case 'nurture-value':
+                prompt = buildNurtureValuePrompt();
+                break;
+                
+              case 'post-convo-recap':
+                prompt = buildPostConvoRecapPrompt();
+                break;
+                
+              case 'info-request-bill':
+                prompt = buildInfoRequestBillPrompt();
+                break;
+                
+              case 'final-ask-close':
+                prompt = buildFinalAskClosePrompt();
+                break;
+                
+              case 'objection-all-set':
+                prompt = buildObjectionAllSetPrompt();
+                break;
+                
+              case 'objection-interested':
+                prompt = buildObjectionInterestedPrompt();
+                break;
+                
+              case 'objection-not-interested':
+                prompt = buildObjectionNotInterestedPrompt();
+                break;
+                
+              default:
+                // Fallback to static prompt
+                prompt = btn.getAttribute('data-prompt');
+            }
           } else {
             // Use static prompt
             prompt = btn.getAttribute('data-prompt');

@@ -7,7 +7,11 @@ class SettingsPage {
             settings: {
                 emailSignature: {
                     text: '',
-                    image: null
+                    image: null,
+                    imageSize: {
+                        width: 200,
+                        height: 100
+                    }
                 },
                 aiTemplates: {
                     warm_intro: '',
@@ -432,6 +436,34 @@ class SettingsPage {
             convertBtn.addEventListener('click', async () => await this.convertDataUrlSignature());
         }
 
+        // Email signature image size inputs
+        const widthInput = document.getElementById('signature-image-size-width');
+        const heightInput = document.getElementById('signature-image-size-height');
+        if (widthInput) {
+            widthInput.addEventListener('input', (e) => {
+                const width = parseInt(e.target.value, 10) || 200;
+                if (!this.state.settings.emailSignature.imageSize) {
+                    this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
+                }
+                this.state.settings.emailSignature.imageSize.width = width;
+                this.markDirty();
+                // Update preview to reflect new size
+                this.renderSignatureSection();
+            });
+        }
+        if (heightInput) {
+            heightInput.addEventListener('input', (e) => {
+                const height = parseInt(e.target.value, 10) || 100;
+                if (!this.state.settings.emailSignature.imageSize) {
+                    this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
+                }
+                this.state.settings.emailSignature.imageSize.height = height;
+                this.markDirty();
+                // Update preview to reflect new size
+                this.renderSignatureSection();
+            });
+        }
+
         // AI Template fields
         const templateFields = [
             'template-warm-intro',
@@ -703,6 +735,10 @@ class SettingsPage {
                                     ...settingsData,
                                     bridgeToMobile: settingsData.bridgeToMobile === true // Ensure boolean
                                 };
+                                // Ensure imageSize is initialized if missing
+                                if (!this.state.settings.emailSignature.imageSize) {
+                                    this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
+                                }
                                 console.log('[Settings] Loaded from CacheManager cache', { bridgeToMobile: this.state.settings.bridgeToMobile });
                                 return;
                             }
@@ -713,6 +749,10 @@ class SettingsPage {
                                 ...settingsData,
                                 bridgeToMobile: settingsData.bridgeToMobile === true // Ensure boolean
                             };
+                            // Ensure imageSize is initialized if missing
+                            if (!this.state.settings.emailSignature.imageSize) {
+                                this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
+                            }
                             console.log('[Settings] Loaded from CacheManager cache', { bridgeToMobile: this.state.settings.bridgeToMobile });
                             return;
                         }
@@ -807,6 +847,12 @@ class SettingsPage {
                                     ...firebaseSettings,
                                     bridgeToMobile: firebaseSettings.bridgeToMobile === true // Ensure boolean
                                 };
+                                // Ensure emailSignature exists and imageSize is initialized if missing
+                                if (!this.state.settings.emailSignature) {
+                                    this.state.settings.emailSignature = { text: '', image: null, imageSize: { width: 200, height: 100 } };
+                                } else if (!this.state.settings.emailSignature.imageSize) {
+                                    this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
+                                }
                                 console.log('[Settings] Loaded from Firebase', { bridgeToMobile: this.state.settings.bridgeToMobile });
                                 
                                 // Cache the settings for future use
@@ -827,6 +873,12 @@ class SettingsPage {
                                 ...firebaseSettings,
                                 bridgeToMobile: firebaseSettings.bridgeToMobile === true // Ensure boolean
                             };
+                            // Ensure emailSignature exists and imageSize is initialized if missing
+                            if (!this.state.settings.emailSignature) {
+                                this.state.settings.emailSignature = { text: '', image: null, imageSize: { width: 200, height: 100 } };
+                            } else if (!this.state.settings.emailSignature.imageSize) {
+                                this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
+                            }
                             console.log('[Settings] Loaded from Firebase', { bridgeToMobile: this.state.settings.bridgeToMobile });
                             
                             // Cache the settings for future use
@@ -1509,9 +1561,12 @@ class SettingsPage {
             html += `<div class="signature-text-preview" style="font-family: inherit; font-size: 14px; color: var(--text-primary); line-height: 1.4; margin-bottom: ${signature.image ? '10px' : '0'};">${textHtml}</div>`;
         }
         if (signature.image) {
+            // Use imageSize from settings, with defaults if not set
+            const width = signature.imageSize?.width || 200;
+            const height = signature.imageSize?.height || 100;
             html += `
                 <div class="signature-image-wrap" style="display:flex; align-items:center; gap:12px;">
-                    <img src="${signature.image}" alt="Signature preview" style="max-width: 200px; max-height: 100px; border-radius: 4px;">
+                    <img src="${signature.image}" alt="Signature preview" style="max-width: ${width}px; max-height: ${height}px; border-radius: 4px;">
                     <button type="button" class="btn-small btn-danger" id="remove-signature-image" title="Remove image">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <polyline points="3,6 5,6 21,6"></polyline>
@@ -1519,6 +1574,16 @@ class SettingsPage {
                         </svg>
                     </button>
                 </div>`;
+        }
+        
+        // Update image size input fields
+        const widthInput = document.getElementById('signature-image-size-width');
+        const heightInput = document.getElementById('signature-image-size-height');
+        if (widthInput) {
+            widthInput.value = signature.imageSize?.width || 200;
+        }
+        if (heightInput) {
+            heightInput.value = signature.imageSize?.height || 100;
         }
 
         // Apply preview state
@@ -2037,7 +2102,10 @@ class SettingsPage {
             }
             
             if (signature.image) {
-                signatureHtml += `<div style="margin-top: 10px;"><img src="${signature.image}" alt="Signature" style="max-width: 200px; max-height: 100px; border-radius: 4px;" /></div>`;
+                // Use imageSize from settings, with defaults if not set
+                const width = signature.imageSize?.width || 200;
+                const height = signature.imageSize?.height || 100;
+                signatureHtml += `<div style="margin-top: 10px;"><img src="${signature.image}" alt="Signature" style="max-width: ${width}px; max-height: ${height}px; border-radius: 4px;" /></div>`;
             }
             
             signatureHtml += '</div>';
