@@ -5561,7 +5561,10 @@ window.getEmailSignature = function() {
                 }
                 
                 if (signature.image) {
-                    signatureHtml += `<div style="margin-top: 10px;"><img src="${signature.image}" alt="Signature" style="max-width: 200px; max-height: 100px; border-radius: 4px;" /></div>`;
+                    // Use imageSize from settings, with defaults if not set
+                    const width = signature.imageSize?.width || 200;
+                    const height = signature.imageSize?.height || 100;
+                    signatureHtml += `<div style="margin-top: 10px;"><img src="${signature.image}" alt="Signature" style="max-width: ${width}px; max-height: ${height}px; border-radius: 4px;" /></div>`;
                 }
                 
                 signatureHtml += '</div>';
