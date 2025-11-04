@@ -1385,14 +1385,15 @@
                 .replace(/'/g, '&#039;');
         }
 
-        // Day part helper
+        // Day part helper - returns greeting for gatekeeper script
         function dayPart() {
             try {
                 const h = new Date().getHours();
-                if (h < 12) return 'morning';
-                if (h < 17) return 'afternoon';
-                return 'evening';
-            } catch(_) { return 'day'; }
+                if (h >= 5 && h < 12) return 'Good morning';
+                if (h >= 12 && h < 17) return 'Good afternoon';
+                if (h >= 17 && h <= 20) return 'Good evening';
+                return 'Hello';
+            } catch(_) { return 'Hello'; }
         }
 
         // Mock data for training (simplified)
@@ -1484,13 +1485,15 @@
             },
             hook: {
                 stage: 'Opening',
-                text: 'Good {{day.part}}, is this <span class="badge contact">(contact name)</span>?',
+                text: '{{day.part}}, is this <span class="badge contact">(contact name)</span>?',
                 responses: [
                     { label: 'Yes, speaking', next: null }, // Will be set dynamically to currentOpener
                     { label: "Who's calling?", next: null }, // Will be set dynamically to currentOpener
-                    { label: 'Not the right person', next: 'gatekeeper_intro' }
+                    { label: 'Gatekeeper', next: 'gatekeeper_intro' }
                 ]
             },
+<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
+grep
             pattern_interrupt_opening: {
                 stage: 'Opening',
                 text: "Hi {{contact.first_name}}, this is <span class=\"name-badge\">(your name)</span> from Power Choosers. <span class=\"pause-indicator\"></span> Real quick though - I'm noticing a pattern with most companies I talk to, they don't have a strategy around electricity. <span class=\"pause-indicator\"></span> And honestly, they're leaving money on the table. <span class=\"pause-indicator\"></span> Do you feel like you have a solid handle on your electricity costs?",
@@ -1520,13 +1523,8 @@
             },
             ack_vendor_handling: {
                 stage: 'Discovery - Transition',
-                text: "<span class=\"tone-marker curious\">respectful, curious tone</span> <span class=\"pause-indicator\"></span> Okay, so you've got someone handling it - that's actually pretty smart. <span class=\"pause-indicator\"></span> Let me ask though, do you know roughly how much you're spending monthly? <span class=\"pause-indicator\"></span> And who's your vendor right now?",
-                responses: [
-                    { label: 'Spending $1K-$5K / vendor is known', next: 'situation_contract_expiry' },
-                    { label: 'Spending $5K-$20K / vendor is known', next: 'situation_contract_expiry' },
-                    { label: 'Spending $20K+ / vendor is known', next: 'situation_contract_expiry' },
-                    { label: "Not sure on either", next: 'situation_monthly_spend' }
-                ]
+                text: "<span class=\"tone-marker curious\">respectful, curious tone</span> <span class=\"pause-indicator\"></span> Okay, so you've got someone handling it - that's actually pretty smart. <span class=\"pause-indicator\"></span> Let me ask though, do you know roughly how much you're spending monthly? <span class=\"pause-indicator\"></span> Just want to see if there's any opportunity we might be missing.",
+                responses: [] // Special handling - will render input field in render() function
             },
             ack_defensive: {
                 stage: 'Discovery - Transition',
@@ -2341,11 +2339,95 @@
             },
             gatekeeper_intro: {
                 stage: 'Gatekeeper',
-                text: "<span class=\"tone-marker friendly\">friendly tone</span> No problem. <span class=\"pause-indicator\"></span> Who would be the right person handling electricity decisions at {{account.name}}?",
+                text: "<span class=\"tone-marker friendly\">friendly, confident tone</span> {{day.part}}, this is <span class=\"name-badge\">(your name)</span> from Power Choosers. <span class=\"pause-indicator\"></span> Quick question — how does your company typically handle energy contract renewals? <span class=\"pause-indicator\"></span> Is that something [CFO/Operations Manager] handles?",
                 responses: [
-                    { label: 'They gave name', next: 'asked_to_speak' },
-                    { label: "Not sure / won't say", next: 'voicemail' },
-                    { label: 'Can I just leave a message', next: 'voicemail' }
+                    { label: "Who should I connect you with?", next: 'gatekeeper_connect_request' },
+                    { label: "What is this about?", next: 'gatekeeper_what_about' },
+                    { label: "They're busy / Can I take a message?", next: 'gatekeeper_busy' },
+                    { label: "They transferred me", next: 'gatekeeper_transferred' },
+                    { label: "They decline / block", next: 'gatekeeper_decline' }
+                ]
+            },
+            gatekeeper_connect_request: {
+                stage: 'Gatekeeper',
+                text: "<span class=\"tone-marker friendly\">appreciative tone</span> Great, I appreciate that. <span class=\"pause-indicator\"></span> Could you please connect me with the person responsible for utilities or energy contracts?",
+                responses: [
+                    { label: "They transferred me", next: 'gatekeeper_transferred' },
+                    { label: "They need more info", next: 'gatekeeper_what_about' },
+                    { label: "They said they're busy", next: 'gatekeeper_busy' },
+                    { label: "They declined", next: 'gatekeeper_decline' }
+                ]
+            },
+            gatekeeper_what_about: {
+                stage: 'Gatekeeper',
+                text: "<span class=\"tone-marker confident\">confident, value-focused tone</span> I'm reaching out about timing for electricity contract renewals — a critical window right now where locking in early often saves companies 15-20% on their energy costs. <span class=\"pause-indicator\"></span> Would it be best to speak with the person managing those contracts?",
+                responses: [
+                    { label: "They'll connect me", next: 'gatekeeper_transferred' },
+                    { label: "They need the person's name", next: 'gatekeeper_connect_request' },
+                    { label: "They're still busy", next: 'gatekeeper_busy' },
+                    { label: "They decline", next: 'gatekeeper_decline' }
+                ]
+            },
+            gatekeeper_busy: {
+                stage: 'Gatekeeper',
+                text: "<span class=\"tone-marker understanding\">understanding, respectful tone</span> I understand. <span class=\"pause-indicator\"></span> When's usually a good time to reach them to discuss this time-sensitive window?",
+                responses: [
+                    { label: "They give a time", next: 'gatekeeper_followup_time' },
+                    { label: "They prefer voicemail", next: 'gatekeeper_voicemail_offer' },
+                    { label: "They want to respect their time", next: 'gatekeeper_respect_time' },
+                    { label: "They decline", next: 'gatekeeper_decline' }
+                ]
+            },
+            gatekeeper_voicemail_offer: {
+                stage: 'Gatekeeper',
+                text: "<span class=\"tone-marker helpful\">helpful tone</span> I can leave a quick voicemail if you'd like; that way they have the details and can call me back if it's relevant.",
+                responses: [
+                    { label: "Yes, leave voicemail", next: 'voicemail' },
+                    { label: "They give a time instead", next: 'gatekeeper_followup_time' },
+                    { label: "They decline", next: 'gatekeeper_decline' }
+                ]
+            },
+            gatekeeper_respect_time: {
+                stage: 'Gatekeeper',
+                text: "<span class=\"tone-marker understanding\">respectful tone</span> Thanks for letting me know. <span class=\"pause-indicator\"></span> I want to respect their time but also make sure they don't miss this. <span class=\"pause-indicator\"></span> When works best?",
+                responses: [
+                    { label: "They give a time", next: 'gatekeeper_followup_time' },
+                    { label: "They prefer voicemail", next: 'gatekeeper_voicemail_offer' },
+                    { label: "They decline", next: 'gatekeeper_decline' }
+                ]
+            },
+            gatekeeper_followup_time: {
+                stage: 'Gatekeeper',
+                text: "<span class=\"tone-marker professional\">professional tone</span> Perfect. <span class=\"pause-indicator\"></span> I'll reach out at that time. <span class=\"pause-indicator\"></span> Should I also leave a brief voicemail now so they have context, or just wait until the time you mentioned?",
+                responses: [
+                    { label: "Leave voicemail now", next: 'voicemail' },
+                    { label: "Just wait until that time", next: 'gatekeeper_scheduled' },
+                    { label: "They decline", next: 'gatekeeper_decline' }
+                ]
+            },
+            gatekeeper_scheduled: {
+                stage: 'Gatekeeper - Scheduled',
+                text: "✅ <strong>Follow-up scheduled!</strong><br><br>You've successfully scheduled a call back time. <span class=\"pause-indicator\"></span> Make sure to follow up when you said you would.",
+                responses: [
+                    { label: 'Start New Call', next: 'start' }
+                ]
+            },
+            gatekeeper_transferred: {
+                stage: 'Gatekeeper - Transfer',
+                text: "<span class=\"tone-marker professional\">professional tone</span> <strong>HOLD FOR TRANSFER...</strong><br><br><em>Once connected, immediately transition to your decision maker script.</em>",
+                responses: [
+                    { label: 'Connected to decision maker', next: null }, // Will be set dynamically to currentOpener
+                    { label: 'Still gatekeeper / wrong person', next: 'gatekeeper_intro' },
+                    { label: 'Transfer failed / hung up', next: 'no_answer' }
+                ]
+            },
+            gatekeeper_decline: {
+                stage: 'Gatekeeper - Decline',
+                text: "<span class=\"tone-marker professional\">professional, respectful tone</span> Thanks for your time. <span class=\"pause-indicator\"></span> I'll try again later. <span class=\"pause-indicator\"></span><br><br><em>Note: Consider noting the best time to call back or any alternative contacts if possible.</em>",
+                responses: [
+                    { label: 'Try again later', next: 'start' },
+                    { label: 'Leave voicemail instead', next: 'voicemail' },
+                    { label: 'Start New Call', next: 'start' }
                 ]
             },
             asked_to_speak: {
@@ -2540,12 +2622,14 @@
             if (currentStateKey === 'start') return null;
             if (currentStateKey === 'pre_call_qualification') return 'Pre-Call';
             if (currentStateKey === 'dialing' || currentStateKey === 'hook' || currentStateKey === 'pattern_interrupt_opening') return 'Opening';
+            // Gatekeeper states are part of Opening phase
+            if (currentStateKey.startsWith('gatekeeper_')) return 'Opening';
 
             // Stage pattern matching
             for (const phase of PHASES) {
                 if (currentStage === phase.stagePattern || 
                     (phase.stagePattern === 'Closing' && currentStage.includes('Closing')) ||
-                    (phase.stagePattern === 'Opening' && (currentStage === 'Opening' || currentStage === 'Connecting'))) {
+                    (phase.stagePattern === 'Opening' && (currentStage === 'Opening' || currentStage === 'Connecting' || currentStage.includes('Gatekeeper')))) {
                     return phase.name;
                 }
             }
@@ -2795,6 +2879,14 @@
                     }
                 });
             }
+            // Also update gatekeeper transfer to point to current opener
+            if (FLOW.gatekeeper_transferred && FLOW.gatekeeper_transferred.responses) {
+                FLOW.gatekeeper_transferred.responses.forEach(response => {
+                    if (response.label === 'Connected to decision maker') {
+                        response.next = currentOpener.state;
+                    }
+                });
+            }
         }
 
         // Render function
@@ -2880,7 +2972,8 @@
                            state.current === 'ack_struggling' || 
                            state.current === 'ack_no_idea' ||
                            state.current === 'ack_dq_confident' ||
-                           state.current === 'ack_dq_struggling') {
+                           state.current === 'ack_dq_struggling' ||
+                           state.current === 'ack_vendor_handling') {
                     // Special handling for monthly spend input
                     const inputWrap = document.createElement('div');
                     inputWrap.className = 'monthly-spend-input-wrap';

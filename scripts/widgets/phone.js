@@ -2244,7 +2244,7 @@
         return { contact, account };
       }
 
-      function dayPart(){ try { const h = new Date().getHours(); if (h < 12) return 'morning'; if (h < 17) return 'afternoon'; return 'evening'; } catch(_) { return 'day'; } }
+      function dayPart(){ try { const h = new Date().getHours(); if (h >= 5 && h < 12) return 'Good morning'; if (h >= 12 && h < 17) return 'Good afternoon'; if (h >= 17 && h <= 20) return 'Good evening'; return 'Hello'; } catch(_) { return 'Hello'; } }
       function chip(scope, key){
         const friendly = {
           'name': 'company name',
@@ -2541,6 +2541,14 @@
             }
           });
         }
+        // Also update gatekeeper transfer to point to current opener
+        if (FLOW && FLOW.gatekeeper_transferred && FLOW.gatekeeper_transferred.responses) {
+          FLOW.gatekeeper_transferred.responses.forEach(response => {
+            if (response.label === 'Connected to decision maker') {
+              response.next = currentOpener.state;
+            }
+          });
+        }
       }
 
       // Flow: ALWAYS use scripts page FLOW (must be exported from call-scripts.js)
@@ -2610,7 +2618,7 @@
         
         const key = state.current;
         // Ensure hook is updated before rendering
-        if (key === 'hook' || (FLOW && FLOW[key] && FLOW[key].stage === 'Opening')) {
+        if (key === 'hook' || (FLOW && FLOW[key] && (FLOW[key].stage === 'Opening' || FLOW[key].stage.includes('Gatekeeper')))) {
           updateHookOpener();
         }
         const node = FLOW[key];
@@ -2642,7 +2650,8 @@
               key === 'ack_struggling' || 
               key === 'ack_no_idea' ||
               key === 'ack_dq_confident' ||
-              key === 'ack_dq_struggling') {
+              key === 'ack_dq_struggling' ||
+              key === 'ack_vendor_handling') {
             const inputWrap = document.createElement('div');
             inputWrap.className = 'monthly-spend-input-wrap';
             inputWrap.style.cssText = 'width: 100%; margin-bottom: 12px;';
@@ -2670,6 +2679,30 @@
             if (state.monthlySpend) {
               input.value = state.monthlySpend;
             }
+            // Prevent dialpad clicks from interfering with input - stop propagation
+            input.addEventListener('click', (e) => {
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+              input.focus();
+            });
+            input.addEventListener('focus', (e) => {
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+            });
+            input.addEventListener('mousedown', (e) => {
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+            });
+            input.addEventListener('keydown', (e) => {
+              e.stopPropagation();
+            });
+            // Also stop propagation on the container and wrap
+            inputContainer.addEventListener('click', (e) => {
+              e.stopPropagation();
+            });
+            inputWrap.addEventListener('click', (e) => {
+              e.stopPropagation();
+            });
             inputContainer.appendChild(input);
             inputWrap.appendChild(inputContainer);
             responses.appendChild(inputWrap);
@@ -2841,7 +2874,17 @@
 
         const node = FLOW[state.current] || FLOW.start;
         const currentStage = node.stage || '';
-        const currentPhaseName = PHASES.find(p => currentStage.includes(p.stagePattern))?.name || '';
+        // Handle gatekeeper states as part of Opening phase
+        let currentPhaseName = '';
+        if (state.current && state.current.startsWith('gatekeeper_')) {
+          currentPhaseName = 'Opening';
+        } else {
+          currentPhaseName = PHASES.find(p => currentStage.includes(p.stagePattern))?.name || '';
+          // Also check for Opening or Gatekeeper stages
+          if (!currentPhaseName && (currentStage === 'Opening' || currentStage.includes('Gatekeeper'))) {
+            currentPhaseName = 'Opening';
+          }
+        }
 
         stageNav.innerHTML = PHASES.map(phase => {
           const isActive = currentPhaseName === phase.name;
