@@ -80,6 +80,77 @@ export default async function handler(req, res) {
             payloadSize: JSON.stringify(body).length
         });
 
+        // Handle call completion - terminate all related legs when any leg completes
+        if (CallStatus === 'completed' && CallSid) {
+            logger.info('Call completed event in status callback - terminating all related legs', 'TwilioWebhook', {
+                callSid: CallSid,
+                from: From,
+                to: To
+            });
+            
+            try {
+                const accountSid = process.env.TWILIO_ACCOUNT_SID;
+                const authToken = process.env.TWILIO_AUTH_TOKEN;
+                
+                if (accountSid && authToken) {
+                    const client = twilio(accountSid, authToken);
+                    const callSidsToTerminate = [CallSid];
+                    
+                    // Find all related calls (children of this call)
+                    try {
+                        const children = await client.calls.list({ parentCallSid: CallSid, limit: 20 });
+                        for (const child of children) {
+                            if (child.status !== 'completed' && child.status !== 'canceled') {
+                                callSidsToTerminate.push(child.sid);
+                            }
+                        }
+                    } catch (fetchError) {
+                        logger.warn('Could not fetch child calls for termination', 'TwilioWebhook', { error: fetchError.message });
+                    }
+                    
+                    // Also check if this is a child call and terminate parent
+                    try {
+                        const call = await client.calls(CallSid).fetch();
+                        if (call.parentCallSid && call.parentCallSid !== CallSid) {
+                            callSidsToTerminate.push(call.parentCallSid);
+                        }
+                    } catch (fetchError) {
+                        // Ignore if call not found
+                    }
+                    
+                    // Terminate all related legs
+                    for (const sid of callSidsToTerminate) {
+                        if (sid === CallSid) continue; // Already completed
+                        try {
+                            const call = await client.calls(sid).fetch();
+                            if (call.status !== 'completed' && call.status !== 'canceled') {
+                                await client.calls(sid).update({ status: 'completed' });
+                                logger.info('Terminated related call leg', 'TwilioWebhook', {
+                                    callSid: sid,
+                                    direction: call.direction,
+                                    from: call.from,
+                                    to: call.to
+                                });
+                            }
+                        } catch (termError) {
+                            // Ignore errors for calls already completed
+                            if (termError.code !== 20404) {
+                                logger.error('Error terminating related call leg', 'TwilioWebhook', {
+                                    callSid: sid,
+                                    error: termError.message
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                logger.error('Error in status callback termination logic', 'TwilioWebhook', {
+                    error: error.message,
+                    callSid: CallSid
+                });
+            }
+        }
+
         // Compute absolute base URL once
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host || '';

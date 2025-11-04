@@ -74,6 +74,74 @@ export default async function handler(req, res) {
       direction: body.Direction 
     });
 
+    // Handle call completion events - terminate all related legs when any leg completes
+    if (event === 'completed' && (parentSid || childSid)) {
+      logger.info('Call completed event detected - terminating all related legs', 'TwilioWebhook', {
+        parentSid,
+        childSid,
+        from: body.From,
+        to: body.To
+      });
+      
+      try {
+        const accountSid = process.env.TWILIO_ACCOUNT_SID;
+        const authToken = process.env.TWILIO_AUTH_TOKEN;
+        
+        if (accountSid && authToken) {
+          const client = twilio(accountSid, authToken);
+          const callSidsToTerminate = [];
+          
+          // Collect all CallSids to terminate
+          if (parentSid) callSidsToTerminate.push(parentSid);
+          if (childSid && childSid !== parentSid) callSidsToTerminate.push(childSid);
+          
+          // Find all related calls (parent and children)
+          if (parentSid) {
+            try {
+              const children = await client.calls.list({ parentCallSid: parentSid, limit: 20 });
+              for (const child of children) {
+                if (child.status !== 'completed' && child.status !== 'canceled') {
+                  callSidsToTerminate.push(child.sid);
+                }
+              }
+            } catch (fetchError) {
+              logger.warn('Could not fetch child calls for termination', 'TwilioWebhook', { error: fetchError.message });
+            }
+          }
+          
+          // Terminate all related legs
+          for (const sid of callSidsToTerminate) {
+            try {
+              const call = await client.calls(sid).fetch();
+              if (call.status !== 'completed' && call.status !== 'canceled') {
+                await client.calls(sid).update({ status: 'completed' });
+                logger.info('Terminated call leg on completed event', 'TwilioWebhook', {
+                  callSid: sid,
+                  direction: call.direction,
+                  from: call.from,
+                  to: call.to
+                });
+              }
+            } catch (termError) {
+              // Ignore errors for calls already completed
+              if (termError.code !== 20404) {
+                logger.error('Error terminating call leg', 'TwilioWebhook', {
+                  callSid: sid,
+                  error: termError.message
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        logger.error('Error in call completion termination logic', 'TwilioWebhook', {
+          error: error.message,
+          parentSid,
+          childSid
+        });
+      }
+    }
+
     // Start dual-channel recording when answered/in-progress/completed (to catch edge cases)
     // IMPORTANT: Only start REST API recording if NO TwiML DialVerb recording exists to avoid interference
     if ((event === 'in-progress' || event === 'answered' || event === 'completed') && targetSid) {
