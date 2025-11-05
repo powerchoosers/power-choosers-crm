@@ -4398,7 +4398,7 @@
   
   async function sendEmailViaSendGrid(emailData) {
     try {
-      const { to, subject, content, _deliverability, threadId, inReplyTo, references, trackingMetadata, isHtmlEmail } = emailData;
+      const { to, subject, content, from, fromName, _deliverability, threadId, inReplyTo, references, trackingMetadata, isHtmlEmail } = emailData;
       
       // Generate unique tracking ID for this email
       const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -4406,7 +4406,9 @@
       console.log('[SendGrid] Email data received:', {
         isHtmlEmail,
         contentLength: content.length,
-        contentPreview: content.substring(0, 100) + '...'
+        contentPreview: content.substring(0, 100) + '...',
+        from: from || 'not set',
+        fromName: fromName || 'not set'
       });
       
       // Prepare email data for SendGrid
@@ -4414,6 +4416,8 @@
         to: to,
         subject: subject,
         content: content,
+        from: from,
+        fromName: fromName,
         trackingId: trackingId,
         threadId: threadId,
         inReplyTo: inReplyTo,
@@ -4606,10 +4610,17 @@
         }
       }
 
+      // Get sender details from settings
+      const senderProfile = getSenderProfile();
+      const senderEmail = senderProfile.email || 'l.patterson@powerchoosers.com';
+      const senderName = senderProfile.name || 'Lewis Patterson';
+
       const emailData = {
         to: to.split(',').map(email => email.trim()),
         subject,
         content: contentWithSignature,
+        from: senderEmail,
+        fromName: senderName,
         isHtmlEmail: isHtmlEmail,
         trackingMetadata: window._lastGeneratedMetadata || null
       };

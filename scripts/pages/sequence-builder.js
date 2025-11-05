@@ -442,11 +442,21 @@ class FreeSequenceAutomation {
         signatureImageEnabled: emailSettings.content?.signatureImage !== false
       };
       
+      // Get sender details from settings
+      const settings = (window.SettingsPage?.getSettings?.()) || (JSON.parse(localStorage.getItem('crm-settings') || '{}'));
+      const general = settings?.general || {};
+      const firstName = general.firstName || '';
+      const lastName = general.lastName || '';
+      const senderName = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : (general.agentName || 'Lewis Patterson');
+      const senderEmail = general.email || 'l.patterson@powerchoosers.com';
+      
       // Prepare email data for SendGrid
       const emailData = {
         to: email.to,
         subject: email.subject,
         content: email.html || email.content || '',
+        from: senderEmail,
+        fromName: senderName,
         isHtmlEmail: true, // Assume HTML for sequence emails
         _deliverability: deliverability
       };
