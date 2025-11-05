@@ -642,7 +642,8 @@ class PowerChoosersCRM {
             const ref = await db.collection('accounts').add(finalDoc);
 
             // Create UI document for notifications and navigation
-            const uiDoc = Object.assign({}, doc, { createdAt: new Date(), updatedAt: new Date() });
+            // Use finalDoc instead of doc to include serviceAddresses and all other fields
+            const uiDoc = Object.assign({}, finalDoc, { createdAt: new Date(), updatedAt: new Date() });
 
             // Notify Accounts page to update its state without reload
             try {
@@ -3919,7 +3920,9 @@ class PowerChoosersCRM {
                             // Live update tables (use UI-friendly timestamps so lists don't show N/A)
                             try {
                                 if (modal._importType === 'accounts') {
-                                    document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: ref.id, doc } }));
+                                    // Use finalDoc instead of doc to include serviceAddresses and all other fields
+                                    const uiDoc = Object.assign({}, finalDoc, { createdAt: new Date(), updatedAt: new Date() });
+                                    document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: ref.id, doc: uiDoc } }));
                                 } else {
                                     const uiDoc = Object.assign({}, doc, { createdAt: new Date(), updatedAt: new Date() });
                                     document.dispatchEvent(new CustomEvent('pc:contact-created', { detail: { id: ref.id, doc: uiDoc } }));

@@ -3705,6 +3705,32 @@ var console = {
       });
       addServiceAddressBtn._bound = true;
     }
+
+    // Listen for service address addition from maps widget
+    document.addEventListener('pc:maps-add-service-address', async (e) => {
+      const { address, addresses } = e.detail;
+      if (address && addresses && state.currentAccount) {
+        await saveServiceAddresses(addresses);
+        // Refresh the account detail view to show new address
+        renderAccountDetail();
+      }
+    });
+
+    // Listen for account field updates from maps widget
+    document.addEventListener('pc:maps-update-account-field', async (e) => {
+      const { field, value } = e.detail;
+      if (field && value !== undefined && state.currentAccount) {
+        // Find the field wrapper and update it
+        const fieldWrap = document.querySelector(`[data-field="${field}"]`);
+        if (fieldWrap) {
+          await commitEdit(fieldWrap, field, value);
+        } else {
+          // Field might not be in DOM yet, save directly
+          await saveField(field, value);
+          renderAccountDetail();
+        }
+      }
+    });
   }
 
   function bindContactItemEvents() {

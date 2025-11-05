@@ -1234,17 +1234,6 @@
     
     injectTaskDetailStyles();
     
-    // Update page title and subtitle - keep original task title and due date/time
-    if (els.title) {
-      els.title.textContent = state.currentTask.title;
-    }
-    
-    if (els.subtitle) {
-      const dueDate = state.currentTask.dueDate;
-      const dueTime = state.currentTask.dueTime;
-      els.subtitle.textContent = `Due: ${dueDate} at ${dueTime}`;
-    }
-    
     // For phone tasks, add header info based on task type
     if (state.taskType === 'phone-call') {
       // Check if this is an account task or contact task
@@ -1274,49 +1263,58 @@
           }
         } catch(_) { /* noop */ }
         
+        // If no icon HTML generated, create a fallback with first letter
+        if (!companyIconHTML) {
+          const fallbackLetter = accountName ? accountName.charAt(0).toUpperCase() : 'C';
+          companyIconHTML = `<div style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: var(--bg-item); border-radius: 6px; font-weight: 600; font-size: 18px; color: var(--text-secondary);">${fallbackLetter}</div>`;
+        }
+        
         // Update title with company name link
         if (els.title && accountName) {
           const companyLinkHTML = `<a href="#account-details" class="company-link" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(accountName)}">${escapeHtml(accountName)}</a>`;
           els.title.innerHTML = `Call ${companyLinkHTML}`;
         }
         
-        // Add company icon/favicon to header
-        const titleSection = document.querySelector('.contact-header-text');
-        if (titleSection) {
-          // More thorough cleanup of existing avatars/icons
-          const existingElements = titleSection.querySelectorAll('.avatar-initials, .company-favicon-header, .avatar-absolute, [class*="avatar"], [class*="favicon"]');
-          existingElements.forEach(el => {
-            if (el && el.parentNode) {
-              el.remove();
-            }
-          });
-          
-          // Also check for any absolutely positioned elements that might be avatars
-          const allChildren = titleSection.querySelectorAll('*');
-          allChildren.forEach(child => {
-            if (child.style && child.style.position === 'absolute' && 
-                (child.classList.contains('avatar-absolute') || 
-                 child.querySelector('.avatar-initials') || 
-                 child.querySelector('.company-favicon-header'))) {
-              child.remove();
-            }
-          });
-          
-          // If no icon HTML generated, create a fallback with first letter
-          if (!companyIconHTML) {
-            const fallbackLetter = accountName ? accountName.charAt(0).toUpperCase() : 'C';
-            companyIconHTML = `<div style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: var(--bg-item); border-radius: 6px; font-weight: 600; font-size: 18px; color: var(--text-secondary);">${fallbackLetter}</div>`;
+        // Add company icon/favicon to header - use a small delay to ensure DOM is ready
+        setTimeout(() => {
+          const titleSection = document.querySelector('.contact-header-text');
+          if (titleSection) {
+            // More thorough cleanup of existing avatars/icons
+            const existingElements = titleSection.querySelectorAll('.avatar-initials, .company-favicon-header, .avatar-absolute, [class*="avatar"], [class*="favicon"]');
+            existingElements.forEach(el => {
+              if (el && el.parentNode) {
+                el.remove();
+              }
+            });
+            
+            // Also check for any absolutely positioned elements that might be avatars
+            const allChildren = titleSection.querySelectorAll('*');
+            allChildren.forEach(child => {
+              if (child.style && child.style.position === 'absolute' && 
+                  (child.classList.contains('avatar-absolute') || 
+                   child.querySelector('.avatar-initials') || 
+                   child.querySelector('.company-favicon-header'))) {
+                child.remove();
+              }
+            });
+            
+            // Add company favicon positioned like the avatar
+            const faviconWrapper = `<div class="company-favicon-header avatar-absolute" aria-hidden="true">${companyIconHTML}</div>`;
+            titleSection.insertAdjacentHTML('beforeend', faviconWrapper);
+            
+            // Add icon-loaded class immediately for smooth animation
+            requestAnimationFrame(() => {
+              const favicon = titleSection.querySelector('.company-favicon-header');
+              if (favicon) favicon.classList.add('icon-loaded');
+            });
           }
-          
-          // Add company favicon positioned like the avatar
-          const faviconWrapper = `<div class="company-favicon-header avatar-absolute" aria-hidden="true">${companyIconHTML}</div>`;
-          titleSection.insertAdjacentHTML('beforeend', faviconWrapper);
-          
-          // Add icon-loaded class immediately for smooth animation
-          requestAnimationFrame(() => {
-            const favicon = titleSection.querySelector('.company-favicon-header');
-            if (favicon) favicon.classList.add('icon-loaded');
-          });
+        }, 50);
+        
+        // Update subtitle
+        if (els.subtitle) {
+          const dueDate = state.currentTask.dueDate;
+          const dueTime = state.currentTask.dueTime;
+          els.subtitle.textContent = `Due: ${dueDate} at ${dueTime}`;
         }
         
         // Add location info under title
@@ -1450,6 +1448,17 @@
             console.log('Contact task - No title section found');
           }
         }, 150); // Increased delay for better cleanup
+      }
+    } else {
+      // For non-phone-call tasks, set title and subtitle normally
+      if (els.title) {
+        els.title.textContent = state.currentTask.title;
+      }
+      
+      if (els.subtitle) {
+        const dueDate = state.currentTask.dueDate;
+        const dueTime = state.currentTask.dueTime;
+        els.subtitle.textContent = `Due: ${dueDate} at ${dueTime}`;
       }
     }
     
