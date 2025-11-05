@@ -249,6 +249,14 @@
     }
   }
 
+  // Helper function to escape HTML
+  function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   // Build rich info window content
   function buildInfoWindowContent(place) {
     const phone = place.nationalPhoneNumber || place.internationalPhoneNumber || '';
@@ -257,6 +265,7 @@
     const reviewCount = place.userRatingCount || 0;
     const priceLevel = place.priceLevel ? '$'.repeat(place.priceLevel) : '';
     const businessStatus = place.businessStatus || '';
+    const address = place.formattedAddress || '';
     
     // Clean up business types for better display
     let businessType = '';
@@ -284,22 +293,269 @@
         return '';
       };
       const photoUrl = getPhotoUri(photo);
-      photoHtml = `<div class="place-photo"><img src="${photoUrl}" alt="${place.displayName}" style="width: 100%; height: 40px; object-fit: cover; border-radius: 4px; margin-bottom: 8px;"></div>`;
+      photoHtml = `<div class="place-photo"><img src="${photoUrl}" alt="${escapeHtml(place.displayName)}" style="width: 100%; height: 40px; object-fit: cover; border-radius: 4px; margin-bottom: 8px;"></div>`;
+    }
+
+    // Check if we're on account detail page
+    const isAccountPage = currentEntityType === 'account' && window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount;
+
+    // Build address with hover actions
+    let addressHtml = '';
+    if (address) {
+      addressHtml = `
+        <p class="address maps-actionable" data-value="${escapeHtml(address)}" data-type="address">
+          <span class="maps-value">${escapeHtml(address)}</span>
+          <span class="maps-actions">
+            <button type="button" class="maps-action-btn" data-action="copy" title="Copy address" aria-label="Copy address">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+            ${isAccountPage ? `<button type="button" class="maps-action-btn" data-action="add-service-address" title="Add to service addresses" aria-label="Add to service addresses">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>` : ''}
+          </span>
+        </p>
+      `;
+    }
+
+    // Build phone with hover actions
+    let phoneHtml = '';
+    if (phone) {
+      phoneHtml = `
+        <p class="phone maps-actionable" data-value="${escapeHtml(phone)}" data-type="phone">
+          <span class="icon-phone" aria-hidden="true"></span>
+          <a href="tel:${phone}" class="link call-link maps-value" data-phone="${phone}">${escapeHtml(phone)}</a>
+          <span class="maps-actions">
+            <button type="button" class="maps-action-btn" data-action="copy" title="Copy phone number" aria-label="Copy phone number">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+            ${isAccountPage ? `<button type="button" class="maps-action-btn" data-action="update-phone" title="Update company phone" aria-label="Update company phone">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>` : ''}
+          </span>
+        </p>
+      `;
+    }
+
+    // Build website with hover actions
+    let websiteHtml = '';
+    if (website) {
+      websiteHtml = `
+        <p class="website maps-actionable" data-value="${escapeHtml(website)}" data-type="website">
+          <span class="icon-globe" aria-hidden="true"></span>
+          <a href="${website}" target="_blank" rel="noopener" class="link maps-value">Visit Website</a>
+          <span class="maps-actions">
+            <button type="button" class="maps-action-btn" data-action="copy" title="Copy website URL" aria-label="Copy website URL">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
+            ${isAccountPage ? `<button type="button" class="maps-action-btn" data-action="update-website" title="Update website" aria-label="Update website">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>` : ''}
+          </span>
+        </p>
+      `;
     }
 
     return `
       <div class="maps-info-window">
         ${photoHtml}
-        <h3>${place.displayName}</h3>
-        <p class="address">${place.formattedAddress}</p>
+        <h3>${escapeHtml(place.displayName)}</h3>
+        ${addressHtml}
         ${rating ? `<p class="rating">⭐ ${rating}/5 (${reviewCount} reviews)</p>` : ''}
         ${priceLevel ? `<p class="price">${priceLevel}</p>` : ''}
         ${businessType ? `<p class="types">${businessType}</p>` : ''}
-        ${phone ? `<p class="phone"><span class="icon-phone" aria-hidden="true"></span> <a href="tel:${phone}" class="link call-link" data-phone="${phone}">${phone}</a></p>` : ''}
-        ${website ? `<p class="website"><span class="icon-globe" aria-hidden="true"></span> <a href="${website}" target="_blank" rel="noopener" class="link">Visit Website</a></p>` : ''}
+        ${phoneHtml}
+        ${websiteHtml}
         ${businessStatus && businessStatus !== 'OPERATIONAL' ? `<p class="status"><strong>Status:</strong> ${businessStatus}</p>` : ''}
       </div>
     `;
+  }
+
+  // Handle action button clicks in info windows
+  function setupInfoWindowActions(infoWindow) {
+    // Use a MutationObserver to detect when info window content is added to DOM
+    let observer;
+    const setupActions = () => {
+      const infoContentEl = document.querySelector('.maps-info-window');
+      if (!infoContentEl) return false;
+      
+      // Find all actionable elements
+      const actionableElements = infoContentEl.querySelectorAll('.maps-actionable');
+      
+      actionableElements.forEach(element => {
+        // Skip if already bound
+        if (element.dataset.bound === 'true') return;
+        element.dataset.bound = 'true';
+        
+        const value = element.getAttribute('data-value');
+        const type = element.getAttribute('data-type');
+        const actions = element.querySelector('.maps-actions');
+        const valueElement = element.querySelector('.maps-value');
+        
+        if (!actions || !valueElement) return;
+        
+        // Show actions on hover
+        element.addEventListener('mouseenter', () => {
+          actions.style.display = 'flex';
+        });
+        
+        element.addEventListener('mouseleave', () => {
+          actions.style.display = 'none';
+        });
+        
+        // Handle action button clicks
+        actions.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const btn = e.target.closest('.maps-action-btn');
+          if (!btn) return;
+          
+          const action = btn.getAttribute('data-action');
+          if (!action) return;
+          
+          if (action === 'copy') {
+            // Copy to clipboard
+            try {
+              await navigator.clipboard.writeText(value);
+              if (window.crm && window.crm.showToast) {
+                const typeLabel = type === 'address' ? 'Address' : type === 'phone' ? 'Phone number' : 'Website';
+                window.crm.showToast(`${typeLabel} copied to clipboard`);
+              }
+            } catch (error) {
+              console.error('[Maps Widget] Failed to copy:', error);
+              if (window.crm && window.crm.showToast) {
+                window.crm.showToast('Failed to copy to clipboard');
+              }
+            }
+          } else if (action === 'add-service-address' && type === 'address') {
+            // Add address to service addresses (only for account detail page)
+            if (currentEntityType === 'account' && window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
+              try {
+                const account = window.AccountDetail.state.currentAccount;
+                const currentAddresses = Array.isArray(account.serviceAddresses) ? account.serviceAddresses : [];
+                
+                // Check if address already exists
+                const addressExists = currentAddresses.some(addr => 
+                  addr.address && addr.address.trim().toLowerCase() === value.trim().toLowerCase()
+                );
+                
+                if (addressExists) {
+                  if (window.crm && window.crm.showToast) {
+                    window.crm.showToast('Address already exists in service addresses');
+                  }
+                  return;
+                }
+                
+                // Add new address (first one is primary if none exist)
+                const newAddress = {
+                  address: value.trim(),
+                  isPrimary: currentAddresses.length === 0
+                };
+                
+                const updatedAddresses = [...currentAddresses, newAddress];
+                
+                // Dispatch event to add service address
+                document.dispatchEvent(new CustomEvent('pc:maps-add-service-address', {
+                  detail: { address: newAddress, addresses: updatedAddresses }
+                }));
+                
+                if (window.crm && window.crm.showToast) {
+                  window.crm.showToast('Address added to service addresses');
+                }
+              } catch (error) {
+                console.error('[Maps Widget] Failed to add service address:', error);
+                if (window.crm && window.crm.showToast) {
+                  window.crm.showToast('Failed to add service address');
+                }
+              }
+            }
+          } else if (action === 'update-phone' && type === 'phone') {
+            // Update company phone field (only for account detail page)
+            if (currentEntityType === 'account' && window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
+              try {
+                document.dispatchEvent(new CustomEvent('pc:maps-update-account-field', {
+                  detail: { field: 'companyPhone', value: value.trim() }
+                }));
+                
+                if (window.crm && window.crm.showToast) {
+                  window.crm.showToast('Company phone updated');
+                }
+              } catch (error) {
+                console.error('[Maps Widget] Failed to update phone:', error);
+                if (window.crm && window.crm.showToast) {
+                  window.crm.showToast('Failed to update company phone');
+                }
+              }
+            }
+          } else if (action === 'update-website' && type === 'website') {
+            // Update website field (only for account detail page)
+            if (currentEntityType === 'account' && window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
+              try {
+                document.dispatchEvent(new CustomEvent('pc:maps-update-account-field', {
+                  detail: { field: 'website', value: value.trim() }
+                }));
+                
+                if (window.crm && window.crm.showToast) {
+                  window.crm.showToast('Website updated');
+                }
+              } catch (error) {
+                console.error('[Maps Widget] Failed to update website:', error);
+                if (window.crm && window.crm.showToast) {
+                  window.crm.showToast('Failed to update website');
+                }
+              }
+            }
+          }
+        });
+      });
+      
+      // Disconnect observer after setup
+      if (observer) {
+        observer.disconnect();
+      }
+      return true;
+    };
+    
+    // Try immediately
+    if (setupActions()) return;
+    
+    // Set up observer to watch for info window content
+    observer = new MutationObserver(() => {
+      if (setupActions()) {
+        if (observer) observer.disconnect();
+      }
+    });
+    
+    // Observe the document body for info window content
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    
+    // Also set up after a short delay
+    setTimeout(() => {
+      if (setupActions() && observer) {
+        observer.disconnect();
+      }
+    }, 100);
   }
 
   // Handle map clicks to find businesses at that location
@@ -321,7 +577,8 @@
           'businessStatus',
           'priceLevel',
           'types',
-          'photos'
+          'photos',
+          'websiteURI'
         ],
         locationBias: clickedLocation,
         maxResultCount: 5,
@@ -357,6 +614,9 @@
         });
         
         infoWindow.open(map);
+        
+        // Setup action buttons
+        setupInfoWindowActions(infoWindow);
 
         // Add click-to-call functionality
         setTimeout(() => {
@@ -428,7 +688,8 @@
           'businessStatus',
           'priceLevel',
           'types',
-          'photos'
+          'photos',
+          'websiteURI'
         ],
         locationBias: map.getCenter(),
         maxResultCount: 10
@@ -476,6 +737,9 @@
             
           // Show the info window
           infoWindow.open({ anchor: marker, map });
+          
+          // Setup action buttons
+          setupInfoWindowActions(infoWindow);
           
           // Add click-to-call functionality after info window opens
           setTimeout(() => {
