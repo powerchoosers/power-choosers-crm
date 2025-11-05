@@ -2960,7 +2960,26 @@
     const g = settings?.general || {};
     const first = g.firstName || '';
     const last = g.lastName || '';
-    const name = (first && last) ? `${first} ${last}`.trim() : (g.agentName || 'Power Choosers Team');
+    
+    // Priority: Settings (firstName + lastName) → Firebase auth displayName → "Power Choosers Team"
+    let name = '';
+    if (first && last) {
+      name = `${first} ${last}`.trim();
+    } else {
+      // Try Firebase auth displayName as fallback
+      try {
+        const user = window.firebase?.auth?.().currentUser;
+        if (user?.displayName) {
+          name = user.displayName.trim();
+        }
+      } catch (_) {}
+      
+      // Final fallback to "Power Choosers Team" (NOT "Power Choosers CRM")
+      if (!name) {
+        name = 'Power Choosers Team';
+      }
+    }
+    
     return {
       name,
       title: g.jobTitle || 'Energy Strategist',
@@ -4613,7 +4632,30 @@
       // Get sender details from settings
       const senderProfile = getSenderProfile();
       const senderEmail = senderProfile.email || 'l.patterson@powerchoosers.com';
-      const senderName = senderProfile.name || 'Lewis Patterson';
+      let senderName = senderProfile.name;
+      
+      // Additional fallback: if name is still empty or "Power Choosers Team", try Firebase auth
+      if (!senderName || senderName === 'Power Choosers Team') {
+        try {
+          const user = window.firebase?.auth?.().currentUser;
+          if (user?.displayName) {
+            senderName = user.displayName.trim();
+            console.log('[EmailCompose] Using Firebase auth displayName as sender name:', senderName);
+          }
+        } catch (_) {}
+        
+        // Final fallback
+        if (!senderName) {
+          senderName = 'Power Choosers Team';
+        }
+      }
+      
+      // Debug logging to verify sender name
+      console.log('[EmailCompose] Sender details:', {
+        email: senderEmail,
+        name: senderName,
+        source: 'getSenderProfile + Firebase auth fallback'
+      });
 
       const emailData = {
         to: to.split(',').map(email => email.trim()),
@@ -4628,7 +4670,7 @@
       // Send via SendGrid
       let result;
       try {
-        console.log('[EmailCompose] Sending via SendGrid...');
+        console.log('[EmailCompose] Sending via SendGrid with fromName:', senderName);
         result = await sendEmailViaSendGrid({ ...emailData, _deliverability: deliver });
         console.log('[EmailCompose] Email sent via SendGrid');
         
