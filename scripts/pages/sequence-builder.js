@@ -447,8 +447,35 @@ class FreeSequenceAutomation {
       const general = settings?.general || {};
       const firstName = general.firstName || '';
       const lastName = general.lastName || '';
-      const senderName = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : (general.agentName || 'Lewis Patterson');
+      
+      // Priority: Settings (firstName + lastName) → Firebase auth displayName → "Power Choosers Team"
+      let senderName = '';
+      if (firstName && lastName) {
+        senderName = `${firstName} ${lastName}`.trim();
+      } else {
+        // Try Firebase auth displayName as fallback
+        try {
+          const user = window.firebase?.auth?.().currentUser;
+          if (user?.displayName) {
+            senderName = user.displayName.trim();
+            console.log('[FreeSequence] Using Firebase auth displayName as sender name:', senderName);
+          }
+        } catch (_) {}
+        
+        // Final fallback to "Power Choosers Team" (NOT "Power Choosers CRM")
+        if (!senderName) {
+          senderName = 'Power Choosers Team';
+        }
+      }
+      
       const senderEmail = general.email || 'l.patterson@powerchoosers.com';
+      
+      // Debug logging to verify sender name
+      console.log('[FreeSequence] Sender details:', {
+        email: senderEmail,
+        name: senderName,
+        source: 'settings + Firebase auth fallback'
+      });
       
       // Prepare email data for SendGrid
       const emailData = {
@@ -462,6 +489,7 @@ class FreeSequenceAutomation {
       };
       
       // Send via SendGrid
+      console.log('[FreeSequence] Sending email with fromName:', senderName);
       const result = await sendEmailViaSendGrid(emailData);
       
       if (result.success) {
