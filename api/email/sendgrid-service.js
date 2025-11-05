@@ -110,11 +110,19 @@ export class SendGridService {
       console.log('[SendGrid] Email type:', isHtmlEmail ? 'HTML' : 'Standard', 'Content length:', content.length);
       console.log('[SendGrid] Text content length:', textContent.length);
       
+              // Log sender details for debugging
+              const finalFromEmail = from || this.fromEmail;
+              const finalFromName = fromName || this.fromName;
+              console.log('[SendGrid] Sending email with from:', {
+                email: finalFromEmail,
+                name: finalFromName
+              });
+              
               const msg = {
         to: allowedRecipients,
         from: {
-          email: from || this.fromEmail,
-          name: fromName || this.fromName
+          email: finalFromEmail,
+          name: finalFromName
         },
         subject: subject,
         html: htmlContent,
