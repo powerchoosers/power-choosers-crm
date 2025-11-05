@@ -889,6 +889,11 @@
     
     // Clean up the preview
     if (preview) {
+      // Remove legacy tracking pixels to avoid 404s and errors (like email-detail.js does)
+      preview = preview
+        .replace(/<img[^>]*src=["'][^"']*\/api\/email\/track\/[^"']+["'][^>]*>/gi, '')
+        .replace(/<img[^>]*src=["'][^"']*vercel\.app\/api\/email\/track\/[^"']+["'][^>]*>/gi, '');
+      
       // Remove extra whitespace and newlines
       preview = preview.replace(/\s+/g, ' ').trim();
       // Limit length to reasonable preview size
