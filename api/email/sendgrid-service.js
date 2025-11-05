@@ -11,8 +11,8 @@ if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.startsWith('SG.
 
 export class SendGridService {
   constructor() {
-    this.fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com';
-    this.fromName = process.env.SENDGRID_FROM_NAME || 'Power Choosers CRM';
+    this.fromEmail = process.env.SENDGRID_FROM_EMAIL || 'l.patterson@powerchoosers.com';
+    this.fromName = process.env.SENDGRID_FROM_NAME || 'Lewis Patterson';
   }
 
   /**
@@ -44,7 +44,7 @@ export class SendGridService {
    */
           async sendEmail(emailData) {
     try {
-              const { to, subject, content, from, trackingId, _deliverability, inReplyTo, references, threadId, isHtmlEmail } = emailData;
+              const { to, subject, content, from, fromName, trackingId, _deliverability, inReplyTo, references, threadId, isHtmlEmail } = emailData;
       
       // Check if any recipients are suppressed
       const recipients = Array.isArray(to) ? to : [to];
@@ -114,7 +114,7 @@ export class SendGridService {
         to: allowedRecipients,
         from: {
           email: from || this.fromEmail,
-          name: this.fromName
+          name: fromName || this.fromName
         },
         subject: subject,
         html: htmlContent,

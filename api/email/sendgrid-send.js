@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   }
 
           try {
-            const { to, subject, content, from, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail } = req.body;
+            const { to, subject, content, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail } = req.body;
 
     if (!to || !subject || !content) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -35,7 +35,8 @@ export default async function handler(req, res) {
       to,
       subject,
       content,
-      from: from || process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com',
+      from: from || process.env.SENDGRID_FROM_EMAIL || 'l.patterson@powerchoosers.com',
+      fromName: fromName || process.env.SENDGRID_FROM_NAME || 'Lewis Patterson',
       trackingId,
               threadId: threadId || undefined,
               inReplyTo: inReplyTo || undefined,
