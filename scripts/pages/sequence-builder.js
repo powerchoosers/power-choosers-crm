@@ -426,25 +426,43 @@ class FreeSequenceAutomation {
     try {
       console.log(`[FreeSequence] Sending email ${email.id}`);
       
-      // Call your email sending service
-      const response = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: email.to,
-          subject: email.subject,
-          html: email.html,
-          text: email.text
-        })
-      });
+      // Get email settings from step or use defaults
+      const step = email.step || {};
+      const isAuto = step.type === 'auto-email';
+      const emailSettings = step.emailSettings || getDefaultEmailSettings(isAuto);
       
-      if (response.ok) {
+      // Build deliverability settings from email settings
+      const deliverability = {
+        enableTracking: emailSettings.deliverability?.openTracking !== false && emailSettings.deliverability?.clickTracking !== false,
+        includeBulkHeaders: emailSettings.deliverability?.bulkHeaders === true,
+        includeListUnsubscribe: emailSettings.deliverability?.listUnsubscribe !== false,
+        includePriorityHeaders: emailSettings.deliverability?.priorityHeaders === true,
+        forceGmailOnly: false,
+        useBrandedHtmlTemplate: false,
+        signatureImageEnabled: emailSettings.content?.signatureImage !== false
+      };
+      
+      // Prepare email data for SendGrid
+      const emailData = {
+        to: email.to,
+        subject: email.subject,
+        content: email.html || email.content || '',
+        isHtmlEmail: true, // Assume HTML for sequence emails
+        _deliverability: deliverability
+      };
+      
+      // Send via SendGrid
+      const result = await sendEmailViaSendGrid(emailData);
+      
+      if (result.success) {
         email.status = 'sent';
         email.sentAt = Date.now();
-        console.log(`[FreeSequence] Email ${email.id} sent successfully`);
+        email.trackingId = result.trackingId;
+        email.messageId = result.messageId;
+        console.log(`[FreeSequence] Email ${email.id} sent successfully via SendGrid`);
       } else {
         email.status = 'error';
-        email.errorMessage = 'Failed to send email';
+        email.errorMessage = result.error || 'Failed to send email';
       }
       
     } catch (error) {

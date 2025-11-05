@@ -1270,18 +1270,18 @@
     els.selectAll = qs('select-all-list-detail');
     if (els.selectAll && !els.selectAll._bound) {
       els.selectAll.addEventListener('change', () => {
-        const currentIds = getPageItems().map((it) => it.id).filter(Boolean);
-        const set = (state.view === 'people') ? state.selectedPeople : state.selectedAccounts;
         if (els.selectAll.checked) {
-          currentIds.forEach((id) => set.add(id));
+          // Open bulk select popover instead of directly selecting
+          openBulkSelectPopover();
         } else {
-          currentIds.forEach((id) => set.delete(id));
+          // Uncheck all
+          const set = (state.view === 'people') ? state.selectedPeople : state.selectedAccounts;
+          set.clear();
+          els.tbody.querySelectorAll('.row-select').forEach(cb => { cb.checked = false; });
+          updateHeaderSelectAll();
+          renderRowSelectionHighlights();
+          showBulkActionsBar();
         }
-        // Update DOM
-        els.tbody.querySelectorAll('.row-select').forEach(cb => { const id = cb.getAttribute('data-id'); cb.checked = set.has(id); });
-        updateHeaderSelectAll();
-        renderRowSelectionHighlights();
-        showBulkActionsBar();
       });
       els.selectAll._bound = '1';
     }
@@ -2209,6 +2209,9 @@
     _getSelectedCount: (kind) => {
       try { return kind === 'accounts' ? state.selectedAccounts.size : state.selectedPeople.size; } catch (_) { return 0; }
     },
+    _getTableContainer: () => {
+      try { return els.tableContainer || null; } catch (_) { return null; }
+    },
     _getChips: (kind) => {
       try { return state.chips[kind] || []; } catch (_) { return []; }
     },
@@ -2225,6 +2228,20 @@
     },
     _getState: () => {
       try { return state; } catch (_) { return {}; }
+    },
+    _render: () => {
+      try { if (typeof render === 'function') render(); } catch (_) {}
+    },
+    _getPageItems: () => {
+      try { 
+        const state = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
+        if (!state) return [];
+        const pageSize = state.pageSize || 50;
+        const currentPage = state.currentPage || 1;
+        const start = (currentPage - 1) * pageSize;
+        const end = start + pageSize;
+        return (state.filtered || []).slice(start, end);
+      } catch (_) { return []; }
     },
     _testBulkBar: () => {
       // Test function to diagnose bulk actions bar
@@ -2612,11 +2629,66 @@ function injectListDetailBulkStyles() {
       contain: paint layout;
     }
     
+    /* Fix checkbox size - select all should match row checkboxes */
+    #select-all-list-detail {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--orange-subtle);
+    }
+    
+    /* Bulk select popover styling */
+    #list-detail-bulk-popover.bulk-select-popover {
+      position: fixed; z-index: 900;
+      width: min(320px, 90vw);
+      background: var(--bg-modal, #262a30); color: var(--text-inverse);
+      border: 1px solid var(--grey-700); border-radius: var(--border-radius);
+      box-shadow: var(--shadow-xl); padding: 16px;
+    }
+    #list-detail-bulk-popover .option { 
+      display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); 
+      margin-bottom: var(--spacing-sm); 
+    }
+    #list-detail-bulk-popover .option:last-of-type { margin-bottom: 0; }
+    #list-detail-bulk-popover label { font-weight: 600; color: var(--text-primary); }
+    #list-detail-bulk-popover .hint { color: var(--text-secondary); font-size: 12px; }
+    #list-detail-bulk-popover input[type="number"] {
+      width: 60px; padding: 4px 8px; background: var(--bg-item); 
+      color: var(--text-inverse); border: 1px solid var(--grey-700); 
+      border-radius: var(--border-radius-sm);
+    }
+    #list-detail-bulk-popover .actions { 
+      display: flex; justify-content: flex-end; gap: var(--spacing-sm); 
+      margin-top: var(--spacing-md); 
+    }
+    #list-detail-bulk-popover .btn-text {
+      padding: 6px 12px; background: transparent; color: var(--text-inverse);
+      border: 1px solid var(--grey-700); border-radius: var(--border-radius-sm);
+      cursor: pointer;
+    }
+    #list-detail-bulk-popover .btn-text:hover { background: var(--grey-700); border-color: var(--border-light); color: var(--text-inverse); }
+    #list-detail-bulk-popover .btn-primary {
+      padding: 6px 12px; background: var(--orange-primary); color: #fff;
+      border: 1px solid var(--orange-primary); border-radius: var(--border-radius-sm);
+      cursor: pointer; font-weight: 600;
+    }
+    #list-detail-bulk-popover .btn-primary:hover { background: var(--orange-muted); border-color: var(--orange-muted); }
+    .bulk-select-backdrop {
+      position: fixed; inset: 0; background: transparent; z-index: 899;
+    }
+    
     #list-detail-bulk-actions.bulk-actions-modal {
-      position: absolute; left: 50%; transform: translateX(-50%); top: 8px;
+      position: absolute; left: 50%; transform: translateX(-50%) translateY(-10px); top: 8px;
       width: max-content; max-width: none; background: var(--bg-card); color: var(--text-primary);
       border: 1px solid var(--border-light); border-radius: var(--border-radius-lg);
       box-shadow: var(--elevation-card); padding: 8px 12px; z-index: 850;
+      opacity: 0;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      pointer-events: none;
+    }
+    #list-detail-bulk-actions.bulk-actions-modal.--show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
     }
     #list-detail-bulk-actions .bar { display: flex; align-items: center; gap: 8px; }
     #list-detail-bulk-actions .spacer { flex: 1 1 auto; }
@@ -2636,25 +2708,305 @@ function injectListDetailBulkStyles() {
   document.head.appendChild(style);
 }
 
-function showBulkActionsBar(forceShow) {
-  console.log('[Bulk Actions] showBulkActionsBar called', { forceShow });
+// ===== Bulk selection popover (Step 1) =====
+function openBulkSelectPopover() {
   const page = document.getElementById('list-detail-page');
-  const container = page?.querySelector('.table-container');
-  console.log('[Bulk Actions] Container found:', !!container);
-  if (!container) return;
+  if (!page) return;
+  
+  // Get state and els via API
+  const state = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
+  if (!state) return;
+  
+  // Get els via closure or query
+  const tableContainer = page.querySelector('.table-container') || 
+                         page.querySelector('#list-detail-table')?.closest('.table-container');
+  if (!tableContainer) return;
+  
+  // Check if popover already exists
+  const existingPopover = document.getElementById('list-detail-bulk-popover');
+  if (existingPopover) return;
+  
+  closeBulkSelectPopover();
+  const view = state.view || 'people';
+  const totalFiltered = (state.filtered || []).length;
+  
+  // Get page items via API
+  const pageItems = window.ListDetail && window.ListDetail._getPageItems ? window.ListDetail._getPageItems() : [];
+  const pageCount = pageItems.length;
+  
+  // Backdrop
+  const backdrop = document.createElement('div');
+  backdrop.className = 'bulk-select-backdrop';
+  backdrop.addEventListener('click', () => {
+    const selectAll = document.getElementById('select-all-list-detail');
+    if (selectAll) {
+      const set = view === 'people' ? state.selectedPeople : state.selectedAccounts;
+      selectAll.checked = set.size > 0;
+    }
+    closeBulkSelectPopover();
+  });
+  document.body.appendChild(backdrop);
+  
+  const pop = document.createElement('div');
+  pop.id = 'list-detail-bulk-popover';
+  pop.className = 'bulk-select-popover';
+  pop.setAttribute('role', 'dialog');
+  pop.setAttribute('aria-label', 'Bulk selection');
+  pop.setAttribute('aria-modal', 'true');
+  
+  const itemType = view === 'people' ? 'people' : 'accounts';
+  pop.innerHTML = `
+    <div class="option">
+      <label style="display:flex;align-items:center;gap:8px;">
+        <input type="radio" name="bulk-mode" value="custom" checked>
+        <span>Select number of ${itemType}</span>
+      </label>
+      <input type="number" min="1" max="${totalFiltered}" step="1" value="${Math.max(1, pageCount)}" id="bulk-custom-count" aria-label="Custom count">
+    </div>
+    <div class="option">
+      <label style="display:flex;align-items:center;gap:8px;">
+        <input type="radio" name="bulk-mode" value="page">
+        <span>Select this page</span>
+      </label>
+      <span class="hint">${pageCount}</span>
+    </div>
+    <div class="option">
+      <label style="display:flex;align-items:center;gap:8px;">
+        <input type="radio" name="bulk-mode" value="all">
+        <span>Select all</span>
+      </label>
+      <span class="hint">${totalFiltered}</span>
+    </div>
+    <div class="actions">
+      <button class="btn-text" id="bulk-cancel">Cancel</button>
+      <button class="btn-primary" id="bulk-apply">Apply</button>
+    </div>
+  `;
+  
+  document.body.appendChild(pop);
+  
+  function positionPopover() {
+    const selectAll = document.getElementById('select-all-list-detail');
+    if (!selectAll) return;
+    const cbRect = selectAll.getBoundingClientRect();
+    let left = cbRect.left;
+    let top = cbRect.bottom + 6;
+    const maxLeft = window.innerWidth - pop.offsetWidth - 8;
+    left = Math.max(8, Math.min(left, Math.max(8, maxLeft)));
+    const maxTop = window.innerHeight - pop.offsetHeight - 8;
+    top = Math.max(8, Math.min(top, maxTop));
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+  }
+  
+  positionPopover();
+  const reposition = () => positionPopover();
+  window.addEventListener('resize', reposition);
+  window.addEventListener('scroll', reposition, true);
+  
+  // Enable/disable custom count input
+  const applyBtnRef = pop.querySelector('#bulk-apply');
+  const customInput = pop.querySelector('#bulk-custom-count');
+  const radios = Array.from(pop.querySelectorAll('input[name="bulk-mode"]'));
+  function updateCustomEnabled() {
+    const isCustom = !!pop.querySelector('input[name="bulk-mode"][value="custom"]:checked');
+    if (customInput) {
+      customInput.disabled = !isCustom;
+      if (isCustom) customInput.removeAttribute('aria-disabled');
+      else customInput.setAttribute('aria-disabled', 'true');
+    }
+  }
+  radios.forEach((r) => r.addEventListener('change', () => { updateCustomEnabled(); if (r.value === 'custom' && customInput && !customInput.disabled) customInput.focus(); }));
+  updateCustomEnabled();
+  
+  // Pressing Enter in the number field applies selection
+  if (customInput) {
+    customInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applyBtnRef && applyBtnRef.click(); } });
+  }
+  
+  // Focus trap and Escape
+  const focusables = Array.from(pop.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'));
+  const firstFocusable = focusables[0];
+  const lastFocusable = focusables[focusables.length - 1];
+  const onKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      const selectAll = document.getElementById('select-all-list-detail');
+      if (selectAll) {
+        const set = view === 'people' ? state.selectedPeople : state.selectedAccounts;
+        selectAll.checked = set.size > 0;
+      }
+      closeBulkSelectPopover();
+      return;
+    }
+    if (e.key === 'Tab' && focusables.length > 0) {
+      if (e.shiftKey && document.activeElement === firstFocusable) { e.preventDefault(); lastFocusable && lastFocusable.focus(); }
+      else if (!e.shiftKey && document.activeElement === lastFocusable) { e.preventDefault(); firstFocusable && firstFocusable.focus(); }
+    }
+  };
+  document.addEventListener('keydown', onKeyDown);
+  if (page) page._bulkKeydownHandler = onKeyDown;
+  
+  // Store cleanup handler
+  if (page) {
+    if (page._bulkPopoverCleanup) page._bulkPopoverCleanup();
+    page._bulkPopoverCleanup = () => {
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+      try {
+        const bd = document.querySelector('.bulk-select-backdrop');
+        if (bd && bd.parentNode) bd.parentNode.removeChild(bd);
+      } catch (e) { /* noop */ }
+    };
+  }
+  
+  // Focus first control
+  const firstInput = pop.querySelector('#bulk-custom-count') || pop.querySelector('input,button');
+  if (firstInput && typeof firstInput.focus === 'function') firstInput.focus();
+  
+  // Wire events
+  const cancelBtn = pop.querySelector('#bulk-cancel');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      const selectAll = document.getElementById('select-all-list-detail');
+      if (selectAll) selectAll.checked = false;
+      closeBulkSelectPopover();
+    });
+  }
+  
+  // Use event delegation for Apply button
+  pop.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'bulk-apply') {
+      const checkedRadio = pop.querySelector('input[name="bulk-mode"]:checked');
+      const mode = checkedRadio ? checkedRadio.value : 'custom';
+      closeBulkSelectPopover();
+      
+      // Apply selection based on mode
+      if (mode === 'custom') {
+        const raw = parseInt(pop.querySelector('#bulk-custom-count').value || '0', 10);
+        const n = Math.min(totalFiltered, Math.max(1, isNaN(raw) ? 0 : raw));
+        selectFirstNFiltered(n);
+      } else if (mode === 'page') {
+        const pageIds = pageItems.map((it) => it.id).filter(Boolean);
+        selectIds(pageIds);
+      } else if (mode === 'all') {
+        const allIds = (state.filtered || []).map((it) => it.id).filter(Boolean);
+        selectIds(allIds);
+      }
+      
+      // Note: selectIds() already calls _render() and showBulkActionsBar(), so no need to call again
+    }
+  });
+  
+  // Close on outside click
+  let outside;
+  setTimeout(() => {
+    outside = function (e) {
+      const selectAll = document.getElementById('select-all-list-detail');
+      if (!pop.contains(e.target) && e.target !== selectAll) {
+        document.removeEventListener('mousedown', outside);
+        if (selectAll) {
+          const set = view === 'people' ? state.selectedPeople : state.selectedAccounts;
+          selectAll.checked = set.size > 0;
+        }
+        closeBulkSelectPopover();
+      }
+    };
+    document.addEventListener('mousedown', outside);
+    if (page) page._bulkOutsideHandler = outside;
+  }, 0);
+}
+
+function closeBulkSelectPopover() {
+  const page = document.getElementById('list-detail-page');
+  const existing = document.getElementById('list-detail-bulk-popover');
+  if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+  if (page && typeof page._bulkPopoverCleanup === 'function') {
+    page._bulkPopoverCleanup();
+    delete page._bulkPopoverCleanup;
+  }
+  // Remove stored handlers
+  if (page && page._bulkKeydownHandler) {
+    try { document.removeEventListener('keydown', page._bulkKeydownHandler); } catch (e) { /* noop */ }
+    delete page._bulkKeydownHandler;
+  }
+  if (page && page._bulkOutsideHandler) {
+    try { document.removeEventListener('mousedown', page._bulkOutsideHandler); } catch (e) { /* noop */ }
+    delete page._bulkOutsideHandler;
+  }
+  // Remove backdrop
+  const bd = document.querySelector('.bulk-select-backdrop');
+  if (bd && bd.parentNode) bd.parentNode.removeChild(bd);
+}
+
+function selectIds(ids) {
+  const state = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
+  if (!state) return;
+  const view = state.view || 'people';
+  const set = view === 'people' ? state.selectedPeople : state.selectedAccounts;
+  set.clear();
+  for (const id of ids) if (id) set.add(id);
+  // Trigger render via ListDetail API or direct call
+  if (window.ListDetail && typeof window.ListDetail._render === 'function') {
+    window.ListDetail._render();
+  } else {
+    // Fallback: try to find and call render function
+    const page = document.getElementById('list-detail-page');
+    if (page && page._render) page._render();
+  }
+  // Show bulk actions bar after selection
+  setTimeout(() => {
+    showBulkActionsBar();
+    updateHeaderSelectAll();
+    renderRowSelectionHighlights();
+  }, 50);
+}
+
+function selectFirstNFiltered(n) {
+  const state = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
+  if (!state || !state.filtered) return;
+  const ids = state.filtered.slice(0, n).map((it) => it.id).filter(Boolean);
+  selectIds(ids);
+}
+
+function showBulkActionsBar(forceShow) {
+  const page = document.getElementById('list-detail-page');
+  if (!page) return;
+  
+  // Try to get container from els if available, otherwise query for it
+  let container = null;
+  if (window.ListDetail && window.ListDetail._getTableContainer) {
+    container = window.ListDetail._getTableContainer();
+  }
+  if (!container) {
+    container = page.querySelector('.table-container') || 
+                page.querySelector('#list-detail-table')?.closest('.table-container');
+  }
+  if (!container) {
+    console.warn('[Bulk Actions] Container not found');
+    return;
+  }
+  
   // Use state.view instead of removed toggle button
   const view = (window.ListDetail && window.ListDetail._getState && window.ListDetail._getState().view) || 'people';
-  const count = view === 'people' ? (window.ListDetail && ListDetail._getSelectedCount ? ListDetail._getSelectedCount('people') : document.querySelectorAll('#list-detail-table .row-select:checked').length) : (window.ListDetail && ListDetail._getSelectedCount ? ListDetail._getSelectedCount('accounts') : document.querySelectorAll('#list-detail-table .row-select:checked').length);
-  console.log('[Bulk Actions] View:', view, 'Count:', count, 'Should show:', !!forceShow || count > 0);
+  const count = view === 'people' 
+    ? (window.ListDetail && ListDetail._getSelectedCount ? ListDetail._getSelectedCount('people') : document.querySelectorAll('#list-detail-table .row-select:checked').length)
+    : (window.ListDetail && ListDetail._getSelectedCount ? ListDetail._getSelectedCount('accounts') : document.querySelectorAll('#list-detail-table .row-select:checked').length);
+  
   const shouldShow = !!forceShow || count > 0;
   let bar = page.querySelector('#list-detail-bulk-actions');
+  
   if (!shouldShow) { 
-    console.log('[Bulk Actions] Hiding bar');
-    if (bar && bar.parentNode) bar.parentNode.removeChild(bar); 
+    if (bar && bar.parentNode) {
+      bar.classList.remove('--show');
+      setTimeout(() => {
+        if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
+      }, 200);
+    }
     return; 
   }
+  
   if (!bar) {
-    console.log('[Bulk Actions] Creating new bar');
     bar = document.createElement('div');
     bar.id = 'list-detail-bulk-actions';
     bar.className = 'bulk-actions-modal';
@@ -2667,26 +3019,32 @@ function showBulkActionsBar(forceShow) {
       <button type="button" class="action-btn-sm danger" id="ld-bulk-delete">Delete</button>
     </div>`;
     container.appendChild(bar);
-    console.log('[Bulk Actions] Bar appended to container');
+    // Add animation class after a brief delay
+    setTimeout(() => {
+      bar.classList.add('--show');
+    }, 10);
+    
     // Bind actions
     bar.querySelector('#ld-bulk-sequence')?.addEventListener('click', () => window.crm?.showToast && window.crm.showToast('Sequence action coming soon'));
     bar.querySelector('#ld-bulk-export')?.addEventListener('click', () => exportSelectedToCsv());
     bar.querySelector('#ld-bulk-remove')?.addEventListener('click', () => removeSelectedFromList());
     bar.querySelector('#ld-bulk-delete')?.addEventListener('click', () => showDeleteConfirmation());
-    // Reposition on scroll/resize
-    const pos = () => {/* anchored via absolute + centered; no-op, layout handles */};
-    window.addEventListener('scroll', pos, true);
-    window.addEventListener('resize', pos, true);
   } else {
-    console.log('[Bulk Actions] Updating existing bar count');
-    const span = bar.querySelector('#ld-selected-count'); if (span) span.textContent = String(count);
+    // Update existing bar count
+    const span = bar.querySelector('#ld-selected-count'); 
+    if (span) span.textContent = String(count);
   }
 }
 
 function hideBulkActionsBar() {
   try {
     const el = document.getElementById('list-detail-bulk-actions');
-    if (el && el.parentNode) el.parentNode.removeChild(el);
+    if (el) {
+      el.classList.remove('--show');
+      setTimeout(() => {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+      }, 200);
+    }
   } catch(_) {}
 }
 
@@ -2742,10 +3100,21 @@ async function removeSelectedFromList() {
   }
 }
 
+// Helper function for SVG icons (needed outside closure)
+function svgIcon(name) {
+  switch (name) {
+    case 'delete':
+      return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
+    default:
+      return '';
+  }
+}
+
 function showDeleteConfirmation() {
   const page = document.getElementById('list-detail-page');
   // Use state.view instead of removed toggle button
-  const view = (window.ListDetail && window.ListDetail._getState && window.ListDetail._getState().view) || 'people';
+  const state = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
+  const view = (state && state.view) || 'people';
   const ids = Array.from(document.querySelectorAll('#list-detail-table .row-select:checked')).map(cb => cb.getAttribute('data-id'));
   
   if (!ids.length) {
@@ -2772,12 +3141,13 @@ function showDeleteConfirmation() {
   pop.setAttribute('role', 'dialog');
   pop.setAttribute('aria-label', 'Confirm delete');
   pop.dataset.placement = 'bottom';
+  const deleteIcon = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
   pop.innerHTML = `
     <div class="delete-popover-inner">
       <div class="delete-title">Delete ${ids.length} ${view === 'people' ? 'contact' : 'account'}${ids.length === 1 ? '' : 's'}?</div>
        <div class="btn-row">
          <button type="button" id="ld-del-cancel" class="btn-text">Cancel</button>
-         <button type="button" id="ld-del-confirm" class="btn-danger">${svgIcon('delete')}<span>Delete</span></button>
+         <button type="button" id="ld-del-confirm" class="btn-danger">${deleteIcon}<span>Delete</span></button>
        </div>
     </div>
   `;
@@ -2823,90 +3193,238 @@ function showDeleteConfirmation() {
 }
 
 async function handleDeleteConfirm(ids, view) {
+  // Close popover first - do this synchronously to prevent UI issues
+  const pop = document.getElementById('list-detail-delete-popover');
+  const backdrop = document.getElementById('list-detail-delete-backdrop');
+  if (pop && pop.parentNode) pop.parentNode.removeChild(pop);
+  if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+
+  // Show progress toast before setTimeout so it's accessible in catch
+  let progressToast = null;
   try {
-    // Close popover first
-    const pop = document.getElementById('list-detail-delete-popover');
-    const backdrop = document.getElementById('list-detail-delete-backdrop');
-    if (pop && pop.parentNode) pop.parentNode.removeChild(pop);
-    if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-
-    // Show progress toast
-    const progressToast = window.crm?.showProgressToast ? 
+    progressToast = window.crm?.showProgressToast ? 
       window.crm.showProgressToast(`Deleting ${ids.length} ${view === 'people' ? 'contact' : 'account'}${ids.length === 1 ? '' : 's'}...`, ids.length, 0) : null;
+  } catch (e) {
+    console.error('Error creating progress toast:', e);
+  }
 
-    let failed = 0;
-    let completed = 0;
+  // Use setTimeout to ensure UI updates happen before starting delete operations
+  setTimeout(async () => {
+    try {
+      let failed = 0;
+      let completed = 0;
 
-    // Use production API for delete operations
-    const base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
-    const url = `${base}/api/${view === 'people' ? 'contacts' : 'accounts'}`;
-    
-    console.log(`[Bulk Delete] Deleting ${ids.length} ${view} items from list-detail page`);
-    
-    // Delete from backend
-    for (const id of ids) {
-      try {
-        console.log(`[Bulk Delete] Deleting ${view}: ${id}`);
-        
-        const response = await fetch(url, {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id })
-        });
-        
-        console.log(`[Bulk Delete] Response for ${id}:`, {
-          status: response.status,
-          statusText: response.statusText,
-          ok: response.ok
-        });
-        
-        if (response.ok) {
-          completed++;
-          console.log(`[Bulk Delete] Successfully deleted ${view} ${id}`);
-          // Update progress toast
-          if (progressToast && typeof progressToast.update === 'function') {
-            progressToast.update(completed, ids.length);
+      // Use Firebase directly like people.js and accounts.js do
+      const collectionName = view === 'people' ? 'contacts' : 'accounts';
+      
+      console.log(`[Bulk Delete] Deleting ${ids.length} ${view} items from list-detail page`);
+      
+      if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
+        // Process deletions sequentially to show progress
+        for (const id of ids) {
+          try {
+            console.log(`[Bulk Delete] Deleting ${view}: ${id}`);
+            await window.firebaseDB.collection(collectionName).doc(id).delete();
+            completed++;
+            console.log(`[Bulk Delete] Successfully deleted ${view} ${id}`);
+            // Update progress toast after each successful delete
+            if (progressToast && typeof progressToast.update === 'function') {
+              progressToast.update(completed, ids.length);
+            }
+          } catch (error) {
+            failed++;
+            console.error(`[Bulk Delete] Error deleting ${view} ${id}:`, error);
+            // Update progress toast on error
+            if (progressToast && typeof progressToast.update === 'function') {
+              progressToast.update(completed, ids.length);
+            }
+          }
+          
+          // Small delay to prevent UI blocking
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      } else {
+        // If no database, just mark all as completed
+        completed = ids.length;
+        if (progressToast && typeof progressToast.update === 'function') {
+          progressToast.update(completed, ids.length);
+        }
+      }
+      
+      // Update list recordCount by decrementing for successfully deleted items
+      const listId = window.listDetailContext?.listId;
+      if (listId && completed > 0 && window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
+        try {
+          const decrement = window.firebase?.firestore?.FieldValue?.increment ? 
+            window.firebase.firestore.FieldValue.increment(-completed) : null;
+          
+          // COST-EFFECTIVE: Try to get current count from cache first (avoids Firestore read)
+          let currentCount = null;
+          if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
+            const listsData = window.BackgroundListsLoader.getListsData() || [];
+            const list = listsData.find(l => l.id === listId);
+            if (list) {
+              currentCount = list.recordCount || list.count || 0;
+              console.log(`[Bulk Delete] Got current count from cache: ${currentCount}`);
+            }
+          }
+          
+          // Fallback: read from Firestore only if not found in cache
+          if (currentCount === null) {
+            const listDoc = await window.firebaseDB.collection('lists').doc(listId).get();
+            currentCount = listDoc.data()?.recordCount || 0;
+            console.log(`[Bulk Delete] Got current count from Firestore: ${currentCount}`);
+          }
+          
+          const newRecordCount = Math.max(0, currentCount - completed);
+          
+          // Update Firestore
+          if (decrement) {
+            await window.firebaseDB.collection('lists').doc(listId).update({
+              recordCount: decrement,
+              updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp || new Date()
+            });
+            console.log(`[Bulk Delete] Decremented list ${listId} recordCount by ${completed}`);
+          } else {
+            // Fallback: update with calculated new count
+            await window.firebaseDB.collection('lists').doc(listId).update({
+              recordCount: newRecordCount,
+              updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp || new Date()
+            });
+            console.log(`[Bulk Delete] Updated list ${listId} recordCount from ${currentCount} to ${newRecordCount}`);
+          }
+          
+          // Update listMembersCache to reflect deleted items
+          if (window.listMembersCache && window.listMembersCache[listId]) {
+            const cache = window.listMembersCache[listId];
+            const idSet = new Set(ids);
+            if (view === 'people' && cache.people) {
+              ids.forEach(id => cache.people.delete(id));
+            } else if (view === 'accounts' && cache.accounts) {
+              ids.forEach(id => cache.accounts.delete(id));
+            }
+            // Update the count in cache
+            if (view === 'people') {
+              cache.count = cache.people?.size || 0;
+            } else {
+              cache.count = cache.accounts?.size || 0;
+            }
+          }
+          
+          // Update BackgroundListsLoader cache locally (cost-effective: avoids Firestore read)
+          if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
+            window.BackgroundListsLoader.updateListCountLocally(listId, newRecordCount);
+          }
+          
+          // Dispatch event to notify lists-overview of count change
+          try {
+            const listState = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
+            const listName = listState?.listName || window.listDetailContext?.listName || 'List';
+            document.dispatchEvent(new CustomEvent('pc:list-count-updated', {
+              detail: {
+                listId,
+                listName,
+                kind: view,
+                deletedCount: completed,
+                newCount: newRecordCount
+              }
+            }));
+          } catch (e) {
+            console.warn('[Bulk Delete] Failed to dispatch count update event:', e);
+          }
+        } catch (countError) {
+          console.warn('[Bulk Delete] Failed to update list recordCount:', countError);
+        }
+      }
+      
+      // Clear selection state
+      const state = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
+      if (state) {
+        if (view === 'people') {
+          state.selectedPeople.clear();
+          // Remove deleted items from state
+          const idSet = new Set(ids);
+          if (Array.isArray(state.dataPeople)) {
+            state.dataPeople = state.dataPeople.filter(c => !idSet.has(c.id));
+          }
+          if (Array.isArray(state.filtered)) {
+            state.filtered = state.filtered.filter(c => !idSet.has(c.id));
           }
         } else {
-          failed++;
-          const errorText = await response.text().catch(()=>'');
-          console.error(`[Bulk Delete] Failed to delete ${view} ${id}:`, response.status, errorText);
+          state.selectedAccounts.clear();
+          // Remove deleted items from state
+          const idSet = new Set(ids);
+          if (Array.isArray(state.dataAccounts)) {
+            state.dataAccounts = state.dataAccounts.filter(a => !idSet.has(a.id));
+          }
+          if (Array.isArray(state.filtered)) {
+            state.filtered = state.filtered.filter(a => !idSet.has(a.id));
+          }
         }
-      } catch (error) {
-        failed++;
-        console.error(`[Bulk Delete] Error deleting ${view} ${id}:`, error);
+      }
+      
+      // Clear DOM checkboxes
+      document.querySelectorAll('#list-detail-table .row-select:checked').forEach(cb => cb.checked = false);
+      const selectAll = document.getElementById('select-all-list-detail');
+      if (selectAll) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+      }
+      
+      hideBulkActionsBar();
+      
+      // Refresh the list data
+      if (window.ListDetail && typeof window.ListDetail._render === 'function') {
+        window.ListDetail._render();
+      } else if (window.ListDetail && typeof window.ListDetail.init === 'function') {
+        const ctx = window.listDetailContext || {};
+        window.ListDetail.init(ctx);
+      }
+      
+      // Trigger lists-overview refresh via event (more reliable than direct call)
+      try {
+        document.dispatchEvent(new CustomEvent('pc:lists-count-updated', {
+          detail: { listId, deletedCount: completed }
+        }));
+      } catch (e) {
+        console.warn('[Bulk Delete] Failed to dispatch lists update event:', e);
+      }
+      
+      // Also try direct call if available (fallback)
+      if (window.ListsOverview && typeof window.ListsOverview.refreshCounts === 'function') {
+        setTimeout(() => {
+          window.ListsOverview.refreshCounts();
+        }, 500);
+      }
+      
+      // Show completion toast with proper handling
+      const successCount = completed;
+      if (progressToast && typeof progressToast.complete === 'function') {
+        if (failed === 0 && successCount === ids.length) {
+          progressToast.complete(`Successfully deleted ${successCount} ${view === 'people' ? 'contact' : 'account'}${successCount === 1 ? '' : 's'}`);
+        } else if (successCount > 0) {
+          progressToast.complete(`Deleted ${successCount} of ${ids.length} ${view === 'people' ? 'contact' : 'account'}${ids.length === 1 ? '' : 's'}`);
+        } else {
+          progressToast.error(`Failed to delete all ${ids.length} ${view === 'people' ? 'contact' : 'account'}${ids.length === 1 ? '' : 's'}`);
+        }
+      } else {
+        // Fallback if progress toast not available
+        if (failed > 0) {
+          window.crm?.showToast ? window.crm.showToast(`Deleted ${completed} ${view === 'people' ? 'contact' : 'account'}${completed === 1 ? '' : 's'}, ${failed} failed`, 'warning') : 
+            console.warn(`Deleted ${completed} ${view}, ${failed} failed`);
+        } else {
+          window.crm?.showToast ? window.crm.showToast(`Successfully deleted ${completed} ${view === 'people' ? 'contact' : 'account'}${completed === 1 ? '' : 's'}`, 'success') :
+            console.log(`Successfully deleted ${completed} ${view}`);
+        }
+      }
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      if (progressToast && typeof progressToast.error === 'function') {
+        progressToast.error();
+      } else {
+        window.crm?.showToast ? window.crm.showToast('Failed to delete items', 'error') :
+          console.error('Failed to delete items');
       }
     }
-    
-    // Clear selection and refresh
-    document.querySelectorAll('#list-detail-table .row-select:checked').forEach(cb => cb.checked = false);
-    hideBulkActionsBar();
-    
-    // Refresh the list data
-    if (window.ListDetail && typeof window.ListDetail.init === 'function') {
-      const ctx = window.listDetailContext || {};
-      window.ListDetail.init(ctx);
-    }
-    
-    // Show completion toast
-    if (progressToast && typeof progressToast.complete === 'function') {
-      progressToast.complete();
-    }
-    
-    if (failed > 0) {
-      window.crm?.showToast ? window.crm.showToast(`Deleted ${completed} ${view === 'people' ? 'contact' : 'account'}${completed === 1 ? '' : 's'}, ${failed} failed`, 'warning') : 
-        console.warn(`Deleted ${completed} ${view}, ${failed} failed`);
-    } else {
-      window.crm?.showToast ? window.crm.showToast(`Successfully deleted ${completed} ${view === 'people' ? 'contact' : 'account'}${completed === 1 ? '' : 's'}`, 'success') :
-        console.log(`Successfully deleted ${completed} ${view}`);
-    }
-    
-  } catch (error) {
-    console.error('Bulk delete error:', error);
-    if (progressToast && typeof progressToast.error === 'function') {
-      progressToast.error();
-    }
-    window.crm?.showToast ? window.crm.showToast('Failed to delete items', 'error') :
-      console.error('Failed to delete items');
-  }
+  }, 50); // Small delay to ensure UI updates
 }

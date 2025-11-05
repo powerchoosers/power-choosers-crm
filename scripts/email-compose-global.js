@@ -1783,29 +1783,29 @@
           
           // Insert single line break for single spacing (like Gmail/Outlook)
           // Use a cleaner approach that doesn't compound with CSS line-height
-          try {
+            try {
             // Get current selection and range
-            const selection = window.getSelection();
+              const selection = window.getSelection();
             if (!selection || selection.rangeCount === 0) return;
             
-            const range = selection.getRangeAt(0);
-            
+              const range = selection.getRangeAt(0);
+              
             // Insert a single <br> with proper spacing control
             // This creates a clean line break without compounding margins
-            const br = document.createElement('br');
+              const br = document.createElement('br');
             range.deleteContents();
-            range.insertNode(br);
-            
+              range.insertNode(br);
+              
             // Create a zero-width space node after br to ensure proper cursor positioning
             const textNode = document.createTextNode('\u200B'); // Zero-width space
-            range.setStartAfter(br);
+              range.setStartAfter(br);
             range.insertNode(textNode);
             
             // Move cursor after the text node
             range.setStartAfter(textNode);
-            range.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(range);
+              range.collapse(true);
+              selection.removeAllRanges();
+              selection.addRange(range);
             
             console.log('[Enter] Single line break inserted with proper spacing');
           } catch (error) {
@@ -2631,7 +2631,7 @@
 
       // Get industry segmentation from settings
       const industrySegmentation = settings?.industrySegmentation || null;
-      
+
       // Call the API
       const response = await fetch(genUrl, {
         method: 'POST',
@@ -3891,7 +3891,7 @@
             <div style="flex:1;">
               <div style="font-weight: 600; font-size: 15px; color: #1e3a8a; margin: 0; line-height: 1.3;">
                 ${senderName}
-              </div>
+            </div>
               <div style="font-size: 13px; color: #1e40af; opacity: 0.9; margin: 2px 0; line-height: 1.3;">
                 ${senderTitle}
               </div>
@@ -4197,16 +4197,16 @@
           if (closing.includes('Best regards,')) {
             // Check if there's already a newline after the comma
             if (!closing.match(/Best regards,\s*\n/i)) {
-              // Replace "Best regards, Name" with "Best regards,\nName"
-              closing = closing.replace(/Best regards,\s*/i, 'Best regards,\n');
+            // Replace "Best regards, Name" with "Best regards,\nName"
+            closing = closing.replace(/Best regards,\s*/i, 'Best regards,\n');
             }
           } else if (closing.includes('Sincerely,')) {
             if (!closing.match(/Sincerely,\s*\n/i)) {
-              closing = closing.replace(/Sincerely,\s*/i, 'Sincerely,\n');
+            closing = closing.replace(/Sincerely,\s*/i, 'Sincerely,\n');
             }
           } else if (closing.includes('Regards,')) {
             if (!closing.match(/Regards,\s*\n/i)) {
-              closing = closing.replace(/Regards,\s*/i, 'Regards,\n');
+            closing = closing.replace(/Regards,\s*/i, 'Regards,\n');
             }
           }
           
@@ -4526,7 +4526,18 @@
     try {
       // Get deliverability settings from settings.js
       const settings = (window.SettingsPage && window.SettingsPage.getSettings) ? window.SettingsPage.getSettings() : (JSON.parse(localStorage.getItem('crm-settings')||'{}'));
-      const deliver = settings?.emailDeliverability || {};
+      const deliverRaw = settings?.emailDeliverability || {};
+      
+      // Map settings format to sendgrid-service format
+      const deliver = {
+        enableTracking: deliverRaw.enableTracking !== false && deliverRaw.enableClickTracking !== false,
+        includeBulkHeaders: deliverRaw.includeBulkHeaders === true,
+        includeListUnsubscribe: deliverRaw.includeListUnsubscribe !== false,
+        includePriorityHeaders: deliverRaw.includePriorityHeaders === true,
+        forceGmailOnly: false,
+        useBrandedHtmlTemplate: deliverRaw.useBrandedHtmlTemplate === true,
+        signatureImageEnabled: deliverRaw.signatureImageEnabled !== false
+      };
       
       // Show sending state
       const sendButton = document.querySelector('#compose-send');

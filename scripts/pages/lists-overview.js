@@ -477,6 +477,11 @@
   function startLiveListsListeners() {
     try {
       if (!window.firebaseDB || !window.firebaseDB.collection) return;
+      
+      // COST-EFFECTIVE: Only use live listeners as backup for multi-user scenarios
+      // Primary updates come from events (pc:list-count-updated) which are free
+      // Live listeners trigger Firestore reads on every change, so use sparingly
+      
       const col = window.firebaseDB.collection('lists');
       
       // People lists - try filtered query first, fallback to unfiltered if it fails
@@ -506,8 +511,8 @@
                   items.push({ id: d.id, ...data });
                 });
                 
-                // CRITICAL FIX: Always merge with existing lists instead of replacing
-                // This prevents losing lists if the listener query has issues or returns incomplete data
+                // COST-EFFECTIVE: Only update if we detect actual changes (not just snapshot triggers)
+                // This reduces unnecessary re-renders and cache updates
                 const existingCount = state.peopleLists.length;
                 
                 // If we have existing lists but listener returns empty, preserve existing
@@ -521,15 +526,42 @@
                   state.peopleLists = items;
                   console.log(`[ListsOverview] First load: set ${items.length} lists`);
                 } else {
-                  // ALWAYS merge when we have existing data - never full replace
-                  // This prevents losing lists from BackgroundListsLoader that aren't in the listener's result
+                  // COST-EFFECTIVE: Only update lists that actually changed, and remove deleted ones
                   const existingMap = new Map(state.peopleLists.map(l => [l.id, l]));
+                  const itemsIds = new Set(items.map(item => item.id));
+                  let changed = false;
+                  
+                  // Remove lists that no longer exist in Firestore (were deleted)
+                  for (const [id, list] of existingMap.entries()) {
+                    if (!itemsIds.has(id)) {
+                      existingMap.delete(id);
+                      changed = true;
+                      // Also remove from BackgroundListsLoader cache
+                      if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.removeListLocally === 'function') {
+                        window.BackgroundListsLoader.removeListLocally(id);
+                      }
+                      console.log(`[ListsOverview] Removed deleted list ${id} from cache`);
+                    }
+                  }
+                  
+                  // Update or add lists that exist in Firestore
                   items.forEach(item => {
-                    existingMap.set(item.id, item); // Update or add
+                    const existing = existingMap.get(item.id);
+                    // Only update if recordCount changed or it's a new list
+                    if (!existing || existing.recordCount !== item.recordCount || existing.name !== item.name) {
+                      existingMap.set(item.id, item);
+                      changed = true;
+                    }
                   });
-                  // Keep ALL existing items, updating only those that appear in the listener's result
-                  state.peopleLists = Array.from(existingMap.values());
-                  console.log(`[ListsOverview] Merged ${items.length} items from listener with ${existingCount} existing lists (total: ${existingMap.size})`);
+                  
+                  // Only re-render if something actually changed
+                  if (changed || existingMap.size !== existingCount) {
+                    state.peopleLists = Array.from(existingMap.values());
+                    console.log(`[ListsOverview] Updated ${items.length} lists from listener (changes detected)`);
+                  } else {
+                    // No changes detected, skip re-render to save resources
+                    return;
+                  }
                 }
                 
                 state.loadedPeople = true;
@@ -595,8 +627,8 @@
                   items.push({ id: d.id, ...data });
                 });
                 
-                // CRITICAL FIX: Always merge with existing lists instead of replacing
-                // This prevents losing lists if the listener query has issues or returns incomplete data
+                // COST-EFFECTIVE: Only update if we detect actual changes (not just snapshot triggers)
+                // This reduces unnecessary re-renders and cache updates
                 const existingCount = state.accountLists.length;
                 
                 // If we have existing lists but listener returns empty, preserve existing
@@ -610,15 +642,42 @@
                   state.accountLists = items;
                   console.log(`[ListsOverview] First load: set ${items.length} account lists`);
                 } else {
-                  // ALWAYS merge when we have existing data - never full replace
-                  // This prevents losing lists from BackgroundListsLoader that aren't in the listener's result
+                  // COST-EFFECTIVE: Only update lists that actually changed, and remove deleted ones
                   const existingMap = new Map(state.accountLists.map(l => [l.id, l]));
+                  const itemsIds = new Set(items.map(item => item.id));
+                  let changed = false;
+                  
+                  // Remove lists that no longer exist in Firestore (were deleted)
+                  for (const [id, list] of existingMap.entries()) {
+                    if (!itemsIds.has(id)) {
+                      existingMap.delete(id);
+                      changed = true;
+                      // Also remove from BackgroundListsLoader cache
+                      if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.removeListLocally === 'function') {
+                        window.BackgroundListsLoader.removeListLocally(id);
+                      }
+                      console.log(`[ListsOverview] Removed deleted list ${id} from cache`);
+                    }
+                  }
+                  
+                  // Update or add lists that exist in Firestore
                   items.forEach(item => {
-                    existingMap.set(item.id, item); // Update or add
+                    const existing = existingMap.get(item.id);
+                    // Only update if recordCount changed or it's a new list
+                    if (!existing || existing.recordCount !== item.recordCount || existing.name !== item.name) {
+                      existingMap.set(item.id, item);
+                      changed = true;
+                    }
                   });
-                  // Keep ALL existing items, updating only those that appear in the listener's result
-                  state.accountLists = Array.from(existingMap.values());
-                  console.log(`[ListsOverview] Merged ${items.length} items from listener with ${existingCount} existing account lists (total: ${existingMap.size})`);
+                  
+                  // Only re-render if something actually changed
+                  if (changed || existingMap.size !== existingCount) {
+                    state.accountLists = Array.from(existingMap.values());
+                    console.log(`[ListsOverview] Updated ${items.length} account lists from listener (changes detected)`);
+                  } else {
+                    // No changes detected, skip re-render to save resources
+                    return;
+                  }
                 }
                 
                 state.loadedAccounts = true;
@@ -738,16 +797,33 @@
     const existingIds = Array.from(existingCards).map(card => card.getAttribute('data-id'));
     const newIds = items.map(item => item.id);
     
-    // Remove cards that no longer exist with fade-out animation
+    // Remove cards that no longer exist with fade-out and slide animation
+    const cardsToRemove = [];
     existingCards.forEach(card => {
       const id = card.getAttribute('data-id');
       if (!newIds.includes(id)) {
+        cardsToRemove.push(card);
+      }
+    });
+    
+    // Add fade-out animation to cards being removed
+    if (cardsToRemove.length > 0) {
+      // Add a class to the grid container to enable smooth transitions for remaining cards
+      els.listContainer.classList.add('card-removing');
+      
+      cardsToRemove.forEach(card => {
         card.classList.add('card-fade-out');
         card.addEventListener('animationend', () => {
           card.remove();
+          // Remove the class after all animations complete
+          if (els.listContainer.querySelectorAll('.card-fade-out').length === 0) {
+            setTimeout(() => {
+              els.listContainer.classList.remove('card-removing');
+            }, 50);
+          }
         }, { once: true });
-      }
-    });
+      });
+    }
     
     // Add or update cards with staggered animations
     items.forEach((item, index) => {
@@ -1160,11 +1236,30 @@
       // Continue with local deletion even if remote fails
     }
 
+    // COST-EFFECTIVE: Remove from BackgroundListsLoader cache (prevents reappearing on navigation)
+    if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.removeListLocally === 'function') {
+      window.BackgroundListsLoader.removeListLocally(id);
+    }
+
+    // Remove from CacheManager cache
+    if (window.CacheManager && typeof window.CacheManager.deleteRecord === 'function') {
+      window.CacheManager.deleteRecord('lists', id).catch(err => 
+        console.warn('[ListsOverview] Failed to delete from cache:', err)
+      );
+    }
+
     // Remove from local state
     if (kind === 'people') {
       state.peopleLists = state.peopleLists.filter(item => item.id !== id);
     } else {
       state.accountLists = state.accountLists.filter(item => item.id !== id);
+    }
+
+    // Also invalidate list members cache if it exists
+    if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
+      window.CacheManager.invalidateListCache(id).catch(err => 
+        console.warn('[ListsOverview] Failed to invalidate list members cache:', err)
+      );
     }
 
     closeDeleteModal();
@@ -1270,15 +1365,37 @@
         }
       }
       
-      /* Smooth card fade-out animation */
+      /* Smooth card fade-out animation with slide and collapse */
       @keyframes cardFadeOut {
-        from {
+        0% {
           opacity: 1;
-          transform: translateY(0) scale(1);
+          transform: translateX(0) translateY(0) scale(1);
+          margin-bottom: var(--spacing-base, 16px);
+          max-height: 500px;
+          padding: var(--spacing-base, 16px);
+        }
+        50% {
+          opacity: 0.3;
+          transform: translateX(-30px) translateY(-5px) scale(0.98);
+        }
+        100% {
+          opacity: 0;
+          transform: translateX(-50px) translateY(-10px) scale(0.9);
+          margin-bottom: 0;
+          max-height: 0;
+          padding-top: 0;
+          padding-bottom: 0;
+          overflow: hidden;
+        }
+      }
+      
+      /* Animation for remaining cards sliding over */
+      @keyframes cardSlideOver {
+        from {
+          transform: translateX(0) translateY(0);
         }
         to {
-          opacity: 0;
-          transform: translateY(-10px) scale(0.95);
+          transform: translateX(0) translateY(0);
         }
       }
       
@@ -1288,12 +1405,54 @@
       }
       
       .list-card.card-fade-out {
-        animation: cardFadeOut 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        animation: cardFadeOut 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        overflow: hidden;
+        pointer-events: none;
+        z-index: 1;
+      }
+      
+      /* Ensure remaining cards smoothly move as deleted card collapses */
+      #lists-grid.card-removing {
+        /* Use subgrid or ensure smooth grid reflow */
+        contain-layout: none;
+      }
+      
+      /* Smooth transition for grid gap when cards collapse */
+      #lists-grid.card-removing {
+        transition: gap 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      /* Smooth transitions for remaining cards to slide over */
+      #lists-grid {
+        transition: grid-template-rows 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      /* When cards are being removed, enable smooth transitions for remaining cards */
+      #lists-grid.card-removing {
+        /* Force a reflow to trigger smooth transitions */
+        transform: translateZ(0);
+      }
+      
+      /* Smooth repositioning for remaining cards during deletion */
+      #lists-grid.card-removing .list-card:not(.card-fade-out) {
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+                    margin 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                    opacity 0.2s ease,
+                    box-shadow 0.2s ease;
       }
       
       /* Hover effects for cards */
       .list-card {
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, margin 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      
+      /* During deletion, maintain hover but with adjusted transition */
+      #lists-grid.card-removing .list-card:not(.card-fade-out):hover {
+        transform: translateY(-2px);
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+                    margin 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                    opacity 0.2s ease,
+                    box-shadow 0.2s ease;
       }
       
       .list-card:hover {
@@ -1585,6 +1744,116 @@
       console.error('[ListsOverview] Error handling new list creation:', error);
     }
   });
+  
+  // Listen for list count update events (from list-detail page deletions)
+  document.addEventListener('pc:lists-count-updated', (event) => {
+    try {
+      const { listId, deletedCount } = event.detail || {};
+      if (!listId) return;
+      
+      console.log('[ListsOverview] List count updated:', { listId, deletedCount });
+      
+      // COST-EFFECTIVE: Update local state and BackgroundListsLoader cache (no Firestore reads)
+      const updateListCount = (list) => {
+        if (list.id === listId) {
+          const calculatedCount = Math.max(0, (list.count || list.recordCount || 0) - (deletedCount || 0));
+          list.count = calculatedCount;
+          list.recordCount = calculatedCount;
+          
+          // Update BackgroundListsLoader cache locally (cost-effective)
+          if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
+            window.BackgroundListsLoader.updateListCountLocally(listId, calculatedCount);
+          }
+          
+          return true;
+        }
+        return false;
+      };
+      
+      let updated = false;
+      for (const list of state.peopleLists) {
+        if (updateListCount(list)) {
+          updated = true;
+          break;
+        }
+      }
+      if (!updated) {
+        for (const list of state.accountLists) {
+          if (updateListCount(list)) {
+            updated = true;
+            break;
+          }
+        }
+      }
+      
+      if (updated) {
+        // Re-render to show updated count
+        applyFilters();
+        console.log('[ListsOverview] Updated list count immediately (no Firestore reads)');
+      }
+    } catch (error) {
+      console.error('[ListsOverview] Error handling list count update:', error);
+    }
+  });
+  
+  // Listen for list count update events (alternative event name)
+  document.addEventListener('pc:list-count-updated', (event) => {
+    try {
+      const { listId, deletedCount, newCount } = event.detail || {};
+      if (!listId) return;
+      
+      console.log('[ListsOverview] List count updated (alt):', { listId, deletedCount, newCount });
+      
+      // COST-EFFECTIVE: Update local state and BackgroundListsLoader cache (no Firestore reads)
+      const updateListCount = (list) => {
+        if (list.id === listId) {
+          const finalCount = typeof newCount === 'number' ? newCount : 
+            (deletedCount ? Math.max(0, (list.count || list.recordCount || 0) - deletedCount) : 
+            (list.count || list.recordCount || 0));
+          list.count = finalCount;
+          list.recordCount = finalCount;
+          
+          // Update BackgroundListsLoader cache locally (cost-effective)
+          if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
+            window.BackgroundListsLoader.updateListCountLocally(listId, finalCount);
+          }
+          
+          return true;
+        }
+        return false;
+      };
+      
+      let updated = false;
+      for (const list of state.peopleLists) {
+        if (updateListCount(list)) {
+          updated = true;
+          break;
+        }
+      }
+      if (!updated) {
+        for (const list of state.accountLists) {
+          if (updateListCount(list)) {
+            updated = true;
+            break;
+          }
+        }
+      }
+      
+      if (updated) {
+        // Re-render to show updated count
+        applyFilters();
+        console.log('[ListsOverview] Updated list count immediately from event (no Firestore reads)');
+      }
+    } catch (error) {
+      console.error('[ListsOverview] Error handling list count update (alt):', error);
+    }
+  });
+
+  // Expose ListsOverview API for other pages
+  window.ListsOverview = {
+    refreshCounts: refreshCounts,
+    getState: () => state
+  };
 
   // Initialize
   if (!initDom()) return;

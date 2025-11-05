@@ -208,6 +208,55 @@
     }
   }
 
+  // Update list recordCount locally (cost-effective: avoids Firestore read)
+  function updateListCountLocally(listId, newCount) {
+    const list = listsData.find(l => l.id === listId);
+    if (list) {
+      list.recordCount = newCount;
+      list.count = newCount;
+      list.updatedAt = new Date();
+      console.log(`[BackgroundListsLoader] ✓ Updated local count for ${listId}: ${newCount}`);
+      
+      // Update cache if available (cost-effective)
+      if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+        window.CacheManager.updateRecord('lists', listId, { 
+          recordCount: newCount, 
+          count: newCount,
+          updatedAt: new Date()
+        }).catch(err => console.warn('[BackgroundListsLoader] Cache update failed:', err));
+      }
+      
+      return true;
+    }
+    return false;
+  }
+
+  // Remove list from cache (cost-effective: avoids Firestore read on reload)
+  function removeListLocally(listId) {
+    const index = listsData.findIndex(l => l.id === listId);
+    if (index >= 0) {
+      listsData.splice(index, 1);
+      console.log(`[BackgroundListsLoader] ✓ Removed list ${listId} from cache`);
+      
+      // Remove from CacheManager cache (cost-effective)
+      if (window.CacheManager && typeof window.CacheManager.deleteRecord === 'function') {
+        window.CacheManager.deleteRecord('lists', listId).catch(err => 
+          console.warn('[BackgroundListsLoader] Cache delete failed:', err)
+        );
+      }
+      
+      // Update cache storage
+      if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+        window.CacheManager.set('lists', listsData).catch(err => 
+          console.warn('[BackgroundListsLoader] Cache save failed:', err)
+        );
+      }
+      
+      return true;
+    }
+    return false;
+  }
+
   // Export public API
   window.BackgroundListsLoader = {
     getListsData: () => listsData,
@@ -215,7 +264,9 @@
     loadMore: loadMoreLists,
     hasMore: () => hasMoreData,
     getCount: () => listsData.length,
-    getTotalCount: getTotalCount
+    getTotalCount: getTotalCount,
+    updateListCountLocally: updateListCountLocally,
+    removeListLocally: removeListLocally
   };
   
   console.log('[BackgroundListsLoader] Module initialized');
