@@ -24,20 +24,23 @@ export default async function handler(req, res) {
 
     // Best-effort: record an open event if Firestore is available and id looks valid
     try {
-      if (db && trackingId) {
+      if (db && trackingId && trackingId.length > 0) {
         const ref = db.collection('emails').doc(trackingId);
         const snap = await ref.get();
         if (snap.exists) {
           const openedAt = new Date().toISOString();
-          await ref.set({
-            openCount: (snap.data().openCount || 0) + 1,
-            opens: (snap.data().opens || []).concat([{ openedAt, userAgent, ip, referer }]),
-            updatedAt: openedAt
-          }, { merge: true });
+          const currentData = snap.data() || {};
+          await ref.update({
+            openCount: (currentData.openCount || 0) + 1,
+            opens: (currentData.opens || []).concat([{ openedAt, userAgent, ip, referer }]),
+            updatedAt: openedAt,
+            lastOpened: openedAt
+          });
         }
       }
-    } catch (_) {
-      // do not block pixel
+    } catch (error) {
+      // Log error but don't block pixel - tracking is best-effort
+      console.error('[Email Track] Error recording open event:', error.message || error);
     }
 
     // For email clients and proxies, allow caching to reduce repeat fetches
@@ -52,6 +55,8 @@ export default async function handler(req, res) {
     res.writeHead(200, headers);
     res.end(PIXEL);
   } catch (error) {
+    // Always return pixel even on error - tracking failures shouldn't break email rendering
+    console.error('[Email Track] Unexpected error:', error.message || error);
     try {
       const headers = {
         'Content-Type': 'image/png',
@@ -61,9 +66,16 @@ export default async function handler(req, res) {
       };
       res.writeHead(200, headers);
       res.end(PIXEL);
-    } catch (_) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Internal server error' }));
+    } catch (sendError) {
+      // Last resort - try to send pixel without headers
+      try {
+        res.writeHead(200, { 'Content-Type': 'image/png' });
+        res.end(PIXEL);
+      } catch (finalError) {
+        // If all else fails, send minimal response
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('');
+      }
     }
   }
 }

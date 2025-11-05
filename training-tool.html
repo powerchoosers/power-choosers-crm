@@ -1496,7 +1496,7 @@
 grep
             pattern_interrupt_opening: {
                 stage: 'Opening',
-                text: "Hi {{contact.first_name}}, this is <span class=\"name-badge\">(your name)</span> from Power Choosers. <span class=\"pause-indicator\"></span> Real quick though - I'm noticing a pattern with most companies I talk to, they don't have a strategy around electricity. <span class=\"pause-indicator\"></span> And honestly, they're leaving money on the table. <span class=\"pause-indicator\"></span> Do you feel like you have a solid handle on your electricity costs?",
+                text: "Hi {{contact.first_name}}, this is <span class=\"name-badge\">(your name)</span> from Power Choosers. <span class=\"pause-indicator\"></span> Real quick though - I'm noticing a pattern with most companies I talk to, they don't have a real strategy around electricity. <span class=\"pause-indicator\"></span> And honestly, they're leaving money on the table. <span class=\"pause-indicator\"></span> Do you feel like you have a solid handle on your electricity costs?",
                 responses: [
                     { label: "Yeah, we're on top of it", next: 'ack_confident_handle' },
                     { label: "Not really, it's chaotic", next: 'ack_struggling' },
@@ -2339,7 +2339,7 @@ grep
             },
             gatekeeper_intro: {
                 stage: 'Gatekeeper',
-                text: "<span class=\"tone-marker friendly\">friendly, confident tone</span> {{day.part}}, this is <span class=\"name-badge\">(your name)</span> from Power Choosers. <span class=\"pause-indicator\"></span> Quick question — how does your company typically handle energy contract renewals? <span class=\"pause-indicator\"></span> Is that something [CFO/Operations Manager] handles?",
+                text: "<span class=\"tone-marker friendly\">friendly, confident tone</span> {{day.part}}, this is Lewis. <span class=\"pause-indicator\"></span> Just a quick question — how does your company typically handle energy contract renewals? <span class=\"pause-indicator\"></span> Is that something (CFO/Operations Manager/{{contact.first_name}}) handles?",
                 responses: [
                     { label: "Who should I connect you with?", next: 'gatekeeper_connect_request' },
                     { label: "What is this about?", next: 'gatekeeper_what_about' },

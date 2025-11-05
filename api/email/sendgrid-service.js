@@ -122,7 +122,14 @@ export class SendGridService {
         trackingSettings: {
           clickTracking: { enable: deliverabilitySettings.enableTracking },
           openTracking: { enable: deliverabilitySettings.enableTracking }
-        }
+        },
+        // Add personalizations with customArgs for webhook matching
+        personalizations: allowedRecipients.map(recipient => ({
+          to: [{ email: recipient }],
+          customArgs: {
+            trackingId: trackingId || ''
+          }
+        }))
       };
 
               // Threading headers
@@ -237,13 +244,16 @@ export class SendGridService {
    */
   async storeEmailRecord(emailData, messageId) {
     try {
+      const now = new Date().toISOString();
       const emailRecord = {
         id: emailData.trackingId,
         to: Array.isArray(emailData.to) ? emailData.to : [emailData.to],
         subject: emailData.subject,
         content: emailData.content,
         from: emailData.from || this.fromEmail,
-        sentAt: new Date().toISOString(),
+        sentAt: now,
+        date: now,                  // Add date field for emails page sorting
+        timestamp: now,             // Add timestamp field for emails page fallback
         messageId: messageId,
                 threadId: emailData.threadId || null,
                 inReplyTo: emailData.inReplyTo || null,
@@ -260,8 +270,8 @@ export class SendGridService {
         provider: 'sendgrid',      // Identify the email provider
         ownerId: emailData.userEmail || null,     // Required for non-admin users
         assignedTo: emailData.userEmail || null,  // Required for non-admin users
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: now,
+        updatedAt: now
       };
 
       await db.collection('emails').doc(emailData.trackingId).set(emailRecord);

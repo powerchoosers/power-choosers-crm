@@ -6449,6 +6449,8 @@ html, body {
     width: 100%;
     box-sizing: border-box;
     /* Spacing is handled by #lists-page .page-content padding */
+    /* Smooth grid layout transitions for card deletions */
+    transition: grid-template-rows 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #lists-page .table-container {
@@ -15142,11 +15144,13 @@ input.row-select[type="checkbox"]:focus-visible {
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
     padding: var(--spacing-base);
-    transition: var(--transition-smooth);
+    transition: var(--transition-smooth), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), margin 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: var(--shadow-sm);
     display: flex;
     flex-direction: column;
     min-height: 180px; /* Ensure consistent card height */
+    /* Smooth repositioning when other cards are deleted */
+    will-change: transform, margin, opacity;
 }
 
 .list-card:hover {
