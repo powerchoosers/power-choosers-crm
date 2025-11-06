@@ -1351,11 +1351,12 @@ const generalSchema = {
       properties: {
         subject: { type: "string", description: "Email subject under 50 chars" },
         greeting: { type: "string", description: "Hello {firstName}," },
+        opening_paragraph: { type: "string", description: "Opening paragraph (2-3 sentences) based on the user's prompt. This should reflect what they typed in, not generic text. Use natural, conversational language that addresses their specific question or concern." },
         sections: { type: "array", items: { type: "string" }, description: "1-5 one-sentence content points" },
         list_header: { type: "string", description: "Header for sections list, e.g. 'How We Can Help:', 'Key Benefits:', 'Why This Matters:'" },
         cta_text: { type: "string", description: "Call to action" }
       },
-      required: ["subject", "greeting", "sections", "list_header", "cta_text"],
+      required: ["subject", "greeting", "opening_paragraph", "sections", "list_header", "cta_text"],
       additionalProperties: false
     }
   }
@@ -2241,9 +2242,10 @@ Generate text for these fields:
 - cta_text: Use exactly: "Will you be able to send over the invoice by end of day so me and my team can get started?"`,
 
       general: `
-TEMPLATE: General Purpose Email
+TEMPLATE: General Purpose Email (Manual Input)
 Generate text for these fields:
-- greeting: "Hello ${firstName},"
+- greeting: "Hello ${firstName}," or "Hi ${firstName},"
+- opening_paragraph: CRITICAL - This MUST be based on the user's specific prompt. Read what they typed and create a natural, conversational opening paragraph (2-3 sentences) that directly addresses their question or concern. DO NOT use generic text like "I wanted to reach out about an interesting opportunity." Instead, use their actual words and context. For example, if they mention "rates went down in October but now creeping back up," start with something like "Sean, I noticed rates dipped in October but they're climbing again now..." - Use their specific details, numbers, and concerns from the prompt.
 - sections: Array of 2-5 content points - EACH MUST BE EXACTLY ONE SENTENCE (no multi-sentence items)
 - list_header: Choose a contextual header for the list section based on email content (e.g., "How We Can Help:", "Key Benefits:", "Why This Matters:", "What to Expect:", "Our Approach:")
 - cta_text: Appropriate call to action based on context
@@ -2253,6 +2255,7 @@ ${dynamicFields.map(field => `- ${field.name}: ${field.description}`).join('\n')
 ` : ''}
 
 CRITICAL RULES:
+- opening_paragraph MUST reflect the user's actual prompt, not generic text
 - Each item in sections array = ONE SENTENCE ONLY
 - list_header must be relevant to the specific email content, not generic
 - Keep sections concise and actionable
