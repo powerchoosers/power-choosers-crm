@@ -20,7 +20,8 @@
     "mailparser": "^3.6.5",
     "sanitize-html": "^2.13.0",
     "node-cron": "^3.0.3",
-    "twilio": "^4.19.0"
+    "twilio": "^4.19.0",
+    "juice": "^10.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.0"
