@@ -1,6 +1,7 @@
 // SendGrid email service for automated email sending
 import sgMail from '@sendgrid/mail';
 import { admin, db } from '../_firebase.js';
+import sanitizeHtml from 'sanitize-html';
 
 // Initialize SendGrid
 if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.startsWith('SG.')) {
@@ -92,18 +93,53 @@ export class SendGridService {
         signatureImageEnabled: true
       };
 
-      // Prepare email message with filtered recipients
-      // Generate appropriate content versions based on email type
-      const htmlContent = content;
-      const textContent = isHtmlEmail ? 
-        this.generateTextFromHtml(content) : 
-        this.stripHtml(content);
+      // STEP 1: Validate and sanitize HTML content (per Twilio recommendations)
+      let htmlContent = content;
       
-      // Validate content before sending
-      if (!htmlContent || htmlContent.trim().length === 0) {
-        throw new Error('HTML content cannot be empty');
+      // Validate UTF-8 encoding
+      if (typeof htmlContent !== 'string') {
+        throw new Error('Content must be a valid UTF-8 string');
       }
-      if (!textContent || textContent.trim().length === 0) {
+      
+      // Check for UTF-8 validity
+      try {
+        // This will throw if content is not valid UTF-8
+        Buffer.from(htmlContent, 'utf8');
+      } catch (utf8Error) {
+        throw new Error('Content must be valid UTF-8 encoded');
+      }
+      
+      // Sanitize HTML: Remove dangerous tags (script, iframe, etc.) per Twilio recommendations
+      if (isHtmlEmail) {
+        htmlContent = this.sanitizeHtmlForSending(htmlContent);
+        console.log('[SendGrid] HTML sanitized, original length:', content.length, 'sanitized length:', htmlContent.length);
+      }
+      
+      // STEP 2: Generate text version with robust error handling
+      let textContent = '';
+      
+      try {
+        textContent = isHtmlEmail ? 
+          this.generateTextFromHtml(htmlContent) : 
+          this.stripHtml(htmlContent);
+      } catch (textGenError) {
+        console.error('[SendGrid] Error generating text content:', textGenError);
+        // Fallback to basic HTML stripping
+        textContent = this.stripHtml(htmlContent) || 'HTML email content';
+      }
+      
+      // Ensure text content is always a valid non-empty string
+      if (!textContent || typeof textContent !== 'string' || textContent.trim().length === 0) {
+        console.warn('[SendGrid] Text content is empty, using fallback');
+        textContent = 'HTML email content - please view in HTML format';
+      }
+      
+      // Validate both contents are valid strings before sending
+      if (!htmlContent || typeof htmlContent !== 'string' || htmlContent.trim().length === 0) {
+        throw new Error('HTML content cannot be empty after sanitization');
+      }
+      
+      if (!textContent || typeof textContent !== 'string' || textContent.trim().length === 0) {
         throw new Error('Text content cannot be empty');
       }
       
@@ -173,24 +209,113 @@ export class SendGridService {
         };
       }
 
-      // Send email via SendGrid
-      const response = await sgMail.send(msg);
+      // STEP 3: Final validation before sending (per Twilio recommendations)
+      // Validate message structure
+      if (!msg.html || typeof msg.html !== 'string') {
+        throw new Error('Invalid HTML content type');
+      }
+      if (!msg.text || typeof msg.text !== 'string') {
+        throw new Error('Invalid text content type');
+      }
+      
+      // Check content size limits (Twilio recommends <1MB for content, 30MB total payload)
+      const MAX_CONTENT_SIZE = 1048576; // 1MB (per Twilio recommendation for practical limits)
+      const MAX_TOTAL_SIZE = 31457280; // 30MB total payload limit
+      
+      if (msg.html.length > MAX_CONTENT_SIZE) {
+        throw new Error(`HTML content too large: ${msg.html.length} bytes (recommended max: ${MAX_CONTENT_SIZE} bytes / 1MB)`);
+      }
+      
+      if (msg.text.length > MAX_CONTENT_SIZE) {
+        throw new Error(`Text content too large: ${msg.text.length} bytes (recommended max: ${MAX_CONTENT_SIZE} bytes / 1MB)`);
+      }
+      
+      const totalSize = msg.html.length + msg.text.length + (msg.subject?.length || 0);
+      if (totalSize > MAX_TOTAL_SIZE) {
+        throw new Error(`Total payload too large: ${totalSize} bytes (max: ${MAX_TOTAL_SIZE} bytes / 30MB)`);
+      }
+      
+      // Ensure all header values are strings (per Twilio recommendation)
+      if (msg.headers) {
+        for (const [key, value] of Object.entries(msg.headers)) {
+          if (typeof value !== 'string') {
+            console.warn(`[SendGrid] Converting header ${key} to string`);
+            msg.headers[key] = String(value);
+          }
+        }
+      }
+      
+      // STEP 4: Send email via SendGrid with enhanced error logging
+      let response;
+      try {
+        response = await sgMail.send(msg);
+      } catch (sendError) {
+        // Enhanced error logging per Twilio recommendations
+        const errorDetails = {
+          message: sendError.message,
+          code: sendError.code,
+          stack: sendError.stack
+        };
+        
+        // Log SendGrid API error response details (per Twilio recommendation)
+        if (sendError.response) {
+          errorDetails.response = {
+            statusCode: sendError.response.statusCode,
+            status: sendError.response.status,
+            body: sendError.response.body,
+            headers: sendError.response.headers
+          };
+          
+          // Extract detailed error messages from SendGrid response
+          if (sendError.response.body && sendError.response.body.errors) {
+            errorDetails.sendGridErrors = sendError.response.body.errors.map(err => ({
+              message: err.message,
+              field: err.field,
+              help: err.help
+            }));
+            console.error('[SendGrid] SendGrid API Error Details:', errorDetails.sendGridErrors);
+          }
+          
+          // Log specific error codes
+          if (sendError.response.statusCode === 413) {
+            console.error('[SendGrid] Payload Too Large - content exceeds SendGrid limits');
+          } else if (sendError.response.statusCode === 400) {
+            console.error('[SendGrid] Bad Request - check payload structure and headers');
+          }
+        }
+        
+        // Log payload information for debugging
+        errorDetails.payloadInfo = {
+          htmlLength: msg.html.length,
+          textLength: msg.text.length,
+          subjectLength: msg.subject?.length || 0,
+          recipientCount: msg.to?.length || 0,
+          hasHeaders: !!msg.headers,
+          headerCount: msg.headers ? Object.keys(msg.headers).length : 0
+        };
+        
+        console.error('[SendGrid] SendGrid API error (full details):', JSON.stringify(errorDetails, null, 2));
+        throw sendError;
+      }
       
       console.log('[SendGrid] Email sent successfully:', {
         to: to,
         subject: subject,
-        messageId: response[0].headers['x-message-id'],
+        messageId: response[0]?.headers?.['x-message-id'] || 'unknown',
         trackingId: trackingId
       });
 
       // Store email record in Firebase (always store regardless of tracking setting)
       if (trackingId && db) {
-        await this.storeEmailRecord({ ...emailData, threadId }, response[0].headers['x-message-id']);
+        const messageId = response[0]?.headers?.['x-message-id'] || null;
+        if (messageId) {
+          await this.storeEmailRecord({ ...emailData, threadId }, messageId);
+        }
       }
 
       return {
         success: true,
-        messageId: response[0].headers['x-message-id'],
+        messageId: response[0]?.headers?.['x-message-id'] || null,
         trackingId: trackingId
       };
 
@@ -291,6 +416,91 @@ export class SendGridService {
   }
 
   /**
+   * Sanitize HTML content before sending (per Twilio recommendations)
+   * Removes dangerous tags (script, iframe) and validates content
+   */
+  sanitizeHtmlForSending(html) {
+    if (!html || typeof html !== 'string') {
+      return '';
+    }
+    
+    try {
+      // Use sanitize-html library to remove dangerous tags and attributes
+      const sanitized = sanitizeHtml(html, {
+        // Allowed tags for email HTML
+        allowedTags: [
+          'p', 'div', 'span', 'br', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+          'strong', 'b', 'em', 'i', 'u', 's', 'strike', 'sup', 'sub',
+          'a', 'img', 'table', 'thead', 'tbody', 'tr', 'td', 'th',
+          'ul', 'ol', 'li', 'blockquote', 'pre', 'code',
+          'font', 'center', 'section', 'article', 'header', 'footer'
+        ],
+        // Disallow dangerous tags (per Twilio recommendations)
+        disallowedTagsMode: 'discard',
+        // Allowed attributes
+        allowedAttributes: {
+          '*': ['style', 'class', 'id', 'dir', 'align', 'width', 'height'],
+          'a': ['href', 'name', 'target', 'rel', 'title'],
+          'img': ['src', 'alt', 'width', 'height', 'style', 'title', 'border'],
+          'table': ['width', 'border', 'cellpadding', 'cellspacing', 'style'],
+          'td': ['width', 'colspan', 'rowspan', 'style', 'align', 'valign'],
+          'th': ['width', 'colspan', 'rowspan', 'style', 'align', 'valign'],
+          'font': ['color', 'size', 'face']
+        },
+        // Allowed URL schemes
+        allowedSchemes: ['http', 'https', 'mailto'],
+        // Transform tags to remove dangerous content
+        transformTags: {
+          'a': (tagName, attribs) => {
+            // Ensure href doesn't contain javascript:
+            if (attribs.href && attribs.href.toLowerCase().startsWith('javascript:')) {
+              attribs.href = '#';
+            }
+            // Remove target="_blank" without rel="noopener" for security
+            if (attribs.target === '_blank' && !attribs.rel) {
+              attribs.rel = 'noopener noreferrer';
+            }
+            return { tagName, attribs };
+          },
+          'img': (tagName, attribs) => {
+            // Block data URLs that are too large (potential security issue)
+            if (attribs.src && attribs.src.startsWith('data:') && attribs.src.length > 100000) {
+              attribs.src = ''; // Remove very large inline images
+            }
+            return { tagName, attribs };
+          }
+        },
+        // Remove empty tags
+        exclusiveFilter: (frame) => {
+          // Remove empty divs and spans
+          if ((frame.tag === 'div' || frame.tag === 'span') && !frame.text) {
+            return false;
+          }
+          return false;
+        }
+      });
+      
+      // Additional cleanup: Remove any remaining script/iframe tags (belt and suspenders)
+      let cleaned = sanitized
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+        .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '') // Remove event handlers
+        .replace(/javascript:/gi, '') // Remove javascript: URLs
+        .replace(/data:text\/html/gi, ''); // Remove data:text/html URLs
+      
+      return cleaned;
+    } catch (error) {
+      console.error('[SendGrid] HTML sanitization error:', error);
+      // Fallback: basic tag removal
+      return html
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+        .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
+        .replace(/javascript:/gi, '');
+    }
+  }
+
+  /**
    * Strip HTML tags for text version
    */
   stripHtml(html) {
@@ -301,11 +511,23 @@ export class SendGridService {
    * Generate proper text version from HTML email
    */
   generateTextFromHtml(html) {
-    if (!html) return 'HTML email content';
+    if (!html || typeof html !== 'string') {
+      console.warn('[SendGrid] Invalid HTML input for text generation');
+      return 'HTML email content';
+    }
+    
+    // Limit processing for very large HTML to prevent memory issues
+    const MAX_HTML_LENGTH = 1000000; // 1MB limit
+    if (html.length > MAX_HTML_LENGTH) {
+      console.warn('[SendGrid] HTML content too large, using simplified text extraction');
+      return this.stripHtml(html.substring(0, MAX_HTML_LENGTH)) || 'HTML email content';
+    }
     
     try {
-      // Remove script and style tags completely
-      let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+      let text = String(html);
+      
+      // Remove script and style tags completely (handle nested tags)
+      text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
       text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
       
       // Convert common HTML elements to text equivalents
@@ -315,33 +537,82 @@ export class SendGridService {
       text = text.replace(/<\/h[1-6]>/gi, '\n\n');
       text = text.replace(/<li>/gi, '• ');
       text = text.replace(/<\/li>/gi, '\n');
+      text = text.replace(/<\/ul>/gi, '\n');
+      text = text.replace(/<\/ol>/gi, '\n');
       
-      // Replace links with text and URL
-      text = text.replace(/<a href="([^"]+)">([^<]+)<\/a>/gi, '$2 ($1)');
+      // Replace links with text and URL (handle multiline links)
+      text = text.replace(/<a[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (match, url, linkText) => {
+        const cleanText = linkText.replace(/<[^>]*>/g, '').trim();
+        return cleanText ? `${cleanText} (${url})` : url;
+      });
+      
+      // Replace images with alt text
+      text = text.replace(/<img[^>]*alt\s*=\s*["']([^"']+)["'][^>]*>/gi, '$1');
+      text = text.replace(/<img[^>]*>/gi, '[Image]');
       
       // Remove all remaining HTML tags
       text = text.replace(/<[^>]*>/g, '');
       
-      // Decode HTML entities
-      text = text.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+      // Decode common HTML entities
+      const entityMap = {
+        '&nbsp;': ' ',
+        '&amp;': '&',
+        '&lt;': '<',
+        '&gt;': '>',
+        '&quot;': '"',
+        '&#39;': "'",
+        '&apos;': "'"
+      };
+      Object.entries(entityMap).forEach(([entity, char]) => {
+        text = text.replace(new RegExp(entity, 'gi'), char);
+      });
+      
+      // Decode numeric entities
+      text = text.replace(/&#(\d+);/g, (match, dec) => {
+        try {
+          return String.fromCharCode(parseInt(dec, 10));
+        } catch {
+          return match;
+        }
+      });
       
       // Clean up whitespace
-      text = text.replace(/\n\s*\n\s*\n/g, '\n\n'); // Max 2 consecutive newlines
+      text = text.replace(/\n\s*\n\s*\n+/g, '\n\n'); // Max 2 consecutive newlines
       text = text.replace(/[ \t]+/g, ' '); // Multiple spaces to single space
       text = text.replace(/\n /g, '\n'); // Remove leading spaces on new lines
+      text = text.replace(/ \n/g, '\n'); // Remove trailing spaces before newlines
       
       const result = text.trim();
       
       // Ensure we always return non-empty content
       if (!result || result.length === 0) {
-        console.warn('[SendGrid] Generated text is empty, using fallback');
-        return this.stripHtml(html) || 'HTML email content';
+        console.warn('[SendGrid] Generated text is empty after processing, using basic strip');
+        const basicStrip = this.stripHtml(html);
+        return basicStrip && basicStrip.length > 0 ? basicStrip : 'HTML email content - please view in HTML format';
+      }
+      
+      // Limit text length to prevent SendGrid issues
+      const MAX_TEXT_LENGTH = 100000;
+      if (result.length > MAX_TEXT_LENGTH) {
+        console.warn('[SendGrid] Text content too long, truncating');
+        return result.substring(0, MAX_TEXT_LENGTH) + '... [content truncated]';
       }
       
       return result;
     } catch (e) {
-      console.warn('[SendGrid] Failed to generate text from HTML, falling back to basic strip:', e);
-      return this.stripHtml(html) || 'HTML email content';
+      console.error('[SendGrid] Failed to generate text from HTML:', e);
+      // Multiple fallback strategies
+      try {
+        const basicStrip = this.stripHtml(html);
+        if (basicStrip && basicStrip.length > 0) {
+          return basicStrip;
+        }
+      } catch (stripError) {
+        console.error('[SendGrid] Even basic strip failed:', stripError);
+      }
+      
+      // Final fallback
+      return 'HTML email content - please view in HTML format';
     }
   }
 

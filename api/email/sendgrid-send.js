@@ -69,10 +69,47 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('[SendGrid] Send error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
+    
+    // Extract more detailed error information (per Twilio recommendations)
+    let errorMessage = error.message || 'Failed to send email';
+    let errorDetails = null;
+    let statusCode = 500;
+    
+    // If it's a SendGrid API error, extract details (per Twilio recommendation)
+    if (error.response && error.response.body) {
+      statusCode = error.response.statusCode || 500;
+      
+      // Extract detailed error messages from SendGrid response
+      if (error.response.body.errors && Array.isArray(error.response.body.errors)) {
+        errorDetails = error.response.body.errors.map(e => ({
+          message: e.message || e,
+          field: e.field || null,
+          help: e.help || null
+        }));
+        errorMessage = errorDetails.map(e => e.message).join('; ');
+        console.error('[SendGrid] SendGrid API Error Details:', errorDetails);
+      } else if (error.response.body.message) {
+        errorMessage = error.response.body.message;
+      }
+      
+      // Provide specific guidance based on status code
+      if (statusCode === 413) {
+        errorMessage = 'Payload Too Large: Email content exceeds SendGrid size limits. ' + errorMessage;
+      } else if (statusCode === 400) {
+        errorMessage = 'Bad Request: Check email payload structure and headers. ' + errorMessage;
+      } else if (statusCode === 401) {
+        errorMessage = 'Unauthorized: Check SendGrid API key permissions. ' + errorMessage;
+      } else if (statusCode === 403) {
+        errorMessage = 'Forbidden: API key does not have Mail Send permissions. ' + errorMessage;
+      }
+    }
+    
+    res.writeHead(statusCode, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Failed to send email', 
-      message: error.message 
+      message: errorMessage,
+      details: errorDetails || null,
+      statusCode: statusCode
     }));
     return;
   }
