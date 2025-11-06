@@ -479,8 +479,8 @@ class FreeSequenceAutomation {
       
       // Prepare email data for SendGrid
       const emailData = {
-        to: email.to,
-        subject: email.subject,
+          to: email.to,
+          subject: email.subject,
         content: email.html || email.content || '',
         from: senderEmail,
         fromName: senderName,

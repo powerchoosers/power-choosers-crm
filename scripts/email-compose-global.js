@@ -4523,7 +4523,21 @@
     const to = toInput?.value?.trim() || '';
     const subject = subjectInput?.value?.trim() || '';
     
-    const body = bodyInput?.innerHTML || '';
+    // Extract HTML content - handle iframe case for HTML templates
+    let body = '';
+    if (bodyInput) {
+      // Check if HTML is rendered in an iframe (for HTML email templates)
+      const iframe = bodyInput.querySelector('.html-email-iframe');
+      if (iframe && iframe.srcdoc) {
+        // Extract HTML from iframe's srcdoc attribute
+        body = iframe.srcdoc;
+        console.log('[EmailCompose] Extracted HTML from iframe srcdoc, length:', body.length);
+      } else {
+        // Standard case: get innerHTML directly
+        body = bodyInput.innerHTML || '';
+        console.log('[EmailCompose] Using innerHTML directly, length:', body.length);
+      }
+    }
     
     // Check attribute first, then detect HTML structure as fallback
     const hasHtmlAttribute = bodyInput?.getAttribute('data-html-email') === 'true';
