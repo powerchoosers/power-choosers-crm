@@ -111,8 +111,18 @@ export class SendGridService {
       
       // Sanitize HTML: Remove dangerous tags (script, iframe, etc.) per Twilio recommendations
       if (isHtmlEmail) {
-        htmlContent = this.sanitizeHtmlForSending(htmlContent);
-        console.log('[SendGrid] HTML sanitized, original length:', content.length, 'sanitized length:', htmlContent.length);
+        // TEMPORARILY DISABLED - sanitize-html is too aggressive for email templates
+        // The library removes <head> and <style> tags needed for email CSS
+        // htmlContent = this.sanitizeHtmlForSending(htmlContent);
+        
+        // Instead, just do minimal cleanup for email HTML to preserve structure
+        htmlContent = htmlContent
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script tags
+          .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '') // Remove iframe tags
+          .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '') // Remove event handlers
+          .replace(/javascript:/gi, ''); // Remove javascript: URLs
+        
+        console.log('[SendGrid] HTML cleaned (minimal), preserving structure. Original length:', content.length, 'cleaned length:', htmlContent.length);
       }
       
       // STEP 2: Generate text version with robust error handling
