@@ -2,6 +2,7 @@
 import sgMail from '@sendgrid/mail';
 import { admin, db } from '../_firebase.js';
 import sanitizeHtml from 'sanitize-html';
+import juice from 'juice';
 
 // Initialize SendGrid
 if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.startsWith('SG.')) {
@@ -109,20 +110,38 @@ export class SendGridService {
         throw new Error('Content must be valid UTF-8 encoded');
       }
       
-      // Sanitize HTML: Remove dangerous tags (script, iframe, etc.) per Twilio recommendations
+      // Sanitize and inline CSS for HTML emails (per Twilio recommendations)
       if (isHtmlEmail) {
-        // TEMPORARILY DISABLED - sanitize-html is too aggressive for email templates
-        // The library removes <head> and <style> tags needed for email CSS
-        // htmlContent = this.sanitizeHtmlForSending(htmlContent);
-        
-        // Instead, just do minimal cleanup for email HTML to preserve structure
+        // Step 1: Remove dangerous tags (script, iframe, etc.)
         htmlContent = htmlContent
           .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script tags
           .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '') // Remove iframe tags
           .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '') // Remove event handlers
           .replace(/javascript:/gi, ''); // Remove javascript: URLs
         
-        console.log('[SendGrid] HTML cleaned (minimal), preserving structure. Original length:', content.length, 'cleaned length:', htmlContent.length);
+        // Step 2: Inline all CSS styles (convert <style> tags and classes to inline styles)
+        // This is required because email clients strip <style> tags and CSS classes
+        try {
+          htmlContent = juice(htmlContent, {
+            removeStyleTags: true, // Remove <style> tags after inlining
+            preserveMediaQueries: true, // Keep media queries in <style> tags (some clients support them)
+            preserveFontFaces: true, // Keep @font-face rules
+            webResources: {
+              images: false, // Don't inline images
+              svgs: false, // Don't inline SVGs
+              scripts: false, // Don't process scripts
+              links: false // Don't process links
+            }
+          });
+          console.log('[SendGrid] CSS styles inlined successfully. Content length:', htmlContent.length);
+        } catch (inlineError) {
+          console.error('[SendGrid] Failed to inline CSS styles:', inlineError);
+          // Fallback: remove <style> tags but keep the HTML structure
+          htmlContent = htmlContent
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+            .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
+          console.warn('[SendGrid] CSS inlining failed, removed <style> tags as fallback');
+        }
       }
       
       // STEP 2: Generate text version with robust error handling
