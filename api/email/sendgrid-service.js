@@ -112,16 +112,26 @@ export class SendGridService {
       
       // Sanitize and inline CSS for HTML emails (per Twilio recommendations)
       if (isHtmlEmail) {
+        console.log('[SendGrid] Processing HTML email, original content length:', htmlContent.length);
+        console.log('[SendGrid] Has <style> tags:', htmlContent.includes('<style'));
+        console.log('[SendGrid] Has CSS classes:', /class=["'][^"']*["']/.test(htmlContent));
+        
         // Step 1: Remove dangerous tags (script, iframe, etc.)
+        const beforeCleanup = htmlContent.length;
         htmlContent = htmlContent
           .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script tags
           .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '') // Remove iframe tags
           .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '') // Remove event handlers
           .replace(/javascript:/gi, ''); // Remove javascript: URLs
+        console.log('[SendGrid] After cleanup, length:', htmlContent.length);
         
         // Step 2: Inline all CSS styles (convert <style> tags and classes to inline styles)
         // This is required because email clients strip <style> tags and CSS classes
         try {
+          const beforeInline = htmlContent.length;
+          const beforeInlineHasStyle = htmlContent.includes('style=');
+          const beforeInlineHasClass = /class=["'][^"']*["']/.test(htmlContent);
+          
           htmlContent = juice(htmlContent, {
             removeStyleTags: true, // Remove <style> tags after inlining
             preserveMediaQueries: true, // Keep media queries in <style> tags (some clients support them)
@@ -133,9 +143,18 @@ export class SendGridService {
               links: false // Don't process links
             }
           });
-          console.log('[SendGrid] CSS styles inlined successfully. Content length:', htmlContent.length);
+          
+          const afterInlineHasStyle = htmlContent.includes('style=');
+          const afterInlineHasClass = /class=["'][^"']*["']/.test(htmlContent);
+          
+          console.log('[SendGrid] CSS inlining completed:');
+          console.log('[SendGrid]   - Before length:', beforeInline, 'After length:', htmlContent.length);
+          console.log('[SendGrid]   - Before inline styles:', beforeInlineHasStyle, 'After inline styles:', afterInlineHasStyle);
+          console.log('[SendGrid]   - Classes remaining:', afterInlineHasClass);
+          console.log('[SendGrid]   - Sample of inlined HTML (first 500 chars):', htmlContent.substring(0, 500));
         } catch (inlineError) {
           console.error('[SendGrid] Failed to inline CSS styles:', inlineError);
+          console.error('[SendGrid] Error stack:', inlineError.stack);
           // Fallback: remove <style> tags but keep the HTML structure
           htmlContent = htmlContent
             .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
