@@ -4552,6 +4552,17 @@
     );
     const isHtmlEmail = hasHtmlAttribute || hasHtmlStructure;
     
+    // TEMPORARY: Using console.error() so logs always appear even when silenced
+    console.error('[EmailCompose] ========== EMAIL TYPE DETECTION ==========');
+    console.error('[EmailCompose] Email mode:', isHtmlEmail ? 'HTML Template' : 'Standard');
+    console.error('[EmailCompose] Detection:', {hasHtmlAttribute, hasHtmlStructure});
+    console.error('[EmailCompose] Body input has data-html-email:', bodyInput?.getAttribute('data-html-email'));
+    console.error('[EmailCompose] Body input has data-template-type:', bodyInput?.getAttribute('data-template-type'));
+    console.error('[EmailCompose] Body length:', body.length);
+    console.error('[EmailCompose] Content preview (first 200 chars):', body.substring(0, 200));
+    console.error('[EmailCompose] Has iframe:', !!bodyInput?.querySelector('.html-email-iframe'));
+    console.error('[EmailCompose] ===========================================');
+    
     console.log('[EmailCompose] Email mode:', isHtmlEmail ? 'HTML Template' : 'Standard');
     console.log('[EmailCompose] Detection:', {hasHtmlAttribute, hasHtmlStructure});
     console.log('[EmailCompose] Content preview:', body.substring(0, 100) + '...');
