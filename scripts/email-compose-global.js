@@ -3776,6 +3776,20 @@
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
     const s = getSenderProfile();
     
+    // Simplify subject for preview (remove sender name, keep first 50 chars)
+    const simplifySubject = (subject) => {
+      if (!subject) return `Energy Solutions for ${company}`;
+      // Remove sender name pattern (e.g., "- Sean" or "- Lewis")
+      let simplified = subject.replace(/\s*-\s*[A-Za-z]+$/, '').trim();
+      // If still too long, truncate to 50 chars
+      if (simplified.length > 50) {
+        simplified = simplified.substring(0, 47) + '...';
+      }
+      return simplified || `Energy Solutions for ${company}`;
+    };
+    
+    const displaySubject = simplifySubject(data.subject);
+    
     const sections = data.sections || [
       'We\'ve secured exclusive rates for facilities that are 15-25% below typical renewal offers',
       'Our team handles all supplier negotiations and contract reviews at no cost to you',
@@ -3840,10 +3854,10 @@
       <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
       <div class="brandline">Your Energy Partner</div>
     </div>
-    <div class="subject-blurb">Energy Solutions for ${company}</div>
+    <div class="subject-blurb">${displaySubject}</div>
     <div class="intro">
-      <p>Hi ${firstName},</p>
-      <p>I wanted to reach out about an interesting opportunity for ${company}.</p>
+      <p>${data.greeting || `Hi ${firstName},`}</p>
+      <p>${data.opening_paragraph || `I wanted to reach out about an interesting opportunity for ${company}.`}</p>
     </div>
     <div class="info-list">
       <strong>${data.list_header || 'How We Can Help:'}</strong>
