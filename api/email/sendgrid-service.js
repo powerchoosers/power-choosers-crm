@@ -417,7 +417,7 @@ export class SendGridService {
 
   /**
    * Sanitize HTML content before sending (per Twilio recommendations)
-   * Removes dangerous tags (script, iframe) and validates content
+   * Removes dangerous tags (script, iframe) while preserving email HTML structure
    */
   sanitizeHtmlForSending(html) {
     if (!html || typeof html !== 'string') {
@@ -425,10 +425,11 @@ export class SendGridService {
     }
     
     try {
-      // Use sanitize-html library to remove dangerous tags and attributes
+      // Use sanitize-html library to remove dangerous tags while preserving email structure
       const sanitized = sanitizeHtml(html, {
-        // Allowed tags for email HTML
+        // Include HTML document structure tags (email clients may strip them, but we preserve them)
         allowedTags: [
+          'html', 'head', 'body', 'style', 'meta', 'title', // Document structure
           'p', 'div', 'span', 'br', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
           'strong', 'b', 'em', 'i', 'u', 's', 'strike', 'sup', 'sub',
           'a', 'img', 'table', 'thead', 'tbody', 'tr', 'td', 'th',
@@ -437,14 +438,16 @@ export class SendGridService {
         ],
         // Disallow dangerous tags (per Twilio recommendations)
         disallowedTagsMode: 'discard',
-        // Allowed attributes
+        // Allow all attributes needed for email HTML
         allowedAttributes: {
-          '*': ['style', 'class', 'id', 'dir', 'align', 'width', 'height'],
+          '*': ['style', 'class', 'id', 'dir', 'align', 'width', 'height', 'bgcolor', 'cellpadding', 'cellspacing', 'border', 'valign'],
+          'html': ['lang'],
+          'meta': ['charset', 'name', 'content', 'http-equiv'],
           'a': ['href', 'name', 'target', 'rel', 'title'],
           'img': ['src', 'alt', 'width', 'height', 'style', 'title', 'border'],
-          'table': ['width', 'border', 'cellpadding', 'cellspacing', 'style'],
-          'td': ['width', 'colspan', 'rowspan', 'style', 'align', 'valign'],
-          'th': ['width', 'colspan', 'rowspan', 'style', 'align', 'valign'],
+          'table': ['width', 'border', 'cellpadding', 'cellspacing', 'style', 'bgcolor', 'align'],
+          'td': ['width', 'colspan', 'rowspan', 'style', 'align', 'valign', 'bgcolor'],
+          'th': ['width', 'colspan', 'rowspan', 'style', 'align', 'valign', 'bgcolor'],
           'font': ['color', 'size', 'face']
         },
         // Allowed URL schemes
@@ -469,29 +472,22 @@ export class SendGridService {
             }
             return { tagName, attribs };
           }
-        },
-        // Remove empty tags
-        exclusiveFilter: (frame) => {
-          // Remove empty divs and spans
-          if ((frame.tag === 'div' || frame.tag === 'span') && !frame.text) {
-            return false;
-          }
-          return false;
         }
       });
       
-      // Additional cleanup: Remove any remaining script/iframe tags (belt and suspenders)
+      // Additional cleanup: Remove any remaining dangerous content (belt and suspenders)
+      // This ensures we catch anything that sanitize-html might have missed
       let cleaned = sanitized
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
-        .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '') // Remove event handlers
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script tags
+        .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '') // Remove iframe tags
+        .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '') // Remove event handlers (onclick, onload, etc.)
         .replace(/javascript:/gi, '') // Remove javascript: URLs
         .replace(/data:text\/html/gi, ''); // Remove data:text/html URLs
       
       return cleaned;
     } catch (error) {
       console.error('[SendGrid] HTML sanitization error:', error);
-      // Fallback: basic tag removal
+      // Fallback: just remove dangerous tags, preserve everything else
       return html
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
         .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
