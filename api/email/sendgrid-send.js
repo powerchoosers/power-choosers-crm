@@ -21,14 +21,6 @@ export default async function handler(req, res) {
           try {
             const { to, subject, content, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail } = req.body;
 
-    // CRITICAL DEBUG: Log what we received from frontend
-    console.error('🔍 [SendGrid-Send] ========== RECEIVED FROM FRONTEND ==========');
-    console.error('🔍 [SendGrid-Send] isHtmlEmail from req.body:', isHtmlEmail, '| Type:', typeof isHtmlEmail, '| Truthy:', !!isHtmlEmail);
-    console.error('🔍 [SendGrid-Send] Content length:', content?.length || 0);
-    console.error('🔍 [SendGrid-Send] Content preview (first 150 chars):', content?.substring(0, 150) || 'NO CONTENT');
-    console.error('🔍 [SendGrid-Send] Full req.body keys:', Object.keys(req.body || {}));
-    console.error('🔍 [SendGrid-Send] ============================================');
-
     if (!to || !subject || !content) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Missing required fields: to, subject, content' }));
@@ -40,12 +32,6 @@ export default async function handler(req, res) {
 
     // Explicit boolean conversion - ensure it's always a boolean, never undefined
     const isHtmlEmailBoolean = Boolean(isHtmlEmail);
-
-    // CRITICAL DEBUG: Log the conversion
-    console.error('🔍 [SendGrid-Send] ========== BOOLEAN CONVERSION ==========');
-    console.error('🔍 [SendGrid-Send] Original isHtmlEmail:', isHtmlEmail, '| Type:', typeof isHtmlEmail);
-    console.error('🔍 [SendGrid-Send] Converted isHtmlEmailBoolean:', isHtmlEmailBoolean, '| Type:', typeof isHtmlEmailBoolean);
-    console.error('🔍 [SendGrid-Send] =======================================');
 
     // Prepare email data
             const emailData = {
@@ -71,11 +57,6 @@ export default async function handler(req, res) {
       }
     };
     
-    // CRITICAL DEBUG: Log what we're passing to service
-    console.error('🔍 [SendGrid-Send] ========== PASSING TO SERVICE ==========');
-    console.error('🔍 [SendGrid-Send] emailData.isHtmlEmail:', emailData.isHtmlEmail, '| Type:', typeof emailData.isHtmlEmail);
-    console.error('🔍 [SendGrid-Send] =========================================');
-
     console.log('[SendGrid] Sending email:', { to, subject, trackingId });
 
     const sendGridService = new SendGridService();
