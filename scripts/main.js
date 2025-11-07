@@ -51,6 +51,35 @@ class PowerChoosersCRM {
             }
         });
         
+        // Listen for booking/lead creation events and show notifications
+        window.addEventListener('pc:booking-created', (e) => {
+            const { contactName, companyName, appointmentDate, selectedTime, source, taskId } = e.detail || {};
+            if (!contactName || !companyName) return;
+            
+            // Use existing Notifications system
+            if (window.Notifications && typeof window.Notifications.add === 'function') {
+                const isBooking = source !== 'home-page';
+                const title = isBooking ? 'New Consultation Scheduled' : 'New Lead Received';
+                const message = isBooking 
+                    ? `${contactName} from ${companyName} scheduled a consultation${appointmentDate ? ` for ${appointmentDate}` : ''}${selectedTime ? ` at ${selectedTime}` : ''}`
+                    : `${contactName} from ${companyName} submitted a lead form`;
+                
+                window.Notifications.add(
+                    isBooking ? 'new-lead' : 'new-lead',
+                    title,
+                    message,
+                    {
+                        contactName: contactName,
+                        companyName: companyName,
+                        appointmentDate: appointmentDate,
+                        selectedTime: selectedTime,
+                        source: source,
+                        taskId: taskId
+                    }
+                );
+            }
+        });
+        
         // Memory monitoring (development mode)
         if (window.location.hostname === 'localhost' || localStorage.getItem('debug-memory') === 'true') {
             this.startMemoryMonitoring();
