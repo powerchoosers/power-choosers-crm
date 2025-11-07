@@ -71,6 +71,7 @@ import txPriceHandler from './api/tx-price.js';
 import twilioPollCiAnalysisHandler from './api/twilio/poll-ci-analysis.js';
 import twilioCallerLookupHandler from './api/twilio/caller-lookup.js';
 import sendgridWebhookHandler from './api/email/sendgrid-webhook.js';
+import sendgridSendHandler from './api/email/sendgrid-send.js';
 import inboundEmailHandler from './api/email/inbound-email.js';
 
 // ADDITIONAL IMPORTS FOR REMAINING PROXY FUNCTIONS
@@ -782,7 +783,19 @@ const server = http.createServer(async (req, res) => {
     return handleApiSendEmail(req, res);
   }
   if (pathname === '/api/email/sendgrid-send') {
-    return handleApiSendGridSend(req, res);
+    // Parse request body before calling handler (handler expects req.body to be parsed)
+    if (req.method === 'POST') {
+      try {
+        req.body = await parseRequestBody(req);
+      } catch (error) {
+        console.error('[Server] SendGrid Send - Body Parse Error:', error.message);
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid request body' }));
+        return;
+      }
+    }
+    // Route directly to sendgrid-send.js handler (has all proper field extraction and logging)
+    return await sendgridSendHandler(req, res);
   }
   if (pathname === '/api/email/sendgrid-test') {
     return handleApiSendGridTest(req, res);
