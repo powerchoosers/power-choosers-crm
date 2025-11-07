@@ -58,17 +58,6 @@ function decodeQuotedPrintable(html) {
 export const config = { api: { bodyParser: false } };
 
 export default async function handler(req, res) {
-  console.log('[InboundEmail] === WEBHOOK CALLED ===');
-  console.log('[InboundEmail] Timestamp:', new Date().toISOString());
-  console.log('[InboundEmail] Method:', req.method);
-  console.log('[InboundEmail] User-Agent:', req.headers['user-agent']);
-  console.log('[InboundEmail] Content-Type:', req.headers['content-type']);
-  
-  // Check if this is from SendGrid
-  const userAgent = req.headers['user-agent'] || '';
-  const isFromSendGrid = userAgent.includes('Sendlib') || userAgent.includes('SendGrid');
-  console.log('[InboundEmail] Is from SendGrid:', isFromSendGrid);
-  
   if (req.method !== 'POST') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
@@ -79,7 +68,6 @@ export default async function handler(req, res) {
   // Enforce content type
   const ct = (req.headers['content-type'] || '').toLowerCase();
   if (!ct.includes('multipart/form-data')) {
-    console.log('[InboundEmail] Rejecting request - invalid content type:', ct);
     res.writeHead(415, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unsupported Media Type: expected multipart/form-data' }));
     return;
@@ -87,7 +75,6 @@ export default async function handler(req, res) {
 
   // Optional Basic Auth via env
   if (!checkBasicAuth(req)) {
-    console.log('[InboundEmail] Basic Auth failed');
     res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="SendGrid Inbound"', 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized' }));
     return;
@@ -109,9 +96,6 @@ export default async function handler(req, res) {
         }
       });
     });
-
-    console.log('[InboundEmail] Parsed fields:', fields);
-    console.log('[InboundEmail] Parsed files:', files);
 
     // Helper: coerce first value of possibly-array field
     const first = (v) => Array.isArray(v) ? v[0] : v;
@@ -140,7 +124,6 @@ export default async function handler(req, res) {
       const emailFile = Array.isArray(files.email) ? files.email[0] : files.email;
       try {
         if (emailFile && emailFile.filepath) {
-          console.log('[InboundEmail] Reading raw MIME from uploaded file part (files.email)');
           const buf = await fs.promises.readFile(emailFile.filepath);
           rawMime = buf.toString('utf8');
         }
@@ -150,7 +133,6 @@ export default async function handler(req, res) {
     }
 
     if (rawMime) {
-      console.log('[InboundEmail] Parsing raw MIME with mailparser');
       let parsed;
       try {
         parsed = await simpleParser(rawMime);
@@ -244,12 +226,6 @@ export default async function handler(req, res) {
         });
       }
     }
-
-    console.log('[InboundEmail] Headers (subset):', {
-      messageId: emailData.messageId,
-      inReplyTo: emailData.inReplyTo,
-      referencesCount: emailData.references?.length || 0
-    });
 
     // Idempotency: dedupe on Message-ID when available
     if (emailData.messageId) {
@@ -346,8 +322,6 @@ export default async function handler(req, res) {
       res.end(JSON.stringify({ error: 'Missing required email fields' }));
       return;
     }
-
-    console.log('[InboundEmail] Extracted email data:', emailData);
 
     // Save to Firebase with proper error handling
     try {

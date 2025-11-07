@@ -48,14 +48,6 @@ export class SendGridService {
     try {
               const { to, subject, content, from, fromName, trackingId, _deliverability, inReplyTo, references, threadId, isHtmlEmail } = emailData;
       
-      // CRITICAL DEBUG: Log what service receives
-      console.error('🔍 [SendGrid-Service] ========== RECEIVED IN sendEmail() ==========');
-      console.error('🔍 [SendGrid-Service] isHtmlEmail:', isHtmlEmail, '| Type:', typeof isHtmlEmail, '| Truthy:', !!isHtmlEmail);
-      console.error('🔍 [SendGrid-Service] Will process as:', isHtmlEmail ? 'HTML EMAIL' : 'STANDARD EMAIL');
-      console.error('🔍 [SendGrid-Service] Content length:', content?.length || 0);
-      console.error('🔍 [SendGrid-Service] Content preview (first 150 chars):', content?.substring(0, 150) || 'NO CONTENT');
-      console.error('🔍 [SendGrid-Service] ===========================================');
-      
       // Check if any recipients are suppressed
       const recipients = Array.isArray(to) ? to : [to];
       const suppressedEmails = [];
@@ -120,52 +112,15 @@ export class SendGridService {
       
       // Sanitize and inline CSS for HTML emails (per Twilio recommendations)
       if (isHtmlEmail) {
-        // TEMPORARY: Using console.error() so logs always appear even when silenced
-        console.error('[SendGrid] ========== HTML EMAIL PROCESSING START ==========');
-        console.error('[SendGrid] Original content length:', htmlContent.length);
-        console.error('[SendGrid] Has <style> tags:', htmlContent.includes('<style'));
-        console.error('[SendGrid] Has CSS classes:', /class=["'][^"']*["']/.test(htmlContent));
-        
-        // Extract and log a sample of the <style> content for debugging
-        const styleMatch = htmlContent.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-        if (styleMatch) {
-          console.error('[SendGrid] Found <style> tag with', styleMatch[1].length, 'characters of CSS');
-          console.error('[SendGrid] CSS sample (first 200 chars):', styleMatch[1].substring(0, 200));
-        } else {
-          console.error('[SendGrid] WARNING: No <style> tag found in HTML!');
-        }
-        
         // Step 1: Remove dangerous tags (script, iframe, etc.)
-        const beforeCleanup = htmlContent.length;
         htmlContent = htmlContent
           .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
           .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
           .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
           .replace(/javascript:/gi, '');
-        console.error('[SendGrid] After cleanup, length:', htmlContent.length);
-        
-        // Verify HTML still has <style> tag after cleanup
-        if (!htmlContent.includes('<style')) {
-          console.error('[SendGrid] ERROR: <style> tag was removed during cleanup!');
-        }
         
         // Step 2: Inline all CSS styles using juice
         try {
-          const beforeInline = htmlContent.length;
-          const beforeInlineHasStyle = htmlContent.includes('style=');
-          const beforeInlineHasClass = /class=["'][^"']*["']/.test(htmlContent);
-          
-          // Count how many elements have classes before inlining
-          const classMatches = htmlContent.match(/class=["'][^"']*["']/g);
-          const classCount = classMatches ? classMatches.length : 0;
-          // TEMPORARY: Using console.error() so logs always appear even when silenced
-          console.error('[SendGrid] Before juice:');
-          console.error('[SendGrid]   - Length:', beforeInline);
-          console.error('[SendGrid]   - Has inline styles:', beforeInlineHasStyle);
-          console.error('[SendGrid]   - Elements with classes:', classCount);
-          
-          // Call juice to inline CSS
-          console.error('[SendGrid] Calling juice() to inline CSS...');
           htmlContent = juice(htmlContent, {
             removeStyleTags: true,
             preserveMediaQueries: true,
@@ -177,56 +132,14 @@ export class SendGridService {
               links: false
             }
           });
-          
-          // Analyze the result
-          const afterInline = htmlContent.length;
-          const afterInlineHasStyle = htmlContent.includes('style=');
-          const afterInlineHasClass = /class=["'][^"']*["']/.test(htmlContent);
-          const styleAttributeMatches = htmlContent.match(/style=["'][^"']*["']/g);
-          const inlineStyleCount = styleAttributeMatches ? styleAttributeMatches.length : 0;
-          
-          // TEMPORARY: Using console.error() so logs always appear even when silenced
-          console.error('[SendGrid] After juice:');
-          console.error('[SendGrid]   - Length:', afterInline, '(changed by', (afterInline - beforeInline), 'chars)');
-          console.error('[SendGrid]   - Has inline styles:', afterInlineHasStyle);
-          console.error('[SendGrid]   - Elements with inline styles:', inlineStyleCount);
-          console.error('[SendGrid]   - Elements with classes remaining:', afterInlineHasClass);
-          
-          // Log a sample of inlined HTML to verify styles are present
-          const sampleMatch = htmlContent.match(/<div[^>]*style=["'][^"']*["'][^>]*>/);
-          if (sampleMatch) {
-            console.error('[SendGrid] Sample inlined element:', sampleMatch[0].substring(0, 200));
-          } else {
-            console.error('[SendGrid] WARNING: No elements with inline styles found in output!');
-          }
-          
-          // Check if <style> tags were removed
-          const hasStyleTagsAfter = htmlContent.includes('<style');
-          if (hasStyleTagsAfter) {
-            console.error('[SendGrid] WARNING: <style> tags still present after juice (removeStyleTags may not be working)');
-          } else {
-            console.error('[SendGrid] ✓ <style> tags removed (as expected)');
-          }
-          
-          // Log first 1000 chars of final HTML for inspection
-          console.error('[SendGrid] Final HTML sample (first 1000 chars):');
-          console.error(htmlContent.substring(0, 1000));
-          
         } catch (inlineError) {
-          console.error('[SendGrid] ========== JUICE INLINING FAILED ==========');
-          console.error('[SendGrid] Error message:', inlineError.message);
-          console.error('[SendGrid] Error stack:', inlineError.stack);
-          console.error('[SendGrid] HTML that failed (first 500 chars):', htmlContent.substring(0, 500));
-          
+          console.error('[SendGrid] CSS inlining failed:', inlineError.message);
           // Fallback: remove <style> tags but keep the HTML structure
           htmlContent = htmlContent
             .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
             .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
           console.warn('[SendGrid] CSS inlining failed, removed <style> tags as fallback');
         }
-        
-        // TEMPORARY: Using console.error() so logs always appear even when silenced
-        console.error('[SendGrid] ========== HTML EMAIL PROCESSING END ==========');
       }
       
       // STEP 2: Generate text version with robust error handling
@@ -257,29 +170,8 @@ export class SendGridService {
         throw new Error('Text content cannot be empty');
       }
       
-      // CRITICAL DEBUG: Log final email type determination
-      console.error('🔍 [SendGrid-Service] ========== FINAL EMAIL TYPE ==========');
-      console.error('🔍 [SendGrid-Service] isHtmlEmail:', isHtmlEmail, '| Type:', typeof isHtmlEmail);
-      console.error('🔍 [SendGrid-Service] Email type:', isHtmlEmail ? 'HTML' : 'Standard');
-      console.error('🔍 [SendGrid-Service] Content length:', content.length);
-      console.error('🔍 [SendGrid-Service] Text content length:', textContent.length);
-      console.error('🔍 [SendGrid-Service] =======================================');
-      
       console.log('[SendGrid] Email type:', isHtmlEmail ? 'HTML' : 'Standard', 'Content length:', content.length);
       console.log('[SendGrid] Text content length:', textContent.length);
-      
-      // Log final HTML that will be sent to SendGrid (for debugging)
-      if (isHtmlEmail) {
-        // TEMPORARY: Using console.error() so logs always appear even when silenced
-        console.error('[SendGrid] ========== FINAL HTML BEING SENT TO SENDGRID ==========');
-        console.error('[SendGrid] HTML length:', htmlContent.length);
-        console.error('[SendGrid] Has inline styles:', htmlContent.includes('style='));
-        const styleCount = (htmlContent.match(/style=["']/g) || []).length;
-        console.error('[SendGrid] Number of inline style attributes:', styleCount);
-        console.error('[SendGrid] First 1500 chars of final HTML:');
-        console.error(htmlContent.substring(0, 1500));
-        console.error('[SendGrid] ====================================================');
-      }
       
               // Log sender details for debugging
               const finalFromEmail = from || this.fromEmail;
