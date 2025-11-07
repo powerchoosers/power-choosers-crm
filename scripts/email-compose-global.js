@@ -3096,7 +3096,7 @@
       <p>${data.main_message || 'I wanted to follow up on our conversation about your energy needs and how Power Choosers can help optimize your costs.'}</p>
     </div>
     <div class="cta-container">
-      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Schedule a Follow-Up Call'}</a>
+      <a href="https://powerchoosers.com/schedule" class="cta-btn">${data.cta_text || 'Schedule a Follow-Up Call'}</a>
       <div style="margin-top:8px;font-size:14px;color:#1e3a8a;opacity:0.83;">
         Prefer email or need more info? Just reply—happy to assist.
       </div>
@@ -3221,7 +3221,7 @@
       <p>⚠️ ${data.urgency_message || 'Market Update: Rates are climbing faster than expected'}</p>
     </div>
     <div class="cta-container">
-      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Let\'s Continue the Conversation'}</a>
+      <a href="https://powerchoosers.com/schedule" class="cta-btn">${data.cta_text || 'Let\'s Continue the Conversation'}</a>
       <div style="margin-top:8px;font-size:14px;color:#1e3a8a;opacity:0.83;">
         Prefer a specific time? Just reply with your availability.
       </div>
@@ -3339,7 +3339,7 @@
       <p>${data.contract_info || '<strong>Your Contract:</strong> Perfect timing for assessment'}</p>
     </div>
     <div class="cta-container">
-      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Schedule Your Free Assessment'}</a>
+      <a href="https://powerchoosers.com/schedule" class="cta-btn">${data.cta_text || 'Schedule Your Free Assessment'}</a>
       <div style="margin-top:8px;font-size:14px;color:#0f766e;opacity:0.83;">
         30-minute consultation • Zero pressure • Maximum insight
       </div>
@@ -3475,7 +3475,7 @@
       <p>Our team has negotiated these rates exclusively for your facility. The pricing is competitive, the transition is seamless, and you maintain complete control throughout the process. This is a <strong>time-sensitive offer</strong> as market conditions continue to shift.</p>
     </div>
     <div class="cta-container">
-      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Let\'s Discuss Your Proposal'}</a>
+      <a href="https://powerchoosers.com/schedule" class="cta-btn">${data.cta_text || 'Let\'s Discuss Your Proposal'}</a>
       <div style="margin-top:8px;font-size:14px;color:#b45309;opacity:0.83;">
         Questions? I'm here to walk through every detail.
       </div>
@@ -3596,7 +3596,7 @@
     </div>
     ${data.social_proof_optional ? `<div class="social-proof"><p>${data.social_proof_optional}</p></div>` : ''}
     <div class="cta-container">
-      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Explore Your Savings Potential'}</a>
+      <a href="https://powerchoosers.com/schedule" class="cta-btn">${data.cta_text || 'Explore Your Savings Potential'}</a>
       <div style="margin-top:8px;font-size:14px;color:#dc2626;opacity:0.83;">
         Quick 15-minute call to discuss your options—no obligation.
       </div>
@@ -3742,7 +3742,7 @@
       <p>⏰ ${data.deadline || 'Needed in 3 business days'}</p>
     </div>
     <div class="cta-container">
-      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Reply with Invoice Attached'}</a>
+      <a href="https://powerchoosers.com/schedule" class="cta-btn">${data.cta_text || 'Schedule a Consultation'}</a>
       <div style="margin-top:8px;font-size:14px;color:#2563eb;opacity:0.83;">
         Or reply with your invoice attached—we'll get started right away.
       </div>
@@ -3866,7 +3866,7 @@
       </ul>
     </div>
     <div class="cta-container">
-      <a href="mailto:${s.email}" class="cta-btn">${data.cta_text || 'Schedule A Meeting'}</a>
+      <a href="https://powerchoosers.com/schedule" class="cta-btn">${data.cta_text || 'Schedule A Meeting'}</a>
       <div style="margin-top:8px;font-size:14px;color:#1e3a8a;opacity:0.83;">
         Prefer email or need more info? Just reply—happy to assist.
       </div>
