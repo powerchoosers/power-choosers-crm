@@ -2718,6 +2718,7 @@ class FreeSequenceAutomation {
    - NOT: "Companies save 10-20%" (too generic)
    - YES: "With 4 facilities in Texas, timing is critical - locking in 6 months out vs 90 days is usually 15-20% difference"
    - Include timing context: early renewal (6 months) vs late (90 days) = money difference
+   - CRITICAL: Mention the 15-20% savings figure ONLY ONCE in the entire email - do not repeat it multiple times
 
 4. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
    - Write like a peer, not a salesperson (conversational, confident, direct)
@@ -3252,6 +3253,63 @@ LENGTH: 60-90 words max`;
         return escapeHtml(v || '');
       });
     return s;
+  }
+
+  // Substitute bracket-style tokens like [contact_company], [company_name], etc.
+  function substituteBracketTokensInPrompt(prompt, contact) {
+    if (!prompt || !contact) return prompt;
+    
+    // Try multiple ways to get company name - prioritize account data
+    let companyName = getAccountFieldFromContact(contact, 'name') || '';
+    if (!companyName) {
+      // Try direct contact fields
+      companyName = contact.company || contact.companyName || contact.accountName || contact.organization || contact.organisation || contact.employer || '';
+    }
+    if (!companyName && contact.account) {
+      // Try account object directly
+      companyName = contact.account.accountName || contact.account.name || contact.account.companyName || '';
+    }
+    if (!companyName && contact.account_id) {
+      // Try to get from accounts cache if available
+      if (window.BackgroundAccountsLoader) {
+        const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+        const account = accounts.find(a => a.id === contact.account_id);
+        if (account) {
+          companyName = account.accountName || account.name || account.companyName || '';
+        }
+      }
+    }
+    
+    const contactCompany = companyName; // Same as company_name for consistency
+    const contactFirstName = contact.first_name || contact.firstName || (contact.name?.split(' ')[0] || '');
+    const contactName = contact.name || contact.full_name || `${contactFirstName} ${contact.last_name || contact.lastName || ''}`.trim();
+    const contactJobTitle = contact.title || contact.job || contact.role || '';
+    const companyIndustry = getAccountFieldFromContact(contact, 'industry') || contact.industry || contact.companyIndustry || '';
+    const companyLocation = [getAccountFieldFromContact(contact, 'city'), getAccountFieldFromContact(contact, 'state')].filter(Boolean).join(', ');
+    const accountCity = getAccountFieldFromContact(contact, 'city') || contact.city || contact.companyCity || '';
+    const accountState = getAccountFieldFromContact(contact, 'state') || contact.state || contact.companyState || contact.region || '';
+    const city = accountCity;
+    const state = accountState;
+    const companyWebsite = getAccountFieldFromContact(contact, 'website') || contact.website || contact.companyWebsite || '';
+    const contactLinkedinRecentActivity = contact.linkedin_recent_activity || contact.recentActivity || '';
+    const role = contactJobTitle;
+    
+    return String(prompt)
+      .replace(/\[contact_company\]/gi, companyName || '[Company Name]')
+      .replace(/\[company_name\]/gi, companyName || '[Company Name]')
+      .replace(/\[contact_first_name\]/gi, contactFirstName || '[First Name]')
+      .replace(/\[contact_name\]/gi, contactName || '[Contact Name]')
+      .replace(/\[contact_job_title\]/gi, contactJobTitle || '[Job Title]')
+      .replace(/\[company_industry\]/gi, companyIndustry || '[Industry]')
+      .replace(/\[company_location\]/gi, companyLocation || '[Location]')
+      .replace(/\[account_city\]/gi, accountCity || '[City]')
+      .replace(/\[account_state\]/gi, accountState || '[State]')
+      .replace(/\[city\]/gi, city || '[City]')
+      .replace(/\[state\]/gi, state || '[State]')
+      .replace(/\[company_website\]/gi, companyWebsite || '[Website]')
+      .replace(/\[contact_linkedin_recent_activity\]/gi, contactLinkedinRecentActivity || '')
+      .replace(/\[role\]/gi, role || '[Role]')
+      .replace(/\[FirstName\]/gi, contactFirstName || '[First Name]');
   }
 
   function processBodyHtmlWithContact(bodyHtml, contact) {
@@ -5848,11 +5906,16 @@ LENGTH: 60-90 words max`;
             const marketContext = aiTemplates.marketContext || { enabled: false };
             const meetingPreferences = aiTemplates.meetingPreferences || { enabled: false };
             
+            // Substitute bracket tokens in prompt before sending to API
+            const substitutedPrompt = selectedContact 
+              ? substituteBracketTokensInPrompt(prompt, selectedContact)
+              : prompt;
+            
             const response = await fetch(`${base}/api/perplexity-email`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                prompt: prompt,
+                prompt: substitutedPrompt,
                 mode: mode,
                 recipient: (() => {
                   // Build enriched recipient object with account data
