@@ -461,7 +461,7 @@ function deSalesify(text) {
 }
 
 // Industry/size-aware post-processor to avoid generic "your industry" and inaccurate size references
-function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory }) {
+function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory, job }) {
   if (!text) return text;
   let out = String(text);
 
@@ -475,15 +475,27 @@ function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory 
   const neutralGroup = industry ? `companies in ${industry}` : 'companies like yours';
   
   // Aggressive removal of "small" language - assume nothing about company size
+  // Replace with industry-based or role-based language
+  const industryBased = industry ? `companies in ${industry}` : 'companies like yours';
+  const roleBased = job ? `As ${job}` : (industry ? `As a ${industry} company` : 'As a company');
+  
   out = out
+    // Catch "as a small" patterns first (most common)
+    .replace(/\bAs a small (?:company|business|firm|organization|operation)\b/gi, industry ? `As a ${industry} company` : 'As a company')
+    .replace(/\bAs a small\b/gi, roleBased)
+    .replace(/\bas a small (?:company|business|firm|organization|operation)\b/gi, industry ? `as a ${industry} company` : 'as a company')
+    .replace(/\bas a small\b/gi, roleBased.toLowerCase())
+    // CEO/role patterns
     .replace(/\bAs CEO of a small business\b/gi, 'As CEO')
     .replace(/\bAs CEO of your company\b/gi, 'As CEO')
-    .replace(/\bAs a small company\b/gi, 'As a team')
-    .replace(/\bAs a small business\b/gi, 'As a team')
+    .replace(/\bAs President of a small (?:company|business)\b/gi, 'As President')
+    .replace(/\bAs Director of a small (?:company|business)\b/gi, 'As Director')
+    .replace(/\bAs Manager of a small (?:company|business)\b/gi, 'As Manager')
+    // Generic "small company/business" patterns
     .replace(/\bof a small company\b/gi, '')
     .replace(/\bof a small business\b/gi, '')
-    .replace(/\ba small company\b/gi, 'companies')
-    .replace(/\ba small business\b/gi, 'businesses')
+    .replace(/\ba small company\b/gi, industryBased)
+    .replace(/\ba small business\b/gi, industryBased)
     .replace(/\bsmall companies\b/gi, 'companies')
     .replace(/\bsmall businesses\b/gi, 'businesses')
     .replace(/\bfor a small company like yours\b/gi, `for ${neutralGroup}`)
@@ -498,7 +510,10 @@ function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory 
     .replace(/\bsmall business operators\b/gi, 'business operators')
     .replace(/\bsmall business owners\b/gi, 'business owners')
     .replace(/\boperators like you\b/gi, industry ? `operators in ${industry}` : 'operators')
-    .replace(/\bespecially those with limited resources\b/gi, 'especially those focused on efficiency');
+    .replace(/\bespecially those with limited resources\b/gi, 'especially those focused on efficiency')
+    // Additional catch-all patterns
+    .replace(/\bsmall (?:company|business|firm|organization|operation)\b/gi, industry ? `${industry} company` : 'company')
+    .replace(/\bsmaller (?:company|business|firm|organization|operation)\b/gi, industry ? `${industry} company` : 'company');
 
   return out;
 }
@@ -1902,12 +1917,12 @@ ${notes ? '- Additional Notes: ' + notes : ''}
 INDUSTRY-SPECIFIC CONTEXT:
 ${industryContent ? '- Industry Focus: ' + industryContent.language + '\n- Key Pain Points: ' + industryContent.painPoints.join(', ') + '\n- Average Savings: ' + industryContent.avgSavings + '\n- Key Benefit: ' + industryContent.keyBenefit + '\n- Urgency Drivers: ' + industryContent.urgencyDrivers.join(', ') : ''}
 
-COMPANY SIZE CONTEXT:
-- Size Category: ${companySizeContext.size}
+COMPANY SIZE CONTEXT (USE FOR FOCUS/PROACH ONLY - NEVER SAY "SMALL COMPANY"):
 - Focus Area: ${companySizeContext.focus}
 - Pain Points: ${companySizeContext.painPoints.join(', ')}
 - Approach: ${companySizeContext.approach}
 - Language Style: ${companySizeContext.language}
+CRITICAL: Use this context for understanding their needs, but ALWAYS phrase as industry-based: "As a ${industry || '[industry]'} company" or "companies in ${industry || '[industry]'}" - NEVER say "small company", "small business", or reference company size unless it's clearly a large enterprise.
 
 CONTRACT URGENCY LEVEL:
 - Urgency Level: ${contractUrgency.level}
@@ -1931,7 +1946,8 @@ ${energy.currentRate ? '- Current Rate: "At ' + energy.currentRate + '/kWh, ther
 ${contractEndLabel ? '- Contract Timing: "With your contract ending ' + contractEndLabel + ', timing is critical..."' : ''}
 ${accountDescription ? '- Company Description: "As ' + accountDescription + ', energy costs are likely a significant expense..."' : ''}
 ${industryContent ? '- Industry Focus: "Manufacturing companies like ' + company + ' typically face ' + industryContent.painPoints[0] + '..."' : ''}
-${companySizeContext ? '- Size Context: "As a ' + companySizeContext.size + ' company, ' + companySizeContext.focus + ' is key..."' : ''}
+${companySizeContext && companySizeContext.size === 'large' ? '- Size Context: "As a large ' + (industry || 'company') + ', ' + companySizeContext.focus + ' is key..."' : ''}
+${companySizeContext && companySizeContext.size !== 'large' ? '- Industry Context: "As a ' + (industry || 'company') + ', ' + companySizeContext.focus + ' is key..." (NEVER say "small company" or "small business" - use industry instead)' : ''}
 ${contractUrgency ? '- Urgency Level: "With ' + contractUrgency.level + ' timing, ' + contractUrgency.focus + '..."' : ''}
 
 ROLE-SPECIFIC OPENING HOOK EXAMPLES:
@@ -2148,9 +2164,10 @@ STYLE RULES:
   - Use first-person voice ("we"/"I") instead of brand-first phrasing.
   - Avoid starting any sentence with "At Power Choosers," or "Power Choosers helps".
   - Prefer "We help…" / "I help…".
-  - NEVER assume company size. DO NOT use "small company", "small business", "limited resources", or similar phrases - these can be insulting to business owners. Use neutral language: "companies in ${industry}", "companies like yours", or focus on role/industry instead.
-  - Focus on role and industry specifics: "As CEO" (not "As CEO of a small business"), "companies in manufacturing" (not "small manufacturing companies").
+  - NEVER assume company size. DO NOT use "small company", "small business", "as a small company", "as a small business", "limited resources", or similar phrases - these can be insulting to business owners. Use neutral language: "companies in ${industry}", "companies like yours", or focus on role/industry instead.
+  - Focus on role and industry specifics: "As CEO" (not "As CEO of a small business"), "As a ${industry} company" (not "As a small company"), "companies in manufacturing" (not "small manufacturing companies").
   - If role and tenure are available (from LinkedIn), you may include them naturally (e.g., "In your 3 years as General Manager").
+  - CRITICAL: If you need to reference the company, use "As a ${industry} company" or "As ${job}" - NEVER say "as a small company" or "as a small business".
 
 EMAIL GENERATION MODE: ${generationMode.toUpperCase()}
 ${modeInstructions ? `
@@ -2333,7 +2350,7 @@ CRITICAL QUALITY RULES:
 - USE ACCOUNT DESCRIPTION: ${accountDescription ? 'Must naturally reference: "' + accountDescription + '"' : 'Reference their specific business'}
 - NATURAL LANGUAGE: Write like a real person researching their company
 - COMPANY SPECIFICITY: ALWAYS reference ${company} specifically. NEVER mention other companies by name in this email.
-- NO SIZE ASSUMPTIONS: NEVER use "small company", "small business", "limited resources" - these can insult business owners. Use role/industry focus instead: "As CEO", "companies in ${industry}"
+- NO SIZE ASSUMPTIONS: NEVER use "small company", "small business", "as a small company", "as a small business", "limited resources" - these can insult business owners. Use role/industry focus instead: "As CEO", "As a ${industry} company", "companies in ${industry}". Only use "large" if you have clear evidence it's a large enterprise.
 - COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
 - SINGLE CTA: Generate exactly ONE call to action per email
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
@@ -2798,7 +2815,12 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         
         // Final language polishing: de-salesify and personalize industry/size
         const sizeCategory = (recipient?.account ? (recipient.account.annualUsage ? (recipient.account.annualUsage < 500000 ? 'small' : (recipient.account.annualUsage < 5000000 ? 'medium' : 'large')) : null) : null);
-        const personalizeCtx = { industry: recipient?.industry || null, companyName: recipient?.company || null, sizeCategory };
+        const personalizeCtx = { 
+          industry: recipient?.industry || null, 
+          companyName: recipient?.company || null, 
+          sizeCategory,
+          job: recipient?.title || recipient?.job || recipient?.role || null
+        };
         if (jsonData.greeting) jsonData.greeting = deSalesify(personalizeIndustryAndSize(jsonData.greeting, personalizeCtx));
         if (jsonData.opening_hook) jsonData.opening_hook = deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx));
         if (jsonData.value_proposition) jsonData.value_proposition = deSalesify(personalizeIndustryAndSize(jsonData.value_proposition, personalizeCtx));
@@ -2836,7 +2858,12 @@ CRITICAL: Use these EXACT meeting times in your CTA.
     res.writeHead(200, { 'Content-Type': 'application/json' });
     // Standard mode: de-salesify and personalize industry/size in the raw content string
     const sizeCategoryStd = (recipient?.account ? (recipient.account.annualUsage ? (recipient.account.annualUsage < 500000 ? 'small' : (recipient.account.annualUsage < 5000000 ? 'medium' : 'large')) : null) : null);
-    const personalizeCtxStd = { industry: recipient?.industry || null, companyName: recipient?.company || null, sizeCategory: sizeCategoryStd };
+    const personalizeCtxStd = { 
+      industry: recipient?.industry || null, 
+      companyName: recipient?.company || null, 
+      sizeCategory: sizeCategoryStd,
+      job: recipient?.title || recipient?.job || recipient?.role || null
+    };
     const polished = deSalesify(personalizeIndustryAndSize(content, personalizeCtxStd));
     return res.end(JSON.stringify({ 
       ok: true, 
