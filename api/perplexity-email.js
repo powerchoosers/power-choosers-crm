@@ -1213,7 +1213,7 @@ const warmIntroSchema = {
         greeting: { type: "string", description: "Hello {firstName}," },
         call_reference: { type: "string", description: "Reference to the call (day, topic)" },
         main_message: { type: "string", description: "What we discussed and next steps" },
-        cta_text: { type: "string", description: "Time slot options question" }
+        cta_text: { type: "string", description: "Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation, e.g., 'Schedule a Follow-Up Call', 'Book Your Consultation', 'Let's Schedule Time to Talk')" }
       },
       required: ["subject", "greeting", "call_reference", "main_message", "cta_text"],
       additionalProperties: false
@@ -1235,7 +1235,7 @@ const followUpSchema = {
         progress_update: { type: "string", description: "Where we are in process" },
         value_props: { type: "array", items: { type: "string" }, description: "4-6 selling points" },
         urgency_message: { type: "string", description: "Market timing message" },
-        cta_text: { type: "string", description: "Call to action" }
+        cta_text: { type: "string", description: "Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation, e.g., 'Schedule a Consultation', 'Book Your Free Assessment', 'Let's Continue the Conversation')" }
       },
       required: ["subject", "greeting", "progress_update", "value_props", "urgency_message", "cta_text"],
       additionalProperties: false
@@ -1257,7 +1257,7 @@ const energyHealthSchema = {
         assessment_items: { type: "array", items: { type: "string" }, description: "Items we review" },
         contract_info: { type: "string", description: "Current contract details" },
         benefits: { type: "string", description: "What they'll learn" },
-        cta_text: { type: "string", description: "Call to action" }
+        cta_text: { type: "string", description: "Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation, e.g., 'Schedule a Consultation', 'Book Your Free Assessment', 'Let's Continue the Conversation')" }
       },
       required: ["subject", "greeting", "assessment_items", "contract_info", "benefits", "cta_text"],
       additionalProperties: false
@@ -1279,7 +1279,7 @@ const proposalSchema = {
         proposal_summary: { type: "string", description: "Key terms overview" },
         pricing_highlight: { type: "string", description: "Main pricing numbers" },
         timeline: { type: "array", items: { type: "string" }, description: "Implementation steps" },
-        cta_text: { type: "string", description: "Call to action" }
+        cta_text: { type: "string", description: "Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation, e.g., 'Schedule a Consultation', 'Book Your Free Assessment', 'Let's Continue the Conversation')" }
       },
       required: ["subject", "greeting", "proposal_summary", "pricing_highlight", "timeline", "cta_text"],
       additionalProperties: false
@@ -1308,7 +1308,7 @@ const coldEmailSchema = {
         opening_hook: { type: "string", description: "Problem-aware opening about industry challenge or market condition (1-2 sentences, NO statistics)" },
         value_proposition: { type: "string", description: "How we help with specific measurable value (include percentages or dollar amounts)" },
         social_proof_optional: { type: "string", description: "Brief credibility with real outcomes (optional, 1 sentence)" },
-        cta_text: { type: "string", description: "Complete call to action sentence with proper ending punctuation" },
+        cta_text: { type: "string", description: "Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation, e.g., 'Schedule Your Free Assessment', 'Book a Consultation', 'Explore Your Savings Potential')" },
         cta_type: { type: "string", description: "CTA pattern used: qualifying_question, soft_ask_with_context, value_question, timing_question, or direct_meeting" }
       },
       required: ["subject", "subject_style", "greeting", "opening_hook", "value_proposition", "cta_text", "cta_type"],
@@ -1332,7 +1332,7 @@ const invoiceSchema = {
         checklist_items: { type: "array", items: { type: "string" }, description: "What we review from invoice" },
         discrepancies: { type: "array", items: { type: "string" }, description: "3-4 common billing discrepancies to watch for based on industry/company" },
         deadline: { type: "string", description: "When we need it (e.g., in 3 business days by [date])" },
-        cta_text: { type: "string", description: "Call to action asking for invoice" }
+        cta_text: { type: "string", description: "Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation, e.g., 'Schedule a Consultation', 'Book Your Assessment')" }
       },
       required: ["subject", "greeting", "intro_paragraph", "checklist_items", "discrepancies", "deadline", "cta_text"],
       additionalProperties: false
@@ -1354,7 +1354,7 @@ const generalSchema = {
         opening_paragraph: { type: "string", description: "Opening paragraph (2-3 sentences) based on the user's prompt. This should reflect what they typed in, not generic text. Use natural, conversational language that addresses their specific question or concern." },
         sections: { type: "array", items: { type: "string" }, description: "1-5 one-sentence content points" },
         list_header: { type: "string", description: "Header for sections list, e.g. 'How We Can Help:', 'Key Benefits:', 'Why This Matters:'" },
-        cta_text: { type: "string", description: "Call to action" }
+        cta_text: { type: "string", description: "Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation, e.g., 'Schedule a Consultation', 'Book Your Free Assessment', 'Let's Continue the Conversation')" }
       },
       required: ["subject", "greeting", "opening_paragraph", "sections", "list_header", "cta_text"],
       additionalProperties: false
@@ -1980,7 +1980,7 @@ Generate text for these fields:
 - greeting: "Hello ${firstName}," 
 - call_reference: Mention specific details from your conversation (day, topics discussed, their insights). Be specific about what you talked about to show you were listening.
 - main_message: Brief recap of conversation with concrete value proposition and urgency (2-3 sentences). Include specific outcomes or savings mentioned. Use casual, relationship-building tone.
-- cta_text: Use a conversational qualifying question that builds on your discussion. Examples: "When does your current energy contract expire?", "Would you be open to discussing your energy setup?", "What's your timeline for making a decision?", "Would you like me to send over that case study we discussed?"`,
+- cta_text: Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation). Examples: "Schedule a Follow-Up Call", "Book Your Consultation", "Let's Schedule Time to Talk", "Schedule Your Free Assessment". Vary based on conversation context but always focus on scheduling.`,
 
       follow_up: `
 TEMPLATE: Follow-Up with Value Props
@@ -1989,7 +1989,7 @@ Generate text for these fields:
 - progress_update: Brief status update on where things stand
 - value_props: Array of 4-6 concise selling points (each 1 sentence)
 - urgency_message: Market timing/urgency message (1-2 sentences)
-- cta_text: Clear next step request`,
+- cta_text: Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation). Examples: "Schedule a Consultation", "Book Your Free Assessment", "Let's Continue the Conversation". Vary based on conversation context but always focus on scheduling.`,
 
       energy_health: `
 TEMPLATE: Energy Health Check Invitation
@@ -1998,7 +1998,7 @@ Generate text for these fields:
 - assessment_items: Array of 4-6 items we review (concise, 1 line each)
 - contract_info: Reference to their contract end date ${contractEndLabel || 'soon'}
 - benefits: What they'll learn from assessment (2-3 sentences)
-- cta_text: Suggest 2 time slots for review`,
+- cta_text: Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation). Examples: "Schedule Your Free Assessment", "Book Your Energy Health Check", "Schedule a Consultation". Vary based on conversation context but always focus on scheduling.`,
 
       proposal: `
 TEMPLATE: Proposal Delivery
@@ -2007,7 +2007,7 @@ Generate text for these fields:
 - proposal_summary: Brief overview of proposal terms (2-3 sentences)
 - pricing_highlight: Key pricing numbers/savings (1-2 sentences)
 - timeline: Array of 3-5 implementation steps
-- cta_text: Next action request`,
+- cta_text: Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation). Examples: "Let's Discuss Your Proposal", "Schedule a Proposal Review", "Book Your Consultation". Vary based on conversation context but always focus on scheduling.`,
 
       cold_email: `
 TEMPLATE: Cold Email Outreach
@@ -2239,7 +2239,7 @@ Generate text for these fields:
   * Business nature: ${company || 'commercial'} ${job ? '(' + job + ')' : ''}
   Choose from: high rates, excessive delivery charges, hidden fees, wrong contract type, poor customer service, unfavorable renewal timing, demand charges, peak usage penalties, incorrect meter readings, unauthorized fees
 - deadline: Use exactly: "${formatDeadline(3)}"
-- cta_text: Use exactly: "Will you be able to send over the invoice by end of day so me and my team can get started?"`,
+- cta_text: Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation). Examples: "Schedule a Consultation", "Book Your Assessment", "Schedule a Meeting". Vary based on conversation context but always focus on scheduling. Note: Even for invoice requests, the CTA should be about scheduling a follow-up meeting.`,
 
       general: `
 TEMPLATE: General Purpose Email (Manual Input)
@@ -2248,7 +2248,7 @@ Generate text for these fields:
 - opening_paragraph: CRITICAL - This MUST be based on the user's specific prompt. Read what they typed and create a natural, conversational opening paragraph (2-3 sentences) that directly addresses their question or concern. DO NOT use generic text like "I wanted to reach out about an interesting opportunity." Instead, use their actual words and context. For example, if they mention "rates went down in October but now creeping back up," start with something like "Sean, I noticed rates dipped in October but they're climbing again now..." - Use their specific details, numbers, and concerns from the prompt.
 - sections: Array of 2-5 content points - EACH MUST BE EXACTLY ONE SENTENCE (no multi-sentence items)
 - list_header: Choose a contextual header for the list section based on email content (e.g., "How We Can Help:", "Key Benefits:", "Why This Matters:", "What to Expect:", "Our Approach:")
-- cta_text: Appropriate call to action based on context
+- cta_text: Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation, e.g., 'Schedule a Consultation', 'Book Your Free Assessment', 'Let's Schedule Time to Talk'). Vary the wording based on the conversation context but always focus on scheduling.
 ${dynamicFields.length > 0 ? `
 DYNAMIC FIELDS (include if relevant):
 ${dynamicFields.map(field => `- ${field.name}: ${field.description}`).join('\n')}

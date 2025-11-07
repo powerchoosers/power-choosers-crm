@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schedule a Consultation — Power Choosers</title>
+    <meta name="description" content="Schedule a free consultation with our energy experts. Find the best time that works for you.">
+    <link rel="icon" type="image/png" sizes="32x32" href="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      :root{
+        --brand-blue:#0b1b45;
+        --brand-orange:#f59e0b;
+        --text:#0f172a;
+        --muted:#475569;
+        --card:#ffffff;
+        --border:#e5e7eb;
+        --shadow:0 10px 24px rgba(0,0,0,.08);
+        --shadow-lg:0 20px 40px rgba(0,0,0,.12);
+        --radius:14px;
+        --radius-lg:20px;
+        --container:1400px;
+        --transition:all .3s cubic-bezier(.4,.0,.2,1);
+      }
+      *{box-sizing:border-box;margin:0;padding:0}
+      html,body{height:100%;scroll-behavior:smooth;overflow-x:hidden}
+      body{margin:0;font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:linear-gradient(135deg,#f8fafc 0%, #ffffff 100%);width:100%;max-width:100vw;min-height:100vh}
+      a{color:inherit;text-decoration:none}
+      img{max-width:100%;display:block;height:auto}
+      
+      /* Header */
+      .site-header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.95);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.05)}
+      .nav{max-width:var(--container);margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:16px 24px}
+      .brand{display:flex;align-items:center;gap:14px}
+      .brand img{height:44px;width:44px;border-radius:50%}
+      .brand-name{font-weight:800;letter-spacing:.2px;font-size:20px}
+      .nav-links{display:flex;gap:22px;align-items:center}
+      .menu-toggle{display:none}
+      .btn{display:inline-flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid transparent;padding:10px 14px;font-weight:600;cursor:pointer;transition:var(--transition);position:relative}
+      .btn-primary{background:linear-gradient(135deg,var(--brand-orange) 0%, #d97706 100%);color:#0a0f1f;box-shadow:0 6px 18px rgba(245,158,11,.35);border:1px solid rgba(255,255,255,.2)}
+      .btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 20px rgba(245,158,11,.3),0 12px 24px rgba(245,158,11,.4)}
+      .btn-primary:disabled{opacity:.6;cursor:not-allowed;transform:none}
+      .btn-outline{border-color:#2d3a5c;background:transparent;transition:var(--transition)}
+      .btn-outline:hover{border-color:var(--brand-orange);background:linear-gradient(135deg,rgba(245,158,11,.05) 0%, rgba(245,158,11,.02) 100%);color:var(--brand-orange)}
+      
+      @media (max-width: 768px){
+        .nav{padding:12px 16px;width:100%;max-width:100%}
+        .menu-toggle{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:#ffffff;border-radius:10px;padding:8px;width:40px;height:40px}
+        .nav{position:relative}
+        .nav-links{position:absolute;top:100%;left:0;right:0;display:none;flex-direction:column;gap:8px;background:rgba(255,255,255,.98);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:12px 16px;width:100%;box-shadow:0 4px 12px rgba(0,0,0,.1)}
+        .nav-links.open{display:flex}
+        .nav-links .btn{width:100%;justify-content:flex-start}
+      }
+      
+      /* Page Header */
+      .page-header{background:linear-gradient(135deg,#0b1b45 0%, #1e3a8a 100%);color:#ffffff;padding:80px 24px 60px;text-align:center;position:relative;overflow:hidden}
+      .page-header::before{content:"";position:absolute;inset:0;background:radial-gradient(600px at 50% 50%, rgba(245,158,11,.1), transparent);pointer-events:none}
+      .page-header h1{font-size:48px;font-weight:800;margin-bottom:16px;line-height:1.1;position:relative;z-index:1}
+      .page-header p{font-size:20px;opacity:.9;max-width:700px;margin:0 auto;position:relative;z-index:1}
+      
+      @media (max-width: 768px){
+        .page-header{padding:60px 16px 40px}
+        .page-header h1{font-size:32px}
+        .page-header p{font-size:16px}
+      }
+      
+      /* Booking Container */
+      .booking-container{max-width:900px;margin:0 auto;padding:60px 24px;width:100%}
+      .booking-card{background:linear-gradient(135deg,#ffffff 0%, #fafbfc 100%);border:1px solid rgba(229,231,235,.6);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);padding:48px;position:relative;overflow:hidden}
+      .booking-card::before{content:"";position:absolute;top:0;right:0;width:400px;height:400px;background:radial-gradient(circle,rgba(245,158,11,.05),transparent);border-radius:50%;pointer-events:none}
+      
+      .form-section{margin-bottom:32px}
+      .form-section:last-child{margin-bottom:0}
+      .form-section-title{font-size:20px;font-weight:700;margin-bottom:20px;color:var(--brand-blue);display:flex;align-items:center;gap:12px}
+      .form-section-title::before{content:"";width:4px;height:24px;background:linear-gradient(180deg,var(--brand-orange),#d97706);border-radius:2px}
+      
+      .form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+      .form-group{display:flex;flex-direction:column}
+      .form-group.full{grid-column:1/-1}
+      .form-group label{font-weight:600;color:var(--text);margin-bottom:8px;font-size:14px}
+      .form-group label .required{color:var(--brand-orange);margin-left:4px}
+      .form-group input,.form-group select,.form-group textarea{width:100%;padding:12px 16px;background:#ffffff;color:var(--text);border:2px solid var(--border);border-radius:10px;font-size:15px;transition:var(--transition);font-family:inherit}
+      .form-group input:hover,.form-group select:hover,.form-group textarea:hover{border-color:#9ca3af;background:#fafbfc}
+      .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--brand-orange);background:#ffffff;box-shadow:0 0 0 3px rgba(245,158,11,.1);transform:translateY(-1px)}
+      .form-group textarea{resize:vertical;min-height:120px;line-height:1.6}
+      .form-group .help-text{font-size:12px;color:var(--muted);margin-top:6px}
+      
+      .time-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-top:16px}
+      .time-slot{padding:14px 16px;background:#ffffff;border:2px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:var(--transition);font-weight:600;color:var(--text)}
+      .time-slot:hover{border-color:var(--brand-orange);background:rgba(245,158,11,.05);transform:translateY(-2px)}
+      .time-slot.selected{background:linear-gradient(135deg,var(--brand-orange) 0%, #d97706 100%);border-color:var(--brand-orange);color:#ffffff;box-shadow:0 4px 12px rgba(245,158,11,.3)}
+      .time-slot.disabled{opacity:.4;cursor:not-allowed;background:#f1f5f9}
+      
+      .submit-section{display:flex;justify-content:flex-end;gap:16px;margin-top:40px;padding-top:32px;border-top:1px solid var(--border)}
+      
+      .success-message{display:none;background:linear-gradient(135deg,rgba(34,197,94,.1) 0%, rgba(34,197,94,.05) 100%);border:2px solid rgba(34,197,94,.3);border-radius:var(--radius-lg);padding:24px;margin-top:24px;text-align:center}
+      .success-message.show{display:block}
+      .success-message h3{color:#16a34a;font-size:20px;font-weight:700;margin-bottom:8px}
+      .success-message p{color:var(--muted);line-height:1.6}
+      
+      .error-message{display:none;background:linear-gradient(135deg,rgba(220,38,38,.1) 0%, rgba(220,38,38,.05) 100%);border:2px solid rgba(220,38,38,.3);border-radius:var(--radius-lg);padding:16px;margin-top:16px;color:#dc2626;font-size:14px}
+      .error-message.show{display:block}
+      
+      .loading-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center}
+      .loading-overlay.show{display:flex}
+      .loading-spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,.3);border-top-color:#ffffff;border-radius:50%;animation:spin .8s linear infinite}
+      @keyframes spin{to{transform:rotate(360deg)}}
+      
+      @media (max-width: 768px){
+        .booking-container{padding:40px 16px}
+        .booking-card{padding:32px 24px}
+        .form-grid{grid-template-columns:1fr}
+        .time-slots{grid-template-columns:repeat(2,1fr)}
+        .submit-section{flex-direction:column-reverse}
+        .submit-section .btn{width:100%}
+      }
+      
+      /* Footer */
+      .footer{background:linear-gradient(180deg,#f8fafc,#ffffff);border-top:1px solid var(--border);padding:48px 24px;margin-top:80px}
+      .footer-content{max-width:var(--container);margin:0 auto;text-align:center;color:var(--muted);font-size:14px}
+      .footer-content a{color:var(--muted);transition:color .2s}
+      .footer-content a:hover{color:var(--brand-orange);text-decoration:none}
+    </style>
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav">
+      <a href="index.html" class="brand">
+        <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" alt="Power Choosers" />
+        <span class="brand-name">Power Choosers</span>
+      </a>
+      <button class="menu-toggle" id="nav-toggle" aria-label="Open menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="nav-links">
+        <a href="index.html#services" class="btn btn-outline">Services</a>
+        <a href="about.html" class="btn btn-outline">About</a>
+        <a href="resources.html" class="btn btn-outline">Resources</a>
+        <a href="index.html#get-started" class="btn btn-primary">Contact</a>
+      </div>
+    </nav>
+  </header>
+
+  <div class="page-header">
+    <h1>Schedule Your Consultation</h1>
+    <p>Book a free consultation with our energy experts. We'll help you find the best energy solutions for your business.</p>
+  </div>
+
+  <div class="booking-container">
+    <div class="booking-card">
+      <form id="booking-form">
+        <div class="form-section">
+          <div class="form-section-title">Your Information</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Contact Name <span class="required">*</span></label>
+              <input type="text" id="contact-name" name="contactName" required placeholder="John Smith">
+            </div>
+            <div class="form-group">
+              <label>Company Name <span class="required">*</span></label>
+              <input type="text" id="company-name" name="companyName" required placeholder="Acme Inc.">
+            </div>
+            <div class="form-group">
+              <label>Email Address <span class="required">*</span></label>
+              <input type="email" id="email" name="email" required placeholder="john@company.com">
+            </div>
+            <div class="form-group">
+              <label>Work Direct Phone <span class="required">*</span></label>
+              <input type="tel" id="phone" name="phone" required placeholder="+1 (972) 834-2317">
+              <div class="help-text">Format: +1 (XXX) XXX-XXXX</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Select Date & Time</div>
+          <div class="form-group">
+            <label>Preferred Date <span class="required">*</span></label>
+            <input type="date" id="appointment-date" name="appointmentDate" required min="">
+            <div class="help-text">Select a date for your consultation</div>
+          </div>
+          <div class="form-group">
+            <label>Preferred Time <span class="required">*</span></label>
+            <div class="time-slots" id="time-slots">
+              <div class="time-slot" data-time="09:00 AM">9:00 AM</div>
+              <div class="time-slot" data-time="10:00 AM">10:00 AM</div>
+              <div class="time-slot" data-time="11:00 AM">11:00 AM</div>
+              <div class="time-slot" data-time="12:00 PM">12:00 PM</div>
+              <div class="time-slot" data-time="01:00 PM">1:00 PM</div>
+              <div class="time-slot" data-time="02:00 PM">2:00 PM</div>
+              <div class="time-slot" data-time="03:00 PM">3:00 PM</div>
+              <div class="time-slot" data-time="04:00 PM">4:00 PM</div>
+            </div>
+            <input type="hidden" id="selected-time" name="selectedTime" required>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section-title">Additional Information</div>
+          <div class="form-group full">
+            <label>What would you like to discuss?</label>
+            <textarea id="additional-notes" name="additionalNotes" placeholder="Tell us about your energy needs, current situation, or any specific questions you have..."></textarea>
+            <div class="help-text">Optional: Help us prepare for our conversation</div>
+          </div>
+        </div>
+
+        <div class="error-message" id="error-message"></div>
+        <div class="success-message" id="success-message">
+          <h3>✓ Consultation Scheduled!</h3>
+          <p>Thank you for scheduling a consultation. We'll send you a confirmation email shortly and one of our energy experts will reach out to confirm the details.</p>
+        </div>
+
+        <div class="submit-section">
+          <button type="button" class="btn btn-outline" onclick="window.location.href='index.html'">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="submit-btn">Schedule Consultation</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-content">
+      © <span id="y"></span> Power Choosers. All rights reserved.
+    </div>
+  </footer>
+
+  <!-- Firebase SDK (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="scripts/firebase.js"></script>
+  <script>
+    // Phone number normalization (matching contact-detail.js format)
+    function normalizePhone(input) {
+      const raw = (input || '').toString().trim();
+      if (!raw) return '';
+      
+      // Remove all non-digit characters except + and extension markers
+      const cleaned = raw.replace(/[^\d+ext.#]/gi, '');
+      
+      // Parse extension if present
+      let number = raw;
+      let extension = '';
+      const extPatterns = [
+        /ext\.?\s*(\d+)/i,
+        /extension\s*(\d+)/i,
+        /x\.?\s*(\d+)/i,
+        /#\s*(\d+)/i,
+        /\s+(\d{3,6})\s*$/
+      ];
+      
+      for (const pattern of extPatterns) {
+        const match = number.match(pattern);
+        if (match) {
+          extension = match[1];
+          number = number.replace(pattern, '').trim();
+          break;
+        }
+      }
+      
+      // Format the number part
+      const digits = number.replace(/\D/g, '');
+      let formattedNumber = '';
+      
+      if (digits.length === 11 && digits.startsWith('1')) {
+        formattedNumber = `+1 (${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`;
+      } else if (digits.length === 10) {
+        formattedNumber = `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+      } else if (/^\+/.test(String(number))) {
+        formattedNumber = number;
+      } else if (digits.length >= 8) {
+        formattedNumber = '+' + digits;
+      } else {
+        return raw;
+      }
+      
+      // Add extension if present
+      if (extension) {
+        return `${formattedNumber} ext. ${extension}`;
+      }
+      
+      return formattedNumber;
+    }
+
+    // Wait for Firebase to initialize
+    function waitForFirebase(callback, maxAttempts = 20) {
+      let attempts = 0;
+      const check = () => {
+        attempts++;
+        if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
+          callback();
+        } else if (attempts < maxAttempts) {
+          setTimeout(check, 100);
+        } else {
+          console.warn('[Schedule] Firebase not available after waiting');
+          callback(); // Continue anyway for fallback behavior
+        }
+      };
+      check();
+    }
+
+    // Set minimum date to today
+    const dateInput = document.getElementById('appointment-date');
+    if (dateInput) {
+      const today = new Date().toISOString().split('T')[0];
+      dateInput.setAttribute('min', today);
+    }
+
+    // Time slot selection
+    const timeSlots = document.querySelectorAll('.time-slot');
+    const selectedTimeInput = document.getElementById('selected-time');
+    let selectedTime = '';
+
+    timeSlots.forEach(slot => {
+      slot.addEventListener('click', () => {
+        if (slot.classList.contains('disabled')) return;
+        timeSlots.forEach(s => s.classList.remove('selected'));
+        slot.classList.add('selected');
+        selectedTime = slot.getAttribute('data-time');
+        if (selectedTimeInput) selectedTimeInput.value = selectedTime;
+      });
+    });
+
+    // Form submission
+    const form = document.getElementById('booking-form');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const errorMessage = document.getElementById('error-message');
+    const successMessage = document.getElementById('success-message');
+    const submitBtn = document.getElementById('submit-btn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      // Validate time selection
+      if (!selectedTime) {
+        showError('Please select a time slot');
+        return;
+      }
+
+      const formData = new FormData(form);
+      const rawDate = formData.get('appointmentDate');
+      // Convert YYYY-MM-DD to MM/DD/YYYY format for tasks.js compatibility
+      let formattedDate = rawDate;
+      if (rawDate && rawDate.includes('-')) {
+        const [year, month, day] = rawDate.split('-');
+        formattedDate = `${month}/${day}/${year}`;
+      }
+      
+      const rawPhone = formData.get('phone');
+      const normalizedPhone = normalizePhone(rawPhone);
+      
+      const bookingData = {
+        contactName: formData.get('contactName'),
+        companyName: formData.get('companyName'),
+        email: formData.get('email'),
+        phone: normalizedPhone,
+        appointmentDate: formattedDate,
+        selectedTime: selectedTime,
+        additionalNotes: formData.get('additionalNotes') || ''
+      };
+
+      // Validate
+      if (!bookingData.contactName || !bookingData.companyName || !bookingData.email || !bookingData.phone || !bookingData.appointmentDate) {
+        showError('Please fill in all required fields');
+        return;
+      }
+
+      showLoading(true);
+      hideError();
+      hideSuccess();
+
+      // Wait for Firebase to be ready
+      waitForFirebase(async () => {
+        try {
+          // Check if contact/account exists, create if not
+          await createOrUpdateContact(bookingData);
+          
+          // Create task for admin
+          await createAdminTask(bookingData);
+          
+          // Show success
+          showSuccess();
+          form.reset();
+          timeSlots.forEach(s => s.classList.remove('selected'));
+          selectedTime = '';
+          if (selectedTimeInput) selectedTimeInput.value = '';
+          
+        } catch (error) {
+          console.error('Booking error:', error);
+          showError('There was an error scheduling your consultation. Please try again or contact us directly.');
+        } finally {
+          showLoading(false);
+        }
+      });
+    });
+
+    async function createOrUpdateContact(bookingData) {
+      const db = window.firebaseDB;
+      if (!db || typeof db.collection !== 'function') {
+        console.warn('Firestore not available, skipping contact creation');
+        return;
+      }
+
+      try {
+        const email = bookingData.email.toLowerCase().trim();
+        const companyName = bookingData.companyName.trim();
+        const contactName = bookingData.contactName.trim();
+        const phone = bookingData.phone.trim();
+        const serverTimestamp = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue ? window.firebase.firestore.FieldValue.serverTimestamp() : new Date();
+
+        // Check if contact exists by email (using 'people' collection)
+        const contactsSnapshot = await db.collection('people').where('email', '==', email).limit(1).get();
+        
+        let contactId = null;
+        if (!contactsSnapshot.empty) {
+          // Contact exists, update if needed
+          const contactDoc = contactsSnapshot.docs[0];
+          contactId = contactDoc.id;
+          const contactData = contactDoc.data();
+          
+          // Update contact with latest info
+          const updates = {};
+          if (!contactData.firstName && contactName) {
+            const nameParts = contactName.split(' ');
+            updates.firstName = nameParts[0] || contactName;
+            updates.lastName = nameParts.slice(1).join(' ') || '';
+          }
+          // Use workDirectPhone field (matching contact-detail.js)
+          if (!contactData.workDirectPhone && phone) updates.workDirectPhone = phone;
+          // Also update mobile if workDirectPhone is not set and mobile is empty
+          if (!contactData.mobile && !contactData.workDirectPhone && phone) updates.mobile = phone;
+          if (!contactData.company && companyName) updates.company = companyName;
+          
+          if (Object.keys(updates).length > 0) {
+            updates.updatedAt = serverTimestamp;
+            await db.collection('people').doc(contactId).update(updates);
+          }
+        } else {
+          // Create new contact (use workDirectPhone field matching contact-detail.js)
+          const nameParts = contactName.split(' ');
+          const newContact = {
+            firstName: nameParts[0] || contactName,
+            lastName: nameParts.slice(1).join(' ') || '',
+            email: email,
+            workDirectPhone: phone, // Use workDirectPhone field
+            company: companyName,
+            ownerId: 'l.patterson@powerchoosers.com', // Admin owner
+            createdAt: serverTimestamp,
+            timestamp: serverTimestamp
+          };
+          
+          const contactRef = await db.collection('people').add(newContact);
+          contactId = contactRef.id;
+        }
+
+        // Check if account exists by company name
+        const accountsSnapshot = await db.collection('accounts').where('name', '==', companyName).limit(1).get();
+        
+        if (accountsSnapshot.empty) {
+          // Create new account
+          const newAccount = {
+            name: companyName,
+            ownerId: 'l.patterson@powerchoosers.com', // Admin owner
+            createdAt: serverTimestamp,
+            timestamp: serverTimestamp
+          };
+          await db.collection('accounts').add(newAccount);
+        }
+
+        return contactId;
+      } catch (error) {
+        console.error('Error creating/updating contact:', error);
+        // Don't throw - continue with task creation even if contact creation fails
+      }
+    }
+
+    async function createAdminTask(bookingData) {
+      const db = window.firebaseDB;
+      const serverTimestamp = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue ? window.firebase.firestore.FieldValue.serverTimestamp() : new Date();
+      
+      const taskData = {
+        title: `Consultation: ${bookingData.contactName} - ${bookingData.companyName}`,
+        type: 'phone-call',
+        priority: 'high',
+        contact: bookingData.contactName,
+        account: bookingData.companyName,
+        dueDate: bookingData.appointmentDate,
+        dueTime: bookingData.selectedTime,
+        status: 'pending',
+        notes: `SCHEDULED CONSULTATION\n\nContact: ${bookingData.contactName}\nCompany: ${bookingData.companyName}\nEmail: ${bookingData.email}\nPhone: ${bookingData.phone}\nDate: ${bookingData.appointmentDate}\nTime: ${bookingData.selectedTime}\n\nAdditional Notes:\n${bookingData.additionalNotes || 'None provided'}`,
+        ownerId: 'l.patterson@powerchoosers.com', // Admin owner
+        createdAt: serverTimestamp,
+        timestamp: serverTimestamp
+      };
+
+      if (db && typeof db.collection === 'function') {
+        try {
+          // Create task in Firestore
+          await db.collection('tasks').add(taskData);
+          console.log('[Schedule] Task created in Firestore');
+        } catch (error) {
+          console.error('Error creating task in Firestore:', error);
+          // Fallback to localStorage/event method
+          taskData.createdAt = Date.now();
+        }
+      }
+
+      // Also save to localStorage for immediate access
+      try {
+        const existingTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+        existingTasks.unshift({ ...taskData, createdAt: Date.now(), id: 'task_' + Date.now() });
+        localStorage.setItem('userTasks', JSON.stringify(existingTasks));
+      } catch (e) {
+        console.warn('Could not save task to localStorage:', e);
+      }
+
+      // Try to use window.Tasks.createTask if available (for tasks.js integration)
+      if (window.Tasks && typeof window.Tasks.createTask === 'function') {
+        try {
+          await window.Tasks.createTask({ ...taskData, createdAt: Date.now() });
+        } catch (e) {
+          console.warn('Could not create task via Tasks.createTask:', e);
+        }
+      } else if (window.createTask && typeof window.createTask === 'function') {
+        try {
+          await window.createTask({ ...taskData, createdAt: Date.now() });
+        } catch (e) {
+          console.warn('Could not create task via createTask:', e);
+        }
+      }
+
+      // Dispatch event for tasks.js to pick up
+      window.dispatchEvent(new CustomEvent('pc:auto-task', { detail: { ...taskData, createdAt: Date.now() } }));
+      window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'booking' } }));
+      
+      // Dispatch event for notification system on crm-dashboard
+      window.dispatchEvent(new CustomEvent('pc:booking-created', { 
+        detail: { 
+          contactName: bookingData.contactName,
+          companyName: bookingData.companyName,
+          appointmentDate: bookingData.appointmentDate,
+          selectedTime: bookingData.selectedTime,
+          source: 'schedule',
+          taskId: taskData.id || 'new'
+        } 
+      }));
+      
+      // Also add notification directly if Notifications system is available
+      if (window.Notifications && typeof window.Notifications.add === 'function') {
+        const message = `${bookingData.contactName} from ${bookingData.companyName} scheduled a consultation${bookingData.appointmentDate ? ` for ${bookingData.appointmentDate}` : ''}${bookingData.selectedTime ? ` at ${bookingData.selectedTime}` : ''}`;
+        window.Notifications.add('new-lead', 'New Consultation Scheduled', message, {
+          contactName: bookingData.contactName,
+          companyName: bookingData.companyName,
+          appointmentDate: bookingData.appointmentDate,
+          selectedTime: bookingData.selectedTime,
+          source: 'schedule'
+        });
+      }
+    }
+
+    function showLoading(show) {
+      if (loadingOverlay) {
+        if (show) loadingOverlay.classList.add('show');
+        else loadingOverlay.classList.remove('show');
+      }
+      if (submitBtn) submitBtn.disabled = show;
+    }
+
+    function showError(message) {
+      if (errorMessage) {
+        errorMessage.textContent = message;
+        errorMessage.classList.add('show');
+        successMessage.classList.remove('show');
+      }
+    }
+
+    function hideError() {
+      if (errorMessage) errorMessage.classList.remove('show');
+    }
+
+    function showSuccess() {
+      if (successMessage) {
+        successMessage.classList.add('show');
+        errorMessage.classList.remove('show');
+        // Scroll to success message
+        successMessage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function hideSuccess() {
+      if (successMessage) successMessage.classList.remove('show');
+    }
+
+    // Mobile nav toggle
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.querySelector('.nav-links');
+    if (navToggle && navLinks) {
+      navToggle.addEventListener('click', () => {
+        const isOpen = navLinks.classList.toggle('open');
+        navToggle.setAttribute('aria-expanded', String(isOpen));
+      });
+      navLinks.addEventListener('click', (e) => {
+        const t = e.target;
+        if (t instanceof Element && (t.matches('a') || t.matches('button'))) {
+          navLinks.classList.remove('open');
+          navToggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+
+    // Year
+    document.getElementById('y').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
+

@@ -196,6 +196,7 @@
         <a href="about.html" class="btn btn-outline">About</a>
         <a href="services.html" class="btn btn-outline">Services</a>
         <a href="resources.html" class="btn btn-outline">Resources</a>
+        <a href="schedule.html" class="btn btn-outline">Schedule</a>
         <button class="btn btn-primary" id="open-modal">Contact</button>
       </div>
     </nav>
@@ -386,6 +387,7 @@
           <a href="about.html" style="color:var(--muted);font-size:14px;transition:color .2s">About Us</a>
           <a href="services.html" style="color:var(--muted);font-size:14px;transition:color .2s">Services</a>
           <a href="resources.html" style="color:var(--muted);font-size:14px;transition:color .2s">Resources</a>
+          <a href="schedule.html" style="color:var(--muted);font-size:14px;transition:color .2s">Schedule Consultation</a>
           <a href="#testimonials" style="color:var(--muted);font-size:14px;transition:color .2s">Testimonials</a>
         </div>
       </div>
@@ -466,6 +468,12 @@
     </div>
   </div>
 
+  <!-- Firebase SDK (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="scripts/firebase.js"></script>
+
   <script>
     // Year
     document.getElementById('y').textContent = new Date().getFullYear();
@@ -484,10 +492,166 @@
     closeBtns.forEach(b=>b.addEventListener('click',()=>{ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); }));
     modal?.addEventListener('click', (e)=>{ if(e.target===modal){ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); } });
 
-    // Lead form handling: mailto fallback
-    document.getElementById('lead-form').addEventListener('submit', function(e){
+    // Lead form handling: Firebase integration + mailto fallback
+    document.getElementById('lead-form').addEventListener('submit', async function(e){
       e.preventDefault();
       const data = Object.fromEntries(new FormData(this).entries());
+      
+      // Firebase integration (same as schedule.html)
+      const companyName = (data.company || '').trim();
+      const contactName = (data.contact || '').trim();
+      const email = (data.email || '').toLowerCase().trim();
+      const phone = (data.phone || '').trim();
+      
+      // Normalize phone number (same function as schedule.html)
+      function normalizePhone(input) {
+        const raw = (input || '').toString().trim();
+        if (!raw) return '';
+        const digits = raw.replace(/\D/g, '');
+        let formattedNumber = '';
+        if (digits.length === 11 && digits.startsWith('1')) {
+          formattedNumber = `+1 (${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`;
+        } else if (digits.length === 10) {
+          formattedNumber = `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+        } else {
+          return raw;
+        }
+        return formattedNumber;
+      }
+      
+      const normalizedPhone = normalizePhone(phone);
+      
+      // Wait for Firebase and create records
+      function waitForFirebase(callback, maxAttempts = 20) {
+        let attempts = 0;
+        const check = () => {
+          attempts++;
+          if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
+            callback();
+          } else if (attempts < maxAttempts) {
+            setTimeout(check, 100);
+          } else {
+            callback(); // Continue anyway
+          }
+        };
+        check();
+      }
+      
+      waitForFirebase(async () => {
+        try {
+          const db = window.firebaseDB;
+          const serverTimestamp = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue ? window.firebase.firestore.FieldValue.serverTimestamp() : new Date();
+          
+          // Check/create contact
+          const contactsSnapshot = await db.collection('people').where('email', '==', email).limit(1).get();
+          let contactId = null;
+          
+          if (!contactsSnapshot.empty) {
+            const contactDoc = contactsSnapshot.docs[0];
+            contactId = contactDoc.id;
+            const contactData = contactDoc.data();
+            const updates = {};
+            if (!contactData.firstName && contactName) {
+              const nameParts = contactName.split(' ');
+              updates.firstName = nameParts[0] || contactName;
+              updates.lastName = nameParts.slice(1).join(' ') || '';
+            }
+            if (!contactData.workDirectPhone && normalizedPhone) updates.workDirectPhone = normalizedPhone;
+            if (!contactData.mobile && !contactData.workDirectPhone && normalizedPhone) updates.mobile = normalizedPhone;
+            if (!contactData.company && companyName) updates.company = companyName;
+            if (Object.keys(updates).length > 0) {
+              updates.updatedAt = serverTimestamp;
+              await db.collection('people').doc(contactId).update(updates);
+            }
+          } else {
+            const nameParts = contactName.split(' ');
+            const newContact = {
+              firstName: nameParts[0] || contactName,
+              lastName: nameParts.slice(1).join(' ') || '',
+              email: email,
+              workDirectPhone: normalizedPhone,
+              company: companyName,
+              ownerId: 'l.patterson@powerchoosers.com',
+              createdAt: serverTimestamp,
+              timestamp: serverTimestamp
+            };
+            const contactRef = await db.collection('people').add(newContact);
+            contactId = contactRef.id;
+          }
+          
+          // Check/create account
+          const accountsSnapshot = await db.collection('accounts').where('name', '==', companyName).limit(1).get();
+          if (accountsSnapshot.empty) {
+            const newAccount = {
+              name: companyName,
+              ownerId: 'l.patterson@powerchoosers.com',
+              createdAt: serverTimestamp,
+              timestamp: serverTimestamp
+            };
+            await db.collection('accounts').add(newAccount);
+          }
+          
+          // Create task
+          const taskData = {
+            title: `New Lead: ${contactName} - ${companyName}`,
+            type: 'phone-call',
+            priority: 'high',
+            contact: contactName,
+            account: companyName,
+            status: 'pending',
+            notes: `NEW LEAD FROM WEBSITE\n\nContact: ${contactName}\nCompany: ${companyName}\nEmail: ${email}\nPhone: ${normalizedPhone}\n\nSource: Home Page Lead Form`,
+            ownerId: 'l.patterson@powerchoosers.com',
+            createdAt: serverTimestamp,
+            timestamp: serverTimestamp
+          };
+          
+          if (db && typeof db.collection === 'function') {
+            try {
+              await db.collection('tasks').add(taskData);
+            } catch (error) {
+              console.error('Error creating task in Firestore:', error);
+              taskData.createdAt = Date.now();
+            }
+          }
+          
+          // Save to localStorage
+          try {
+            const existingTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+            existingTasks.unshift({ ...taskData, createdAt: Date.now(), id: 'task_' + Date.now() });
+            localStorage.setItem('userTasks', JSON.stringify(existingTasks));
+          } catch (e) {
+            console.warn('Could not save task to localStorage:', e);
+          }
+          
+          // Dispatch events
+          window.dispatchEvent(new CustomEvent('pc:auto-task', { detail: { ...taskData, createdAt: Date.now() } }));
+          window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'lead-form' } }));
+          window.dispatchEvent(new CustomEvent('pc:booking-created', { 
+            detail: { 
+              contactName: contactName,
+              companyName: companyName,
+              source: 'home-page',
+              taskId: 'new'
+            } 
+          }));
+          
+          // Also add notification directly if Notifications system is available
+          if (window.Notifications && typeof window.Notifications.addNewLead === 'function') {
+            window.Notifications.addNewLead(`${contactName} - ${companyName}`, 'Home Page Lead Form');
+          } else if (window.Notifications && typeof window.Notifications.add === 'function') {
+            window.Notifications.add('new-lead', 'New Lead Received', `${contactName} from ${companyName} submitted a lead form`, {
+              contactName: contactName,
+              companyName: companyName,
+              source: 'home-page'
+            });
+          }
+          
+        } catch (error) {
+          console.error('Error processing lead form:', error);
+        }
+      });
+      
+      // Also send mailto as fallback
       const subject = encodeURIComponent('Power Choosers — Quote Request');
       const body = encodeURIComponent(
         `Company: ${data.company || ''}\n`+
