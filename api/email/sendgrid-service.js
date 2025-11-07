@@ -48,6 +48,14 @@ export class SendGridService {
     try {
               const { to, subject, content, from, fromName, trackingId, _deliverability, inReplyTo, references, threadId, isHtmlEmail } = emailData;
       
+      // CRITICAL DEBUG: Log what service receives
+      console.error('🔍 [SendGrid-Service] ========== RECEIVED IN sendEmail() ==========');
+      console.error('🔍 [SendGrid-Service] isHtmlEmail:', isHtmlEmail, '| Type:', typeof isHtmlEmail, '| Truthy:', !!isHtmlEmail);
+      console.error('🔍 [SendGrid-Service] Will process as:', isHtmlEmail ? 'HTML EMAIL' : 'STANDARD EMAIL');
+      console.error('🔍 [SendGrid-Service] Content length:', content?.length || 0);
+      console.error('🔍 [SendGrid-Service] Content preview (first 150 chars):', content?.substring(0, 150) || 'NO CONTENT');
+      console.error('🔍 [SendGrid-Service] ===========================================');
+      
       // Check if any recipients are suppressed
       const recipients = Array.isArray(to) ? to : [to];
       const suppressedEmails = [];
@@ -248,6 +256,14 @@ export class SendGridService {
       if (!textContent || typeof textContent !== 'string' || textContent.trim().length === 0) {
         throw new Error('Text content cannot be empty');
       }
+      
+      // CRITICAL DEBUG: Log final email type determination
+      console.error('🔍 [SendGrid-Service] ========== FINAL EMAIL TYPE ==========');
+      console.error('🔍 [SendGrid-Service] isHtmlEmail:', isHtmlEmail, '| Type:', typeof isHtmlEmail);
+      console.error('🔍 [SendGrid-Service] Email type:', isHtmlEmail ? 'HTML' : 'Standard');
+      console.error('🔍 [SendGrid-Service] Content length:', content.length);
+      console.error('🔍 [SendGrid-Service] Text content length:', textContent.length);
+      console.error('🔍 [SendGrid-Service] =======================================');
       
       console.log('[SendGrid] Email type:', isHtmlEmail ? 'HTML' : 'Standard', 'Content length:', content.length);
       console.log('[SendGrid] Text content length:', textContent.length);
