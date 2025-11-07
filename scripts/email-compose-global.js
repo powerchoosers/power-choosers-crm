@@ -4433,11 +4433,21 @@
     try {
       const { to, subject, content, from, fromName, _deliverability, threadId, inReplyTo, references, trackingMetadata, isHtmlEmail } = emailData;
       
+      // CRITICAL DEBUG: Log what we received
+      console.error('🔍 [SendEmailViaSendGrid] ========== RECEIVED EMAIL DATA ==========');
+      console.error('🔍 [SendEmailViaSendGrid] isHtmlEmail:', isHtmlEmail, '| Type:', typeof isHtmlEmail, '| Truthy:', !!isHtmlEmail);
+      console.error('🔍 [SendEmailViaSendGrid] Content length:', content?.length || 0);
+      console.error('🔍 [SendEmailViaSendGrid] Content preview (first 150 chars):', content?.substring(0, 150) || 'NO CONTENT');
+      console.error('🔍 [SendEmailViaSendGrid] =========================================');
+      
       // Generate unique tracking ID for this email
       const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
+      // Explicit boolean conversion - ensure it's always a boolean, never undefined
+      const isHtmlEmailBoolean = Boolean(isHtmlEmail);
+      
       console.log('[SendGrid] Email data received:', {
-        isHtmlEmail,
+        isHtmlEmail: isHtmlEmailBoolean,
         contentLength: content.length,
         contentPreview: content.substring(0, 100) + '...',
         from: from || 'not set',
@@ -4455,9 +4465,15 @@
         threadId: threadId,
         inReplyTo: inReplyTo,
         references: references,
-        isHtmlEmail: isHtmlEmail || false,
+        isHtmlEmail: isHtmlEmailBoolean, // Use explicit boolean, not || false
         _deliverability: _deliverability
       };
+      
+      // CRITICAL DEBUG: Log what we're sending to API
+      console.error('🔍 [SendEmailViaSendGrid] ========== SENDING TO API ==========');
+      console.error('🔍 [SendEmailViaSendGrid] isHtmlEmail in payload:', emailPayload.isHtmlEmail, '| Type:', typeof emailPayload.isHtmlEmail);
+      console.error('🔍 [SendEmailViaSendGrid] JSON.stringify test:', JSON.stringify({ isHtmlEmail: emailPayload.isHtmlEmail }));
+      console.error('🔍 [SendEmailViaSendGrid] =====================================');
       
       // Send via SendGrid API
       const response = await fetch(`${window.API_BASE_URL}/api/email/sendgrid-send`, {
@@ -4541,27 +4557,41 @@
     
     // Check attribute first, then detect HTML structure as fallback
     const hasHtmlAttribute = bodyInput?.getAttribute('data-html-email') === 'true';
+    
+    // More flexible HTML structure detection - check for common HTML email patterns
     const hasHtmlStructure = body && (
       body.includes('<!DOCTYPE html>') ||
       body.includes('<html') ||
-      (body.includes('<div') && body.includes('class="container"') && body.includes('style="')) ||
-      body.includes('class="header"') || // Common in your templates
-      body.includes('class="email-template"') || // Another common pattern
-      body.includes('font-family: Arial') || // Template styling
-      body.includes('max-width: 600px') // Template container width
+      body.includes('<head>') ||
+      body.includes('</head>') ||
+      (body.includes('<style') && body.includes('</style>')) ||
+      (body.includes('<div') && body.includes('class=') && body.includes('style=')) ||
+      body.includes('class="header"') ||
+      body.includes('class="email-template"') ||
+      body.includes('class="container"') ||
+      body.includes('font-family:') ||
+      body.includes('max-width:') ||
+      body.includes('background-color:') ||
+      (body.includes('<table') && body.includes('style=')) // Common in HTML emails
     );
-    const isHtmlEmail = hasHtmlAttribute || hasHtmlStructure;
     
-    // TEMPORARY: Using console.error() so logs always appear even when silenced
-    console.error('[EmailCompose] ========== EMAIL TYPE DETECTION ==========');
-    console.error('[EmailCompose] Email mode:', isHtmlEmail ? 'HTML Template' : 'Standard');
-    console.error('[EmailCompose] Detection:', {hasHtmlAttribute, hasHtmlStructure});
-    console.error('[EmailCompose] Body input has data-html-email:', bodyInput?.getAttribute('data-html-email'));
-    console.error('[EmailCompose] Body input has data-template-type:', bodyInput?.getAttribute('data-template-type'));
-    console.error('[EmailCompose] Body length:', body.length);
-    console.error('[EmailCompose] Content preview (first 200 chars):', body.substring(0, 200));
-    console.error('[EmailCompose] Has iframe:', !!bodyInput?.querySelector('.html-email-iframe'));
-    console.error('[EmailCompose] ===========================================');
+    // Explicit boolean conversion - prioritize attribute, then structure
+    const isHtmlEmail = Boolean(hasHtmlAttribute || hasHtmlStructure);
+    
+    // CRITICAL DEBUG: Using console.error() so logs always appear even when silenced
+    console.error('🔍 [EmailCompose] ========== EMAIL TYPE DETECTION ==========');
+    console.error('🔍 [EmailCompose] Final isHtmlEmail:', isHtmlEmail, '| Type:', typeof isHtmlEmail);
+    console.error('🔍 [EmailCompose] Detection results:', {
+      hasHtmlAttribute,
+      hasHtmlStructure,
+      attributeValue: bodyInput?.getAttribute('data-html-email'),
+      templateType: bodyInput?.getAttribute('data-template-type')
+    });
+    console.error('🔍 [EmailCompose] Body length:', body.length);
+    console.error('🔍 [EmailCompose] Content preview (first 200 chars):', body.substring(0, 200));
+    console.error('🔍 [EmailCompose] Has iframe:', !!bodyInput?.querySelector('.html-email-iframe'));
+    console.error('🔍 [EmailCompose] Iframe srcdoc length:', bodyInput?.querySelector('.html-email-iframe')?.srcdoc?.length || 0);
+    console.error('🔍 [EmailCompose] ===========================================');
     
     console.log('[EmailCompose] Email mode:', isHtmlEmail ? 'HTML Template' : 'Standard');
     console.log('[EmailCompose] Detection:', {hasHtmlAttribute, hasHtmlStructure});
@@ -4702,9 +4732,16 @@
         content: contentWithSignature,
         from: senderEmail,
         fromName: senderName,
-        isHtmlEmail: isHtmlEmail,
+        isHtmlEmail: Boolean(isHtmlEmail), // Explicit boolean conversion
         trackingMetadata: window._lastGeneratedMetadata || null
       };
+
+      // CRITICAL DEBUG: Log what we're about to send
+      console.error('🔍 [EmailCompose] ========== PREPARING TO SEND ==========');
+      console.error('🔍 [EmailCompose] isHtmlEmail value:', emailData.isHtmlEmail, '| Type:', typeof emailData.isHtmlEmail);
+      console.error('🔍 [EmailCompose] Content length:', emailData.content.length);
+      console.error('🔍 [EmailCompose] Content preview (first 200 chars):', emailData.content.substring(0, 200));
+      console.error('🔍 [EmailCompose] =======================================');
 
       // Send via SendGrid
       let result;

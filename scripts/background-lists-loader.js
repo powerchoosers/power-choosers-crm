@@ -31,7 +31,7 @@
         if (window.DataManager && typeof window.DataManager.queryWithOwnership==='function') {
           newLists = await window.DataManager.queryWithOwnership('lists');
         } else {
-          const email = window.currentUserEmail || '';
+          const email = getUserEmail();
           const db = window.firebaseDB;
           // Check multiple ownership fields for lists
           const [ownedSnap, assignedSnap, createdSnap] = await Promise.all([
@@ -186,7 +186,7 @@
     if (!window.firebaseDB) return 0;
     
     try {
-      const email = window.currentUserEmail || '';
+      const email = getUserEmail();
       if (window.currentUserRole !== 'admin' && email) {
         // Non-admin: count only owned/assigned lists
         const [ownedSnap, assignedSnap] = await Promise.all([
@@ -231,6 +231,35 @@
     return false;
   }
 
+  // Add list to cache locally (cost-effective: avoids Firestore read)
+  function addListLocally(newList) {
+    if (!newList || !newList.id) {
+      console.warn('[BackgroundListsLoader] Cannot add list - missing id');
+      return false;
+    }
+    
+    // Check if list already exists
+    const existingIndex = listsData.findIndex(l => l.id === newList.id);
+    if (existingIndex >= 0) {
+      // Update existing list
+      listsData[existingIndex] = newList;
+      console.log(`[BackgroundListsLoader] ✓ Updated list ${newList.id} in cache`);
+    } else {
+      // Add new list at the beginning (most recent first)
+      listsData = [newList, ...listsData];
+      console.log(`[BackgroundListsLoader] ✓ Added list ${newList.id} to cache`);
+    }
+    
+    // Update CacheManager cache (cost-effective - IndexedDB write only)
+    if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+      window.CacheManager.updateRecord('lists', newList.id, newList).catch(err => 
+        console.warn('[BackgroundListsLoader] Cache update failed:', err)
+      );
+    }
+    
+    return true;
+  }
+
   // Remove list from cache (cost-effective: avoids Firestore read on reload)
   function removeListLocally(listId) {
     const index = listsData.findIndex(l => l.id === listId);
@@ -266,6 +295,7 @@
     getCount: () => listsData.length,
     getTotalCount: getTotalCount,
     updateListCountLocally: updateListCountLocally,
+    addListLocally: addListLocally,
     removeListLocally: removeListLocally
   };
   

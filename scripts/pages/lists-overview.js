@@ -13,6 +13,18 @@
   };
   const STORAGE_KEY = 'pc_lists_kind';
 
+  // Helper function to get normalized user email (cost-effective - no Firestore reads)
+  function getUserEmail() {
+    try {
+      if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+        return window.DataManager.getCurrentUserEmail();
+      }
+      return (window.currentUserEmail || '').toLowerCase();
+    } catch(_) {
+      return (window.currentUserEmail || '').toLowerCase();
+    }
+  }
+
   function qs(id) { return document.getElementById(id); }
 
   function initDom() {
@@ -169,15 +181,16 @@
     const createBtn = popoverEl?.querySelector('[data-act="create"]');
     if (createBtn) createBtn.disabled = true;
 
+    const email = getUserEmail();
     let newItem = { 
       name, 
       kind, 
       recordCount: 0, 
       createdAt: new Date(), 
       updatedAt: new Date(),
-      ownerId: window.currentUserEmail || '',
-      createdBy: window.currentUserEmail || '',
-      assignedTo: window.currentUserEmail || ''
+      ownerId: email,
+      createdBy: email,
+      assignedTo: email
     };
     try {
       if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
@@ -192,6 +205,30 @@
     } catch (err) {
       console.warn('Create list failed:', err);
       // keep local item without id if offline
+    }
+
+    // COST-EFFECTIVE: Update BackgroundListsLoader cache locally (zero Firestore reads)
+    if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.addListLocally === 'function') {
+      window.BackgroundListsLoader.addListLocally(newItem);
+      console.log('[ListsOverview] ✓ Updated BackgroundListsLoader cache locally');
+    }
+
+    // COST-EFFECTIVE: Update CacheManager locally (IndexedDB write only, no Firestore read)
+    if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function' && newItem.id) {
+      window.CacheManager.updateRecord('lists', newItem.id, newItem).catch(err => 
+        console.warn('[ListsOverview] Cache update failed:', err)
+      );
+      console.log('[ListsOverview] ✓ Updated CacheManager cache locally');
+    }
+
+    // COST-EFFECTIVE: Dispatch event for cross-component sync (free, no cost)
+    try {
+      document.dispatchEvent(new CustomEvent('pc:list-created', {
+        detail: { id: newItem.id, list: newItem, kind }
+      }));
+      console.log('[ListsOverview] ✓ Dispatched pc:list-created event');
+    } catch (e) {
+      console.warn('[ListsOverview] Failed to dispatch event:', e);
     }
 
     // Update local state and render
@@ -310,6 +347,44 @@
   }
 
   async function ensureLoadedThenRender() {
+    // COST-EFFECTIVE: Use BackgroundListsLoader cache first (zero Firestore reads)
+    if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
+      const allLists = window.BackgroundListsLoader.getListsData() || [];
+      
+      if (allLists.length > 0) {
+        // Filter by kind client-side (no Firestore query needed)
+        const filteredLists = allLists.filter(list => {
+          const listKind = (list.kind || list.type || list.listType || '').toLowerCase();
+          if (state.kind === 'people') {
+            return listKind === 'people' || listKind === 'person' || listKind === 'contacts' || listKind === 'contact';
+          } else {
+            return listKind === 'accounts' || listKind === 'account' || listKind === 'companies' || listKind === 'company';
+          }
+        });
+        
+        // Update state with filtered lists (zero cost)
+        if (state.kind === 'people') {
+          state.peopleLists = filteredLists;
+          state.loadedPeople = true;
+          console.log('[ListsOverview] ✓ Loaded', filteredLists.length, 'people lists from BackgroundListsLoader cache (zero cost)');
+        } else {
+          state.accountLists = filteredLists;
+          state.loadedAccounts = true;
+          console.log('[ListsOverview] ✓ Loaded', filteredLists.length, 'account lists from BackgroundListsLoader cache (zero cost)');
+        }
+        
+        // Preload members if needed (uses cache if available)
+        if (typeof window.__preloadListMembers === 'function') {
+          await window.__preloadListMembers(filteredLists);
+        }
+        
+        applyFilters();
+        updateToggleState();
+        return; // Skip Firestore query - cache has data
+      }
+    }
+    
+    // Fallback: Only query Firestore if BackgroundListsLoader has no data
     if (state.kind === 'people' && !state.loadedPeople) {
       await loadLists('people');
     } else if (state.kind === 'accounts' && !state.loadedAccounts) {
@@ -320,15 +395,15 @@
   }
 
   async function loadLists(kind) {
-    // Try to load from BackgroundListsLoader first, then Firestore fallback
+    // COST-EFFECTIVE: Always try BackgroundListsLoader first (zero Firestore reads if cache available)
     try {
       if (console.time) console.time(`[ListsOverview] loadLists ${kind}`);
       
       // Use BackgroundListsLoader (cache-first)
-      if (window.BackgroundListsLoader) {
+      if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
         let listsData = window.BackgroundListsLoader.getListsData() || [];
         
-        // If background loader hasn't loaded data yet, wait for it
+        // If background loader hasn't loaded data yet, wait for it (cost-effective: avoids Firestore query)
         if (listsData.length === 0) {
           console.log('[ListsOverview] BackgroundListsLoader not ready yet, waiting...');
           // Wait up to 3 seconds for background loader
@@ -336,58 +411,60 @@
             await new Promise(resolve => setTimeout(resolve, 100));
             listsData = window.BackgroundListsLoader.getListsData() || [];
             if (listsData.length > 0) {
-              console.log('[ListsOverview] BackgroundListsLoader ready after', (attempt + 1) * 100, 'ms with', listsData.length, 'lists');
+              console.log('[ListsOverview] ✓ BackgroundListsLoader ready after', (attempt + 1) * 100, 'ms with', listsData.length, 'lists (zero cost)');
               break;
             }
           }
         }
         
-        // Filter by kind client-side
-        const filteredLists = listsData.filter(list => {
-          const listKind = (list.kind || list.type || list.listType || '').toLowerCase();
-          if (kind === 'people') {
-            return listKind === 'people' || listKind === 'person' || listKind === 'contacts' || listKind === 'contact';
+        // COST-EFFECTIVE: Filter by kind client-side (no Firestore query needed)
+        if (listsData.length > 0) {
+          const filteredLists = listsData.filter(list => {
+            const listKind = (list.kind || list.type || list.listType || '').toLowerCase();
+            if (kind === 'people') {
+              return listKind === 'people' || listKind === 'person' || listKind === 'contacts' || listKind === 'contact';
+            } else {
+              return listKind === 'accounts' || listKind === 'account' || listKind === 'companies' || listKind === 'company';
+            }
+          });
+          
+          console.log('[ListsOverview] ✓ Loaded', filteredLists.length, 'lists from BackgroundListsLoader for kind:', kind, '(zero cost)');
+          
+          // Ensure global cache exists
+          try { window.listMembersCache = window.listMembersCache || {}; } catch (_) {}
+
+          // Preload members for all lists in this kind and compute counts (uses cache if available)
+          if (typeof window.__preloadListMembers === 'function') {
+            await window.__preloadListMembers(filteredLists);
           } else {
-            return listKind === 'accounts' || listKind === 'account' || listKind === 'companies' || listKind === 'company';
+            // Fallback: set default counts
+            console.log('[ListsOverview] Preloader not available, setting default counts');
+            for (const list of filteredLists) {
+              list.count = 0;
+            }
           }
-        });
-        
-        console.log('[ListsOverview] Loaded', filteredLists.length, 'lists from BackgroundListsLoader for kind:', kind);
-        
-        // Ensure global cache exists
-        try { window.listMembersCache = window.listMembersCache || {}; } catch (_) {}
 
-        // Preload members for all lists in this kind and compute counts
-        if (typeof window.__preloadListMembers === 'function') {
-          await window.__preloadListMembers(filteredLists);
-        } else {
-          // Fallback: set default counts
-          console.log('[ListsOverview] Preloader not available, setting default counts');
-          for (const list of filteredLists) {
-            list.count = 0;
+          if (kind === 'people') {
+            state.peopleLists = filteredLists;
+            state.loadedPeople = true;
+          } else {
+            state.accountLists = filteredLists;
+            state.loadedAccounts = true;
           }
+          
+          if (console.timeEnd) console.timeEnd(`[ListsOverview] loadLists ${kind}`);
+          renderFilteredItems(kind === 'people' ? state.peopleLists : state.accountLists);
+          return; // Skip Firestore query - cache has data
         }
-
-        if (kind === 'people') {
-          state.peopleLists = filteredLists;
-          state.loadedPeople = true;
-        } else {
-          state.accountLists = filteredLists;
-          state.loadedAccounts = true;
-        }
-        
-        if (console.timeEnd) console.timeEnd(`[ListsOverview] loadLists ${kind}`);
-        renderFilteredItems(kind === 'people' ? state.peopleLists : state.accountLists);
-        return;
       }
       
       // Fallback to direct Firestore query
       if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
         // Primary query: filter by kind on server if available
-        const email = window.currentUserEmail || '';
         let query = window.firebaseDB.collection('lists');
         
         // CRITICAL: Add ownership filter FIRST for non-admin users (required by Firestore rules)
+        const email = getUserEmail();
         if (window.currentUserRole !== 'admin' && email) {
           query = query.where('ownerId', '==', email);
         }
@@ -401,7 +478,7 @@
         // and filter client-side using flexible field names: kind | type | listType.
         if (!items.length) {
           try {
-            const email = window.currentUserEmail || '';
+            const email = getUserEmail();
             let altSnap;
             if (window.currentUserRole !== 'admin' && email) {
               // Non-admin: use scoped query - check multiple ownership fields
@@ -463,7 +540,42 @@
       }
       if (console.timeEnd) console.timeEnd(`[ListsOverview] loadLists ${kind}`);
     } catch (err) {
-      console.warn('Failed to load lists for kind', kind, err);
+      console.error('[ListsOverview] Failed to load lists for kind', kind, err);
+      
+      // COST-EFFECTIVE: Preserve cache on error (don't clear existing data)
+      // Try to use BackgroundListsLoader cache as fallback
+      if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
+        try {
+          const cachedLists = window.BackgroundListsLoader.getListsData() || [];
+          if (cachedLists.length > 0) {
+            const filteredLists = cachedLists.filter(list => {
+              const listKind = (list.kind || list.type || list.listType || '').toLowerCase();
+              if (kind === 'people') {
+                return listKind === 'people' || listKind === 'person' || listKind === 'contacts' || listKind === 'contact';
+              } else {
+                return listKind === 'accounts' || listKind === 'account' || listKind === 'companies' || listKind === 'company';
+              }
+            });
+            
+            if (kind === 'people') {
+              if (state.peopleLists.length === 0) {
+                state.peopleLists = filteredLists; // Only use cache if state is empty
+              }
+              state.loadedPeople = true;
+            } else {
+              if (state.accountLists.length === 0) {
+                state.accountLists = filteredLists; // Only use cache if state is empty
+              }
+              state.loadedAccounts = true;
+            }
+            console.log('[ListsOverview] ✓ Preserved cache data on error (zero cost)');
+          }
+        } catch (cacheErr) {
+          console.warn('[ListsOverview] Cache fallback failed:', cacheErr);
+        }
+      }
+      
+      // Mark as loaded to prevent infinite retry loops
       if (kind === 'people') state.loadedPeople = true; else state.loadedAccounts = true;
     }
   }
@@ -473,6 +585,19 @@
   let _unsubListsAccounts = null;
   let _peopleListenerRetries = 0;
   let _accountsListenerRetries = 0;
+  
+  // COST-EFFECTIVE: Debounce function to prevent rapid updates (reduces re-renders)
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
   
   function startLiveListsListeners() {
     try {
@@ -487,6 +612,83 @@
       // People lists - try filtered query first, fallback to unfiltered if it fails
       if (_unsubListsPeople) { try { _unsubListsPeople(); } catch(_) {} _unsubListsPeople = null; }
       
+      // COST-EFFECTIVE: Debounced update handler (500ms) to prevent flickering
+      const debouncedPeopleUpdate = debounce((items) => {
+        try {
+          // COST-EFFECTIVE: Prefer BackgroundListsLoader cache if available (zero cost)
+          if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
+            const cachedLists = window.BackgroundListsLoader.getListsData() || [];
+            if (cachedLists.length > 0) {
+              // Merge listener updates with cache data instead of replacing
+              const cachedMap = new Map(cachedLists.map(l => [l.id, l]));
+              items.forEach(item => {
+                cachedMap.set(item.id, item); // Update with listener data
+              });
+              items = Array.from(cachedMap.values());
+              console.log('[ListsOverview] ✓ Merged listener updates with cache (zero cost)');
+            }
+          }
+          
+          // COST-EFFECTIVE: Only update if we detect actual changes (not just snapshot triggers)
+          const existingCount = state.peopleLists.length;
+          
+          // COST-EFFECTIVE: If we have existing lists but listener returns empty, preserve existing
+          if (existingCount > 0 && items.length === 0) {
+            console.warn('[ListsOverview] Live listener returned empty but we have existing lists, preserving cache');
+            return; // Don't overwrite with empty data
+          }
+          
+          // If this is the first load (no existing data), do full replacement
+          if (existingCount === 0) {
+            state.peopleLists = items;
+            console.log(`[ListsOverview] First load: set ${items.length} lists`);
+          } else {
+            // COST-EFFECTIVE: Merge updates instead of replacing (preserves cache)
+            const existingMap = new Map(state.peopleLists.map(l => [l.id, l]));
+            const itemsIds = new Set(items.map(item => item.id));
+            let changed = false;
+            
+            // Remove lists that no longer exist in Firestore (were deleted)
+            for (const [id, list] of existingMap.entries()) {
+              if (!itemsIds.has(id)) {
+                existingMap.delete(id);
+                changed = true;
+                // Also remove from BackgroundListsLoader cache
+                if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.removeListLocally === 'function') {
+                  window.BackgroundListsLoader.removeListLocally(id);
+                }
+                console.log(`[ListsOverview] Removed deleted list ${id} from cache`);
+              }
+            }
+            
+            // Update or add lists that exist in Firestore (merge with existing)
+            items.forEach(item => {
+              const existing = existingMap.get(item.id);
+              // Only update if recordCount changed, name changed, or it's a new list
+              if (!existing || existing.recordCount !== item.recordCount || existing.name !== item.name) {
+                existingMap.set(item.id, item);
+                changed = true;
+              }
+            });
+            
+            // Only re-render if something actually changed
+            if (changed || existingMap.size !== existingCount) {
+              state.peopleLists = Array.from(existingMap.values());
+              console.log(`[ListsOverview] ✓ Updated ${items.length} lists from listener (changes detected, merged with cache)`);
+            } else {
+              // No changes detected, skip re-render to save resources
+              return;
+            }
+          }
+          
+          state.loadedPeople = true;
+          if (state.kind === 'people') renderFilteredItems(state.peopleLists);
+          _peopleListenerRetries = 0; // Reset retry counter on success
+        } catch (e) {
+          console.error('[ListsOverview] People lists debounced update error:', e);
+        }
+      }, 500); // 500ms debounce
+      
       const setupPeopleListener = (useFilter = true) => {
         try {
           let query = col;
@@ -496,7 +698,7 @@
           
           _unsubListsPeople = query.onSnapshot(
             (snap) => {
-              // Success handler
+              // Success handler - use debounced update
               try {
                 let items = [];
                 snap.forEach((d) => {
@@ -511,62 +713,8 @@
                   items.push({ id: d.id, ...data });
                 });
                 
-                // COST-EFFECTIVE: Only update if we detect actual changes (not just snapshot triggers)
-                // This reduces unnecessary re-renders and cache updates
-                const existingCount = state.peopleLists.length;
-                
-                // If we have existing lists but listener returns empty, preserve existing
-                if (existingCount > 0 && items.length === 0) {
-                  console.warn('[ListsOverview] Live listener returned empty but we have existing lists, preserving them');
-                  return; // Don't overwrite with empty data
-                }
-                
-                // If this is the first load (no existing data), do full replacement
-                if (existingCount === 0) {
-                  state.peopleLists = items;
-                  console.log(`[ListsOverview] First load: set ${items.length} lists`);
-                } else {
-                  // COST-EFFECTIVE: Only update lists that actually changed, and remove deleted ones
-                  const existingMap = new Map(state.peopleLists.map(l => [l.id, l]));
-                  const itemsIds = new Set(items.map(item => item.id));
-                  let changed = false;
-                  
-                  // Remove lists that no longer exist in Firestore (were deleted)
-                  for (const [id, list] of existingMap.entries()) {
-                    if (!itemsIds.has(id)) {
-                      existingMap.delete(id);
-                      changed = true;
-                      // Also remove from BackgroundListsLoader cache
-                      if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.removeListLocally === 'function') {
-                        window.BackgroundListsLoader.removeListLocally(id);
-                      }
-                      console.log(`[ListsOverview] Removed deleted list ${id} from cache`);
-                    }
-                  }
-                  
-                  // Update or add lists that exist in Firestore
-                  items.forEach(item => {
-                    const existing = existingMap.get(item.id);
-                    // Only update if recordCount changed or it's a new list
-                    if (!existing || existing.recordCount !== item.recordCount || existing.name !== item.name) {
-                      existingMap.set(item.id, item);
-                      changed = true;
-                    }
-                  });
-                  
-                  // Only re-render if something actually changed
-                  if (changed || existingMap.size !== existingCount) {
-                    state.peopleLists = Array.from(existingMap.values());
-                    console.log(`[ListsOverview] Updated ${items.length} lists from listener (changes detected)`);
-                  } else {
-                    // No changes detected, skip re-render to save resources
-                    return;
-                  }
-                }
-                
-                state.loadedPeople = true;
-                if (state.kind === 'people') renderFilteredItems(state.peopleLists);
-                _peopleListenerRetries = 0; // Reset retry counter on success
+                // Use debounced update to prevent flickering
+                debouncedPeopleUpdate(items);
               } catch (e) {
                 console.error('[ListsOverview] People lists snapshot error:', e);
               }
@@ -603,6 +751,83 @@
       // Account lists - same fallback pattern
       if (_unsubListsAccounts) { try { _unsubListsAccounts(); } catch(_) {} _unsubListsAccounts = null; }
       
+      // COST-EFFECTIVE: Debounced update handler (500ms) to prevent flickering
+      const debouncedAccountsUpdate = debounce((items) => {
+        try {
+          // COST-EFFECTIVE: Prefer BackgroundListsLoader cache if available (zero cost)
+          if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
+            const cachedLists = window.BackgroundListsLoader.getListsData() || [];
+            if (cachedLists.length > 0) {
+              // Merge listener updates with cache data instead of replacing
+              const cachedMap = new Map(cachedLists.map(l => [l.id, l]));
+              items.forEach(item => {
+                cachedMap.set(item.id, item); // Update with listener data
+              });
+              items = Array.from(cachedMap.values());
+              console.log('[ListsOverview] ✓ Merged listener updates with cache (zero cost)');
+            }
+          }
+          
+          // COST-EFFECTIVE: Only update if we detect actual changes (not just snapshot triggers)
+          const existingCount = state.accountLists.length;
+          
+          // COST-EFFECTIVE: If we have existing lists but listener returns empty, preserve existing
+          if (existingCount > 0 && items.length === 0) {
+            console.warn('[ListsOverview] Live listener returned empty but we have existing lists, preserving cache');
+            return; // Don't overwrite with empty data
+          }
+          
+          // If this is the first load (no existing data), do full replacement
+          if (existingCount === 0) {
+            state.accountLists = items;
+            console.log(`[ListsOverview] First load: set ${items.length} account lists`);
+          } else {
+            // COST-EFFECTIVE: Merge updates instead of replacing (preserves cache)
+            const existingMap = new Map(state.accountLists.map(l => [l.id, l]));
+            const itemsIds = new Set(items.map(item => item.id));
+            let changed = false;
+            
+            // Remove lists that no longer exist in Firestore (were deleted)
+            for (const [id, list] of existingMap.entries()) {
+              if (!itemsIds.has(id)) {
+                existingMap.delete(id);
+                changed = true;
+                // Also remove from BackgroundListsLoader cache
+                if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.removeListLocally === 'function') {
+                  window.BackgroundListsLoader.removeListLocally(id);
+                }
+                console.log(`[ListsOverview] Removed deleted list ${id} from cache`);
+              }
+            }
+            
+            // Update or add lists that exist in Firestore (merge with existing)
+            items.forEach(item => {
+              const existing = existingMap.get(item.id);
+              // Only update if recordCount changed, name changed, or it's a new list
+              if (!existing || existing.recordCount !== item.recordCount || existing.name !== item.name) {
+                existingMap.set(item.id, item);
+                changed = true;
+              }
+            });
+            
+            // Only re-render if something actually changed
+            if (changed || existingMap.size !== existingCount) {
+              state.accountLists = Array.from(existingMap.values());
+              console.log(`[ListsOverview] ✓ Updated ${items.length} account lists from listener (changes detected, merged with cache)`);
+            } else {
+              // No changes detected, skip re-render to save resources
+              return;
+            }
+          }
+          
+          state.loadedAccounts = true;
+          if (state.kind === 'accounts') renderFilteredItems(state.accountLists);
+          _accountsListenerRetries = 0; // Reset retry counter on success
+        } catch (e) {
+          console.error('[ListsOverview] Account lists debounced update error:', e);
+        }
+      }, 500); // 500ms debounce
+      
       const setupAccountsListener = (useFilter = true) => {
         try {
           let query = col;
@@ -612,7 +837,7 @@
           
           _unsubListsAccounts = query.onSnapshot(
             (snap) => {
-              // Success handler
+              // Success handler - use debounced update
               try {
                 let items = [];
                 snap.forEach((d) => {
@@ -627,62 +852,8 @@
                   items.push({ id: d.id, ...data });
                 });
                 
-                // COST-EFFECTIVE: Only update if we detect actual changes (not just snapshot triggers)
-                // This reduces unnecessary re-renders and cache updates
-                const existingCount = state.accountLists.length;
-                
-                // If we have existing lists but listener returns empty, preserve existing
-                if (existingCount > 0 && items.length === 0) {
-                  console.warn('[ListsOverview] Live listener returned empty but we have existing lists, preserving them');
-                  return; // Don't overwrite with empty data
-                }
-                
-                // If this is the first load (no existing data), do full replacement
-                if (existingCount === 0) {
-                  state.accountLists = items;
-                  console.log(`[ListsOverview] First load: set ${items.length} account lists`);
-                } else {
-                  // COST-EFFECTIVE: Only update lists that actually changed, and remove deleted ones
-                  const existingMap = new Map(state.accountLists.map(l => [l.id, l]));
-                  const itemsIds = new Set(items.map(item => item.id));
-                  let changed = false;
-                  
-                  // Remove lists that no longer exist in Firestore (were deleted)
-                  for (const [id, list] of existingMap.entries()) {
-                    if (!itemsIds.has(id)) {
-                      existingMap.delete(id);
-                      changed = true;
-                      // Also remove from BackgroundListsLoader cache
-                      if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.removeListLocally === 'function') {
-                        window.BackgroundListsLoader.removeListLocally(id);
-                      }
-                      console.log(`[ListsOverview] Removed deleted list ${id} from cache`);
-                    }
-                  }
-                  
-                  // Update or add lists that exist in Firestore
-                  items.forEach(item => {
-                    const existing = existingMap.get(item.id);
-                    // Only update if recordCount changed or it's a new list
-                    if (!existing || existing.recordCount !== item.recordCount || existing.name !== item.name) {
-                      existingMap.set(item.id, item);
-                      changed = true;
-                    }
-                  });
-                  
-                  // Only re-render if something actually changed
-                  if (changed || existingMap.size !== existingCount) {
-                    state.accountLists = Array.from(existingMap.values());
-                    console.log(`[ListsOverview] Updated ${items.length} account lists from listener (changes detected)`);
-                  } else {
-                    // No changes detected, skip re-render to save resources
-                    return;
-                  }
-                }
-                
-                state.loadedAccounts = true;
-                if (state.kind === 'accounts') renderFilteredItems(state.accountLists);
-                _accountsListenerRetries = 0; // Reset retry counter on success
+                // Use debounced update to prevent flickering
+                debouncedAccountsUpdate(items);
               } catch (e) {
                 console.error('[ListsOverview] Account lists snapshot error:', e);
               }
@@ -1580,7 +1751,7 @@
   window.debugListOwnership = async () => {
     if (!window.firebaseDB) return console.log('Firebase not available');
     
-    const email = window.currentUserEmail || '';
+    const email = getUserEmail();
     console.log('Debugging list ownership for email:', email);
     
     try {
@@ -1613,7 +1784,7 @@
     
     try {
       // Get all lists for current user
-      const email = window.currentUserEmail || '';
+      const email = getUserEmail();
       let listsSnap;
       
       if (window.currentUserRole !== 'admin' && email) {
