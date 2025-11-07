@@ -71,7 +71,9 @@
       .hero{position:relative;overflow:hidden;background:linear-gradient(180deg,#ffffff 0%, #fff 55%, #fafafa 100%)}
       .hero::before{content:"";position:absolute;inset:-120px -40px auto auto;width:520px;height:520px;background:radial-gradient(closest-side, rgba(11,27,69,.18), transparent 70%);border-radius:50%;filter:blur(2px);pointer-events:none}
       .hero::after{content:"";position:absolute;bottom:-140px;left:-120px;width:520px;height:520px;background:radial-gradient(closest-side, rgba(245,158,11,.18), transparent 70%);border-radius:50%;filter:blur(2px);pointer-events:none}
-      .hero-inner{max-width:var(--container);margin:0 auto;padding:84px 20px 46px;display:grid;grid-template-columns:1fr;gap:22px;align-items:center}
+      .hero-inner{max-width:var(--container);margin:0 auto;padding:84px 20px 46px;display:grid;grid-template-columns:auto 1fr;gap:32px;align-items:center}
+      .hero-image{flex-shrink:0;max-width:400px;width:100%}
+      .hero-image img{width:100%;height:auto;display:block}
       .hero h1{font-size:48px;line-height:1.1;margin:0 0 14px;font-weight:800}
       .hero p{font-size:18px;color:#334155;margin:0 0 22px}
       .hero-cta{display:flex;gap:12px;flex-wrap:wrap}
@@ -136,6 +138,7 @@
       /* Responsive */
       @media (max-width: 900px){
         .hero-inner{grid-template-columns:1fr;gap:22px;padding:56px 20px 32px}
+        .hero-image{max-width:280px;margin:0 auto}
         .cards,.how-steps,.why-grid,.t-grid{grid-template-columns:1fr}
         .partners{grid-template-columns:repeat(2,minmax(0,1fr))}
       }
@@ -164,6 +167,9 @@
   <!-- Hero -->
   <section class="hero">
     <div class="hero-inner">
+      <div class="hero-image">
+        <img src="/images/choose.png" alt="Choose Wisely - Power Your Savings" loading="eager" />
+      </div>
       <div>
         <h1>Choose Wisely. Power Your Savings.</h1>
         <p>We connect your business with the best energy solutions, effortlessly optimizing your spend and impact.</p>
