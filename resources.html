@@ -35,10 +35,10 @@
       .nav-links{display:flex;gap:22px;align-items:center}
       .menu-toggle{display:none}
       .btn{display:inline-flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid transparent;padding:10px 14px;font-weight:600;cursor:pointer;transition:.2s ease;}
-      .btn-primary{background:var(--brand-orange);color:#0a0f1f;box-shadow:0 6px 18px rgba(245,158,11,.35)}
-      .btn-primary:hover{filter:brightness(1.05)}
-      .btn-outline{border-color:#2d3a5c;background:transparent}
-      .btn-outline:hover{border-color:#3c4f7e;background:#0f1a33}
+      .btn-primary{background:linear-gradient(135deg,var(--brand-orange) 0%, #d97706 100%);color:#0a0f1f;box-shadow:0 6px 18px rgba(245,158,11,.35);border:1px solid rgba(255,255,255,.2);transition:all .3s cubic-bezier(.4,.0,.2,1)}
+      .btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 20px rgba(245,158,11,.3),0 12px 24px rgba(245,158,11,.4)}
+      .btn-outline{border-color:#2d3a5c;background:transparent;transition:all .3s cubic-bezier(.4,.0,.2,1)}
+      .btn-outline:hover{border-color:var(--brand-orange);background:linear-gradient(135deg,rgba(245,158,11,.05) 0%, rgba(245,158,11,.02) 100%);color:var(--brand-orange)}
       
       @media (max-width: 768px){
         .nav{padding:12px 16px;width:100%;max-width:100%}
@@ -57,8 +57,9 @@
       /* Resources */
       .resources-section{max-width:var(--container);margin:0 auto;padding:80px 24px;width:100%}
       .resources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:32px;margin-bottom:64px}
-      .resource-card{background:#ffffff;border:1px solid var(--border);border-radius:var(--radius);padding:32px;box-shadow:var(--shadow);transition:transform .3s ease,box-shadow .3s ease;display:flex;flex-direction:column}
-      .resource-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+      .resource-card{background:linear-gradient(135deg,#ffffff 0%, #fafbfc 100%);border:1px solid rgba(229,231,235,.6);border-radius:var(--radius-lg);padding:32px;box-shadow:0 4px 12px rgba(0,0,0,.05);transition:all .3s cubic-bezier(.4,.0,.2,1);display:flex;flex-direction:column;position:relative;overflow:hidden}
+      .resource-card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--brand-orange),transparent)}
+      .resource-card:hover{transform:translateY(-6px);box-shadow:0 20px 40px rgba(0,0,0,.12);border-color:rgba(245,158,11,.2)}
       .resource-category{display:inline-block;padding:6px 12px;background:linear-gradient(135deg,rgba(11,27,69,.1),rgba(245,158,11,.1));border-radius:6px;font-size:12px;font-weight:600;color:var(--brand-blue);margin-bottom:16px;width:fit-content}
       .resource-card h3{font-size:24px;font-weight:700;margin-bottom:12px;line-height:1.3}
       .resource-card p{color:var(--muted);line-height:1.6;margin-bottom:20px;flex-grow:1}
@@ -69,7 +70,8 @@
       .guides-content{max-width:var(--container);margin:0 auto}
       .guides-content h2{font-size:40px;font-weight:800;margin-bottom:48px;text-align:center}
       .guides-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px}
-      .guide-item{background:#ffffff;padding:24px;border-radius:var(--radius);border:1px solid var(--border);display:flex;align-items:start;gap:16px;transition:transform .2s ease}
+      .guide-item{background:linear-gradient(135deg,#ffffff 0%, #fafbfc 100%);padding:24px;border-radius:var(--radius-lg);border:1px solid rgba(229,231,235,.6);display:flex;align-items:start;gap:16px;transition:all .3s ease;box-shadow:0 2px 8px rgba(0,0,0,.03)}
+      .guide-item:hover{border-color:rgba(245,158,11,.2);box-shadow:0 8px 16px rgba(0,0,0,.08)}
       .guide-item:hover{transform:translateX(4px)}
       .guide-icon{width:48px;height:48px;background:linear-gradient(135deg,rgba(11,27,69,.1),rgba(245,158,11,.1));border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
       .guide-content h4{font-size:18px;font-weight:700;margin-bottom:6px}
@@ -77,7 +79,9 @@
       
       .faq-section{max-width:var(--container);margin:0 auto;padding:80px 24px;width:100%}
       .faq-section h2{font-size:40px;font-weight:800;margin-bottom:48px;text-align:center}
-      .faq-item{background:#ffffff;border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:16px;transition:box-shadow .2s ease}
+      .faq-item{background:linear-gradient(135deg,#ffffff 0%, #fafbfc 100%);border:1px solid rgba(229,231,235,.6);border-radius:var(--radius-lg);padding:24px;margin-bottom:16px;transition:all .3s ease;box-shadow:0 2px 8px rgba(0,0,0,.03);position:relative;overflow:hidden}
+      .faq-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--brand-orange),transparent)}
+      .faq-item:hover{border-color:rgba(245,158,11,.2);box-shadow:0 8px 16px rgba(0,0,0,.08)}
       .faq-item:hover{box-shadow:var(--shadow)}
       .faq-question{font-size:18px;font-weight:700;margin-bottom:12px;color:var(--brand-blue)}
       .faq-answer{color:var(--muted);line-height:1.7}
@@ -248,7 +252,7 @@
     
     <div class="faq-item">
       <div class="faq-question">How long does the procurement process take?</div>
-      <div class="faq-answer">Typically, our competitive procurement process takes 2-4 weeks from initial assessment to contract execution. We work efficiently to minimize disruption to your operations while ensuring you get the best rates available.</div>
+      <div class="faq-answer">We can often provide pricing on the spot (same day) for straightforward situations, or within 1-4 weeks depending on the complexity of your needs and market conditions. We work efficiently to minimize disruption to your operations while ensuring you get the best rates available.</div>
     </div>
     
     <div class="faq-item">
