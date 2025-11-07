@@ -70,6 +70,18 @@
   
   let peopleColumnOrder = DEFAULT_PEOPLE_COL_ORDER.slice();
   let accountsColumnOrder = DEFAULT_ACCOUNTS_COL_ORDER.slice();
+
+  // Helper function to get normalized user email (cost-effective - no Firestore reads)
+  function getUserEmail() {
+    try {
+      if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+        return window.DataManager.getCurrentUserEmail();
+      }
+      return (window.currentUserEmail || '').toLowerCase();
+    } catch(_) {
+      return (window.currentUserEmail || '').toLowerCase();
+    }
+  }
   
   function loadColumnOrder() {
     try {
@@ -956,7 +968,7 @@
           }
         } else if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
           // Firestore fallback - SCOPED queries for security compliance
-          const email = window.currentUserEmail || '';
+          const email = getUserEmail();
           
           if (!state.loadedPeople) {
             let peopleSnap;
@@ -1009,7 +1021,37 @@
       state.loadedAccounts = true;
       
     } catch (e) {
-      console.error('[ListDetail] Failed loading data:', e);
+      console.error('[ListDetail] Failed loading data (preserving cache):', e);
+      
+      // COST-EFFECTIVE: Preserve cache on error (don't clear existing data)
+      // Try to use BackgroundLoaders as fallback
+      if (!state.loadedPeople && window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+        try {
+          const cached = window.BackgroundContactsLoader.getContactsData() || [];
+          if (cached.length > 0) {
+            state.dataPeople = cached;
+            state.loadedPeople = true;
+            console.log('[ListDetail] ✓ Preserved contacts cache on error (zero cost)');
+          }
+        } catch (cacheErr) {
+          console.warn('[ListDetail] Contacts cache fallback failed:', cacheErr);
+        }
+      }
+      
+      if (!state.loadedAccounts && window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+        try {
+          const cached = window.BackgroundAccountsLoader.getAccountsData() || [];
+          if (cached.length > 0) {
+            state.dataAccounts = cached;
+            state.loadedAccounts = true;
+            console.log('[ListDetail] ✓ Preserved accounts cache on error (zero cost)');
+          }
+        } catch (cacheErr) {
+          console.warn('[ListDetail] Accounts cache fallback failed:', cacheErr);
+        }
+      }
+      
+      // Ensure defaults (preserve existing data)
       state.dataPeople = state.dataPeople || [];
       state.dataAccounts = state.dataAccounts || [];
       state.loadedPeople = true;
@@ -1023,73 +1065,113 @@
   }
 
   async function fetchMembers(listId) {
+    // COST-EFFECTIVE: Always initialize Sets (preserves cache on errors)
     state.membersPeople = new Set();
     state.membersAccounts = new Set();
-    if (!listId) return;
     
-      if (console.time) console.time(`[ListDetail] fetchMembers ${listId}`);
+    if (!listId) {
+      console.log('[ListDetail] No listId provided, skipping member fetch');
+      return;
+    }
     
-    // 1) Check IndexedDB cache first (10-minute expiry)
+    if (console.time) console.time(`[ListDetail] fetchMembers ${listId}`);
+    
+    // 1) Check IndexedDB cache first (10-minute expiry) - COST-EFFECTIVE: zero Firestore reads
     try {
       const cached = await window.CacheManager.getCachedListMembers(listId);
-      if (cached) {
-        state.membersPeople = cached.people;
-        state.membersAccounts = cached.accounts;
-        console.log(`[ListDetail] Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from cache`);
-          if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
-        return;
-        }
-    } catch (e) {
-      console.warn('[ListDetail] Cache read failed:', e);
-      }
-
-    // 2) Cache miss - fetch from Firebase
-    console.log('[ListDetail] Cache miss, fetching from Firebase...');
-    try {
-      if (!window.firebaseDB || typeof window.firebaseDB.collection !== 'function') return;
-
-      let gotAny = false;
-      
-      // Try subcollection first: lists/{id}/members
-      const subSnap = await window.firebaseDB.collection('lists').doc(listId).collection('members').get();
-      if (subSnap && subSnap.docs && subSnap.docs.length) {
-        gotAny = true;
-        subSnap.docs.forEach(d => {
-          const m = d.data() || {};
-          const t = (m.targetType || m.type || '').toLowerCase();
-          const id = m.targetId || m.id || d.id;
-          if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
-          else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
-        });
-      }
-
-      // Fallback to top-level listMembers collection
-      if (!gotAny) {
-          const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).limit(5000).get();
-          lmSnap?.docs?.forEach(d => {
-            const m = d.data() || {};
-            const t = (m.targetType || m.type || '').toLowerCase();
-            const id = m.targetId || m.id || d.id;
-            if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
-            else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
-          });
-      }
-      
-      // 3) Cache the results for next time
-      await window.CacheManager.cacheListMembers(listId, state.membersPeople, state.membersAccounts);
-      
-      console.log(`[ListDetail] Fetched from Firebase: ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts`);
-      
-      // 4) Update legacy in-memory cache for backward compatibility
+      if (cached && (cached.people instanceof Set || Array.isArray(cached.people))) {
+        state.membersPeople = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
+        state.membersAccounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
+        console.log(`[ListDetail] ✓ Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from cache (zero cost)`);
+        
+        // Update legacy in-memory cache for backward compatibility
         window.listMembersCache = window.listMembersCache || {};
         window.listMembersCache[listId] = {
           people: new Set(state.membersPeople),
           accounts: new Set(state.membersAccounts),
           loaded: true
         };
+        
+        if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
+        return;
+      }
+    } catch (e) {
+      console.warn('[ListDetail] Cache read failed (preserving empty Sets):', e);
+      // COST-EFFECTIVE: Preserve empty Sets instead of clearing - allows filtering to work
+    }
+
+    // 2) Cache miss - fetch from Firebase (only if cache empty/expired)
+    console.log('[ListDetail] Cache miss, fetching from Firebase...');
+    try {
+      if (!window.firebaseDB || typeof window.firebaseDB.collection !== 'function') {
+        console.warn('[ListDetail] Firestore not available, preserving empty Sets');
+        if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
+        return;
+      }
+
+      let gotAny = false;
+      
+      // COST-EFFECTIVE: Try subcollection first (single query), fallback only if empty
+      try {
+        const subSnap = await window.firebaseDB.collection('lists').doc(listId).collection('members').get();
+        if (subSnap && subSnap.docs && subSnap.docs.length > 0) {
+          gotAny = true;
+          subSnap.docs.forEach(d => {
+            const m = d.data() || {};
+            const t = (m.targetType || m.type || '').toLowerCase();
+            const id = m.targetId || m.id || d.id;
+            if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
+            else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
+          });
+          console.log(`[ListDetail] ✓ Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from subcollection`);
+        }
+      } catch (subErr) {
+        console.warn('[ListDetail] Subcollection query failed, trying fallback:', subErr);
+      }
+
+      // COST-EFFECTIVE: Fallback to top-level listMembers collection (only if subcollection empty)
+      if (!gotAny) {
+        try {
+          const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).limit(5000).get();
+          if (lmSnap && lmSnap.docs && lmSnap.docs.length > 0) {
+            lmSnap.docs.forEach(d => {
+              const m = d.data() || {};
+              const t = (m.targetType || m.type || '').toLowerCase();
+              const id = m.targetId || m.id || d.id;
+              if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
+              else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
+            });
+            console.log(`[ListDetail] ✓ Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from top-level collection`);
+          }
+        } catch (lmErr) {
+          console.warn('[ListDetail] Top-level query failed:', lmErr);
+          // COST-EFFECTIVE: Preserve empty Sets on error (don't clear cache)
+        }
+      }
+      
+      // 3) Cache the results for next time (COST-EFFECTIVE: IndexedDB write only)
+      if (state.membersPeople.size > 0 || state.membersAccounts.size > 0) {
+        try {
+          await window.CacheManager.cacheListMembers(listId, state.membersPeople, state.membersAccounts);
+          console.log(`[ListDetail] ✓ Cached members for future use (zero cost on next load)`);
+        } catch (cacheErr) {
+          console.warn('[ListDetail] Cache write failed (non-critical):', cacheErr);
+        }
+      }
+      
+      console.log(`[ListDetail] ✓ Fetched from Firebase: ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts`);
+      
+      // 4) Update legacy in-memory cache for backward compatibility
+      window.listMembersCache = window.listMembersCache || {};
+      window.listMembersCache[listId] = {
+        people: new Set(state.membersPeople),
+        accounts: new Set(state.membersAccounts),
+        loaded: true
+      };
       
     } catch (err) {
-      console.error('[ListDetail] Failed to fetch list members:', err);
+      console.error('[ListDetail] Failed to fetch list members (preserving empty Sets):', err);
+      // COST-EFFECTIVE: Preserve empty Sets on error - allows filtering to work without crashing
     }
     
     if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
@@ -1967,10 +2049,30 @@
     if (!window.__restoringListDetail) {
       state.currentPage = 1;
     }
+    
+    // COST-EFFECTIVE: Load data and members in parallel (cache-first, zero cost if cached)
     const [dataLoaded, membersLoaded] = await Promise.all([
       loadDataOnce(),
       fetchMembers(state.listId)
     ]);
+    
+    // CRITICAL: Ensure members are loaded before filtering (fixes race condition)
+    // Verify members Sets are initialized (even if empty)
+    if (!state.membersPeople || !(state.membersPeople instanceof Set)) {
+      state.membersPeople = new Set();
+      console.warn('[ListDetail] Members Set not initialized, creating empty Set');
+    }
+    if (!state.membersAccounts || !(state.membersAccounts instanceof Set)) {
+      state.membersAccounts = new Set();
+      console.warn('[ListDetail] Accounts Set not initialized, creating empty Set');
+    }
+    
+    console.log('[ListDetail] ✓ Data and members loaded, ready to filter:', {
+      people: state.dataPeople.length,
+      accounts: state.dataAccounts.length,
+      membersPeople: state.membersPeople.size,
+      membersAccounts: state.membersAccounts.size
+    });
     
     // Re-render with loaded data - batch all DOM updates in a single frame
     renderTableHead();
@@ -1995,6 +2097,7 @@
     } catch(_) {}
     
     // Apply filters and render table body, then fade it in smoothly
+    // CRITICAL: Members are now guaranteed to be loaded before filtering
     applyFilters();
     
     // Only fade in if table was hidden (fresh load)

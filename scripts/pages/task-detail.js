@@ -45,6 +45,56 @@
     return div.innerHTML;
   }
 
+  // Helper functions for ownership filtering and localStorage key management
+  function getUserTasksKey() {
+    try {
+      const email = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') 
+        ? window.DataManager.getCurrentUserEmail() 
+        : (window.currentUserEmail || '').toLowerCase();
+      return email ? `userTasks:${email}` : 'userTasks';
+    } catch(_) { 
+      return 'userTasks'; 
+    }
+  }
+
+  function getUserEmail() {
+    try {
+      if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+        return window.DataManager.getCurrentUserEmail();
+      }
+      return (window.currentUserEmail || '').toLowerCase();
+    } catch(_) {
+      return (window.currentUserEmail || '').toLowerCase();
+    }
+  }
+
+  function isAdmin() {
+    try {
+      if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+        return window.DataManager.isCurrentUserAdmin();
+      }
+      return window.currentUserRole === 'admin';
+    } catch(_) {
+      return window.currentUserRole === 'admin';
+    }
+  }
+
+  function filterTasksByOwnership(tasks) {
+    if (!tasks || !Array.isArray(tasks)) return [];
+    if (isAdmin()) return tasks;
+    
+    const email = getUserEmail();
+    if (!email) return [];
+    
+    return tasks.filter(t => {
+      if (!t) return false;
+      const ownerId = (t.ownerId || '').toLowerCase();
+      const assignedTo = (t.assignedTo || '').toLowerCase();
+      const createdBy = (t.createdBy || '').toLowerCase();
+      return ownerId === email || assignedTo === email || createdBy === email;
+    });
+  }
+
   // Get primary phone data with type information (same logic as contact-detail.js)
   function getPrimaryPhoneData(contact) {
     if (!contact) return { value: '', type: 'mobile', field: 'mobile' };
@@ -691,6 +741,23 @@
   async function handleTaskComplete() {
     if (!state.currentTask) return;
     
+    // CRITICAL: Verify ownership before deletion
+    if (!isAdmin()) {
+      const email = getUserEmail();
+      const task = state.currentTask;
+      const ownerId = (task.ownerId || '').toLowerCase();
+      const assignedTo = (task.assignedTo || '').toLowerCase();
+      const createdBy = (task.createdBy || '').toLowerCase();
+      
+      if (ownerId !== email && assignedTo !== email && createdBy !== email) {
+        console.error('[TaskDetail] User does not have permission to complete this task');
+        if (window.crm && typeof window.crm.showToast === 'function') {
+          window.crm.showToast('You do not have permission to complete this task', 'error');
+        }
+        return;
+      }
+    }
+    
     // Get updated notes from the form
     const callNotesEl = document.getElementById('call-notes');
     const updatedNotes = callNotesEl ? callNotesEl.value.trim() : '';
@@ -705,16 +772,22 @@
       }
     }
     
-    // Remove from localStorage completely
+    // Remove from localStorage completely (use namespaced key)
     try {
-      const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+      const key = getUserTasksKey();
+      const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
       const filteredTasks = userTasks.filter(t => t.id !== state.currentTask.id);
-      localStorage.setItem('userTasks', JSON.stringify(filteredTasks));
+      localStorage.setItem(key, JSON.stringify(filteredTasks));
+      
+      // Also clean up legacy key
+      const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+      const filteredLegacy = legacyTasks.filter(t => t.id !== state.currentTask.id);
+      localStorage.setItem('userTasks', JSON.stringify(filteredLegacy));
     } catch (e) {
       console.warn('Could not remove task from localStorage:', e);
     }
     
-    // Delete from Firebase completely
+    // Delete from Firebase completely (with ownership check)
     try {
       if (window.firebaseDB) {
         const snapshot = await window.firebaseDB.collection('tasks')
@@ -724,6 +797,21 @@
         
         if (!snapshot.empty) {
           const doc = snapshot.docs[0];
+          const data = doc.data();
+          
+          // Verify ownership before deletion
+          if (!isAdmin()) {
+            const email = getUserEmail();
+            const ownerId = (data.ownerId || '').toLowerCase();
+            const assignedTo = (data.assignedTo || '').toLowerCase();
+            const createdBy = (data.createdBy || '').toLowerCase();
+            
+            if (ownerId !== email && assignedTo !== email && createdBy !== email) {
+              console.error('[TaskDetail] User does not have permission to delete this task');
+              return;
+            }
+          }
+          
           await doc.ref.delete();
         }
       }
@@ -813,29 +901,100 @@
     state.navigating = true;
     
     try {
-      // Get all tasks from the same source (localStorage + Firebase)
+      // Get all tasks from the same source (localStorage + Firebase) with ownership filtering
       let allTasks = [];
       
-      // Load from localStorage
+      // Load from localStorage (with ownership filtering)
       try {
-        const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-        allTasks = [...userTasks];
+        const key = getUserTasksKey();
+        const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
+        allTasks = filterTasksByOwnership(userTasks);
+        
+        // Fallback to legacy key
+        if (allTasks.length === 0) {
+          const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+          allTasks = filterTasksByOwnership(legacyTasks);
+        }
       } catch (_) { allTasks = []; }
       
-      // Load from Firebase
-      if (window.firebaseDB) {
+      // Load from BackgroundTasksLoader (cache-first, cost-efficient)
+      if (window.BackgroundTasksLoader) {
         try {
-          const snapshot = await window.firebaseDB.collection('tasks')
-            .orderBy('timestamp', 'desc')
-            .limit(200)
-            .get();
-          const firebaseTasks = snapshot.docs.map(doc => {
-            const data = doc.data() || {};
-            const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
-            return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
-          });
+          const cachedTasks = window.BackgroundTasksLoader.getTasksData() || [];
+          const filteredCached = filterTasksByOwnership(cachedTasks);
           
           // Merge with localStorage (local takes precedence for duplicates)
+          const allTasksMap = new Map();
+          allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+          filteredCached.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+          allTasks = Array.from(allTasksMap.values());
+        } catch (e) {
+          console.warn('Could not load tasks from BackgroundTasksLoader:', e);
+        }
+      }
+      
+      // Only query Firebase if BackgroundTasksLoader doesn't have enough data
+      if (allTasks.length < 10 && window.firebaseDB) {
+        try {
+          let firebaseTasks = [];
+          
+          if (!isAdmin()) {
+            const email = getUserEmail();
+            if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+              firebaseTasks = await window.DataManager.queryWithOwnership('tasks');
+              firebaseTasks = firebaseTasks.slice(0, 200);
+            } else if (email) {
+              // Fallback: two separate queries
+              const [ownedSnap, assignedSnap] = await Promise.all([
+                window.firebaseDB.collection('tasks')
+                  .where('ownerId', '==', email)
+                  .orderBy('timestamp', 'desc')
+                  .limit(100)
+                  .get(),
+                window.firebaseDB.collection('tasks')
+                  .where('assignedTo', '==', email)
+                  .orderBy('timestamp', 'desc')
+                  .limit(100)
+                  .get()
+              ]);
+              
+              const tasksMap = new Map();
+              ownedSnap.docs.forEach(doc => {
+                const data = doc.data();
+                tasksMap.set(doc.id, {
+                  id: doc.id,
+                  ...data,
+                  createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
+                  status: data.status || 'pending'
+                });
+              });
+              assignedSnap.docs.forEach(doc => {
+                if (!tasksMap.has(doc.id)) {
+                  const data = doc.data();
+                  tasksMap.set(doc.id, {
+                    id: doc.id,
+                    ...data,
+                    createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
+                    status: data.status || 'pending'
+                  });
+                }
+              });
+              firebaseTasks = Array.from(tasksMap.values());
+            }
+          } else {
+            // Admin: unrestricted query
+            const snapshot = await window.firebaseDB.collection('tasks')
+              .orderBy('timestamp', 'desc')
+              .limit(200)
+              .get();
+            firebaseTasks = snapshot.docs.map(doc => {
+              const data = doc.data() || {};
+              const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
+              return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
+            });
+          }
+          
+          // Merge with existing tasks
           const allTasksMap = new Map();
           allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
           firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
@@ -971,29 +1130,100 @@
     if (!prevBtn || !nextBtn) return;
     
     try {
-      // Get all tasks (same logic as navigation)
+      // Get all tasks (same logic as navigation) with ownership filtering
       let allTasks = [];
       
-      // Load from localStorage
+      // Load from localStorage (with ownership filtering)
       try {
-        const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-        allTasks = [...userTasks];
+        const key = getUserTasksKey();
+        const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
+        allTasks = filterTasksByOwnership(userTasks);
+        
+        // Fallback to legacy key
+        if (allTasks.length === 0) {
+          const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+          allTasks = filterTasksByOwnership(legacyTasks);
+        }
       } catch (_) { allTasks = []; }
       
-      // Load from Firebase
-      if (window.firebaseDB) {
+      // Load from BackgroundTasksLoader (cache-first, cost-efficient)
+      if (window.BackgroundTasksLoader) {
         try {
-          const snapshot = await window.firebaseDB.collection('tasks')
-            .orderBy('timestamp', 'desc')
-            .limit(200)
-            .get();
-          const firebaseTasks = snapshot.docs.map(doc => {
-            const data = doc.data() || {};
-            const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
-            return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
-          });
+          const cachedTasks = window.BackgroundTasksLoader.getTasksData() || [];
+          const filteredCached = filterTasksByOwnership(cachedTasks);
           
-          // Merge with localStorage
+          // Merge with localStorage (local takes precedence for duplicates)
+          const allTasksMap = new Map();
+          allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+          filteredCached.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+          allTasks = Array.from(allTasksMap.values());
+        } catch (e) {
+          console.warn('Could not load tasks from BackgroundTasksLoader:', e);
+        }
+      }
+      
+      // Only query Firebase if BackgroundTasksLoader doesn't have enough data
+      if (allTasks.length < 10 && window.firebaseDB) {
+        try {
+          let firebaseTasks = [];
+          
+          if (!isAdmin()) {
+            const email = getUserEmail();
+            if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+              firebaseTasks = await window.DataManager.queryWithOwnership('tasks');
+              firebaseTasks = firebaseTasks.slice(0, 200);
+            } else if (email) {
+              // Fallback: two separate queries
+              const [ownedSnap, assignedSnap] = await Promise.all([
+                window.firebaseDB.collection('tasks')
+                  .where('ownerId', '==', email)
+                  .orderBy('timestamp', 'desc')
+                  .limit(100)
+                  .get(),
+                window.firebaseDB.collection('tasks')
+                  .where('assignedTo', '==', email)
+                  .orderBy('timestamp', 'desc')
+                  .limit(100)
+                  .get()
+              ]);
+              
+              const tasksMap = new Map();
+              ownedSnap.docs.forEach(doc => {
+                const data = doc.data();
+                tasksMap.set(doc.id, {
+                  id: doc.id,
+                  ...data,
+                  createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
+                  status: data.status || 'pending'
+                });
+              });
+              assignedSnap.docs.forEach(doc => {
+                if (!tasksMap.has(doc.id)) {
+                  const data = doc.data();
+                  tasksMap.set(doc.id, {
+                    id: doc.id,
+                    ...data,
+                    createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
+                    status: data.status || 'pending'
+                  });
+                }
+              });
+              firebaseTasks = Array.from(tasksMap.values());
+            }
+          } else {
+            // Admin: unrestricted query
+            const snapshot = await window.firebaseDB.collection('tasks')
+              .orderBy('timestamp', 'desc')
+              .limit(200)
+              .get();
+            firebaseTasks = snapshot.docs.map(doc => {
+              const data = doc.data() || {};
+              const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
+              return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
+            });
+          }
+          
+          // Merge with existing tasks
           const allTasksMap = new Map();
           allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
           firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
@@ -1092,40 +1322,118 @@
   }
 
   async function loadTaskData(taskId) {
-    // Load task from localStorage and Firebase
+    // CRITICAL: Re-initialize DOM refs to ensure els.content exists
+    if (!initDomRefs()) {
+      console.warn('[TaskDetail] DOM not ready, retrying...');
+      // Retry after a short delay
+      setTimeout(() => {
+        if (initDomRefs()) {
+          loadTaskData(taskId);
+        } else {
+          console.error('[TaskDetail] Failed to initialize DOM refs');
+        }
+      }, 100);
+      return;
+    }
+    
+    // Load task from localStorage and Firebase with ownership filtering
     let task = null;
     
-    // Try localStorage first
+    // Try localStorage first (with ownership filtering)
     try {
-      const userTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-      task = userTasks.find(t => t.id === taskId);
+      const key = getUserTasksKey();
+      const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
+      const filteredTasks = filterTasksByOwnership(userTasks);
+      task = filteredTasks.find(t => t.id === taskId);
+      
+      // Fallback to legacy key if not found
+      if (!task) {
+        const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+        const filteredLegacy = filterTasksByOwnership(legacyTasks);
+        task = filteredLegacy.find(t => t.id === taskId);
+      }
     } catch (e) {
       console.warn('Could not load task from localStorage:', e);
     }
     
-    // If not found, try pre-loaded essential data
+    // If not found, try pre-loaded essential data (with ownership filtering)
     if (!task && window._essentialTasksData) {
-      task = window._essentialTasksData.find(t => t.id === taskId);
+      const filteredEssential = filterTasksByOwnership(window._essentialTasksData);
+      task = filteredEssential.find(t => t.id === taskId);
       if (task) {
         console.log('[TaskDetail] Using pre-loaded task data');
       }
     }
     
-    // If not found, try Firebase
+    // If not found, try BackgroundTasksLoader (cache-first, cost-efficient)
+    if (!task && window.BackgroundTasksLoader) {
+      try {
+        const allTasks = window.BackgroundTasksLoader.getTasksData() || [];
+        const filteredTasks = filterTasksByOwnership(allTasks);
+        task = filteredTasks.find(t => t.id === taskId);
+        if (task) {
+          console.log('[TaskDetail] Using BackgroundTasksLoader cached data');
+        }
+      } catch (e) {
+        console.warn('Could not load task from BackgroundTasksLoader:', e);
+      }
+    }
+    
+    // If not found, try Firebase (with ownership filtering)
     if (!task && window.firebaseDB) {
       try {
         console.log('Loading task from Firebase:', taskId);
-        const snapshot = await window.firebaseDB.collection('tasks')
-          .where('id', '==', taskId)
-          .limit(1)
-          .get();
         
-        if (!snapshot.empty) {
-          const doc = snapshot.docs[0];
-          const data = doc.data();
-          const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? 
-            data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
-          task = { ...data, id: data.id || doc.id, createdAt, status: data.status || 'pending' };
+        // Use ownership-aware query for non-admin users
+        if (!isAdmin()) {
+          const email = getUserEmail();
+          if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+            const allTasks = await window.DataManager.queryWithOwnership('tasks');
+            task = allTasks.find(t => t.id === taskId);
+          } else if (email) {
+            // Fallback: two separate queries
+            const [ownedSnap, assignedSnap] = await Promise.all([
+              window.firebaseDB.collection('tasks')
+                .where('id', '==', taskId)
+                .where('ownerId', '==', email)
+                .limit(1)
+                .get(),
+              window.firebaseDB.collection('tasks')
+                .where('id', '==', taskId)
+                .where('assignedTo', '==', email)
+                .limit(1)
+                .get()
+            ]);
+            
+            if (!ownedSnap.empty) {
+              const doc = ownedSnap.docs[0];
+              const data = doc.data();
+              task = { ...data, id: data.id || doc.id };
+            } else if (!assignedSnap.empty) {
+              const doc = assignedSnap.docs[0];
+              const data = doc.data();
+              task = { ...data, id: data.id || doc.id };
+            }
+          }
+        } else {
+          // Admin: unrestricted query
+          const snapshot = await window.firebaseDB.collection('tasks')
+            .where('id', '==', taskId)
+            .limit(1)
+            .get();
+          
+          if (!snapshot.empty) {
+            const doc = snapshot.docs[0];
+            const data = doc.data();
+            task = { ...data, id: data.id || doc.id };
+          }
+        }
+        
+        if (task) {
+          const createdAt = task.createdAt || (task.timestamp && typeof task.timestamp.toDate === 'function' ? 
+            task.timestamp.toDate().getTime() : task.timestamp) || Date.now();
+          task.createdAt = createdAt;
+          task.status = task.status || 'pending';
         }
       } catch (error) {
         console.warn('Could not load task from Firebase:', error);
@@ -1134,6 +1442,10 @@
     
     if (!task) {
       console.error('Task not found:', taskId);
+      // Show error message to user
+      if (els.content) {
+        els.content.innerHTML = '<div class="empty" style="padding: 2rem; text-align: center; color: var(--text-secondary);">Task not found or you do not have access to this task.</div>';
+      }
       return;
     }
     // Normalize legacy task shapes/titles/types
@@ -1184,6 +1496,66 @@
     }
   }
 
+  // Helper function to render avatar or icon with retry logic
+  function renderAvatarOrIcon(elementSelector, htmlContent, isAvatar = false) {
+    const maxRetries = 10;
+    let retries = 0;
+    
+    const tryRender = () => {
+      const titleSection = document.querySelector(elementSelector);
+      if (titleSection) {
+        // Cleanup existing elements
+        const existingElements = titleSection.querySelectorAll('.avatar-initials, .company-favicon-header, .avatar-absolute, [class*="avatar"], [class*="favicon"]');
+        existingElements.forEach(el => {
+          if (el && el.parentNode) {
+            el.remove();
+          }
+        });
+        
+        // Also check for absolutely positioned elements
+        const allChildren = titleSection.querySelectorAll('*');
+        allChildren.forEach(child => {
+          if (child.style && child.style.position === 'absolute' && 
+              (child.classList.contains('avatar-absolute') || 
+               child.querySelector('.avatar-initials') || 
+               child.querySelector('.company-favicon-header'))) {
+            child.remove();
+          }
+        });
+        
+        // Add the new element
+        const wrapper = isAvatar 
+          ? `<span class="avatar-initials avatar-absolute" aria-hidden="true">${htmlContent}</span>`
+          : `<div class="company-favicon-header avatar-absolute" aria-hidden="true">${htmlContent}</div>`;
+        
+        titleSection.insertAdjacentHTML('beforeend', wrapper);
+        
+        // Add icon-loaded class
+        requestAnimationFrame(() => {
+          const element = titleSection.querySelector(isAvatar ? '.avatar-initials' : '.company-favicon-header');
+          if (element) {
+            element.classList.add('icon-loaded');
+            console.log(`[TaskDetail] Successfully rendered ${isAvatar ? 'avatar' : 'icon'}`);
+          }
+        });
+        
+        return true;
+      } else if (retries < maxRetries) {
+        retries++;
+        requestAnimationFrame(tryRender);
+        return false;
+      } else {
+        console.warn(`[TaskDetail] Failed to render ${isAvatar ? 'avatar' : 'icon'} after ${maxRetries} retries`);
+        return false;
+      }
+    };
+    
+    // Start with a small delay, then retry
+    setTimeout(() => {
+      requestAnimationFrame(tryRender);
+    }, 50);
+  }
+
   // Robust cleanup function to remove all existing avatars/icons
   function cleanupExistingAvatarsAndIcons() {
     const titleSection = document.querySelector('.contact-header-text');
@@ -1228,6 +1600,15 @@
 
   function renderTaskPage() {
     if (!state.currentTask) return;
+    
+    // CRITICAL: Ensure DOM refs are initialized
+    if (!els.content) {
+      if (!initDomRefs()) {
+        console.warn('[TaskDetail] DOM not ready for rendering, retrying...');
+        setTimeout(() => renderTaskPage(), 100);
+        return;
+      }
+    }
     
     // Clean up any existing avatars/icons first
     cleanupExistingAvatarsAndIcons();
@@ -1275,40 +1656,8 @@
           els.title.innerHTML = `Call ${companyLinkHTML}`;
         }
         
-        // Add company icon/favicon to header - use a small delay to ensure DOM is ready
-        setTimeout(() => {
-          const titleSection = document.querySelector('.contact-header-text');
-          if (titleSection) {
-            // More thorough cleanup of existing avatars/icons
-            const existingElements = titleSection.querySelectorAll('.avatar-initials, .company-favicon-header, .avatar-absolute, [class*="avatar"], [class*="favicon"]');
-            existingElements.forEach(el => {
-              if (el && el.parentNode) {
-                el.remove();
-              }
-            });
-            
-            // Also check for any absolutely positioned elements that might be avatars
-            const allChildren = titleSection.querySelectorAll('*');
-            allChildren.forEach(child => {
-              if (child.style && child.style.position === 'absolute' && 
-                  (child.classList.contains('avatar-absolute') || 
-                   child.querySelector('.avatar-initials') || 
-                   child.querySelector('.company-favicon-header'))) {
-                child.remove();
-              }
-            });
-            
-            // Add company favicon positioned like the avatar
-            const faviconWrapper = `<div class="company-favicon-header avatar-absolute" aria-hidden="true">${companyIconHTML}</div>`;
-            titleSection.insertAdjacentHTML('beforeend', faviconWrapper);
-            
-            // Add icon-loaded class immediately for smooth animation
-            requestAnimationFrame(() => {
-              const favicon = titleSection.querySelector('.company-favicon-header');
-              if (favicon) favicon.classList.add('icon-loaded');
-            });
-          }
-        }, 50);
+        // Add company icon/favicon to header using retry helper
+        renderAvatarOrIcon('.contact-header-text', companyIconHTML, false);
         
         // Update subtitle
         if (els.subtitle) {
@@ -1404,50 +1753,11 @@
         // Set the contact details content
         contactInfoEl.innerHTML = `<div class="contact-details-normal">${contactDetailsHTML}</div>`;
         
-        // Add absolutely positioned avatar to the main title container
-        // Use a longer delay to ensure DOM is ready and previous elements are cleaned up
-        setTimeout(() => {
-          const titleSection = document.querySelector('.contact-header-text');
-          console.log('Contact task - Title section found:', !!titleSection, 'Initials:', initials);
-          if (titleSection) {
-            // More thorough cleanup of existing avatars/icons
-            const existingElements = titleSection.querySelectorAll('.avatar-initials, .company-favicon-header, .avatar-absolute, [class*="avatar"], [class*="favicon"]');
-            existingElements.forEach(el => {
-              if (el && el.parentNode) {
-                console.log('Removing existing avatar/icon element:', el.className);
-                el.remove();
-              }
-            });
-            
-            // Also check for any absolutely positioned elements that might be avatars
-            const allChildren = titleSection.querySelectorAll('*');
-            allChildren.forEach(child => {
-              if (child.style && child.style.position === 'absolute' && 
-                  (child.classList.contains('avatar-absolute') || 
-                   child.querySelector('.avatar-initials') || 
-                   child.querySelector('.company-favicon-header'))) {
-                console.log('Removing absolutely positioned avatar element:', child.className);
-                child.remove();
-              }
-            });
-            
-            // Ensure we have valid initials
-            const finalInitials = initials && initials !== '?' ? initials : (contactName ? contactName.charAt(0).toUpperCase() : 'C');
-            
-            // Add the avatar positioned relative to the title section
-            const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true">${escapeHtml(finalInitials)}</span>`;
-            console.log('Adding avatar HTML:', avatarHTML);
-            titleSection.insertAdjacentHTML('beforeend', avatarHTML);
-            
-            // Add icon-loaded class immediately for smooth animation
-            requestAnimationFrame(() => {
-              const avatar = titleSection.querySelector('.avatar-initials');
-              if (avatar) avatar.classList.add('icon-loaded');
-            });
-          } else {
-            console.log('Contact task - No title section found');
-          }
-        }, 150); // Increased delay for better cleanup
+        // Add absolutely positioned avatar to the main title container using retry helper
+        // Ensure we have valid initials
+        const finalInitials = initials && initials !== '?' ? initials : (contactName ? contactName.charAt(0).toUpperCase() : 'C');
+        console.log('Contact task - Rendering avatar with initials:', finalInitials);
+        renderAvatarOrIcon('.contact-header-text', escapeHtml(finalInitials), true);
       }
     } else {
       // For non-phone-call tasks, set title and subtitle normally
@@ -1465,11 +1775,26 @@
     // Render task-specific content (split layout similar to Apollo screenshot)
     renderTaskContent();
     
-    // Add company link event handlers
-    setupCompanyLinkHandlers();
+    // Re-attach event handlers after content is rendered (with retry logic)
+    const attachHandlers = () => {
+      setupCompanyLinkHandlers();
+      setupContactLinkHandlers();
+      
+      // Verify handlers were attached
+      const companyLinks = document.querySelectorAll('#task-detail-page .company-link');
+      const contactLinks = document.querySelectorAll('#task-detail-page .contact-link');
+      
+      if (companyLinks.length > 0 || contactLinks.length > 0) {
+        console.log(`[TaskDetail] Attached handlers to ${companyLinks.length} company links and ${contactLinks.length} contact links`);
+      }
+    };
     
-    // Add contact link event handlers
-    setupContactLinkHandlers();
+    // Immediate attachment
+    attachHandlers();
+    
+    // Retry attachment after a short delay to catch dynamically added elements
+    setTimeout(attachHandlers, 100);
+    setTimeout(attachHandlers, 300);
     
     // Load widgets
     loadTaskWidgets();
