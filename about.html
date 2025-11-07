@@ -35,10 +35,10 @@
       .nav-links{display:flex;gap:22px;align-items:center}
       .menu-toggle{display:none}
       .btn{display:inline-flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid transparent;padding:10px 14px;font-weight:600;cursor:pointer;transition:.2s ease;}
-      .btn-primary{background:var(--brand-orange);color:#0a0f1f;box-shadow:0 6px 18px rgba(245,158,11,.35)}
-      .btn-primary:hover{filter:brightness(1.05)}
-      .btn-outline{border-color:#2d3a5c;background:transparent}
-      .btn-outline:hover{border-color:#3c4f7e;background:#0f1a33}
+      .btn-primary{background:linear-gradient(135deg,var(--brand-orange) 0%, #d97706 100%);color:#0a0f1f;box-shadow:0 6px 18px rgba(245,158,11,.35);border:1px solid rgba(255,255,255,.2);transition:all .3s cubic-bezier(.4,.0,.2,1)}
+      .btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 20px rgba(245,158,11,.3),0 12px 24px rgba(245,158,11,.4)}
+      .btn-outline{border-color:#2d3a5c;background:transparent;transition:all .3s cubic-bezier(.4,.0,.2,1)}
+      .btn-outline:hover{border-color:var(--brand-orange);background:linear-gradient(135deg,rgba(245,158,11,.05) 0%, rgba(245,158,11,.02) 100%);color:var(--brand-orange)}
       
       @media (max-width: 768px){
         .nav{padding:12px 16px;width:100%;max-width:100%}
@@ -57,19 +57,21 @@
       /* Content */
       .content-section{max-width:var(--container);margin:0 auto;padding:80px 24px;width:100%}
       .content-grid{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;margin-bottom:80px}
-      .content-text h2{font-size:40px;font-weight:800;margin-bottom:24px;line-height:1.2}
-      .content-text p{font-size:18px;color:var(--muted);line-height:1.7;margin-bottom:20px}
+      .content-text h2{font-size:40px;font-weight:800;margin-bottom:24px;line-height:1.2;background:linear-gradient(135deg,var(--brand-blue) 0%, #1e3a8a 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+      .content-text p{font-size:18px;color:var(--muted);line-height:1.7;margin-bottom:20px;letter-spacing:.2px}
       .content-image{position:relative;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-lg)}
       .content-image img{width:100%;height:auto;display:block}
       
       .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:32px;margin:80px 0}
-      .stat-card{text-align:center;padding:32px;background:linear-gradient(135deg,#f8fafc 0%, #ffffff 100%);border-radius:var(--radius);border:1px solid var(--border)}
+      .stat-card{text-align:center;padding:32px;background:linear-gradient(135deg,#f8fafc 0%, #ffffff 100%);border-radius:var(--radius-lg);border:1px solid rgba(229,231,235,.6);box-shadow:0 4px 12px rgba(0,0,0,.05);transition:all .3s ease}
+      .stat-card:hover{transform:translateY(-4px);box-shadow:0 12px 24px rgba(0,0,0,.08);border-color:rgba(245,158,11,.2)}
       .stat-number{font-size:48px;font-weight:800;color:var(--brand-orange);margin-bottom:8px}
       .stat-label{font-size:16px;color:var(--muted);font-weight:600}
       
       .values-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;margin-top:64px}
-      .value-card{background:#ffffff;border:1px solid var(--border);border-radius:var(--radius);padding:32px;box-shadow:var(--shadow);transition:transform .3s ease,box-shadow .3s ease}
-      .value-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+      .value-card{background:linear-gradient(135deg,#ffffff 0%, #fafbfc 100%);border:1px solid rgba(229,231,235,.6);border-radius:var(--radius-lg);padding:32px;box-shadow:0 4px 12px rgba(0,0,0,.05);transition:all .3s cubic-bezier(.4,.0,.2,1);position:relative;overflow:hidden}
+      .value-card::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(245,158,11,.3),transparent)}
+      .value-card:hover{transform:translateY(-6px);box-shadow:0 20px 40px rgba(0,0,0,.12);border-color:rgba(245,158,11,.2)}
       .value-icon{width:56px;height:56px;background:linear-gradient(135deg,rgba(11,27,69,.1),rgba(245,158,11,.1));border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:20px}
       .value-card h3{font-size:24px;font-weight:700;margin-bottom:12px}
       .value-card p{color:var(--muted);line-height:1.6}
@@ -139,7 +141,7 @@
         <p>Our team combines decades of industry experience with cutting-edge technology to simplify energy procurement, reduce costs, and provide transparent, honest advice to businesses of all sizes.</p>
       </div>
       <div class="content-image">
-        <img src="/images/choose.png" alt="Power Choosers Team" />
+        <img src="/images/orbs.png" alt="Power Choosers - Connecting Energy Suppliers" />
       </div>
     </div>
 

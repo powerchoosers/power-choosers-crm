@@ -4433,13 +4433,6 @@
     try {
       const { to, subject, content, from, fromName, _deliverability, threadId, inReplyTo, references, trackingMetadata, isHtmlEmail } = emailData;
       
-      // CRITICAL DEBUG: Log what we received
-      console.error('🔍 [SendEmailViaSendGrid] ========== RECEIVED EMAIL DATA ==========');
-      console.error('🔍 [SendEmailViaSendGrid] isHtmlEmail:', isHtmlEmail, '| Type:', typeof isHtmlEmail, '| Truthy:', !!isHtmlEmail);
-      console.error('🔍 [SendEmailViaSendGrid] Content length:', content?.length || 0);
-      console.error('🔍 [SendEmailViaSendGrid] Content preview (first 150 chars):', content?.substring(0, 150) || 'NO CONTENT');
-      console.error('🔍 [SendEmailViaSendGrid] =========================================');
-      
       // Generate unique tracking ID for this email
       const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
@@ -4468,12 +4461,6 @@
         isHtmlEmail: isHtmlEmailBoolean, // Use explicit boolean, not || false
         _deliverability: _deliverability
       };
-      
-      // CRITICAL DEBUG: Log what we're sending to API
-      console.error('🔍 [SendEmailViaSendGrid] ========== SENDING TO API ==========');
-      console.error('🔍 [SendEmailViaSendGrid] isHtmlEmail in payload:', emailPayload.isHtmlEmail, '| Type:', typeof emailPayload.isHtmlEmail);
-      console.error('🔍 [SendEmailViaSendGrid] JSON.stringify test:', JSON.stringify({ isHtmlEmail: emailPayload.isHtmlEmail }));
-      console.error('🔍 [SendEmailViaSendGrid] =====================================');
       
       // Send via SendGrid API
       const response = await fetch(`${window.API_BASE_URL}/api/email/sendgrid-send`, {
@@ -4577,21 +4564,6 @@
     
     // Explicit boolean conversion - prioritize attribute, then structure
     const isHtmlEmail = Boolean(hasHtmlAttribute || hasHtmlStructure);
-    
-    // CRITICAL DEBUG: Using console.error() so logs always appear even when silenced
-    console.error('🔍 [EmailCompose] ========== EMAIL TYPE DETECTION ==========');
-    console.error('🔍 [EmailCompose] Final isHtmlEmail:', isHtmlEmail, '| Type:', typeof isHtmlEmail);
-    console.error('🔍 [EmailCompose] Detection results:', {
-      hasHtmlAttribute,
-      hasHtmlStructure,
-      attributeValue: bodyInput?.getAttribute('data-html-email'),
-      templateType: bodyInput?.getAttribute('data-template-type')
-    });
-    console.error('🔍 [EmailCompose] Body length:', body.length);
-    console.error('🔍 [EmailCompose] Content preview (first 200 chars):', body.substring(0, 200));
-    console.error('🔍 [EmailCompose] Has iframe:', !!bodyInput?.querySelector('.html-email-iframe'));
-    console.error('🔍 [EmailCompose] Iframe srcdoc length:', bodyInput?.querySelector('.html-email-iframe')?.srcdoc?.length || 0);
-    console.error('🔍 [EmailCompose] ===========================================');
     
     console.log('[EmailCompose] Email mode:', isHtmlEmail ? 'HTML Template' : 'Standard');
     console.log('[EmailCompose] Detection:', {hasHtmlAttribute, hasHtmlStructure});
@@ -4735,13 +4707,6 @@
         isHtmlEmail: Boolean(isHtmlEmail), // Explicit boolean conversion
         trackingMetadata: window._lastGeneratedMetadata || null
       };
-
-      // CRITICAL DEBUG: Log what we're about to send
-      console.error('🔍 [EmailCompose] ========== PREPARING TO SEND ==========');
-      console.error('🔍 [EmailCompose] isHtmlEmail value:', emailData.isHtmlEmail, '| Type:', typeof emailData.isHtmlEmail);
-      console.error('🔍 [EmailCompose] Content length:', emailData.content.length);
-      console.error('🔍 [EmailCompose] Content preview (first 200 chars):', emailData.content.substring(0, 200));
-      console.error('🔍 [EmailCompose] =======================================');
 
       // Send via SendGrid
       let result;
