@@ -1667,8 +1667,32 @@
       let intelligentPrompt = userPrompt;
       
       if (!userPrompt) {
-        // Generate intelligent prompt based on email content
-        intelligentPrompt = `Reply to this email thread:
+        // Check if this is an out-of-office message
+        const contentLower = emailThreadContext.content.toLowerCase();
+        const subjectLower = emailThreadContext.subject.toLowerCase();
+        const isOutOfOffice = /out of(?:[ -]the)?[ -]office|ooo|away from|be back|returning/i.test(contentLower) ||
+                             /out of(?:[ -]the)?[ -]office|ooo|away from/i.test(subjectLower) ||
+                             /won'?t be (?:in|available)|will be unavailable/i.test(contentLower);
+        
+        if (isOutOfOffice) {
+          // Generate simple acknowledgment for OOO messages
+          intelligentPrompt = `This is an out-of-office auto-reply message. Generate a brief, professional acknowledgment:
+Subject: ${emailThreadContext.subject}
+From: ${emailThreadContext.from}
+Content: ${emailThreadContext.content.substring(0, 300)}
+
+Generate a SHORT, friendly acknowledgment that:
+- Thanks them for letting you know
+- Acknowledges their return date if mentioned
+- Says you'll follow up when they're back
+- NO sales pitch, NO energy services mention
+- Keep it under 40 words total
+- Be warm and casual
+
+CRITICAL: Return ONLY plain text paragraphs (paragraph1, paragraph2, paragraph3 in JSON), NO questions about contracts or energy costs.`;
+        } else {
+          // Generate intelligent prompt based on email content
+          intelligentPrompt = `Reply to this email thread:
 Subject: ${emailThreadContext.subject}
 From: ${emailThreadContext.from}
 Date: ${emailThreadContext.date}
@@ -1679,6 +1703,7 @@ Generate an appropriate professional reply that:
 - Maintains a professional and helpful tone
 - Provides relevant information or next steps
 - Is concise and actionable`;
+        }
       } else {
         // User provided prompt - enhance with thread context
         intelligentPrompt = `${userPrompt}
@@ -1828,15 +1853,52 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
   
   // Helper: Format standard reply
   function formatStandardReply(output, recipient) {
+    // Get sender's first name for signature
+    const settings = (window.SettingsPage?.getSettings?.()) || {};
+    const senderFirstName = settings?.general?.firstName || 
+                           window.authManager?.getCurrentUser()?.displayName?.split(' ')[0] || 
+                           'Power Choosers Team';
+    
+    // If output is a string, try to parse as JSON first
     if (typeof output === 'string') {
-      // Plain text output
+      try {
+        // Try to parse JSON (handles both ```json blocks and raw JSON)
+        let jsonText = output.trim()
+          .replace(/^\s*```json\s*/i, '')
+          .replace(/^\s*```\s*/i, '')
+          .replace(/\s*```\s*$/i, '');
+        
+        // Extract the first JSON object only (ignore trailing notes)
+        const match = jsonText.match(/\{[\s\S]*\}/);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          
+          // Successfully parsed JSON - format it
+          const subject = parsed.subject || '';
+          const greeting = parsed.greeting || '';
+          const paragraphs = [
+            parsed.paragraph1,
+            parsed.paragraph2,
+            parsed.paragraph3
+          ].filter(Boolean);
+          
+          // Add signature to last paragraph
+          const html = `<p>${greeting}</p>${paragraphs.map(p => `<p>${p}</p>`).join('')}<p><br></p><p>Best regards,<br>${senderFirstName}</p>`;
+          
+          return { subject, html };
+        }
+      } catch (e) {
+        console.warn('[EmailDetail] JSON parse failed, treating as plain text:', e);
+      }
+      
+      // Fallback: treat as plain text with signature
       return {
         subject: '',
-        html: output.replace(/\n/g, '<br>')
+        html: output.replace(/\n/g, '<br>') + `<br><br>Best regards,<br>${senderFirstName}`
       };
     }
     
-    // JSON output
+    // Already an object - format directly
     const subject = output.subject || '';
     const greeting = output.greeting || '';
     const paragraphs = [
@@ -1845,7 +1907,8 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       output.paragraph3
     ].filter(Boolean);
     
-    const html = `<p>${greeting}</p>${paragraphs.map(p => `<p>${p}</p>`).join('')}`;
+    // Add signature to formatted output
+    const html = `<p>${greeting}</p>${paragraphs.map(p => `<p>${p}</p>`).join('')}<p><br></p><p>Best regards,<br>${senderFirstName}</p>`;
     
     return { subject, html };
   }
