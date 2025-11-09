@@ -251,30 +251,94 @@ class ActivityManager {
     try {
       const emails = await this.fetchEmails();
       
+      // Helper to extract email addresses from string or array
+      const extractEmails = (value) => {
+        if (!value) return [];
+        if (Array.isArray(value)) {
+          return value.map(v => String(v || '').toLowerCase().trim()).filter(e => e);
+        }
+        const str = String(value || '');
+        // Extract emails from "Name <email@domain.com>" format or plain email
+        const matches = str.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+          return matches.map(e => e.toLowerCase().trim());
+      };
+      
+      // Helper to normalize email for comparison
+      const normalizeEmail = (email) => String(email || '').toLowerCase().trim();
+      
       for (const email of emails) {
         let shouldInclude = false;
         
         if (entityType === 'global') {
           shouldInclude = true;
         } else if (entityType === 'contact' && entityId) {
-          shouldInclude = email.contactId === entityId;
+          // Match by contactId if available
+          if (email.contactId === entityId) {
+            shouldInclude = true;
+          } else {
+            // Match by email address - get contact's email
+              const contacts = window.getPeopleData ? window.getPeopleData() : [];
+              const contact = contacts.find(c => c.id === entityId);
+              if (contact) {
+              const contactEmail = normalizeEmail(contact.email);
+              if (contactEmail) {
+                // Check if contact email matches email's to/from fields
+                const emailTo = extractEmails(email.to);
+                const emailFrom = extractEmails(email.from);
+                shouldInclude = emailTo.includes(contactEmail) || emailFrom.includes(contactEmail);
+              }
+            }
+          }
         } else if (entityType === 'account' && entityId) {
           if (window.getPeopleData) {
             const contacts = window.getPeopleData() || [];
             const accountContacts = contacts.filter(c => c.accountId === entityId);
+            
+            // Match by contactId
             shouldInclude = accountContacts.some(c => c.id === email.contactId);
+            
+            // Also match by email address
+            if (!shouldInclude) {
+              const accountContactEmails = accountContacts
+                .map(c => normalizeEmail(c.email))
+                .filter(e => e);
+              
+              if (accountContactEmails.length > 0) {
+                const emailTo = extractEmails(email.to);
+                const emailFrom = extractEmails(email.from);
+                shouldInclude = accountContactEmails.some(contactEmail => 
+                  emailTo.includes(contactEmail) || emailFrom.includes(contactEmail)
+                );
+              }
+            }
           }
         }
 
         if (shouldInclude) {
+          // Determine if email is sent or received
+          const currentUserEmail = window.DataManager?.getCurrentUserEmail?.() || window.currentUserEmail || '';
+          const emailFrom = extractEmails(email.from);
+          const isSent = email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail;
+          const isReceived = email.type === 'received' || email.emailType === 'received' || 
+                            (emailFrom.length > 0 && !emailFrom.some(e => e.includes(currentUserEmail.toLowerCase())));
+          
+          const emailType = isSent ? 'sent' : (isReceived ? 'received' : 'sent');
+          const direction = isSent ? 'Sent' : 'Received';
+          
+          // Get preview text
+          const previewText = email.text || email.snippet || 
+            (email.html ? this.stripHtml(email.html) : '') || 
+            email.content || email.body || '';
+          
           activities.push({
             id: `email-${email.id}`,
             type: 'email',
-            title: email.subject || 'Email Sent',
-            description: this.truncateText(email.body || email.content, 100),
-            timestamp: email.timestamp || email.createdAt,
+            title: email.subject || `${direction} Email`,
+            description: this.truncateText(previewText, 100),
+            timestamp: email.timestamp || email.sentAt || email.receivedAt || email.createdAt,
             icon: 'email',
-            data: email
+            data: email,
+            emailId: email.id // Store email ID for navigation
           });
         }
       }
@@ -905,8 +969,11 @@ class ActivityManager {
           // Get entity avatar for the activity
           const entityAvatar = this.getEntityAvatarForActivity(activity);
           
+          // Add emailId data attribute for email activities
+          const emailIdAttr = activity.emailId ? `data-email-id="${activity.emailId}"` : '';
+          
           return `
-            <div class="activity-item" data-activity-id="${activity.id}" data-activity-type="${activity.type}" ${clickAttributes}>
+            <div class="activity-item" data-activity-id="${activity.id}" data-activity-type="${activity.type}" ${emailIdAttr} ${clickAttributes}>
             <div class="activity-entity-avatar">
               ${entityAvatar}
             </div>
@@ -999,7 +1066,8 @@ class ActivityManager {
       item.addEventListener('click', () => {
         const activityId = item.getAttribute('data-activity-id');
         const activityType = item.getAttribute('data-activity-type');
-        this.handleActivityClick(activityType, activityId, entityType, entityId);
+        const emailId = item.getAttribute('data-email-id'); // Get emailId if available
+        this.handleActivityClick(activityType, activityId, entityType, entityId, { emailId });
       });
     });
   }
@@ -1007,7 +1075,7 @@ class ActivityManager {
   /**
    * Handle activity item click
    */
-  handleActivityClick(activityType, activityId, entityType, entityId) {
+  handleActivityClick(activityType, activityId, entityType, entityId, activityData = null) {
     switch (activityType) {
       case 'call':
         this.openCallDetail(activityId);
@@ -1019,7 +1087,8 @@ class ActivityManager {
         this.openSequenceDetail(activityId);
         break;
       case 'email':
-        this.openEmailDetail(activityId);
+        // Pass entityType and entityId to openEmailDetail for navigation source tracking
+        this.openEmailDetail(activityId, entityType, entityId);
         break;
       case 'task':
         this.openTaskDetail(activityId);
@@ -1057,10 +1126,34 @@ class ActivityManager {
   /**
    * Open email detail
    */
-  openEmailDetail(activityId) {
-    // Navigate to emails page
+  openEmailDetail(activityId, entityType = null, entityId = null) {
+    // Extract email ID from activity ID (format: "email-{emailId}")
+    const emailId = activityId.replace(/^email-/, '');
+    
+    // Store navigation source based on where we came from
+    if (entityType === 'contact' && entityId) {
+      window._emailNavigationSource = 'contact-detail';
+      window._emailNavigationContactId = entityId;
+    } else if (entityType === 'task' && entityId) {
+      window._emailNavigationSource = 'task-detail';
+      window._emailNavigationTaskId = entityId;
+    } else if (entityType === 'global' || !entityType) {
+      // Check if we're on dashboard/home page
+      const currentPage = window.crm?.currentPage || '';
+      if (currentPage === 'dashboard' || currentPage === 'home') {
+        window._emailNavigationSource = 'home';
+      } else {
+        // Default to emails page
+        window._emailNavigationSource = null;
+      }
+    }
+    
+    // Navigate to email detail page with the email ID
     if (window.crm && typeof window.crm.navigateToPage === 'function') {
-      window.crm.navigateToPage('emails');
+      window.crm.navigateToPage('email-detail', { emailId });
+    } else if (window.EmailDetail && typeof window.EmailDetail.show === 'function') {
+      // Fallback: direct call to EmailDetail module
+            window.EmailDetail.show(emailId);
     }
   }
 
@@ -1437,6 +1530,29 @@ class ActivityManager {
     } catch (_) {
       return 0;
     }
+  }
+
+  /**
+   * Strip HTML tags to get plain text
+   */
+  stripHtml(html) {
+    if (!html) return '';
+    
+    // Remove style and script tags completely
+    let cleaned = html
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '');
+    
+    // Extract text content from remaining HTML
+    const tmp = document.createElement('div');
+    tmp.innerHTML = cleaned;
+    let text = tmp.textContent || tmp.innerText || '';
+    
+    // Clean up the extracted text
+    text = text.replace(/\s+/g, ' ').trim();
+    
+    return text;
   }
 
   /**

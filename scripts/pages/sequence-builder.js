@@ -2255,6 +2255,8 @@ class FreeSequenceAutomation {
                           data-prompt-template="objection-interested">Response - They Show Interest</button>
                         <button class="ai-suggestion" type="button" 
                           data-prompt-template="objection-not-interested">Response - Not Interested</button>
+                        <button class="ai-suggestion" type="button" 
+                          data-prompt-template="breakup-email">Breakup - Last Chance</button>
                       </div>
                       <div class="ai-row actions">
                         <button class="fmt-btn ai-generate" data-mode="standard">Generate Standard</button>
@@ -2698,21 +2700,30 @@ class FreeSequenceAutomation {
     
     return `Write a cold introduction email that MUST:
 
-1. OPEN WITH OBSERVATION (CRITICAL - THIS IS THE MOST IMPORTANT PART)
-   - Reference something SPECIFIC about [contact_company] (location, facility count, operational model, recent activity)
-   - Use [contact_linkedin_recent_activity] if available - reference naturally ("I noticed..." or "I saw...")
-   - Use [company_website] insights if available - show you actually researched
-   - If no specific data: reference their industry/role pattern with peer context ("I've been talking to [role]s across [state], and...")
-   - NEVER: "I hope you're well" or "I wanted to reach out" or "I hope this email finds you well"
-   - MUST: Prove you researched - include specific details (location, facility size, operations type)
+1. GREETING (RANDOMIZE FOR VARIETY)
+   - RANDOMLY choose ONE of these greetings:
+     * "Hi [contact_first_name],"
+     * "Hey [contact_first_name],"
+     * "Hello [contact_first_name],"
+   - DO NOT use "Hi [contact_first_name] there," or add extra words
 
-2. ACKNOWLEDGE THEIR SITUATION (ROLE-SPECIFIC)
+2. OPEN WITH OBSERVATION (CRITICAL - MUST USE RESEARCH)
+   - YOU MUST reference something SPECIFIC about [contact_company] that proves you researched them
+   - REQUIRED: Include at least ONE of these research elements:
+     * Location/facility details: "I noticed [contact_company] operates in [city], [state]..."
+     * Recent activity from LinkedIn: "I saw [contact_company] recently..." (if [contact_linkedin_recent_activity] available)
+     * Website insight: "On your website, I noticed..." (if [company_website] available)
+     * Industry pattern with peer context: "I've been talking to [role]s across [state], and..."
+   - NEVER: "I hope you're well" or "I wanted to reach out" or "I hope this email finds you well"
+   - MUST: Prove you researched - include specific details (location, facility size, operations type, operational model)
+
+3. ACKNOWLEDGE THEIR SITUATION (ROLE-SPECIFIC)
    - For [contact_job_title]: Show you understand what they actually deal with daily
    - For [company_industry]: Reference industry-specific pain points naturally (not generic)
    - Use their role language (CFOs care about predictability/budgets, Operations care about uptime/reliability)
    - Make it about THEM, not about us (don't lead with "We help...")
 
-3. ONE INSIGHT (SPECIFIC, NOT GENERIC)
+4. ONE INSIGHT (SPECIFIC, NOT GENERIC)
    - Provide ONE concrete observation about why this matters to them NOW
    - Use SPECIFIC numbers and timing: "6 months early = 15-20% savings" NOT "thousands annually"
    - NOT: "Companies save 10-20%" (too generic)
@@ -2720,7 +2731,7 @@ class FreeSequenceAutomation {
    - Include timing context: early renewal (6 months) vs late (90 days) = money difference
    - CRITICAL: Mention the 15-20% savings figure ONLY ONCE in the entire email - do not repeat it multiple times
 
-4. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
+5. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
    - Write like a peer, not a salesperson (conversational, confident, direct)
    - Use contractions: "we're," "don't," "it's," "you're," "I'm"
    - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
@@ -2730,14 +2741,14 @@ class FreeSequenceAutomation {
    - NO: "Would you be open to..." (permission-based, weak)
    - YES: Ask specific questions that assume conversation is happening
 
-5. CALL TO ACTION (ASSERTIVE, NOT PERMISSION-BASED)
+6. CALL TO ACTION (ASSERTIVE, NOT PERMISSION-BASED)
    - Use THIS specific CTA (don't change it, use exactly as written):
    "${cta}"
    - MUST: Assume the conversation is happening - don't ask for permission to talk
    - NO: "Would you be open to a conversation?" or "Let's schedule a call"
    - YES: Ask specific question about their contract, timing, or process
 
-6. SUBJECT LINE (SPECIFIC, NOT VAGUE)
+7. SUBJECT LINE (SPECIFIC, NOT VAGUE)
    - MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
    - Examples: "[FirstName], contract timing question" or "[FirstName], rate lock timing question"
    - NOT generic: "thoughts on energy planning" or "insight to ease costs" or "thoughts on energy strategy"
@@ -2745,19 +2756,19 @@ class FreeSequenceAutomation {
    - Role-specific: For Controllers/CFO: "budget question about energy renewal timing"
    - For Operations/Facilities: "facility renewal timing question"
 
-7. FORMAT
+8. FORMAT
    - 100-130 words max (scannable, not overwhelming)
    - 2-3 short paragraphs (break up visually)
    - Scannable on mobile (short lines, clear breaks)
    - One CTA at end (the specific CTA provided above)
 
-8. PERSONALIZATION
-   - Include [contact_first_name] naturally in greeting
+9. PERSONALIZATION
+   - Include [contact_first_name] naturally in randomized greeting
    - Reference [company_name] specifically (not "your company")
    - For [company_industry], use industry-specific language naturally
    - Reference location if available ([city], [state]) for regional context
 
-9. PROOF OF RESEARCH
+10. PROOF OF RESEARCH
    - Include at least ONE specific detail that proves you researched (not just role description)
    - Examples: "4 locations across Texas," "24/7 operations," "both electricity and natural gas"
    - This makes you stand out from generic templates
@@ -2770,80 +2781,79 @@ ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should s
   function buildFollowUpValuePrompt(ctaVariant = true, role = 'all') {
     const cta = ctaVariant ? getRandomFollowUpCTA1(role) : FOLLOWUP_CTA_VARIANTS_STEP2[0].text;
     
-    return `Write a follow-up email after the initial cold introduction received no response.
+    return `Write Follow-Up #1 (DAY 2 - VALUE ADD, NO RESPONSE):
 
-KEY DIFFERENCES FROM FIRST EMAIL:
-- SHORTER: 40-50% shorter than initial (50-80 words max)
-- NEW ANGLE: introduce a different observation or insight they haven't seen
-- VALUE FOCUSED: provide something helpful, not just "did you see my email?"
-- NEW INSIGHT: reference a peer insight or industry trend they'd care about
-- SINGLE CTA: one ask only
+CONTEXT: This is 2 days after the intro email. They haven't responded. DON'T mention the first email.
 
-STRUCTURE:
-1. Open with OBSERVATION - something specific to their business/role (different from first email)
-2. Include INSIGHT - 1-2 sentences about a common mistake companies are making
-3. Provide VALUE - quick tip, stat, or resource relevant to their situation
-4. Close with SOFT CTA - Use THIS specific CTA (don't change it, use exactly as written):
+FRAMEWORK (2025 Best Practice - Day 2 Follow-Up):
+1. GREETING (RANDOMIZE): Use "Hi [contact_first_name]," OR "Hey [contact_first_name]," OR "Hello [contact_first_name],"
+
+2. NEW VALUE/INSIGHT (NOT a repeat of intro):
+   - Share ONE new insight they'd find valuable (NOT generic)
+   - Examples:
+     * "Here's a rate trend your peers noticed this spring..."
+     * "I just saw [company_industry] contracts in [state] locked in at..."
+     * "Quick insight about [company_industry] renewal timing..."
+   - Make it about THEM discovering something useful, not you selling
+
+3. SOFT, CURIOUS CTA: Use THIS specific CTA (don't change it):
    "${cta}"
 
-TONE: Consultative, not pushy. Genuinely curious, not following up just because you have to.
+KEY DIFFERENCES FROM INTRO:
+- SHORTER: 50-80 words max (40-50% shorter than intro)
+- NEW ANGLE: Different observation/insight than intro
+- NO "just following up" or "checking in" language
+- VALUE FOCUSED: Give them something useful without asking for anything
+- Consultative tone, not pushy
+
+TONE: 29-year-old Texas professional, genuinely helpful, peer-to-peer
 
 AVOID:
 - "Didn't see my last email..."
 - "Just checking in..."
 - "Wanted to follow up"
-- Generic "I can help you save money"
-
-SOUND LIKE: 29-year-old Texas professional, peer-to-peer, not salesy
-- Use contractions (I'm, you're, don't)
-- Short sentences mixed with normal ones
-- Real observation, not corporate speak
-
-EMAIL DETAILS:
-- To: [contact_name] at [company_name]
-- Role: [contact_job_title]
-- Industry: [company_industry]
-- Location: [company_location]
+- Repeating intro content
 
 LENGTH: 50-80 words max
-PURPOSE: Keep conversation alive with new angle`;
+PURPOSE: Provide new value to keep conversation alive`;
   }
 
   function buildFollowUpCuriosityPrompt(ctaVariant = true, role = 'all') {
     const cta = ctaVariant ? getRandomFollowUpCTA2(role) : FOLLOWUP_CTA_VARIANTS_STEP3[0].text;
     
-    return `Write a second follow-up email with a DIFFERENT angle than the first.
+    return `Write Follow-Up #2 (DAY 5 - ADDRESS OBJECTION/FAQ):
 
-KEY PRINCIPLE: People respond to curiosity questions more than asks.
+CONTEXT: This is 5 days after intro. Still no response. Address a common objection or FAQ.
 
-STRUCTURE:
-1. OBSERVATION - reference something new they might not have considered
-2. STORY/STAT - share what you're seeing with similar companies
-3. DIRECT QUESTION - ask them something that makes THEM think about their situation
-4. SOFT CTA - Use THIS specific question (don't change it, use exactly as written):
+FRAMEWORK (2025 Best Practice - Day 5 Follow-Up):
+1. GREETING (RANDOMIZE): Use "Hi [contact_first_name]," OR "Hey [contact_first_name]," OR "Hello [contact_first_name],"
+
+2. ADDRESS OBJECTION/FAQ:
+   - Lead with a common challenge or mistake companies make
+   - Examples:
+     * "A lot of companies wait until the last minute—here's why early review matters..."
+     * "Most [role]s I talk to don't realize timing costs them 15-20%..."
+     * "The biggest mistake I see in [company_industry] is..."
+   - Make it educational, not salesy
+
+3. CURIOSITY CTA: Use THIS specific CTA (don't change it):
    "${cta}"
 
-FOR ENERGY CONTEXT:
-- If they haven't responded to contract/pricing angle:
-  - Ask about HOW they make decisions (not IF they want to meet)
-  - Reference decision-making process other CEOs/Controllers use
-  - Use their decision-making as conversation starter
+KEY DIFFERENCES FROM FOLLOW-UP #1:
+- Address an objection/FAQ (not another value insight)
+- Educational tone (not another pitch)
+- Focus on WHY timing/planning matters
 
-TONE: Genuine curiosity, not another pitch attempt
+TONE: Genuine curiosity, genuinely helpful, peer-to-peer
 
 AVOID:
-- Repeating the same value prop
-- "Just wanted to follow up again"
+- Repeating value prop from first two emails
+- "Just wanted to follow up again..."
 - Being pushy about meeting
+- Generic "checking in"
 
-SOUND LIKE: Natural, conversational
-
-EMAIL DETAILS:
-- To: [contact_name] at [company_name]
-- Role: [contact_job_title]
-- Industry: [company_industry]
-
-LENGTH: 60-90 words max`;
+LENGTH: 60-90 words max
+PURPOSE: Address why they haven't responded, educate on common mistake`;
   }
 
   function buildNurtureValuePrompt() {
@@ -3139,6 +3149,57 @@ LENGTH: 60-90 words max`;
   }
 
   // ========== END OBJECTION HANDLING PROMPT BUILDERS ==========
+
+  // ========== BREAKUP EMAIL (FINAL TOUCH) ==========
+
+  function buildBreakupEmailPrompt() {
+    return `Write BREAKUP EMAIL (DAY 20+ - FINAL LAST CHANCE):
+
+CONTEXT: Final email in sequence. Give them a clear out or last chance to engage.
+
+FRAMEWORK (2025 Best Practice - Breakup Email):
+1. GREETING (RANDOMIZE): Use "Hi [contact_first_name]," OR "Hey [contact_first_name]," OR "Hello [contact_first_name],"
+
+2. ACKNOWLEDGE THE SILENCE (RESPECTFULLY):
+   - Recognize they haven't responded (don't be passive-aggressive)
+   - Examples:
+     * "I haven't heard back, so I'm guessing [topic] isn't a priority right now..."
+     * "Since I haven't heard from you, I'll assume the timing isn't right..."
+     * "It seems like [topic] might not be on your radar at the moment..."
+
+3. GIVE THEM AN OUT (GENUINELY):
+   - Make it EASY for them to say "remove me" or "not interested"
+   - Examples:
+     * "Should I keep you on my list for future updates, or would you prefer I remove you?"
+     * "If the timing's not right, just let me know and I'll take you off my list."
+     * "Quick question: Keep you posted on [topic], or remove you for now?"
+
+4. FINAL VALUE (OPTIONAL - LIGHT TOUCH):
+   - One last tiny piece of value or reminder (keep brief)
+   - "If things change and you want to revisit [topic], I'm happy to help."
+   - "Feel free to reach out if your situation changes."
+
+KEY PRINCIPLES:
+- Be GENUINE and respectful (not manipulative)
+- Give them permission to say no
+- Make it easy to respond either way
+- No guilt trips, no FOMO tactics
+- Professional and classy exit
+
+TONE: Respectful, professional, genuine, not desperate
+
+AVOID:
+- "This is my last email..." (sounds desperate)
+- Guilt trips or FOMO tactics
+- Being passive-aggressive
+- "I'm shocked you haven't responded..."
+- Long explanations about why they should care
+
+LENGTH: 40-60 words max (SHORT and respectful)
+PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
+  }
+
+  // ========== END BREAKUP EMAIL ==========
 
   // Get signature HTML for preview if settings allow it
   function getSignatureForPreview(step, isAuto) {
@@ -3770,6 +3831,8 @@ LENGTH: 60-90 words max`;
               data-prompt-template="objection-interested">Response - They Show Interest</button>
             <button class="ai-suggestion" type="button" 
               data-prompt-template="objection-not-interested">Response - Not Interested</button>
+            <button class="ai-suggestion" type="button" 
+              data-prompt-template="breakup-email">Breakup - Last Chance</button>
           </div>
           <div class="ai-row actions">
             <button class="fmt-btn ai-generate" data-mode="standard">Generate Standard</button>
@@ -4038,6 +4101,7 @@ LENGTH: 60-90 words max`;
           font-size: 12px;
           cursor: pointer;
           transition: all 0.2s ease;
+          text-align: center;
         }
         
         .ai-suggestion:hover {
@@ -4704,6 +4768,10 @@ LENGTH: 60-90 words max`;
                   
                 case 'objection-not-interested':
                   prompt = buildObjectionNotInterestedPrompt();
+                  break;
+                  
+                case 'breakup-email':
+                  prompt = buildBreakupEmailPrompt();
                   break;
                   
                 default:
@@ -5840,6 +5908,10 @@ LENGTH: 60-90 words max`;
                 prompt = buildObjectionNotInterestedPrompt();
                 break;
                 
+              case 'breakup-email':
+                prompt = buildBreakupEmailPrompt();
+                break;
+
               default:
                 // Fallback to static prompt
                 prompt = btn.getAttribute('data-prompt');

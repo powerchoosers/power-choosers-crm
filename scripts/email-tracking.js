@@ -20,11 +20,178 @@ class EmailTrackingManager {
         
         // Start polling for tracking events
         this.startTrackingEventPolling();
+        
+        // Start real-time listeners for email opens/clicks
+        this.startEmailTrackingListeners();
     }
 
     startTrackingEventPolling() {
         // SendGrid webhooks handle tracking events - no polling needed
         console.log('[EmailTracking] Using SendGrid webhooks for tracking events');
+    }
+
+    /**
+     * Start real-time listeners for email opens and clicks
+     */
+    startEmailTrackingListeners() {
+        try {
+            if (!this.db) {
+                console.warn('[EmailTracking] Firebase not available for real-time listeners');
+                return;
+            }
+
+            // Get current user email to filter emails
+            const getUserEmail = () => {
+                try {
+                    if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                        return window.DataManager.getCurrentUserEmail();
+                    }
+                    return (window.currentUserEmail || '').toLowerCase();
+                } catch(_) {
+                    return (window.currentUserEmail || '').toLowerCase();
+                }
+            };
+
+            const userEmail = getUserEmail();
+            if (!userEmail) {
+                console.warn('[EmailTracking] User email not available, skipping listeners');
+                return;
+            }
+
+            // Track previous open/click counts to detect changes
+            const previousCounts = new Map();
+
+            // Listen to sent emails owned by current user
+            const unsubscribe = this.db.collection('emails')
+                .where('type', '==', 'sent')
+                .where('ownerId', '==', userEmail)
+                .onSnapshot((snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === 'modified') {
+                            const emailData = change.doc.data();
+                            const emailId = change.doc.id;
+                            const currentOpenCount = emailData.openCount || 0;
+                            const currentClickCount = emailData.clickCount || 0;
+                            
+                            const prev = previousCounts.get(emailId) || { openCount: 0, clickCount: 0 };
+                            
+                            // Check for new opens
+                            if (currentOpenCount > prev.openCount) {
+                                const newOpens = currentOpenCount - prev.openCount;
+                                this.showEmailOpenNotification(emailData, newOpens);
+                            }
+                            
+                            // Check for new clicks
+                            if (currentClickCount > prev.clickCount) {
+                                const newClicks = currentClickCount - prev.clickCount;
+                                this.showEmailClickNotification(emailData, newClicks);
+                            }
+                            
+                            // Update previous counts
+                            previousCounts.set(emailId, {
+                                openCount: currentOpenCount,
+                                clickCount: currentClickCount
+                            });
+                        } else if (change.type === 'added') {
+                            // Initialize counts for new emails
+                            const emailData = change.doc.data();
+                            const emailId = change.doc.id;
+                            previousCounts.set(emailId, {
+                                openCount: emailData.openCount || 0,
+                                clickCount: emailData.clickCount || 0
+                            });
+                        }
+                    });
+                }, (error) => {
+                    console.error('[EmailTracking] Error in real-time listener:', error);
+                });
+
+            // Store unsubscribe function
+            if (!this._unsubscribers) {
+                this._unsubscribers = [];
+            }
+            this._unsubscribers.push(unsubscribe);
+            
+            console.log('[EmailTracking] Started real-time listeners for email opens/clicks');
+        } catch (error) {
+            console.error('[EmailTracking] Error starting email tracking listeners:', error);
+        }
+    }
+
+    /**
+     * Show notification when email is opened
+     */
+    showEmailOpenNotification(emailData, count) {
+        try {
+            if (!window.Notifications || typeof window.Notifications.add !== 'function') {
+                console.warn('[EmailTracking] Notifications system not available');
+                return;
+            }
+
+            const subject = emailData.subject || 'Email';
+            const to = Array.isArray(emailData.to) ? emailData.to[0] : emailData.to;
+            const recipient = to ? (to.includes('<') ? to.match(/<(.+)>/)?.[1] || to : to) : 'recipient';
+            
+            const title = count === 1 ? 'Email Opened' : `${count} Email Opens`;
+            const message = `${recipient} opened "${subject}"`;
+
+            window.Notifications.add(
+                'email-opened',
+                title,
+                message,
+                {
+                    emailId: emailData.id,
+                    subject: subject,
+                    recipient: recipient,
+                    openCount: emailData.openCount || 0
+                }
+            );
+
+            // Also show toast if available
+            if (window.crm && typeof window.crm.showToast === 'function') {
+                window.crm.showToast(message, { type: 'success', duration: 3000 });
+            }
+        } catch (error) {
+            console.error('[EmailTracking] Error showing open notification:', error);
+        }
+    }
+
+    /**
+     * Show notification when email link is clicked
+     */
+    showEmailClickNotification(emailData, count) {
+        try {
+            if (!window.Notifications || typeof window.Notifications.add !== 'function') {
+                console.warn('[EmailTracking] Notifications system not available');
+                return;
+            }
+
+            const subject = emailData.subject || 'Email';
+            const to = Array.isArray(emailData.to) ? emailData.to[0] : emailData.to;
+            const recipient = to ? (to.includes('<') ? to.match(/<(.+)>/)?.[1] || to : to) : 'recipient';
+            
+            const title = count === 1 ? 'Email Link Clicked' : `${count} Link Clicks`;
+            const message = `${recipient} clicked a link in "${subject}"`;
+
+            window.Notifications.add(
+                'email-clicked',
+                title,
+                message,
+                {
+                    emailId: emailData.id,
+                    subject: subject,
+                    recipient: recipient,
+                    clickCount: emailData.clickCount || 0
+                }
+            );
+
+            // Also show toast if available
+            if (window.crm && typeof window.crm.showToast === 'function') {
+                window.crm.showToast(message, { type: 'success', duration: 3000 });
+            }
+        } catch (error) {
+            console.error('[EmailTracking] Error showing click notification:', error);
+        }
     }
 
     async processTrackingEvent(event) {
