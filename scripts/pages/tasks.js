@@ -115,6 +115,11 @@
       .create-task-modal input:focus, .create-task-modal select:focus, .create-task-modal textarea:focus { outline: none; border-color: var(--orange-subtle); background: var(--bg-widget); box-shadow: 0 0 0 3px rgba(255,145,0,0.1); transform: translateY(-1px); }
       .create-task-modal textarea { resize: vertical; min-height: 80px; height: auto; line-height: 1.4; }
       .create-task-modal .footer { display: flex; justify-content: flex-end; gap: var(--spacing-sm); padding: var(--spacing-lg); border-top: 1px solid var(--border-light); background: var(--bg-subtle); }
+      
+      /* Status badge styles */
+      .status-badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 500; }
+      .status-badge.pending { background: var(--grey-600); color: var(--text-primary); }
+      .status-badge.completed { background: var(--grey-700); color: var(--text-inverse); }
     `;
     document.head.appendChild(style);
   }

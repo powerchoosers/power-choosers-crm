@@ -427,6 +427,74 @@
       replyParagraph.innerHTML = '<br>'; // Empty paragraph with line break for typing
       els.replyBodyInput.appendChild(replyParagraph);
       
+      // Add original email thread (Gmail-style)
+      try {
+        const originalContent = email.html || email.text || email.content || '';
+        if (originalContent) {
+          // Create divider
+          const divider = document.createElement('div');
+          divider.style.margin = '24px 0 16px 0';
+          divider.style.paddingTop = '16px';
+          divider.style.borderTop = '1px solid var(--border-light)';
+          divider.style.color = 'var(--text-secondary)';
+          divider.style.fontSize = '13px';
+          divider.setAttribute('contenteditable', 'false');
+          divider.setAttribute('data-quoted-content', 'true');
+          
+          // Format original email header
+          const originalFrom = email.from || 'Unknown Sender';
+          const originalDate = email.date ? new Date(email.date).toLocaleString() : '';
+          const originalSubject = email.subject || '';
+          
+          // Create quoted content container
+          const quotedContainer = document.createElement('div');
+          quotedContainer.style.margin = '0';
+          quotedContainer.style.padding = '12px 16px';
+          quotedContainer.style.backgroundColor = 'var(--bg-secondary)';
+          quotedContainer.style.borderLeft = '3px solid var(--border-light)';
+          quotedContainer.style.borderRadius = '4px';
+          quotedContainer.style.color = 'var(--text-secondary)';
+          quotedContainer.style.fontSize = '13px';
+          quotedContainer.style.lineHeight = '1.5';
+          quotedContainer.setAttribute('contenteditable', 'false');
+          quotedContainer.setAttribute('data-quoted-content', 'true');
+          
+          // Add header info
+          const headerInfo = document.createElement('div');
+          headerInfo.style.marginBottom = '8px';
+          headerInfo.style.fontWeight = '600';
+          headerInfo.style.color = 'var(--text-primary)';
+          headerInfo.innerHTML = `On ${originalDate}, ${originalFrom} wrote:`;
+          quotedContainer.appendChild(headerInfo);
+          
+          // Add original content
+          const contentDiv = document.createElement('div');
+          contentDiv.style.color = 'var(--text-secondary)';
+          contentDiv.style.whiteSpace = 'pre-wrap';
+          contentDiv.setAttribute('contenteditable', 'false');
+          contentDiv.setAttribute('data-quoted-content', 'true');
+          
+          // If HTML, strip and convert to plain text for quoted section
+          if (email.html) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = email.html;
+            const plainText = tempDiv.textContent || tempDiv.innerText || '';
+            // Preserve line breaks
+            contentDiv.textContent = plainText;
+          } else {
+            contentDiv.textContent = originalContent;
+          }
+          
+          quotedContainer.appendChild(contentDiv);
+          divider.appendChild(quotedContainer);
+          
+          // Insert divider before signature
+          els.replyBodyInput.appendChild(divider);
+        }
+      } catch (error) {
+        console.warn('[EmailDetail] Error adding original email thread:', error);
+      }
+      
       // Add signature if available
       try {
         const signature = window.getEmailSignature ? window.getEmailSignature() : '';
@@ -672,7 +740,8 @@
                                      node.nodeType === Node.TEXT_NODE || 
                                      (node.nodeType === Node.ELEMENT_NODE && 
                                       node.getAttribute('contenteditable') !== 'false' &&
-                                      node.getAttribute('data-signature') !== 'true')
+                                      node.getAttribute('data-signature') !== 'true' &&
+                                      node.getAttribute('data-quoted-content') !== 'true')
                                    );
         
         if (!hasEditableContent) {
@@ -681,9 +750,12 @@
           p.style.margin = '0 0 16px 0';
           p.style.color = 'var(--text-primary)';
           
-          // Insert before signature if it exists
+          // Insert before quoted content or signature if they exist
+          const quotedContent = els.replyBodyInput.querySelector('[data-quoted-content="true"]');
           const signature = els.replyBodyInput.querySelector('[data-signature="true"]');
-          if (signature) {
+          if (quotedContent) {
+            els.replyBodyInput.insertBefore(p, quotedContent);
+          } else if (signature) {
             els.replyBodyInput.insertBefore(p, signature);
           } else {
             els.replyBodyInput.appendChild(p);
@@ -703,6 +775,35 @@
       
       // Add click handler to ensure it's editable
       els.replyBodyInput.addEventListener('click', (e) => {
+        // Don't allow clicking on quoted content or signature
+        if (e.target.closest('[data-quoted-content="true"]')) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Move cursor to the paragraph before quoted content
+          const quoted = e.target.closest('[data-quoted-content="true"]');
+          let p = quoted.previousElementSibling;
+          if (!p || p.tagName !== 'P') {
+            // Create a paragraph if none exists
+            p = document.createElement('p');
+            p.innerHTML = '<br>';
+            p.style.margin = '0 0 16px 0';
+            p.style.color = 'var(--text-primary)';
+            quoted.parentNode.insertBefore(p, quoted);
+          }
+          
+          // Set cursor at the end of the paragraph
+          setTimeout(() => {
+            const range = document.createRange();
+            const sel = window.getSelection();
+            range.selectNodeContents(p);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }, 0);
+          return;
+        }
+        
         // Don't allow clicking on signature
         if (e.target.closest('[data-signature="true"]')) {
           e.preventDefault();
@@ -731,11 +832,44 @@
           els.replyBodyInput.contentEditable = 'true';
         }
         
-        // Handle Backspace/Delete to prevent signature deletion
+        // Handle Backspace/Delete to prevent signature and quoted content deletion
         if (e.key === 'Backspace' || e.key === 'Delete') {
           const selection = window.getSelection();
           if (selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);
+            
+            // Check if we're about to delete quoted content
+            const quotedElements = els.replyBodyInput.querySelectorAll('[data-quoted-content="true"]');
+            for (const quoted of quotedElements) {
+              try {
+                if (range.intersectsNode(quoted)) {
+                  console.log('[EmailDetail] Backspace/Delete would affect quoted content - preventing');
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  // Move cursor to the paragraph before quoted content
+                  let p = quoted.previousElementSibling;
+                  if (!p || p.tagName !== 'P') {
+                    // Create a paragraph if none exists
+                    p = document.createElement('p');
+                    p.innerHTML = '<br>';
+                    p.style.margin = '0 0 16px 0';
+                    p.style.color = 'var(--text-primary)';
+                    quoted.parentNode.insertBefore(p, quoted);
+                  }
+                  
+                  // Set cursor at the end of the paragraph
+                  const newRange = document.createRange();
+                  newRange.selectNodeContents(p);
+                  newRange.collapse(false);
+                  selection.removeAllRanges();
+                  selection.addRange(newRange);
+                  return;
+                }
+              } catch (err) {
+                console.warn('[EmailDetail] Error checking quoted content:', err);
+              }
+            }
             
             // Check if we're about to delete the signature
             const signatureElements = els.replyBodyInput.querySelectorAll('[data-signature="true"]');
