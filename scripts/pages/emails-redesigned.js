@@ -364,15 +364,45 @@
 
   // Generate email row HTML with favicon integration and snippet
   function rowHtml(email) {
+    const isSentEmail = email.isSentEmail || email.type === 'sent';
+    
+    // For sent emails, use user's profile photo; otherwise use domain favicon
+    let avatarHtml = '';
+    if (isSentEmail) {
+      // Get user's profile photo from settings
+      const settings = (window.SettingsPage?.getSettings?.()) || {};
+      const g = settings?.general || {};
+      const profilePhotoUrl = g.hostedPhotoURL || g.photoURL || '';
+      
+      if (profilePhotoUrl) {
+        // Use profile photo
+        avatarHtml = `<img src="${escapeHtml(profilePhotoUrl)}" alt="Profile" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 2px solid var(--orange-primary);" />`;
+      } else {
+        // Fallback to initials avatar
+        const firstName = g.firstName || '';
+        const lastName = g.lastName || '';
+        const initials = ((firstName.charAt(0) || '') + (lastName.charAt(0) || '')).toUpperCase() || 'U';
+        avatarHtml = `<div style="width: 28px; height: 28px; border-radius: 50%; background: var(--orange-subtle); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 12px; letter-spacing: 0.5px;" aria-hidden="true">${escapeHtml(initials)}</div>`;
+      }
+    } else {
+      // Use domain favicon for received emails
     const senderDomain = extractDomain(email.from);
-    const faviconHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
+      avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
       domain: senderDomain,
       size: 28
     });
+    }
 
     const senderName = extractName(email.from);
     const isSelected = state.selected.has(email.id);
     const emailPreview = getEmailPreview(email);
+
+    // Get tracking counts for sent emails
+    const openCount = (email.isSentEmail || email.type === 'sent') ? (email.openCount || 0) : 0;
+    const clickCount = (email.isSentEmail || email.type === 'sent') ? (email.clickCount || 0) : 0;
+    const hasOpens = openCount > 0;
+    const hasClicks = clickCount > 0;
+    const isStarred = email.starred || false;
 
     return `
       <tr class="email-row ${isSelected ? 'row-selected' : ''}" data-email-id="${email.id}">
@@ -381,7 +411,7 @@
         </td>
         <td class="email-sender-cell">
           <div class="sender-cell__wrap">
-            ${faviconHtml}
+            ${avatarHtml}
             <span class="sender-name">${escapeHtml(senderName)}</span>
           </div>
         </td>
@@ -396,10 +426,9 @@
         </td>
         <td class="qa-cell">
           <div class="qa-actions">
-            <button class="qa-btn" data-action="view" data-email-id="${email.id}" title="View">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
+            <button class="qa-btn ${isStarred ? 'starred' : ''}" data-action="star" data-email-id="${email.id}" title="${isStarred ? 'Unstar' : 'Star'}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="${isStarred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
               </svg>
             </button>
             ${email.type === 'scheduled' && email.status === 'pending_approval' ? `
@@ -414,13 +443,14 @@
                 </svg>
               </button>
             ` : email.isSentEmail ? `
-              <button class="qa-btn" data-action="clicks" data-email-id="${email.id}" title="View clicks">
+              <button class="qa-btn ${hasClicks ? 'clicked' : 'not-clicked'}" data-action="clicks" data-email-id="${email.id}" title="${hasClicks ? `Clicked ${clickCount} time${clickCount !== 1 ? 's' : ''}` : 'Not clicked'}" style="position: relative;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
                   <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/>
                   <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-3.5"/>
                   <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
                 </svg>
+                ${hasClicks ? `<span class="tracking-badge">${clickCount}</span>` : ''}
               </button>
             ` : `
               <button class="qa-btn" data-action="reply" data-email-id="${email.id}" title="Reply">
@@ -467,8 +497,8 @@
         const action = btn.dataset.action;
         const emailId = btn.dataset.emailId;
         
-        if (action === 'view') {
-          viewEmail(emailId);
+        if (action === 'star') {
+          toggleStar(emailId);
         } else if (action === 'clicks') {
           showClickDetails(emailId);
         } else if (action === 'reply') {
@@ -496,6 +526,39 @@
     // Navigate to email detail page
     if (window.crm && typeof window.crm.navigateToPage === 'function') {
       window.crm.navigateToPage('email-detail', { emailId });
+    }
+  }
+
+  // Toggle star status
+  async function toggleStar(emailId) {
+    const email = state.data.find(e => e.id === emailId);
+    if (!email) return;
+
+    try {
+      const newStarred = !email.starred;
+      
+      // Update in Firebase
+      await firebase.firestore().collection('emails').doc(emailId).update({
+        starred: newStarred
+      });
+
+      // Update local state
+      email.starred = newStarred;
+      
+      // Update the email in state.data
+      const emailIndex = state.data.findIndex(e => e.id === emailId);
+      if (emailIndex !== -1) {
+        state.data[emailIndex].starred = newStarred;
+      }
+
+      // Re-render to update the star button
+      render();
+
+    } catch (error) {
+      console.error('[EmailsPage] Failed to toggle star:', error);
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Failed to update star status');
+      }
     }
   }
 
@@ -824,19 +887,14 @@
   function formatDate(date) {
     if (!date) return '';
     const d = new Date(date);
-    const now = new Date();
-    const diffTime = Math.abs(now - d);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 1) {
-      return 'Today';
-    } else if (diffDays === 2) {
-      return 'Yesterday';
-    } else if (diffDays <= 7) {
-      return d.toLocaleDateString('en-US', { weekday: 'short' });
-    } else {
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
+    return d.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
 
   function escapeHtml(text) {
@@ -861,12 +919,27 @@
     };
   }
 
-  // Strip HTML tags to get plain text (from old emails.js)
+  // Strip HTML tags to get plain text (improved to remove style/script tags)
   function stripHtml(html) {
     if (!html) return '';
+    
+    // First, remove style and script tags completely (they contain CSS/JS, not email content)
+    let cleaned = html
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, ''); // Remove HTML comments
+    
+    // Then extract text content from remaining HTML
     const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || '';
+    tmp.innerHTML = cleaned;
+    let text = tmp.textContent || tmp.innerText || '';
+    
+    // Clean up the extracted text
+    text = text
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim();
+    
+    return text;
   }
 
   // Get email preview/snippet (from old emails.js)
