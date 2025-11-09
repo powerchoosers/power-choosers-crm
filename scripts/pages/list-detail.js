@@ -911,13 +911,19 @@
   // updateViewToggle function removed - no longer needed since list detail shows only one type
 
   async function loadDataOnce() {
-    if (state.loadedPeople && state.loadedAccounts) return;
+    // COST OPTIMIZATION: Only load the data type needed for this list (people OR accounts, not both)
+    const needsPeople = state.view === 'people' && !state.loadedPeople;
+    const needsAccounts = state.view === 'accounts' && !state.loadedAccounts;
+    
+    // If both already loaded or nothing needed, return early
+    if (!needsPeople && !needsAccounts) return;
     
     try {
       if (console.time) console.time('[ListDetail] loadDataOnce');
       
       // PRIORITY 1: Use BackgroundContactsLoader and BackgroundAccountsLoader for instant data access
-      if (!state.loadedPeople) {
+      // COST OPTIMIZATION: Only load what's needed for the current list view
+      if (needsPeople) {
         if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
           state.dataPeople = window.BackgroundContactsLoader.getContactsData() || [];
           state.loadedPeople = true;
@@ -929,7 +935,7 @@
         }
       }
       
-      if (!state.loadedAccounts) {
+      if (needsAccounts) {
         if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
           state.dataAccounts = window.BackgroundAccountsLoader.getAccountsData() || [];
           state.loadedAccounts = true;
@@ -942,15 +948,16 @@
       }
       
       // FALLBACK: If background loaders not ready yet, wait for them
-      if ((!state.loadedPeople || !state.loadedAccounts) && 
-          (window.BackgroundContactsLoader || window.BackgroundAccountsLoader)) {
+      // COST OPTIMIZATION: Only wait for the loader we actually need
+      if ((needsPeople && !state.loadedPeople && window.BackgroundContactsLoader) ||
+          (needsAccounts && !state.loadedAccounts && window.BackgroundAccountsLoader)) {
         console.log('[ListDetail] Background loaders not ready yet, waiting...');
         
         // Wait up to 3 seconds (30 attempts x 100ms)
         for (let attempt = 0; attempt < 30; attempt++) {
           await new Promise(resolve => setTimeout(resolve, 100));
           
-          if (!state.loadedPeople && window.BackgroundContactsLoader) {
+          if (needsPeople && !state.loadedPeople && window.BackgroundContactsLoader) {
             const contacts = window.BackgroundContactsLoader.getContactsData() || [];
             if (contacts.length > 0) {
               state.dataPeople = contacts;
@@ -959,7 +966,7 @@
             }
           }
           
-          if (!state.loadedAccounts && window.BackgroundAccountsLoader) {
+          if (needsAccounts && !state.loadedAccounts && window.BackgroundAccountsLoader) {
             const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
             if (accounts.length > 0) {
               state.dataAccounts = accounts;
@@ -968,30 +975,33 @@
             }
           }
           
-          // Break if both are loaded
-          if (state.loadedPeople && state.loadedAccounts) {
+          // Break if what we need is loaded
+          if ((needsPeople && state.loadedPeople) || (needsAccounts && state.loadedAccounts)) {
             break;
           }
         }
         
-        if (!state.loadedPeople || !state.loadedAccounts) {
+        if ((needsPeople && !state.loadedPeople) || (needsAccounts && !state.loadedAccounts)) {
           console.warn('[ListDetail] ⚠ Timeout waiting for background loaders after 3 seconds', {
             peopleLoaded: state.loadedPeople,
-            accountsLoaded: state.loadedAccounts
+            accountsLoaded: state.loadedAccounts,
+            needsPeople,
+            needsAccounts
           });
         }
       }
       
       // FINAL FALLBACK: Use CacheManager or Firestore
-      if (!state.loadedPeople || !state.loadedAccounts) {
+      // COST OPTIMIZATION: Only load what's needed
+      if ((needsPeople && !state.loadedPeople) || (needsAccounts && !state.loadedAccounts)) {
         if (window.CacheManager && typeof window.CacheManager.get === 'function') {
-          if (!state.loadedPeople) {
+          if (needsPeople && !state.loadedPeople) {
             state.dataPeople = await window.CacheManager.get('contacts') || [];
             state.loadedPeople = true;
             console.debug('[ListDetail] loadDataOnce: people loaded from CacheManager', { count: state.dataPeople.length });
           }
           
-          if (!state.loadedAccounts) {
+          if (needsAccounts && !state.loadedAccounts) {
             state.dataAccounts = await window.CacheManager.get('accounts') || [];
             state.loadedAccounts = true;
             console.debug('[ListDetail] loadDataOnce: accounts loaded from CacheManager', { count: state.dataAccounts.length });
@@ -1000,7 +1010,7 @@
           // Firestore fallback - SCOPED queries for security compliance
           const email = getUserEmail();
           
-          if (!state.loadedPeople) {
+          if (needsPeople && !state.loadedPeople) {
             let peopleSnap;
             if (window.currentUserRole !== 'admin' && email) {
               // Non-admin: use scoped queries
@@ -1021,7 +1031,7 @@
             console.debug('[ListDetail] loadDataOnce: people loaded from Firestore (scoped)', { count: state.dataPeople.length });
           }
           
-          if (!state.loadedAccounts) {
+          if (needsAccounts && !state.loadedAccounts) {
             let accountsSnap;
             if (window.currentUserRole !== 'admin' && email) {
               // Non-admin: use scoped queries
@@ -1044,18 +1054,22 @@
         }
       }
       
-      // Ensure defaults
-      state.dataPeople = state.dataPeople || [];
-      state.dataAccounts = state.dataAccounts || [];
-      state.loadedPeople = true;
-      state.loadedAccounts = true;
+      // Ensure defaults (only for what we actually loaded)
+      if (needsPeople) {
+        state.dataPeople = state.dataPeople || [];
+        state.loadedPeople = true;
+      }
+      if (needsAccounts) {
+        state.dataAccounts = state.dataAccounts || [];
+        state.loadedAccounts = true;
+      }
       
     } catch (e) {
       console.error('[ListDetail] Failed loading data (preserving cache):', e);
       
       // COST-EFFECTIVE: Preserve cache on error (don't clear existing data)
-      // Try to use BackgroundLoaders as fallback
-      if (!state.loadedPeople && window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+      // Try to use BackgroundLoaders as fallback (only for what we need)
+      if (needsPeople && !state.loadedPeople && window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
         try {
           const cached = window.BackgroundContactsLoader.getContactsData() || [];
           if (cached.length > 0) {
@@ -1068,7 +1082,7 @@
         }
       }
       
-      if (!state.loadedAccounts && window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+      if (needsAccounts && !state.loadedAccounts && window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
         try {
           const cached = window.BackgroundAccountsLoader.getAccountsData() || [];
           if (cached.length > 0) {
@@ -1081,11 +1095,15 @@
         }
       }
       
-      // Ensure defaults (preserve existing data)
-      state.dataPeople = state.dataPeople || [];
-      state.dataAccounts = state.dataAccounts || [];
-      state.loadedPeople = true;
-      state.loadedAccounts = true;
+      // Ensure defaults (only for what we actually needed)
+      if (needsPeople) {
+        state.dataPeople = state.dataPeople || [];
+        state.loadedPeople = true;
+      }
+      if (needsAccounts) {
+        state.dataAccounts = state.dataAccounts || [];
+        state.loadedAccounts = true;
+      }
     }
     
     if (console.timeEnd) console.timeEnd('[ListDetail] loadDataOnce');

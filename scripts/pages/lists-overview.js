@@ -271,10 +271,18 @@
           b.setAttribute('aria-selected', active ? 'true' : 'false');
         });
         
-        // Update state and reload
+        // Update state
         state.kind = newView;
         try { localStorage.setItem(STORAGE_KEY, state.kind); } catch {}
-        ensureLoadedThenRender();
+        
+        // COST-EFFECTIVE: If both kinds are already loaded, just re-render (zero cost)
+        // Otherwise, ensure data is loaded
+        if (state.loadedPeople && state.loadedAccounts) {
+          applyFilters();
+          updateToggleState();
+        } else {
+          ensureLoadedThenRender();
+        }
       });
     }
 
@@ -352,32 +360,35 @@
       const allLists = window.BackgroundListsLoader.getListsData() || [];
       
       if (allLists.length > 0) {
-        // Filter by kind client-side (no Firestore query needed)
-        const filteredLists = allLists.filter(list => {
+        // CRITICAL FIX: Load BOTH people and accounts lists from cache on initial load
+        // This ensures both are ready when user toggles, and initial render is correct
+        
+        // Filter people lists
+        const peopleLists = allLists.filter(list => {
           const listKind = (list.kind || list.type || list.listType || '').toLowerCase();
-          if (state.kind === 'people') {
-            return listKind === 'people' || listKind === 'person' || listKind === 'contacts' || listKind === 'contact';
-          } else {
-            return listKind === 'accounts' || listKind === 'account' || listKind === 'companies' || listKind === 'company';
-          }
+          return listKind === 'people' || listKind === 'person' || listKind === 'contacts' || listKind === 'contact';
         });
         
-        // Update state with filtered lists (zero cost)
-        if (state.kind === 'people') {
-          state.peopleLists = filteredLists;
-          state.loadedPeople = true;
-          console.log('[ListsOverview] ✓ Loaded', filteredLists.length, 'people lists from BackgroundListsLoader cache (zero cost)');
-        } else {
-          state.accountLists = filteredLists;
-          state.loadedAccounts = true;
-          console.log('[ListsOverview] ✓ Loaded', filteredLists.length, 'account lists from BackgroundListsLoader cache (zero cost)');
-        }
+        // Filter account lists
+        const accountLists = allLists.filter(list => {
+          const listKind = (list.kind || list.type || list.listType || '').toLowerCase();
+          return listKind === 'accounts' || listKind === 'account' || listKind === 'companies' || listKind === 'company';
+        });
         
-        // Preload members if needed (uses cache if available)
+        // Update state with both filtered lists (zero cost)
+        state.peopleLists = peopleLists;
+        state.loadedPeople = true;
+        state.accountLists = accountLists;
+        state.loadedAccounts = true;
+        
+        console.log('[ListsOverview] ✓ Loaded', peopleLists.length, 'people lists and', accountLists.length, 'account lists from BackgroundListsLoader cache (zero cost)');
+        
+        // Preload members for both kinds if needed (uses cache if available)
         if (typeof window.__preloadListMembers === 'function') {
-          await window.__preloadListMembers(filteredLists);
+          await window.__preloadListMembers([...peopleLists, ...accountLists]);
         }
         
+        // Now render with the correct kind filter
         applyFilters();
         updateToggleState();
         return; // Skip Firestore query - cache has data
@@ -385,13 +396,28 @@
     }
     
     // Fallback: Only query Firestore if BackgroundListsLoader has no data
+    // COST OPTIMIZATION: Load current kind first for immediate display, lazy-load other kind in background
     if (state.kind === 'people' && !state.loadedPeople) {
       await loadLists('people');
+      applyFilters();
+      updateToggleState();
+      // Lazy-load accounts in background (non-blocking)
+      if (!state.loadedAccounts) {
+        loadLists('accounts').catch(err => console.warn('[ListsOverview] Background load of accounts failed:', err));
+      }
     } else if (state.kind === 'accounts' && !state.loadedAccounts) {
       await loadLists('accounts');
+      applyFilters();
+      updateToggleState();
+      // Lazy-load people in background (non-blocking)
+      if (!state.loadedPeople) {
+        loadLists('people').catch(err => console.warn('[ListsOverview] Background load of people failed:', err));
+      }
+    } else {
+      // Both already loaded or current kind already loaded
+      applyFilters();
+      updateToggleState();
     }
-    applyFilters();
-    updateToggleState();
   }
 
   async function loadLists(kind) {
@@ -433,7 +459,8 @@
           // Ensure global cache exists
           try { window.listMembersCache = window.listMembersCache || {}; } catch (_) {}
 
-          // Preload members for all lists in this kind and compute counts (uses cache if available)
+          // COST OPTIMIZATION: Preload members for lists in this kind (uses cache if available)
+          // The preloader checks cache first, so this is cost-effective
           if (typeof window.__preloadListMembers === 'function') {
             await window.__preloadListMembers(filteredLists);
           } else {
@@ -903,11 +930,15 @@
     items = items.filter(item => {
       const name = (item.name || '').toLowerCase();
       const kind = item.kind || item.type || '';
-      const owner = (item.createdBy || item.owner || '').toLowerCase();
+      // FIX: Check ownerId field (primary) and fallback to createdBy/owner, normalize properly
+      const ownerId = (item.ownerId || '').toLowerCase();
+      const createdBy = (item.createdBy || '').toLowerCase();
+      const owner = (item.owner || '').toLowerCase();
+      const ownerMatch = ownerId || createdBy || owner;
       
       return (!nameFilter || name.includes(nameFilter)) &&
              (!typeFilter || kind === typeFilter) &&
-             (!ownerFilter || owner.includes(ownerFilter));
+             (!ownerFilter || ownerMatch.includes(ownerFilter));
     });
     
     // Update filter badge
@@ -1712,7 +1743,36 @@
   // Simple function to fetch list members
   async function fetchListMembersSimple(listId) {
     const out = { people: new Set(), accounts: new Set(), loaded: false };
-    if (!listId || !window.firebaseDB || typeof window.firebaseDB.collection !== 'function') return out;
+    if (!listId) return out;
+    
+    // COST OPTIMIZATION: Check IndexedDB cache first (zero Firestore reads if cached)
+    if (window.CacheManager && typeof window.CacheManager.getCachedListMembers === 'function') {
+      try {
+        const cached = await window.CacheManager.getCachedListMembers(listId);
+        if (cached && (cached.people instanceof Set || Array.isArray(cached.people))) {
+          out.people = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
+          out.accounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
+          out.loaded = true;
+          console.log(`[ListsOverview] ✓ Loaded members for ${listId} from CacheManager (zero cost)`);
+          return out;
+        }
+      } catch (e) {
+        console.warn('[ListsOverview] Cache check failed, falling back to Firestore:', e);
+      }
+    }
+    
+    // Also check in-memory cache (faster than IndexedDB)
+    if (window.listMembersCache && window.listMembersCache[listId] && window.listMembersCache[listId].loaded) {
+      const cached = window.listMembersCache[listId];
+      out.people = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
+      out.accounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
+      out.loaded = true;
+      console.log(`[ListsOverview] ✓ Loaded members for ${listId} from in-memory cache (zero cost)`);
+      return out;
+    }
+    
+    // Cache miss - fetch from Firestore
+    if (!window.firebaseDB || typeof window.firebaseDB.collection !== 'function') return out;
     
     try {
       // Try subcollection first
@@ -1737,6 +1797,16 @@
         });
       }
       out.loaded = true;
+      
+      // COST OPTIMIZATION: Cache the results for next time (IndexedDB write only)
+      if ((out.people.size > 0 || out.accounts.size > 0) && window.CacheManager && typeof window.CacheManager.cacheListMembers === 'function') {
+        try {
+          await window.CacheManager.cacheListMembers(listId, out.people, out.accounts);
+          console.log(`[ListsOverview] ✓ Cached members for ${listId} (zero cost on next load)`);
+        } catch (cacheErr) {
+          console.warn('[ListsOverview] Cache write failed (non-critical):', cacheErr);
+        }
+      }
     } catch (error) {
       console.warn('[ListsOverview] Failed to fetch members for list', listId, error);
     }
@@ -2035,7 +2105,8 @@
   } catch {}
   attachEvents();
   updateToggleState();
-  applyFilters(); // Show loading state immediately
+  // CRITICAL FIX: Don't call applyFilters() before data is loaded - it will render empty
+  // Instead, let ensureLoadedThenRender() call applyFilters() after data is ready
   ensureLoadedThenRender();
   startLiveListsListeners();
 })();
@@ -2047,7 +2118,42 @@
   async function fetchMembersForList(listId) {
     const out = { people: new Set(), accounts: new Set(), loaded: false };
     if (console.time) console.time(`[ListsOverview] preload fetch ${listId}`);
-    if (!listId || !window.firebaseDB || typeof window.firebaseDB.collection !== 'function') return out;
+    if (!listId) return out;
+    
+    // COST OPTIMIZATION: Check IndexedDB cache first (zero Firestore reads if cached)
+    if (window.CacheManager && typeof window.CacheManager.getCachedListMembers === 'function') {
+      try {
+        const cached = await window.CacheManager.getCachedListMembers(listId);
+        if (cached && (cached.people instanceof Set || Array.isArray(cached.people))) {
+          out.people = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
+          out.accounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
+          out.loaded = true;
+          if (console.timeEnd) console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
+          console.log(`[ListsOverview] ✓ Loaded members for ${listId} from CacheManager (zero cost)`);
+          return out;
+        }
+      } catch (e) {
+        console.warn('[ListsOverview] Cache check failed, falling back to Firestore:', e);
+      }
+    }
+    
+    // Also check in-memory cache (faster than IndexedDB)
+    if (window.listMembersCache && window.listMembersCache[listId] && window.listMembersCache[listId].loaded) {
+      const cached = window.listMembersCache[listId];
+      out.people = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
+      out.accounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
+      out.loaded = true;
+      if (console.timeEnd) console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
+      console.log(`[ListsOverview] ✓ Loaded members for ${listId} from in-memory cache (zero cost)`);
+      return out;
+    }
+    
+    // Cache miss - fetch from Firestore
+    if (!window.firebaseDB || typeof window.firebaseDB.collection !== 'function') {
+      if (console.timeEnd) console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
+      return out;
+    }
+    
     let gotAny = false;
     // Prefer subcollection lists/{id}/members
     try {
@@ -2079,6 +2185,17 @@
       } catch (_) {}
     }
     out.loaded = true;
+    
+    // COST OPTIMIZATION: Cache the results for next time (IndexedDB write only)
+    if ((out.people.size > 0 || out.accounts.size > 0) && window.CacheManager && typeof window.CacheManager.cacheListMembers === 'function') {
+      try {
+        await window.CacheManager.cacheListMembers(listId, out.people, out.accounts);
+        console.log(`[ListsOverview] ✓ Cached members for ${listId} (zero cost on next load)`);
+      } catch (cacheErr) {
+        console.warn('[ListsOverview] Cache write failed (non-critical):', cacheErr);
+      }
+    }
+    
     if (console.timeEnd) console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
     return out;
   }

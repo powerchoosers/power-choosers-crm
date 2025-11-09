@@ -9549,7 +9549,7 @@ html, body {
     min-height: 84px;
     max-height: 84px;
     overflow: hidden;
-    padding: 4px 0 8px 0; /* Balanced vertical padding: 4px top, 8px bottom */
+    padding: 4px 12px 8px 12px; /* Balanced padding: 4px top, 12px sides, 8px bottom */
     box-sizing: border-box;
 }
 
