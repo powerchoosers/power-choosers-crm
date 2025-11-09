@@ -2287,6 +2287,52 @@ CRITICAL RULES:
     };
   }
 
+  // Check if this is an out-of-office reply first
+  const isOutOfOffice = /out of(?:[ -]the)?[ -]office|ooo|away from|be back|returning/i.test(String(prompt || '')) ||
+                       /won'?t be (?:in|available)|will be unavailable/i.test(String(prompt || ''));
+
+  if (isOutOfOffice) {
+    const oooRules = `
+OUT-OF-OFFICE AUTO-REPLY DETECTED:
+
+CRITICAL RULES:
+- This is an automated absence notification, NOT a sales opportunity
+- Generate a brief, courteous acknowledgment ONLY
+- NO sales pitch, NO energy services, NO value propositions
+- Keep total response under 40 words
+- Acknowledge their absence and return date
+- Express intention to reconnect when they're back
+- Use warm, casual tone
+
+OUTPUT FORMAT (JSON):
+{
+  "subject": "Re: [their subject]",
+  "greeting": "Hi ${firstName || 'there'},",
+  "paragraph1": "[Brief acknowledgment - 1 sentence]",
+  "paragraph2": "[Thank them and note their return date - 1 sentence]",
+  "paragraph3": "[Simple 'talk soon' closing - 1 sentence]",
+  "closing": "Best regards,\\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
+}
+
+FORBIDDEN:
+❌ NO "15-25% rate increases"
+❌ NO "electricity costs"
+❌ NO "energy solutions"
+❌ NO questions about contracts
+❌ NO sales language whatsoever
+
+EXAMPLE TONE:
+"Thanks for the heads up! Enjoy your time off, and I'll catch up with you when you're back in the office."
+
+CRITICAL: Return ONLY valid JSON with brief, friendly acknowledgment. No business discussion.`;
+
+    return { 
+      prompt: oooRules,
+      researchData: null,
+      openingStyle: null
+    };
+  }
+
   // Standard text mode (existing logic)
   const identity = whoWeAre || `You are ${senderName}, an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates. Write in first person ("we"/"I"). Do NOT use brand-first openers like "At Power Choosers," or "Power Choosers helps" — prefer "We help" or "I help".
 
@@ -2311,7 +2357,7 @@ OUTPUT FORMAT (JSON):
   "paragraph1": "[Opening paragraph with context - 2-3 sentences]",
   "paragraph2": "[Main message paragraph - 3-4 sentences about value and next steps]",
   "paragraph3": "[Call to action paragraph - clear question or request]",
-  "closing": "Best regards,\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
+  "closing": "Best regards,\\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
 }
 
 CRITICAL: Return ONLY valid JSON. Each paragraph should be a separate field. Do not include any text outside the JSON structure.
