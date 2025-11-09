@@ -14,10 +14,10 @@ return;
     const response = await fetch(rssUrl, { headers: { 'User-Agent': 'PowerChoosersCRM/1.0' } });
     const xml = await response.text();
 
-    const items = [];
+    const rawItems = [];
     const itemRegex = /<item>([\s\S]*?)<\/item>/g;
     let match;
-    while ((match = itemRegex.exec(xml)) && items.length < 4) {
+    while ((match = itemRegex.exec(xml)) && rawItems.length < 4) {
       const block = match[1];
       const getTag = (name) => {
         const r = new RegExp(`<${name}>([\\s\\S]*?)<\\/${name}>`, 'i');
@@ -30,7 +30,50 @@ return;
       let publishedAt = '';
       try { publishedAt = new Date(pubDate).toISOString(); } catch (_) { publishedAt = ''; }
       if (!title || !link) continue;
-      items.push({ title, url: link, publishedAt });
+      rawItems.push({ title, url: link, publishedAt });
+    }
+
+    // Reformat headlines using Gemini to fit exactly 3 lines
+    const items = [];
+    try {
+      const { GoogleGenerativeAI } = await import('@google/generative-ai');
+      const apiKey = process.env.GEMINI_API_KEY;
+      
+      if (apiKey) {
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+        
+        // Process headlines in parallel for better performance
+        const reformattedItems = await Promise.all(rawItems.map(async (item) => {
+          try {
+            const prompt = `Rewrite this energy news headline to be approximately 90-110 characters (fits exactly 3 lines in a widget). Keep the key information concise and scannable. Remove source attribution (like "- CBS News", "- The Hill", etc.) from the end. Return ONLY the rewritten headline with no quotes or extra text:
+
+"${item.title}"`;
+            
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            const reformattedTitle = response.text().trim().replace(/^["']|["']$/g, ''); // Remove quotes if any
+            
+            return {
+              ...item,
+              title: reformattedTitle || item.title // Fallback to original if Gemini fails
+            };
+          } catch (err) {
+            console.error('[Energy News] Gemini reformatting failed for headline:', err);
+            return item; // Fallback to original headline
+          }
+        }));
+        
+        items.push(...reformattedItems);
+      } else {
+        // No Gemini key - use original headlines
+        console.warn('[Energy News] GEMINI_API_KEY not set, using original headlines');
+        items.push(...rawItems);
+      }
+    } catch (error) {
+      // Gemini import or processing failed - use original headlines
+      console.error('[Energy News] Gemini processing failed:', error);
+      items.push(...rawItems);
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
