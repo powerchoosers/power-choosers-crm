@@ -5543,6 +5543,44 @@ html, body {
 }
 
 /* Email detail page styles */
+#email-detail-page .page-header {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+#email-detail-page .page-title-section {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start; /* Ensure title stays next to back button */
+    gap: 12px; /* Comfortable spacing between back button and subject */
+    flex: 1;
+    min-width: 0; /* Allow title to shrink if needed */
+    margin-bottom: 0; /* Override general page-title-section margin */
+}
+
+#email-detail-page .page-title {
+    margin: 0; /* Remove default margin */
+    padding: 0; /* Remove any padding */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 0 0 auto; /* Don't grow, stay next to button */
+}
+
+#email-detail-page .back-btn--icon {
+    margin: 0; /* Ensure no margin on back button */
+    flex-shrink: 0; /* Don't shrink */
+}
+
+#email-detail-page .page-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-shrink: 0; /* Prevent buttons from shrinking */
+}
+
 #email-detail-page .email-detail-container {
     background: var(--bg-card);
     border: 1px solid var(--border-light);
@@ -5605,6 +5643,577 @@ html, body {
     gap: 8px;
 }
 
+/* Gmail-style Reply/Forward Container */
+#email-detail-page .email-reply-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    margin: 20px var(--spacing-base) var(--spacing-base) var(--spacing-base);
+    overflow: hidden;
+}
+
+#email-detail-page .email-reply-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--bg-card);
+}
+
+#email-detail-page .email-reply-recipient {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+#email-detail-page .reply-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-item);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+    border: 1px solid var(--border-light);
+}
+
+#email-detail-page .reply-arrow {
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+#email-detail-page .reply-to-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+#email-detail-page .reply-to-input,
+#email-detail-page .reply-cc-input,
+#email-detail-page .reply-bcc-input,
+#email-detail-page .reply-subject-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid var(--border-light);
+    border-radius: 6px;
+    background: var(--bg-item);
+    color: var(--text-primary);
+    font-size: 14px;
+    transition: all 0.3s ease;
+    outline: none;
+    box-sizing: border-box;
+    flex: 1;
+}
+
+#email-detail-page .reply-to-input:hover,
+#email-detail-page .reply-cc-input:hover,
+#email-detail-page .reply-bcc-input:hover,
+#email-detail-page .reply-subject-input:hover {
+    border-color: var(--grey-500);
+    background: var(--bg-widget);
+}
+
+#email-detail-page .reply-to-input:focus,
+#email-detail-page .reply-cc-input:focus,
+#email-detail-page .reply-bcc-input:focus,
+#email-detail-page .reply-subject-input:focus {
+    outline: none;
+    border-color: var(--orange-subtle);
+    background: var(--bg-widget);
+    box-shadow: 0 0 0 3px rgba(255,145,0,0.1);
+    transform: translateY(-1px);
+}
+
+#email-detail-page .reply-to-input::placeholder,
+#email-detail-page .reply-cc-input::placeholder,
+#email-detail-page .reply-bcc-input::placeholder,
+#email-detail-page .reply-subject-input::placeholder {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+#email-detail-page .reply-cc-toggle {
+    background: var(--bg-item);
+    border: 2px solid var(--border-light);
+    padding: 6px 12px;
+    cursor: pointer;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+#email-detail-page .reply-cc-toggle:hover {
+    background: var(--bg-widget);
+    border-color: var(--grey-500);
+}
+
+#email-detail-page .reply-cc-toggle:focus {
+    outline: none;
+    border-color: var(--orange-subtle);
+    box-shadow: 0 0 0 3px rgba(255,145,0,0.1);
+}
+
+#email-detail-page .reply-cc-bcc {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-light);
+}
+
+#email-detail-page .email-reply-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px;
+    border-bottom: 1px solid var(--border-light);
+    background: transparent;
+    border-radius: var(--border-radius-sm);
+    gap: 12px;
+}
+
+#email-detail-page .reply-toolbar-left,
+#email-detail-page .reply-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+#email-detail-page .toolbar-btn {
+    background: none;
+    border: 1px solid var(--grey-600);
+    color: var(--grey-300);
+    width: 30px;
+    height: 30px;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+#email-detail-page .toolbar-btn:hover {
+    background: var(--grey-700);
+    color: var(--text-inverse);
+    border-color: var(--grey-500);
+}
+
+#email-detail-page .toolbar-btn:focus-visible {
+    outline: 2px solid var(--orange-muted);
+    outline-offset: 2px;
+}
+
+#email-detail-page .toolbar-btn:active {
+    transform: translateY(0.5px);
+}
+
+#email-detail-page .toolbar-btn svg {
+    width: 16px !important;
+    height: 16px !important;
+    display: block;
+    pointer-events: none;
+}
+
+#email-detail-page .email-reply-body {
+    min-height: 200px;
+    padding: 16px;
+    background: var(--bg-card);
+}
+
+#email-detail-page .reply-body-input {
+    min-height: 150px;
+    padding: 12px;
+    border: 2px solid var(--border-light);
+    border-radius: 6px;
+    background: var(--bg-item);
+    outline: none;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    word-wrap: break-word;
+    transition: all 0.3s ease;
+    cursor: text;
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+#email-detail-page .reply-body-input:hover {
+    border-color: var(--grey-500);
+    background: var(--bg-widget);
+}
+
+#email-detail-page .reply-body-input:focus {
+    outline: none;
+    border-color: var(--orange-subtle);
+    background: var(--bg-widget);
+    box-shadow: 0 0 0 3px rgba(255,145,0,0.1);
+}
+
+#email-detail-page .reply-body-input:empty::before {
+    content: attr(placeholder);
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+/* Ensure contenteditable is always enabled */
+#email-detail-page .reply-body-input[contenteditable="true"],
+#email-detail-page .reply-body-input[contenteditable=""] {
+    cursor: text;
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+/* Prevent issues with signature blocks */
+#email-detail-page .reply-body-input [data-signature="true"] {
+    pointer-events: none;
+    user-select: none;
+}
+
+#email-detail-page .email-reply-footer {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-light);
+    background: var(--surface-hover);
+    position: relative;
+}
+
+#email-detail-page .reply-actions {
+    display: flex;
+    gap: 8px;
+}
+
+#email-detail-page .reply-send-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    background: linear-gradient(135deg, var(--orange-subtle), #e67e22);
+    color: var(--text-inverse);
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: none;
+}
+
+#email-detail-page .reply-send-btn:hover {
+    background: linear-gradient(135deg, #e67e22, #d35400);
+    box-shadow: none;
+    transform: translateY(-1px);
+}
+
+#email-detail-page .reply-send-btn:active {
+    background: linear-gradient(135deg, #d35400, #c0392b);
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+#email-detail-page .reply-send-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+#email-detail-page .reply-discard-btn {
+    background: transparent;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+#email-detail-page .reply-discard-btn:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+}
+
+/* Formatting bar - slides down below toolbar like global compose */
+#email-detail-page .reply-formatting-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    background: transparent;
+    border: 0;
+    border-radius: var(--border-radius-sm);
+    padding: 0;
+    margin-bottom: 0;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease, padding 0.3s ease, border 0.3s ease, margin-bottom 0.3s ease;
+}
+
+#email-detail-page .reply-formatting-bar.open {
+    max-height: 200px;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    border: 0;
+    padding: 6px;
+    margin-bottom: var(--spacing-sm);
+    overflow: visible;
+}
+
+#email-detail-page .reply-formatting-bar .fmt-btn {
+    background: none;
+    border: 1px solid var(--grey-600);
+    color: var(--grey-300);
+    height: 30px;
+    min-width: 30px;
+    padding: 0 8px;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+#email-detail-page .reply-formatting-bar .fmt-btn:hover {
+    background: var(--grey-700);
+    color: var(--text-inverse);
+    border-color: var(--grey-500);
+}
+
+#email-detail-page .reply-formatting-bar .fmt-btn:focus-visible {
+    outline: 2px solid var(--orange-muted);
+    outline-offset: 2px;
+}
+
+#email-detail-page .reply-formatting-bar .fmt-btn:active {
+    transform: translateY(0.5px);
+}
+
+#email-detail-page .reply-formatting-bar .fmt-btn[aria-pressed="true"] {
+    background: var(--grey-700);
+    color: var(--text-inverse);
+    border-color: var(--grey-600);
+}
+
+#email-detail-page .formatting-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border-light);
+    margin: 0 4px;
+}
+
+/* AI bar - slides down below toolbar like global compose */
+#email-detail-page .reply-ai-bar {
+    display: block;
+    background: transparent;
+    border: 0;
+    border-radius: var(--border-radius-sm);
+    padding: 0;
+    margin-bottom: 0;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease, padding 0.3s ease, border 0.3s ease, margin-bottom 0.3s ease;
+}
+
+#email-detail-page .reply-ai-bar.open {
+    max-height: 480px;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    border: 0;
+    padding: 16px;
+    margin-bottom: var(--spacing-sm);
+    overflow: visible;
+}
+
+#email-detail-page .reply-ai-bar .ai-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#email-detail-page .reply-ai-bar .ai-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#email-detail-page .reply-ai-bar .ai-prompt {
+    width: 100%;
+    min-height: 68px;
+    padding: 12px;
+    background: var(--bg-item);
+    border: 2px solid var(--border-light);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    transition: all 0.3s ease;
+}
+
+#email-detail-page .reply-ai-bar .ai-prompt:focus {
+    outline: none;
+    border-color: var(--orange-subtle);
+    box-shadow: 0 0 0 3px rgba(255,145,0,0.1);
+    background: var(--bg-widget);
+}
+
+#email-detail-page .reply-ai-bar .ai-prompt::placeholder {
+    color: var(--text-muted);
+}
+
+#email-detail-page .reply-ai-bar .ai-row.actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+#email-detail-page .reply-ai-bar .ai-generate {
+    background: var(--grey-600);
+    border: 1px solid var(--grey-600);
+    color: var(--text-primary);
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+#email-detail-page .reply-ai-bar .ai-generate:hover {
+    background: var(--grey-500);
+    color: var(--text-inverse);
+    border-color: var(--grey-500);
+}
+
+#email-detail-page .reply-ai-bar .ai-status {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-left: auto;
+}
+
+/* Link bar - slides down below toolbar like global compose */
+#email-detail-page .reply-link-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: 0;
+    border-radius: var(--border-radius-sm);
+    padding: 0;
+    margin-bottom: 0;
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+    overflow: hidden;
+    flex-wrap: wrap;
+    transition: max-height 0.3s ease, opacity 0.3s ease, transform 0.3s ease, padding 0.3s ease, border 0.3s ease, margin-bottom 0.3s ease;
+}
+
+#email-detail-page .reply-link-bar.open {
+    max-height: 200px;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    border: 0;
+    padding: 12px 16px;
+    margin-bottom: var(--spacing-sm);
+    overflow: visible;
+}
+
+#email-detail-page .link-text-input,
+#email-detail-page .link-url-input {
+    flex: 1;
+    min-width: 150px;
+    padding: 10px 12px;
+    border: 2px solid var(--border-light);
+    border-radius: 6px;
+    background: var(--bg-item);
+    color: var(--text-primary);
+    font-size: 14px;
+    transition: all 0.3s ease;
+    outline: none;
+    box-sizing: border-box;
+}
+
+#email-detail-page .link-text-input:hover,
+#email-detail-page .link-url-input:hover {
+    border-color: var(--grey-500);
+    background: var(--bg-widget);
+}
+
+#email-detail-page .link-text-input:focus,
+#email-detail-page .link-url-input:focus {
+    outline: none;
+    border-color: var(--orange-subtle);
+    background: var(--bg-widget);
+    box-shadow: 0 0 0 3px rgba(255,145,0,0.1);
+    transform: translateY(-1px);
+}
+
+#email-detail-page .reply-link-bar .fmt-btn {
+    background: none;
+    border: 1px solid var(--grey-600);
+    color: var(--grey-300);
+    height: 30px;
+    min-width: 30px;
+    padding: 0 12px;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+#email-detail-page .reply-link-bar .fmt-btn:hover {
+    background: var(--grey-700);
+    color: var(--text-inverse);
+    border-color: var(--grey-500);
+}
+
+#email-detail-page .reply-link-bar .fmt-btn:focus-visible {
+    outline: 2px solid var(--orange-muted);
+    outline-offset: 2px;
+}
+
+#email-detail-page .reply-link-bar .fmt-btn:active {
+    transform: translateY(0.5px);
+}
+
+#email-detail-page .link-text-input::placeholder,
+#email-detail-page .link-url-input::placeholder {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
 #email-detail-page .email-detail-body {
     padding: var(--spacing-lg);
 }
@@ -5612,6 +6221,23 @@ html, body {
 #email-detail-page .email-content {
     line-height: 1.6;
     color: var(--text-primary);
+    border-radius: var(--border-radius-sm);
+    overflow: hidden;
+}
+
+/* Round corners on HTML email containers */
+#email-detail-page .email-content > div,
+#email-detail-page .email-content > iframe {
+    border-radius: var(--border-radius-sm);
+    overflow: hidden;
+}
+
+/* Round corners on HTML email container elements */
+#email-detail-page .email-content .container,
+#email-detail-page .email-content [class*="container"],
+#email-detail-page .email-content [style*="container"] {
+    border-radius: var(--border-radius-sm) !important;
+    overflow: hidden;
 }
 
 #email-detail-page .email-content img {
@@ -5627,6 +6253,17 @@ html, body {
 #email-detail-page .email-content a:hover {
     color: var(--text-inverse);
     text-decoration: underline;
+}
+
+/* Fix signature text color to match email content */
+#email-detail-page .email-content [data-signature="true"],
+#email-detail-page .email-content [data-signature="true"] * {
+    color: var(--text-primary) !important;
+}
+
+/* Fix signature border color to be visible on dark background */
+#email-detail-page .email-content [data-signature="true"] {
+    border-top-color: var(--border-light) !important;
 }
 
 /* Star button styling */
@@ -5824,6 +6461,65 @@ html, body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 .qa-btn svg { display:block; width: 14px; height: 14px; stroke: currentColor; fill: none; }
+
+/* Tracking states for email action buttons */
+.qa-btn.opened {
+  background-color: var(--orange-subtle);
+  color: white;
+  border-color: var(--orange-subtle);
+}
+
+.qa-btn.not-opened {
+  background-color: var(--grey-400);
+  color: var(--grey-600);
+}
+
+.qa-btn.clicked {
+  background-color: var(--orange-subtle);
+  color: white;
+  border-color: var(--orange-subtle);
+}
+
+.qa-btn.not-clicked {
+  background-color: var(--grey-400);
+  color: var(--grey-600);
+}
+
+/* Star button styling */
+.qa-btn.starred {
+  color: var(--orange-subtle);
+  background-color: var(--bg-item);
+  border-color: var(--orange-subtle);
+}
+
+.qa-btn.starred svg {
+  fill: currentColor;
+}
+
+.qa-btn.starred:hover {
+  background-color: var(--orange-subtle);
+  color: white;
+}
+
+/* Tracking badge on qa-btn buttons */
+#emails-table .qa-btn .tracking-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background-color: var(--orange-subtle);
+  color: white;
+  font-size: 9px;
+  font-weight: 600;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border: 1px solid var(--bg-card);
+  z-index: 1;
+}
 
 /* Keep all headers and cells on a single line */
 .data-table th,

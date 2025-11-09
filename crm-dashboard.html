@@ -717,18 +717,33 @@
                         <div class="page-container">
                             <div class="page-header">
                                 <div class="page-title-section">
-                                    <button class="back-btn" id="email-back-btn">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <polyline points="15,18 9,12 15,6"/>
+                                    <button class="back-btn back-btn--icon" id="email-back-btn" aria-label="Back" title="Back">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                                            <path d="M19 12H5M12 19l-7-7 7-7"/>
                                         </svg>
-                                        Back to Emails
                                     </button>
                                     <h2 class="page-title" id="email-detail-title">Email Subject</h2>
                                 </div>
                                 <div class="page-actions">
-                                    <button class="btn-secondary" id="reply-btn">Reply</button>
-                                    <button class="btn-secondary" id="forward-btn">Forward</button>
-                                    <button class="btn-danger" id="delete-email-btn">Delete</button>
+                                    <button class="quick-action-btn" id="reply-btn" title="Reply" aria-label="Reply">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                            <polyline points="9,10 4,15 9,20"/>
+                                            <path d="M20,4v7a4,4,0,0,1-4,4H4"/>
+                                        </svg>
+                                    </button>
+                                    <button class="quick-action-btn" id="forward-btn" title="Forward" aria-label="Forward">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                            <polyline points="15,14 20,9 15,4"/>
+                                            <path d="M4,20v-7a4,4,0,0,1,4-4h12"/>
+                                        </svg>
+                                    </button>
+                                    <button class="quick-action-btn" id="delete-email-btn" title="Delete" aria-label="Delete">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                            <polyline points="3,6 5,6 21,6"/>
+                                            <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/>
+                                            <path d="M10,11v6M14,11v6"/>
+                                        </svg>
+                                    </button>
                                 </div>
                             </div>
                             <div class="page-content">
@@ -757,6 +772,142 @@
                                     <div class="email-detail-body">
                                         <div class="email-content" id="email-content">
                                             <!-- Email content will be inserted here -->
+                                        </div>
+                                    </div>
+                                    <!-- Gmail-style Reply/Forward Compose Container -->
+                                    <div class="email-reply-container" id="email-reply-container" style="display: none;">
+                                        <div class="email-reply-header">
+                                            <div class="email-reply-recipient">
+                                                <div class="reply-avatar">
+                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                                        <circle cx="12" cy="7" r="4"></circle>
+                                                    </svg>
+                                                </div>
+                                                <div class="reply-arrow">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <polyline points="9,10 4,15 9,20"></polyline>
+                                                        <path d="M20,4v7a4,4,0,0,1-4,4H4"></path>
+                                                    </svg>
+                                                </div>
+                                                <div class="reply-to-info">
+                                                    <input type="text" class="reply-to-input input-standard" id="reply-to-input" placeholder="To" readonly>
+                                                    <button class="reply-cc-toggle" id="reply-cc-toggle" title="Cc, Bcc" type="button">
+                                                        Cc Bcc
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="reply-cc-bcc" id="reply-cc-bcc" style="display: none;">
+                                                <input type="text" class="reply-cc-input input-standard" id="reply-cc-input" placeholder="Cc">
+                                                <input type="text" class="reply-bcc-input input-standard" id="reply-bcc-input" placeholder="Bcc">
+                                            </div>
+                                            <input type="text" class="reply-subject-input input-standard" id="reply-subject-input" placeholder="Subject">
+                                        </div>
+                                        <div class="email-reply-toolbar">
+                                            <div class="reply-toolbar-left">
+                                                <button class="toolbar-btn" data-action="formatting" title="Formatting" aria-label="Text formatting">Aa</button>
+                                                <button class="toolbar-btn" data-action="attach" title="Attach files">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                                    </svg>
+                                                </button>
+                                                <button class="toolbar-btn" data-action="link" title="Insert link">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                                                    </svg>
+                                                </button>
+                                                <button class="toolbar-btn" data-action="image" title="Insert image">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                                        <polyline points="21,15 16,10 5,21"></polyline>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <div class="reply-toolbar-right">
+                                                <button class="toolbar-btn toolbar-ai" data-action="ai" title="Write with AI" aria-label="Write with AI">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48">
+                                                        <path fill="white" d="M23.426,31.911l-1.719,3.936c-0.661,1.513-2.754,1.513-3.415,0l-1.719-3.936	c-1.529-3.503-4.282-6.291-7.716-7.815l-4.73-2.1c-1.504-0.668-1.504-2.855,0-3.523l4.583-2.034	c3.522-1.563,6.324-4.455,7.827-8.077l1.741-4.195c0.646-1.557,2.797-1.557,3.443,0l1.741,4.195	c1.503,3.622,4.305,6.514,7.827,8.077l4.583,2.034c1.504,0.668,1.504,2.855,0,3.523l-4.73,2.1	C27.708,25.62,24.955,28.409,23.426,31.911z"></path>
+                                                        <path fill="white" d="M38.423,43.248l-0.493,1.131c-0.361,0.828-1.507,0.828-1.868,0l-0.493-1.131	c-0.879-2.016-2.464-3.621-4.44-4.5l-1.52-0.675c-0.822-0.365-0.822-1.56,0-1.925l1.435-0.638c2.027-0.901,3.64-2.565,4.504-4.65	l0.507-1.222c0.353-0.852,1.531-0.852,1.884,0l0.507,1.222c0.864,2.085,2.477,3.749,4.504,4.65l1.435,0.638	c0.822,0.365,0.822,1.56,0,1.925l-1.52,0.675C40.887,39.627,39.303,41.232,38.423,43.248z"></path>
+                                                    </svg>
+                                                </button>
+                                                <button class="toolbar-btn" data-action="more" title="More options">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <circle cx="12" cy="12" r="1"></circle>
+                                                        <circle cx="19" cy="12" r="1"></circle>
+                                                        <circle cx="5" cy="12" r="1"></circle>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <!-- AI bar (hidden by default, slides down below toolbar) -->
+                                        <div class="ai-bar reply-ai-bar" aria-hidden="true">
+                                            <div class="ai-inner">
+                                                <div class="ai-row">
+                                                    <textarea class="ai-prompt input-dark" rows="3" 
+                                                              placeholder="Describe the reply you want... (leave empty for AI to generate based on email thread)"></textarea>
+                                                </div>
+                                                <div class="ai-row actions">
+                                                    <button class="fmt-btn ai-generate" data-mode="standard">Generate Standard</button>
+                                                    <button class="fmt-btn ai-generate" data-mode="html">Generate HTML</button>
+                                                    <div class="ai-status" aria-live="polite"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- Formatting bar (hidden by default, slides down below toolbar) -->
+                                        <div class="formatting-bar reply-formatting-bar" aria-hidden="true">
+                                            <button class="fmt-btn" data-fmt="bold" title="Bold" aria-label="Bold">
+                                                <span class="fmt-glyph">B</span>
+                                            </button>
+                                            <button class="fmt-btn" data-fmt="italic" title="Italic" aria-label="Italic">
+                                                <span class="fmt-glyph" style="font-style:italic;">I</span>
+                                            </button>
+                                            <button class="fmt-btn" data-fmt="underline" title="Underline" aria-label="Underline">
+                                                <span class="fmt-glyph" style="text-decoration:underline;">U</span>
+                                            </button>
+                                            <div class="formatting-divider"></div>
+                                            <button class="fmt-btn" data-fmt="insertUnorderedList" title="Bullet list">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                                                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                                                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                                                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                                                </svg>
+                                            </button>
+                                            <button class="fmt-btn" data-fmt="insertOrderedList" title="Numbered list">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <line x1="10" y1="6" x2="21" y2="6"></line>
+                                                    <line x1="10" y1="12" x2="21" y2="12"></line>
+                                                    <line x1="10" y1="18" x2="21" y2="18"></line>
+                                                    <line x1="4" y1="6" x2="4" y2="6"></line>
+                                                    <line x1="4" y1="12" x2="4" y2="12"></line>
+                                                    <line x1="4" y1="18" x2="4" y2="18"></line>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <!-- Link bar (hidden by default, slides down below toolbar) -->
+                                        <div class="link-bar reply-link-bar" aria-hidden="true">
+                                            <input type="text" class="link-text-input input-standard" data-link-text placeholder="Link text">
+                                            <input type="url" class="link-url-input input-standard" data-link-url placeholder="URL">
+                                            <button class="fmt-btn" data-link-insert type="button">Insert</button>
+                                            <button class="fmt-btn" data-link-cancel type="button">Cancel</button>
+                                        </div>
+                                        <div class="email-reply-body">
+                                            <div class="reply-body-input" contenteditable="true" id="reply-body-input" role="textbox" aria-multiline="true" placeholder=""></div>
+                                        </div>
+                                        <div class="email-reply-footer">
+                                            <div class="reply-actions">
+                                                <button class="btn-primary reply-send-btn" id="reply-send-btn">Send</button>
+                                                <button class="reply-discard-btn" id="reply-discard-btn" title="Discard">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <polyline points="3,6 5,6 21,6"></polyline>
+                                                        <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -3638,7 +3789,8 @@
                 <div class="editor-toolbar" role="toolbar" aria-label="Email editor actions">
                     <button class="toolbar-btn toolbar-ai" type="button" data-action="ai" aria-label="Write with AI" title="Write with AI">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48">
-                            <path fill="white" d="M46.117,23.081l-0.995-0.04H45.12C34.243,22.613,25.387,13.757,24.959,2.88l-0.04-0.996	C24.9,1.39,24.494,1,24,1s-0.9,0.39-0.919,0.883l-0.04,0.996c-0.429,10.877-9.285,19.733-20.163,20.162l-0.995,0.04	C1.39,23.1,1,23.506,1,24s0.39,0.9,0.884,0.919l0.995,0.039c10.877,0.43,19.733,9.286,20.162,20.163l0.04,0.996	C23.1,46.61,23.506,47,24,47s0.9-0.39,0.919-0.883l0.04-0.996c0.429-10.877,9.285-19.733,20.162-20.163l0.995-0.039	C46.61,24.9,47,24.494,47,24S46.61,23.1,46.117,23.081z"></path>
+                            <path fill="white" d="M23.426,31.911l-1.719,3.936c-0.661,1.513-2.754,1.513-3.415,0l-1.719-3.936	c-1.529-3.503-4.282-6.291-7.716-7.815l-4.73-2.1c-1.504-0.668-1.504-2.855,0-3.523l4.583-2.034	c3.522-1.563,6.324-4.455,7.827-8.077l1.741-4.195c0.646-1.557,2.797-1.557,3.443,0l1.741,4.195	c1.503,3.622,4.305,6.514,7.827,8.077l4.583,2.034c1.504,0.668,1.504,2.855,0,3.523l-4.73,2.1	C27.708,25.62,24.955,28.409,23.426,31.911z"></path>
+                            <path fill="white" d="M38.423,43.248l-0.493,1.131c-0.361,0.828-1.507,0.828-1.868,0l-0.493-1.131	c-0.879-2.016-2.464-3.621-4.44-4.5l-1.52-0.675c-0.822-0.365-0.822-1.56,0-1.925l1.435-0.638c2.027-0.901,3.64-2.565,4.504-4.65	l0.507-1.222c0.353-0.852,1.531-0.852,1.884,0l0.507,1.222c0.864,2.085,2.477,3.749,4.504,4.65l1.435,0.638	c0.822,0.365,0.822,1.56,0,1.925l-1.52,0.675C40.887,39.627,39.303,41.232,38.423,43.248z"></path>
                         </svg>
                         <span class="label">Write with AI</span>
                     </button>
