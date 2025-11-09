@@ -429,45 +429,75 @@
         }
         
         // Handle company name clicks (for contacts)
-        if (anchor.matches('.company-link[data-company-name]') && !anchor.hasAttribute('data-account-id')) {
+        // COST-EFFECTIVE: Use findAccountByName() which checks cache first, then BackgroundAccountsLoader (zero Firestore reads)
+        if (anchor.matches('.company-link[data-company-name]')) {
           e.preventDefault();
+          const accountId = anchor.getAttribute('data-account-id');
+          // Note: getAttribute returns the decoded value, no need to decode HTML entities here
           const companyName = anchor.getAttribute('data-company-name');
-          if (companyName) {
-            // Find the account by name
-            const account = state.dataAccounts.find(acc => acc.accountName === companyName || acc.name === companyName);
-            if (account) {
-              // Store navigation context for back button
-              window._accountNavigationSource = 'list-detail';
-              window._accountNavigationListId = state.listId;
-              window._accountNavigationListName = state.listName;
-              window._accountNavigationListView = 'people';
-              
-              // Capture state for restoration
+          
+          let account = null;
+          
+          // If data-account-id exists, use it directly (fastest path)
+          if (accountId) {
+            // Try to find account in local state first
+            account = state.dataAccounts.find(acc => acc.id === accountId);
+            
+            // Fallback to BackgroundAccountsLoader (cost-effective: zero Firestore reads)
+            if (!account && window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
               try {
-                window._listDetailReturn = {
-                  page: state.currentPage,
-                  scroll: window.scrollY || 0,
-                  filters: {
-                    quickSearch: els.quickSearch ? els.quickSearch.value : '',
-                    chips: { ...state.chips },
-                    flags: { ...state.flags }
-                  },
-                  listId: state.listId,
-                  listName: state.listName,
-                  view: state.view
-                };
-                console.log('[ListDetail] Captured state for back navigation:', window._listDetailReturn);
+                const allAccounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+                account = allAccounts.find(acc => acc.id === accountId);
               } catch (_) { /* noop */ }
-              
-              // Prefetch account object and open detail immediately
-              try { window._prefetchedAccountForDetail = account; } catch (_) {}
-              if (window.showAccountDetail && typeof window.showAccountDetail === 'function') {
-                window.showAccountDetail(account.id);
-              } else if (window.crm && typeof window.crm.navigateToPage === 'function') {
-                // Fallback: go to accounts page
-                window.crm.navigateToPage('accounts');
-              }
             }
+            
+            // Final fallback to global getAccountsData (cost-effective: uses cache)
+            if (!account && typeof window.getAccountsData === 'function') {
+              try {
+                const allAccounts = window.getAccountsData() || [];
+                account = allAccounts.find(acc => acc.id === accountId);
+              } catch (_) { /* noop */ }
+            }
+          } else if (companyName) {
+            // No account ID - find by name (case-insensitive, with fallback to global accounts data)
+            account = findAccountByName(companyName);
+          }
+          
+          if (account && account.id) {
+            console.log('[ListDetail] Navigating to account:', account.id, account.accountName || account.name);
+            // Store navigation context for back button
+            window._accountNavigationSource = 'list-detail';
+            window._accountNavigationListId = state.listId;
+            window._accountNavigationListName = state.listName;
+            window._accountNavigationListView = 'people';
+            
+            // Capture state for restoration
+            try {
+              window._listDetailReturn = {
+                page: state.currentPage,
+                scroll: window.scrollY || 0,
+                filters: {
+                  quickSearch: els.quickSearch ? els.quickSearch.value : '',
+                  chips: { ...state.chips },
+                  flags: { ...state.flags }
+                },
+                listId: state.listId,
+                listName: state.listName,
+                view: state.view
+              };
+              console.log('[ListDetail] Captured state for back navigation:', window._listDetailReturn);
+            } catch (_) { /* noop */ }
+            
+            // Prefetch account object and open detail immediately
+            try { window._prefetchedAccountForDetail = account; } catch (_) {}
+            if (window.showAccountDetail && typeof window.showAccountDetail === 'function') {
+              window.showAccountDetail(account.id);
+            } else if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              // Fallback: go to accounts page
+              window.crm.navigateToPage('accounts');
+            }
+          } else {
+            console.warn('[ListDetail] ⚠ Cannot navigate: account not found for company:', companyName);
           }
         }
         
@@ -1289,6 +1319,67 @@
   }
 
   function normalize(s) { return (s || '').toString().trim().toLowerCase(); }
+  
+  // Helper to decode HTML entities (for company name matching)
+  function decodeHtmlEntities(str) {
+    if (!str) return '';
+    const txt = document.createElement('textarea');
+    txt.innerHTML = str;
+    return txt.value;
+  }
+  
+  // Helper to find account by name (case-insensitive, with fallback to global accounts data)
+  function findAccountByName(companyName) {
+    if (!companyName) return null;
+    // Decode HTML entities first (e.g., &#039; → ', &amp; → &)
+    const decodedName = decodeHtmlEntities(companyName);
+    const normalizedName = normalize(decodedName);
+    
+    // First try state.dataAccounts (local cache)
+    let account = state.dataAccounts.find(acc => {
+      const accName = normalize(acc.accountName || acc.name || acc.companyName || '');
+      return accName === normalizedName;
+    });
+    
+    if (account) {
+      console.debug('[ListDetail] Found account in state.dataAccounts:', decodedName, '→', account.id);
+      return account;
+    }
+    
+    // Fallback to BackgroundAccountsLoader (cost-effective: zero Firestore reads)
+    if (!account && window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+      try {
+        const allAccounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+        account = allAccounts.find(acc => {
+          const accName = normalize(acc.accountName || acc.name || acc.companyName || '');
+          return accName === normalizedName;
+        });
+        if (account) {
+          console.debug('[ListDetail] Found account in BackgroundAccountsLoader:', decodedName, '→', account.id);
+        }
+      } catch (_) { /* noop */ }
+    }
+    
+    // Final fallback to global getAccountsData (cost-effective: uses cache)
+    if (!account && typeof window.getAccountsData === 'function') {
+      try {
+        const allAccounts = window.getAccountsData() || [];
+        account = allAccounts.find(acc => {
+          const accName = normalize(acc.accountName || acc.name || acc.companyName || '');
+          return accName === normalizedName;
+        });
+        if (account) {
+          console.debug('[ListDetail] Found account in getAccountsData:', decodedName, '→', account.id);
+        }
+      } catch (_) { /* noop */ }
+    }
+    
+    if (!account) {
+      console.warn('[ListDetail] ⚠ Account not found for company:', decodedName, '(original:', companyName + ')');
+    }
+    
+    return account || null;
+  }
 
   function getPageItems() {
     const start = (state.currentPage - 1) * state.pageSize;
@@ -1418,7 +1509,7 @@
     const id = c.id || '';
     const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ') || escapeHtml(c.name || '');
     const title = escapeHtml(c.title || '');
-    const company = escapeHtml(c.companyName || '');
+    const company = c.companyName || ''; // Don't escape here - will escape when inserting into HTML
     const email = escapeHtml(c.email || '');
     
     // Phone: prefer user-selected default, then fallback to priority order
@@ -1463,14 +1554,31 @@
           break;
         case 'company':
           // Build favicon/logo HTML with logoUrl priority and safe click behavior
+          // COST-EFFECTIVE: Use findAccountByName() which checks cache first, then BackgroundAccountsLoader (zero Firestore reads)
+          const acct = findAccountByName(company);
           const faviconHTML = (() => {
-            const acct = state.dataAccounts.find(acc => acc.accountName === company || acc.name === company) || {};
-            let domain = String(acct.domain || acct.website || '').trim();
+            let domain = '';
+            let logoUrl = '';
+            
+            if (acct) {
+              domain = String(acct.domain || acct.website || '').trim();
+              logoUrl = acct.logoUrl || acct.logoURL || '';
+            }
+            
+            // If no domain from account, try to derive from company name (fallback for logo rendering)
+            if (!domain && company) {
+              // Try to extract domain from company name if it looks like a domain
+              const nameStr = String(company).trim();
+              if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(nameStr) && !/\s/.test(nameStr)) {
+                domain = nameStr.replace(/^www\./i, '');
+              }
+            }
+            
             if (/^https?:\/\//i.test(domain)) {
               try { domain = new URL(domain).hostname; } catch(_) { domain = domain.replace(/^https?:\/\//i, '').split('/')[0]; }
             }
             domain = domain ? domain.replace(/^www\./i, '') : '';
-            const logoUrl = acct.logoUrl || acct.logoURL || '';
+            
             if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
               const html = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
               return html && String(html).trim() ? html : '<span class="company-favicon placeholder" aria-hidden="true"></span>';
@@ -1480,7 +1588,10 @@
             }
             return '<span class="company-favicon placeholder" aria-hidden="true"></span>';
           })();
-          html += `<td><a href="#" class="company-link" data-company-name="${escapeHtml(company)}"><span class="company-cell__wrap">${faviconHTML}<span class="company-name">${company}</span></span></a></td>`;
+          
+          // Add data-account-id if account found (enables proper navigation)
+          const accountIdAttr = acct && acct.id ? ` data-account-id="${escapeHtml(acct.id)}"` : '';
+          html += `<td><a href="#" class="company-link" data-company-name="${escapeHtml(company)}"${accountIdAttr}><span class="company-cell__wrap">${faviconHTML}<span class="company-name">${escapeHtml(company)}</span></span></a></td>`;
           break;
         case 'email':
           html += `<td class="email-link" data-email="${escapeHtml(email)}" data-name="${escapeHtml(fullName)}">${email}</td>`;

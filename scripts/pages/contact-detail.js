@@ -2254,12 +2254,31 @@
             }
           }
           
-          // Method 2: Query by company name (fallback)
+          // Method 2: Query by company name (fallback) - try exact match first
           if (companyName) {
-            const snapshot = await window.firebaseDB.collection('accounts')
+            let snapshot = await window.firebaseDB.collection('accounts')
               .where('accountName', '==', companyName)
               .limit(1)
               .get();
+            
+            // If exact match fails, try BackgroundAccountsLoader with normalized matching (cost-effective: zero Firestore reads)
+            if (snapshot.empty && window.BackgroundAccountsLoader) {
+              const accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
+              const normalizedCompany = String(companyName).trim().toLowerCase();
+              const found = accountsData.find(a => {
+                const accName = String(a.accountName || a.name || a.companyName || '').trim().toLowerCase();
+                return accName === normalizedCompany;
+              });
+              if (found) {
+                console.log('[ContactDetail] ✓ Found linked account in BackgroundAccountsLoader cache (by name):', found.name || found.accountName);
+                // Cache the result
+                if (cacheKey) {
+                  if (!state._accountCache) state._accountCache = {};
+                  state._accountCache[cacheKey] = found;
+                }
+                return found;
+              }
+            }
             
             if (!snapshot.empty) {
               const account = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
@@ -2269,7 +2288,6 @@
                 state._accountCache[cacheKey] = account;
               }
               return account;
-            } else {
             }
           }
           
@@ -2306,6 +2324,18 @@
         const m = accounts.find(a => a.id === accountId);
         if (m) {
           return m;
+        }
+      }
+      
+      // Fallback to company name with normalized exact match first (cost-effective)
+      if (companyName) {
+        const normalizedCompany = String(companyName).trim().toLowerCase();
+        const exactMatch = accounts.find(a => {
+          const accName = String(a.accountName || a.name || a.companyName || '').trim().toLowerCase();
+          return accName === normalizedCompany;
+        });
+        if (exactMatch) {
+          return exactMatch;
         }
       }
       
@@ -6960,20 +6990,46 @@ async function createContactSequenceThenAdd(name) {
   function normalizeStr(s) { return (s == null ? '' : String(s)).trim().toLowerCase(); }
 
   // Navigate from Contact Detail to linked Account Detail
+  // COST-EFFECTIVE: Uses cache-first approach with multiple fallbacks (zero Firestore reads when cache available)
   function navigateToAccountFromContact() {
     const c = state.currentContact;
     if (!c) return;
     let accountId = c.accountId || c.account_id || '';
+    
+    // If no accountId, try to find account by name (case-insensitive)
     if (!accountId) {
-      const key = normalizeStr(c.companyName || c.accountName || '');
-      if (key && typeof window.getAccountsData === 'function') {
-        try {
-          const accounts = window.getAccountsData() || [];
-          const match = accounts.find(a => normalizeStr(a.accountName || a.name || a.companyName) === key);
-          if (match) accountId = match.id;
-        } catch (_) { /* noop */ }
+      const companyName = c.companyName || c.accountName || '';
+      if (companyName) {
+        const normalizedName = normalizeStr(companyName);
+        
+        // First try preloaded account (fastest - already loaded)
+        if (state._preloadedAccount && state._preloadedAccount.id) {
+          const accName = normalizeStr(state._preloadedAccount.accountName || state._preloadedAccount.name || state._preloadedAccount.companyName || '');
+          if (accName === normalizedName) {
+            accountId = state._preloadedAccount.id;
+          }
+        }
+        
+        // Fallback to BackgroundAccountsLoader (cost-effective: zero Firestore reads)
+        if (!accountId && window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+          try {
+            const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+            const match = accounts.find(a => normalizeStr(a.accountName || a.name || a.companyName) === normalizedName);
+            if (match) accountId = match.id;
+          } catch (_) { /* noop */ }
+        }
+        
+        // Final fallback to global getAccountsData (cost-effective: uses cache)
+        if (!accountId && typeof window.getAccountsData === 'function') {
+          try {
+            const accounts = window.getAccountsData() || [];
+            const match = accounts.find(a => normalizeStr(a.accountName || a.name || a.companyName) === normalizedName);
+            if (match) accountId = match.id;
+          } catch (_) { /* noop */ }
+        }
       }
     }
+    
     if (accountId && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
       try { window.AccountDetail.show(accountId); } catch (e) { /* noop */ }
     }

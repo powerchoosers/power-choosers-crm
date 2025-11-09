@@ -37,6 +37,17 @@ class PowerChoosersCRM {
     constructor() {
         this.currentPage = 'dashboard';
         this.sidebar = document.getElementById('sidebar');
+        
+        // Sidebar hover state
+        this.sidebarOpenTimer = null;
+        this.sidebarCloseTimer = null;
+        this.sidebarLockCollapse = false;
+        this.sidebarPointerInside = false;
+        this.sidebarLastMouseX = 0;
+        this.sidebarLastMouseY = 0;
+        this.sidebarMouseMoved = false;
+        this.sidebarLastEdgeCheck = 0;
+        
         this.init();
         
         // PRE-LOAD ESSENTIAL DATA THEN LOAD WIDGETS
@@ -1054,6 +1065,9 @@ class PowerChoosersCRM {
                 e.preventDefault();
                 const targetPage = item.getAttribute('data-page');
                 
+                // Collapse sidebar and lock to prevent immediate reopening
+                this.collapseSidebarAndLock();
+                
                 // No special handling needed for Client Management - it has its own page now
                 
                 this.navigateToPage(targetPage);
@@ -1401,90 +1415,128 @@ class PowerChoosersCRM {
 
     // Sidebar Hover Effects
     setupSidebarHover() {
-        const sidebar = document.getElementById('sidebar');
+        const sidebar = this.sidebar;
         if (!sidebar) return;
 
-        // Timers and state
-        let openTimer = null;
-        let closeTimer = null;
-        let lockCollapse = false;   // When true, ignore hover-open until unlocked
-        let pointerInside = false;  // Track pointer within sidebar
-
-        // Helpers
-        const clearTimers = () => { if (openTimer) clearTimeout(openTimer); if (closeTimer) clearTimeout(closeTimer); openTimer = closeTimer = null; };
-        const openSidebar = () => { if (!lockCollapse) sidebar.classList.add('expanded'); };
-        const closeSidebar = () => { if (!pointerInside) sidebar.classList.remove('expanded'); };
+        // Helpers with requestAnimationFrame for smooth animations
+        const openSidebar = () => { 
+            // Only open if not locked AND mouse has moved (prevents accidental reopening)
+            if (!this.sidebarLockCollapse && this.sidebarMouseMoved) {
+                // Use requestAnimationFrame for smoother animation
+                requestAnimationFrame(() => {
+                    sidebar.classList.add('expanded'); 
+                });
+            }
+        };
+        
+        const closeSidebar = () => { 
+            if (!this.sidebarPointerInside) {
+                // Use requestAnimationFrame for smoother animation
+                requestAnimationFrame(() => {
+                    sidebar.classList.remove('expanded'); 
+                });
+            }
+        };
 
         if (!sidebar._hoverBound) {
-            // Pointer-based hover inside the sidebar
+            // Pointer-based hover inside the sidebar (passive for better performance)
             sidebar.addEventListener('pointerenter', () => {
-                pointerInside = true;
-                if (lockCollapse) return; // Don't open if locked
-                if (closeTimer) clearTimeout(closeTimer);
+                this.sidebarPointerInside = true;
+                if (this.sidebarLockCollapse) return; // Don't open if locked
+                if (this.sidebarCloseTimer) clearTimeout(this.sidebarCloseTimer);
                 // Small show delay to avoid accidental flicker
-                openTimer = setTimeout(openSidebar, 90);
-            });
+                this.sidebarOpenTimer = setTimeout(openSidebar, 90);
+            }, { passive: true });
 
             sidebar.addEventListener('pointerleave', () => {
-                pointerInside = false;
-                if (!lockCollapse) {
+                this.sidebarPointerInside = false;
+                if (!this.sidebarLockCollapse) {
                     // Small hide delay for smoother exit
-                    closeTimer = setTimeout(closeSidebar, 150);
+                    this.sidebarCloseTimer = setTimeout(closeSidebar, 150);
                 }
-            });
+            }, { passive: true });
 
-            // Edge-trigger: open when pointer approaches left edge, even if not over sidebar yet
-            // This improves discoverability without a dedicated DOM edge element
-            const edgeWidth = 12; // px
+            // Track mouse movement globally for movement detection (passive for better performance)
             document.addEventListener('pointermove', (e) => {
-                if (lockCollapse || sidebar.classList.contains('click-locked')) return;
-                if (e.clientX <= edgeWidth) {
-                    if (closeTimer) clearTimeout(closeTimer);
-                    if (!sidebar.classList.contains('expanded')) {
-                        if (openTimer) clearTimeout(openTimer);
-                        openTimer = setTimeout(openSidebar, 90);
+                // Throttle edge detection for performance (every 50ms max)
+                const now = Date.now();
+                const shouldCheckEdge = now - this.sidebarLastEdgeCheck >= 50;
+                
+                // Check if mouse has moved significantly (5px threshold)
+                const movedX = Math.abs(e.clientX - this.sidebarLastMouseX);
+                const movedY = Math.abs(e.clientY - this.sidebarLastMouseY);
+                if (movedX > 5 || movedY > 5) {
+                    this.sidebarMouseMoved = true;
+                    this.sidebarLastMouseX = e.clientX;
+                    this.sidebarLastMouseY = e.clientY;
+                }
+                
+                // Edge-trigger: open when pointer approaches left edge (throttled)
+                if (shouldCheckEdge) {
+                    this.sidebarLastEdgeCheck = now;
+                    
+                    if (this.sidebarLockCollapse || sidebar.classList.contains('click-locked')) return;
+                    
+                    const edgeWidth = 12; // px
+                    if (e.clientX <= edgeWidth) {
+                        if (this.sidebarCloseTimer) clearTimeout(this.sidebarCloseTimer);
+                        if (!sidebar.classList.contains('expanded')) {
+                            if (this.sidebarOpenTimer) clearTimeout(this.sidebarOpenTimer);
+                            this.sidebarOpenTimer = setTimeout(openSidebar, 90);
+                        }
+                    } else if (!this.sidebarPointerInside) {
+                        if (this.sidebarOpenTimer) clearTimeout(this.sidebarOpenTimer);
+                        // Debounced close when pointer moves away from edge and not inside
+                        this.sidebarCloseTimer = setTimeout(closeSidebar, 150);
                     }
-                } else if (!pointerInside) {
-                    if (openTimer) clearTimeout(openTimer);
-                    // Debounced close when pointer moves away from edge and not inside
-                    closeTimer = setTimeout(closeSidebar, 150);
                 }
-            });
+            }, { passive: true }); // Passive listener prevents blocking the main thread
 
-            // On nav click: collapse immediately and lock until pointer leaves (prevents quick reopen)
-            const navItems = document.querySelectorAll('.nav-item');
-            navItems.forEach(item => {
-                if (!item._sidebarNavBound) {
-                    item.addEventListener('click', () => {
-                        // Use CSS-based locking for more effective control
-                        sidebar.classList.add('click-locked');
-                        lockCollapse = true;
-                        pointerInside = false;
-                        clearTimers();
-                        sidebar.classList.remove('expanded');
-
-                        // Unlock after a longer delay to prevent immediate reopening
-                        setTimeout(() => {
-                            sidebar.classList.remove('click-locked');
-                            lockCollapse = false;
-                        }, 800); // Longer delay to match CSS transition timing
-                    });
-                    item._sidebarNavBound = true;
-                }
-            });
-
-            // Also collapse on hashchange/navigation to ensure closed state during page load
+            // Collapse on hashchange/navigation to ensure closed state during page load
             window.addEventListener('hashchange', () => {
-                sidebar.classList.add('click-locked');
-                lockCollapse = true;
-                clearTimers();
-                pointerInside = false;
-                sidebar.classList.remove('expanded');
-                // Remain locked until pointer leaves, to avoid re-opening during page load
+                this.collapseSidebarAndLock(1200);
             });
 
             sidebar._hoverBound = true;
         }
+    }
+
+    // Collapse sidebar and lock it to prevent immediate reopening
+    collapseSidebarAndLock(duration = 1200) {
+        if (!this.sidebar) return;
+        
+        // Use requestAnimationFrame for smoother collapse animation
+        requestAnimationFrame(() => {
+            this.sidebar.classList.add('click-locked');
+            this.sidebarLockCollapse = true;
+            this.sidebarMouseMoved = false; // Reset movement flag
+            this.clearSidebarTimers();
+            this.sidebar.classList.remove('expanded');
+        });
+        
+        // Capture current mouse position for movement detection
+        const captureCurrentPosition = (e) => {
+            this.sidebarLastMouseX = e.clientX;
+            this.sidebarLastMouseY = e.clientY;
+            document.removeEventListener('pointermove', captureCurrentPosition, { once: true });
+        };
+        document.addEventListener('pointermove', captureCurrentPosition, { once: true });
+        
+        // Unlock after duration
+        setTimeout(() => {
+            requestAnimationFrame(() => {
+                this.sidebar.classList.remove('click-locked');
+                this.sidebarLockCollapse = false;
+                // Don't clear pointerInside - let natural pointerleave event handle it
+            });
+        }, duration);
+    }
+
+    // Clear sidebar timers helper
+    clearSidebarTimers() {
+        if (this.sidebarOpenTimer) clearTimeout(this.sidebarOpenTimer);
+        if (this.sidebarCloseTimer) clearTimeout(this.sidebarCloseTimer);
+        this.sidebarOpenTimer = this.sidebarCloseTimer = null;
     }
 
     // Search Functionality
@@ -5151,6 +5203,7 @@ class PowerChoosersCRM {
                     const when = it.publishedAt ? this.formatTimeAgo(it.publishedAt) : '';
                     const time = when || (it.publishedAt ? new Date(it.publishedAt).toLocaleString() : '');
                     const safeHref = escapeHtml(url);
+                    
                     return `
                         <a class="news-item" href="${safeHref}" target="_blank" rel="noopener noreferrer">
                             <div class="news-title">${title}</div>
@@ -5298,7 +5351,7 @@ window.__pcFaviconHelper = {
                              alt="" 
                              referrerpolicy="no-referrer" 
                              loading="lazy"
-                             style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;"
+                             style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;pointer-events:none;"
                              onerror="window.__pcFaviconHelper.onLogoError('${containerId}','${cleanDomain}',${size})">`;
             }
             if (domain) {
@@ -5355,7 +5408,7 @@ window.__pcFaviconHelper = {
                  alt="" 
                  referrerpolicy="no-referrer" 
                  loading="lazy"
-                 style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;"
+                 style="width:${size}px;height:${size}px;object-fit:cover;border-radius:6px;flex-shrink:0;pointer-events:none;"
                  onload="window.__pcFaviconHelper.onFaviconLoad('${containerId}')"
                  onerror="window.__pcFaviconHelper.onFaviconError('${containerId}', '${cleanDomain}', ${size})" />
         `;
