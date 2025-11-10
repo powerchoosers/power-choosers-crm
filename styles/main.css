@@ -797,7 +797,6 @@ button:hover:not(:disabled),
 .skeleton-body-4 {
     width: 70%;
 }
-
 .skeleton-body-5 {
     width: 50%;
 }
@@ -2396,7 +2395,6 @@ tbody.animating tr:nth-child(n+11) { animation-delay: 200ms; }
     font-weight: 500;
     margin-bottom: 4px;
 }
-
 .empty-subtext, .error-subtext {
     color: var(--text-muted);
     font-size: 12px;
@@ -2659,6 +2657,10 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
     justify-content: center;
     transition: var(--transition-fast);
 }
+.collapse-btn svg {
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: center;
+}
 .collapse-btn:hover,
 .icon-btn-sm:hover { background: var(--grey-600); border-color: var(--grey-500); color: var(--text-inverse); }
 .collapse-btn:focus-visible,
@@ -2715,7 +2717,20 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
 }
 .delay-label { color: var(--text-secondary); }
 
-.step-body { padding: var(--spacing-base); border-top: 1px solid var(--border-light); }
+.step-body { 
+    padding: var(--spacing-base); 
+    border-top: 1px solid var(--border-light);
+    overflow: hidden;
+    transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, padding 0.4s ease;
+}
+.step-body[hidden] {
+    display: block !important;
+    height: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    opacity: 0;
+    overflow: hidden;
+}
 
 /* Editor toolbar inside email step */
 .editor-toolbar {
@@ -3192,7 +3207,6 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
     background: linear-gradient(45deg, transparent 46%, var(--grey-600) 48%, var(--grey-600) 52%, transparent 54%), var(--grey-800);
     border: 1px dashed var(--grey-600);
 }
-
 .step-tabs {
     display: flex;
     gap: var(--spacing-sm);
@@ -3250,10 +3264,10 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
 
   /* Notes widget: match textarea font to status/clock (use app sans stack) */
   .notes-textarea {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }
   .notes-textarea::placeholder {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }
 
   /* Standardized close button styles for all modals and widgets */
@@ -3378,7 +3392,7 @@ button.delay-pill { cursor: pointer; -webkit-appearance: none; appearance: none;
 html, body {
     height: 100vh;
     overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     background: var(--bg-main);
     color: var(--text-primary);
     line-height: 1.5;
@@ -3992,7 +4006,6 @@ html, body {
     font-weight: 600;
     color: var(--text-primary);
 }
-
 .mark-all-read {
     background: none;
     border: none;
@@ -4414,32 +4427,36 @@ html, body {
     border-top-right-radius: var(--border-radius);
 }
 
-/* Sequence Builder header layout: place title right of back arrow */
+/* Sequence Builder header layout: align title and actions */
 #sequence-builder-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: var(--spacing-lg);
 }
+
 #sequence-builder-header .page-title-section {
     display: flex;
     align-items: center;
-    justify-content: flex-start; /* keep title next to back button */
+    justify-content: flex-start;
     gap: var(--spacing-base);
+    margin-bottom: 0;
 }
 
-/* Sequence Builder header actions ordering */
-#sequence-builder-header .page-actions .contact-search-container { order: 0; }
-#sequence-builder-header .page-actions #contacts-btn { order: 1; }
-#sequence-builder-header .page-actions #add-step-btn { order: 2; }
+#sequence-builder-header .contact-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    align-items: flex-start;
+}
 
-/* Tighter, even spacing between search, Contacts, and Add Step */
 #sequence-builder-header .page-actions {
     display: flex;
     align-items: center;
-    gap: 8px; /* bring search closer to Contacts */
+    gap: 8px;
+    margin-left: auto;
 }
 
-/* Ensure the search input fills the 300px container to avoid extra internal gap */
 #sequence-builder-header .contact-search-container .search-input-small {
     width: 300px;
 }
@@ -4780,7 +4797,6 @@ html, body {
     box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.25) !important; /* match other inputs */
     z-index: 10002 !important; /* raise above neighbors while focused */
 }
-
 #calls-filters .chip-input:focus-within {
     outline: none !important;
     background: var(--bg-secondary) !important;
@@ -5580,7 +5596,6 @@ html, body {
     gap: var(--spacing-sm);
     flex-shrink: 0; /* Prevent buttons from shrinking */
 }
-
 #email-detail-page .email-detail-container {
     background: var(--bg-card);
     border: 1px solid var(--border-light);
@@ -6287,6 +6302,10 @@ html, body {
     font-weight: 600;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 
 .btn-primary:hover {
@@ -6381,7 +6400,6 @@ html, body {
     font-size: 0.875rem;
     transition: var(--transition-fast);
 }
-
 .btn-text:hover {
     color: var(--text-inverse);
     transform: translateY(-1px);
@@ -7178,7 +7196,6 @@ html, body {
     /* Ensure 25px spacing between the bottom of the scrollable table area and the pinned pagination/footer */
     padding-bottom: 25px;
 }
-
 /* === Lists page header layout: group back icon and title together === */
 #lists-page .page-title-section {
     justify-content: flex-start; /* left-align children so title sits next to back button */
@@ -7979,7 +7996,6 @@ html, body {
   border-radius: var(--border-radius);
   border-left: 3px solid;
 }
-
 .tip-item.tip-info {
   background: rgba(59, 130, 246, 0.1);
   border-left-color: #3b82f6;
@@ -8520,6 +8536,9 @@ html, body {
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s ease, visibility 0.3s ease;
+    /* Performance optimizations for smooth first render */
+    will-change: opacity, visibility;
+    contain: layout style paint;
 }
 
 .pc-modal.show {
@@ -8534,6 +8553,9 @@ html, body {
     backdrop-filter: blur(1.5px);
     opacity: 0;
     transition: opacity 0.3s ease;
+    /* Performance optimizations */
+    will-change: opacity;
+    transform: translateZ(0); /* Force GPU acceleration */
 }
 
 .pc-modal.show .pc-modal__backdrop {
@@ -8544,7 +8566,7 @@ html, body {
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%) scale(0.95) translateY(10px);
+    transform: translate(-50%, -50%) scale(0.95) translateY(10px) translateZ(0);
     width: 760px;
     max-width: calc(100vw - 40px);
     max-height: 78vh;
@@ -8559,10 +8581,14 @@ html, body {
     display: flex;
     flex-direction: column;
     transition: transform 0.3s ease;
+    /* Performance optimizations for smooth animations */
+    will-change: transform;
+    contain: layout style paint;
+    transform-style: preserve-3d;
 }
 
 .pc-modal.show .pc-modal__dialog {
-    transform: translate(-50%, -50%) scale(1) translateY(0);
+    transform: translate(-50%, -50%) scale(1) translateY(0) translateZ(0);
 }
 
 /* Modal form takes full height and manages body/footer layout */
@@ -8734,7 +8760,7 @@ html, body {
 }
 .list-card-count { 
     color: var(--text-secondary); 
-    font-size: 0.9rem;
+    font-size: 0.9rem; 
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -8764,7 +8790,6 @@ html, body {
     font-size: 0.85rem;
     transition: var(--transition-fast);
 }
-
 .table-pagination .page-btn:hover:not(:disabled) {
     background: var(--bg-secondary);
     border-color: var(--accent-color);
@@ -9189,7 +9214,7 @@ html, body {
 }
 
 .phone-display {
-  font-size: 20px;
+  font-size: 24px;
   text-align: center;
   padding: 10px;
   letter-spacing: 1px;
@@ -9561,7 +9586,6 @@ html, body {
     position: relative;
     z-index: 2;
 }
-
 .task-name, .news-title, .lead-name {
     font-weight: 500;
     margin-bottom: 4px;
@@ -10362,7 +10386,6 @@ html, body {
 .metric-row:last-child {
     border-bottom: none;
 }
-
 .metric-label {
     color: var(--grey-400);
     font-size: 0.875rem;
@@ -11158,7 +11181,6 @@ input[type="number"]::-webkit-inner-spin-button {
     color: var(--text-secondary);
     font-size: 0.9rem;
 }
-
 .lusha-contacts-list {
     display: flex;
     flex-direction: column;
@@ -11953,7 +11975,6 @@ font-size: 1.75rem;
 font-weight: 600;
 color: var(--text-primary);
 }
-
 /* Overrides: dropdown and preview picker use compact title size */
 #contact-search-results .contact-name,
 .contact-search-results .contact-name,
@@ -11992,6 +12013,8 @@ margin-bottom: var(--spacing-md);
 .quick-action-btn {
     width: 36px;
     height: 36px;
+    min-width: 36px;
+    min-height: 36px;
     border-radius: var(--border-radius);
     border: 1px solid var(--border-light);
     background: var(--bg-item);
@@ -12001,6 +12024,16 @@ margin-bottom: var(--spacing-md);
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+/* Match quick-action-btn height to btn-primary for sequence builder */
+/* btn-primary has padding: 10px 20px, so height is ~40px (10px top + ~20px line-height + 10px bottom) */
+#sequence-builder-header .quick-action-btn {
+    height: 40px;
+    width: 40px;
+    min-height: 40px;
+    min-width: 40px;
 }
 
 .quick-action-btn:hover {
@@ -12755,7 +12788,6 @@ margin-bottom: var(--spacing-md);
     font-size: 0.85rem;
     color: var(--text-secondary);
 }
-
 .activity-placeholder {
     display: flex;
     flex-direction: column;
@@ -13554,7 +13586,6 @@ button svg,
     transition: opacity 300ms ease-out, transform 300ms ease-out;
     will-change: opacity, transform;
 }
-
 /* SVG icons - loaded state */
 .qa-btn svg.icon-loaded,
 .action-btn svg.icon-loaded,
@@ -13814,7 +13845,7 @@ button svg.icon-loaded,
 /* phone call note textarea placeholder styling */
 .step-card[data-type="phone-call"] .call-note::placeholder {
     color: var(--grey-400);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 /* LinkedIn task note textarea styling - match phone call styling */
@@ -13823,7 +13854,7 @@ button svg.icon-loaded,
 .step-card[data-type="li-view-profile"] .linkedin-note::placeholder,
 .step-card[data-type="li-interact-post"] .linkedin-note::placeholder {
     color: var(--grey-400);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 /* === DRAG AND DROP FOR SEQUENCE STEPS === */
@@ -14356,7 +14387,6 @@ input.row-select[type="checkbox"]:focus-visible {
     gap: var(--spacing-sm);
     flex-shrink: 0;
 }
-
 .email-action-btn {
     background: none;
     border: 1px solid var(--border-color);
@@ -15151,7 +15181,6 @@ input.row-select[type="checkbox"]:focus-visible {
 @supports not (gap: 1rem) {
     .editor-toolbar .toolbar-btn + .toolbar-btn { margin-left: 10px; }
 }
-
 .toolbar-btn {
     display: flex;
     align-items: center;
@@ -15950,7 +15979,6 @@ input.row-select[type="checkbox"]:focus-visible {
     border: none;
     font-weight: 500;
 }
-
 .list-card-actions .btn-secondary:hover {
     background: #e55a2b;
     transform: none;
@@ -16749,7 +16777,6 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     font-size: 1.5rem;
     flex-shrink: 0;
 }
-
 .option-text {
     flex: 1;
 }
@@ -17549,7 +17576,6 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 .deal-step-content[hidden] {
     display: none !important;
 }
-
 /* Account dropdown styling */
 .account-dropdown {
     position: absolute;
@@ -18180,7 +18206,7 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     max-width: 280px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 .maps-info-window h3 {
@@ -18339,7 +18365,6 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     display: inline-block;
     transform: translateY(-1px); /* subtle nudge for optical centering */
 }
-
 /* Use same close button styles as notes widget */
 /* .widget-card .maps-close inherits from .notes-close - no additional styles needed */
 
@@ -19137,7 +19162,6 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     color: var(--text-secondary);
     margin: 0 0 32px 0;
 }
-
 .welcome-content h3 {
     font-size: 16px;
     font-weight: 600;

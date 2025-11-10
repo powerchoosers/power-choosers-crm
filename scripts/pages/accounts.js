@@ -1045,14 +1045,8 @@ var console = {
         render();
       });
       
-      // Immediately scan for cached favicon images and mark them loaded (no flicker)
-      requestAnimationFrame(() => {
-        document.querySelectorAll('#accounts-page .company-favicon').forEach(img => {
-          if (img.complete && img.naturalWidth > 0 && !img.classList.contains('icon-loaded')) {
-            img.classList.add('icon-loaded');
-          }
-        });
-      });
+      // Let the global animation system handle icon animations
+      // The MutationObserver in __pcIconAnimator will catch all icons and add fade-in animations
     } catch (e) {
       state.data = [];
       state.filtered = [];
@@ -1316,7 +1310,8 @@ var console = {
     
     // If this isn't the first render, pre-mark favicons as loaded to prevent animation flicker
     if (state.hasAnimated && rows) {
-      rows = rows.replace(/class="company-favicon"/g, 'class="company-favicon icon-loaded"');
+      // Don't add icon-loaded immediately - let the global animation system handle it
+      // This ensures smooth fade-in animations for all icons
     }
     
     els.tbody.innerHTML = rows || emptyHtml();
