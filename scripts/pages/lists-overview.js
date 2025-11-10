@@ -561,9 +561,13 @@
           const cache = window.listMembersCache?.[item.id];
           const k = (item.kind || kind || 'people').toLowerCase();
           if (cache) {
-            item.count = k === 'accounts' ? (cache.accounts?.size || 0) : (cache.people?.size || 0);
+            // Use cache count as the source of truth
+            const cacheCount = k === 'accounts' ? (cache.accounts?.size || 0) : (cache.people?.size || 0);
+            item.count = cacheCount;
+            item.recordCount = cacheCount; // Keep both in sync
           } else {
-            item.count = typeof item.count === 'number' ? item.count : 0;
+            // Fallback to recordCount (preferred) or count field
+            item.count = typeof item.recordCount === 'number' ? item.recordCount : (typeof item.count === 'number' ? item.count : 0);
           }
         }
 
@@ -650,6 +654,12 @@
       // COST-EFFECTIVE: Debounced update handler (500ms) to prevent flickering
       const debouncedPeopleUpdate = debounce((items) => {
         try {
+          // CRITICAL FIX: Skip live listener updates during restore operation
+          if (window._listsOverviewRestoring) {
+            console.log('[ListsOverview] ⏭️ Skipping live listener update during restore');
+            return;
+          }
+          
           // CRITICAL FIX: Protect against incomplete listener data
           const existingCount = state.peopleLists.length;
           
@@ -758,6 +768,12 @@
       // COST-EFFECTIVE: Debounced update handler (500ms) to prevent flickering
       const debouncedAccountsUpdate = debounce((items) => {
         try {
+          // CRITICAL FIX: Skip live listener updates during restore operation
+          if (window._listsOverviewRestoring) {
+            console.log('[ListsOverview] ⏭️ Skipping live listener update during restore');
+            return;
+          }
+          
           // CRITICAL FIX: Protect against incomplete listener data
           const existingCount = state.accountLists.length;
           
@@ -1114,7 +1130,8 @@
   function listCardHtml(item) {
     const id = escapeHtml(item.id || '');
     const name = escapeHtml(item.name || 'Untitled list');
-    const count = typeof item.count === 'number' ? item.count : (item.recordCount || 0);
+    // CRITICAL FIX: Prioritize recordCount (from Firestore) over count (may be stale)
+    const count = typeof item.recordCount === 'number' ? item.recordCount : (typeof item.count === 'number' ? item.count : 0);
     const type = escapeHtml(item.kind || item.type || (state.kind === 'people' ? 'people' : 'accounts'));
     const owner = escapeHtml(item.createdBy || 'You');
     const updated = escapeHtml(formatDateOrNA(item.updatedAt || item.createdAt));
@@ -1496,6 +1513,9 @@
         const detail = ev && ev.detail ? ev.detail : {};
         console.log('[ListsOverview] Restoring state from back button:', detail);
         
+        // CRITICAL FIX: Set flag to prevent live listener from overwriting during restore
+        window._listsOverviewRestoring = true;
+        
         // Restore search term
         if (detail.searchTerm && qs('lists-quick-search')) {
           qs('lists-quick-search').value = detail.searchTerm;
@@ -1524,8 +1544,15 @@
         }, 100);
         
         console.log('[ListsOverview] State restored successfully');
+        
+        // Clear restore flag after a delay to allow live listener to settle
+        setTimeout(() => {
+          window._listsOverviewRestoring = false;
+          console.log('[ListsOverview] Restore flag cleared');
+        }, 1500); // 1.5 seconds should be enough for debounced listener
       } catch (e) { 
         console.error('[ListsOverview] Error restoring state:', e);
+        window._listsOverviewRestoring = false;
       }
     });
     document._listsRestoreBound = true;
@@ -1812,6 +1839,220 @@
       }
     } catch (error) {
       console.error('Debug failed:', error);
+    }
+  };
+  
+  // Debug helper to check a specific list's member count
+  window.debugListMembers = async (listId) => {
+    if (!window.firebaseDB) return console.log('Firebase not available');
+    if (!listId) return console.log('Please provide a listId');
+    
+    console.log(`🔍 Debugging members for list: ${listId}`);
+    
+    try {
+      // Check subcollection
+      let subCount = 0;
+      try {
+        const subSnap = await window.firebaseDB.collection('lists').doc(listId).collection('members').get();
+        subCount = subSnap.docs.length;
+        console.log(`📁 Subcollection (lists/${listId}/members):`, subCount, 'documents');
+        if (subCount > 0) {
+          console.log('   Sample member:', subSnap.docs[0].data());
+        }
+      } catch (e) {
+        console.log('   Subcollection error:', e.message);
+      }
+      
+      // Check top-level listMembers
+      let topCount = 0;
+      try {
+        const topSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).get();
+        topCount = topSnap.docs.length;
+        console.log(`📋 Top-level (listMembers where listId==${listId}):`, topCount, 'documents');
+        if (topCount > 0) {
+          const sample = topSnap.docs[0].data();
+          console.log('   Sample member:', sample);
+          console.log('   Has ownerId?', !!sample.ownerId);
+          console.log('   Has userId?', !!sample.userId);
+        }
+      } catch (e) {
+        console.log('   Top-level query error:', e.message);
+        console.log('   This is expected for non-admins if listMembers lack ownership fields');
+      }
+      
+      // Check cache
+      const cached = window.listMembersCache?.[listId];
+      console.log(`💾 In-memory cache:`, cached ? {
+        loaded: cached.loaded,
+        people: cached.people?.size || 0,
+        accounts: cached.accounts?.size || 0
+      } : 'not cached');
+      
+      console.log('\n📊 Summary:');
+      console.log(`   Subcollection: ${subCount} members`);
+      console.log(`   Top-level: ${topCount} members`);
+      console.log(`   Cache: ${cached ? (cached.people?.size || 0) + (cached.accounts?.size || 0) : 0} members`);
+      console.log('\n💡 Recommendation:', subCount > 0 ? 'Using subcollections ✅' : 'Should migrate to subcollections');
+      
+    } catch (error) {
+      console.error('Debug failed:', error);
+    }
+  };
+  
+  // ONE-TIME FIX: Add missing ownership fields to all lists
+  window.fixListOwnership = async () => {
+    if (!window.firebaseDB) return console.log('Firebase not available');
+    
+    const email = getUserEmail();
+    console.log('🔧 Fixing list ownership fields for:', email);
+    console.log('This will add ownerId, assignedTo, and createdBy to all your lists');
+    
+    if (!confirm('This will update all lists that are missing ownership fields. Continue?')) {
+      return console.log('Cancelled by user');
+    }
+    
+    try {
+      // Get all lists that you have access to (via any ownership field)
+      const [ownedSnap, assignedSnap, createdSnap] = await Promise.all([
+        window.firebaseDB.collection('lists').where('ownerId','==',email).get(),
+        window.firebaseDB.collection('lists').where('assignedTo','==',email).get(),
+        window.firebaseDB.collection('lists').where('createdBy','==',email).get()
+      ]);
+      
+      // Merge all lists using a Map to deduplicate
+      const listsMap = new Map();
+      ownedSnap.docs.forEach(doc => listsMap.set(doc.id, doc));
+      assignedSnap.docs.forEach(doc => { if (!listsMap.has(doc.id)) listsMap.set(doc.id, doc); });
+      createdSnap.docs.forEach(doc => { if (!listsMap.has(doc.id)) listsMap.set(doc.id, doc); });
+      
+      const allLists = Array.from(listsMap.values());
+      console.log(`📋 Found ${allLists.length} total lists accessible to you`);
+      
+      let updated = 0;
+      let skipped = 0;
+      let errors = 0;
+      
+      for (const listDoc of allLists) {
+        const listData = listDoc.data();
+        const updates = {};
+        let needsUpdate = false;
+        
+        // Add ownerId if missing
+        if (!listData.ownerId) {
+          updates.ownerId = email;
+          needsUpdate = true;
+        }
+        
+        // Add assignedTo if missing
+        if (!listData.assignedTo) {
+          updates.assignedTo = email;
+          needsUpdate = true;
+        }
+        
+        // Add createdBy if missing
+        if (!listData.createdBy) {
+          updates.createdBy = email;
+          needsUpdate = true;
+        }
+        
+        // Add updatedAt
+        if (needsUpdate) {
+          updates.updatedAt = window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date();
+        }
+        
+        if (needsUpdate) {
+          try {
+            await listDoc.ref.update(updates);
+            console.log(`✅ Updated "${listData.name}" with fields:`, Object.keys(updates));
+            updated++;
+          } catch (error) {
+            console.error(`❌ Failed to update "${listData.name}":`, error);
+            errors++;
+          }
+        } else {
+          console.log(`⏭️ Skipped "${listData.name}" (already has all ownership fields)`);
+          skipped++;
+        }
+      }
+      
+      console.log(`\n🎉 Migration complete!`);
+      console.log(`  ✅ Updated: ${updated}`);
+      console.log(`  ⏭️ Skipped: ${skipped} (already correct)`);
+      console.log(`  ❌ Errors: ${errors}`);
+      
+      if (updated > 0) {
+        console.log('\n🔄 Refreshing lists page...');
+        // Force reload
+        state.loadedPeople = false;
+        state.loadedAccounts = false;
+        await ensureLoadedThenRender();
+        console.log('✅ Lists page refreshed');
+      }
+      
+    } catch (error) {
+      console.error('❌ Migration failed:', error);
+    }
+  };
+  
+  // CRITICAL FIX: Sync count field with recordCount (one-time fix for data inconsistency)
+  window.syncCountFields = async () => {
+    if (!window.firebaseDB) return console.log('Firebase not available');
+    
+    console.log('🔄 Syncing count and recordCount fields...');
+    
+    try {
+      const email = getUserEmail();
+      const [ownedSnap, assignedSnap, createdSnap] = await Promise.all([
+        window.firebaseDB.collection('lists').where('ownerId','==',email).get(),
+        window.firebaseDB.collection('lists').where('assignedTo','==',email).get(),
+        window.firebaseDB.collection('lists').where('createdBy','==',email).get()
+      ]);
+      
+      const map = new Map();
+      ownedSnap.docs.forEach(d=>map.set(d.id, d));
+      assignedSnap.docs.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
+      createdSnap.docs.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
+      
+      const allLists = Array.from(map.values());
+      console.log(`📋 Found ${allLists.length} lists to sync`);
+      
+      let updated = 0;
+      let skipped = 0;
+      
+      for (const listDoc of allLists) {
+        const listData = listDoc.data();
+        const recordCount = listData.recordCount || 0;
+        const count = listData.count || 0;
+        
+        if (count !== recordCount) {
+          try {
+            await listDoc.ref.update({
+              count: recordCount,
+              updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date()
+            });
+            console.log(`✅ "${listData.name}": count ${count} → ${recordCount}`);
+            updated++;
+          } catch (error) {
+            console.error(`❌ Failed to update "${listData.name}":`, error);
+          }
+        } else {
+          console.log(`⏭️ "${listData.name}": already in sync (${count})`);
+          skipped++;
+        }
+      }
+      
+      console.log(`\n🎉 Sync complete!`);
+      console.log(`  ✅ Updated: ${updated}`);
+      console.log(`  ⏭️ Skipped: ${skipped}`);
+      
+      if (updated > 0) {
+        state.loadedPeople = false;
+        state.loadedAccounts = false;
+        await ensureLoadedThenRender();
+        console.log('✅ Lists page refreshed');
+      }
+    } catch (error) {
+      console.error('❌ Sync failed:', error);
     }
   };
   

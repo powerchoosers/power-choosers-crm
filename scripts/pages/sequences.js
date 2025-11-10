@@ -111,12 +111,141 @@
 
   function updateField(id, patch) {
     if (!sequencesCol || !id || !patch) return Promise.resolve();
-    return sequencesCol.doc(id).set(patch, { merge: true });
+    // CRITICAL FIX: Add server timestamp to ensure update is persisted
+    const updateData = {
+      ...patch,
+      updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
+    };
+    return sequencesCol.doc(id).set(updateData, { merge: true });
   }
 
   function deleteFromFirestore(id) {
     if (!sequencesCol || !id) return Promise.resolve();
     return sequencesCol.doc(id).delete();
+  }
+
+  // Function to start sequence for all active members when sequence is activated
+  async function startSequenceForAllMembers(sequence) {
+    if (!sequence || !sequence.id || !window.firebaseDB) {
+      console.warn('[Sequences] Cannot start sequences: missing sequence or database');
+      return;
+    }
+
+    try {
+      console.log(`[Sequences] Starting sequence "${sequence.name}" for all active members...`);
+      
+      // Get all sequenceMembers for this sequence
+      const membersQuery = await window.firebaseDB.collection('sequenceMembers')
+        .where('sequenceId', '==', sequence.id)
+        .where('targetType', '==', 'people')
+        .get();
+
+      if (membersQuery.empty) {
+        console.log('[Sequences] No members found for sequence');
+        if (window.crm?.showToast) {
+          window.crm.showToast('No contacts in sequence to start', 'info');
+        }
+        return;
+      }
+
+      // Get SequenceBuilder function if available
+      if (!window.SequenceBuilder || typeof window.SequenceBuilder.startSequenceForContact !== 'function') {
+        console.warn('[Sequences] SequenceBuilder not available');
+        return;
+      }
+
+      // Load contact data for all members
+      const contactIds = [];
+      membersQuery.forEach(doc => {
+        const data = doc.data();
+        if (data.targetId) contactIds.push(data.targetId);
+      });
+
+      if (contactIds.length === 0) {
+        console.log('[Sequences] No contact IDs found');
+        return;
+      }
+
+      // Load contact details
+      const contacts = [];
+      const db = window.firebaseDB;
+      for (const contactId of contactIds) {
+        try {
+          const contactDoc = await db.collection('people').doc(contactId).get();
+          if (contactDoc.exists) {
+            const contactData = contactDoc.data();
+            contacts.push({
+              id: contactId,
+              name: [contactData.firstName, contactData.lastName].filter(Boolean).join(' ') || contactData.name || 'Contact',
+              company: contactData.companyName || contactData.company || '',
+              email: contactData.email || '',
+              ...contactData
+            });
+          }
+        } catch (err) {
+          console.warn(`[Sequences] Failed to load contact ${contactId}:`, err);
+        }
+      }
+
+      if (contacts.length === 0) {
+        console.log('[Sequences] No valid contacts found');
+        return;
+      }
+
+      // Start sequence for each contact
+      let startedCount = 0;
+      let errorCount = 0;
+
+      // Show progress toast
+      const progressToast = window.crm?.showProgressToast ? 
+        window.crm.showProgressToast(`Starting sequence for ${contacts.length} contacts...`, contacts.length, 0) : null;
+
+      for (let i = 0; i < contacts.length; i++) {
+        const contact = contacts[i];
+        try {
+          // Only start if contact has email (or skip email steps if no email)
+          await window.SequenceBuilder.startSequenceForContact(sequence, {
+            id: contact.id,
+            name: contact.name,
+            company: contact.company,
+            email: contact.email,
+            contact: contact.name,
+            account: contact.company
+          });
+          startedCount++;
+          
+          // Update progress
+          if (progressToast && typeof progressToast.update === 'function') {
+            progressToast.update(i + 1, contacts.length);
+          }
+        } catch (err) {
+          console.warn(`[Sequences] Failed to start sequence for contact ${contact.id}:`, err);
+          errorCount++;
+        }
+      }
+
+      // Complete progress toast
+      if (progressToast && typeof progressToast.complete === 'function') {
+        let message = `Started sequence for ${startedCount} contact${startedCount === 1 ? '' : 's'}`;
+        if (errorCount > 0) {
+          message += ` (${errorCount} failed)`;
+        }
+        progressToast.complete(message);
+      } else if (window.crm?.showToast) {
+        let message = `Started sequence for ${startedCount} contact${startedCount === 1 ? '' : 's'}`;
+        if (errorCount > 0) {
+          message += ` (${errorCount} failed)`;
+        }
+        window.crm.showToast(message, startedCount > 0 ? 'success' : 'info');
+      }
+
+      console.log(`[Sequences] Started sequence for ${startedCount}/${contacts.length} contacts`);
+    } catch (err) {
+      console.error('[Sequences] Failed to start sequences for all members:', err);
+      if (window.crm?.showToast) {
+        window.crm.showToast('Failed to start sequences. Please try again.', 'error');
+      }
+    }
   }
 
   // Function to start a sequence for a contact
@@ -322,7 +451,27 @@
           const on = !!t.checked;
           const it = state.data.find(s => s.id === id);
           if (it) it.isActive = on;
-          updateField(id, { isActive: on }).catch((err) => console.warn('Failed to update sequence:', err));
+          
+          // CRITICAL FIX: Update Firestore with proper error handling
+          updateField(id, { isActive: on })
+            .then(() => {
+              console.log(`[Sequences] Successfully ${on ? 'activated' : 'deactivated'} sequence ${id}`);
+              // If activating, start sequences for all active members
+              if (on && it) {
+                startSequenceForAllMembers(it).catch(err => {
+                  console.warn('[Sequences] Failed to start sequences for members:', err);
+                });
+              }
+            })
+            .catch((err) => {
+              console.error('[Sequences] Failed to update sequence:', err);
+              // Revert UI state on error
+              if (it) it.isActive = !on;
+              t.checked = !on;
+              if (window.crm?.showToast) {
+                window.crm.showToast('Failed to update sequence. Please try again.', 'error');
+              }
+            });
         }
       });
 
@@ -427,11 +576,14 @@
     const name = escapeHtml(s.name);
     const by = escapeHtml(s.createdBy);
     const st = s.stats || {};
+    // CRITICAL FIX: Use recordCount if available, otherwise fall back to stats.active
+    // recordCount is the actual count of sequenceMembers, stats.active may be stale
+    const activeCount = typeof s.recordCount === 'number' ? s.recordCount : (st.active || 0);
     const cells = [
       `<td class="col-select"><label class="toggle-switch"><input type="checkbox" class="seq-activate" data-id="${id}" aria-label="Activate sequence"${s.isActive ? ' checked' : ''}><span class="toggle-slider"></span></label></td>`,
       `<td><button type="button" class="btn-text seq-open" data-id="${id}" aria-label="Open sequence ${name}">${name}</button></td>`,
       `<td>${by}</td>`,
-      `<td>${fmtNum(st.active)}</td>`,
+      `<td>${fmtNum(activeCount)}</td>`,
       `<td>${fmtNum(st.paused)}</td>`,
       `<td>${fmtNum(st.notSent)}</td>`,
       `<td>${fmtNum(st.bounced)}</td>`,
@@ -591,11 +743,73 @@
     // navigation controller to handle visibility.
   }
 
+  // Function to recalculate and sync sequence member counts
+  async function recalculateSequenceCounts() {
+    if (!window.firebaseDB) {
+      console.warn('[Sequences] Cannot recalculate: database not available');
+      return;
+    }
+
+    try {
+      console.log('[Sequences] Recalculating sequence member counts...');
+      const sequences = state.data || [];
+      let fixedCount = 0;
+
+      for (const seq of sequences) {
+        if (!seq.id) continue;
+
+        try {
+          // Count actual sequenceMembers
+          const membersQuery = await window.firebaseDB.collection('sequenceMembers')
+            .where('sequenceId', '==', seq.id)
+            .where('targetType', '==', 'people')
+            .get();
+
+          const actualCount = membersQuery.size;
+          const currentActive = seq.stats?.active || 0;
+          const currentRecordCount = seq.recordCount;
+
+          // Update if counts don't match
+          if (actualCount !== currentActive || actualCount !== currentRecordCount) {
+            await updateField(seq.id, {
+              'stats.active': actualCount,
+              'recordCount': actualCount
+            });
+            
+            // Update local state
+            if (seq.stats) {
+              seq.stats.active = actualCount;
+            }
+            seq.recordCount = actualCount;
+            
+            fixedCount++;
+            console.log(`[Sequences] Fixed count for "${seq.name}": ${currentActive}/${currentRecordCount} → ${actualCount}`);
+          }
+        } catch (err) {
+          console.warn(`[Sequences] Failed to recalculate count for sequence ${seq.id}:`, err);
+        }
+      }
+
+      if (fixedCount > 0) {
+        render(); // Refresh the display
+        if (window.crm?.showToast) {
+          window.crm.showToast(`Updated counts for ${fixedCount} sequence${fixedCount === 1 ? '' : 's'}`, 'success');
+        }
+        console.log(`[Sequences] Fixed ${fixedCount} sequence counts`);
+      } else {
+        console.log('[Sequences] All sequence counts are correct');
+      }
+    } catch (err) {
+      console.error('[Sequences] Failed to recalculate counts:', err);
+    }
+  }
+
   // Expose public API
   try {
     window.Sequences = window.Sequences || {};
     window.Sequences.loadMoreSequences = loadMoreSequences;
     window.Sequences.loadFromFirestore = loadFromFirestore;
+    window.Sequences.recalculateSequenceCounts = recalculateSequenceCounts;
   } catch(_) {}
 
   // Initialize immediately since this script is loaded after DOM

@@ -132,32 +132,64 @@
     // Check if this is a sent email
     const isSentEmail = email.isSentEmail || email.type === 'sent';
 
-    // Set sender info
+    // Helper function to get account logoUrl from recipient email
+    function getRecipientAccountInfo(recipientEmail) {
+      if (!recipientEmail) return { logoUrl: null, domain: null };
+      
+      try {
+        const recipientDomain = extractDomain(recipientEmail);
+        if (!recipientDomain) return { logoUrl: null, domain: null };
+        
+        // Try to find account by domain
+        const accounts = window.getAccountsData ? window.getAccountsData() : [];
+        const account = accounts.find(a => {
+          const accountDomain = (a.domain || '').toLowerCase().replace(/^www\./, '');
+          const accountWebsite = (a.website || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+          const domainLower = recipientDomain.toLowerCase();
+          return accountDomain === domainLower || accountWebsite === domainLower;
+        });
+        
+        if (account) {
+          const logoUrl = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon;
+          return { logoUrl: logoUrl || null, domain: account.domain || account.website || recipientDomain };
+        }
+        
+        return { logoUrl: null, domain: recipientDomain };
+      } catch (_) {
+        return { logoUrl: null, domain: extractDomain(recipientEmail) };
+      }
+    }
+
+    // Set sender/recipient info
     if (els.senderName) {
       if (isSentEmail) {
-        // For sent emails, use user's name from settings
-        const settings = (window.SettingsPage?.getSettings?.()) || {};
-        const g = settings?.general || {};
-        const firstName = g.firstName || '';
-        const lastName = g.lastName || '';
-        const displayName = (firstName && lastName) ? `${firstName} ${lastName}`.trim() : 
-                           (window.authManager?.getCurrentUser?.()?.displayName) || 
-                           extractName(email.from);
-        els.senderName.textContent = displayName;
+        // For sent emails, show recipient name
+        // Handle both string and array formats for email.to
+        let recipientEmail = '';
+        if (Array.isArray(email.to)) {
+          recipientEmail = email.to[0] || '';
+        } else {
+          recipientEmail = email.to || '';
+        }
+        els.senderName.textContent = extractName(recipientEmail) || 'Unknown Recipient';
       } else {
-      els.senderName.textContent = extractName(email.from);
+        els.senderName.textContent = extractName(email.from);
       }
     }
 
     if (els.senderEmail) {
       if (isSentEmail) {
-        // For sent emails, use the actual sender email from settings (l.patterson@powerchoosers.com)
-        const settings = (window.SettingsPage?.getSettings?.()) || {};
-        const g = settings?.general || {};
-        const userEmail = g.email || (window.authManager?.getCurrentUser?.()?.email) || email.from;
-        els.senderEmail.textContent = userEmail;
+        // For sent emails, show recipient email
+        // Handle both string and array formats for email.to
+        let recipientEmail = '';
+        if (Array.isArray(email.to)) {
+          recipientEmail = email.to[0] || '';
+        } else {
+          recipientEmail = email.to || '';
+        }
+        els.senderEmail.textContent = recipientEmail || 'Unknown';
       } else {
-      els.senderEmail.textContent = email.from || 'Unknown';
+        els.senderEmail.textContent = email.from || 'Unknown';
       }
     }
 
@@ -166,32 +198,32 @@
       els.emailDate.textContent = formatDate(email.date);
     }
 
-    // Set sender avatar
+    // Set sender/recipient avatar
     if (els.senderAvatar) {
       if (isSentEmail) {
-        // For sent emails, use user's profile photo
-        const settings = (window.SettingsPage?.getSettings?.()) || {};
-        const g = settings?.general || {};
-        const profilePhotoUrl = g.hostedPhotoURL || g.photoURL || '';
-        
-        if (profilePhotoUrl) {
-          // Use profile photo
-          els.senderAvatar.innerHTML = `<img src="${escapeHtml(profilePhotoUrl)}" alt="Profile" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--orange-primary);" />`;
+        // For sent emails, show recipient with account logo
+        // Handle both string and array formats for email.to
+        let recipientEmail = '';
+        if (Array.isArray(email.to)) {
+          recipientEmail = email.to[0] || '';
         } else {
-          // Fallback to initials avatar
-          const firstName = g.firstName || '';
-          const lastName = g.lastName || '';
-          const initials = ((firstName.charAt(0) || '') + (lastName.charAt(0) || '')).toUpperCase() || 'U';
-          els.senderAvatar.innerHTML = `<div style="width: 40px; height: 40px; border-radius: 50%; background: var(--orange-subtle); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 16px; letter-spacing: 0.5px;" aria-hidden="true">${escapeHtml(initials)}</div>`;
+          recipientEmail = email.to || '';
         }
+        const accountInfo = getRecipientAccountInfo(recipientEmail);
+        const faviconHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
+          logoUrl: accountInfo.logoUrl,
+          domain: accountInfo.domain,
+          size: 40
+        });
+        els.senderAvatar.innerHTML = faviconHtml;
       } else {
         // Use domain favicon for received emails
-      const domain = extractDomain(email.from);
-      const faviconHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
-        domain: domain,
-        size: 40
-      });
-      els.senderAvatar.innerHTML = faviconHtml;
+        const domain = extractDomain(email.from);
+        const faviconHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
+          domain: domain,
+          size: 40
+        });
+        els.senderAvatar.innerHTML = faviconHtml;
       }
     }
 
@@ -2592,28 +2624,204 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     return match ? match[1] : '';
   }
 
+  // Cache for contact names looked up from Firebase (populated asynchronously)
+  const contactNameCache = new Map();
+  const pendingLookups = new Set(); // Track lookups in progress to avoid duplicates
+
+  // Async helper to lookup contact name from Firebase and cache it
+  async function lookupContactNameFromFirebase(emailAddress) {
+    if (!emailAddress || !emailAddress.includes('@') || !window.firebaseDB) {
+      return null;
+    }
+
+    const normalizedEmail = emailAddress.toLowerCase().trim();
+
+    // Avoid duplicate lookups
+    if (pendingLookups.has(normalizedEmail)) {
+      return null;
+    }
+
+    pendingLookups.add(normalizedEmail);
+
+    try {
+      // Try contacts collection first
+      let snap = await window.firebaseDB.collection('contacts')
+        .where('email', '==', normalizedEmail)
+        .limit(1)
+        .get();
+
+      // Fallback to people collection
+      if (!snap || snap.empty) {
+        snap = await window.firebaseDB.collection('people')
+          .where('email', '==', normalizedEmail)
+          .limit(1)
+          .get();
+      }
+
+      if (snap && !snap.empty) {
+        const doc = snap.docs[0];
+        const contact = doc.data();
+        
+        // Build full name from contact
+        const firstName = contact.firstName || '';
+        const lastName = contact.lastName || '';
+        const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+        
+        if (fullName) {
+          contactNameCache.set(normalizedEmail, fullName);
+          // Trigger a re-render if email detail is showing
+          if (state.currentEmail) {
+            setTimeout(() => populateEmailDetails(state.currentEmail), 100);
+          }
+          return fullName;
+        }
+        
+        // Fallback to contact name field
+        if (contact.name) {
+          contactNameCache.set(normalizedEmail, contact.name);
+          setTimeout(() => populateEmailDetails(state.currentEmail), 100);
+          return contact.name;
+        }
+      }
+    } catch (error) {
+      console.warn('[EmailDetail] Error looking up contact name from Firebase:', error);
+    } finally {
+      pendingLookups.delete(normalizedEmail);
+    }
+
+    return null;
+  }
+
+  // Helper function to format email username as "First Last"
+  function formatEmailAsName(emailUsername) {
+    if (!emailUsername || typeof emailUsername !== 'string') return emailUsername;
+    
+    // Remove common prefixes/suffixes
+    let cleaned = emailUsername.toLowerCase().trim();
+    
+    // Handle common separators: aaron.rodriguez, aaron_rodriguez, aaron-rodriguez
+    let parts = [];
+    if (cleaned.includes('.')) {
+      parts = cleaned.split('.');
+    } else if (cleaned.includes('_')) {
+      parts = cleaned.split('_');
+    } else if (cleaned.includes('-')) {
+      parts = cleaned.split('-');
+    } else {
+      // Try to split camelCase or detect word boundaries
+      // For now, just return capitalized single word
+      return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    }
+    
+    // Capitalize each part and join
+    parts = parts
+      .filter(p => p.length > 0) // Remove empty parts
+      .map(p => p.charAt(0).toUpperCase() + p.slice(1)); // Capitalize first letter
+    
+    if (parts.length >= 2) {
+      return parts.join(' ');
+    } else if (parts.length === 1) {
+      return parts[0];
+    }
+    
+    return emailUsername; // Fallback
+  }
+
   function extractName(email) {
-    if (!email || typeof email !== 'string') return 'Unknown';
+    // Handle null, undefined, or empty values
+    if (!email) return 'Unknown';
+    
+    // Convert to string if it's not already
+    if (typeof email !== 'string') {
+      email = String(email);
+    }
+    
+    // If it's still empty after conversion, return Unknown
+    if (!email.trim()) return 'Unknown';
+    
+    // Extract email address from various formats
+    let emailAddress = '';
+    let extractedName = '';
     
     // Handle format: "Name" <email@domain.com>
     const quotedMatch = email.match(/^"([^"]+)"\s*<(.+)>$/);
     if (quotedMatch) {
-      return quotedMatch[1]; // Return the quoted name
+      extractedName = quotedMatch[1];
+      emailAddress = quotedMatch[2].toLowerCase().trim();
+    } else {
+      // Handle format: Name <email@domain.com>
+      const angleMatch = email.match(/^([^<]+)\s*<(.+)>$/);
+      if (angleMatch) {
+        extractedName = angleMatch[1].trim();
+        emailAddress = angleMatch[2].toLowerCase().trim();
+      } else {
+        // Handle format: email@domain.com
+        emailAddress = email.toLowerCase().trim();
+      }
     }
     
-    // Handle format: Name <email@domain.com>
-    const angleMatch = email.match(/^([^<]+)\s*<(.+)>$/);
-    if (angleMatch) {
-      return angleMatch[1].trim(); // Return name before <
+    // If we already have a name from the email string, use it
+    if (extractedName && extractedName.length > 0) {
+      return extractedName;
     }
     
-    // Handle format: email@domain.com
-    const emailMatch = email.match(/^(.+)@/);
-    if (emailMatch) {
-      return emailMatch[1];
+    // Otherwise, try to look up contact by email address
+    if (emailAddress && emailAddress.includes('@')) {
+      const normalizedEmail = emailAddress.toLowerCase().trim();
+      
+      // Priority 1: Check cache (populated by Firebase lookups)
+      if (contactNameCache.has(normalizedEmail)) {
+        return contactNameCache.get(normalizedEmail);
+      }
+      
+      // Priority 2: Use cached people data - no API calls needed
+      try {
+        const people = window.getPeopleData ? window.getPeopleData() : [];
+        const contact = people.find(p => {
+          const contactEmail = (p.email || '').toLowerCase().trim();
+          return contactEmail === normalizedEmail;
+        });
+        
+        if (contact) {
+          // Build full name from contact
+          const firstName = contact.firstName || '';
+          const lastName = contact.lastName || '';
+          const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+          if (fullName) {
+            // Cache it for future use
+            contactNameCache.set(normalizedEmail, fullName);
+            return fullName;
+          }
+          // Fallback to contact name field
+          if (contact.name) {
+            contactNameCache.set(normalizedEmail, contact.name);
+            return contact.name;
+          }
+        }
+      } catch (_) {
+        // Silently fail and continue to fallback
+      }
+      
+      // Priority 3: If cache is empty, trigger async Firebase lookup (non-blocking)
+      // This will update the cache and trigger a re-render when complete
+      if (window.firebaseDB && !pendingLookups.has(normalizedEmail)) {
+        lookupContactNameFromFirebase(normalizedEmail).catch(() => {
+          // Silently fail
+        });
+      }
     }
     
-    return email; // Fallback to full string
+    // If no contact found, format email username as "First Last"
+    if (emailAddress && emailAddress.includes('@')) {
+      const emailMatch = emailAddress.match(/^(.+)@/);
+      if (emailMatch) {
+        const emailUsername = emailMatch[1];
+        const formattedName = formatEmailAsName(emailUsername);
+        return formattedName;
+      }
+    }
+    
+    return email; // Final fallback to full string
   }
 
   function formatDate(date) {
