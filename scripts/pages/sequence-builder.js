@@ -48,15 +48,25 @@ class FreeSequenceAutomation {
         
         // Calculate when this email should be sent
         let sendTime;
-        if (i === 0 && step.delay === 'immediate') {
-          // First step: send in 30 minutes (for AI generation)
-          sendTime = Date.now() + (30 * 60 * 1000);
+        const delayMinutes = step.delayMinutes || 0;
+        
+        if (i === 0) {
+          // First step: use the actual delayMinutes value (0 for immediate, or specified delay)
+          // For AI generation, we still need some time, but respect user's "immediate" setting
+          if (delayMinutes === 0) {
+            // User set to immediate: schedule for 1 minute from now (allows AI generation time)
+            sendTime = Date.now() + (1 * 60 * 1000);
+          } else {
+            // User specified a delay: use it
+            sendTime = Date.now() + (delayMinutes * 60 * 1000);
+          }
         } else {
           // Calculate based on delay from previous step
           const previousStepTime = i > 0 ? 
             (emailSteps[i-1].scheduledTime || Date.now()) : 
             Date.now();
-          sendTime = this.calculateSendTime(previousStepTime, step.delay);
+          // calculateSendTime expects delay in minutes as a number
+          sendTime = previousStepTime + (delayMinutes * 60 * 1000);
         }
         
         // Generate unique ID

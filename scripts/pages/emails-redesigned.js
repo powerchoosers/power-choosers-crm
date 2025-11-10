@@ -203,11 +203,20 @@
       }
       
       // Ensure all emails have required fields and preserve content fields
-      state.data = emailsData.map(email => ({
+      state.data = emailsData.map(email => {
+        // Normalize 'to' field - handle both string and array formats
+        let normalizedTo = '';
+        if (Array.isArray(email.to)) {
+          normalizedTo = email.to.length > 0 ? email.to[0] : '';
+        } else {
+          normalizedTo = email.to || '';
+        }
+        
+        return {
         ...email,
         type: email.type || 'received',
         from: email.from || 'Unknown',
-        to: email.to || '',
+        to: normalizedTo,
         subject: email.subject || '(No Subject)',
         date: email.date || email.timestamp || email.createdAt || new Date(),
         // Preserve all content fields like old system
@@ -224,7 +233,8 @@
         starred: email.starred || false,
         deleted: email.deleted || false,
         unread: email.unread !== false
-      }));
+        };
+      });
       
       // Sort by date (newest first)
       state.data.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -293,10 +303,16 @@
       // Scheduled emails are already filtered by ownership in BackgroundEmailsLoader
       // Only shows scheduled emails owned by or assigned to current user
       filtered = filtered.filter(email => {
-        return email.type === 'scheduled' && 
-               email.scheduledSendTime && 
-               email.scheduledSendTime > Date.now() &&
-               !email.deleted;
+        // CRITICAL FIX: Show emails that are scheduled for now or future (not just future)
+        // Also include emails with status 'not_generated' or 'pending_approval' that haven't been sent yet
+        const isScheduled = email.type === 'scheduled';
+        const hasSendTime = email.scheduledSendTime && typeof email.scheduledSendTime === 'number';
+        const isFutureOrNow = hasSendTime && email.scheduledSendTime >= (Date.now() - 60000); // Allow 1 minute buffer for "due now" emails
+        const isPending = email.status === 'not_generated' || email.status === 'pending_approval' || !email.status;
+        const notDeleted = !email.deleted;
+        const notSent = email.status !== 'sent' && email.status !== 'delivered';
+        
+        return isScheduled && hasSendTime && (isFutureOrNow || isPending) && notDeleted && notSent;
       });
       // Sort by scheduled send time (earliest first)
       filtered.sort((a, b) => a.scheduledSendTime - b.scheduledSendTime);
@@ -333,6 +349,15 @@
   function render() {
     if (!els.tbody) return;
     
+    // Update table header to show "To" for sent emails, "From" for others
+    const table = document.getElementById('emails-table');
+    if (table) {
+      const headerCell = table.querySelector('thead th:nth-child(2)'); // Second column (after checkbox)
+      if (headerCell) {
+        headerCell.textContent = state.currentFolder === 'sent' ? 'To' : 'From';
+      }
+    }
+    
     const rows = getPageItems();
     els.tbody.innerHTML = rows.map(email => rowHtml(email)).join('');
     
@@ -362,38 +387,72 @@
     bindRowEvents();
   }
 
+  // Helper function to get account logoUrl from recipient email
+  function getRecipientAccountInfo(recipientEmail) {
+    if (!recipientEmail) return { logoUrl: null, domain: null };
+    
+    try {
+      const recipientDomain = extractDomain(recipientEmail);
+      if (!recipientDomain) return { logoUrl: null, domain: null };
+      
+      // Try to find account by domain
+      const accounts = window.getAccountsData ? window.getAccountsData() : [];
+      const account = accounts.find(a => {
+        const accountDomain = (a.domain || '').toLowerCase().replace(/^www\./, '');
+        const accountWebsite = (a.website || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+        const domainLower = recipientDomain.toLowerCase();
+        return accountDomain === domainLower || accountWebsite === domainLower;
+      });
+      
+      if (account) {
+        const logoUrl = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon;
+        return { logoUrl: logoUrl || null, domain: account.domain || account.website || recipientDomain };
+      }
+      
+      return { logoUrl: null, domain: recipientDomain };
+    } catch (_) {
+      return { logoUrl: null, domain: extractDomain(recipientEmail) };
+    }
+  }
+
   // Generate email row HTML with favicon integration and snippet
   function rowHtml(email) {
     const isSentEmail = email.isSentEmail || email.type === 'sent';
     
-    // For sent emails, use user's profile photo; otherwise use domain favicon
+    // For sent emails, show recipient info with logo; otherwise show sender info
     let avatarHtml = '';
+    let displayName = '';
+    
     if (isSentEmail) {
-      // Get user's profile photo from settings
-      const settings = (window.SettingsPage?.getSettings?.()) || {};
-      const g = settings?.general || {};
-      const profilePhotoUrl = g.hostedPhotoURL || g.photoURL || '';
-      
-      if (profilePhotoUrl) {
-        // Use profile photo
-        avatarHtml = `<img src="${escapeHtml(profilePhotoUrl)}" alt="Profile" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 2px solid var(--orange-primary);" />`;
+      // For sent emails, show recipient with account logo
+      // Handle both string and array formats for email.to
+      let recipientEmail = '';
+      if (Array.isArray(email.to)) {
+        recipientEmail = email.to[0] || '';
       } else {
-        // Fallback to initials avatar
-        const firstName = g.firstName || '';
-        const lastName = g.lastName || '';
-        const initials = ((firstName.charAt(0) || '') + (lastName.charAt(0) || '')).toUpperCase() || 'U';
-        avatarHtml = `<div style="width: 28px; height: 28px; border-radius: 50%; background: var(--orange-subtle); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 12px; letter-spacing: 0.5px;" aria-hidden="true">${escapeHtml(initials)}</div>`;
+        recipientEmail = email.to || '';
       }
-    } else {
-      // Use domain favicon for received emails
-    const senderDomain = extractDomain(email.from);
+      
+      const recipientName = extractName(recipientEmail);
+      displayName = recipientName;
+      
+      // Get account info for recipient
+      const accountInfo = getRecipientAccountInfo(recipientEmail);
       avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
-      domain: senderDomain,
-      size: 28
-    });
+        logoUrl: accountInfo.logoUrl,
+        domain: accountInfo.domain,
+        size: 28
+      });
+    } else {
+      // For received emails, show sender with domain favicon
+      const senderDomain = extractDomain(email.from);
+      displayName = extractName(email.from);
+      avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
+        domain: senderDomain,
+        size: 28
+      });
     }
 
-    const senderName = extractName(email.from);
     const isSelected = state.selected.has(email.id);
     const emailPreview = getEmailPreview(email);
 
@@ -412,7 +471,7 @@
         <td class="email-sender-cell">
           <div class="sender-cell__wrap">
             ${avatarHtml}
-            <span class="sender-name">${escapeHtml(senderName)}</span>
+            <span class="sender-name">${escapeHtml(displayName)}</span>
           </div>
         </td>
         <td class="email-subject-cell">
@@ -426,11 +485,13 @@
         </td>
         <td class="qa-cell">
           <div class="qa-actions">
-            <button class="qa-btn ${isStarred ? 'starred' : ''}" data-action="star" data-email-id="${email.id}" title="${isStarred ? 'Unstar' : 'Star'}">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="${isStarred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-              </svg>
-            </button>
+            ${!isSentEmail ? `
+              <button class="qa-btn ${isStarred ? 'starred' : ''}" data-action="star" data-email-id="${email.id}" title="${isStarred ? 'Unstar' : 'Star'}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="${isStarred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+              </button>
+            ` : ''}
             ${email.type === 'scheduled' && email.status === 'pending_approval' ? `
               <button class="qa-btn" data-action="approve" data-email-id="${email.id}" title="Approve" style="color: #28a745;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -442,8 +503,15 @@
                   <path d="M18 6L6 18M6 6l12 12"/>
                 </svg>
               </button>
-            ` : email.isSentEmail ? `
-              <button class="qa-btn ${hasClicks ? 'clicked' : 'not-clicked'}" data-action="clicks" data-email-id="${email.id}" title="${hasClicks ? `Clicked ${clickCount} time${clickCount !== 1 ? 's' : ''}` : 'Not clicked'}" style="position: relative;">
+            ` : isSentEmail ? `
+              <button class="qa-btn ${hasOpens ? 'opened' : ''}" data-action="view" data-email-id="${email.id}" title="${hasOpens ? `Opened ${openCount} time${openCount !== 1 ? 's' : ''}` : 'Not opened'}" style="position: relative;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                ${hasOpens ? `<span class="tracking-badge">${openCount}</span>` : ''}
+              </button>
+              <button class="qa-btn" data-action="clicks" data-email-id="${email.id}" title="${hasClicks ? `Clicked ${clickCount} time${clickCount !== 1 ? 's' : ''}` : 'Not clicked'}" style="position: relative;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
                   <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/>
@@ -860,28 +928,204 @@
     return match ? match[1] : '';
   }
 
+  // Cache for contact names looked up from Firebase (populated asynchronously)
+  const contactNameCache = new Map();
+  const pendingLookups = new Set(); // Track lookups in progress to avoid duplicates
+
+  // Async helper to lookup contact name from Firebase and cache it
+  async function lookupContactNameFromFirebase(emailAddress) {
+    if (!emailAddress || !emailAddress.includes('@') || !window.firebaseDB) {
+      return null;
+    }
+
+    const normalizedEmail = emailAddress.toLowerCase().trim();
+
+    // Avoid duplicate lookups
+    if (pendingLookups.has(normalizedEmail)) {
+      return null;
+    }
+
+    pendingLookups.add(normalizedEmail);
+
+    try {
+      // Try contacts collection first
+      let snap = await window.firebaseDB.collection('contacts')
+        .where('email', '==', normalizedEmail)
+        .limit(1)
+        .get();
+
+      // Fallback to people collection
+      if (!snap || snap.empty) {
+        snap = await window.firebaseDB.collection('people')
+          .where('email', '==', normalizedEmail)
+          .limit(1)
+          .get();
+      }
+
+      if (snap && !snap.empty) {
+        const doc = snap.docs[0];
+        const contact = doc.data();
+        
+        // Build full name from contact
+        const firstName = contact.firstName || '';
+        const lastName = contact.lastName || '';
+        const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+        
+        if (fullName) {
+          contactNameCache.set(normalizedEmail, fullName);
+          // Trigger a re-render if we're on the emails page
+          if (state.currentFolder) {
+            setTimeout(() => render(), 100);
+          }
+          return fullName;
+        }
+        
+        // Fallback to contact name field
+        if (contact.name) {
+          contactNameCache.set(normalizedEmail, contact.name);
+          setTimeout(() => render(), 100);
+          return contact.name;
+        }
+      }
+    } catch (error) {
+      console.warn('[EmailsPage] Error looking up contact name from Firebase:', error);
+    } finally {
+      pendingLookups.delete(normalizedEmail);
+    }
+
+    return null;
+  }
+
+  // Helper function to format email username as "First Last"
+  function formatEmailAsName(emailUsername) {
+    if (!emailUsername || typeof emailUsername !== 'string') return emailUsername;
+    
+    // Remove common prefixes/suffixes
+    let cleaned = emailUsername.toLowerCase().trim();
+    
+    // Handle common separators: aaron.rodriguez, aaron_rodriguez, aaron-rodriguez
+    let parts = [];
+    if (cleaned.includes('.')) {
+      parts = cleaned.split('.');
+    } else if (cleaned.includes('_')) {
+      parts = cleaned.split('_');
+    } else if (cleaned.includes('-')) {
+      parts = cleaned.split('-');
+    } else {
+      // Try to split camelCase or detect word boundaries
+      // For now, just return capitalized single word
+      return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    }
+    
+    // Capitalize each part and join
+    parts = parts
+      .filter(p => p.length > 0) // Remove empty parts
+      .map(p => p.charAt(0).toUpperCase() + p.slice(1)); // Capitalize first letter
+    
+    if (parts.length >= 2) {
+      return parts.join(' ');
+    } else if (parts.length === 1) {
+      return parts[0];
+    }
+    
+    return emailUsername; // Fallback
+  }
+
   function extractName(email) {
-    if (!email || typeof email !== 'string') return 'Unknown';
+    // Handle null, undefined, or empty values
+    if (!email) return 'Unknown';
+    
+    // Convert to string if it's not already
+    if (typeof email !== 'string') {
+      email = String(email);
+    }
+    
+    // If it's still empty after conversion, return Unknown
+    if (!email.trim()) return 'Unknown';
+    
+    // Extract email address from various formats
+    let emailAddress = '';
+    let extractedName = '';
     
     // Handle format: "Name" <email@domain.com>
     const quotedMatch = email.match(/^"([^"]+)"\s*<(.+)>$/);
     if (quotedMatch) {
-      return quotedMatch[1]; // Return the quoted name
+      extractedName = quotedMatch[1];
+      emailAddress = quotedMatch[2].toLowerCase().trim();
+    } else {
+      // Handle format: Name <email@domain.com>
+      const angleMatch = email.match(/^([^<]+)\s*<(.+)>$/);
+      if (angleMatch) {
+        extractedName = angleMatch[1].trim();
+        emailAddress = angleMatch[2].toLowerCase().trim();
+      } else {
+        // Handle format: email@domain.com
+        emailAddress = email.toLowerCase().trim();
+      }
     }
     
-    // Handle format: Name <email@domain.com>
-    const angleMatch = email.match(/^([^<]+)\s*<(.+)>$/);
-    if (angleMatch) {
-      return angleMatch[1].trim(); // Return name before <
+    // If we already have a name from the email string, use it
+    if (extractedName && extractedName.length > 0) {
+      return extractedName;
     }
     
-    // Handle format: email@domain.com
-    const emailMatch = email.match(/^(.+)@/);
-    if (emailMatch) {
-      return emailMatch[1];
+    // Otherwise, try to look up contact by email address
+    if (emailAddress && emailAddress.includes('@')) {
+      const normalizedEmail = emailAddress.toLowerCase().trim();
+      
+      // Priority 1: Check cache (populated by Firebase lookups)
+      if (contactNameCache.has(normalizedEmail)) {
+        return contactNameCache.get(normalizedEmail);
+      }
+      
+      // Priority 2: Use cached people data - no API calls needed
+      try {
+        const people = window.getPeopleData ? window.getPeopleData() : [];
+        const contact = people.find(p => {
+          const contactEmail = (p.email || '').toLowerCase().trim();
+          return contactEmail === normalizedEmail;
+        });
+        
+        if (contact) {
+          // Build full name from contact
+          const firstName = contact.firstName || '';
+          const lastName = contact.lastName || '';
+          const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+          if (fullName) {
+            // Cache it for future use
+            contactNameCache.set(normalizedEmail, fullName);
+            return fullName;
+          }
+          // Fallback to contact name field
+          if (contact.name) {
+            contactNameCache.set(normalizedEmail, contact.name);
+            return contact.name;
+          }
+        }
+      } catch (_) {
+        // Silently fail and continue to fallback
+      }
+      
+      // Priority 3: If cache is empty, trigger async Firebase lookup (non-blocking)
+      // This will update the cache and trigger a re-render when complete
+      if (window.firebaseDB && !pendingLookups.has(normalizedEmail)) {
+        lookupContactNameFromFirebase(normalizedEmail).catch(() => {
+          // Silently fail
+        });
+      }
     }
     
-    return email; // Fallback to full string
+    // If no contact found, format email username as "First Last"
+    if (emailAddress && emailAddress.includes('@')) {
+      const emailMatch = emailAddress.match(/^(.+)@/);
+      if (emailMatch) {
+        const emailUsername = emailMatch[1];
+        const formattedName = formatEmailAsName(emailUsername);
+        return formattedName;
+      }
+    }
+    
+    return email; // Final fallback to full string
   }
 
   function formatDate(date) {

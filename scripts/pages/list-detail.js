@@ -3140,16 +3140,23 @@ function openBulkSelectPopover() {
       const mode = checkedRadio ? checkedRadio.value : 'custom';
       closeBulkSelectPopover();
       
+      // Get fresh state to ensure we have the latest filtered data
+      const freshState = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : state;
+      const freshFiltered = freshState.filtered || [];
+      const freshPageItems = window.ListDetail && window.ListDetail._getPageItems ? window.ListDetail._getPageItems() : pageItems;
+      
       // Apply selection based on mode
       if (mode === 'custom') {
         const raw = parseInt(pop.querySelector('#bulk-custom-count').value || '0', 10);
-        const n = Math.min(totalFiltered, Math.max(1, isNaN(raw) ? 0 : raw));
+        const n = Math.min(freshFiltered.length, Math.max(1, isNaN(raw) ? 0 : raw));
         selectFirstNFiltered(n);
       } else if (mode === 'page') {
-        const pageIds = pageItems.map((it) => it.id).filter(Boolean);
+        const pageIds = freshPageItems.map((it) => it.id).filter(Boolean);
         selectIds(pageIds);
       } else if (mode === 'all') {
-        const allIds = (state.filtered || []).map((it) => it.id).filter(Boolean);
+        // CRITICAL FIX: Use fresh filtered state to ensure we get ALL items, not just current page
+        const allIds = freshFiltered.map((it) => it.id).filter(Boolean);
+        console.log('[ListDetail] Selecting all filtered items:', { totalFiltered: freshFiltered.length, allIds: allIds.length });
         selectIds(allIds);
       }
       
@@ -3562,10 +3569,11 @@ async function populateListDetailSequences(container, view) {
       item.setAttribute('data-name', String(seq.name || 'Sequence'));
       
       const memberCount = seq.stats?.active || 0;
+      const stepCount = Array.isArray(seq.steps) ? seq.steps.length : 0;
       const metaBits = [];
       if (seq.isActive === false) metaBits.push('Inactive');
       metaBits.push(`${memberCount} member${memberCount === 1 ? '' : 's'}`);
-      if (seq.stats && typeof seq.stats.delivered === 'number') metaBits.push(`${seq.stats.delivered} steps`);
+      if (stepCount > 0) metaBits.push(`${stepCount} step${stepCount === 1 ? '' : 's'}`);
       const meta = metaBits.join(' • ');
       
       item.innerHTML = `
@@ -3595,6 +3603,8 @@ async function handleListDetailSequenceChoose(el, view) {
   
   if (!sequenceId) return;
   
+  let progressToast = null;
+  
   try {
     // Get selected IDs
     const selectedIds = Array.from(document.querySelectorAll('#list-detail-table .row-select:checked'))
@@ -3613,8 +3623,17 @@ async function handleListDetailSequenceChoose(el, view) {
       return;
     }
     
+    // Close panel early to show progress toast
+    closeListDetailSequencePanel();
+    
     const email = getUserEmail();
     const targetType = view === 'people' ? 'people' : 'accounts';
+    const itemLabel = view === 'people' ? 'contact' : 'account';
+    const itemLabelPlural = view === 'people' ? 'contacts' : 'accounts';
+    
+    // Show initial progress toast - Step 1: Loading data
+    progressToast = window.crm?.showProgressToast ? 
+      window.crm.showProgressToast(`Adding ${selectedIds.length} ${selectedIds.length === 1 ? itemLabel : itemLabelPlural} to "${sequenceName}"...`, 3, 0) : null;
     
     // ✅ NEW: Load full contact data and validate emails
     const contactsData = [];
@@ -3631,6 +3650,11 @@ async function handleListDetailSequenceChoose(el, view) {
       }
     }
     
+    // Update progress - Step 1 complete
+    if (progressToast && typeof progressToast.update === 'function') {
+      progressToast.update(1, 3);
+    }
+    
     // Validate emails
     const contactsWithoutEmail = contactsData.filter(c => !c.email || c.email.trim() === '');
     let idsToAdd = selectedIds;
@@ -3638,15 +3662,21 @@ async function handleListDetailSequenceChoose(el, view) {
     if (contactsWithoutEmail.length > 0) {
       const result = await showListDetailEmailValidationModal(contactsWithoutEmail, contactsData.length);
       if (!result.proceed) {
-        closeListDetailSequencePanel();
+        // User cancelled
+        if (progressToast && typeof progressToast.error === 'function') {
+          progressToast.error('Cancelled');
+        }
         return;
       }
       if (result.validOnly) {
         // Filter to only add contacts with emails
         idsToAdd = contactsData.filter(c => c.email && c.email.trim() !== '').map(c => c.id);
         if (idsToAdd.length === 0) {
-          if (window.crm?.showToast) window.crm.showToast('No valid email addresses found');
-          closeListDetailSequencePanel();
+          if (progressToast && typeof progressToast.error === 'function') {
+            progressToast.error('No valid email addresses found');
+          } else {
+            if (window.crm?.showToast) window.crm.showToast('No valid email addresses found');
+          }
           return;
         }
       }
@@ -3664,6 +3694,11 @@ async function handleListDetailSequenceChoose(el, view) {
       if (data.targetId) existingIds.add(String(data.targetId));
     });
     
+    // Update progress - Step 2 complete
+    if (progressToast && typeof progressToast.update === 'function') {
+      progressToast.update(2, 3);
+    }
+    
     // Add new members
     const batch = db.batch();
     const newIds = idsToAdd.filter(id => !existingIds.has(id));
@@ -3671,15 +3706,16 @@ async function handleListDetailSequenceChoose(el, view) {
     
     for (const targetId of newIds) {
       const contact = contactsData.find(c => c.id === targetId);
-      const hasEmail = contact && contact.email && contact.email.trim() !== '';
+      // CRITICAL FIX: Ensure hasEmail is always boolean, never undefined
+      const hasEmail = !!(contact && contact.email && contact.email.trim() !== '');
       
       const memberRef = db.collection('sequenceMembers').doc();
       const memberData = {
         sequenceId,
         targetId,
         targetType,
-        hasEmail: hasEmail, // Track whether contact has email
-        skipEmailSteps: !hasEmail, // Flag to skip email steps
+        hasEmail: hasEmail, // Track whether contact has email (always boolean)
+        skipEmailSteps: !hasEmail, // Flag to skip email steps (always boolean)
         ownerId: email,
         userId: window.firebase?.auth()?.currentUser?.uid || null,
         createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date(),
@@ -3692,26 +3728,55 @@ async function handleListDetailSequenceChoose(el, view) {
     if (addedCount > 0) {
       await batch.commit();
       
-      // Update sequence stats
+      // Update sequence stats - increment stats.active and recalculate recordCount
       if (window.firebase?.firestore?.FieldValue) {
+        // First, get current count to calculate new recordCount
+        const membersQuery = await db.collection('sequenceMembers')
+          .where('sequenceId', '==', sequenceId)
+          .where('targetType', '==', targetType)
+          .get();
+        
+        const actualCount = membersQuery.size;
+        
         await db.collection('sequences').doc(sequenceId).update({
-          'stats.active': window.firebase.firestore.FieldValue.increment(addedCount)
+          'stats.active': window.firebase.firestore.FieldValue.increment(addedCount),
+          'recordCount': actualCount  // CRITICAL: Set recordCount to actual count from sequenceMembers
         });
       }
+    }
+    
+    // Update progress - Step 3 complete
+    if (progressToast && typeof progressToast.update === 'function') {
+      progressToast.update(3, 3);
     }
     
     const skippedCount = selectedIds.length - addedCount;
     const withoutEmailCount = contactsWithoutEmail.length;
     
-    // Show success message
-    let message = `Added ${addedCount} ${addedCount === 1 ? (view === 'people' ? 'contact' : 'account') : (view === 'people' ? 'contacts' : 'accounts')} to "${sequenceName}"`;
+    // Show completion message
+    let message = `Added ${addedCount} ${addedCount === 1 ? itemLabel : itemLabelPlural} to "${sequenceName}"`;
     if (withoutEmailCount > 0) {
       message += ` (${withoutEmailCount} without email - email steps will be skipped)`;
     }
     if (skippedCount > withoutEmailCount) {
       message += ` (${skippedCount - withoutEmailCount} already in sequence)`;
     }
-    if (window.crm?.showToast) window.crm.showToast(message, 'success');
+    
+    if (progressToast && typeof progressToast.complete === 'function') {
+      progressToast.complete(message);
+    } else {
+      if (window.crm?.showToast) window.crm.showToast(message, 'success');
+    }
+    
+    // Refresh sequence panel to show updated member count
+    const sequencePanel = document.getElementById('list-detail-sequence-panel');
+    if (sequencePanel && sequencePanel.classList.contains('--show')) {
+      const sequenceBody = sequencePanel.querySelector('#list-detail-sequence-body');
+      if (sequenceBody) {
+        // Reload sequences to get updated member counts
+        await populateListDetailSequences(sequenceBody, view);
+      }
+    }
     
     // Clear selection
     document.querySelectorAll('#list-detail-table .row-select:checked').forEach(cb => cb.checked = false);
@@ -3735,9 +3800,11 @@ async function handleListDetailSequenceChoose(el, view) {
     
   } catch (err) {
     console.error('[ListDetail] Failed to add to sequence:', err);
-    if (window.crm?.showToast) window.crm.showToast('Failed to add to sequence', 'error');
-  } finally {
-    closeListDetailSequencePanel();
+    if (progressToast && typeof progressToast.error === 'function') {
+      progressToast.error('Failed to add to sequence');
+    } else {
+      if (window.crm?.showToast) window.crm.showToast('Failed to add to sequence', 'error');
+    }
   }
 }
 
