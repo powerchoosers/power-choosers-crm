@@ -7860,10 +7860,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         }));
       }
       
-      // Show success message with cost savings
-      if (window.crm && typeof window.crm.showToast === 'function') {
-        window.crm.showToast(`🎉 FREE Sequence started! ${result.scheduledEmailCount} emails scheduled. Cost: $0/month! (Saved $22/month)`);
-      }
+      // Show success message with cost savings (removed from here to avoid toast spam when starting for multiple contacts)
       
       console.log('[SequenceBuilder] FREE sequence started successfully:', {
         totalTasks: tasks.length,
@@ -7873,7 +7870,12 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         savings: '$22/month'
       });
       
-      return tasks;
+      // Return result with scheduledEmailCount so caller can track total
+      return {
+        tasks: tasks,
+        scheduledEmailCount: result.scheduledEmailCount,
+        success: true
+      };
     } catch (error) {
       console.error('[SequenceBuilder] Error starting FREE sequence:', error);
       if (window.crm && typeof window.crm.showToast === 'function') {
