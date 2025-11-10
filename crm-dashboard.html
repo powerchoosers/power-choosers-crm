@@ -1251,22 +1251,15 @@
                                 <div class="page-title-section">
                                     <h2 class="page-title">Client Management</h2>
                                     <div class="page-actions">
-                                        <button class="action-btn" id="refresh-client-data">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <polyline points="23,4 23,10 17,10"></polyline>
-                                                <polyline points="1,20 1,14 7,14"></polyline>
-                                                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4a9 9 0 0 1-14.85 4.36L23 14"></path>
-                                            </svg>
-                                            Refresh
-                                        </button>
+                                        <button class="btn-primary" id="add-account-client-mgmt-btn">Add Account</button>
                                     </div>
                                 </div>
                             </div>
                             <div class="page-content">
                                 <!-- Loading and Error States -->
-                                <div class="loading-spinner" style="display: none; text-align: center; padding: 40px;">
+                                <div class="loading-state" style="display: none; text-align: center; padding: 40px;">
                                     <div class="spinner"></div>
-                                    <p>Loading client data...</p>
+                                    <p style="margin-top: 16px; color: var(--text-secondary);">Loading client data...</p>
                                 </div>
                                 <div class="error-message" style="display: none; background: #fee; border: 1px solid #fcc; color: #c33; padding: 16px; border-radius: 8px; margin: 16px 0;"></div>
 
@@ -1874,9 +1867,9 @@
                             
                             <div class="page-content">
                                 <!-- Loading and Error States -->
-                                <div class="loading-spinner" style="display: none; text-align: center; padding: 40px;">
+                                <div class="loading-state" style="display: none; text-align: center; padding: 40px;">
                                     <div class="spinner"></div>
-                                    <p>Loading agents data...</p>
+                                    <p style="margin-top: 16px; color: var(--text-secondary);">Loading agents data...</p>
                                 </div>
                                 
                                 <div class="error-message" style="display: none; text-align: center; padding: 40px; color: var(--red-500);">
@@ -2029,9 +2022,9 @@
                             
                             <div class="page-content">
                                 <!-- Loading and Error States -->
-                                <div class="loading-spinner" style="display: none;">
+                                <div class="loading-state" style="display: none; text-align: center; padding: 40px;">
                                     <div class="spinner"></div>
-                                    <p>Loading agent data...</p>
+                                    <p style="margin-top: 16px; color: var(--text-secondary);">Loading agent data...</p>
                                 </div>
                                 
                                 <div class="error-message" style="display: none;">
@@ -3034,6 +3027,44 @@
                     <button type="submit" class="btn-primary">Create contact</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Client Management: Add Account Search Modal -->
+    <div id="modal-client-mgmt-search" class="pc-modal" hidden>
+        <div class="pc-modal__backdrop" data-close="client-search"></div>
+        <div class="pc-modal__dialog" style="max-width: 600px;">
+            <div class="pc-modal__header">
+                <h3>Add Account to Client Management</h3>
+                <button class="pc-modal__close" data-close="client-search" aria-label="Close">×</button>
+            </div>
+            <div class="pc-modal__body">
+                <div class="account-search-container">
+                    <label style="display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 0.9rem;">
+                        Search for an existing account
+                    </label>
+                    <div class="account-search-wrap">
+                        <input 
+                            type="text" 
+                            id="client-mgmt-account-search" 
+                            class="input-dark" 
+                            placeholder="Type company name, industry, or city..."
+                            autocomplete="off"
+                            style="width: 100%; padding: 12px 16px; font-size: 1rem;"
+                        />
+                        <div id="client-mgmt-search-results" class="account-search-dropdown" hidden>
+                            <div class="search-results-list">
+                                <!-- Results populated by JavaScript -->
+                            </div>
+                            <div class="search-empty" hidden>
+                                <p style="padding: 16px; text-align: center; color: var(--text-muted);">
+                                    No accounts found
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -3579,7 +3579,6 @@ async function handleListDetailSequenceChoose(el, view) {
       return;
     }
     
-    // Add all selected contacts/accounts to the sequence
     const db = window.firebaseDB;
     if (!db) {
       if (window.crm?.showToast) window.crm.showToast('Database not available');
@@ -3589,8 +3588,42 @@ async function handleListDetailSequenceChoose(el, view) {
     
     const email = getUserEmail();
     const targetType = view === 'people' ? 'people' : 'accounts';
-    let addedCount = 0;
-    let skippedCount = 0;
+    
+    // ✅ NEW: Load full contact data and validate emails
+    const contactsData = [];
+    const collectionName = targetType === 'people' ? 'people' : 'accounts';
+    
+    for (const id of selectedIds) {
+      try {
+        const docRef = await db.collection(collectionName).doc(id).get();
+        if (docRef.exists) {
+          contactsData.push({ id: docRef.id, ...docRef.data() });
+        }
+      } catch (err) {
+        console.warn(`Failed to load ${targetType} ${id}:`, err);
+      }
+    }
+    
+    // Validate emails
+    const contactsWithoutEmail = contactsData.filter(c => !c.email || c.email.trim() === '');
+    let idsToAdd = selectedIds;
+    
+    if (contactsWithoutEmail.length > 0) {
+      const result = await showListDetailEmailValidationModal(contactsWithoutEmail, contactsData.length);
+      if (!result.proceed) {
+        closeListDetailSequencePanel();
+        return;
+      }
+      if (result.validOnly) {
+        // Filter to only add contacts with emails
+        idsToAdd = contactsData.filter(c => c.email && c.email.trim() !== '').map(c => c.id);
+        if (idsToAdd.length === 0) {
+          if (window.crm?.showToast) window.crm.showToast('No valid email addresses found');
+          closeListDetailSequencePanel();
+          return;
+        }
+      }
+    }
     
     // Check for existing memberships to avoid duplicates
     const existingQuery = await db.collection('sequenceMembers')
@@ -3606,14 +3639,20 @@ async function handleListDetailSequenceChoose(el, view) {
     
     // Add new members
     const batch = db.batch();
-    const newIds = selectedIds.filter(id => !existingIds.has(id));
+    const newIds = idsToAdd.filter(id => !existingIds.has(id));
+    let addedCount = 0;
     
     for (const targetId of newIds) {
+      const contact = contactsData.find(c => c.id === targetId);
+      const hasEmail = contact && contact.email && contact.email.trim() !== '';
+      
       const memberRef = db.collection('sequenceMembers').doc();
       const memberData = {
         sequenceId,
         targetId,
         targetType,
+        hasEmail: hasEmail, // Track whether contact has email
+        skipEmailSteps: !hasEmail, // Flag to skip email steps
         ownerId: email,
         userId: window.firebase?.auth()?.currentUser?.uid || null,
         createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date(),
@@ -3634,12 +3673,16 @@ async function handleListDetailSequenceChoose(el, view) {
       }
     }
     
-    skippedCount = selectedIds.length - addedCount;
+    const skippedCount = selectedIds.length - addedCount;
+    const withoutEmailCount = contactsWithoutEmail.length;
     
     // Show success message
     let message = `Added ${addedCount} ${addedCount === 1 ? (view === 'people' ? 'contact' : 'account') : (view === 'people' ? 'contacts' : 'accounts')} to "${sequenceName}"`;
-    if (skippedCount > 0) {
-      message += ` (${skippedCount} already in sequence)`;
+    if (withoutEmailCount > 0) {
+      message += ` (${withoutEmailCount} without email - email steps will be skipped)`;
+    }
+    if (skippedCount > withoutEmailCount) {
+      message += ` (${skippedCount - withoutEmailCount} already in sequence)`;
     }
     if (window.crm?.showToast) window.crm.showToast(message, 'success');
     
@@ -4152,4 +4195,99 @@ async function handleDeleteConfirm(ids, view) {
       }
     }
   }, 50); // Small delay to ensure UI updates
+}
+
+// ===== Email Validation Modal for List Detail =====
+async function showListDetailEmailValidationModal(contactsWithoutEmail, totalContacts) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'pc-modal__backdrop';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    
+    const validCount = totalContacts - contactsWithoutEmail.length;
+    const invalidCount = contactsWithoutEmail.length;
+    
+    const contactsList = contactsWithoutEmail.slice(0, 5).map(c => 
+      `<li style="margin-bottom: 8px;">• ${escapeHtmlForSequence(c.name || (c.firstName + ' ' + (c.lastName || '')).trim() || 'Unknown')} ${c.company || c.companyName ? `(${escapeHtmlForSequence(c.company || c.companyName)})` : ''}</li>`
+    ).join('');
+    const moreCount = invalidCount > 5 ? ` + ${invalidCount - 5} more` : '';
+    
+    overlay.innerHTML = `
+      <div class="pc-modal__dialog" style="max-width: 500px;">
+        <div class="pc-modal__header">
+          <h2 style="display: flex; align-items: center; gap: 12px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffc107" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span>Email Validation Warning</span>
+          </h2>
+          <button type="button" class="pc-modal__close" id="email-validation-close" aria-label="Close">×</button>
+        </div>
+        <div class="pc-modal__body">
+          <p style="margin-bottom: 16px; font-size: 15px;">
+            <strong>${totalContacts} contacts selected</strong><br>
+            ${validCount} ${validCount === 1 ? 'contact has' : 'contacts have'} valid email${validCount === 1 ? '' : 's'}<br>
+            <span style="color: #ffc107;">${invalidCount} ${invalidCount === 1 ? 'contact is' : 'contacts are'} missing email addresses</span>
+          </p>
+          
+          <p style="margin-bottom: 8px; font-weight: 600;">Contacts without emails:</p>
+          <ul style="margin-left: 20px; margin-bottom: 16px; color: var(--text-muted);">
+            ${contactsList}
+            ${moreCount ? `<li style="margin-top: 8px; font-style: italic;">${moreCount}</li>` : ''}
+          </ul>
+          
+          <p style="margin-bottom: 0; font-size: 14px; color: var(--text-muted); background: var(--bg-item); padding: 12px; border-radius: var(--border-radius-sm); border-left: 3px solid #ffc107;">
+            <strong>Note:</strong> Contacts without emails will be added to the sequence, but <strong>email steps will be automatically skipped</strong>. They will only receive phone calls, LinkedIn messages, or other non-email touchpoints.
+          </p>
+        </div>
+        <div class="pc-modal__footer">
+          <button type="button" class="btn btn-text" id="email-validation-cancel">Cancel</button>
+          ${validCount > 0 ? `
+            <button type="button" class="btn btn-secondary" id="email-validation-valid-only">Add ${validCount} with Emails Only</button>
+          ` : ''}
+          <button type="button" class="btn btn-primary" id="email-validation-proceed">Add All ${totalContacts}</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        overlay.classList.add('show');
+      });
+    });
+    
+    const close = (result) => {
+      overlay.classList.remove('show');
+      setTimeout(() => {
+        if (overlay.parentElement) {
+          overlay.parentElement.removeChild(overlay);
+        }
+      }, 200);
+      resolve(result);
+    };
+    
+    overlay.querySelector('#email-validation-close')?.addEventListener('click', () => close({ proceed: false }));
+    overlay.querySelector('#email-validation-cancel')?.addEventListener('click', () => close({ proceed: false }));
+    overlay.querySelector('#email-validation-proceed')?.addEventListener('click', () => close({ proceed: true, validOnly: false }));
+    overlay.querySelector('#email-validation-valid-only')?.addEventListener('click', () => close({ proceed: true, validOnly: true }));
+    
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        close({ proceed: false });
+      }
+    });
+    
+    const onEscape = (e) => {
+      if (e.key === 'Escape') {
+        document.removeEventListener('keydown', onEscape);
+        close({ proceed: false });
+      }
+    };
+    document.addEventListener('keydown', onEscape);
+  });
 }

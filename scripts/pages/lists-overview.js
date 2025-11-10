@@ -262,7 +262,12 @@
         const btn = e.target.closest('button.toggle-btn');
         if (!btn) return;
         const newView = btn.getAttribute('data-view');
-        if (!newView || newView === state.kind) return;
+        if (!newView || newView === state.kind) {
+          console.log('[ListsOverview] Toggle clicked but view unchanged:', { current: state.kind, newView });
+          return;
+        }
+        
+        console.log('[ListsOverview] Toggle clicked:', { from: state.kind, to: newView });
         
         // Update active styles
         viewToggle.querySelectorAll('.toggle-btn').forEach(b => {
@@ -278,9 +283,11 @@
         // COST-EFFECTIVE: If both kinds are already loaded, just re-render (zero cost)
         // Otherwise, ensure data is loaded
         if (state.loadedPeople && state.loadedAccounts) {
+          console.log('[ListsOverview] Both kinds loaded, applying filters for:', state.kind);
           applyFilters();
           updateToggleState();
         } else {
+          console.log('[ListsOverview] Not all kinds loaded, calling ensureLoadedThenRender');
           ensureLoadedThenRender();
         }
       });
@@ -388,7 +395,8 @@
           await window.__preloadListMembers([...peopleLists, ...accountLists]);
         }
         
-        // Now render with the correct kind filter
+        // CRITICAL: Render with the correct kind filter based on current state.kind
+        // This ensures only the correct type is shown on initial load
         applyFilters();
         updateToggleState();
         return; // Skip Firestore query - cache has data
@@ -924,9 +932,27 @@
     const typeFilter = qs('lists-filter-type')?.value || '';
     const ownerFilter = qs('lists-filter-owner')?.value?.toLowerCase() || '';
     
+    // CRITICAL FIX: Always filter by state.kind first to ensure correct type is shown
     let items = state.kind === 'people' ? state.peopleLists : state.accountLists;
     
-    // Apply filters
+    // Additional safety: double-check that items match the current kind
+    // This prevents mixed types from showing
+    items = items.filter(item => {
+      const itemKind = (item.kind || item.type || item.listType || '').toLowerCase();
+      const expectedKind = state.kind === 'people' ? 'people' : 'accounts';
+      
+      // Normalize item kind to match expected
+      const isPeople = itemKind === 'people' || itemKind === 'person' || itemKind === 'contacts' || itemKind === 'contact';
+      const isAccounts = itemKind === 'accounts' || itemKind === 'account' || itemKind === 'companies' || itemKind === 'company';
+      
+      // Only include items that match the current kind
+      if (state.kind === 'people' && !isPeople) return false;
+      if (state.kind === 'accounts' && !isAccounts) return false;
+      
+      return true;
+    });
+    
+    // Apply additional filters (name, type, owner)
     items = items.filter(item => {
       const name = (item.name || '').toLowerCase();
       const kind = item.kind || item.type || '';
@@ -953,6 +979,7 @@
       }
     }
     
+    console.log('[ListsOverview] applyFilters:', { kind: state.kind, itemsCount: items.length, peopleListsCount: state.peopleLists.length, accountListsCount: state.accountLists.length });
     renderFilteredItems(items);
   }
 
