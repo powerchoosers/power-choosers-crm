@@ -1122,7 +1122,10 @@ class SettingsPage {
                     isAdmin,
                     bridgeToMobile: settingsToSave.bridgeToMobile,
                     twilioNumbers: settingsToSave.twilioNumbers?.length || 0,
-                    selectedPhoneNumber: settingsToSave.selectedPhoneNumber
+                    selectedPhoneNumber: settingsToSave.selectedPhoneNumber,
+                    hasEmailSignature: !!settingsToSave.emailSignature,
+                    signatureImage: settingsToSave.emailSignature?.image || 'none',
+                    signatureText: settingsToSave.emailSignature?.text || 'none'
                 });
                 
                 await window.firebaseDB.collection('settings').doc(docId).set(settingsToSave, { merge: false });
@@ -1541,6 +1544,8 @@ class SettingsPage {
     // Render the email signature UI (text field value, image preview, button label, remove action)
     renderSignatureSection() {
         const signature = this.state.settings.emailSignature || {};
+        
+        console.log('[Signature] Rendering signature section, image URL:', signature.image);
 
         // Sync textarea value from state
         const signatureTextArea = document.getElementById('email-signature-text');
@@ -1552,7 +1557,10 @@ class SettingsPage {
         const uploadBtn = document.getElementById('upload-signature-image');
         const preview = document.getElementById('signature-image-preview');
 
-        if (!preview) return;
+        if (!preview) {
+            console.warn('[Signature] Preview element not found, cannot render signature');
+            return;
+        }
 
         // Build preview HTML: text (if any) above image (if any)
         let html = '';
@@ -1564,9 +1572,14 @@ class SettingsPage {
             // Use imageSize from settings, with defaults if not set
             const width = signature.imageSize?.width || 200;
             const height = signature.imageSize?.height || 100;
+            // Escape the image URL to prevent XSS
+            const imageUrl = String(signature.image).replace(/"/g, '&quot;');
+            console.log('[Signature] Rendering image with URL:', imageUrl, 'size:', width, 'x', height);
             html += `
-                <div class="signature-image-wrap" style="display:flex; align-items:center; gap:12px;">
-                    <img src="${signature.image}" alt="Signature preview" style="max-width: ${width}px; max-height: ${height}px; border-radius: 4px;">
+                <div class="signature-image-wrap" style="display:flex; align-items:center; gap:12px; margin-top: 8px;">
+                    <img src="${imageUrl}" alt="Signature preview" 
+                         style="max-width: ${width}px; max-height: ${height}px; border-radius: 4px; border: 1px solid var(--border-light);"
+                         onerror="console.error('[Signature] Image failed to load:', this.src); this.style.display='none';">
                     <button type="button" class="btn-small btn-danger" id="remove-signature-image" title="Remove image">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <polyline points="3,6 5,6 21,6"></polyline>
@@ -1588,11 +1601,25 @@ class SettingsPage {
 
         // Apply preview state
         if (html) {
-            preview.hidden = false;
+            // Remove hidden attribute and ensure it's visible
+            preview.removeAttribute('hidden');
+            preview.style.display = 'block';
+            preview.style.visibility = 'visible';
+            preview.style.opacity = '1';
             preview.innerHTML = html;
+            console.log('[Signature] Preview updated with HTML, image should be visible');
+            console.log('[Signature] Preview element state:', {
+                hidden: preview.hasAttribute('hidden'),
+                display: preview.style.display,
+                visibility: preview.style.visibility,
+                innerHTML: preview.innerHTML.substring(0, 100)
+            });
         } else {
-            preview.hidden = true;
+            preview.setAttribute('hidden', '');
+            preview.style.display = 'none';
+            preview.style.visibility = 'hidden';
             preview.innerHTML = '';
+            console.log('[Signature] Preview hidden (no content)');
         }
 
         // Toggle upload button label between Upload vs Edit
@@ -1614,10 +1641,16 @@ class SettingsPage {
             }
         }
 
-        // Wire remove button if present
+        // Wire remove button if present (remove old listeners first to prevent duplicates)
         const removeBtn = document.getElementById('remove-signature-image');
         if (removeBtn) {
-            removeBtn.addEventListener('click', () => this.removeSignatureImage());
+            // Clone and replace to remove all event listeners
+            const newRemoveBtn = removeBtn.cloneNode(true);
+            removeBtn.parentNode.replaceChild(newRemoveBtn, removeBtn);
+            newRemoveBtn.addEventListener('click', () => {
+                console.log('[Signature] Remove button clicked');
+                this.removeSignatureImage();
+            });
         }
     }
 
@@ -1682,6 +1715,8 @@ class SettingsPage {
             if (window.showToast) {
                 window.showToast('Please select a valid image file.', 'error');
             }
+            // Reset input to allow selecting the same file again
+            event.target.value = '';
             return;
         }
 
@@ -1690,50 +1725,175 @@ class SettingsPage {
             if (window.showToast) {
                 window.showToast('Image file must be smaller than 2MB.', 'error');
             }
+            // Reset input to allow selecting the same file again
+            event.target.value = '';
             return;
         }
 
+        // Store reference to file input for reset
+        const fileInput = event.target;
+        const uploadBtn = document.getElementById('upload-signature-image');
+
         try {
-            // Show uploading state
+            // Show uploading state with visual indicator
             if (window.showToast) {
                 window.showToast('Uploading signature image...', 'info');
             }
+            
+            // Disable upload button during upload
+            if (uploadBtn) {
+                uploadBtn.disabled = true;
+                uploadBtn.style.opacity = '0.6';
+                uploadBtn.textContent = 'Uploading...';
+            }
+
+            console.log('[Signature] Starting upload for file:', file.name, file.size, 'bytes');
+            console.log('[Signature] File type:', file.type);
 
             // Convert file to base64 and upload as JSON
             const base64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
-                reader.onload = () => resolve(reader.result.split(',')[1]);
-                reader.onerror = reject;
+                reader.onload = () => {
+                    const result = reader.result;
+                    const base64Data = result.split(',')[1];
+                    console.log('[Signature] File converted to base64, length:', base64Data.length);
+                    resolve(base64Data);
+                };
+                reader.onerror = (err) => {
+                    console.error('[Signature] FileReader error:', err);
+                    reject(err);
+                };
                 reader.readAsDataURL(file);
             });
 
             // Always use Vercel endpoint (works locally and deployed)
             const apiBase = 'https://power-choosers-crm-792458658491.us-south1.run.app';
-            const response = await fetch(`${apiBase}/api/upload/signature-image`, {
+            const uploadUrl = `${apiBase}/api/upload/signature-image`;
+            console.log('[Signature] Uploading to:', uploadUrl);
+            
+            // Create AbortController for timeout (60 seconds to allow for large images and Imgur processing)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+                console.log('[Signature] Client-side timeout reached after 60 seconds');
+                controller.abort();
+            }, 60000); // 60 second timeout
+            
+            let response;
+            try {
+                response = await fetch(uploadUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: base64, type: 'signature' })
-            });
+                    body: JSON.stringify({ image: base64, type: 'signature' }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+                console.error('[Signature] Fetch error caught:', fetchError);
+                if (fetchError.name === 'AbortError') {
+                    throw new Error('Upload timed out after 60 seconds. The server may be processing a large image. Please try again with a smaller image or check your connection.');
+                }
+                throw new Error(`Network error: ${fetchError.message}`);
+            }
 
-            if (!response.ok) throw new Error(`Upload failed: ${response.status}`);
-            const { imageUrl } = await response.json();
+            console.log('[Signature] Upload response status:', response.status, response.ok);
+            console.log('[Signature] Upload response headers:', Object.fromEntries(response.headers.entries()));
+
+            if (!response.ok) {
+                let errorText = '';
+                try {
+                    errorText = await response.text();
+                    console.error('[Signature] Upload failed with status:', response.status, errorText);
+                } catch (textError) {
+                    console.error('[Signature] Could not read error response:', textError);
+                    errorText = `HTTP ${response.status}`;
+                }
+                throw new Error(`Upload failed: ${response.status} - ${errorText}`);
+            }
+
+            let responseData;
+            try {
+                const responseText = await response.text();
+                console.log('[Signature] Upload response text (raw):', responseText.substring(0, 200));
+                responseData = JSON.parse(responseText);
+                console.log('[Signature] Upload response data (parsed):', responseData);
+            } catch (parseError) {
+                console.error('[Signature] Failed to parse response:', parseError);
+                throw new Error('Invalid response from server');
+            }
+
+            // Handle both response formats: { imageUrl } or { success, imageUrl }
+            const imageUrl = responseData.imageUrl || (responseData.success && responseData.data?.link);
             
-            if (imageUrl) {
+            if (!imageUrl) {
+                console.error('[Signature] No imageUrl in response:', responseData);
+                throw new Error('Server did not return image URL');
+            }
+
+            console.log('[Signature] Image uploaded successfully, URL:', imageUrl);
+
                 // Store the hosted image URL
+            if (!this.state.settings.emailSignature) {
+                this.state.settings.emailSignature = { text: '', image: null, imageSize: { width: 200, height: 100 } };
+            }
                 this.state.settings.emailSignature.image = imageUrl;
+            
+            // Mark as dirty and update UI
             this.markDirty();
             this.renderSignatureSection();
+            
+            // Auto-save the settings immediately after successful upload
+            console.log('[Signature] Auto-saving settings after upload...');
+            await this.saveSettings();
+            
+            // Reset file input to allow selecting the same file again
+            fileInput.value = '';
+            
+            // Re-enable upload button
+            if (uploadBtn) {
+                uploadBtn.disabled = false;
+                uploadBtn.style.opacity = '1';
+            }
                 
                 if (window.showToast) {
-                    window.showToast('Signature image uploaded successfully!', 'success');
+                window.showToast('Signature image uploaded and saved successfully!', 'success');
                 }
-            } else {
-                throw new Error('Failed to upload image');
-            }
+            
+            console.log('[Signature] Upload complete, image URL stored:', imageUrl);
+            console.log('[Signature] State after upload:', {
+                hasImage: !!this.state.settings.emailSignature?.image,
+                imageUrl: this.state.settings.emailSignature?.image
+            });
         } catch (error) {
             console.error('[Signature] Upload error:', error);
+            console.error('[Signature] Error stack:', error.stack);
+            console.error('[Signature] Error details:', {
+                name: error.name,
+                message: error.message,
+                cause: error.cause
+            });
+            
+            // Reset file input on error
+            fileInput.value = '';
+            
+            // Re-enable upload button
+            if (uploadBtn) {
+                uploadBtn.disabled = false;
+                uploadBtn.style.opacity = '1';
+                const uploadBtnEl = document.getElementById('upload-signature-image');
+                if (uploadBtnEl) {
+                    uploadBtnEl.innerHTML = `
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
+                            <circle cx="12" cy="13" r="3"></circle>
+                        </svg>
+                        Upload Image`;
+                }
+            }
+            
+            const errorMessage = error.message || 'Failed to upload signature image. Please try again.';
             if (window.showToast) {
-                window.showToast('Failed to upload signature image. Please try again.', 'error');
+                window.showToast(errorMessage, 'error');
             }
         }
     }
@@ -1806,6 +1966,10 @@ class SettingsPage {
     }
 
     removeSignatureImage() {
+        console.log('[Signature] Removing signature image');
+        if (!this.state.settings.emailSignature) {
+            this.state.settings.emailSignature = { text: '', image: null, imageSize: { width: 200, height: 100 } };
+        }
         this.state.settings.emailSignature.image = null;
         const imageInput = document.getElementById('email-signature-image');
         if (imageInput) {
@@ -1813,6 +1977,7 @@ class SettingsPage {
         }
         this.markDirty();
         this.renderSignatureSection();
+        console.log('[Signature] Signature image removed, state updated');
     }
 
     // Convert existing data URL signatures to hosted URLs
