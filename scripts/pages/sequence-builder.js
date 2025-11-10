@@ -550,7 +550,6 @@ class FreeSequenceAutomation {
     console.log('[FreeSequence] Free automation stopped');
   }
 }
-
 // Sequence Builder page module (placeholder)
 (function () {
   const state = {
@@ -1185,7 +1184,6 @@ class FreeSequenceAutomation {
       console.warn('Failed to load contacts from sequenceMembers:', err);
     }
   }
-
   function render() {
     if (!state.currentSequence || !els.mainContent) return;
 
@@ -1226,7 +1224,14 @@ class FreeSequenceAutomation {
             <input type="text" id="contact-search-input" class="search-input-small" placeholder="Search contacts to add..." aria-label="Search contacts to add to sequence" />
             <div class="contact-search-results" id="contact-search-results" hidden></div>
           </div>
-          <button class="btn-secondary" id="contacts-btn" aria-label="Contacts">Contacts</button>
+          <button class="quick-action-btn list-header-btn" id="contacts-btn" aria-label="Sequence Contacts" title="Sequence Contacts" aria-haspopup="dialog">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </button>
           <button class="btn-primary" id="add-step-btn">Add Step</button>
         </div>
       </div>`;
@@ -1264,19 +1269,10 @@ class FreeSequenceAutomation {
     const headerWrap = document.createElement('div');
     headerWrap.innerHTML = headerHtml;
     const headerEl = headerWrap.firstElementChild;
-    if (pageHeader && headerEl && pageHeader.parentElement) {
-      // Diff-update inner content to avoid unmounting icons/header root
-      try {
-        const newSubtitle = headerEl.querySelector('.contact-subtitle');
-        const oldSubtitle = pageHeader.querySelector('.contact-subtitle');
-        if (newSubtitle && oldSubtitle) {
-          oldSubtitle.replaceWith(newSubtitle);
-        } else {
-          pageHeader.innerHTML = headerEl.innerHTML;
-        }
-      } catch (_) {
-        pageHeader.innerHTML = headerEl.innerHTML;
-      }
+    if (pageHeader && headerEl) {
+      pageHeader.id = 'sequence-builder-header';
+      pageHeader.classList.add('page-header');
+      pageHeader.innerHTML = headerEl.innerHTML;
     } else if (pageContainer && headerEl) {
       pageContainer.prepend(headerEl);
     }
@@ -1293,6 +1289,16 @@ class FreeSequenceAutomation {
     attachEvents();
     // Attach builder specific interactions
     attachBuilderEvents();
+    
+    // Mark all step bodies as initially rendered (no animation on first load)
+    setTimeout(() => {
+      const container = document.getElementById('sequence-builder-view');
+      if (container) {
+        container.querySelectorAll('.step-body').forEach(body => {
+          body.dataset.initialRender = 'true';
+        });
+      }
+    }, 100);
   }
 
   function handleAddStep(type, label) {
@@ -1777,7 +1783,6 @@ class FreeSequenceAutomation {
     }, 0);
     return overlay;
   }
-
   // Variables popover anchored to the Variables toolbar button
   function createVariablesPopover(anchorEl, onSelect) {
     // Close any existing popover first
@@ -2365,7 +2370,6 @@ class FreeSequenceAutomation {
         </div>
       </div>`;
   }
-
   function renderLinkedInStepHTML(step, order) {
     const delayText = formatDelay(step.delayMinutes || 0);
     const shortDelay = formatDelayShort(step.delayMinutes || 0);
@@ -2995,13 +2999,11 @@ AVOID (Weak CTAs):
 - "Would you be interested in discussing further?"
 - "Feel free to reach out if you have questions"
 - "We should probably talk next week"
-
 VALUE REMINDER:
 - 15-20% savings based on current market
 - Locked-in rates = budget certainty
 - Simplified process vs. current supplier
 - Better terms because shopping early
-
 TIMELINE:
 - "I can have quotes by [SPECIFIC DATE]"
 - "Let's schedule [SPECIFIC DAY/TIME], 30 min"
@@ -3417,29 +3419,60 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
 
   // Fetch contacts from Firestore for search/suggestions (used by UI renderers)
   async function fetchContacts(query) {
-    if (!window.firebaseDB) return [];
     const q = String(query || '').toLowerCase().trim();
     try {
-      const email = window.currentUserEmail || '';
-      let snapshot;
-      if (window.currentUserRole !== 'admin' && email) {
-        // Non-admin: use scoped query
-        const [ownedSnap, assignedSnap] = await Promise.all([
-          window.firebaseDB.collection('contacts').where('ownerId','==',email).get(),
-          window.firebaseDB.collection('contacts').where('assignedTo','==',email).get()
-        ]);
-        const map = new Map();
-        ownedSnap.forEach(d=>map.set(d.id, d));
-        assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
-        snapshot = { forEach: (callback) => map.forEach(callback) };
-      } else {
-        // Admin: use unfiltered query
-        snapshot = await window.firebaseDB.collection('contacts').get();
+      // COST OPTIMIZATION: Use cache-first approach (zero Firebase queries after first load)
+      let contactsData = [];
+      
+      // Priority 1: BackgroundContactsLoader (cached, zero cost)
+      if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+        contactsData = window.BackgroundContactsLoader.getContactsData() || [];
       }
       
+      // Priority 2: window.getPeopleData (if people.js is loaded)
+      if (contactsData.length === 0 && typeof window.getPeopleData === 'function') {
+        contactsData = window.getPeopleData() || [];
+      }
+      
+      // Priority 3: CacheManager (still cached, zero cost)
+      if (contactsData.length === 0 && window.CacheManager && typeof window.CacheManager.get === 'function') {
+        try {
+          contactsData = await window.CacheManager.get('contacts') || [];
+        } catch (err) {
+          console.warn('[SequenceBuilder] CacheManager read failed:', err);
+        }
+      }
+      
+      // Only fetch from Firebase if cache is completely empty (last resort - costs money)
+      if (contactsData.length === 0 && window.firebaseDB) {
+        console.warn('[SequenceBuilder] No cached contacts found, fetching from Firestore (costs money)');
+        const email = window.currentUserEmail || '';
+        let snapshot;
+        if (window.currentUserRole !== 'admin' && email) {
+          // Non-admin: use scoped query
+          const [ownedSnap, assignedSnap] = await Promise.all([
+            window.firebaseDB.collection('contacts').where('ownerId','==',email).get(),
+            window.firebaseDB.collection('contacts').where('assignedTo','==',email).get()
+          ]);
+          const map = new Map();
+          ownedSnap.forEach(d=>map.set(d.id, d));
+          assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
+          snapshot = { forEach: (callback) => map.forEach(callback) };
+        } else {
+          // Admin: use unfiltered query
+          snapshot = await window.firebaseDB.collection('contacts').get();
+        }
+        
+        // Convert snapshot to array
+        contactsData = [];
+        snapshot.forEach(doc => {
+          contactsData.push({ id: doc.id, ...doc.data() });
+        });
+      }
+      
+      // Filter contacts by search query (client-side, no Firebase cost)
       const out = [];
-      snapshot.forEach(doc => {
-        const person = { id: doc.id, ...doc.data() };
+      contactsData.forEach(person => {
         const nameFields = [person.firstName || '', person.lastName || '', person.fullName || '', person.name || ''];
         const titleFields = [person.title || '', person.jobTitle || ''];
         const companyFields = [
@@ -3972,7 +4005,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       }
     };
   }
-
   function createEmailSettingsHTML(settings, step) {
     const isAuto = step.type === 'auto-email';
     
@@ -4434,6 +4466,421 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
   window.closeEmailSettings = closeEmailSettings;
   window.saveEmailSettings = saveEmailSettings;
 
+  // Sequence Contacts Panel (dropdown similar to contact-lists-panel)
+  let _positionSequenceContactsPanel = null;
+  let _onSequenceContactsOutside = null;
+
+  function injectSequenceContactsStyles() {
+    let style = document.getElementById('sequence-contacts-panel-styles');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'sequence-contacts-panel-styles';
+      document.head.appendChild(style);
+    }
+    style.textContent = `
+      /* Sequence Contacts Panel */
+      #sequence-contacts-panel { 
+        position: fixed; 
+        z-index: 1200; 
+        width: min(560px, 92vw);
+        background: var(--bg-card); 
+        color: var(--text-primary); 
+        border: 1px solid var(--border-light);
+        border-radius: var(--border-radius); 
+        box-shadow: var(--elevation-card-hover, 0 16px 40px rgba(0,0,0,.28), 0 6px 18px rgba(0,0,0,.22));
+        transform: translateY(-8px); 
+        opacity: 0; 
+        transition: transform 400ms ease, opacity 400ms ease;
+        --arrow-size: 10px;
+        /* Don't use overflow: hidden - it clips the arrow pointer */
+      }
+      #sequence-contacts-panel.--show { 
+        transform: translateY(0); 
+        opacity: 1; 
+      }
+      #sequence-contacts-panel .list-header { 
+        display: flex; 
+        align-items: center; 
+        justify-content: space-between; 
+        padding: 14px 16px; 
+        border-bottom: 1px solid var(--border-light); 
+        font-weight: 700; 
+        background: var(--bg-card);
+        border-radius: var(--border-radius) var(--border-radius) 0 0;
+      }
+      #sequence-contacts-panel .list-title { 
+        font-weight: 700; 
+        color: var(--text-primary); 
+        font-size: 1rem; 
+      }
+      #sequence-contacts-panel .close-btn {
+        display: inline-flex; 
+        align-items: center; 
+        justify-content: center;
+        width: 28px; 
+        height: 28px; 
+        min-width: 28px; 
+        min-height: 28px; 
+        padding: 0;
+        background: var(--bg-item) !important; 
+        color: var(--grey-300) !important;
+        border: 1px solid var(--border-light); 
+        border-radius: var(--border-radius-sm);
+        line-height: 1; 
+        font-size: 16px; 
+        font-weight: 600; 
+        cursor: pointer;
+        transition: var(--transition-fast); 
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent; 
+        margin-right: 0;
+      }
+      #sequence-contacts-panel .close-btn:hover {
+        background: var(--grey-600) !important; 
+        color: var(--text-inverse) !important;
+      }
+      #sequence-contacts-panel .close-btn:focus-visible {
+        outline: 2px solid var(--orange-muted); 
+        outline-offset: 2px;
+      }
+      #sequence-contacts-panel .list-body { 
+        max-height: min(70vh, 720px); 
+        overflow: auto; 
+        background: var(--bg-card); 
+      }
+      #sequence-contacts-panel .list-body::-webkit-scrollbar { 
+        width: 10px; 
+      }
+      #sequence-contacts-panel .list-body::-webkit-scrollbar-thumb { 
+        background: var(--grey-700); 
+        border-radius: 8px; 
+      }
+      #sequence-contacts-panel .list-item { 
+        display: flex; 
+        align-items: center; 
+        gap: 12px; 
+        padding: 12px 16px; 
+        cursor: pointer; 
+        background: var(--bg-card); 
+        border-top: 1px solid var(--border-light); 
+      }
+      #sequence-contacts-panel .list-item:first-child { 
+        border-top: 0; 
+      }
+      #sequence-contacts-panel .list-item:last-child {
+        border-radius: 0 0 var(--border-radius) var(--border-radius);
+      }
+      #sequence-contacts-panel .list-item:hover { 
+        background: var(--bg-hover); 
+      }
+      #sequence-contacts-panel .list-item[aria-disabled="true"] { 
+        opacity: .6; 
+        cursor: default; 
+      }
+      #sequence-contacts-panel .list-item:focus-visible { 
+        outline: none; 
+        box-shadow: 0 0 0 3px rgba(255,139,0,.35) inset; 
+      }
+      #sequence-contacts-panel .list-item .name-cell__wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      #sequence-contacts-panel .list-item .avatar-initials {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--orange-subtle);
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 12px;
+        letter-spacing: 0.5px;
+        flex-shrink: 0;
+      }
+      #sequence-contacts-panel .list-item .list-name { 
+        font-weight: 600; 
+        color: var(--grey-400);
+      }
+      #sequence-contacts-panel .list-item .list-meta { 
+        color: var(--text-muted); 
+        font-size: .85rem; 
+      }
+      #sequence-contacts-panel .list-item .list-company {
+        color: var(--grey-400);
+        font-size: .85rem;
+      }
+
+      /* Pointer arrow */
+      #sequence-contacts-panel::before,
+      #sequence-contacts-panel::after {
+        content: "";
+        position: absolute;
+        width: var(--arrow-size);
+        height: var(--arrow-size);
+        transform: rotate(45deg);
+        pointer-events: none;
+      }
+      /* Bottom placement (arrow on top edge) */
+      #sequence-contacts-panel[data-placement="bottom"]::before {
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        top: calc(-1 * var(--arrow-size) / 2 + 1px);
+        background: var(--border-light);
+      }
+      #sequence-contacts-panel[data-placement="bottom"]::after {
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        top: calc(-1 * var(--arrow-size) / 2 + 2px);
+        background: var(--bg-card);
+      }
+      /* Top placement (arrow on bottom edge) */
+      #sequence-contacts-panel[data-placement="top"]::before {
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        bottom: calc(-1 * var(--arrow-size) / 2 + 1px);
+        background: var(--border-light);
+      }
+      #sequence-contacts-panel[data-placement="top"]::after {
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+        bottom: calc(-1 * var(--arrow-size) / 2 + 2px);
+        background: var(--bg-card);
+      }
+    `;
+  }
+
+  function closeSequenceContactsPanel() {
+    const panel = document.getElementById('sequence-contacts-panel');
+    const cleanup = () => {
+      if (panel && panel.parentElement) panel.parentElement.removeChild(panel);
+      try { document.removeEventListener('mousedown', _onSequenceContactsOutside, true); } catch(_) {}
+      try { window.removeEventListener('resize', _positionSequenceContactsPanel, true); } catch(_) {}
+      try { window.removeEventListener('scroll', _positionSequenceContactsPanel, true); } catch(_) {}
+      try {
+        const trigger = document.getElementById('contacts-btn');
+        if (trigger) {
+          trigger.setAttribute('aria-expanded', 'false');
+        }
+      } catch(_) {}
+      _positionSequenceContactsPanel = null;
+      _onSequenceContactsOutside = null;
+    };
+    if (panel) {
+      panel.classList.remove('--show');
+      setTimeout(cleanup, 400);
+    } else {
+      cleanup();
+    }
+  }
+
+  function openSequenceContactsPanel(anchorEl) {
+    if (document.getElementById('sequence-contacts-panel')) return;
+    
+    injectSequenceContactsStyles();
+    
+    const panel = document.createElement('div');
+    panel.id = 'sequence-contacts-panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-label', 'Sequence contacts');
+    
+    const contacts = Array.isArray(state.contacts) ? state.contacts.slice() : [];
+    const total = contacts.length;
+    
+    // Sort by name
+    contacts.sort((a, b) => {
+      const an = (a.name || a.fullName || `${a.firstName || ''} ${a.lastName || ''}`).trim().toLowerCase();
+      const bn = (b.name || b.fullName || `${b.firstName || ''} ${b.lastName || ''}`).trim().toLowerCase();
+      return an.localeCompare(bn);
+    });
+    
+    panel.innerHTML = `
+      <div class="list-header">
+        <div class="list-title">Sequence Contacts (${total})</div>
+        <button type="button" class="close-btn" id="sequence-contacts-close" aria-label="Close">×</button>
+      </div>
+      <div class="list-body" id="sequence-contacts-body">
+        ${total === 0 
+          ? '<div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">No contacts in this sequence</div><div class="list-meta">Add contacts using the search bar</div></div></div>'
+          : contacts.map(c => {
+              const nameRaw = c.name || c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed Contact';
+              const name = escapeHtml(nameRaw);
+              const title = escapeHtml(c.title || c.jobTitle || '');
+              const company = escapeHtml(c.company || c.companyName || '');
+              const initials = escapeHtml(getInitials(nameRaw));
+              const cid = escapeHtml(c.id || '');
+              
+              return `
+                <div class="list-item" tabindex="0" data-id="${cid}">
+                  <div class="name-cell__wrap">
+                    <span class="avatar-initials" aria-hidden="true">${initials}</span>
+                    <div>
+                      <div class="list-name">${name}</div>
+                      ${title || company ? `<div class="list-meta">${title ? `${title}${company ? ' at ' : ''}` : ''}${company || ''}</div>` : ''}
+                      ${company && !title ? `<div class="list-company">${company}</div>` : ''}
+                    </div>
+                  </div>
+                </div>`;
+            }).join('')
+        }
+      </div>`;
+    
+    document.body.appendChild(panel);
+    
+    // Position panel
+    _positionSequenceContactsPanel = function position() {
+      if (!panel || !anchorEl) return;
+      const r = anchorEl.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - r.bottom;
+      const spaceAbove = r.top;
+      
+      // Calculate arrow position first (centered with button)
+      const buttonCenter = r.left + (r.width / 2);
+      
+      // Try to center panel with button, but keep in viewport
+      const idealLeft = buttonCenter - (panelRect.width / 2);
+      let left = idealLeft;
+      
+      let placement = 'bottom';
+      let top = r.bottom + 8;
+      
+      if (spaceBelow < panelRect.height && spaceAbove > spaceBelow) {
+        placement = 'top';
+        top = r.top - panelRect.height - 8;
+      }
+      
+      if (left + panelRect.width > window.innerWidth - 16) {
+        left = window.innerWidth - panelRect.width - 16;
+      }
+      if (left < 16) left = 16;
+      
+      // Arrow position: distance from button center to panel left edge
+      const arrowLeft = buttonCenter - left;
+      panel.style.setProperty('--arrow-left', `${Math.max(20, Math.min(arrowLeft, panelRect.width - 20))}px`);
+      
+      panel.style.left = `${left}px`;
+      panel.style.top = `${top}px`;
+      panel.setAttribute('data-placement', placement);
+    };
+    
+    _positionSequenceContactsPanel();
+    window.addEventListener('resize', _positionSequenceContactsPanel, true);
+    window.addEventListener('scroll', _positionSequenceContactsPanel, true);
+    
+    // Show panel with animation
+    requestAnimationFrame(() => {
+      panel.classList.add('--show');
+    });
+    
+    // Close button
+    const closeBtn = panel.querySelector('#sequence-contacts-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeSequenceContactsPanel();
+      });
+    }
+    
+    // Click outside to close
+    _onSequenceContactsOutside = (e) => {
+      if (!panel.contains(e.target) && !anchorEl.contains(e.target)) {
+        closeSequenceContactsPanel();
+      }
+    };
+    setTimeout(() => {
+      document.addEventListener('mousedown', _onSequenceContactsOutside, true);
+    }, 0);
+    
+    // Keyboard navigation
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSequenceContactsPanel();
+        try { anchorEl.focus(); } catch(_) {}
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    
+    // Contact click handler
+    const body = panel.querySelector('#sequence-contacts-body');
+    if (body) {
+      body.addEventListener('click', (e) => {
+        const item = e.target.closest('.list-item[data-id]');
+        if (item && !item.hasAttribute('aria-disabled')) {
+          const contactId = item.getAttribute('data-id');
+          if (contactId) {
+            // Navigate to contact detail
+            try { 
+              window.crm && window.crm.navigateToPage && window.crm.navigateToPage('people'); 
+            } catch (_) {}
+            const tryOpen = () => {
+              if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                try { 
+                  window.ContactDetail.show(contactId); 
+                  closeSequenceContactsPanel();
+                } catch (_) {}
+              } else {
+                setTimeout(tryOpen, 80);
+              }
+            };
+            requestAnimationFrame(() => {
+              setTimeout(tryOpen, 100);
+            });
+          }
+        }
+      });
+    }
+    
+    // Set aria-expanded
+    if (anchorEl) {
+      anchorEl.setAttribute('aria-expanded', 'true');
+    }
+    
+    // Load contacts if needed
+    if (state.currentSequence?.id && contacts.length === 0) {
+      loadContactsFromSequenceMembers(state.currentSequence.id).then(() => {
+        const freshContacts = Array.isArray(state.contacts) ? state.contacts.slice() : [];
+        if (freshContacts.length > 0 && body) {
+          freshContacts.sort((a, b) => {
+            const an = (a.name || a.fullName || `${a.firstName || ''} ${a.lastName || ''}`).trim().toLowerCase();
+            const bn = (b.name || b.fullName || `${b.firstName || ''} ${b.lastName || ''}`).trim().toLowerCase();
+            return an.localeCompare(bn);
+          });
+          
+          body.innerHTML = freshContacts.map(c => {
+            const nameRaw = c.name || c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed Contact';
+            const name = escapeHtml(nameRaw);
+            const title = escapeHtml(c.title || c.jobTitle || '');
+            const company = escapeHtml(c.company || c.companyName || '');
+            const initials = escapeHtml(getInitials(nameRaw));
+            const cid = escapeHtml(c.id || '');
+            
+            return `
+              <div class="list-item" tabindex="0" data-id="${cid}">
+                <div class="name-cell__wrap">
+                  <span class="avatar-initials" aria-hidden="true">${initials}</span>
+                  <div>
+                    <div class="list-name">${name}</div>
+                    ${title || company ? `<div class="list-meta">${title ? `${title}${company ? ' at ' : ''}` : ''}${company || ''}</div>` : ''}
+                    ${company && !title ? `<div class="list-company">${company}</div>` : ''}
+                  </div>
+                </div>
+              </div>`;
+          }).join('');
+          
+          // Update header count
+          const titleEl = panel.querySelector('.list-title');
+          if (titleEl) {
+            titleEl.textContent = `Sequence Contacts (${freshContacts.length})`;
+          }
+        }
+      }).catch(err => {
+        console.warn('[SequenceBuilder] Failed to load contacts for panel:', err);
+      });
+    }
+  }
+
   // Delete confirmation popover state (anchored under trash icon)
   let _openDeletePopover = null; // { el, cleanup }
   function closeDeletePopover() {
@@ -4553,7 +5000,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       }
     };
   }
-
   function openDeletePopover(anchorEl, step) {
     if (!anchorEl || !step) return;
     closeDeletePopover();
@@ -5012,34 +5458,19 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     if (builderAddBtn) builderAddBtn.addEventListener('click', onAdd);
     builderAddBtns.forEach(btn => btn.addEventListener('click', onAdd));
 
-    // Open contacts list modal
+    // Open contacts dropdown panel
     const contactsBtn = document.getElementById('contacts-btn');
     if (contactsBtn && !contactsBtn.dataset.bound) {
       contactsBtn.dataset.bound = '1';
-      contactsBtn.addEventListener('click', async () => {
-        // Close any existing instance first (singleton)
-        document.querySelectorAll('.modal-overlay.contacts-modal-overlay').forEach(el => el.remove());
-
-        // Open immediately using current in-memory contacts
-        const overlay = createContactsListModal();
-        overlay.classList.add('contacts-modal-overlay');
-        document.body.appendChild(overlay);
-        overlay.focus();
-
-        // Fire-and-forget background refresh; when done, re-render modal if still open
-        if (state.currentSequence?.id) {
-          try {
-            await loadContactsFromSequenceMembers(state.currentSequence.id);
-            const open = document.querySelector('.modal-overlay.contacts-modal-overlay');
-            if (open) {
-              const fresh = createContactsListModal();
-              fresh.classList.add('contacts-modal-overlay');
-              open.replaceWith(fresh);
-              fresh.focus();
-            }
-          } catch (err) {
-            console.warn('[SequenceBuilder] contacts modal refresh failed', err);
-          }
+      contactsBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Toggle behavior: close if already open
+        if (document.getElementById('sequence-contacts-panel')) {
+          closeSequenceContactsPanel();
+        } else {
+          openSequenceContactsPanel(contactsBtn);
         }
       });
     }
@@ -5187,20 +5618,128 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     saveBtn && saveBtn.addEventListener('click', doSave);
     cancelBtn && cancelBtn.addEventListener('click', doCancel);
   }
-
   function attachBuilderEvents() {
     const container = document.getElementById('sequence-builder-view');
     if (!container || !state.currentSequence?.steps) return;
 
-    // Collapse/expand
+    // Collapse/expand with smooth animations
     container.querySelectorAll('.step-card .collapse-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const card = btn.closest('.step-card');
         const id = card?.getAttribute('data-id');
         const step = state.currentSequence.steps.find(s => s.id === id);
         if (!step) return;
-        step.collapsed = !step.collapsed;
-        render();
+        
+        const stepBody = card.querySelector('.step-body');
+        if (!stepBody) {
+          // Fallback to simple toggle if body not found
+          step.collapsed = !step.collapsed;
+          render();
+          return;
+        }
+        
+        const isCollapsed = step.collapsed;
+        // Skip animation on initial render
+        const isInitialRender = stepBody.dataset.initialRender === 'true';
+        if (isInitialRender) {
+          stepBody.dataset.initialRender = 'false';
+        }
+        
+        if (isCollapsed) {
+          // Expand
+          step.collapsed = false;
+          stepBody.removeAttribute('hidden');
+          
+          if (isInitialRender) {
+            // No animation on initial render
+            btn.setAttribute('aria-expanded', 'true');
+            btn.innerHTML = svgChevronDown();
+            return;
+          }
+          
+          // Get natural height
+          const naturalHeight = stepBody.scrollHeight;
+          const naturalPaddingTop = window.getComputedStyle(stepBody).paddingTop;
+          const naturalPaddingBottom = window.getComputedStyle(stepBody).paddingBottom;
+          
+          // Set initial state
+          stepBody.style.height = '0';
+          stepBody.style.opacity = '0';
+          stepBody.style.paddingTop = '0';
+          stepBody.style.paddingBottom = '0';
+          
+          // Force reflow
+          void stepBody.offsetHeight;
+          
+          // Animate to natural height
+          requestAnimationFrame(() => {
+            stepBody.style.transition = 'height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, padding 0.4s ease';
+            stepBody.style.height = naturalHeight + 'px';
+            stepBody.style.opacity = '1';
+            stepBody.style.paddingTop = naturalPaddingTop;
+            stepBody.style.paddingBottom = naturalPaddingBottom;
+            
+            // Clean up after animation
+            setTimeout(() => {
+              stepBody.style.height = '';
+              stepBody.style.transition = '';
+              stepBody.style.paddingTop = '';
+              stepBody.style.paddingBottom = '';
+            }, 400);
+          });
+          
+          // Update button icon
+          btn.setAttribute('aria-expanded', 'true');
+          btn.innerHTML = svgChevronDown();
+        } else {
+          // Collapse
+          if (isInitialRender) {
+            // No animation on initial render
+            step.collapsed = true;
+            stepBody.setAttribute('hidden', '');
+            btn.setAttribute('aria-expanded', 'false');
+            btn.innerHTML = svgChevronRight();
+            return;
+          }
+          
+          const currentHeight = stepBody.scrollHeight;
+          const currentPaddingTop = window.getComputedStyle(stepBody).paddingTop;
+          const currentPaddingBottom = window.getComputedStyle(stepBody).paddingBottom;
+          
+          // Set explicit height before animating
+          stepBody.style.height = currentHeight + 'px';
+          stepBody.style.paddingTop = currentPaddingTop;
+          stepBody.style.paddingBottom = currentPaddingBottom;
+          
+          // Force reflow
+          void stepBody.offsetHeight;
+          
+          // Animate to 0
+          requestAnimationFrame(() => {
+            step.collapsed = true;
+            stepBody.style.transition = 'height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, padding 0.4s ease';
+            stepBody.style.height = '0';
+            stepBody.style.opacity = '0';
+            stepBody.style.paddingTop = '0';
+            stepBody.style.paddingBottom = '0';
+            
+            // Set hidden after animation completes
+            setTimeout(() => {
+              stepBody.setAttribute('hidden', '');
+              stepBody.style.height = '';
+              stepBody.style.transition = '';
+              stepBody.style.paddingTop = '';
+              stepBody.style.paddingBottom = '';
+            }, 400);
+          });
+          
+          // Update button icon
+          btn.setAttribute('aria-expanded', 'false');
+          btn.innerHTML = svgChevronRight();
+        }
+        
+        // Save the collapsed state
+        try { scheduleStepSave(step.id, false); } catch (_) { /* noop */ }
       });
     });
 
@@ -5808,7 +6347,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       return { subject: 'Energy Solutions', html: '<p>Error generating email content.</p>' };
     }
   }
-
     // AI bar interactions (event delegation per step-card) – only present in AI mode in Preview
     container.querySelectorAll('.step-card .ai-bar').forEach(bar => {
       // Get card reference for this bar
@@ -6412,7 +6950,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         }
       }
     });
-
     // Link bar interactions (per step-card)
     container.querySelectorAll('.step-card .link-bar').forEach(bar => {
       // Close on outside click
@@ -7050,7 +7587,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       };
     }
   }
-
   // Function to create tasks from sequence steps
   function createTasksFromSequence(sequence, contactData) {
     if (!sequence.steps || !Array.isArray(sequence.steps)) return [];

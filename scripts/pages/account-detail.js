@@ -2772,9 +2772,12 @@ var console = {
     // Open modal with animation (same as add modals)
     overlay.removeAttribute('hidden');
     
-    // Trigger animation after a brief delay to ensure DOM is ready
+    // Double requestAnimationFrame ensures browser is ready for smooth animation
+    // This prevents choppy first render by giving browser time to create compositor layers
     requestAnimationFrame(() => {
-      overlay.classList.add('show');
+      requestAnimationFrame(() => {
+        overlay.classList.add('show');
+      });
     });
     
     const close = () => { 
@@ -5026,12 +5029,14 @@ var console = {
         border-radius: var(--border-radius); box-shadow: var(--elevation-card-hover, 0 16px 40px rgba(0,0,0,.28), 0 6px 18px rgba(0,0,0,.22));
         transform: translateY(-8px); opacity: 0; transition: transform 400ms ease, opacity 400ms ease;
         /* Avoid clipping the pointer arrow */
-        --arrow-size: 10px; }
+        --arrow-size: 10px;
+        /* Don't use overflow: hidden - it clips the arrow pointer */ }
       #account-lists-panel.--show { transform: translateY(0); opacity: 1; }
       #account-lists-panel .list-header { 
         display: flex; align-items: center; justify-content: space-between; 
         padding: 14px 16px; border-bottom: 1px solid var(--border-light); 
-        font-weight: 700; background: var(--bg-card); 
+        font-weight: 700; background: var(--bg-card);
+        border-radius: var(--border-radius) var(--border-radius) 0 0;
       }
       #account-lists-panel .list-title { 
         font-weight: 700; color: var(--text-primary); font-size: 1rem; 
@@ -5056,6 +5061,9 @@ var console = {
       #account-lists-panel .list-body::-webkit-scrollbar-thumb { background: var(--grey-700); border-radius: 8px; }
       #account-lists-panel .list-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; cursor:pointer; background: var(--bg-card); border-top: 1px solid var(--border-light); }
       #account-lists-panel .list-item:first-child { border-top: 0; }
+      #account-lists-panel .list-item:last-child {
+        border-radius: 0 0 var(--border-radius) var(--border-radius);
+      }
       #account-lists-panel .list-item:hover { background: var(--bg-hover); }
       #account-lists-panel .list-item[aria-disabled="true"] { opacity: .6; cursor: default; }
       #account-lists-panel .list-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,139,0,.35) inset; }

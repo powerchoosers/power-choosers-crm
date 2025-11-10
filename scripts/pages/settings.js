@@ -2405,8 +2405,17 @@ function injectModernStyles() {
             transform: rotate(-90deg);
         }
         
+        #settings-page .settings-content {
+            overflow: hidden;
+            transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, padding 0.4s ease;
+        }
+        
         #settings-page .settings-section.collapsed .settings-content {
-            display: none;
+            height: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            opacity: 0;
+            overflow: hidden;
         }
         
         #settings-page .settings-section-title svg {
@@ -3074,6 +3083,18 @@ function setupCollapseFunctionality() {
     };
     
     const setupSectionCollapse = (section, title, collapseBtn) => {
+        // Mark as initially rendered (no animation on first load)
+        const content = section.querySelector('.settings-content');
+        if (content) {
+            content.dataset.initialRender = 'true';
+        }
+        
+        // Start all sections collapsed by default
+        section.classList.add('collapsed');
+        if (collapseBtn) {
+            collapseBtn.setAttribute('aria-label', 'Expand section');
+        }
+        
         // Make the entire title clickable
         title.addEventListener('click', () => {
             toggleSectionCollapse(section);
@@ -3091,19 +3112,95 @@ function setupCollapseFunctionality() {
 }
 
 function toggleSectionCollapse(section) {
+    const content = section.querySelector('.settings-content');
+    if (!content) return;
+    
     const isCollapsed = section.classList.contains('collapsed');
+    const collapseBtn = section.querySelector('.collapse-btn');
+    
+    // Skip animation on initial render
+    const isInitialRender = content.dataset.initialRender === 'true';
+    if (isInitialRender) {
+        content.dataset.initialRender = 'false';
+    }
     
     if (isCollapsed) {
         // Expand
         section.classList.remove('collapsed');
-        const collapseBtn = section.querySelector('.collapse-btn');
+        
+        if (isInitialRender) {
+            // No animation on initial render
+            if (collapseBtn) {
+                collapseBtn.setAttribute('aria-label', 'Collapse section');
+            }
+            return;
+        }
+        
+        // First, set height to 0 and remove collapsed class to get natural height
+        content.style.height = '0';
+        content.style.opacity = '0';
+        
+        // Get the natural height
+        const naturalHeight = content.scrollHeight;
+        const naturalPaddingTop = window.getComputedStyle(content).paddingTop;
+        const naturalPaddingBottom = window.getComputedStyle(content).paddingBottom;
+        
+        // Force reflow
+        void content.offsetHeight;
+        
+        // Animate to natural height
+        requestAnimationFrame(() => {
+            content.style.transition = 'height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, padding 0.4s ease';
+            content.style.height = naturalHeight + 'px';
+            content.style.opacity = '1';
+            content.style.paddingTop = naturalPaddingTop;
+            content.style.paddingBottom = naturalPaddingBottom;
+            
+            // Clean up after animation
+            setTimeout(() => {
+                content.style.height = '';
+                content.style.transition = '';
+                content.style.paddingTop = '';
+                content.style.paddingBottom = '';
+            }, 400);
+        });
+        
         if (collapseBtn) {
             collapseBtn.setAttribute('aria-label', 'Collapse section');
         }
     } else {
         // Collapse
-        section.classList.add('collapsed');
-        const collapseBtn = section.querySelector('.collapse-btn');
+        if (isInitialRender) {
+            // No animation on initial render
+            section.classList.add('collapsed');
+            if (collapseBtn) {
+                collapseBtn.setAttribute('aria-label', 'Expand section');
+            }
+            return;
+        }
+        
+        const currentHeight = content.scrollHeight;
+        const currentPaddingTop = window.getComputedStyle(content).paddingTop;
+        const currentPaddingBottom = window.getComputedStyle(content).paddingBottom;
+        
+        // Set explicit height before animating
+        content.style.height = currentHeight + 'px';
+        content.style.paddingTop = currentPaddingTop;
+        content.style.paddingBottom = currentPaddingBottom;
+        
+        // Force reflow
+        void content.offsetHeight;
+        
+        // Animate to 0
+        requestAnimationFrame(() => {
+            section.classList.add('collapsed');
+            content.style.transition = 'height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, padding 0.4s ease';
+            content.style.height = '0';
+            content.style.opacity = '0';
+            content.style.paddingTop = '0';
+            content.style.paddingBottom = '0';
+        });
+        
         if (collapseBtn) {
             collapseBtn.setAttribute('aria-label', 'Expand section');
         }

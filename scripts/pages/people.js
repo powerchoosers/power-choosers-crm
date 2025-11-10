@@ -2618,8 +2618,8 @@
     
     // If this isn't the first render, pre-mark icons as loaded to prevent animation flicker
     if (state.hasAnimated && rows) {
-      rows = rows.replace(/class="company-favicon"/g, 'class="company-favicon icon-loaded"');
-      rows = rows.replace(/class="avatar-initials"/g, 'class="avatar-initials icon-loaded"');
+      // Don't add icon-loaded immediately - let the global animation system handle it
+      // This ensures smooth fade-in animations for all icons
     }
     
     els.tbody.innerHTML = rows || emptyHtml();

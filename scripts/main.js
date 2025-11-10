@@ -471,9 +471,12 @@ class PowerChoosersCRM {
     // Open modal with animation
     modal.removeAttribute('hidden');
     
-    // Trigger animation after a brief delay to ensure DOM is ready
+    // Double requestAnimationFrame ensures browser is ready for smooth animation
+    // This prevents choppy first render by giving browser time to create compositor layers
     requestAnimationFrame(() => {
-      modal.classList.add('show');
+      requestAnimationFrame(() => {
+        modal.classList.add('show');
+      });
     });
 
     // Focus management: move focus to Close button if present, else first input
@@ -803,9 +806,12 @@ class PowerChoosersCRM {
     // Open modal with animation
     modal.removeAttribute('hidden');
     
-    // Trigger animation after a brief delay to ensure DOM is ready
+    // Double requestAnimationFrame ensures browser is ready for smooth animation
+    // This prevents choppy first render by giving browser time to create compositor layers
     requestAnimationFrame(() => {
-      modal.classList.add('show');
+      requestAnimationFrame(() => {
+        modal.classList.add('show');
+      });
     });
 
     // Focus management: move focus to Close button if present, else first input
@@ -1052,6 +1058,67 @@ class PowerChoosersCRM {
         try {
             this.updateWidgetPanel(this.currentPage);
         } catch (_) { /* noop */ }
+        
+        // Pre-warm modal animations for smooth first use (performance optimization)
+        setTimeout(() => this.preWarmModalAnimations(), 500);
+    }
+    
+    // Pre-warm modal animations to prevent choppy first render
+    preWarmModalAnimations() {
+        // Force browser to create compositor layers for modals
+        const modals = ['modal-add-contact', 'modal-add-account'];
+        
+        modals.forEach(modalId => {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            
+            const dialog = modal.querySelector('.pc-modal__dialog');
+            const backdrop = modal.querySelector('.pc-modal__backdrop');
+            
+            if (!dialog || !backdrop) return;
+            
+            // Temporarily show modal off-screen to force layer creation
+            // This pre-compiles the CSS and creates GPU layers without visible flash
+            const originalHidden = modal.hasAttribute('hidden');
+            const originalDisplay = modal.style.display;
+            const originalTransform = dialog.style.transform;
+            const originalOpacity = modal.style.opacity;
+            
+            // Force layout calculation by briefly showing elements
+            modal.removeAttribute('hidden');
+            modal.style.display = 'block';
+            modal.style.opacity = '0';
+            modal.style.visibility = 'hidden';
+            modal.style.position = 'fixed';
+            modal.style.top = '-9999px';
+            modal.style.left = '-9999px';
+            
+            // Force browser to create compositor layers
+            void dialog.offsetHeight; // Force layout
+            void backdrop.offsetHeight; // Force layout
+            
+            // Trigger a micro-animation to warm up the GPU
+            requestAnimationFrame(() => {
+                dialog.style.transform = 'translate(-50%, -50%) scale(0.98) translateY(5px) translateZ(0)';
+                backdrop.style.opacity = '0.1';
+                
+                requestAnimationFrame(() => {
+                    // Reset everything
+                    dialog.style.transform = originalTransform || '';
+                    backdrop.style.opacity = '';
+                    modal.style.display = originalDisplay || '';
+                    modal.style.opacity = originalOpacity || '';
+                    modal.style.visibility = '';
+                    modal.style.position = '';
+                    modal.style.top = '';
+                    modal.style.left = '';
+                    
+                    if (originalHidden) {
+                        modal.setAttribute('hidden', '');
+                    }
+                });
+            });
+        });
     }
 
     // Navigation System
@@ -5418,7 +5485,10 @@ window.__pcFaviconHelper = {
     onFaviconLoad: function(containerId) {
         const img = document.getElementById(containerId);
         if (img) {
-            img.classList.add('icon-loaded');
+            // Use requestAnimationFrame to ensure smooth animation
+            requestAnimationFrame(() => {
+                img.classList.add('icon-loaded');
+            });
         }
     },
 
@@ -5482,11 +5552,21 @@ window.__pcIconAnimator = {
             if (img.dataset.iconObserved) return;
             img.dataset.iconObserved = 'true';
             
+            // Ensure image starts hidden for animation
+            if (!img.classList.contains('icon-loaded')) {
+                img.style.opacity = '0';
+                img.style.transform = 'scale(0.95)';
+            }
+            
             // Check if already loaded (cached images)
             const checkAndLoad = () => {
                 if (img.complete && img.naturalWidth > 0) {
-                    // Synchronously add class for cached images - no animation delay
-                    img.classList.add('icon-loaded');
+                    // For cached images, add a small delay to ensure smooth fade-in
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            img.classList.add('icon-loaded');
+                        });
+                    });
                     return true;
                 }
                 return false;
@@ -5497,12 +5577,20 @@ window.__pcIconAnimator = {
             
             // If not cached, wait for load event
             img.addEventListener('load', () => {
-                requestAnimationFrame(() => img.classList.add('icon-loaded'));
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        img.classList.add('icon-loaded');
+                    });
+                });
             }, { once: true });
             
             // Handle error - still show with animation
             img.addEventListener('error', () => {
-                requestAnimationFrame(() => img.classList.add('icon-loaded'));
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        img.classList.add('icon-loaded');
+                    });
+                });
             }, { once: true });
         };
         

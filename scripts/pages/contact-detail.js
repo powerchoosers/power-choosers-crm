@@ -528,9 +528,12 @@
     // Open modal with animation (same as add modals)
     overlay.removeAttribute('hidden');
     
-    // Trigger animation after a brief delay to ensure DOM is ready
+    // Double requestAnimationFrame ensures browser is ready for smooth animation
+    // This prevents choppy first render by giving browser time to create compositor layers
     requestAnimationFrame(() => {
-      overlay.classList.add('show');
+      requestAnimationFrame(() => {
+        overlay.classList.add('show');
+      });
     });
     
     // Focus first input
@@ -5848,7 +5851,11 @@ function closeContactSequencesPanel() {
   const panel = document.getElementById('contact-sequences-panel');
   const cleanup = () => {
     if (panel && panel.parentElement) panel.parentElement.removeChild(panel);
-    try { document.removeEventListener('mousedown', _onContactSequencesOutside, true); } catch(_) {}
+    try { 
+      if (_onContactSequencesOutside) {
+        document.removeEventListener('mousedown', _onContactSequencesOutside, true);
+      }
+    } catch(_) {}
     // Reset trigger state and restore focus
     try {
       const trigger = document.getElementById('add-contact-to-sequences');
@@ -5980,6 +5987,7 @@ function openContactSequencesPanel() {
     const inside = panel.contains(e.target);
     const isTrigger = !!(e.target.closest && e.target.closest('#add-contact-to-sequences'));
     const isSearchBar = e.target.classList && e.target.classList.contains('search-input');
+    // Close if clicking outside the panel (including on other buttons)
     if (!inside && !isTrigger) {
       closeContactSequencesPanel();
       if (isSearchBar && typeof e.target.focus === 'function') {
@@ -5988,11 +5996,10 @@ function openContactSequencesPanel() {
     }
   };
   
-  // Guard against duplicate mousedown listeners
-  if (!document._contactSequencesMousedownBound) {
+  // Always attach the listener (remove guard to ensure it works)
+  setTimeout(() => {
     document.addEventListener('mousedown', _onContactSequencesOutside, true);
-    document._contactSequencesMousedownBound = true;
-  }
+  }, 0);
 }
 
 // Populate sequences into the contact sequences panel
@@ -6209,12 +6216,14 @@ async function createContactSequenceThenAdd(name) {
         border-radius: var(--border-radius); box-shadow: var(--elevation-card-hover, 0 16px 40px rgba(0,0,0,.28), 0 6px 18px rgba(0,0,0,.22));
         transform: translateY(-8px); opacity: 0; transition: transform 400ms ease, opacity 400ms ease;
         /* Avoid clipping the pointer arrow */
-        --arrow-size: 10px; }
+        --arrow-size: 10px;
+        /* Don't use overflow: hidden - it clips the arrow pointer */ }
       #contact-lists-panel.--show, #contact-sequences-panel.--show { transform: translateY(0); opacity: 1; }
       #contact-lists-panel .list-header, #contact-sequences-panel .list-header { 
         display: flex; align-items: center; justify-content: space-between; 
         padding: 14px 16px; border-bottom: 1px solid var(--border-light); 
-        font-weight: 700; background: var(--bg-card); 
+        font-weight: 700; background: var(--bg-card);
+        border-radius: var(--border-radius) var(--border-radius) 0 0;
       }
       #contact-lists-panel .list-title, #contact-sequences-panel .list-title { 
         font-weight: 700; color: var(--text-primary); font-size: 1rem; 
@@ -6239,6 +6248,9 @@ async function createContactSequenceThenAdd(name) {
       #contact-lists-panel .list-body::-webkit-scrollbar-thumb, #contact-sequences-panel .list-body::-webkit-scrollbar-thumb { background: var(--grey-700); border-radius: 8px; }
       #contact-lists-panel .list-item, #contact-sequences-panel .list-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; cursor:pointer; background: var(--bg-card); border-top: 1px solid var(--border-light); }
       #contact-lists-panel .list-item:first-child, #contact-sequences-panel .list-item:first-child { border-top: 0; }
+      #contact-lists-panel .list-item:last-child, #contact-sequences-panel .list-item:last-child {
+        border-radius: 0 0 var(--border-radius) var(--border-radius);
+      }
       #contact-lists-panel .list-item:hover, #contact-sequences-panel .list-item:hover { background: var(--bg-hover); }
       #contact-lists-panel .list-item[aria-disabled="true"], #contact-sequences-panel .list-item[aria-disabled="true"] { opacity: .6; cursor: default; }
       #contact-lists-panel .list-item:focus-visible, #contact-sequences-panel .list-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,139,0,.35) inset; }
@@ -6303,7 +6315,11 @@ async function createContactSequenceThenAdd(name) {
       }
       
       if (panel && panel.parentElement) panel.parentElement.removeChild(panel);
-      try { document.removeEventListener('mousedown', _onContactListsOutside, true); } catch(_) {}
+      try { 
+        if (_onContactListsOutside) {
+          document.removeEventListener('mousedown', _onContactListsOutside, true);
+        }
+      } catch(_) {}
       // Reset trigger state and restore focus
       try {
         const trigger = document.getElementById('add-contact-to-list');
@@ -6483,12 +6499,14 @@ async function createContactSequenceThenAdd(name) {
       document._contactListsKeydownBound = true;
     }
 
-    // Click-away
+    // Click-away handler - closes when clicking outside or on other buttons
     _onContactListsOutside = (e) => {
       const inside = panel.contains(e.target);
       const isTrigger = !!(e.target.closest && e.target.closest('#add-contact-to-list'));
       // Allow clicking on global search bar (class 'search-input') to close the modal and allow focus
       const isSearchBar = e.target.classList && e.target.classList.contains('search-input');
+      
+      // Close if clicking outside the panel (including on other buttons like add-to-sequence)
       if (!inside && !isTrigger) {
         closeContactListsPanel();
         // If search bar, focus it after closing modal
@@ -6498,11 +6516,10 @@ async function createContactSequenceThenAdd(name) {
       }
     };
     
-    // Guard against duplicate mousedown listeners
-    if (!document._contactListsMousedownBound) {
+    // Always attach the listener (remove guard to ensure it works)
+    setTimeout(() => {
       document.addEventListener('mousedown', _onContactListsOutside, true);
-      document._contactListsMousedownBound = true;
-    }
+    }, 0);
 
   }
 
