@@ -1040,14 +1040,10 @@ async function handleApiUploadHostGoogleAvatar(req, res) {
 
 async function handleApiUploadSignatureImage(req, res) {
   try {
-    console.log('[Server] Signature upload request received:', req.method);
     if (req.method === 'POST') {
       req.body = await parseRequestBody(req);
-      console.log('[Server] Request body parsed, size:', req.body?.image?.length || 0);
     }
-    console.log('[Server] Calling signature upload handler...');
     const result = await uploadSignatureImageHandler(req, res);
-    console.log('[Server] Handler completed');
     return result;
   } catch (error) {
     console.error('[Server] Error in signature upload handler wrapper:', error);
@@ -1084,8 +1080,6 @@ async function handleApiDebugHealth(req, res) {
 
 async function handleApiDebugFirestore(req, res) {
   try {
-    console.log('[Debug] Testing Firestore connection...');
-    
     // Test basic Firestore access
     const testDoc = await db.collection('debug').doc('test').get();
     
