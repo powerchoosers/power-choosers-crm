@@ -36,6 +36,8 @@ export default async function handler(req, res) {
     const now = Date.now();
     
     // Query for approved emails that are ready to send
+    // Note: This runs server-side with Firebase Admin SDK, which bypasses Firestore rules
+    // The ownership fields were added during email creation to ensure client-side queries work
     const readyToSendQuery = db.collection('emails')
       .where('type', '==', 'scheduled')
       .where('status', '==', 'approved')
