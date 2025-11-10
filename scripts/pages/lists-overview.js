@@ -650,74 +650,26 @@
       // COST-EFFECTIVE: Debounced update handler (500ms) to prevent flickering
       const debouncedPeopleUpdate = debounce((items) => {
         try {
-          // COST-EFFECTIVE: Prefer BackgroundListsLoader cache if available (zero cost)
-          if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
-            const cachedLists = window.BackgroundListsLoader.getListsData() || [];
-            if (cachedLists.length > 0) {
-              // Merge listener updates with cache data instead of replacing
-              const cachedMap = new Map(cachedLists.map(l => [l.id, l]));
-              items.forEach(item => {
-                cachedMap.set(item.id, item); // Update with listener data
-              });
-              items = Array.from(cachedMap.values());
-              console.log('[ListsOverview] ✓ Merged listener updates with cache (zero cost)');
-            }
+          // CRITICAL FIX: Don't merge with cache - use listener data as source of truth
+          // The aggressive merge logic was causing lists to disappear
+          
+          // If listener returns empty and we have existing data, preserve existing (safety check only)
+          if (items.length === 0 && state.peopleLists.length > 0) {
+            console.warn('[ListsOverview] Live listener returned empty, preserving existing lists');
+            return;
           }
           
-          // COST-EFFECTIVE: Only update if we detect actual changes (not just snapshot triggers)
-          const existingCount = state.peopleLists.length;
-          
-          // COST-EFFECTIVE: If we have existing lists but listener returns empty, preserve existing
-          if (existingCount > 0 && items.length === 0) {
-            console.warn('[ListsOverview] Live listener returned empty but we have existing lists, preserving cache');
-            return; // Don't overwrite with empty data
-          }
-          
-          // If this is the first load (no existing data), do full replacement
-          if (existingCount === 0) {
-            state.peopleLists = items;
-            console.log(`[ListsOverview] First load: set ${items.length} lists`);
-          } else {
-            // COST-EFFECTIVE: Merge updates instead of replacing (preserves cache)
-            const existingMap = new Map(state.peopleLists.map(l => [l.id, l]));
-            const itemsIds = new Set(items.map(item => item.id));
-            let changed = false;
-            
-            // Remove lists that no longer exist in Firestore (were deleted)
-            for (const [id, list] of existingMap.entries()) {
-              if (!itemsIds.has(id)) {
-                existingMap.delete(id);
-                changed = true;
-                // Also remove from BackgroundListsLoader cache
-                if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.removeListLocally === 'function') {
-                  window.BackgroundListsLoader.removeListLocally(id);
-                }
-                console.log(`[ListsOverview] Removed deleted list ${id} from cache`);
-              }
-            }
-            
-            // Update or add lists that exist in Firestore (merge with existing)
-            items.forEach(item => {
-              const existing = existingMap.get(item.id);
-              // Only update if recordCount changed, name changed, or it's a new list
-              if (!existing || existing.recordCount !== item.recordCount || existing.name !== item.name) {
-                existingMap.set(item.id, item);
-                changed = true;
-              }
-            });
-            
-            // Only re-render if something actually changed
-            if (changed || existingMap.size !== existingCount) {
-              state.peopleLists = Array.from(existingMap.values());
-              console.log(`[ListsOverview] ✓ Updated ${items.length} lists from listener (changes detected, merged with cache)`);
-            } else {
-              // No changes detected, skip re-render to save resources
-              return;
-            }
-          }
-          
+          // Use listener data directly - it's the source of truth
+          state.peopleLists = items;
           state.loadedPeople = true;
-          if (state.kind === 'people') renderFilteredItems(state.peopleLists);
+          
+          console.log(`[ListsOverview] ✓ Updated ${items.length} people lists from listener`);
+          
+          // Re-render if we're viewing people lists
+          if (state.kind === 'people') {
+            applyFilters();
+          }
+          
           _peopleListenerRetries = 0; // Reset retry counter on success
         } catch (e) {
           console.error('[ListsOverview] People lists debounced update error:', e);
@@ -789,74 +741,26 @@
       // COST-EFFECTIVE: Debounced update handler (500ms) to prevent flickering
       const debouncedAccountsUpdate = debounce((items) => {
         try {
-          // COST-EFFECTIVE: Prefer BackgroundListsLoader cache if available (zero cost)
-          if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
-            const cachedLists = window.BackgroundListsLoader.getListsData() || [];
-            if (cachedLists.length > 0) {
-              // Merge listener updates with cache data instead of replacing
-              const cachedMap = new Map(cachedLists.map(l => [l.id, l]));
-              items.forEach(item => {
-                cachedMap.set(item.id, item); // Update with listener data
-              });
-              items = Array.from(cachedMap.values());
-              console.log('[ListsOverview] ✓ Merged listener updates with cache (zero cost)');
-            }
+          // CRITICAL FIX: Don't merge with cache - use listener data as source of truth
+          // The aggressive merge logic was causing lists to disappear
+          
+          // If listener returns empty and we have existing data, preserve existing (safety check only)
+          if (items.length === 0 && state.accountLists.length > 0) {
+            console.warn('[ListsOverview] Live listener returned empty, preserving existing lists');
+            return;
           }
           
-          // COST-EFFECTIVE: Only update if we detect actual changes (not just snapshot triggers)
-          const existingCount = state.accountLists.length;
-          
-          // COST-EFFECTIVE: If we have existing lists but listener returns empty, preserve existing
-          if (existingCount > 0 && items.length === 0) {
-            console.warn('[ListsOverview] Live listener returned empty but we have existing lists, preserving cache');
-            return; // Don't overwrite with empty data
-          }
-          
-          // If this is the first load (no existing data), do full replacement
-          if (existingCount === 0) {
-            state.accountLists = items;
-            console.log(`[ListsOverview] First load: set ${items.length} account lists`);
-          } else {
-            // COST-EFFECTIVE: Merge updates instead of replacing (preserves cache)
-            const existingMap = new Map(state.accountLists.map(l => [l.id, l]));
-            const itemsIds = new Set(items.map(item => item.id));
-            let changed = false;
-            
-            // Remove lists that no longer exist in Firestore (were deleted)
-            for (const [id, list] of existingMap.entries()) {
-              if (!itemsIds.has(id)) {
-                existingMap.delete(id);
-                changed = true;
-                // Also remove from BackgroundListsLoader cache
-                if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.removeListLocally === 'function') {
-                  window.BackgroundListsLoader.removeListLocally(id);
-                }
-                console.log(`[ListsOverview] Removed deleted list ${id} from cache`);
-              }
-            }
-            
-            // Update or add lists that exist in Firestore (merge with existing)
-            items.forEach(item => {
-              const existing = existingMap.get(item.id);
-              // Only update if recordCount changed, name changed, or it's a new list
-              if (!existing || existing.recordCount !== item.recordCount || existing.name !== item.name) {
-                existingMap.set(item.id, item);
-                changed = true;
-              }
-            });
-            
-            // Only re-render if something actually changed
-            if (changed || existingMap.size !== existingCount) {
-              state.accountLists = Array.from(existingMap.values());
-              console.log(`[ListsOverview] ✓ Updated ${items.length} account lists from listener (changes detected, merged with cache)`);
-            } else {
-              // No changes detected, skip re-render to save resources
-              return;
-            }
-          }
-          
+          // Use listener data directly - it's the source of truth
+          state.accountLists = items;
           state.loadedAccounts = true;
-          if (state.kind === 'accounts') renderFilteredItems(state.accountLists);
+          
+          console.log(`[ListsOverview] ✓ Updated ${items.length} account lists from listener`);
+          
+          // Re-render if we're viewing account lists
+          if (state.kind === 'accounts') {
+            applyFilters();
+          }
+          
           _accountsListenerRetries = 0; // Reset retry counter on success
         } catch (e) {
           console.error('[ListsOverview] Account lists debounced update error:', e);
@@ -1204,7 +1108,25 @@
   async function handleOpenList(id, kind) {
     const listArr = kind === 'people' ? state.peopleLists : state.accountLists;
     const item = (listArr || []).find(x => x.id === id);
-    const name = item?.name || 'List';
+    
+    // CRITICAL FIX: If no list found, try to load from Firestore directly
+    let name = item?.name;
+    if (!name && window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
+      try {
+        const listDoc = await window.firebaseDB.collection('lists').doc(id).get();
+        if (listDoc.exists) {
+          name = listDoc.data().name || 'List';
+          console.log('[ListsOverview] Loaded list name from Firestore:', name);
+        } else {
+          name = 'List';
+        }
+      } catch (e) {
+        console.warn('[ListsOverview] Failed to load list name:', e);
+        name = 'List';
+      }
+    } else if (!name) {
+      name = 'List';
+    }
     
     try {
       const cache = window.listMembersCache?.[id];
@@ -1772,33 +1694,21 @@
     const out = { people: new Set(), accounts: new Set(), loaded: false };
     if (!listId) return out;
     
-    // COST OPTIMIZATION: Check IndexedDB cache first (zero Firestore reads if cached)
-    if (window.CacheManager && typeof window.CacheManager.getCachedListMembers === 'function') {
-      try {
-        const cached = await window.CacheManager.getCachedListMembers(listId);
-        if (cached && (cached.people instanceof Set || Array.isArray(cached.people))) {
-          out.people = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
-          out.accounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
-          out.loaded = true;
-          console.log(`[ListsOverview] ✓ Loaded members for ${listId} from CacheManager (zero cost)`);
-          return out;
-        }
-      } catch (e) {
-        console.warn('[ListsOverview] Cache check failed, falling back to Firestore:', e);
+    // CRITICAL FIX: Check in-memory cache ONLY (skip IndexedDB - it can be stale)
+    // In-memory cache is updated in real-time, IndexedDB can lag behind
+    if (window.listMembersCache && window.listMembersCache[listId] && window.listMembersCache[listId].loaded) {
+      const cached = window.listMembersCache[listId];
+      // Verify cache has actual data (not empty stale cache)
+      if (cached.people instanceof Set || Array.isArray(cached.people)) {
+        out.people = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
+        out.accounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
+        out.loaded = true;
+        console.log(`[ListsOverview] ✓ Loaded members for ${listId} from in-memory cache`, { people: out.people.size, accounts: out.accounts.size });
+        return out;
       }
     }
     
-    // Also check in-memory cache (faster than IndexedDB)
-    if (window.listMembersCache && window.listMembersCache[listId] && window.listMembersCache[listId].loaded) {
-      const cached = window.listMembersCache[listId];
-      out.people = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
-      out.accounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
-      out.loaded = true;
-      console.log(`[ListsOverview] ✓ Loaded members for ${listId} from in-memory cache (zero cost)`);
-      return out;
-    }
-    
-    // Cache miss - fetch from Firestore
+    // Always fetch from Firestore for accurate data (reasonable cost for correctness)
     if (!window.firebaseDB || typeof window.firebaseDB.collection !== 'function') return out;
     
     try {
@@ -1825,14 +1735,13 @@
       }
       out.loaded = true;
       
-      // COST OPTIMIZATION: Cache the results for next time (IndexedDB write only)
-      if ((out.people.size > 0 || out.accounts.size > 0) && window.CacheManager && typeof window.CacheManager.cacheListMembers === 'function') {
-        try {
-          await window.CacheManager.cacheListMembers(listId, out.people, out.accounts);
-          console.log(`[ListsOverview] ✓ Cached members for ${listId} (zero cost on next load)`);
-        } catch (cacheErr) {
-          console.warn('[ListsOverview] Cache write failed (non-critical):', cacheErr);
-        }
+      // Update in-memory cache for fast subsequent access
+      try {
+        window.listMembersCache = window.listMembersCache || {};
+        window.listMembersCache[listId] = out;
+        console.log(`[ListsOverview] ✓ Updated in-memory cache for ${listId}`, { people: out.people.size, accounts: out.accounts.size });
+      } catch (cacheErr) {
+        console.warn('[ListsOverview] In-memory cache update failed:', cacheErr);
       }
     } catch (error) {
       console.warn('[ListsOverview] Failed to fetch members for list', listId, error);
@@ -1983,6 +1892,29 @@
     state.loadedPeople = false;
     state.loadedAccounts = false;
     await ensureLoadedThenRender();
+  });
+  
+  // CRITICAL FIX: Listen for bulk import completion to invalidate stale caches
+  document.addEventListener('pc:bulk-import-complete', async (event) => {
+    try {
+      const { listId, type } = event.detail || {};
+      console.log('[ListsOverview] Bulk import complete, invalidating caches for:', { listId, type });
+      
+      // Clear in-memory cache for this list
+      if (listId && window.listMembersCache) {
+        delete window.listMembersCache[listId];
+        console.log('[ListsOverview] ✓ Cleared in-memory cache for', listId);
+      }
+      
+      // Force reload of list data
+      state.loadedPeople = false;
+      state.loadedAccounts = false;
+      await ensureLoadedThenRender();
+      
+      console.log('[ListsOverview] ✓ Reloaded lists after bulk import');
+    } catch (e) {
+      console.error('[ListsOverview] Error handling bulk import complete:', e);
+    }
   });
 
   // Listen for new list creation events
@@ -2147,35 +2079,21 @@
     if (console.time) console.time(`[ListsOverview] preload fetch ${listId}`);
     if (!listId) return out;
     
-    // COST OPTIMIZATION: Check IndexedDB cache first (zero Firestore reads if cached)
-    if (window.CacheManager && typeof window.CacheManager.getCachedListMembers === 'function') {
-      try {
-        const cached = await window.CacheManager.getCachedListMembers(listId);
-        if (cached && (cached.people instanceof Set || Array.isArray(cached.people))) {
-          out.people = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
-          out.accounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
-          out.loaded = true;
-          if (console.timeEnd) console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
-          console.log(`[ListsOverview] ✓ Loaded members for ${listId} from CacheManager (zero cost)`);
-          return out;
-        }
-      } catch (e) {
-        console.warn('[ListsOverview] Cache check failed, falling back to Firestore:', e);
+    // CRITICAL FIX: Check in-memory cache ONLY (skip IndexedDB - it can be stale)
+    if (window.listMembersCache && window.listMembersCache[listId] && window.listMembersCache[listId].loaded) {
+      const cached = window.listMembersCache[listId];
+      // Verify cache has actual data (not empty stale cache)
+      if (cached.people instanceof Set || Array.isArray(cached.people)) {
+        out.people = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
+        out.accounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
+        out.loaded = true;
+        if (console.timeEnd) console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
+        console.log(`[ListsOverview] ✓ Loaded members for ${listId} from in-memory cache`, { people: out.people.size, accounts: out.accounts.size });
+        return out;
       }
     }
     
-    // Also check in-memory cache (faster than IndexedDB)
-    if (window.listMembersCache && window.listMembersCache[listId] && window.listMembersCache[listId].loaded) {
-      const cached = window.listMembersCache[listId];
-      out.people = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
-      out.accounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
-      out.loaded = true;
-      if (console.timeEnd) console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
-      console.log(`[ListsOverview] ✓ Loaded members for ${listId} from in-memory cache (zero cost)`);
-      return out;
-    }
-    
-    // Cache miss - fetch from Firestore
+    // Always fetch from Firestore for accurate data
     if (!window.firebaseDB || typeof window.firebaseDB.collection !== 'function') {
       if (console.timeEnd) console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
       return out;
@@ -2213,14 +2131,13 @@
     }
     out.loaded = true;
     
-    // COST OPTIMIZATION: Cache the results for next time (IndexedDB write only)
-    if ((out.people.size > 0 || out.accounts.size > 0) && window.CacheManager && typeof window.CacheManager.cacheListMembers === 'function') {
-      try {
-        await window.CacheManager.cacheListMembers(listId, out.people, out.accounts);
-        console.log(`[ListsOverview] ✓ Cached members for ${listId} (zero cost on next load)`);
-      } catch (cacheErr) {
-        console.warn('[ListsOverview] Cache write failed (non-critical):', cacheErr);
-      }
+    // Update in-memory cache for fast subsequent access
+    try {
+      window.listMembersCache = window.listMembersCache || {};
+      window.listMembersCache[listId] = out;
+      console.log(`[ListsOverview] ✓ Updated in-memory cache for ${listId}`, { people: out.people.size, accounts: out.accounts.size });
+    } catch (cacheErr) {
+      console.warn('[ListsOverview] In-memory cache update failed:', cacheErr);
     }
     
     if (console.timeEnd) console.timeEnd(`[ListsOverview] preload fetch ${listId}`);
