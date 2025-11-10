@@ -1039,10 +1039,23 @@ async function handleApiUploadHostGoogleAvatar(req, res) {
 }
 
 async function handleApiUploadSignatureImage(req, res) {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
+  try {
+    console.log('[Server] Signature upload request received:', req.method);
+    if (req.method === 'POST') {
+      req.body = await parseRequestBody(req);
+      console.log('[Server] Request body parsed, size:', req.body?.image?.length || 0);
+    }
+    console.log('[Server] Calling signature upload handler...');
+    const result = await uploadSignatureImageHandler(req, res);
+    console.log('[Server] Handler completed');
+    return result;
+  } catch (error) {
+    console.error('[Server] Error in signature upload handler wrapper:', error);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Server error', message: error.message }));
+    }
   }
-  return await uploadSignatureImageHandler(req, res);
 }
 
 // Algolia and Maps handlers
@@ -1570,7 +1583,7 @@ async function handleApiEnergyNews(req, res) {
         // Process headlines in parallel for better performance
         const reformattedItems = await Promise.all(rawItems.map(async (item) => {
           try {
-            const prompt = `Rewrite this energy news headline to be approximately 90-110 characters (fits exactly 3 lines in a widget). Keep the key information concise and scannable. Remove source attribution (like "- CBS News", "- The Hill", etc.) from the end. Return ONLY the rewritten headline with no quotes or extra text:
+            const prompt = `Rewrite this energy news headline to be approximately 150-180 characters long (must fill exactly 3 lines in a widget display). Make it detailed and comprehensive while remaining clear and scannable. Include the key facts and context. Remove source attribution (like "- CBS News", "- The Hill", etc.) from the end. Return ONLY the rewritten headline with no quotes or extra text:
 
 "${item.title}"`;
             
