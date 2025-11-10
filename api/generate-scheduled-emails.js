@@ -26,10 +26,14 @@ export default async function handler(req, res) {
     return;
   }
 
+  const isProduction = process.env.NODE_ENV === 'production';
+
   try {
     const { immediate = false } = req.body || {};
     
-    console.log('[GenerateScheduledEmails] Starting generation process, immediate:', immediate);
+    if (!isProduction) {
+      console.log('[GenerateScheduledEmails] Starting generation process, immediate:', immediate);
+    }
     
     // Calculate time range for emails to generate
     const now = Date.now();
@@ -48,20 +52,26 @@ export default async function handler(req, res) {
       endTime = startTime + (24 * 60 * 60 * 1000); // 24 hours
     }
     
-    console.log('[GenerateScheduledEmails] Time range:', { startTime, endTime, immediate, now });
+    if (!isProduction) {
+      console.log('[GenerateScheduledEmails] Time range:', { startTime, endTime, immediate, now });
+    }
     
     // Query for scheduled emails that need generation
     // Use >= and <= to include boundary times
+    // Limit to 10 emails per run to prevent Perplexity API rate limits
     const scheduledEmailsQuery = db.collection('emails')
       .where('type', '==', 'scheduled')
       .where('status', '==', 'not_generated')
       .where('scheduledSendTime', '>=', startTime)
-      .where('scheduledSendTime', '<=', endTime);
+      .where('scheduledSendTime', '<=', endTime)
+      .limit(10);
     
     const scheduledEmailsSnapshot = await scheduledEmailsQuery.get();
     
     if (scheduledEmailsSnapshot.empty) {
-      console.log('[GenerateScheduledEmails] No emails to generate');
+      if (!isProduction) {
+        console.log('[GenerateScheduledEmails] No emails to generate');
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         success: true, 
@@ -71,7 +81,9 @@ export default async function handler(req, res) {
       return;
     }
     
-    console.log('[GenerateScheduledEmails] Found', scheduledEmailsSnapshot.size, 'emails to generate');
+    if (!isProduction) {
+      console.log('[GenerateScheduledEmails] Found', scheduledEmailsSnapshot.size, 'emails to generate');
+    }
     
     let generatedCount = 0;
     const errors = [];
@@ -80,7 +92,9 @@ export default async function handler(req, res) {
     for (const emailDoc of scheduledEmailsSnapshot.docs) {
       try {
         const emailData = emailDoc.data();
-        console.log('[GenerateScheduledEmails] Processing email:', emailDoc.id);
+        if (!isProduction) {
+          console.log('[GenerateScheduledEmails] Processing email:', emailDoc.id);
+        }
         
         // Get contact data for personalization
         let contactData = {};
@@ -130,17 +144,27 @@ export default async function handler(req, res) {
         });
         
         // Update email with generated content
-        await emailDoc.ref.update({
+        // Ensure ownership fields are preserved/set
+        const updateData = {
           subject: generatedContent.subject,
           html: generatedContent.html,
           text: generatedContent.text,
           status: 'pending_approval',
           generatedAt: Date.now(),
           generatedBy: 'scheduled_job'
-        });
+        };
+        
+        // Add ownership fields if not already present
+        if (emailData.ownerId) updateData.ownerId = emailData.ownerId;
+        if (emailData.assignedTo) updateData.assignedTo = emailData.assignedTo;
+        if (emailData.createdBy) updateData.createdBy = emailData.createdBy;
+        
+        await emailDoc.ref.update(updateData);
         
         generatedCount++;
-        console.log('[GenerateScheduledEmails] Generated email:', emailDoc.id);
+        if (!isProduction) {
+          console.log('[GenerateScheduledEmails] Generated email:', emailDoc.id);
+        }
         
       } catch (error) {
         console.error('[GenerateScheduledEmails] Failed to generate email:', emailDoc.id, error);
@@ -162,7 +186,9 @@ export default async function handler(req, res) {
       }
     }
     
-    console.log('[GenerateScheduledEmails] Generation complete. Generated:', generatedCount, 'Errors:', errors.length);
+    if (!isProduction) {
+      console.log('[GenerateScheduledEmails] Generation complete. Generated:', generatedCount, 'Errors:', errors.length);
+    }
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
