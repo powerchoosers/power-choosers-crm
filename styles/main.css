@@ -6487,21 +6487,9 @@ html, body {
   border-color: var(--orange-subtle);
 }
 
-.qa-btn.not-opened {
-  background-color: var(--grey-400);
-  color: var(--grey-600);
-}
+/* Not-opened button uses default qa-btn styling (no special styling needed) */
 
-.qa-btn.clicked {
-  background-color: var(--orange-subtle);
-  color: white;
-  border-color: var(--orange-subtle);
-}
-
-.qa-btn.not-clicked {
-  background-color: var(--grey-400);
-  color: var(--grey-600);
-}
+/* Clicked button stays grey (no special styling) */
 
 /* Star button styling */
 .qa-btn.starred {

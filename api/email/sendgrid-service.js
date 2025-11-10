@@ -42,6 +42,98 @@ export class SendGridService {
   }
 
   /**
+   * Look up contact name by email address (with Firebase fallback)
+   * Returns formatted "FirstName LastName" or null if not found
+   */
+  async lookupContactName(emailAddress) {
+    if (!emailAddress || typeof emailAddress !== 'string' || !emailAddress.includes('@')) {
+      return null;
+    }
+
+    const normalizedEmail = emailAddress.toLowerCase().trim();
+
+    try {
+      if (!db) {
+        return null;
+      }
+
+      // Try contacts collection first
+      let snap = await db.collection('contacts')
+        .where('email', '==', normalizedEmail)
+        .limit(1)
+        .get();
+
+      // Fallback to people collection
+      if (!snap || snap.empty) {
+        snap = await db.collection('people')
+          .where('email', '==', normalizedEmail)
+          .limit(1)
+          .get();
+      }
+
+      if (snap && !snap.empty) {
+        const doc = snap.docs[0];
+        const contact = doc.data();
+        
+        // Build full name from contact
+        const firstName = contact.firstName || '';
+        const lastName = contact.lastName || '';
+        const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+        
+        if (fullName) {
+          return fullName;
+        }
+        
+        // Fallback to contact name field
+        if (contact.name) {
+          return contact.name;
+        }
+      }
+    } catch (error) {
+      console.warn(`[SendGrid] Error looking up contact name for ${emailAddress}:`, error);
+    }
+
+    return null;
+  }
+
+  /**
+   * Format email username as "First Last" (e.g., aaron.rodriguez -> Aaron Rodriguez)
+   */
+  formatEmailAsName(emailUsername) {
+    if (!emailUsername || typeof emailUsername !== 'string') {
+      return null;
+    }
+
+    const cleaned = emailUsername.toLowerCase().trim();
+    let parts = [];
+
+    // Handle common separators
+    if (cleaned.includes('.')) {
+      parts = cleaned.split('.');
+    } else if (cleaned.includes('_')) {
+      parts = cleaned.split('_');
+    } else if (cleaned.includes('-')) {
+      parts = cleaned.split('-');
+    } else {
+      // Single word - just capitalize
+      return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    }
+
+    // Capitalize each part and join
+    parts = parts
+      .filter(p => p.length > 0)
+      .map(p => p.charAt(0).toUpperCase() + p.slice(1));
+
+    if (parts.length >= 2) {
+      return parts.join(' ');
+    } else if (parts.length === 1) {
+      return parts[0];
+    }
+
+    return null;
+  }
+
+  /**
    * Send a single email via SendGrid
    */
           async sendEmail(emailData) {
@@ -195,12 +287,33 @@ export class SendGridService {
           openTracking: { enable: deliverabilitySettings.enableTracking }
         },
         // Add personalizations with customArgs for webhook matching
-        personalizations: allowedRecipients.map(recipient => ({
-          to: [{ email: recipient }],
-          customArgs: {
-            trackingId: trackingId || ''
-          }
-        }))
+        // Include recipient names if available
+        personalizations: await Promise.all(
+          allowedRecipients.map(async (recipient) => {
+            // Look up contact name from CRM
+            let recipientName = await this.lookupContactName(recipient);
+            
+            // If no contact found, format email username as name
+            if (!recipientName) {
+              const emailMatch = recipient.match(/^(.+)@/);
+              if (emailMatch) {
+                recipientName = this.formatEmailAsName(emailMatch[1]);
+              }
+            }
+            
+            // Build to array with name if available
+            const toArray = recipientName 
+              ? [{ email: recipient, name: recipientName }]
+              : [{ email: recipient }];
+            
+            return {
+              to: toArray,
+              customArgs: {
+                trackingId: trackingId || ''
+              }
+            };
+          })
+        )
       };
 
               // Threading headers
