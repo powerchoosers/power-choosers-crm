@@ -29,8 +29,8 @@
   function initDomRefs() {
     els.page = document.getElementById('client-management-page');
     els.dashboard = els.page ? els.page.querySelector('.client-dashboard') : null;
-    els.refreshBtn = document.getElementById('refresh-client-data');
-    els.loadingSpinner = els.page ? els.page.querySelector('.loading-spinner') : null;
+    els.addAccountBtn = document.getElementById('add-account-client-mgmt-btn');
+    els.loadingSpinner = els.page ? els.page.querySelector('.loading-state') : null;
     els.errorMessage = els.page ? els.page.querySelector('.error-message') : null;
     return !!els.page && !!els.dashboard;
   }
@@ -210,12 +210,20 @@
       const loadTime = performance.now() - startTime;
       console.log(`[ClientManagement] Page loaded in ${loadTime.toFixed(2)}ms from cache`);
       
+      // Show helpful message if no accounts exist
+      if (state.data.accounts.length === 0) {
+        console.log('[ClientManagement] No accounts found. Click "Add Account" to get started.');
+      }
+      
       // 4. Refresh stale data in background (no UI blocking)
       refreshStaleData();
       
     } catch (error) {
       console.error('[ClientManagement] Failed to load data:', error);
-      showError('Failed to load client data. Please try again.');
+      // Only show error if it's a real error, not just empty data
+      if (state.data.accounts.length === 0 && !window.BackgroundAccountsLoader) {
+        showError('Failed to load client data. Please refresh the page.');
+      }
       hideLoading();
     }
   }
@@ -270,6 +278,20 @@
           showError('User authentication required. Please log in.');
         }
       });
+    }
+    
+    // Listen for account creation from Add Account modal
+    if (els.page && !els.page._accountCreatedHandler) {
+      els.page._accountCreatedHandler = async function (ev) {
+        try {
+          console.log('[ClientManagement] New account created, refreshing data...');
+          // Reload data to show the new account
+          await loadClientData();
+        } catch (e) {
+          console.error('[ClientManagement] Failed to refresh after account creation:', e);
+        }
+      };
+      els.page.addEventListener('account-created', els.page._accountCreatedHandler);
     }
     
     // Listen for account updates
@@ -739,14 +761,14 @@
 
   // Event handlers
   function attachEvents() {
-    if (els.refreshBtn) {
-      els.refreshBtn.addEventListener('click', async () => {
-        await loadClientData();
-        // Add visual feedback
-        els.refreshBtn.style.transform = 'rotate(360deg)';
-        setTimeout(() => {
-          els.refreshBtn.style.transform = '';
-        }, 300);
+    // Add Account button handler - opens search modal
+    if (els.addAccountBtn) {
+      els.addAccountBtn.addEventListener('click', async () => {
+        try {
+          openAccountSearchModal();
+        } catch (e) {
+          console.error('Open Account Search modal failed', e);
+        }
       });
     }
 
@@ -760,6 +782,233 @@
         console.log('Card action clicked:', cardTitle);
       });
     });
+  }
+
+  // Open account search modal
+  function openAccountSearchModal() {
+    const modal = document.getElementById('modal-client-mgmt-search');
+    if (!modal) {
+      console.error('Client Management search modal not found');
+      return;
+    }
+
+    // Show modal with animation (same as add contact/account modals)
+    modal.removeAttribute('hidden');
+    
+    // Force reflow for animation
+    modal.offsetHeight;
+    
+    // Add show class for animation
+    requestAnimationFrame(() => {
+      modal.classList.add('show');
+    });
+
+    // Focus on search input after animation starts
+    setTimeout(() => {
+      const searchInput = document.getElementById('client-mgmt-account-search');
+      if (searchInput) {
+        searchInput.value = '';
+        searchInput.focus();
+      }
+    }, 150);
+
+    // Initialize search functionality
+    initAccountSearch();
+  }
+
+  // Close account search modal
+  function closeAccountSearchModal() {
+    const modal = document.getElementById('modal-client-mgmt-search');
+    if (!modal) return;
+
+    // Remove show class for exit animation (same as other modals)
+    modal.classList.remove('show');
+    
+    // Wait for animation to complete before hiding
+    setTimeout(() => {
+      modal.setAttribute('hidden', '');
+      // Clear search
+      const searchInput = document.getElementById('client-mgmt-account-search');
+      const resultsDropdown = document.getElementById('client-mgmt-search-results');
+      if (searchInput) searchInput.value = '';
+      if (resultsDropdown) resultsDropdown.setAttribute('hidden', '');
+      // Remove dropdown-visible class to reset padding
+      const modalBody = modal.querySelector('.pc-modal__body');
+      if (modalBody) modalBody.classList.remove('dropdown-visible');
+    }, 300); // Match the modal transition duration
+  }
+
+  // Initialize account search functionality
+  function initAccountSearch() {
+    const searchInput = document.getElementById('client-mgmt-account-search');
+    const resultsDropdown = document.getElementById('client-mgmt-search-results');
+    const resultsList = resultsDropdown?.querySelector('.search-results-list');
+    const emptyMessage = resultsDropdown?.querySelector('.search-empty');
+
+    if (!searchInput || !resultsDropdown || !resultsList) return;
+
+    // Remove existing listeners to prevent duplicates
+    const newInput = searchInput.cloneNode(true);
+    searchInput.parentNode.replaceChild(newInput, searchInput);
+
+    // Get all accounts from BackgroundAccountsLoader
+    const allAccounts = window.BackgroundAccountsLoader?.getAccountsData() || [];
+
+    // Search as user types
+    newInput.addEventListener('input', (e) => {
+      const query = e.target.value.trim().toLowerCase();
+      const modalBody = document.querySelector('#modal-client-mgmt-search .pc-modal__body');
+
+      if (query.length === 0) {
+        // Hide dropdown and collapse padding
+        resultsDropdown.setAttribute('hidden', '');
+        if (modalBody) modalBody.classList.remove('dropdown-visible');
+        return;
+      }
+
+      // Filter accounts
+      const matches = allAccounts.filter(account => {
+        const name = (account.accountName || account.name || '').toLowerCase();
+        const industry = (account.industry || '').toLowerCase();
+        const city = (account.city || '').toLowerCase();
+        return name.includes(query) || industry.includes(query) || city.includes(query);
+      }).slice(0, 10); // Limit to 10 results
+
+      // Show/hide dropdown
+      if (matches.length > 0) {
+        renderSearchResults(matches, resultsList);
+        resultsDropdown.removeAttribute('hidden');
+        emptyMessage.setAttribute('hidden', '');
+        // Add class to modal body to expand padding
+        if (modalBody) modalBody.classList.add('dropdown-visible');
+      } else {
+        // No matches but query exists - show empty state
+        resultsList.innerHTML = '';
+        resultsDropdown.removeAttribute('hidden');
+        emptyMessage.removeAttribute('hidden');
+        // Add class to modal body to expand padding
+        if (modalBody) modalBody.classList.add('dropdown-visible');
+      }
+    });
+
+    // Handle modal close buttons
+    const closeButtons = document.querySelectorAll('[data-close="client-search"]');
+    closeButtons.forEach(btn => {
+      btn.addEventListener('click', closeAccountSearchModal);
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', function escHandler(e) {
+      if (e.key === 'Escape') {
+        closeAccountSearchModal();
+        document.removeEventListener('keydown', escHandler);
+      }
+    });
+
+    // Close dropdown when clicking outside search area (but keep modal open)
+    // Delay attachment to prevent immediate closure when modal opens
+    setTimeout(() => {
+      const modal = document.getElementById('modal-client-mgmt-search');
+      if (modal && modal.classList.contains('show')) {
+        document.addEventListener('click', function clickOutsideHandler(e) {
+          // Only handle if modal is still open
+          if (!modal.classList.contains('show')) {
+            document.removeEventListener('click', clickOutsideHandler);
+            return;
+          }
+          
+          const searchWrap = document.querySelector('.account-search-wrap');
+          const dropdown = document.getElementById('client-mgmt-search-results');
+          
+          if (!searchWrap || !dropdown) return;
+          
+          // If click is outside the search area and dropdown is visible
+          if (!searchWrap.contains(e.target) && !dropdown.hasAttribute('hidden')) {
+            dropdown.setAttribute('hidden', '');
+            const modalBody = document.querySelector('#modal-client-mgmt-search .pc-modal__body');
+            if (modalBody) modalBody.classList.remove('dropdown-visible');
+          }
+        });
+      }
+    }, 100); // Small delay to prevent immediate closure
+  }
+
+  // Render search results
+  function renderSearchResults(accounts, container) {
+    if (!container) return;
+
+    container.innerHTML = accounts.map(account => {
+      const accountName = account.accountName || account.name || 'Unnamed Account';
+      const industry = account.industry || '';
+      const city = account.city || '';
+      const website = account.website || '';
+      const logoUrl = account.logoUrl || '';
+
+      // Extract domain from website
+      let domain = '';
+      if (website) {
+        try {
+          const url = new URL(website.includes('://') ? website : 'https://' + website);
+          domain = url.hostname.replace(/^www\./, '');
+        } catch (e) {
+          domain = website.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+        }
+      }
+
+      // Generate company icon HTML using the favicon helper
+      const iconHTML = window.__pcFaviconHelper?.generateCompanyIconHTML({
+        logoUrl: logoUrl,
+        domain: domain,
+        size: 48
+      }) || `<div style="width: 48px; height: 48px; background: var(--grey-700); border-radius: 6px;"></div>`;
+
+      return `
+        <div class="account-search-result" data-account-id="${account.id || ''}">
+          <div class="company-icon-wrap">
+            ${iconHTML}
+          </div>
+          <div class="account-info">
+            <div class="account-name">${escapeHtml(accountName)}</div>
+            <div class="account-details">
+              ${industry ? `<span class="account-detail">${escapeHtml(industry)}</span>` : ''}
+              ${city ? `<span class="account-detail">${escapeHtml(city)}</span>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Add click handlers to results
+    container.querySelectorAll('.account-search-result').forEach(resultEl => {
+      resultEl.addEventListener('click', () => {
+        const accountId = resultEl.dataset.accountId;
+        handleAccountSelected(accountId);
+      });
+    });
+  }
+
+  // Handle account selection
+  function handleAccountSelected(accountId) {
+    console.log('[ClientManagement] Account selected:', accountId);
+    
+    // Close the modal
+    closeAccountSearchModal();
+
+    // Show success message
+    if (window.crm && typeof window.crm.showToast === 'function') {
+      window.crm.showToast('Account added to Client Management', 'success');
+    }
+
+    // Refresh the dashboard to show the account
+    // (In a real implementation, you might store selected accounts in a separate list)
+    renderDashboard();
+  }
+
+  // HTML escape helper
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
   }
 
   // Public API methods

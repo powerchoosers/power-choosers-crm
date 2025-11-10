@@ -25,7 +25,7 @@ const state = {
   function initDomRefs() {
     els.page = document.getElementById('agents-page');
     els.dashboard = els.page ? els.page.querySelector('.agents-dashboard') : null;
-    els.loadingSpinner = els.page ? els.page.querySelector('.loading-spinner') : null;
+    els.loadingSpinner = els.page ? els.page.querySelector('.loading-state') : null;
     els.errorMessage = els.page ? els.page.querySelector('.error-message') : null;
     els.refreshBtn = document.getElementById('refresh-agents-data');
     els.addAgentBtn = document.getElementById('add-agent-btn');

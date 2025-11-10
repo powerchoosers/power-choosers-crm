@@ -13691,6 +13691,185 @@ button svg.icon-loaded,
 .var-item-label { font-weight: 500; }
 .var-item-token { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; color: var(--grey-300); }
 
+/* === Client Management Account Search Dropdown === */
+.account-search-container {
+    position: relative;
+    overflow: visible !important; /* Allow dropdown to overflow */
+}
+
+.account-search-wrap {
+    position: relative;
+    z-index: 1; /* Ensure it's above other content */
+    overflow: visible !important; /* Allow dropdown to overflow */
+}
+
+/* Allow dropdown to overflow modal body - CRITICAL for search dropdown */
+#modal-client-mgmt-search {
+    overflow: visible !important;
+    contain: none !important; /* Disable containment that clips content */
+}
+
+#modal-client-mgmt-search .pc-modal__dialog {
+    overflow: visible !important;
+    max-height: none !important;
+    contain: none !important; /* Disable containment that clips content */
+}
+
+#modal-client-mgmt-search .pc-modal__body {
+    overflow: visible !important;
+    overflow-y: visible !important;
+    position: relative; /* Ensure proper stacking context */
+    contain: none !important; /* Disable containment */
+    /* Only add padding when dropdown is visible */
+    padding-bottom: var(--spacing-lg);
+    transition: padding-bottom 0.2s ease; /* Smooth padding transition */
+}
+
+/* Add extra padding when dropdown is visible to prevent clipping */
+#modal-client-mgmt-search .pc-modal__body.dropdown-visible {
+    padding-bottom: 420px; /* Space for max-height dropdown (400px) + gap */
+}
+
+/* Fallback for browsers that support :has() */
+#modal-client-mgmt-search .pc-modal__body:has(.account-search-dropdown:not([hidden])) {
+    padding-bottom: 420px;
+}
+
+.account-search-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 10000 !important; /* Very high z-index to appear above modal */
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+}
+
+.account-search-dropdown:not([hidden]) {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    animation: searchDropdownFadeIn 0.2s ease;
+}
+
+@keyframes searchDropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.search-results-list {
+    padding: 4px;
+}
+
+.account-search-result {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s ease;
+    animation: searchResultSlideIn 0.2s ease backwards;
+}
+
+.account-search-result:nth-child(1) { animation-delay: 0ms; }
+.account-search-result:nth-child(2) { animation-delay: 30ms; }
+.account-search-result:nth-child(3) { animation-delay: 60ms; }
+.account-search-result:nth-child(4) { animation-delay: 90ms; }
+.account-search-result:nth-child(5) { animation-delay: 120ms; }
+.account-search-result:nth-child(n+6) { animation-delay: 150ms; }
+
+@keyframes searchResultSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.account-search-result:hover {
+    background: var(--grey-700);
+}
+
+.account-search-result .company-icon-wrap {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.account-search-result .account-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.account-search-result .account-name {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-inverse);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.account-search-result .account-details {
+    display: flex;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.account-search-result .account-detail {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.account-search-result .account-detail:not(:last-child)::after {
+    content: '•';
+    margin-left: 8px;
+    color: var(--grey-500);
+}
+
+.account-search-dropdown::-webkit-scrollbar {
+    width: 8px;
+}
+
+.account-search-dropdown::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.account-search-dropdown::-webkit-scrollbar-thumb {
+    background: var(--grey-600);
+    border-radius: 4px;
+}
+
+.account-search-dropdown::-webkit-scrollbar-thumb:hover {
+    background: var(--grey-500);
+}
+
 /* Inline variable chip used in rich editor */
 .var-chip {
     display: inline-flex;
@@ -19510,6 +19689,14 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     font-weight: 600;
 }
 
+/* Loading state container - does NOT spin */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
 /* Loading spinner for client management */
 .spinner {
     width: 32px;
@@ -19518,7 +19705,14 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     border-top: 3px solid var(--orange-primary);
     border-radius: 50%;
     animation: spin 1s linear infinite;
-    margin: 0 auto 16px;
+    margin: 0 auto;
+    flex-shrink: 0;
+}
+
+.loading-state p {
+    margin-top: 16px;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
 }
 
 @keyframes spin {

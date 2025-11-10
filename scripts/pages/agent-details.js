@@ -18,7 +18,7 @@
   function initDomRefs() {
     els.page = document.getElementById('agent-details-page');
     els.dashboard = els.page ? els.page.querySelector('.agent-details-dashboard') : null;
-    els.loadingSpinner = els.page ? els.page.querySelector('.loading-spinner') : null;
+    els.loadingSpinner = els.page ? els.page.querySelector('.loading-state') : null;
     els.errorMessage = els.page ? els.page.querySelector('.error-message') : null;
     els.backBtn = document.getElementById('agent-details-back');
     els.editBtn = document.getElementById('edit-agent-btn');

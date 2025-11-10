@@ -6098,9 +6098,26 @@ async function addCurrentContactToSequence(sequenceId, sequenceName) {
   try {
     const contactId = state.currentContact?.id;
     if (!contactId) { closeContactSequencesPanel(); return; }
+    
+    // ✅ NEW: Email validation
+    if (!state.currentContact.email || state.currentContact.email.trim() === '') {
+      const result = await showContactDetailEmailValidationModal(state.currentContact);
+      if (!result.proceed) {
+        closeContactSequencesPanel();
+        return; // User cancelled
+      }
+    }
+    
     const db = window.firebaseDB;
     if (db && typeof db.collection === 'function') {
-      const doc = { sequenceId, targetId: contactId, targetType: 'people' };
+      const hasEmail = state.currentContact.email && state.currentContact.email.trim() !== '';
+      const doc = { 
+        sequenceId, 
+        targetId: contactId, 
+        targetType: 'people',
+        hasEmail: hasEmail, // Track whether contact has email
+        skipEmailSteps: !hasEmail // Flag to skip email steps
+      };
       if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
         doc.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
         doc.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
@@ -6117,10 +6134,13 @@ async function addCurrentContactToSequence(sequenceId, sequenceName) {
         });
       }
     }
-    window.crm?.showToast && window.crm.showToast(`Added to "${sequenceName}"`);
+    
+    const hasEmail = state.currentContact.email && state.currentContact.email.trim() !== '';
+    const message = `Added to "${sequenceName}"${!hasEmail ? ' (email steps will be skipped)' : ''}`;
+    window.crm?.showToast && window.crm.showToast(message, 'success');
   } catch (err) {
     console.warn('Add to sequence failed', err);
-    window.crm?.showToast && window.crm.showToast('Failed to add to sequence');
+    window.crm?.showToast && window.crm.showToast('Failed to add to sequence', 'error');
   } finally {
     closeContactSequencesPanel();
   }
@@ -7316,6 +7336,89 @@ window.testPhoneInput = function(value, cursorPos = 0) {
   console.log('formatPhoneNumberForInput:', formatPhoneNumberForInput(value));
   console.log('formatPhoneForDisplay:', formatPhoneForDisplay(value));
 };
+
+// ===== Email Validation Modal for Contact Detail =====
+async function showContactDetailEmailValidationModal(contact) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'pc-modal__backdrop';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    
+    const contactName = contact.name || (contact.firstName + ' ' + (contact.lastName || '')).trim() || 'Unknown';
+    const companyName = contact.company || contact.companyName || '';
+    
+    overlay.innerHTML = `
+      <div class="pc-modal__dialog" style="max-width: 500px;">
+        <div class="pc-modal__header">
+          <h2 style="display: flex; align-items: center; gap: 12px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffc107" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span>Email Validation Warning</span>
+          </h2>
+          <button type="button" class="pc-modal__close" id="email-validation-close" aria-label="Close">×</button>
+        </div>
+        <div class="pc-modal__body">
+          <p style="margin-bottom: 16px; font-size: 15px; color: #ffc107;">
+            <strong>This contact is missing an email address.</strong>
+          </p>
+          
+          <p style="margin-bottom: 8px; font-weight: 600;">Contact without email:</p>
+          <ul style="margin-left: 20px; margin-bottom: 16px; color: var(--text-muted);">
+            <li>• ${escapeHtml(contactName)} ${companyName ? `(${escapeHtml(companyName)})` : ''}</li>
+          </ul>
+          
+          <p style="margin-bottom: 0; font-size: 14px; color: var(--text-muted); background: var(--bg-item); padding: 12px; border-radius: var(--border-radius-sm); border-left: 3px solid #ffc107;">
+            <strong>Note:</strong> This contact will be added to the sequence, but <strong>email steps will be automatically skipped</strong>. They will only receive phone calls, LinkedIn messages, or other non-email touchpoints.
+          </p>
+        </div>
+        <div class="pc-modal__footer">
+          <button type="button" class="btn btn-text" id="email-validation-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="email-validation-proceed">Add Anyway</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        overlay.classList.add('show');
+      });
+    });
+    
+    const close = (result) => {
+      overlay.classList.remove('show');
+      setTimeout(() => {
+        if (overlay.parentElement) {
+          overlay.parentElement.removeChild(overlay);
+        }
+      }, 200);
+      resolve(result);
+    };
+    
+    overlay.querySelector('#email-validation-close')?.addEventListener('click', () => close({ proceed: false }));
+    overlay.querySelector('#email-validation-cancel')?.addEventListener('click', () => close({ proceed: false }));
+    overlay.querySelector('#email-validation-proceed')?.addEventListener('click', () => close({ proceed: true }));
+    
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        close({ proceed: false });
+      }
+    });
+    
+    const onEscape = (e) => {
+      if (e.key === 'Escape') {
+        document.removeEventListener('keydown', onEscape);
+        close({ proceed: false });
+      }
+    };
+    document.addEventListener('keydown', onEscape);
+  });
+}
 
 })();
 
