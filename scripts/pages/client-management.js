@@ -8,6 +8,7 @@
     eventsInitialized: false, // Add this flag
     userEmail: '', // Will be set after auth is ready
     isAdmin: false, // Will be set after auth is ready
+    selectedAccountIds: [], // Track which accounts are in client management
     data: {
       accounts: [],
       contacts: [],
@@ -161,6 +162,28 @@
     return false;
   }
 
+  // Load selected account IDs from localStorage
+  function loadSelectedAccounts() {
+    try {
+      const saved = localStorage.getItem('client-management-selected-accounts');
+      if (saved) {
+        state.selectedAccountIds = JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('[ClientManagement] Failed to load selected accounts:', e);
+      state.selectedAccountIds = [];
+    }
+  }
+
+  // Save selected account IDs to localStorage
+  function saveSelectedAccounts() {
+    try {
+      localStorage.setItem('client-management-selected-accounts', JSON.stringify(state.selectedAccountIds));
+    } catch (e) {
+      console.warn('[ClientManagement] Failed to save selected accounts:', e);
+    }
+  }
+
   // Load real data from cache-first approach
   async function loadClientData() {
     const startTime = performance.now();
@@ -175,6 +198,9 @@
     // Update state from global variables (in case they changed)
     state.userEmail = window.currentUserEmail || '';
     state.isAdmin = window.currentUserRole === 'admin';
+
+    // Load selected accounts
+    loadSelectedAccounts();
 
     showLoading();
 
@@ -354,7 +380,10 @@
 
   // Calculate dashboard metrics from real data
   function calculateMetrics() {
-    const accounts = state.data.accounts;
+    // Only calculate metrics for selected accounts (accounts in client management)
+    const accounts = state.data.accounts.filter(acc => 
+      state.selectedAccountIds.includes(acc.id)
+    );
     const tasks = state.data.tasks;
     const contacts = state.data.contacts;
 
@@ -561,8 +590,10 @@
     const clientList = clientListCard.querySelector('.client-list');
     if (!clientList) return;
 
-    // Filter accounts based on current filters
-    let filteredAccounts = state.data.accounts;
+    // Filter to only show selected accounts (accounts added to client management)
+    let filteredAccounts = state.data.accounts.filter(acc => 
+      state.selectedAccountIds.includes(acc.id)
+    );
 
     // Apply contract status filter
     if (state.filters.contractStatus !== 'all') {
@@ -871,7 +902,9 @@
         const name = (account.accountName || account.name || '').toLowerCase();
         const industry = (account.industry || '').toLowerCase();
         const city = (account.city || '').toLowerCase();
-        return name.includes(query) || industry.includes(query) || city.includes(query);
+        const state = (account.state || '').toLowerCase();
+        const location = city && state ? `${city}, ${state}`.toLowerCase() : (city || state).toLowerCase();
+        return name.includes(query) || industry.includes(query) || city.includes(query) || state.includes(query) || location.includes(query);
       }).slice(0, 10); // Limit to 10 results
 
       // Show/hide dropdown
@@ -941,8 +974,19 @@
       const accountName = account.accountName || account.name || 'Unnamed Account';
       const industry = account.industry || '';
       const city = account.city || '';
+      const state = account.state || '';
       const website = account.website || '';
       const logoUrl = account.logoUrl || '';
+
+      // Format location as "city, state" or just city if no state
+      let location = '';
+      if (city && state) {
+        location = `${city}, ${state}`;
+      } else if (city) {
+        location = city;
+      } else if (state) {
+        location = state;
+      }
 
       // Extract domain from website
       let domain = '';
@@ -971,7 +1015,7 @@
             <div class="account-name">${escapeHtml(accountName)}</div>
             <div class="account-details">
               ${industry ? `<span class="account-detail">${escapeHtml(industry)}</span>` : ''}
-              ${city ? `<span class="account-detail">${escapeHtml(city)}</span>` : ''}
+              ${location ? `<span class="account-detail">${escapeHtml(location)}</span>` : ''}
             </div>
           </div>
         </div>
@@ -991,6 +1035,20 @@
   function handleAccountSelected(accountId) {
     console.log('[ClientManagement] Account selected:', accountId);
     
+    if (!accountId) {
+      console.warn('[ClientManagement] No account ID provided');
+      return;
+    }
+
+    // Add account to selected list if not already there
+    if (!state.selectedAccountIds.includes(accountId)) {
+      state.selectedAccountIds.push(accountId);
+      saveSelectedAccounts();
+      console.log('[ClientManagement] Account added to client management:', accountId);
+    } else {
+      console.log('[ClientManagement] Account already in client management:', accountId);
+    }
+    
     // Close the modal
     closeAccountSearchModal();
 
@@ -1000,7 +1058,6 @@
     }
 
     // Refresh the dashboard to show the account
-    // (In a real implementation, you might store selected accounts in a separate list)
     renderDashboard();
   }
 
