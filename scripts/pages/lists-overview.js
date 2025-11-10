@@ -650,20 +650,37 @@
       // COST-EFFECTIVE: Debounced update handler (500ms) to prevent flickering
       const debouncedPeopleUpdate = debounce((items) => {
         try {
-          // CRITICAL FIX: Don't merge with cache - use listener data as source of truth
-          // The aggressive merge logic was causing lists to disappear
+          // CRITICAL FIX: Protect against incomplete listener data
+          const existingCount = state.peopleLists.length;
           
-          // If listener returns empty and we have existing data, preserve existing (safety check only)
-          if (items.length === 0 && state.peopleLists.length > 0) {
-            console.warn('[ListsOverview] Live listener returned empty, preserving existing lists');
+          console.log(`[ListsOverview] Live listener update - people lists:`, {
+            existingCount,
+            newCount: items.length,
+            currentView: state.kind,
+            itemIds: items.map(i => i.id).slice(0, 5), // Show first 5 IDs
+            existingIds: state.peopleLists.map(i => i.id).slice(0, 5)
+          });
+          
+          // CRITICAL: Only protect against complete data loss or massive drops
+          // Don't protect against normal updates (user deleted lists, etc.)
+          // If listener returns 50% or less of existing items, it's likely incomplete
+          if (existingCount > 5 && items.length > 0 && items.length < existingCount * 0.5) {
+            console.warn(`[ListsOverview] ⚠️ Live listener returned ${items.length} items but we have ${existingCount} (${Math.round(items.length/existingCount*100)}%) - likely incomplete data, preserving existing`);
             return;
           }
           
-          // Use listener data directly - it's the source of truth
+          // If listener returns empty and we have existing data, preserve existing
+          if (items.length === 0 && existingCount > 0) {
+            console.warn('[ListsOverview] ⚠️ Live listener returned empty, preserving existing lists');
+            return;
+          }
+          
+          // Update with listener data
+          const previousCount = state.peopleLists.length;
           state.peopleLists = items;
           state.loadedPeople = true;
           
-          console.log(`[ListsOverview] ✓ Updated ${items.length} people lists from listener`);
+          console.log(`[ListsOverview] ✓ Updated people lists from listener: ${previousCount} → ${items.length}`);
           
           // Re-render if we're viewing people lists
           if (state.kind === 'people') {
@@ -741,20 +758,36 @@
       // COST-EFFECTIVE: Debounced update handler (500ms) to prevent flickering
       const debouncedAccountsUpdate = debounce((items) => {
         try {
-          // CRITICAL FIX: Don't merge with cache - use listener data as source of truth
-          // The aggressive merge logic was causing lists to disappear
+          // CRITICAL FIX: Protect against incomplete listener data
+          const existingCount = state.accountLists.length;
           
-          // If listener returns empty and we have existing data, preserve existing (safety check only)
-          if (items.length === 0 && state.accountLists.length > 0) {
-            console.warn('[ListsOverview] Live listener returned empty, preserving existing lists');
+          console.log(`[ListsOverview] Live listener update - account lists:`, {
+            existingCount,
+            newCount: items.length,
+            currentView: state.kind,
+            itemIds: items.map(i => i.id).slice(0, 5),
+            existingIds: state.accountLists.map(i => i.id).slice(0, 5)
+          });
+          
+          // CRITICAL: Only protect against complete data loss or massive drops
+          // If listener returns 50% or less of existing items, it's likely incomplete
+          if (existingCount > 5 && items.length > 0 && items.length < existingCount * 0.5) {
+            console.warn(`[ListsOverview] ⚠️ Live listener returned ${items.length} items but we have ${existingCount} (${Math.round(items.length/existingCount*100)}%) - likely incomplete data, preserving existing`);
             return;
           }
           
-          // Use listener data directly - it's the source of truth
+          // If listener returns empty and we have existing data, preserve existing
+          if (items.length === 0 && existingCount > 0) {
+            console.warn('[ListsOverview] ⚠️ Live listener returned empty, preserving existing lists');
+            return;
+          }
+          
+          // Update with listener data
+          const previousCount = state.accountLists.length;
           state.accountLists = items;
           state.loadedAccounts = true;
           
-          console.log(`[ListsOverview] ✓ Updated ${items.length} account lists from listener`);
+          console.log(`[ListsOverview] ✓ Updated account lists from listener: ${previousCount} → ${items.length}`);
           
           // Re-render if we're viewing account lists
           if (state.kind === 'accounts') {

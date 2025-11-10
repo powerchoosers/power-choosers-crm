@@ -965,6 +965,21 @@ class FreeSequenceAutomation {
     }
     state.currentSequence = sequence;
     
+    // Ensure all steps have position fields (backward compatibility)
+    if (Array.isArray(state.currentSequence.steps)) {
+      // Sort by existing position first, then assign sequential positions
+      state.currentSequence.steps.sort((a, b) => {
+        const posA = typeof a.position === 'number' ? a.position : 999999;
+        const posB = typeof b.position === 'number' ? b.position : 999999;
+        return posA - posB;
+      });
+      
+      // Assign/update position fields
+      state.currentSequence.steps.forEach((step, idx) => {
+        step.position = idx;
+      });
+    }
+    
     // Initialize contacts from sequence payload first (for immediate UI)
     try {
       state.contacts = Array.isArray(sequence.contacts) ? [...sequence.contacts] : [];
@@ -1324,7 +1339,9 @@ class FreeSequenceAutomation {
     try {
       if (!state.currentSequence.steps) state.currentSequence.steps = [];
       const id = 'step-' + Date.now();
-      const base = { id, type, label, createdAt: Date.now(), collapsed: false, paused: false };
+      // Add position field to maintain explicit order
+      const position = state.currentSequence.steps.length;
+      const base = { id, type, label, createdAt: Date.now(), collapsed: false, paused: false, position };
       let step = base;
       if (type === 'auto-email' || type === 'manual-email') {
         step = {
@@ -2069,8 +2086,15 @@ class FreeSequenceAutomation {
   }
 
   function renderSteps(steps) {
+    // Sort steps by position to maintain explicit order
+    const sortedSteps = [...steps].sort((a, b) => {
+      const posA = typeof a.position === 'number' ? a.position : 999999;
+      const posB = typeof b.position === 'number' ? b.position : 999999;
+      return posA - posB;
+    });
+    
     const out = [];
-    steps.forEach((step, idx) => {
+    sortedSteps.forEach((step, idx) => {
       const order = idx + 1;
       if (step.channel === 'email' || step.type === 'auto-email' || step.type === 'manual-email') {
         out.push(renderEmailStepHTML(step, order));
@@ -2174,7 +2198,7 @@ class FreeSequenceAutomation {
               <button class="tab ${previewActive ? 'active' : ''}" role="tab" data-tab="preview">Preview</button>
               <div class="spacer"></div>
               <div class="preview-contact-picker ${previewActive ? '' : 'hidden'}">
-                <input type="text" class="input-dark preview-contact-input" placeholder="Search contact for preview..." value="${escapeHtml(selContact?.full_name || selContact?.fullName || selContact?.name || selContact?.title || '')}" aria-label="Search contact for preview" />
+                <input type="text" class="input-dark preview-contact-input" placeholder="Search contact for preview..." value="${escapeHtml(selContact?.full_name || selContact?.fullName || selContact?.name || ((selContact?.firstName || '') + ' ' + (selContact?.lastName || '')).trim() || 'Unnamed Contact')}" aria-label="Search contact for preview" />
                 <div class="preview-results" role="listbox" aria-label="Contact results"></div>
               </div>
             </div>
@@ -6727,6 +6751,13 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         const step = state.currentSequence.steps.find(s => s.id === id);
         if (!step || !step.data?.aiOutput) return;
         if (!step.data) step.data = {};
+        
+        // Preserve the AI prompt text from the textarea
+        const promptTextarea = card.querySelector('.ai-prompt');
+        if (promptTextarea && promptTextarea.value.trim()) {
+          step.data.aiPrompt = promptTextarea.value.trim();
+        }
+        
         step.data.subject = step.data.aiOutput.subject || step.data.subject || '';
         step.data.body = step.data.aiOutput.html || step.data.body || '';
         step.data.aiStatus = 'saved';
@@ -7561,6 +7592,11 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       // that excludes the dragged element (see updateDropIndicator),
       // so no additional adjustment is needed here.
       steps.splice(newIndex, 0, step);
+      
+      // Update position fields for all steps to maintain explicit order
+      steps.forEach((s, idx) => {
+        s.position = idx;
+      });
       
       // Save and re-render
       try { scheduleStepSave(stepId, true); } catch (_) { /* noop */ }
