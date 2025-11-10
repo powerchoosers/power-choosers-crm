@@ -141,12 +141,14 @@
         .get();
 
       if (membersQuery.empty) {
-        console.log('[Sequences] No members found for sequence');
+        console.log('[Sequences] No members found for sequence:', sequence.id);
         if (window.crm?.showToast) {
-          window.crm.showToast('No contacts in sequence to start', 'info');
+          window.crm.showToast('No contacts in sequence. Add contacts to the sequence first.', 'info');
         }
         return;
       }
+      
+      console.log(`[Sequences] Found ${membersQuery.size} member(s) in sequence`);
 
       // Get SequenceBuilder function if available
       if (!window.SequenceBuilder || typeof window.SequenceBuilder.startSequenceForContact !== 'function') {
@@ -240,6 +242,33 @@
       }
 
       console.log(`[Sequences] Started sequence for ${startedCount}/${contacts.length} contacts`);
+      
+      // Automatically trigger email generation for newly created scheduled emails
+      if (startedCount > 0) {
+        try {
+          console.log('[Sequences] Triggering automatic email generation...');
+          const response = await fetch('/api/generate-scheduled-emails', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ immediate: true })
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            console.log('[Sequences] Email generation triggered:', result);
+            if (result.count > 0 && window.crm?.showToast) {
+              window.crm.showToast(`Generated ${result.count} scheduled email${result.count !== 1 ? 's' : ''}`, 'success');
+            }
+          } else {
+            console.warn('[Sequences] Failed to trigger email generation:', response.status);
+          }
+        } catch (genError) {
+          console.warn('[Sequences] Error triggering email generation:', genError);
+          // Don't show error to user - generation can be done manually if needed
+        }
+      }
     } catch (err) {
       console.error('[Sequences] Failed to start sequences for all members:', err);
       if (window.crm?.showToast) {

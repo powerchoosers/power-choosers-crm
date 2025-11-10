@@ -126,6 +126,31 @@ class FreeSequenceAutomation {
       
       console.log(`[FreeSequence] Created ${scheduledEmailCount} scheduled emails`);
       
+      // Automatically trigger email generation for newly created scheduled emails
+      if (scheduledEmailCount > 0) {
+        try {
+          console.log('[FreeSequence] Triggering automatic email generation...');
+          const baseUrl = window.API_BASE_URL || window.location.origin || '';
+          const response = await fetch(`${baseUrl}/api/generate-scheduled-emails`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ immediate: true })
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            console.log('[FreeSequence] Email generation triggered:', result);
+          } else {
+            console.warn('[FreeSequence] Failed to trigger email generation:', response.status);
+          }
+        } catch (genError) {
+          console.warn('[FreeSequence] Error triggering email generation:', genError);
+          // Don't throw - generation can be done manually if needed
+        }
+      }
+      
       // Dispatch event to refresh emails page
       window.dispatchEvent(new CustomEvent('pc:emails-updated'));
       
