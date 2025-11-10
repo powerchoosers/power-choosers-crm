@@ -171,6 +171,15 @@
           }
         }, (error) => {
           console.error('[BackgroundEmailsLoader] Realtime listener error:', error);
+          
+          // Handle permission denied errors gracefully
+          if (error.code === 'permission-denied') {
+            console.warn('[BackgroundEmailsLoader] Permission denied - user may not have access to emails');
+            emailsData = []; // Clear data
+            document.dispatchEvent(new CustomEvent('pc:emails-loaded', { 
+              detail: { count: 0, error: 'permission-denied' } 
+            }));
+          }
         });
 
       console.log('[BackgroundEmailsLoader] Realtime listener started');
@@ -215,11 +224,22 @@
           document.dispatchEvent(new CustomEvent('pc:emails-updated', { detail: { count: emailsData.length } }));
         }
       };
+      const handleError = (e, type) => {
+        console.error(`[BackgroundEmailsLoader] Scoped listener error (${type}):`, e);
+        if (e.code === 'permission-denied') {
+          console.warn(`[BackgroundEmailsLoader] Permission denied for ${type} query`);
+          emailsData = [];
+          document.dispatchEvent(new CustomEvent('pc:emails-loaded', { 
+            detail: { count: 0, error: 'permission-denied' } 
+          }));
+        }
+      };
+      
       listeners.push(
-        db.collection('emails').where('ownerId','==',email).limit(100).onSnapshot(handleSnapshot, (e)=>console.error('[BackgroundEmailsLoader] Scoped listener error (owner):', e))
+        db.collection('emails').where('ownerId','==',email).limit(100).onSnapshot(handleSnapshot, (e)=>handleError(e, 'owner'))
       );
       listeners.push(
-        db.collection('emails').where('assignedTo','==',email).limit(100).onSnapshot(handleSnapshot, (e)=>console.error('[BackgroundEmailsLoader] Scoped listener error (assigned):', e))
+        db.collection('emails').where('assignedTo','==',email).limit(100).onSnapshot(handleSnapshot, (e)=>handleError(e, 'assigned'))
       );
       _unsubscribe = () => { try { listeners.forEach(u=>u && u()); } catch(_) {} };
       console.log('[BackgroundEmailsLoader] Scoped realtime listeners started');
