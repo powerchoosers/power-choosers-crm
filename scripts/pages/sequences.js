@@ -191,12 +191,16 @@
 
       if (contacts.length === 0) {
         console.log('[Sequences] No valid contacts found');
+        if (window.crm?.showToast) {
+          window.crm.showToast('⚠️ No contacts found in this list. Add contacts to the list first.', 'warning');
+        }
         return;
       }
 
       // Start sequence for each contact
       let startedCount = 0;
       let errorCount = 0;
+      let totalEmailsCreated = 0;
 
       // Show progress toast
       const progressToast = window.crm?.showProgressToast ? 
@@ -206,7 +210,7 @@
         const contact = contacts[i];
         try {
           // Only start if contact has email (or skip email steps if no email)
-          await window.SequenceBuilder.startSequenceForContact(sequence, {
+          const result = await window.SequenceBuilder.startSequenceForContact(sequence, {
             id: contact.id,
             name: contact.name,
             company: contact.company,
@@ -214,7 +218,13 @@
             contact: contact.name,
             account: contact.company
           });
+          
           startedCount++;
+          
+          // Track how many emails were created
+          if (result && result.scheduledEmailCount) {
+            totalEmailsCreated += result.scheduledEmailCount;
+          }
           
           // Update progress
           if (progressToast && typeof progressToast.update === 'function') {
@@ -228,25 +238,28 @@
 
       // Complete progress toast
       if (progressToast && typeof progressToast.complete === 'function') {
-        let message = `Started sequence for ${startedCount} contact${startedCount === 1 ? '' : 's'}`;
+        let message = `✓ Sequence started! ${totalEmailsCreated} emails scheduled for ${startedCount} contact${startedCount === 1 ? '' : 's'}`;
         if (errorCount > 0) {
           message += ` (${errorCount} failed)`;
         }
         progressToast.complete(message);
       } else if (window.crm?.showToast) {
-        let message = `Started sequence for ${startedCount} contact${startedCount === 1 ? '' : 's'}`;
+        let message = `✓ Sequence started! ${totalEmailsCreated} emails scheduled for ${startedCount} contact${startedCount === 1 ? '' : 's'}`;
         if (errorCount > 0) {
           message += ` (${errorCount} failed)`;
         }
         window.crm.showToast(message, startedCount > 0 ? 'success' : 'info');
       }
 
-      console.log(`[Sequences] Started sequence for ${startedCount}/${contacts.length} contacts`);
+      console.log(`[Sequences] ✓ Started sequence for ${startedCount}/${contacts.length} contacts (${totalEmailsCreated} emails created)`);
+      
+      // Wait a moment to let Firebase writes complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Automatically trigger email generation for newly created scheduled emails
-      if (startedCount > 0) {
+      if (totalEmailsCreated > 0) {
         try {
-          console.log('[Sequences] Triggering automatic email generation...');
+          console.log('[Sequences] Triggering automatic email generation for', totalEmailsCreated, 'emails...');
           const response = await fetch('/api/generate-scheduled-emails', {
             method: 'POST',
             headers: {
@@ -259,14 +272,26 @@
             const result = await response.json();
             console.log('[Sequences] Email generation triggered:', result);
             if (result.count > 0 && window.crm?.showToast) {
-              window.crm.showToast(`Generated ${result.count} scheduled email${result.count !== 1 ? 's' : ''}`, 'success');
+              window.crm.showToast(`📧 Generated content for ${result.count} email${result.count !== 1 ? 's' : ''}. Check Scheduled tab!`, 'success');
+            } else if (result.count === 0) {
+              console.warn('[Sequences] No emails were generated. They may already be generated or failed generation.');
             }
           } else {
             console.warn('[Sequences] Failed to trigger email generation:', response.status);
+            if (window.crm?.showToast) {
+              window.crm.showToast('⚠️ Email generation may have failed. Check Scheduled tab or try "Generate Now" button.', 'warning');
+            }
           }
         } catch (genError) {
           console.warn('[Sequences] Error triggering email generation:', genError);
-          // Don't show error to user - generation can be done manually if needed
+          if (window.crm?.showToast) {
+            window.crm.showToast('⚠️ Email generation error. Check Scheduled tab or try "Generate Now" button.', 'warning');
+          }
+        }
+      } else {
+        console.warn('[Sequences] No emails were created for this sequence.');
+        if (window.crm?.showToast) {
+          window.crm.showToast('⚠️ No emails were created. Check if sequence has email steps.', 'warning');
         }
       }
     } catch (err) {

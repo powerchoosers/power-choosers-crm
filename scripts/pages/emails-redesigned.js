@@ -1338,9 +1338,78 @@
   // AI helper functions moved to email-compose-global.js
 
   // Remaining AI functions moved to email-compose-global.js
+  
+  // Debug helper function to check scheduled emails in Firebase
+  async function debugScheduledEmails() {
+    if (!window.firebaseDB) {
+      console.error('[EmailsDebug] Firebase not available');
+      return;
+    }
+    
+    try {
+      const db = window.firebaseDB;
+      const now = Date.now();
+      
+      // Query all scheduled emails
+      const allScheduledQuery = await db.collection('emails')
+        .where('type', '==', 'scheduled')
+        .get();
+      
+      console.log('=== SCHEDULED EMAILS DEBUG ===');
+      console.log(`Total scheduled emails in Firebase: ${allScheduledQuery.size}`);
+      
+      if (allScheduledQuery.size > 0) {
+        const byStatus = {};
+        const details = [];
+        
+        allScheduledQuery.forEach(doc => {
+          const data = doc.data();
+          const status = data.status || 'unknown';
+          byStatus[status] = (byStatus[status] || 0) + 1;
+          
+          const scheduledTime = data.scheduledSendTime || 0;
+          const timeUntilSend = scheduledTime - now;
+          const minutesUntilSend = Math.round(timeUntilSend / (60 * 1000));
+          
+          details.push({
+            id: doc.id,
+            status: status,
+            to: data.to,
+            contactName: data.contactName,
+            scheduledTime: new Date(scheduledTime).toLocaleString(),
+            minutesUntilSend: minutesUntilSend,
+            sequenceName: data.sequenceName || 'N/A',
+            subject: data.subject || '(not generated)',
+            createdAt: data.createdAt
+          });
+        });
+        
+        console.log('Breakdown by status:', byStatus);
+        console.table(details);
+        
+        // Show user-friendly summary
+        const summary = Object.entries(byStatus)
+          .map(([status, count]) => `${count} ${status}`)
+          .join(', ');
+        
+        if (window.crm && window.crm.showToast) {
+          window.crm.showToast(`📊 Found ${allScheduledQuery.size} scheduled emails: ${summary}`, 'info');
+        }
+      } else {
+        console.log('No scheduled emails found in Firebase.');
+        if (window.crm && window.crm.showToast) {
+          window.crm.showToast('⚠️ No scheduled emails found in Firebase. Sequence may not have created emails.', 'warning');
+        }
+      }
+      
+      console.log('==============================');
+    } catch (error) {
+      console.error('[EmailsDebug] Error checking scheduled emails:', error);
+    }
+  }
 
   // Export for global access
-  window.EmailsPage = { init, reload: reloadEmails };
+  window.EmailsPage = { init, reload: reloadEmails, debugScheduledEmails };
 
   // Create emailManager alias for backward compatibility with click-to-email
   if (!window.emailManager) {

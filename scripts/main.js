@@ -48,6 +48,9 @@ class PowerChoosersCRM {
         this.sidebarMouseMoved = false;
         this.sidebarLastEdgeCheck = 0;
         
+        // Email automation
+        this.emailAutomationInterval = null;
+        
         this.init();
         
         // PRE-LOAD ESSENTIAL DATA THEN LOAD WIDGETS
@@ -4661,6 +4664,125 @@ class PowerChoosersCRM {
         this.newsRefreshTimer = setInterval(() => {
             this.loadEnergyNews();
         }, 3 * 60 * 60 * 1000);
+        
+        // Start email automation monitor
+        this.startEmailAutomation();
+    }
+    
+    // Email Automation Monitor - checks for emails that need generation/sending
+    startEmailAutomation() {
+        if (this.emailAutomationInterval) return; // Already running
+        
+        console.log('[CRM] Starting email automation monitor...');
+        
+        // Check every 2 minutes
+        this.emailAutomationInterval = setInterval(async () => {
+            await this.checkScheduledEmails();
+        }, 2 * 60 * 1000); // 2 minutes
+        
+        // Run immediately on start (after a 5 second delay to let things initialize)
+        setTimeout(() => {
+            this.checkScheduledEmails();
+        }, 5000);
+    }
+    
+    async checkScheduledEmails() {
+        if (!window.firebaseDB) return;
+        
+        try {
+            const now = Date.now();
+            const db = window.firebaseDB;
+            
+            // 1. Check for emails that need content generation
+            const needsGenerationQuery = db.collection('emails')
+                .where('type', '==', 'scheduled')
+                .where('status', '==', 'not_generated')
+                .where('scheduledSendTime', '>=', now - (60 * 1000)) // 1 min buffer
+                .where('scheduledSendTime', '<=', now + (24 * 60 * 60 * 1000)) // Next 24 hours
+                .limit(10);
+            
+            const needsGenerationSnapshot = await needsGenerationQuery.get();
+            
+            if (!needsGenerationSnapshot.empty) {
+                console.log(`[CRM Automation] Found ${needsGenerationSnapshot.size} emails needing generation`);
+                
+                // Trigger generation
+                try {
+                    const response = await fetch('/api/generate-scheduled-emails', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ immediate: true })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        console.log(`[CRM Automation] Generated ${result.count} emails`);
+                        
+                        // Optional: Show toast notification
+                        if (result.count > 0 && this.showToast) {
+                            this.showToast(`✓ Generated ${result.count} scheduled email${result.count !== 1 ? 's' : ''}`, 'success');
+                        }
+                        
+                        // Refresh emails page if user is viewing it
+                        if (this.currentPage === 'emails' && window.EmailsPage && typeof window.EmailsPage.refresh === 'function') {
+                            window.EmailsPage.refresh();
+                        }
+                    }
+                } catch (error) {
+                    console.warn('[CRM Automation] Generation failed:', error);
+                }
+            }
+            
+            // 2. Check for approved emails ready to send
+            const readyToSendQuery = db.collection('emails')
+                .where('type', '==', 'scheduled')
+                .where('status', '==', 'approved')
+                .where('scheduledSendTime', '<=', now)
+                .limit(10);
+            
+            const readyToSendSnapshot = await readyToSendQuery.get();
+            
+            if (!readyToSendSnapshot.empty) {
+                console.log(`[CRM Automation] Found ${readyToSendSnapshot.size} emails ready to send`);
+                
+                // Trigger sending
+                try {
+                    const response = await fetch('/api/send-scheduled-emails', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        console.log(`[CRM Automation] Sent ${result.count} emails`);
+                        
+                        // Optional: Show toast notification
+                        if (result.count > 0 && this.showToast) {
+                            this.showToast(`✓ Sent ${result.count} scheduled email${result.count !== 1 ? 's' : ''}`, 'success');
+                        }
+                        
+                        // Refresh emails page if user is viewing it
+                        if (this.currentPage === 'emails' && window.EmailsPage && typeof window.EmailsPage.refresh === 'function') {
+                            window.EmailsPage.refresh();
+                        }
+                    }
+                } catch (error) {
+                    console.warn('[CRM Automation] Sending failed:', error);
+                }
+            }
+            
+        } catch (error) {
+            console.error('[CRM Automation] Check failed:', error);
+        }
+    }
+    
+    // Add cleanup method
+    stopEmailAutomation() {
+        if (this.emailAutomationInterval) {
+            clearInterval(this.emailAutomationInterval);
+            this.emailAutomationInterval = null;
+            console.log('[CRM] Email automation monitor stopped');
+        }
     }
 
     updateLivePrice() {
