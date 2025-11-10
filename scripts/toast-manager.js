@@ -35,6 +35,17 @@ class ToastManager {
 
     // Main toast creation method
     showToast(options) {
+        // Handle string arguments (legacy support)
+        if (typeof options === 'string') {
+            options = { message: options, type: 'info' };
+        }
+        
+        // Ensure options is an object
+        if (!options || typeof options !== 'object') {
+            console.warn('[ToastManager] Invalid options provided to showToast:', options);
+            options = { message: String(options || ''), type: 'info' };
+        }
+        
         const {
             type = 'info',
             title,
@@ -50,7 +61,8 @@ class ToastManager {
         const toastId = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         
         // Play sound if enabled and not a save notification
-        if (sound && this.soundEnabled && type !== 'save' && this.sounds[type]) {
+        // Safely check if sound exists and has play method
+        if (sound && this.soundEnabled && type !== 'save' && this.sounds && this.sounds[type] && typeof this.sounds[type].play === 'function') {
             this.sounds[type].play().catch(e => console.warn('Could not play notification sound:', e));
         }
 

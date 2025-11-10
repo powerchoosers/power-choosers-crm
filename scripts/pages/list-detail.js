@@ -3245,7 +3245,7 @@ function showBulkActionsBar(forceShow) {
     bar.innerHTML = `<div class="bar">
       <strong><span id="ld-selected-count">${count}</span> selected</strong>
       <div class="spacer"></div>
-      <button type="button" class="action-btn-sm" id="ld-bulk-sequence">Start Sequence</button>
+      <button type="button" class="action-btn-sm" id="ld-bulk-sequence">Add to sequence</button>
       <button type="button" class="action-btn-sm" id="ld-bulk-export">Export CSV</button>
       <button type="button" class="action-btn-sm" id="ld-bulk-remove">Remove from List</button>
       <button type="button" class="action-btn-sm danger" id="ld-bulk-delete">Delete</button>
@@ -3257,7 +3257,14 @@ function showBulkActionsBar(forceShow) {
     }, 10);
     
     // Bind actions
-    bar.querySelector('#ld-bulk-sequence')?.addEventListener('click', () => window.crm?.showToast && window.crm.showToast('Sequence action coming soon'));
+    bar.querySelector('#ld-bulk-sequence')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (document.getElementById('list-detail-sequence-panel')) {
+        closeListDetailSequencePanel();
+      } else {
+        openListDetailSequencePanel(bar.querySelector('#ld-bulk-sequence'));
+      }
+    });
     bar.querySelector('#ld-bulk-export')?.addEventListener('click', () => exportSelectedToCsv());
     bar.querySelector('#ld-bulk-remove')?.addEventListener('click', () => removeSelectedFromList());
     bar.querySelector('#ld-bulk-delete')?.addEventListener('click', () => showDeleteConfirmation());
@@ -3278,6 +3285,492 @@ function hideBulkActionsBar() {
       }, 200);
     }
   } catch(_) {}
+}
+
+// ===== Sequence dropdown panel =====
+let _onListDetailSequenceKeydown = null;
+let _positionListDetailSequencePanel = null;
+let _onListDetailSequenceOutside = null;
+
+function escapeHtmlForSequence(text) {
+  if (text == null) return '';
+  return String(text)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function closeListDetailSequencePanel() {
+  const panel = document.getElementById('list-detail-sequence-panel');
+  if (panel && panel.parentNode) {
+    panel.classList.remove('--show');
+    setTimeout(() => {
+      if (panel && panel.parentNode) panel.parentNode.removeChild(panel);
+    }, 200);
+  }
+  try {
+    if (_onListDetailSequenceKeydown) {
+      document.removeEventListener('keydown', _onListDetailSequenceKeydown, true);
+      _onListDetailSequenceKeydown = null;
+    }
+    if (_onListDetailSequenceOutside) {
+      document.removeEventListener('mousedown', _onListDetailSequenceOutside, true);
+      _onListDetailSequenceOutside = null;
+    }
+    if (_positionListDetailSequencePanel) {
+      window.removeEventListener('resize', _positionListDetailSequencePanel, true);
+      window.removeEventListener('scroll', _positionListDetailSequencePanel, true);
+      _positionListDetailSequencePanel = null;
+    }
+  } catch(_) {}
+}
+
+function openListDetailSequencePanel(triggerBtn) {
+  if (document.getElementById('list-detail-sequence-panel')) {
+    closeListDetailSequencePanel();
+    return;
+  }
+  
+  const page = document.getElementById('list-detail-page');
+  if (!page) return;
+  
+  const view = (window.ListDetail && window.ListDetail._getState && window.ListDetail._getState().view) || 'people';
+  const selectedCount = view === 'people' 
+    ? (window.ListDetail && ListDetail._getSelectedCount ? ListDetail._getSelectedCount('people') : document.querySelectorAll('#list-detail-table .row-select:checked').length)
+    : (window.ListDetail && ListDetail._getSelectedCount ? ListDetail._getSelectedCount('accounts') : document.querySelectorAll('#list-detail-table .row-select:checked').length);
+  
+  if (selectedCount === 0) {
+    if (window.crm?.showToast) window.crm.showToast('Please select contacts first');
+    return;
+  }
+  
+  // Inject styles if needed
+  injectListDetailSequenceStyles();
+  
+  const panel = document.createElement('div');
+  panel.id = 'list-detail-sequence-panel';
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-label', 'Add to sequence');
+  panel.innerHTML = `
+    <div class="list-header">
+      <div class="list-title">Add ${selectedCount} ${selectedCount === 1 ? (view === 'people' ? 'contact' : 'account') : (view === 'people' ? 'contacts' : 'accounts')} to sequence</div>
+      <button type="button" class="close-btn" aria-label="Close">×</button>
+    </div>
+    <div class="list-body" id="list-detail-sequence-body">
+      <div class="list-item" aria-disabled="true" tabindex="0">
+        <div><div class="list-name">Loading sequences…</div><div class="list-meta">Please wait</div></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(panel);
+  
+  // Position panel
+  _positionListDetailSequencePanel = function position() {
+    if (!panel || !triggerBtn) return;
+    const triggerRect = triggerBtn.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    
+    // Try bottom placement first
+    const spaceBelow = viewportHeight - triggerRect.bottom;
+    const spaceAbove = triggerRect.top;
+    const useTop = spaceBelow < panelRect.height && spaceAbove > spaceBelow;
+    
+    let top, left, placement;
+    if (useTop) {
+      placement = 'top';
+      top = triggerRect.top - panelRect.height - 8;
+    } else {
+      placement = 'bottom';
+      top = triggerRect.bottom + 8;
+    }
+    
+    // Center horizontally relative to trigger button
+    left = triggerRect.left + (triggerRect.width / 2) - (panelRect.width / 2);
+    
+    // Keep within viewport
+    left = Math.max(8, Math.min(left, viewportWidth - panelRect.width - 8));
+    top = Math.max(8, Math.min(top, viewportHeight - panelRect.height - 8));
+    
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    panel.setAttribute('data-placement', placement);
+    panel.style.setProperty('--arrow-left', `${triggerRect.left + (triggerRect.width / 2) - left}px`);
+  };
+  
+  _positionListDetailSequencePanel();
+  window.addEventListener('resize', _positionListDetailSequencePanel, true);
+  window.addEventListener('scroll', _positionListDetailSequencePanel, true);
+  
+  // Show with animation
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      panel.classList.add('--show');
+    });
+  });
+  
+  // Load sequences
+  populateListDetailSequences(panel.querySelector('#list-detail-sequence-body'), view);
+  
+  // Close button
+  panel.querySelector('.close-btn')?.addEventListener('click', () => closeListDetailSequencePanel());
+  
+  // Keyboard handling
+  _onListDetailSequenceKeydown = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeListDetailSequencePanel();
+      return;
+    }
+    if ((e.key === 'Enter' || e.key === ' ') && document.activeElement?.classList?.contains('list-item') && !document.activeElement.hasAttribute('aria-disabled')) {
+      e.preventDefault();
+      handleListDetailSequenceChoose(document.activeElement, view);
+    }
+  };
+  document.addEventListener('keydown', _onListDetailSequenceKeydown, true);
+  
+  // Click outside to close
+  _onListDetailSequenceOutside = (e) => {
+    const inside = panel.contains(e.target);
+    const isTrigger = triggerBtn && (triggerBtn.contains(e.target) || triggerBtn === e.target);
+    if (!inside && !isTrigger) {
+      closeListDetailSequencePanel();
+    }
+  };
+  setTimeout(() => {
+    document.addEventListener('mousedown', _onListDetailSequenceOutside, true);
+  }, 0);
+  
+  // Focus management
+  setTimeout(() => {
+    const first = panel.querySelector('.list-item:not([aria-disabled="true"]), .close-btn');
+    if (first) first.focus();
+  }, 100);
+}
+
+async function populateListDetailSequences(container, view) {
+  if (!container) return;
+  
+  try {
+    let sequences = [];
+    
+    // Cache-first loading using BackgroundSequencesLoader
+    if (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function') {
+      sequences = window.BackgroundSequencesLoader.getSequencesData() || [];
+      console.log('[ListDetail] Loaded', sequences.length, 'sequences from BackgroundSequencesLoader');
+    }
+    
+    // Fallback to CacheManager
+    if (sequences.length === 0 && window.CacheManager && typeof window.CacheManager.get === 'function') {
+      try {
+        const cached = await window.CacheManager.get('sequences');
+        if (cached && Array.isArray(cached) && cached.length > 0) {
+          sequences = cached;
+          console.log('[ListDetail] Loaded', sequences.length, 'sequences from CacheManager');
+        }
+      } catch (e) {
+        console.warn('[ListDetail] CacheManager get failed:', e);
+      }
+    }
+    
+    // Fallback to Firestore
+    if (sequences.length === 0 && window.firebaseDB) {
+      try {
+        const isAdmin = window.currentUserRole === 'admin';
+        const email = getUserEmail();
+        let q = window.firebaseDB.collection('sequences');
+        
+        if (!isAdmin && email) {
+          // Non-admin: filter by ownerId, assignedTo, or createdBy
+          q = q.where('ownerId', '==', email);
+        }
+        
+        const snap = await q.get();
+        sequences = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log('[ListDetail] Loaded', sequences.length, 'sequences from Firestore');
+      } catch (e) {
+        console.warn('[ListDetail] Firestore query failed:', e);
+      }
+    }
+    
+    // Filter sequences for non-admin users (in case cache had all sequences)
+    const isAdmin = window.currentUserRole === 'admin';
+    if (!isAdmin && sequences.length > 0) {
+      const email = getUserEmail();
+      sequences = sequences.filter(s => {
+        if (!s) return false;
+        const owner = (s.ownerId || '').toLowerCase();
+        const assigned = (s.assignedTo || '').toLowerCase();
+        const created = (s.createdBy || '').toLowerCase();
+        return owner === email || assigned === email || created === email;
+      });
+    }
+    
+    // Remove loading row
+    const loadingRow = container.querySelector('.list-item[aria-disabled="true"]');
+    if (loadingRow) loadingRow.remove();
+    
+    if (sequences.length === 0) {
+      container.innerHTML = '<div class="list-item" aria-disabled="true"><div><div class="list-name">No sequences</div><div class="list-meta">Create a sequence first</div></div></div>';
+      return;
+    }
+    
+    // Sort by name
+    sequences.sort((a, b) => {
+      const nameA = (a.name || '').toLowerCase();
+      const nameB = (b.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+    
+    // Render sequences
+    const frag = document.createDocumentFragment();
+    sequences.forEach(seq => {
+      const item = document.createElement('div');
+      item.className = 'list-item';
+      item.tabIndex = 0;
+      item.setAttribute('data-id', String(seq.id));
+      item.setAttribute('data-name', String(seq.name || 'Sequence'));
+      
+      const memberCount = seq.stats?.active || 0;
+      const metaBits = [];
+      if (seq.isActive === false) metaBits.push('Inactive');
+      metaBits.push(`${memberCount} member${memberCount === 1 ? '' : 's'}`);
+      if (seq.stats && typeof seq.stats.delivered === 'number') metaBits.push(`${seq.stats.delivered} steps`);
+      const meta = metaBits.join(' • ');
+      
+      item.innerHTML = `
+        <div>
+          <div class="list-name">${escapeHtmlForSequence(seq.name || 'Sequence')}</div>
+          <div class="list-meta">${escapeHtmlForSequence(meta || '')}</div>
+        </div>
+      `;
+      
+      item.addEventListener('click', () => handleListDetailSequenceChoose(item, view));
+      frag.appendChild(item);
+    });
+    
+    container.appendChild(frag);
+  } catch (err) {
+    console.warn('[ListDetail] Failed to load sequences:', err);
+    const loadingRow = container.querySelector('.list-item[aria-disabled="true"]');
+    if (loadingRow) {
+      loadingRow.innerHTML = '<div><div class="list-name">Error loading sequences</div><div class="list-meta">Please try again</div></div>';
+    }
+  }
+}
+
+async function handleListDetailSequenceChoose(el, view) {
+  const sequenceId = el.getAttribute('data-id');
+  const sequenceName = el.getAttribute('data-name') || 'Sequence';
+  
+  if (!sequenceId) return;
+  
+  try {
+    // Get selected IDs
+    const selectedIds = Array.from(document.querySelectorAll('#list-detail-table .row-select:checked'))
+      .map(cb => cb.getAttribute('data-id'))
+      .filter(Boolean);
+    
+    if (selectedIds.length === 0) {
+      closeListDetailSequencePanel();
+      return;
+    }
+    
+    // Add all selected contacts/accounts to the sequence
+    const db = window.firebaseDB;
+    if (!db) {
+      if (window.crm?.showToast) window.crm.showToast('Database not available');
+      closeListDetailSequencePanel();
+      return;
+    }
+    
+    const email = getUserEmail();
+    const targetType = view === 'people' ? 'people' : 'accounts';
+    let addedCount = 0;
+    let skippedCount = 0;
+    
+    // Check for existing memberships to avoid duplicates
+    const existingQuery = await db.collection('sequenceMembers')
+      .where('sequenceId', '==', sequenceId)
+      .where('targetType', '==', targetType)
+      .get();
+    
+    const existingIds = new Set();
+    existingQuery.forEach(doc => {
+      const data = doc.data();
+      if (data.targetId) existingIds.add(String(data.targetId));
+    });
+    
+    // Add new members
+    const batch = db.batch();
+    const newIds = selectedIds.filter(id => !existingIds.has(id));
+    
+    for (const targetId of newIds) {
+      const memberRef = db.collection('sequenceMembers').doc();
+      const memberData = {
+        sequenceId,
+        targetId,
+        targetType,
+        ownerId: email,
+        userId: window.firebase?.auth()?.currentUser?.uid || null,
+        createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date(),
+        updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date()
+      };
+      batch.set(memberRef, memberData);
+      addedCount++;
+    }
+    
+    if (addedCount > 0) {
+      await batch.commit();
+      
+      // Update sequence stats
+      if (window.firebase?.firestore?.FieldValue) {
+        await db.collection('sequences').doc(sequenceId).update({
+          'stats.active': window.firebase.firestore.FieldValue.increment(addedCount)
+        });
+      }
+    }
+    
+    skippedCount = selectedIds.length - addedCount;
+    
+    // Show success message
+    let message = `Added ${addedCount} ${addedCount === 1 ? (view === 'people' ? 'contact' : 'account') : (view === 'people' ? 'contacts' : 'accounts')} to "${sequenceName}"`;
+    if (skippedCount > 0) {
+      message += ` (${skippedCount} already in sequence)`;
+    }
+    if (window.crm?.showToast) window.crm.showToast(message, 'success');
+    
+    // Clear selection
+    document.querySelectorAll('#list-detail-table .row-select:checked').forEach(cb => cb.checked = false);
+    const selectAll = document.getElementById('select-all-list-detail');
+    if (selectAll) {
+      selectAll.checked = false;
+      selectAll.indeterminate = false;
+    }
+    
+    // Update state
+    if (window.ListDetail && window.ListDetail._getState) {
+      const state = window.ListDetail._getState();
+      if (view === 'people') {
+        state.selectedPeople.clear();
+      } else {
+        state.selectedAccounts.clear();
+      }
+    }
+    
+    showBulkActionsBar();
+    
+  } catch (err) {
+    console.error('[ListDetail] Failed to add to sequence:', err);
+    if (window.crm?.showToast) window.crm.showToast('Failed to add to sequence', 'error');
+  } finally {
+    closeListDetailSequencePanel();
+  }
+}
+
+function injectListDetailSequenceStyles() {
+  let style = document.getElementById('list-detail-sequence-styles');
+  if (!style) {
+    style = document.createElement('style');
+    style.id = 'list-detail-sequence-styles';
+    document.head.appendChild(style);
+  }
+  style.textContent = `
+    /* List Detail: Add to Sequence panel */
+    #list-detail-sequence-panel { 
+      position: fixed; z-index: 1200; width: min(560px, 92vw);
+      background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-light);
+      border-radius: var(--border-radius); box-shadow: var(--elevation-card-hover, 0 16px 40px rgba(0,0,0,.28), 0 6px 18px rgba(0,0,0,.22));
+      transform: translateY(-8px); opacity: 0; transition: transform 400ms ease, opacity 400ms ease;
+      --arrow-size: 10px;
+    }
+    #list-detail-sequence-panel.--show { transform: translateY(0); opacity: 1; }
+    #list-detail-sequence-panel .list-header { 
+      display: flex; align-items: center; justify-content: space-between; 
+      padding: 14px 16px; border-bottom: 1px solid var(--border-light); 
+      font-weight: 700; background: var(--bg-card);
+      border-radius: var(--border-radius) var(--border-radius) 0 0;
+    }
+    #list-detail-sequence-panel .list-title { 
+      font-weight: 700; color: var(--text-primary); font-size: 1rem; 
+    }
+    #list-detail-sequence-panel .close-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0;
+      background: var(--bg-item) !important; color: var(--grey-300) !important;
+      border: 1px solid var(--border-light); border-radius: var(--border-radius-sm);
+      line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer;
+      transition: var(--transition-fast); box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent; margin-right: 0;
+    }
+    #list-detail-sequence-panel .close-btn:hover {
+      background: var(--grey-600) !important; color: var(--text-inverse) !important;
+    }
+    #list-detail-sequence-panel .close-btn:focus-visible {
+      outline: 2px solid var(--orange-muted); outline-offset: 2px;
+    }
+    #list-detail-sequence-panel .list-body { 
+      max-height: min(70vh, 720px); overflow: auto; background: var(--bg-card); 
+    }
+    #list-detail-sequence-panel .list-body::-webkit-scrollbar { width: 10px; }
+    #list-detail-sequence-panel .list-body::-webkit-scrollbar-thumb { 
+      background: var(--grey-700); border-radius: 8px; 
+    }
+    #list-detail-sequence-panel .list-item { 
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; 
+      padding: 12px 16px; cursor: pointer; background: var(--bg-card); 
+      border-top: 1px solid var(--border-light); 
+    }
+    #list-detail-sequence-panel .list-item:first-child { border-top: 0; }
+    #list-detail-sequence-panel .list-item:last-child {
+      border-radius: 0 0 var(--border-radius) var(--border-radius);
+    }
+    #list-detail-sequence-panel .list-item:hover { background: var(--bg-hover); }
+    #list-detail-sequence-panel .list-item[aria-disabled="true"] { 
+      opacity: .6; cursor: default; 
+    }
+    #list-detail-sequence-panel .list-item:focus-visible { 
+      outline: none; box-shadow: 0 0 0 3px rgba(255,139,0,.35) inset; 
+    }
+    #list-detail-sequence-panel .list-name { font-weight: 600; }
+    #list-detail-sequence-panel .list-meta { color: var(--text-muted); font-size: .85rem; }
+    
+    /* Pointer arrow */
+    #list-detail-sequence-panel::before,
+    #list-detail-sequence-panel::after {
+      content: "";
+      position: absolute;
+      width: var(--arrow-size);
+      height: var(--arrow-size);
+      transform: rotate(45deg);
+      pointer-events: none;
+    }
+    /* Bottom placement (arrow on top edge) */
+    #list-detail-sequence-panel[data-placement="bottom"]::before {
+      left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+      top: calc(-1 * var(--arrow-size) / 2 + 1px);
+      background: var(--border-light);
+    }
+    #list-detail-sequence-panel[data-placement="bottom"]::after {
+      left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+      top: calc(-1 * var(--arrow-size) / 2 + 2px);
+      background: var(--bg-card);
+    }
+    /* Top placement (arrow on bottom edge) */
+    #list-detail-sequence-panel[data-placement="top"]::before {
+      left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+      bottom: calc(-1 * var(--arrow-size) / 2 + 1px);
+      background: var(--border-light);
+    }
+    #list-detail-sequence-panel[data-placement="top"]::after {
+      left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2));
+      bottom: calc(-1 * var(--arrow-size) / 2 + 2px);
+      background: var(--bg-card);
+    }
+  `;
 }
 
 function exportSelectedToCsv() {
