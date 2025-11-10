@@ -207,7 +207,6 @@ class SettingsPage {
         if (firebase && firebase.auth) {
             this.authStateListener = firebase.auth().onAuthStateChanged((user) => {
                 if (user) {
-                    console.log('[Settings] Auth state changed - user logged in:', user.email);
                     // Update profile fields immediately when auth state changes
                     this.forceUpdateProfileFields();
                 }
@@ -330,16 +329,6 @@ class SettingsPage {
             emailEl.classList.remove('placeholder');
             emailEl.dispatchEvent(new Event('input', { bubbles: true }));
         }
-        
-        console.log('[Settings] forceUpdateProfileFields completed:', {
-            firstName,
-            lastName,
-            email,
-            firstNameElUpdated: !!firstNameEl && firstNameEl.value === firstName,
-            lastNameElUpdated: !!lastNameEl && lastNameEl.value === lastName,
-            emailElUpdated: !!emailEl && emailEl.value === email,
-            source: window.authManager ? 'authManager' : 'firebase.auth'
-        });
     }
     
     async ensureGoogleUserData() {
@@ -392,14 +381,6 @@ class SettingsPage {
                 this.state.settings.general.email = email;
             }
             
-            console.log('[Settings] Ensured Google user data:', {
-                displayName: displayName,
-                email: email,
-                firstName: this.state.settings.general.firstName,
-                lastName: this.state.settings.general.lastName,
-                emailField: this.state.settings.general.email,
-                source: window.authManager ? 'authManager' : 'firebase.auth'
-            });
         } else {
             console.warn('[Settings] No current user found for Google data population after waiting');
         }
@@ -739,7 +720,6 @@ class SettingsPage {
                                 if (!this.state.settings.emailSignature.imageSize) {
                                     this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
                                 }
-                                console.log('[Settings] Loaded from CacheManager cache', { bridgeToMobile: this.state.settings.bridgeToMobile });
                                 return;
                             }
                         } else {
@@ -800,13 +780,11 @@ class SettingsPage {
                             settingsDoc = await window.firebaseDB.collection('settings').doc(docId).get();
                             // If document doesn't exist (for new employees), that's fine - we'll create it on save
                             if (!settingsDoc.exists) {
-                                console.log('[Settings] Per-user settings document does not exist yet (will be created on first save)');
                                 settingsDoc = null; // Clear so we skip to defaults + Google data
                             }
                         } catch (err) {
                             // Permission errors are expected if document doesn't exist or user doesn't own it
                             if (err.code === 'permission-denied') {
-                                console.log('[Settings] Cannot access per-user settings (not created yet or permission denied), will create on save');
                             } else {
                                 console.warn('[Settings] Error loading per-user settings, trying legacy:', err);
                             }
@@ -828,8 +806,6 @@ class SettingsPage {
                     if (settingsDoc && settingsDoc.exists) {
                         const firebaseSettings = settingsDoc.data();
                         
-                        // Log loaded bridgeToMobile value for debugging
-                        console.log('[Settings] Loaded from Firebase - bridgeToMobile:', firebaseSettings.bridgeToMobile);
                         
                         // Check ownership for non-admin users (only for legacy 'user-settings' doc)
                         if (!isAdmin() && docId === 'user-settings') {
@@ -853,13 +829,11 @@ class SettingsPage {
                                 } else if (!this.state.settings.emailSignature.imageSize) {
                                     this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
                                 }
-                                console.log('[Settings] Loaded from Firebase', { bridgeToMobile: this.state.settings.bridgeToMobile });
                                 
                                 // Cache the settings for future use
                                 if (window.CacheManager) {
                                     try {
                                         await window.CacheManager.set('settings', [{ id: 'user-settings', ...firebaseSettings }]);
-                                        console.log('[Settings] Cached settings for future use');
                                     } catch (error) {
                                         console.warn('[Settings] Failed to cache settings:', error);
                                     }
@@ -915,7 +889,6 @@ class SettingsPage {
                         ...parsed,
                         bridgeToMobile: parsed.bridgeToMobile === true // Ensure boolean
                     };
-                    console.log('[Settings] Loaded from localStorage', { bridgeToMobile: this.state.settings.bridgeToMobile });
                 } catch (error) {
                     console.error('Error loading settings from localStorage:', error);
                     }
@@ -934,7 +907,6 @@ class SettingsPage {
                         ...parsed,
                         bridgeToMobile: parsed.bridgeToMobile === true // Ensure boolean
                     };
-                    console.log('[Settings] Loaded from localStorage (error fallback)', { bridgeToMobile: this.state.settings.bridgeToMobile });
                 } catch (parseError) {
                     console.error('Error parsing localStorage settings:', parseError);
                 }
@@ -971,15 +943,6 @@ class SettingsPage {
                 // Trigger re-hosting to Imgur
                 await this.hostGoogleAvatar(user.photoURL);
             }
-            
-            // Debug logging
-            console.log('[Settings] Auto-populated from Google:', {
-                displayName: user.displayName,
-                email: userEmail,
-                firstName: this.state.settings.general.firstName,
-                lastName: this.state.settings.general.lastName,
-                emailSet: this.state.settings.general.email
-            });
         } else {
             console.warn('[Settings] No current user found, cannot auto-populate profile');
         }
@@ -1002,7 +965,6 @@ class SettingsPage {
                 if (imageUrl) {
                     this.state.settings.general.hostedPhotoURL = imageUrl;
                     this.markDirty();
-                    console.log('[Settings] Google avatar hosted successfully:', imageUrl);
                     
                     // Trigger profile photo refresh in auth system
                     if (window.authManager && typeof window.authManager.refreshProfilePhoto === 'function') {
@@ -1116,21 +1078,8 @@ class SettingsPage {
                 // Ensure bridgeToMobile is explicitly saved (boolean, not undefined)
                 settingsToSave.bridgeToMobile = this.state.settings.bridgeToMobile === true;
                 
-                console.log('[Settings] Saving to Firebase:', { 
-                    docId, 
-                    userEmail, 
-                    isAdmin,
-                    bridgeToMobile: settingsToSave.bridgeToMobile,
-                    twilioNumbers: settingsToSave.twilioNumbers?.length || 0,
-                    selectedPhoneNumber: settingsToSave.selectedPhoneNumber,
-                    hasEmailSignature: !!settingsToSave.emailSignature,
-                    signatureImage: settingsToSave.emailSignature?.image || 'none',
-                    signatureText: settingsToSave.emailSignature?.text || 'none'
-                });
-                
                 await window.firebaseDB.collection('settings').doc(docId).set(settingsToSave, { merge: false });
                 
-                console.log('[Settings] Saved to Firebase successfully');
             }
             
             // Also save to localStorage as backup
@@ -1155,7 +1104,6 @@ class SettingsPage {
             // Fallback to localStorage only if Firebase fails
             try {
                 localStorage.setItem('crm-settings', JSON.stringify(this.state.settings));
-                console.log('[Settings] Saved to localStorage as fallback');
                 
                 if (window.showToast) {
                     window.showToast('Settings saved locally (Firebase unavailable)', 'warning');
@@ -1332,15 +1280,6 @@ class SettingsPage {
                 g.email = email;
                 this.state.settings.general.email = email;
             }
-            
-            console.log('[Settings] Populated from Google during render:', {
-                displayName: displayName,
-                email: email,
-                firstName: g.firstName,
-                lastName: g.lastName,
-                emailField: g.email,
-                source: window.authManager ? 'authManager' : 'firebase.auth'
-            });
         } else {
             console.warn('[Settings] No user available during render for profile population');
             // Try one more time with a delay
@@ -1368,11 +1307,6 @@ class SettingsPage {
                         const emailEl = document.getElementById('user-email');
                         if (emailEl) emailEl.value = retryUser.email.toLowerCase();
                     }
-                    console.log('[Settings] Retry populated from Google:', {
-                        firstName: g.firstName,
-                        lastName: g.lastName,
-                        email: g.email
-                    });
                 }
             }, 500);
         }
@@ -1545,7 +1479,6 @@ class SettingsPage {
     renderSignatureSection() {
         const signature = this.state.settings.emailSignature || {};
         
-        console.log('[Signature] Rendering signature section, image URL:', signature.image);
 
         // Sync textarea value from state
         const signatureTextArea = document.getElementById('email-signature-text');
@@ -1574,7 +1507,6 @@ class SettingsPage {
             const height = signature.imageSize?.height || 100;
             // Escape the image URL to prevent XSS
             const imageUrl = String(signature.image).replace(/"/g, '&quot;');
-            console.log('[Signature] Rendering image with URL:', imageUrl, 'size:', width, 'x', height);
             html += `
                 <div class="signature-image-wrap" style="display:flex; align-items:center; gap:12px; margin-top: 8px;">
                     <img src="${imageUrl}" alt="Signature preview" 
@@ -1607,19 +1539,11 @@ class SettingsPage {
             preview.style.visibility = 'visible';
             preview.style.opacity = '1';
             preview.innerHTML = html;
-            console.log('[Signature] Preview updated with HTML, image should be visible');
-            console.log('[Signature] Preview element state:', {
-                hidden: preview.hasAttribute('hidden'),
-                display: preview.style.display,
-                visibility: preview.style.visibility,
-                innerHTML: preview.innerHTML.substring(0, 100)
-            });
         } else {
             preview.setAttribute('hidden', '');
             preview.style.display = 'none';
             preview.style.visibility = 'hidden';
             preview.innerHTML = '';
-            console.log('[Signature] Preview hidden (no content)');
         }
 
         // Toggle upload button label between Upload vs Edit
@@ -1648,7 +1572,6 @@ class SettingsPage {
             const newRemoveBtn = removeBtn.cloneNode(true);
             removeBtn.parentNode.replaceChild(newRemoveBtn, removeBtn);
             newRemoveBtn.addEventListener('click', () => {
-                console.log('[Signature] Remove button clicked');
                 this.removeSignatureImage();
             });
         }
@@ -1679,10 +1602,6 @@ class SettingsPage {
             // Ensure bridgeToMobile is boolean (not undefined/null)
             const bridgeToMobile = this.state.settings.bridgeToMobile === true;
             
-            // Debug log for troubleshooting
-            if (isSelected && isAdmin) {
-                console.log(`[Settings] Rendering phone ${phone.number}, bridgeToMobile:`, bridgeToMobile, 'state:', this.state.settings.bridgeToMobile);
-            }
             
             return `
                 <div class="phone-number-item ${isSelected ? 'selected' : ''}" data-index="${index}">
@@ -1747,8 +1666,6 @@ class SettingsPage {
                 uploadBtn.textContent = 'Uploading...';
             }
 
-            console.log('[Signature] Starting upload for file:', file.name, file.size, 'bytes');
-            console.log('[Signature] File type:', file.type);
 
             // Convert file to base64 and upload as JSON
             const base64 = await new Promise((resolve, reject) => {
@@ -1756,7 +1673,6 @@ class SettingsPage {
                 reader.onload = () => {
                     const result = reader.result;
                     const base64Data = result.split(',')[1];
-                    console.log('[Signature] File converted to base64, length:', base64Data.length);
                     resolve(base64Data);
                 };
                 reader.onerror = (err) => {
@@ -1769,12 +1685,10 @@ class SettingsPage {
             // Always use Vercel endpoint (works locally and deployed)
             const apiBase = 'https://power-choosers-crm-792458658491.us-south1.run.app';
             const uploadUrl = `${apiBase}/api/upload/signature-image`;
-            console.log('[Signature] Uploading to:', uploadUrl);
             
             // Create AbortController for timeout (60 seconds to allow for large images and Imgur processing)
             const controller = new AbortController();
             const timeoutId = setTimeout(() => {
-                console.log('[Signature] Client-side timeout reached after 60 seconds');
                 controller.abort();
             }, 60000); // 60 second timeout
             
@@ -1796,8 +1710,6 @@ class SettingsPage {
                 throw new Error(`Network error: ${fetchError.message}`);
             }
 
-            console.log('[Signature] Upload response status:', response.status, response.ok);
-            console.log('[Signature] Upload response headers:', Object.fromEntries(response.headers.entries()));
 
             if (!response.ok) {
                 let errorText = '';
@@ -1814,9 +1726,7 @@ class SettingsPage {
             let responseData;
             try {
                 const responseText = await response.text();
-                console.log('[Signature] Upload response text (raw):', responseText.substring(0, 200));
                 responseData = JSON.parse(responseText);
-                console.log('[Signature] Upload response data (parsed):', responseData);
             } catch (parseError) {
                 console.error('[Signature] Failed to parse response:', parseError);
                 throw new Error('Invalid response from server');
@@ -1830,7 +1740,6 @@ class SettingsPage {
                 throw new Error('Server did not return image URL');
             }
 
-            console.log('[Signature] Image uploaded successfully, URL:', imageUrl);
 
                 // Store the hosted image URL
             if (!this.state.settings.emailSignature) {
@@ -1843,7 +1752,6 @@ class SettingsPage {
             this.renderSignatureSection();
             
             // Auto-save the settings immediately after successful upload
-            console.log('[Signature] Auto-saving settings after upload...');
             await this.saveSettings();
             
             // Reset file input to allow selecting the same file again
@@ -1859,11 +1767,6 @@ class SettingsPage {
                 window.showToast('Signature image uploaded and saved successfully!', 'success');
                 }
             
-            console.log('[Signature] Upload complete, image URL stored:', imageUrl);
-            console.log('[Signature] State after upload:', {
-                hasImage: !!this.state.settings.emailSignature?.image,
-                imageUrl: this.state.settings.emailSignature?.image
-            });
         } catch (error) {
             console.error('[Signature] Upload error:', error);
             console.error('[Signature] Error stack:', error.stack);
@@ -1966,7 +1869,6 @@ class SettingsPage {
     }
 
     removeSignatureImage() {
-        console.log('[Signature] Removing signature image');
         if (!this.state.settings.emailSignature) {
             this.state.settings.emailSignature = { text: '', image: null, imageSize: { width: 200, height: 100 } };
         }
@@ -1977,7 +1879,6 @@ class SettingsPage {
         }
         this.markDirty();
         this.renderSignatureSection();
-        console.log('[Signature] Signature image removed, state updated');
     }
 
     // Convert existing data URL signatures to hosted URLs
@@ -1988,7 +1889,6 @@ class SettingsPage {
         }
 
         try {
-            console.log('[Signature] Converting data URL to hosted URL...');
             
             // Convert data URL to file
             const base64Data = signature.image.split(',')[1];
@@ -2010,7 +1910,6 @@ class SettingsPage {
                 this.state.settings.emailSignature.image = hostedUrl;
                 this.markDirty();
                 this.renderSignatureSection();
-                console.log('[Signature] Successfully converted to hosted URL:', hostedUrl);
             }
             
         } catch (error) {
@@ -2207,8 +2106,6 @@ class SettingsPage {
         this.state.settings.bridgeToMobile = bridgeToMobile;
         this.markDirty();
         
-        console.log(`[Settings] Bridge to mobile ${bridgeToMobile ? 'enabled' : 'disabled'} (mobile: 9728342317)`);
-        console.log(`[Settings] Current state.bridgeToMobile:`, this.state.settings.bridgeToMobile);
         
         // Re-render phone numbers to update UI immediately
         this.renderPhoneNumbers();
@@ -3102,7 +2999,6 @@ function injectModernStyles() {
     // Add collapse buttons immediately (with retry logic)
     addCollapseButtons();
     
-    console.log('[Settings] Modern styles and UI elements initialized');
 }
 
 function updateSectionTitles() {
@@ -3204,7 +3100,6 @@ function addCollapseButtons() {
             title.insertBefore(collapseBtn, title.firstChild);
         });
         
-        console.log('[Settings] Collapse buttons added to', sectionTitles.length, 'sections');
     };
     
     // Try immediately, and if DOM not ready, retry
@@ -3244,7 +3139,6 @@ function setupCollapseFunctionality() {
             }
         });
         
-        console.log('[Settings] Collapse functionality set up for', sections.length, 'sections');
     };
     
     const setupSectionCollapse = (section, title, collapseBtn) => {
@@ -3521,7 +3415,6 @@ function initVoicemailRecording() {
         reader.onload = () => {
             const audioData = reader.result;
             localStorage.setItem('voicemail-recording', audioData);
-            console.log('Recording saved to localStorage');
         };
         reader.readAsDataURL(audioBlob);
     }
