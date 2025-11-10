@@ -269,8 +269,8 @@ class FreeSequenceAutomation {
         }
       }
       
-      // Call your AI service (this would be your existing AI endpoint)
-      const response = await fetch('/api/generate-email-content', {
+      // Call Perplexity email API endpoint (using existing endpoint)
+      const response = await fetch('/api/perplexity-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
