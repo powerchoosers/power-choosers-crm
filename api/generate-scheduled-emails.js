@@ -1,5 +1,5 @@
-const admin = require('firebase-admin');
-const { getFirestore } = require('firebase-admin/firestore');
+import admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
@@ -8,19 +8,22 @@ if (!admin.apps.length) {
 
 const db = getFirestore();
 
-exports.handler = async (req, res) => {
+export default async function handler(req, res) {
   // Set CORS headers
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
+    res.writeHead(200);
+    res.end();
     return;
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   try {
@@ -33,8 +36,9 @@ exports.handler = async (req, res) => {
     let startTime, endTime;
     
     if (immediate) {
-      // For immediate generation, get all not_generated emails
-      startTime = now;
+      // For immediate generation, get all not_generated emails (including those scheduled for now or future)
+      // Use a small buffer to include emails scheduled for "now" (within last minute)
+      startTime = now - (60 * 1000); // 1 minute buffer to catch emails scheduled for "now"
       endTime = now + (365 * 24 * 60 * 60 * 1000); // 1 year from now
     } else {
       // For daily 8 AM job, get emails scheduled for today
@@ -44,24 +48,27 @@ exports.handler = async (req, res) => {
       endTime = startTime + (24 * 60 * 60 * 1000); // 24 hours
     }
     
-    console.log('[GenerateScheduledEmails] Time range:', { startTime, endTime, immediate });
+    console.log('[GenerateScheduledEmails] Time range:', { startTime, endTime, immediate, now });
     
     // Query for scheduled emails that need generation
+    // Use >= and <= to include boundary times
     const scheduledEmailsQuery = db.collection('emails')
       .where('type', '==', 'scheduled')
       .where('status', '==', 'not_generated')
-      .where('scheduledSendTime', '>', startTime)
-      .where('scheduledSendTime', '<', endTime);
+      .where('scheduledSendTime', '>=', startTime)
+      .where('scheduledSendTime', '<=', endTime);
     
     const scheduledEmailsSnapshot = await scheduledEmailsQuery.get();
     
     if (scheduledEmailsSnapshot.empty) {
       console.log('[GenerateScheduledEmails] No emails to generate');
-      return res.status(200).json({ 
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
         success: true, 
         count: 0, 
         message: 'No scheduled emails to generate' 
-      });
+      }));
+      return;
     }
     
     console.log('[GenerateScheduledEmails] Found', scheduledEmailsSnapshot.size, 'emails to generate');
@@ -157,21 +164,23 @@ exports.handler = async (req, res) => {
     
     console.log('[GenerateScheduledEmails] Generation complete. Generated:', generatedCount, 'Errors:', errors.length);
     
-    return res.status(200).json({
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       success: true,
       count: generatedCount,
       errors: errors.length,
       errorDetails: errors
-    });
+    }));
     
   } catch (error) {
     console.error('[GenerateScheduledEmails] Fatal error:', error);
-    return res.status(500).json({
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       success: false,
       error: error.message
-    });
+    }));
   }
-};
+}
 
 // Generate email content using Perplexity API
 async function generateEmailContent({ prompt, contactName, contactCompany, sequenceContext }) {

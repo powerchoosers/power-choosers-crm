@@ -73,6 +73,8 @@ import twilioCallerLookupHandler from './api/twilio/caller-lookup.js';
 import sendgridWebhookHandler from './api/email/sendgrid-webhook.js';
 import sendgridSendHandler from './api/email/sendgrid-send.js';
 import inboundEmailHandler from './api/email/inbound-email.js';
+import generateScheduledEmailsHandler from './api/generate-scheduled-emails.js';
+import sendScheduledEmailsHandler from './api/send-scheduled-emails.js';
 
 // ADDITIONAL IMPORTS FOR REMAINING PROXY FUNCTIONS
 import emailBackfillThreadsHandler from './api/email/backfill-threads.js';
@@ -827,6 +829,12 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/email/unsubscribe') {
     return handleApiEmailUnsubscribe(req, res);
   }
+  if (pathname === '/api/generate-scheduled-emails') {
+    return handleApiGenerateScheduledEmails(req, res);
+  }
+  if (pathname === '/api/send-scheduled-emails') {
+    return handleApiSendScheduledEmails(req, res);
+  }
   if (pathname === '/api/process-call') {
     return handleApiProcessCall(req, res);
   }
@@ -987,6 +995,20 @@ async function handleApiEmailUnsubscribe(req, res) {
     req.body = await parseRequestBody(req);
   }
   return await emailUnsubscribeHandler(req, res);
+}
+
+async function handleApiGenerateScheduledEmails(req, res) {
+  if (req.method === 'POST') {
+    req.body = await parseRequestBody(req);
+  }
+  return await generateScheduledEmailsHandler(req, res);
+}
+
+async function handleApiSendScheduledEmails(req, res) {
+  if (req.method === 'POST') {
+    req.body = await parseRequestBody(req);
+  }
+  return await sendScheduledEmailsHandler(req, res);
 }
 
 // Process call and track email performance

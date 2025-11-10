@@ -1,6 +1,6 @@
-const admin = require('firebase-admin');
-const { getFirestore } = require('firebase-admin/firestore');
-const sgMail = require('@sendgrid/mail');
+import admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
+import sgMail from '@sendgrid/mail';
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
@@ -12,19 +12,22 @@ const db = getFirestore();
 // Initialize SendGrid
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-exports.handler = async (req, res) => {
+export default async function handler(req, res) {
   // Set CORS headers
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
+    res.writeHead(200);
+    res.end();
     return;
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   try {
@@ -42,11 +45,13 @@ exports.handler = async (req, res) => {
     
     if (readyToSendSnapshot.empty) {
       console.log('[SendScheduledEmails] No emails ready to send');
-      return res.status(200).json({ 
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
         success: true, 
         count: 0, 
         message: 'No emails ready to send' 
-      });
+      }));
+      return;
     }
     
     console.log('[SendScheduledEmails] Found', readyToSendSnapshot.size, 'emails ready to send');
@@ -132,18 +137,20 @@ exports.handler = async (req, res) => {
     
     console.log('[SendScheduledEmails] Send process complete. Sent:', sentCount, 'Errors:', errors.length);
     
-    return res.status(200).json({
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       success: true,
       count: sentCount,
       errors: errors.length,
       errorDetails: errors
-    });
+    }));
     
   } catch (error) {
     console.error('[SendScheduledEmails] Fatal error:', error);
-    return res.status(500).json({
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       success: false,
       error: error.message
-    });
+    }));
   }
-};
+}
