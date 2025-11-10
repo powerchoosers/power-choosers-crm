@@ -1362,6 +1362,8 @@
         const byStatus = {};
         const details = [];
         
+        let missingOwnership = 0;
+        
         allScheduledQuery.forEach(doc => {
           const data = doc.data();
           const status = data.status || 'unknown';
@@ -1370,6 +1372,9 @@
           const scheduledTime = data.scheduledSendTime || 0;
           const timeUntilSend = scheduledTime - now;
           const minutesUntilSend = Math.round(timeUntilSend / (60 * 1000));
+          
+          const hasOwnership = !!(data.ownerId && data.assignedTo && data.createdBy);
+          if (!hasOwnership) missingOwnership++;
           
           details.push({
             id: doc.id,
@@ -1380,12 +1385,16 @@
             minutesUntilSend: minutesUntilSend,
             sequenceName: data.sequenceName || 'N/A',
             subject: data.subject || '(not generated)',
+            hasOwnership: hasOwnership ? '✅' : '❌ MISSING',
+            ownerId: data.ownerId || 'MISSING',
             createdAt: data.createdAt
           });
         });
         
         console.log('Breakdown by status:', byStatus);
         console.table(details);
+        console.log(`\n⚠️ CRITICAL: ${missingOwnership} emails are missing ownership fields!`);
+        console.log(`✅ ${allScheduledQuery.size - missingOwnership} emails have proper ownership`);
         
         // Show user-friendly summary
         const summary = Object.entries(byStatus)
@@ -1393,7 +1402,11 @@
           .join(', ');
         
         if (window.crm && window.crm.showToast) {
-          window.crm.showToast(`📊 Found ${allScheduledQuery.size} scheduled emails: ${summary}`, 'info');
+          if (missingOwnership > 0) {
+            window.crm.showToast(`⚠️ Found ${allScheduledQuery.size} scheduled emails but ${missingOwnership} are MISSING ownership fields! See MIGRATION_FIX_EMAILS.md`, 'warning');
+          } else {
+            window.crm.showToast(`📊 Found ${allScheduledQuery.size} scheduled emails: ${summary}`, 'info');
+          }
         }
       } else {
         console.log('No scheduled emails found in Firebase.');
