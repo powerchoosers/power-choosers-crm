@@ -2051,6 +2051,33 @@
       els.tbody.style.opacity = '1'; // Keep visible if we have data
     }
     
+    // CRITICAL FIX: Listen for bulk import completion to invalidate stale caches
+    if (!window._listDetailBulkImportListenerBound) {
+      document.addEventListener('pc:bulk-import-complete', async (event) => {
+        try {
+          const { listId, type } = event.detail || {};
+          console.log('[ListDetail] Bulk import complete, refreshing data for:', { listId, type });
+          
+          // If we're viewing the affected list, clear cache and reload
+          if (listId && state.listId === listId) {
+            // Clear in-memory cache for this list
+            if (window.listMembersCache) {
+              delete window.listMembersCache[listId];
+              console.log('[ListDetail] ✓ Cleared in-memory cache for current list');
+            }
+            
+            // Force reload of list members
+            await refreshListMembership();
+            
+            console.log('[ListDetail] ✓ Reloaded list after bulk import');
+          }
+        } catch (e) {
+          console.error('[ListDetail] Error handling bulk import complete:', e);
+        }
+      });
+      window._listDetailBulkImportListenerBound = true;
+    }
+    
     // Listen for restoration event from back navigation (with guard to prevent duplicates)
     if (!window._listDetailRestoreListenerBound) {
       document.addEventListener('pc:list-detail-restore', (e) => {

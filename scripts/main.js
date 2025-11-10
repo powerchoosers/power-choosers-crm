@@ -4208,6 +4208,13 @@ class PowerChoosersCRM {
             // Invalidate cache for all affected lists to ensure list detail pages refresh
             const affectedLists = new Set([...listAssignments, ...queuedMergeAssignments].map(a => a.listId));
             for (const listId of affectedLists) {
+                // Clear in-memory cache (most important - IndexedDB can lag)
+                if (window.listMembersCache && window.listMembersCache[listId]) {
+                    delete window.listMembersCache[listId];
+                    console.log(`✓ Cleared in-memory cache for list ${listId}`);
+                }
+                
+                // Also clear IndexedDB cache
                 if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
                     try {
                         await window.CacheManager.invalidateListCache(listId);
@@ -4215,6 +4222,16 @@ class PowerChoosersCRM {
                     } catch (cacheError) {
                         console.warn('Cache invalidation failed for list', listId, ':', cacheError);
                     }
+                }
+                
+                // CRITICAL FIX: Dispatch event to notify pages to reload
+                try {
+                    document.dispatchEvent(new CustomEvent('pc:bulk-import-complete', {
+                        detail: { listId, type: modal._importType }
+                    }));
+                    console.log(`✓ Dispatched bulk import complete event for ${listId}`);
+                } catch (e) {
+                    console.warn('Failed to dispatch bulk import event:', e);
                 }
             }
             
