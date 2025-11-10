@@ -158,9 +158,13 @@
 
       // Load contact data for all members
       const contactIds = [];
+      const memberByTargetId = new Map();
       membersQuery.forEach(doc => {
-        const data = doc.data();
-        if (data.targetId) contactIds.push(data.targetId);
+        const data = doc.data() || {};
+        if (data.targetId) {
+          contactIds.push(data.targetId);
+          memberByTargetId.set(String(data.targetId), data);
+        }
       });
 
       if (contactIds.length === 0) {
@@ -168,33 +172,106 @@
         return;
       }
 
-      // Load contact details
+      // Load contact details (robust resolver: people -> contacts -> background cache)
       const contacts = [];
       const db = window.firebaseDB;
+      let unresolvedCount = 0;
       for (const contactId of contactIds) {
+        let resolved = false;
         try {
-          const contactDoc = await db.collection('people').doc(contactId).get();
-          if (contactDoc.exists) {
-            const contactData = contactDoc.data();
+          // Try people collection first
+          const peopleDoc = await db.collection('people').doc(String(contactId)).get();
+          if (peopleDoc && peopleDoc.exists) {
+            const contactData = peopleDoc.data() || {};
             contacts.push({
-              id: contactId,
+              id: String(contactId),
               name: [contactData.firstName, contactData.lastName].filter(Boolean).join(' ') || contactData.name || 'Contact',
               company: contactData.companyName || contactData.company || '',
-              email: contactData.email || '',
+              email: (contactData.email || '').trim(),
               ...contactData
             });
+            resolved = true;
+          } else {
+            // Fallback: try contacts collection
+            const contactsDoc = await db.collection('contacts').doc(String(contactId)).get();
+            if (contactsDoc && contactsDoc.exists) {
+              const c = contactsDoc.data() || {};
+              contacts.push({
+                id: String(contactId),
+                name: [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || 'Contact',
+                company: c.companyName || c.company || '',
+                email: (c.email || '').trim(),
+                ...c
+              });
+              resolved = true;
+            } else {
+              // Fallback: background contacts cache (if available)
+              try {
+                let bgContacts = [];
+                if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+                  bgContacts = window.BackgroundContactsLoader.getContactsData() || [];
+                } else if (typeof window.getPeopleData === 'function') {
+                  bgContacts = window.getPeopleData() || [];
+                }
+                if (Array.isArray(bgContacts) && bgContacts.length) {
+                  const found = bgContacts.find(p => String(p.id) === String(contactId));
+                  if (found) {
+                    contacts.push({
+                      id: String(contactId),
+                      name: [found.firstName, found.lastName].filter(Boolean).join(' ') || found.name || 'Contact',
+                      company: found.companyName || found.company || '',
+                      email: (found.email || '').trim(),
+                      ...found
+                    });
+                    resolved = true;
+                  }
+                }
+              } catch (cacheErr) {
+                console.warn('[Sequences] Background contacts lookup failed:', cacheErr);
+              }
+            }
           }
         } catch (err) {
           console.warn(`[Sequences] Failed to load contact ${contactId}:`, err);
         }
+        if (!resolved) {
+          // Last-chance fallback: build contact from member data (if present)
+          const memberData = memberByTargetId.get(String(contactId));
+          if (memberData) {
+            const fallbackEmail = (memberData.email || '').trim();
+            const fallbackName = [memberData.firstName, memberData.lastName].filter(Boolean).join(' ') || memberData.name || 'Contact';
+            const fallbackCompany = memberData.companyName || memberData.company || '';
+            if (fallbackEmail || fallbackName) {
+              contacts.push({
+                id: String(contactId),
+                name: fallbackName,
+                company: fallbackCompany,
+                email: fallbackEmail,
+                _source: 'sequenceMember'
+              });
+              resolved = true;
+            }
+          }
+        }
+        if (!resolved) {
+          unresolvedCount++;
+          console.warn(`[Sequences] Could not resolve contactId=${contactId} in people/contacts/cache`);
+        }
       }
 
       if (contacts.length === 0) {
-        console.log('[Sequences] No valid contacts found');
+        console.log('[Sequences] No valid contacts found (resolved=0, unresolved=' + unresolvedCount + ')');
         if (window.crm?.showToast) {
-          window.crm.showToast('⚠️ No contacts found in this list. Add contacts to the list first.', 'warning');
+          window.crm.showToast("⚠️ Couldn't resolve any contacts from sequence members. Check that member IDs exist in people/contacts.", 'warning');
         }
         return;
+      }
+      
+      if (unresolvedCount > 0) {
+        console.warn(`[Sequences] ${unresolvedCount} member(s) could not be resolved. Proceeding with ${contacts.length} resolved contact(s).`);
+        if (window.crm?.showToast) {
+          window.crm.showToast(`⚠️ ${unresolvedCount} member${unresolvedCount === 1 ? '' : 's'} not found. Started ${contacts.length} contact${contacts.length === 1 ? '' : 's'}.`, 'info');
+        }
       }
 
       // Start sequence for each contact

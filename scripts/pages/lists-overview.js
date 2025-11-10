@@ -1780,7 +1780,7 @@
           const t = (m.targetType || m.type || '').toLowerCase();
           const id = m.targetId || m.id || d.id;
           if (t === 'people' || t === 'contact' || t === 'contacts') out.people.add(id);
-          else if (t === 'accounts' || t === 'account') out.accounts.add(id);
+          else if (t === 'accounts' || t === 'account' || t === 'companies' || t === 'company') out.accounts.add(id);
         });
       } else {
         // Fallback to top-level listMembers
@@ -1790,7 +1790,7 @@
           const t = (m.targetType || m.type || '').toLowerCase();
           const id = m.targetId || m.id || d.id;
           if (t === 'people' || t === 'contact' || t === 'contacts') out.people.add(id);
-          else if (t === 'accounts' || t === 'account') out.accounts.add(id);
+          else if (t === 'accounts' || t === 'account' || t === 'companies' || t === 'company') out.accounts.add(id);
         });
       }
       out.loaded = true;
@@ -2168,6 +2168,64 @@
     await ensureLoadedThenRender();
   });
   
+  // Invalidate caches on account create/update events (handles newly added accounts to lists)
+  document.addEventListener('pc:account-created', async (event) => {
+    try {
+      const detail = event?.detail || {};
+      const listId = detail.listId || detail.targetListId || null;
+      if (listId && window.listMembersCache) {
+        delete window.listMembersCache[listId];
+        console.log('[ListsOverview] ✓ Cleared in-memory cache for list (account-created):', listId);
+      }
+      // Force a lightweight reload of lists
+      state.loadedAccounts = false;
+      await ensureLoadedThenRender();
+    } catch (e) {
+      console.warn('[ListsOverview] account-created handler failed:', e);
+    }
+  });
+  
+  document.addEventListener('pc:account-updated', async (event) => {
+    try {
+      const detail = event?.detail || {};
+      const listId = detail.listId || detail.targetListId || null;
+      if (listId && window.listMembersCache) {
+        delete window.listMembersCache[listId];
+        console.log('[ListsOverview] ✓ Cleared in-memory cache for list (account-updated):', listId);
+      }
+      // Refresh account lists view if currently showing accounts
+      if (state.kind === 'accounts') {
+        state.loadedAccounts = false;
+        await ensureLoadedThenRender();
+      }
+    } catch (e) {
+      console.warn('[ListsOverview] account-updated handler failed:', e);
+    }
+  });
+  
+  // Helper to clear caches manually from console if needed
+  window.clearListCaches = async function(listId) {
+    try {
+      if (listId && window.listMembersCache) {
+        delete window.listMembersCache[listId];
+        console.log('[ListsOverview] Cleared in-memory members cache for list:', listId);
+      } else {
+        window.listMembersCache = {};
+        console.log('[ListsOverview] Cleared all in-memory members cache');
+      }
+      if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+        await window.CacheManager.invalidate('lists');
+        console.log('[ListsOverview] Invalidated IndexedDB lists cache');
+      }
+      state.loadedPeople = false;
+      state.loadedAccounts = false;
+      await ensureLoadedThenRender();
+      console.log('[ListsOverview] Reload complete after cache clear');
+    } catch (e) {
+      console.error('[ListsOverview] Failed to clear caches:', e);
+    }
+  };
+  
   // CRITICAL FIX: Listen for bulk import completion to invalidate stale caches
   document.addEventListener('pc:bulk-import-complete', async (event) => {
     try {
@@ -2384,7 +2442,7 @@
           const t = toSafeLower(m.targetType || m.type);
           const id = m.targetId || m.id || d.id;
           if (t === 'people' || t === 'contact' || t === 'contacts') out.people.add(id);
-          else if (t === 'accounts' || t === 'account') out.accounts.add(id);
+          else if (t === 'accounts' || t === 'account' || t === 'companies' || t === 'company') out.accounts.add(id);
         });
         console.debug('[ListsOverview] preload subcollection', { listId, docs: subSnap.docs.length, people: out.people.size, accounts: out.accounts.size });
       }
@@ -2398,7 +2456,7 @@
           const t = toSafeLower(m.targetType || m.type);
           const id = m.targetId || m.id || d.id;
           if (t === 'people' || t === 'contact' || t === 'contacts') out.people.add(id);
-          else if (t === 'accounts' || t === 'account') out.accounts.add(id);
+          else if (t === 'accounts' || t === 'account' || t === 'companies' || t === 'company') out.accounts.add(id);
         });
         console.debug('[ListsOverview] preload top-level', { listId, docs: lmSnap?.docs?.length || 0, people: out.people.size, accounts: out.accounts.size });
       } catch (_) {}
