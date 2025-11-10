@@ -30,23 +30,31 @@ export default async function handler(req, res) {
     return;
   }
 
+  const isProduction = process.env.NODE_ENV === 'production';
+
   try {
-    console.log('[SendScheduledEmails] Starting send process');
+    if (!isProduction) {
+      console.log('[SendScheduledEmails] Starting send process');
+    }
     
     const now = Date.now();
     
     // Query for approved emails that are ready to send
     // Note: This runs server-side with Firebase Admin SDK, which bypasses Firestore rules
     // The ownership fields were added during email creation to ensure client-side queries work
+    // Limit to 50 emails per run to stay well under SendGrid's 100/sec rate limit
     const readyToSendQuery = db.collection('emails')
       .where('type', '==', 'scheduled')
       .where('status', '==', 'approved')
-      .where('scheduledSendTime', '<=', now);
+      .where('scheduledSendTime', '<=', now)
+      .limit(50);
     
     const readyToSendSnapshot = await readyToSendQuery.get();
     
     if (readyToSendSnapshot.empty) {
-      console.log('[SendScheduledEmails] No emails ready to send');
+      if (!isProduction) {
+        console.log('[SendScheduledEmails] No emails ready to send');
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         success: true, 
@@ -56,7 +64,9 @@ export default async function handler(req, res) {
       return;
     }
     
-    console.log('[SendScheduledEmails] Found', readyToSendSnapshot.size, 'emails ready to send');
+    if (!isProduction) {
+      console.log('[SendScheduledEmails] Found', readyToSendSnapshot.size, 'emails ready to send');
+    }
     
     let sentCount = 0;
     const errors = [];
@@ -65,7 +75,37 @@ export default async function handler(req, res) {
     for (const emailDoc of readyToSendSnapshot.docs) {
       try {
         const emailData = emailDoc.data();
-        console.log('[SendScheduledEmails] Sending email:', emailDoc.id);
+        
+        // Use transaction to claim the email (idempotency)
+        let shouldSend = false;
+        await db.runTransaction(async (transaction) => {
+          const freshDoc = await transaction.get(emailDoc.ref);
+          if (!freshDoc.exists) {
+            return;
+          }
+          
+          const currentStatus = freshDoc.data().status;
+          
+          // Only proceed if status is still 'approved'
+          if (currentStatus === 'approved') {
+            transaction.update(emailDoc.ref, {
+              status: 'sending',
+              sendingStartedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            shouldSend = true;
+          }
+        });
+        
+        if (!shouldSend) {
+          if (!isProduction) {
+            console.log('[SendScheduledEmails] Email', emailDoc.id, 'already claimed or sent');
+          }
+          continue;
+        }
+        
+        if (!isProduction) {
+          console.log('[SendScheduledEmails] Sending email:', emailDoc.id);
+        }
         
         // Prepare SendGrid message
         const msg = {
@@ -99,7 +139,9 @@ export default async function handler(req, res) {
         
         // Send email via SendGrid
         const sendResult = await sgMail.send(msg);
-        console.log('[SendScheduledEmails] Email sent successfully:', emailDoc.id, sendResult[0].statusCode);
+        if (!isProduction) {
+          console.log('[SendScheduledEmails] Email sent successfully:', emailDoc.id, sendResult[0].statusCode);
+        }
         
         // Update email record
         await emailDoc.ref.update({
@@ -137,7 +179,9 @@ export default async function handler(req, res) {
       }
     }
     
-    console.log('[SendScheduledEmails] Send process complete. Sent:', sentCount, 'Errors:', errors.length);
+    if (!isProduction) {
+      console.log('[SendScheduledEmails] Send process complete. Sent:', sentCount, 'Errors:', errors.length);
+    }
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
