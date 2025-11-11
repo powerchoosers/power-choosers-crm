@@ -12,12 +12,17 @@
  */
 
 async function backfillSequenceMembersOwnerId() {
+  console.log('[Backfill] ========================================');
   console.log('[Backfill] Starting sequenceMembers ownerId backfill...');
+  console.log('[Backfill] ========================================');
   
+  // Check Firebase availability
   if (!window.firebaseDB) {
-    console.error('[Backfill] Firebase not available. Make sure you are logged in.');
-    return;
+    console.error('[Backfill] ❌ Firebase not available. Make sure you are logged in.');
+    console.error('[Backfill] window.firebaseDB:', window.firebaseDB);
+    return { success: false, error: 'Firebase not available' };
   }
+  console.log('[Backfill] ✅ Firebase database available');
   
   // Get current user email
   const getUserEmail = () => {
@@ -33,11 +38,13 @@ async function backfillSequenceMembersOwnerId() {
   
   const currentUserEmail = getUserEmail();
   if (!currentUserEmail) {
-    console.error('[Backfill] Could not determine current user email');
-    return;
+    console.error('[Backfill] ❌ Could not determine current user email');
+    console.error('[Backfill] window.currentUserEmail:', window.currentUserEmail);
+    console.error('[Backfill] window.DataManager:', window.DataManager);
+    return { success: false, error: 'Could not determine user email' };
   }
   
-  console.log(`[Backfill] Using ownerId: ${currentUserEmail}`);
+  console.log(`[Backfill] ✅ Using ownerId: ${currentUserEmail}`);
   
   try {
     // Get all sequenceMembers documents
@@ -107,23 +114,48 @@ async function backfillSequenceMembersOwnerId() {
       }
     }
     
-    console.log(`[Backfill] Complete! Updated: ${updated}, Skipped: ${skipped}, Errors: ${errors}`);
+    console.log('[Backfill] ========================================');
+    console.log(`[Backfill] ✅ Complete! Updated: ${updated}, Skipped: ${skipped}, Errors: ${errors}`);
+    console.log('[Backfill] ========================================');
+    
+    const result = { success: true, updated, skipped, errors };
     
     if (window.crm && typeof window.crm.showToast === 'function') {
       window.crm.showToast(`✓ Backfill complete: ${updated} updated, ${skipped} skipped`, 'success', 5000);
     }
     
+    return result;
+    
   } catch (error) {
-    console.error('[Backfill] Error:', error);
+    console.error('[Backfill] ========================================');
+    console.error('[Backfill] ❌ Error:', error);
+    console.error('[Backfill] Error stack:', error.stack);
+    console.error('[Backfill] ========================================');
+    
     if (window.crm && typeof window.crm.showToast === 'function') {
       window.crm.showToast('Backfill failed. Check console for details.', 'error');
     }
+    
+    return { success: false, error: error.message };
   }
 }
 
 // Make function available globally for console execution
 if (typeof window !== 'undefined') {
   window.backfillSequenceMembersOwnerId = backfillSequenceMembersOwnerId;
+  
+  // Helper function that automatically awaits and shows result
+  window.runBackfill = async function() {
+    console.log('[Backfill] Running backfill...');
+    try {
+      const result = await backfillSequenceMembersOwnerId();
+      console.log('[Backfill] Final result:', result);
+      return result;
+    } catch (error) {
+      console.error('[Backfill] Unexpected error:', error);
+      return { success: false, error: error.message };
+    }
+  };
 }
 
 // Auto-run if executed directly (Node.js with Firebase Admin)
