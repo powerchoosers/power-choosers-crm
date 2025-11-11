@@ -4728,7 +4728,8 @@
           };
           
           // Send to tracking endpoint
-          fetch('/api/track-email-performance', {
+          const baseUrl = window.API_BASE_URL || window.location.origin || '';
+          fetch(`${baseUrl}/api/track-email-performance`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(trackingData)

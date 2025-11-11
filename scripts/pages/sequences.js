@@ -329,7 +329,8 @@
 
       // Call server endpoint to process immediately
       try {
-        const response = await fetch('/api/process-sequence-activations', {
+        const baseUrl = window.API_BASE_URL || window.location.origin || '';
+        const response = await fetch(`${baseUrl}/api/process-sequence-activations`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

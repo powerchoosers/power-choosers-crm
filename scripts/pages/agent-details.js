@@ -271,7 +271,8 @@
       }
       
       // Cache miss - fetch from API
-      const response = await fetch('/api/twilio/phone-numbers', {
+      const baseUrl = window.API_BASE_URL || window.location.origin || '';
+      const response = await fetch(`${baseUrl}/api/twilio/phone-numbers`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -313,7 +314,8 @@
       }
       
       // Cache miss - fetch from API
-      const response = await fetch('/api/sendgrid/email-addresses', {
+      const baseUrl = window.API_BASE_URL || window.location.origin || '';
+      const response = await fetch(`${baseUrl}/api/sendgrid/email-addresses`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

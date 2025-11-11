@@ -4709,7 +4709,8 @@ class PowerChoosersCRM {
                 
                 // Trigger generation
                 try {
-                    const response = await fetch('/api/generate-scheduled-emails', {
+                    const baseUrl = window.API_BASE_URL || window.location.origin || '';
+                    const response = await fetch(`${baseUrl}/api/generate-scheduled-emails`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ immediate: true })
@@ -4748,7 +4749,8 @@ class PowerChoosersCRM {
                 
                 // Trigger sending
                 try {
-                    const response = await fetch('/api/send-scheduled-emails', {
+                    const baseUrl = window.API_BASE_URL || window.location.origin || '';
+                    const response = await fetch(`${baseUrl}/api/send-scheduled-emails`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' }
                     });

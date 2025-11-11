@@ -2476,7 +2476,8 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       });
 
       // Call AI generation API
-      const response = await fetch('/api/generate-email-content', {
+      const baseUrl = window.API_BASE_URL || window.location.origin || '';
+      const response = await fetch(`${baseUrl}/api/generate-email-content`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
