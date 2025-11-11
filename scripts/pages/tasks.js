@@ -234,7 +234,7 @@
 
   async function loadData(){
     // Build from real sources: BackgroundTasksLoader + localStorage tasks + LinkedIn sequence tasks
-    const linkedInTasks = getLinkedInTasksFromSequences();
+    const linkedInTasks = await getLinkedInTasksFromSequences();
     let userTasks = [];
     let firebaseTasks = [];
     
@@ -398,64 +398,224 @@
     }
   }
 
-  function getLinkedInTasksFromSequences() {
+  async function getLinkedInTasksFromSequences() {
     const linkedInTasks = [];
     
-    // Get sequences from global state or localStorage
-    let sequences = [];
-    try {
-      if (window.firebaseDB) {
-        // In a real app, this would be an async call to Firestore
-        // For now, we'll check localStorage or global state
-        const storedSequences = localStorage.getItem('sequences');
-        if (storedSequences) {
-          sequences = JSON.parse(storedSequences);
-        }
-      }
-    } catch (e) {
-      console.warn('Could not load sequences for task generation:', e);
+    if (!window.firebaseDB) {
+      console.warn('[Tasks] Firebase not available for sequence tasks');
+      return linkedInTasks;
     }
     
-    sequences.forEach(sequence => {
-      if (!sequence.steps || !Array.isArray(sequence.steps)) return;
+    // Get current user email for ownership
+    const getUserEmail = () => {
+      try {
+        if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+          return window.DataManager.getCurrentUserEmail().toLowerCase();
+        }
+        return (window.currentUserEmail || '').toLowerCase();
+      } catch (_) {
+        return (window.currentUserEmail || '').toLowerCase();
+      }
+    };
+    const userEmail = getUserEmail();
+    
+    try {
+      // Get all active sequences
+      const sequencesSnapshot = await window.firebaseDB.collection('sequences').get();
+      if (sequencesSnapshot.empty) {
+        return linkedInTasks;
+      }
       
-      sequence.steps.forEach(step => {
-        // Only process LinkedIn steps that are active (not paused)
-        if (!step.paused && (step.type === 'li-connect' || step.type === 'li-message' || step.type === 'li-view-profile' || step.type === 'li-interact-post')) {
-          const typeLabels = {
-            'li-connect': 'linkedin-connect',
-            'li-message': 'linkedin-message', 
-            'li-view-profile': 'linkedin-view',
-            'li-interact-post': 'linkedin-interact'
-          };
+      const sequences = [];
+      sequencesSnapshot.forEach(doc => {
+        sequences.push({ id: doc.id, ...doc.data() });
+      });
+      
+      // Get all sequenceMembers to find active contacts (with ownership filter)
+      const membersQuery = window.firebaseDB.collection('sequenceMembers');
+      const membersSnapshot = await membersQuery.get();
+      
+      if (membersSnapshot.empty) {
+        return linkedInTasks;
+      }
+      
+      // Group members by sequenceId and contactId
+      const membersBySequence = new Map();
+      membersSnapshot.forEach(doc => {
+        const data = doc.data();
+        // Filter by ownership (non-admin users)
+        const isAdmin = () => {
+          try {
+            if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+              return window.DataManager.isCurrentUserAdmin();
+            }
+            return window.currentUserRole === 'admin';
+          } catch (_) {
+            return window.currentUserRole === 'admin';
+          }
+        };
+        
+        if (!isAdmin()) {
+          const ownerId = (data.ownerId || '').toLowerCase();
+          const assignedTo = (data.assignedTo || '').toLowerCase();
+          const createdBy = (data.createdBy || '').toLowerCase();
+          if (ownerId !== userEmail && assignedTo !== userEmail && createdBy !== userEmail) {
+            return; // Skip if user doesn't own this member
+          }
+        }
+        
+        const key = `${data.sequenceId}_${data.targetId}`;
+        if (!membersBySequence.has(key)) {
+          membersBySequence.set(key, []);
+        }
+        membersBySequence.get(key).push(data);
+      });
+      
+      const now = Date.now();
+      
+      // For each sequence/contact combination, determine current step and filter tasks
+      for (const sequence of sequences) {
+        if (!sequence.steps || !Array.isArray(sequence.steps)) continue;
+        
+        // Find all contacts in this sequence
+        const sequenceMembers = Array.from(membersBySequence.entries())
+          .filter(([key]) => key.startsWith(`${sequence.id}_`))
+          .map(([, members]) => members[0]);
+        
+        for (const member of sequenceMembers) {
+          const contactId = member.targetId;
           
-          const taskTitles = {
-            'li-connect': 'Add on LinkedIn',
-            'li-message': 'Send a message on LinkedIn',
-            'li-view-profile': 'View LinkedIn profile', 
-            'li-interact-post': 'Interact with LinkedIn Post'
-          };
+          // Determine current step for this contact by checking scheduled emails
+          let currentStep = -1; // -1 means no steps completed yet
           
-          // Calculate due date based on step delay
-          const delayMinutes = step.delayMinutes || 0;
-          const dueDate = new Date(Date.now() + delayMinutes * 60 * 1000);
+          try {
+            // Get all scheduled emails for this contact in this sequence
+            const emailsQuery = window.firebaseDB.collection('emails')
+              .where('sequenceId', '==', sequence.id)
+              .where('contactId', '==', contactId);
+            
+            const emailsSnapshot = await emailsQuery.get();
+            
+            // Find the highest stepIndex where email has been sent OR is due now
+            emailsSnapshot.forEach(doc => {
+              const email = doc.data();
+              const stepIndex = email.stepIndex || 0;
+              const scheduledTime = email.scheduledSendTime || 0;
+              const status = email.status || '';
+              
+              // Convert Firestore timestamp to milliseconds if needed
+              let scheduledTimeMs = scheduledTime;
+              if (scheduledTime && typeof scheduledTime.toDate === 'function') {
+                scheduledTimeMs = scheduledTime.toDate().getTime();
+              } else if (typeof scheduledTime === 'object' && scheduledTime.seconds) {
+                scheduledTimeMs = scheduledTime.seconds * 1000;
+              }
+              
+              // Step is "reached" if:
+              // 1. Email has been sent (status === 'sent')
+              // 2. OR email is due now (scheduledTime <= now and status is not 'rejected')
+              if (status === 'sent' || (scheduledTimeMs <= now && status !== 'rejected' && status !== 'cancelled')) {
+                if (stepIndex > currentStep) {
+                  currentStep = stepIndex;
+                }
+              }
+            });
+          } catch (error) {
+            console.warn(`[Tasks] Failed to check email progress for contact ${contactId}:`, error);
+            // Continue with currentStep = -1 (will only show step 0 tasks if due)
+          }
           
-          linkedInTasks.push({
-            id: `linkedin_${step.id}`,
-            title: step.data?.note || taskTitles[step.type] || 'LinkedIn task',
-            contact: `Contact from ${sequence.name}`,
-            account: `Account from ${sequence.name}`,
-            type: typeLabels[step.type] || 'linkedin',
-            priority: step.data?.priority || 'medium',
-            dueDate: dueDate.toLocaleDateString(),
-            status: 'pending',
-            sequenceId: sequence.id,
-            stepId: step.id,
-            isLinkedInTask: true
+          // Now process steps, but only show tasks that:
+          // 1. Are at or before currentStep + 1 (allow next step)
+          // 2. Have scheduledSendTime <= now (only show tasks that are due)
+          sequence.steps.forEach((step, stepIndex) => {
+            // Only process LinkedIn steps that are active (not paused)
+            if (step.paused || !(step.type === 'li-connect' || step.type === 'li-message' || step.type === 'li-view-profile' || step.type === 'li-interact-post')) {
+              return;
+            }
+            
+            // Check if this step should be shown:
+            // 1. Step must be <= currentStep + 1 (we've reached this step or it's the next one)
+            if (stepIndex > currentStep + 1) {
+              return; // Skip future steps
+            }
+            
+            // 2. Calculate when this step is due (based on cumulative delays)
+            let cumulativeDelay = 0;
+            for (let i = 0; i <= stepIndex; i++) {
+              if (sequence.steps[i] && sequence.steps[i].delayMinutes) {
+                cumulativeDelay += sequence.steps[i].delayMinutes;
+              }
+            }
+            
+            // Get sequence start time from member creation or first email
+            let sequenceStartTime = now;
+            try {
+              if (member.createdAt) {
+                // Convert Firestore timestamp to milliseconds
+                if (member.createdAt.toDate) {
+                  sequenceStartTime = member.createdAt.toDate().getTime();
+                } else if (member.createdAt.seconds) {
+                  sequenceStartTime = member.createdAt.seconds * 1000;
+                } else if (typeof member.createdAt === 'number') {
+                  sequenceStartTime = member.createdAt;
+                }
+              }
+            } catch (_) {
+              // Fallback to now if we can't determine start time
+            }
+            
+            const stepDueTime = sequenceStartTime + (cumulativeDelay * 60 * 1000);
+            
+            // Only show task if it's due now or in the past
+            if (stepDueTime > now) {
+              return; // Skip tasks that aren't due yet
+            }
+            
+            // Task passes all filters - create it
+            const typeLabels = {
+              'li-connect': 'linkedin-connect',
+              'li-message': 'linkedin-message', 
+              'li-view-profile': 'linkedin-view',
+              'li-interact-post': 'linkedin-interact'
+            };
+            
+            const taskTitles = {
+              'li-connect': 'Add on LinkedIn',
+              'li-message': 'Send a message on LinkedIn',
+              'li-view-profile': 'View LinkedIn profile', 
+              'li-interact-post': 'Interact with LinkedIn Post'
+            };
+            
+            const dueDate = new Date(stepDueTime);
+            
+            linkedInTasks.push({
+              id: `linkedin_${sequence.id}_${contactId}_${stepIndex}`,
+              title: step.data?.note || taskTitles[step.type] || 'LinkedIn task',
+              contact: `Contact from ${sequence.name}`,
+              account: `Account from ${sequence.name}`,
+              type: typeLabels[step.type] || 'linkedin',
+              priority: step.data?.priority || 'medium',
+              dueDate: dueDate.toLocaleDateString(),
+              dueTime: dueDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+              status: 'pending',
+              sequenceId: sequence.id,
+              contactId: contactId,
+              stepId: step.id,
+              stepIndex: stepIndex,
+              isLinkedInTask: true,
+              // Ownership fields
+              ownerId: userEmail || member.ownerId || '',
+              assignedTo: userEmail || member.assignedTo || '',
+              createdBy: userEmail || member.createdBy || '',
+              createdAt: Date.now()
+            });
           });
         }
-      });
-    });
+      }
+    } catch (error) {
+      console.error('[Tasks] Error loading LinkedIn tasks from sequences:', error);
+    }
     
     return linkedInTasks;
   }

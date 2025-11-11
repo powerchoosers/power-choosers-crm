@@ -54,24 +54,24 @@ async function backfillSequenceMembersOwnerId() {
     let skipped = 0;
     let errors = 0;
     
-    const batch = window.firebaseDB.batch();
+    let batch = window.firebaseDB.batch();
     let batchCount = 0;
     const BATCH_SIZE = 500; // Firestore batch limit
     
-    membersQuery.forEach(doc => {
+    for (const doc of membersQuery.docs) {
       const data = doc.data();
       
       // Skip if already has ownerId
       if (data.ownerId) {
         skipped++;
-        return;
+        continue;
       }
       
       // Add ownerId (use existing userId if available, otherwise use current user)
-      const ownerId = data.userId || currentUserEmail;
+      const ownerId = (data.userId || currentUserEmail).toLowerCase();
       
       batch.update(doc.ref, {
-        ownerId: ownerId.toLowerCase(),
+        ownerId: ownerId,
         updatedAt: window.firebase.firestore.FieldValue.serverTimestamp()
       });
       
@@ -80,16 +80,31 @@ async function backfillSequenceMembersOwnerId() {
       
       // Commit batch when it reaches limit
       if (batchCount >= BATCH_SIZE) {
-        batch.commit();
-        batchCount = 0;
-        console.log(`[Backfill] Committed batch of ${BATCH_SIZE} updates...`);
+        try {
+          await batch.commit();
+          console.log(`[Backfill] Committed batch of ${BATCH_SIZE} updates...`);
+          // Create new batch for next set of updates
+          batch = window.firebaseDB.batch();
+          batchCount = 0;
+        } catch (error) {
+          console.error(`[Backfill] Error committing batch:`, error);
+          errors += batchCount;
+          // Create new batch and continue
+          batch = window.firebaseDB.batch();
+          batchCount = 0;
+        }
       }
-    });
+    }
     
     // Commit remaining updates
     if (batchCount > 0) {
-      await batch.commit();
-      console.log(`[Backfill] Committed final batch of ${batchCount} updates`);
+      try {
+        await batch.commit();
+        console.log(`[Backfill] Committed final batch of ${batchCount} updates`);
+      } catch (error) {
+        console.error(`[Backfill] Error committing final batch:`, error);
+        errors += batchCount;
+      }
     }
     
     console.log(`[Backfill] Complete! Updated: ${updated}, Skipped: ${skipped}, Errors: ${errors}`);
@@ -137,17 +152,18 @@ if (typeof require !== 'undefined' && require.main === module) {
       
       let updated = 0;
       let skipped = 0;
+      let errors = 0;
       
-      const batch = db.batch();
+      let batch = db.batch();
       let batchCount = 0;
       const BATCH_SIZE = 500;
       
-      membersQuery.forEach(doc => {
+      for (const doc of membersQuery.docs) {
         const data = doc.data();
         
         if (data.ownerId) {
           skipped++;
-          return;
+          continue;
         }
         
         const ownerId = (data.userId || 'l.patterson@powerchoosers.com').toLowerCase();
@@ -161,17 +177,33 @@ if (typeof require !== 'undefined' && require.main === module) {
         updated++;
         
         if (batchCount >= BATCH_SIZE) {
-          batch.commit();
-          batchCount = 0;
-          console.log(`[Backfill] Committed batch...`);
+          try {
+            await batch.commit();
+            console.log(`[Backfill] Committed batch of ${BATCH_SIZE} updates...`);
+            // Create new batch for next set of updates
+            batch = db.batch();
+            batchCount = 0;
+          } catch (error) {
+            console.error(`[Backfill] Error committing batch:`, error);
+            errors += batchCount;
+            // Create new batch and continue
+            batch = db.batch();
+            batchCount = 0;
+          }
         }
-      });
-      
-      if (batchCount > 0) {
-        await batch.commit();
       }
       
-      console.log(`[Backfill] Complete! Updated: ${updated}, Skipped: ${skipped}`);
+      if (batchCount > 0) {
+        try {
+          await batch.commit();
+          console.log(`[Backfill] Committed final batch of ${batchCount} updates`);
+        } catch (error) {
+          console.error(`[Backfill] Error committing final batch:`, error);
+          errors += batchCount;
+        }
+      }
+      
+      console.log(`[Backfill] Complete! Updated: ${updated}, Skipped: ${skipped}, Errors: ${errors}`);
     } catch (error) {
       console.error('[Backfill] Error:', error);
       process.exit(1);
