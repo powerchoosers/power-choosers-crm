@@ -589,11 +589,31 @@
             
             const dueDate = new Date(stepDueTime);
             
-            linkedInTasks.push({
+            // Resolve actual contact name and account from contactId
+            let actualContactName = `Contact from ${sequence.name}`;
+            let actualAccountName = `Account from ${sequence.name}`;
+            let accountId = null;
+            
+            try {
+              if (window.getPeopleData && typeof window.getPeopleData === 'function') {
+                const contacts = window.getPeopleData() || [];
+                const contact = contacts.find(c => c && c.id === contactId);
+                if (contact) {
+                  const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim();
+                  actualContactName = fullName || contact.name || actualContactName;
+                  actualAccountName = contact.companyName || contact.company || contact.accountName || actualAccountName;
+                  accountId = contact.accountId || contact.account_id || null;
+                }
+              }
+            } catch (error) {
+              console.warn(`[Tasks] Could not resolve contact ${contactId} for task:`, error);
+            }
+            
+            const taskData = {
               id: `linkedin_${sequence.id}_${contactId}_${stepIndex}`,
               title: step.data?.note || taskTitles[step.type] || 'LinkedIn task',
-              contact: `Contact from ${sequence.name}`,
-              account: `Account from ${sequence.name}`,
+              contact: actualContactName,
+              account: actualAccountName,
               type: typeLabels[step.type] || 'linkedin',
               priority: step.data?.priority || 'medium',
               dueDate: dueDate.toLocaleDateString(),
@@ -601,6 +621,7 @@
               status: 'pending',
               sequenceId: sequence.id,
               contactId: contactId,
+              accountId: accountId,
               stepId: step.id,
               stepIndex: stepIndex,
               isLinkedInTask: true,
@@ -608,8 +629,30 @@
               ownerId: userEmail || member.ownerId || '',
               assignedTo: userEmail || member.assignedTo || '',
               createdBy: userEmail || member.createdBy || '',
-              createdAt: Date.now()
-            });
+              createdAt: Date.now(),
+              timestamp: Date.now()
+            };
+            
+            linkedInTasks.push(taskData);
+            
+            // Save to Firebase so it appears in Recent Activities
+            try {
+              const db = window.firebaseDB;
+              if (db) {
+                // Check if task already exists (idempotent)
+                const existingTask = await db.collection('tasks').doc(taskData.id).get();
+                if (!existingTask.exists) {
+                  await db.collection('tasks').doc(taskData.id).set({
+                    ...taskData,
+                    timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
+                  });
+                  console.log(`[Tasks] Saved sequence task to Firebase: ${taskData.id}`);
+                }
+              }
+            } catch (error) {
+              console.warn(`[Tasks] Failed to save sequence task to Firebase:`, error);
+              // Continue even if save fails - task will still show in tasks list
+            }
           });
         }
       }
