@@ -119,13 +119,22 @@ window.deleteOldTasks = async function(daysOld = 30, options = {}) {
   
   // Show preview
   if (tasksToDelete.length > 0) {
-    console.table(tasksToDelete.map(t => ({
+    const preview = tasksToDelete.map(t => ({
       id: t.id,
       title: t.title,
       type: t.type,
       status: t.status,
       created: new Date(t.createdAt || t.timestamp || 0).toLocaleDateString()
-    })));
+    }));
+    
+    if (typeof console.table === 'function') {
+      console.table(preview);
+    } else {
+      console.log('[Task Cleanup] Tasks to delete:');
+      preview.forEach((t, i) => {
+        console.log(`${i + 1}. ${t.title} (${t.type}) - ${t.status} - Created: ${t.created}`);
+      });
+    }
   }
   
   if (dryRun) {
@@ -326,13 +335,22 @@ window.deleteRecentTasks = async function(hoursRecent = 24, options = {}) {
   
   // Show preview
   if (tasksToDelete.length > 0) {
-    console.table(tasksToDelete.map(t => ({
+    const preview = tasksToDelete.map(t => ({
       id: t.id,
       title: t.title,
       type: t.type,
       status: t.status,
       created: new Date(t.createdAt || t.timestamp || 0).toLocaleString()
-    })));
+    }));
+    
+    if (typeof console.table === 'function') {
+      console.table(preview);
+    } else {
+      console.log('[Task Cleanup] Recent tasks to delete:');
+      preview.forEach((t, i) => {
+        console.log(`${i + 1}. ${t.title} (${t.type}) - ${t.status} - Created: ${t.created}`);
+      });
+    }
   }
   
   if (dryRun) {
