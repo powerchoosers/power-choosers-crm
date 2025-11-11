@@ -401,11 +401,6 @@
   async function getLinkedInTasksFromSequences() {
     const linkedInTasks = [];
     
-    if (!window.firebaseDB) {
-      console.warn('[Tasks] Firebase not available for sequence tasks');
-      return linkedInTasks;
-    }
-    
     // Get current user email for ownership
     const getUserEmail = () => {
       try {
@@ -420,18 +415,28 @@
     const userEmail = getUserEmail();
     
     try {
-      // Get all active sequences
-      const sequencesSnapshot = await window.firebaseDB.collection('sequences').get();
-      if (sequencesSnapshot.empty) {
+      // Use cached sequences from BackgroundSequencesLoader (FAST - no Firestore query)
+      let sequences = [];
+      if (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function') {
+        sequences = window.BackgroundSequencesLoader.getSequencesData() || [];
+        console.log('[Tasks] Using cached sequences:', sequences.length);
+      } else if (window.firebaseDB) {
+        // Fallback to Firestore if background loader not available
+        const sequencesSnapshot = await window.firebaseDB.collection('sequences').get();
+        sequences = sequencesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log('[Tasks] Loaded sequences from Firestore:', sequences.length);
+      }
+      
+      if (sequences.length === 0) {
         return linkedInTasks;
       }
       
-      const sequences = [];
-      sequencesSnapshot.forEach(doc => {
-        sequences.push({ id: doc.id, ...doc.data() });
-      });
+      // Get all sequenceMembers (single query for all sequences)
+      if (!window.firebaseDB) {
+        console.warn('[Tasks] Firebase not available for sequence members');
+        return linkedInTasks;
+      }
       
-      // Get all sequenceMembers to find active contacts (with ownership filter)
       const membersQuery = window.firebaseDB.collection('sequenceMembers');
       const membersSnapshot = await membersQuery.get();
       
@@ -473,6 +478,36 @@
       
       const now = Date.now();
       
+      // OPTIMIZATION: Query all emails once instead of per-contact
+      // Get all sequence IDs for efficient querying
+      const sequenceIds = sequences.map(s => s.id);
+      const emailsBySequenceAndContact = new Map();
+      
+      if (sequenceIds.length > 0) {
+        try {
+          // Query all emails for all sequences at once (much faster!)
+          const allEmailsSnapshot = await window.firebaseDB.collection('emails')
+            .where('type', '==', 'scheduled')
+            .get();
+          
+          // Group emails by sequenceId and contactId
+          allEmailsSnapshot.forEach(doc => {
+            const email = doc.data();
+            if (email.sequenceId && email.contactId) {
+              const key = `${email.sequenceId}_${email.contactId}`;
+              if (!emailsBySequenceAndContact.has(key)) {
+                emailsBySequenceAndContact.set(key, []);
+              }
+              emailsBySequenceAndContact.get(key).push(email);
+            }
+          });
+          
+          console.log('[Tasks] Loaded all sequence emails:', allEmailsSnapshot.size);
+        } catch (error) {
+          console.warn('[Tasks] Failed to load sequence emails:', error);
+        }
+      }
+      
       // For each sequence/contact combination, determine current step and filter tasks
       for (const sequence of sequences) {
         if (!sequence.steps || !Array.isArray(sequence.steps)) continue;
@@ -488,42 +523,33 @@
           // Determine current step for this contact by checking scheduled emails
           let currentStep = -1; // -1 means no steps completed yet
           
-          try {
-            // Get all scheduled emails for this contact in this sequence
-            const emailsQuery = window.firebaseDB.collection('emails')
-              .where('sequenceId', '==', sequence.id)
-              .where('contactId', '==', contactId);
+          // Get emails for this specific sequence/contact from cached map
+          const emailKey = `${sequence.id}_${contactId}`;
+          const contactEmails = emailsBySequenceAndContact.get(emailKey) || [];
+          
+          // Find the highest stepIndex where email has been sent OR is due now
+          contactEmails.forEach(email => {
+            const stepIndex = email.stepIndex || 0;
+            const scheduledTime = email.scheduledSendTime || 0;
+            const status = email.status || '';
             
-            const emailsSnapshot = await emailsQuery.get();
+            // Convert Firestore timestamp to milliseconds if needed
+            let scheduledTimeMs = scheduledTime;
+            if (scheduledTime && typeof scheduledTime.toDate === 'function') {
+              scheduledTimeMs = scheduledTime.toDate().getTime();
+            } else if (typeof scheduledTime === 'object' && scheduledTime.seconds) {
+              scheduledTimeMs = scheduledTime.seconds * 1000;
+            }
             
-            // Find the highest stepIndex where email has been sent OR is due now
-            emailsSnapshot.forEach(doc => {
-              const email = doc.data();
-              const stepIndex = email.stepIndex || 0;
-              const scheduledTime = email.scheduledSendTime || 0;
-              const status = email.status || '';
-              
-              // Convert Firestore timestamp to milliseconds if needed
-              let scheduledTimeMs = scheduledTime;
-              if (scheduledTime && typeof scheduledTime.toDate === 'function') {
-                scheduledTimeMs = scheduledTime.toDate().getTime();
-              } else if (typeof scheduledTime === 'object' && scheduledTime.seconds) {
-                scheduledTimeMs = scheduledTime.seconds * 1000;
+            // Step is "reached" if:
+            // 1. Email has been sent (status === 'sent')
+            // 2. OR email is due now (scheduledTime <= now and status is not 'rejected')
+            if (status === 'sent' || (scheduledTimeMs <= now && status !== 'rejected' && status !== 'cancelled')) {
+              if (stepIndex > currentStep) {
+                currentStep = stepIndex;
               }
-              
-              // Step is "reached" if:
-              // 1. Email has been sent (status === 'sent')
-              // 2. OR email is due now (scheduledTime <= now and status is not 'rejected')
-              if (status === 'sent' || (scheduledTimeMs <= now && status !== 'rejected' && status !== 'cancelled')) {
-                if (stepIndex > currentStep) {
-                  currentStep = stepIndex;
-                }
-              }
-            });
-          } catch (error) {
-            console.warn(`[Tasks] Failed to check email progress for contact ${contactId}:`, error);
-            // Continue with currentStep = -1 (will only show step 0 tasks if due)
-          }
+            }
+          });
           
           // Now process steps, but only show tasks that:
           // 1. Are at or before currentStep + 1 (allow next step)
