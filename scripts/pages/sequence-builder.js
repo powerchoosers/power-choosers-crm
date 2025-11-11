@@ -7817,67 +7817,149 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
   // Function to start a sequence for a contact using FREE automation
   async function startSequenceForContact(sequence, contactData) {
     try {
-      console.log('[SequenceBuilder] Starting sequence with FREE automation:', contactData);
+      console.log('[SequenceBuilder] Starting sequence for single contact via server-side processing:', contactData);
       
-      // Initialize free automation if not already done
-      if (!window.freeSequenceAutomation) {
-        window.freeSequenceAutomation = new FreeSequenceAutomation();
+      // Get user email for ownership
+      const getUserEmail = () => {
+        try {
+          if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+            return window.DataManager.getCurrentUserEmail();
+          }
+          return (window.currentUserEmail || '').toLowerCase();
+        } catch(_) {
+          return (window.currentUserEmail || '').toLowerCase();
+        }
+      };
+      const userEmail = getUserEmail();
+      
+      if (!userEmail) {
+        throw new Error('User email not found');
       }
       
-      // Start sequence using free automation (handles all email scheduling)
-      const result = await window.freeSequenceAutomation.startSequence(sequence, contactData);
+      // Resolve contact ID from contactData
+      let contactId = contactData.id || contactData.contactId;
       
-      // Create regular tasks (non-email) for tracking
-      const tasks = createTasksFromSequence(sequence, contactData);
-      const nonEmailTasks = tasks.filter(task => task.type !== 'auto-email');
-      
-      // Save non-email tasks to localStorage
-      if (nonEmailTasks.length > 0) {
-        const existingTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-        const newTasks = [...existingTasks, ...nonEmailTasks];
-        localStorage.setItem('userTasks', JSON.stringify(newTasks));
-        
-        // Save tasks to Firebase if available
-        if (window.firebaseDB) {
-          const batch = window.firebaseDB.batch();
-          nonEmailTasks.forEach(task => {
-            const taskRef = window.firebaseDB.collection('tasks').doc(task.id);
-            batch.set(taskRef, {
-              ...task,
-              timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
-            });
-          });
-          await batch.commit();
+      if (!contactId) {
+        // Try to find contact by email in people data
+        if (contactData.email && window.getPeopleData && typeof window.getPeopleData === 'function') {
+          const contacts = window.getPeopleData() || [];
+          const match = contacts.find(c => c && (c.email || '').toLowerCase() === contactData.email.toLowerCase());
+          if (match) {
+            contactId = match.id;
+          }
         }
         
-        // Dispatch event to update tasks page
-        window.dispatchEvent(new CustomEvent('tasksUpdated', { 
-          detail: { source: 'sequenceStart', tasks: nonEmailTasks } 
-        }));
+        // If still no contact ID, generate a temporary one
+        if (!contactId) {
+          contactId = `temp_contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          console.warn('[SequenceBuilder] Generated temporary contact ID:', contactId);
+        }
       }
       
-      // Show success message with cost savings (removed from here to avoid toast spam when starting for multiple contacts)
+      // Create sequenceActivation document with single contact
+      const activationRef = window.firebaseDB.collection('sequenceActivations').doc();
+      const activationId = activationRef.id;
       
-      console.log('[SequenceBuilder] FREE sequence started successfully:', {
-        totalTasks: tasks.length,
-        scheduledEmails: result.scheduledEmailCount,
-        contact: contactData.email,
-        cost: '$0/month',
-        savings: '$22/month'
-      });
-      
-      // Return result with scheduledEmailCount so caller can track total
-      return {
-        tasks: tasks,
-        scheduledEmailCount: result.scheduledEmailCount,
-        success: true
+      const sequenceActivationData = {
+        sequenceId: sequence.id,
+        contactIds: [contactId],
+        status: 'pending',
+        processedContacts: 0,
+        totalContacts: 1,
+        ownerId: userEmail,
+        assignedTo: userEmail,
+        createdBy: userEmail,
+        createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
       };
-    } catch (error) {
-      console.error('[SequenceBuilder] Error starting FREE sequence:', error);
+      
+      await activationRef.set(sequenceActivationData);
+      console.log('[SequenceBuilder] Created sequenceActivation:', activationId);
+      
+      // Show progress toast
       if (window.crm && typeof window.crm.showToast === 'function') {
-        window.crm.showToast('Failed to start sequence. Please try again.');
+        window.crm.showToast(`Sequence queued for ${contactData.name || contactData.email}. Processing...`, 'info');
       }
-      return [];
+      
+      // Call server endpoint to process immediately
+      try {
+        const baseUrl = window.API_BASE_URL || window.location.origin || '';
+        const response = await fetch(`${baseUrl}/api/process-sequence-activations`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            immediate: true,
+            activationId: activationId
+          })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('[SequenceBuilder] Sequence activation triggered:', result);
+          
+          if (window.crm && typeof window.crm.showToast === 'function') {
+            window.crm.showToast(`✓ Sequence started for ${contactData.name || contactData.email}!`, 'success');
+          }
+          
+          return {
+            tasks: [],
+            scheduledEmailCount: result.emailsCreated || 0,
+            success: true
+          };
+        } else {
+          const errorText = await response.text();
+          console.error('[SequenceBuilder] Failed to trigger processing:', response.status, errorText);
+          
+          // Update activation to failed
+          await activationRef.update({ 
+            status: 'failed', 
+            errorMessage: errorText 
+          });
+          
+          if (window.crm && typeof window.crm.showToast === 'function') {
+            window.crm.showToast(`Failed to start sequence: ${errorText}`, 'error');
+          }
+          
+          return {
+            tasks: [],
+            scheduledEmailCount: 0,
+            success: false
+          };
+        }
+      } catch (apiError) {
+        console.error('[SequenceBuilder] Error calling API:', apiError);
+        
+        // Update activation to failed
+        try {
+          await activationRef.update({ 
+            status: 'failed', 
+            errorMessage: apiError.message 
+          });
+        } catch (updateError) {
+          console.error('[SequenceBuilder] Failed to update activation status:', updateError);
+        }
+        
+        if (window.crm && typeof window.crm.showToast === 'function') {
+          window.crm.showToast(`Failed to start sequence: ${apiError.message}`, 'error');
+        }
+        
+        return {
+          tasks: [],
+          scheduledEmailCount: 0,
+          success: false
+        };
+      }
+    } catch (error) {
+      console.error('[SequenceBuilder] Error starting sequence:', error);
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast('Failed to start sequence. Please try again.', 'error');
+      }
+      return {
+        tasks: [],
+        scheduledEmailCount: 0,
+        success: false
+      };
     }
   }
 
