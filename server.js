@@ -1674,10 +1674,9 @@ async function handleApiSendEmail(req, res) {
     // Generate unique tracking ID
     const trackingId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Create tracking pixel URL - handle both local and Vercel deployment
-    const protocol = req.headers['x-forwarded-proto'] || (req.connection.encrypted ? 'https' : 'http');
-    const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
-    const trackingPixelUrl = `${protocol}://${host}/api/email/track/${trackingId}`;
+    // Create tracking pixel URL - always use Cloud Run URL
+    const baseUrl = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
+    const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
     
     // Inject tracking pixel into email content
     const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
