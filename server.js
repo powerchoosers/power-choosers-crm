@@ -75,6 +75,7 @@ import sendgridSendHandler from './api/email/sendgrid-send.js';
 import inboundEmailHandler from './api/email/inbound-email.js';
 import generateScheduledEmailsHandler from './api/generate-scheduled-emails.js';
 import sendScheduledEmailsHandler from './api/send-scheduled-emails.js';
+import processSequenceActivationsHandler from './api/process-sequence-activations.js';
 
 // ADDITIONAL IMPORTS FOR REMAINING PROXY FUNCTIONS
 import emailBackfillThreadsHandler from './api/email/backfill-threads.js';
@@ -835,6 +836,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/send-scheduled-emails') {
     return handleApiSendScheduledEmails(req, res);
   }
+  if (pathname === '/api/process-sequence-activations') {
+    return handleApiProcessSequenceActivations(req, res);
+  }
   if (pathname === '/api/process-call') {
     return handleApiProcessCall(req, res);
   }
@@ -1009,6 +1013,13 @@ async function handleApiSendScheduledEmails(req, res) {
     req.body = await parseRequestBody(req);
   }
   return await sendScheduledEmailsHandler(req, res);
+}
+
+async function handleApiProcessSequenceActivations(req, res) {
+  if (req.method === 'POST') {
+    req.body = await parseRequestBody(req);
+  }
+  return await processSequenceActivationsHandler(req, res);
 }
 
 // Process call and track email performance

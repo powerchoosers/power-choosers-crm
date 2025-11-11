@@ -528,16 +528,18 @@
           // Now process steps, but only show tasks that:
           // 1. Are at or before currentStep + 1 (allow next step)
           // 2. Have scheduledSendTime <= now (only show tasks that are due)
-          sequence.steps.forEach((step, stepIndex) => {
+          for (let stepIndex = 0; stepIndex < sequence.steps.length; stepIndex++) {
+            const step = sequence.steps[stepIndex];
+            
             // Only process LinkedIn steps that are active (not paused)
             if (step.paused || !(step.type === 'li-connect' || step.type === 'li-message' || step.type === 'li-view-profile' || step.type === 'li-interact-post')) {
-              return;
+              continue;
             }
             
             // Check if this step should be shown:
             // 1. Step must be <= currentStep + 1 (we've reached this step or it's the next one)
             if (stepIndex > currentStep + 1) {
-              return; // Skip future steps
+              continue; // Skip future steps
             }
             
             // 2. Calculate when this step is due (based on cumulative delays)
@@ -569,7 +571,7 @@
             
             // Only show task if it's due now or in the past
             if (stepDueTime > now) {
-              return; // Skip tasks that aren't due yet
+              continue; // Skip tasks that aren't due yet
             }
             
             // Task passes all filters - create it
@@ -653,7 +655,7 @@
               console.warn(`[Tasks] Failed to save sequence task to Firebase:`, error);
               // Continue even if save fails - task will still show in tasks list
             }
-          });
+          }
         }
       }
     } catch (error) {

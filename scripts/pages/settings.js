@@ -2268,7 +2268,8 @@ class SettingsPage {
             this.logAlgolia('📡 Sending reindex request to server...');
 
             // Call server-side API
-            const response = await fetch('/api/algolia/reindex', {
+            const baseUrl = window.API_BASE_URL || window.location.origin || '';
+            const response = await fetch(`${baseUrl}/api/algolia/reindex`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2324,7 +2325,8 @@ class SettingsPage {
             this.logAlgolia('📡 Sending reindex request to server...');
 
             // Call server-side API
-            const response = await fetch('/api/algolia/reindex', {
+            const baseUrl = window.API_BASE_URL || window.location.origin || '';
+            const response = await fetch(`${baseUrl}/api/algolia/reindex`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

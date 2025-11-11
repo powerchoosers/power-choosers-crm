@@ -222,7 +222,8 @@ class FreeSequenceAutomation {
       }
       
       // Call Perplexity email API endpoint (using existing endpoint)
-      const response = await fetch('/api/perplexity-email', {
+      const baseUrl = window.API_BASE_URL || window.location.origin || '';
+      const response = await fetch(`${baseUrl}/api/perplexity-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -7792,7 +7793,8 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
   // Function to send email via SendGrid
   async function sendEmailViaSendGrid(emailData) {
     try {
-      const response = await fetch('/api/email/sendgrid-send', {
+      const baseUrl = window.API_BASE_URL || window.location.origin || '';
+      const response = await fetch(`${baseUrl}/api/email/sendgrid-send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

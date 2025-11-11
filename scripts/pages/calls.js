@@ -3751,7 +3751,8 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
         try {
           console.log(`🔄 Processing call: ${call.id}`);
           
-          const response = await fetch('/api/process-call', {
+          const baseUrl = window.API_BASE_URL || window.location.origin || '';
+          const response = await fetch(`${baseUrl}/api/process-call`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ callSid: call.id })
