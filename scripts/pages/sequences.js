@@ -134,10 +134,23 @@
     try {
       console.log(`[Sequences] Starting sequence "${sequence.name}" for all active members...`);
       
+      // Resolve current user email for ownership filter (required by Firestore rules)
+      const currentUserEmail = (() => {
+        try {
+          if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+            return String(window.DataManager.getCurrentUserEmail() || '').toLowerCase();
+          }
+          return String(window.currentUserEmail || '').toLowerCase();
+        } catch (_) {
+          return String(window.currentUserEmail || '').toLowerCase();
+        }
+      })();
+      
       // Get all sequenceMembers for this sequence
       const membersQuery = await window.firebaseDB.collection('sequenceMembers')
         .where('sequenceId', '==', sequence.id)
         .where('targetType', '==', 'people')
+        .where('ownerId', '==', currentUserEmail)
         .get();
 
       if (membersQuery.empty) {
@@ -270,105 +283,99 @@
       if (unresolvedCount > 0) {
         console.warn(`[Sequences] ${unresolvedCount} member(s) could not be resolved. Proceeding with ${contacts.length} resolved contact(s).`);
         if (window.crm?.showToast) {
-          window.crm.showToast(`⚠️ ${unresolvedCount} member${unresolvedCount === 1 ? '' : 's'} not found. Started ${contacts.length} contact${contacts.length === 1 ? '' : 's'}.`, 'info');
+          window.crm.showToast(`⚠️ ${unresolvedCount} member${unresolvedCount === 1 ? '' : 's'} not found. Will process ${contacts.length} contact${contacts.length === 1 ? '' : 's'}.`, 'info');
         }
       }
 
-      // Start sequence for each contact
-      let startedCount = 0;
-      let errorCount = 0;
-      let totalEmailsCreated = 0;
+      // Get user email for ownership
+      const getUserEmail = () => {
+        try {
+          if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+            return window.DataManager.getCurrentUserEmail().toLowerCase();
+          }
+          return (window.currentUserEmail || '').toLowerCase();
+        } catch (_) {
+          return (window.currentUserEmail || '').toLowerCase();
+        }
+      };
+      const userEmail = getUserEmail();
+
+      // Collect all contact IDs (server will validate emails)
+      const allContactIds = contacts.map(c => String(c.id));
+
+      // Create single sequenceActivations document with ALL contact IDs
+      const activationRef = window.firebaseDB.collection('sequenceActivations').doc();
+      const activationId = activationRef.id;
+      
+      const sequenceActivationData = {
+        sequenceId: sequence.id,
+        contactIds: allContactIds, // All contact IDs in one array
+        status: 'pending',
+        processedContacts: 0,
+        totalContacts: allContactIds.length,
+        ownerId: userEmail,
+        assignedTo: userEmail,
+        createdBy: userEmail,
+        createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
+      };
+
+      await activationRef.set(sequenceActivationData);
+      console.log('[Sequences] Created batch sequenceActivation:', activationId, `(${allContactIds.length} contacts)`);
 
       // Show progress toast
-      const progressToast = window.crm?.showProgressToast ? 
-        window.crm.showProgressToast(`Starting sequence for ${contacts.length} contacts...`, contacts.length, 0) : null;
-
-      for (let i = 0; i < contacts.length; i++) {
-        const contact = contacts[i];
-        try {
-          // Only start if contact has email (or skip email steps if no email)
-          const result = await window.SequenceBuilder.startSequenceForContact(sequence, {
-            id: contact.id,
-            name: contact.name,
-            company: contact.company,
-            email: contact.email,
-            contact: contact.name,
-            account: contact.company
-          });
-          
-          startedCount++;
-          
-          // Track how many emails were created
-          if (result && result.scheduledEmailCount) {
-            totalEmailsCreated += result.scheduledEmailCount;
-          }
-          
-          // Update progress
-          if (progressToast && typeof progressToast.update === 'function') {
-            progressToast.update(i + 1, contacts.length);
-          }
-        } catch (err) {
-          console.warn(`[Sequences] Failed to start sequence for contact ${contact.id}:`, err);
-          errorCount++;
-        }
+      if (window.crm?.showToast) {
+        window.crm.showToast(`Sequence queued for ${allContactIds.length} contacts. Processing in background...`, 'info');
       }
 
-      // Complete progress toast
-      if (progressToast && typeof progressToast.complete === 'function') {
-        let message = `✓ Sequence started! ${totalEmailsCreated} emails scheduled for ${startedCount} contact${startedCount === 1 ? '' : 's'}`;
-        if (errorCount > 0) {
-          message += ` (${errorCount} failed)`;
-        }
-        progressToast.complete(message);
-      } else if (window.crm?.showToast) {
-        let message = `✓ Sequence started! ${totalEmailsCreated} emails scheduled for ${startedCount} contact${startedCount === 1 ? '' : 's'}`;
-        if (errorCount > 0) {
-          message += ` (${errorCount} failed)`;
-        }
-        window.crm.showToast(message, startedCount > 0 ? 'success' : 'info');
-      }
-
-      console.log(`[Sequences] ✓ Started sequence for ${startedCount}/${contacts.length} contacts (${totalEmailsCreated} emails created)`);
-      
-      // Wait a moment to let Firebase writes complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Automatically trigger email generation for newly created scheduled emails
-      if (totalEmailsCreated > 0) {
-        try {
-          console.log('[Sequences] Triggering automatic email generation for', totalEmailsCreated, 'emails...');
-          const response = await fetch('/api/generate-scheduled-emails', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ immediate: true })
-          });
+      // Call server endpoint to process immediately
+      try {
+        const response = await fetch('/api/process-sequence-activations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            immediate: true,
+            activationId: activationId
+          })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('[Sequences] Batch activation processing triggered:', result);
           
-          if (response.ok) {
-            const result = await response.json();
-            console.log('[Sequences] Email generation triggered:', result);
-            if (result.count > 0 && window.crm?.showToast) {
-              window.crm.showToast(`📧 Generated content for ${result.count} email${result.count !== 1 ? 's' : ''}. Check Scheduled tab!`, 'success');
-            } else if (result.count === 0) {
-              console.warn('[Sequences] No emails were generated. They may already be generated or failed generation.');
-            }
-          } else {
-            console.warn('[Sequences] Failed to trigger email generation:', response.status);
-            if (window.crm?.showToast) {
-              window.crm.showToast('⚠️ Email generation may have failed. Check Scheduled tab or try "Generate Now" button.', 'warning');
-            }
-          }
-        } catch (genError) {
-          console.warn('[Sequences] Error triggering email generation:', genError);
           if (window.crm?.showToast) {
-            window.crm.showToast('⚠️ Email generation error. Check Scheduled tab or try "Generate Now" button.', 'warning');
+            window.crm.showToast(`✓ Sequence started! Processing ${allContactIds.length} contacts in batches.`, 'success');
+          }
+        } else {
+          const errorText = await response.text();
+          console.error('[Sequences] Failed to trigger batch processing:', response.status, errorText);
+          
+          // Update activation to failed
+          await activationRef.update({ 
+            status: 'failed', 
+            errorMessage: errorText 
+          });
+          
+          if (window.crm?.showToast) {
+            window.crm.showToast(`Failed to start sequence: ${errorText}`, 'error');
           }
         }
-      } else {
-        console.warn('[Sequences] No emails were created for this sequence.');
+      } catch (genError) {
+        console.error('[Sequences] Error triggering batch processing:', genError);
+        
+        // Update activation to failed
+        try {
+          await activationRef.update({ 
+            status: 'failed', 
+            errorMessage: genError.message 
+          });
+        } catch (updateError) {
+          console.error('[Sequences] Failed to update activation status:', updateError);
+        }
+        
         if (window.crm?.showToast) {
-          window.crm.showToast('⚠️ No emails were created. Check if sequence has email steps.', 'warning');
+          window.crm.showToast(`Failed to start sequence: ${genError.message}`, 'error');
         }
       }
     } catch (err) {

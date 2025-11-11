@@ -29,139 +29,91 @@ class FreeSequenceAutomation {
       };
       const userEmail = getUserEmail();
       
-      // Create scheduled email records for all auto-email steps
-      const emailSteps = sequence.steps.filter(step => step.type === 'auto-email');
-      let scheduledEmailCount = 0;
-      
       // Get Firebase database reference
       const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
-      
-      for (let i = 0; i < emailSteps.length; i++) {
-        const step = emailSteps[i];
-        
-        // ✅ NEW: Skip email steps if contact has no email
-        const hasEmail = contactData.email && contactData.email.trim() !== '';
-        if (!hasEmail) {
-          console.log(`[FreeSequenceAutomation] Skipping email step ${i} for ${contactData.name} - no email address`);
-          continue; // Skip this email step
-        }
-        
-        // Calculate when this email should be sent
-        let sendTime;
-        const delayMinutes = step.delayMinutes || 0;
-        
-        if (i === 0) {
-          // First step: use the actual delayMinutes value (0 for immediate, or specified delay)
-          // For AI generation, we still need some time, but respect user's "immediate" setting
-          if (delayMinutes === 0) {
-            // User set to immediate: schedule for 1 minute from now (allows AI generation time)
-            sendTime = Date.now() + (1 * 60 * 1000);
-          } else {
-            // User specified a delay: use it
-            sendTime = Date.now() + (delayMinutes * 60 * 1000);
-          }
-        } else {
-          // Calculate based on delay from previous step
-          const previousStepTime = i > 0 ? 
-            (emailSteps[i-1].scheduledTime || Date.now()) : 
-            Date.now();
-          // calculateSendTime expects delay in minutes as a number
-          sendTime = previousStepTime + (delayMinutes * 60 * 1000);
-        }
-        
-        // Generate unique ID
-        const emailId = `free_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`;
-        
-        // Create scheduled email record with proper ownership fields
-        const scheduledEmail = {
-          id: emailId,
-          type: 'scheduled',
-          status: 'not_generated',
-          scheduledSendTime: sendTime,
-          date: new Date(sendTime).toISOString(), // For display in emails list
-          contactId: contactData.id || contactData.email,
-          contactName: contactData.name,
-          contactCompany: contactData.company,
-          to: contactData.email,
-          from: userEmail || 'noreply@powerchoosers.com',
-          subject: '', // Will be generated
-          html: '', // Will be generated
-          text: '', // Will be generated
-          sequenceId: sequence.id,
-          sequenceName: sequence.name,
-          stepIndex: i,
-          totalSteps: emailSteps.length,
-          aiPrompt: step.emailSettings?.aiPrompt || step.data?.aiPrompt || 'Write a professional follow-up email',
-          // Ownership fields for Firestore rules
-          ownerId: userEmail || '',
-          assignedTo: userEmail || '',
-          createdBy: userEmail || '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          // Free automation flag
-          freeAutomation: true,
-          deleted: false,
-          unread: true
-        };
-        
-        // Store in memory for client-side checks
-        this.scheduledEmails.set(scheduledEmail.id, scheduledEmail);
-        
-        // Save to Firebase with proper ownership fields
-        if (db) {
-          try {
-            await db.collection('emails').doc(emailId).set(scheduledEmail);
-            console.log(`[FreeSequence] Saved scheduled email to Firebase: ${emailId}`);
-          } catch (error) {
-            console.error('[FreeSequence] Failed to save scheduled email to Firebase:', error);
-            // Continue even if Firebase save fails
-          }
-        }
-        
-        scheduledEmailCount++;
-        
-        // Schedule client-side check
-        this.scheduleEmailCheck(scheduledEmail);
+      if (!db) {
+        throw new Error('Firebase not available');
       }
       
-      console.log(`[FreeSequence] Created ${scheduledEmailCount} scheduled emails`);
+      // Skip if contact has no email
+      const hasEmail = contactData.email && contactData.email.trim() !== '';
+      if (!hasEmail) {
+        console.log(`[FreeSequenceAutomation] Skipping sequence for ${contactData.name} - no email address`);
+        throw new Error('Contact must have an email address to start sequence');
+      }
       
-      // Automatically trigger email generation for newly created scheduled emails
-      if (scheduledEmailCount > 0) {
-        try {
-          console.log('[FreeSequence] Triggering automatic email generation...');
-          const baseUrl = window.API_BASE_URL || window.location.origin || '';
-          const response = await fetch(`${baseUrl}/api/generate-scheduled-emails`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ immediate: true })
+      // Create sequenceActivations document
+      const activationRef = db.collection('sequenceActivations').doc();
+      const activationId = activationRef.id;
+      
+      const sequenceActivationData = {
+        sequenceId: sequence.id,
+        contactIds: [contactData.id], // Single contact for this method
+        status: 'pending',
+        processedContacts: 0,
+        totalContacts: 1,
+        ownerId: userEmail,
+        assignedTo: userEmail,
+        createdBy: userEmail,
+        createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
+      };
+      
+      await activationRef.set(sequenceActivationData);
+      console.log('[FreeSequence] Created sequenceActivation:', activationId);
+      
+      // Call server endpoint to process immediately
+      try {
+        const baseUrl = window.API_BASE_URL || window.location.origin || '';
+        const response = await fetch(`${baseUrl}/api/process-sequence-activations`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            immediate: true,
+            activationId: activationId
+          })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('[FreeSequence] Activation processing triggered:', result);
+          
+          // Dispatch event to refresh emails page
+          window.dispatchEvent(new CustomEvent('pc:emails-updated'));
+          
+          return {
+            success: true,
+            scheduledEmailCount: 0, // Will be updated by server
+            message: 'Sequence queued for processing'
+          };
+        } else {
+          const errorText = await response.text();
+          console.error('[FreeSequence] Failed to trigger processing:', response.status, errorText);
+          
+          // Update activation to failed
+          await activationRef.update({ 
+            status: 'failed', 
+            errorMessage: errorText 
           });
           
-          if (response.ok) {
-            const result = await response.json();
-            console.log('[FreeSequence] Email generation triggered:', result);
-          } else {
-            console.warn('[FreeSequence] Failed to trigger email generation:', response.status);
-          }
-        } catch (genError) {
-          console.warn('[FreeSequence] Error triggering email generation:', genError);
-          // Don't throw - generation can be done manually if needed
+          throw new Error(`Failed to start sequence: ${errorText}`);
         }
+      } catch (genError) {
+        console.error('[FreeSequence] Error triggering processing:', genError);
+        
+        // Update activation to failed
+        try {
+          await activationRef.update({ 
+            status: 'failed', 
+            errorMessage: genError.message 
+          });
+        } catch (updateError) {
+          console.error('[FreeSequence] Failed to update activation status:', updateError);
+        }
+        
+        throw genError;
       }
-      
-      // Dispatch event to refresh emails page
-      window.dispatchEvent(new CustomEvent('pc:emails-updated'));
-      
-      // Start the free automation loop
-      this.startFreeAutomation();
-      
-      return {
-        success: true,
-        scheduledEmailCount,
-        message: 'Sequence started with free automation'
-      };
       
     } catch (error) {
       console.error('[FreeSequence] Error starting sequence:', error);
@@ -384,34 +336,43 @@ class FreeSequenceAutomation {
    * Approve an email for sending
    */
   async approveEmail(emailId) {
-    const email = this.scheduledEmails.get(emailId);
-    if (email) {
-      email.status = 'approved';
-      email.approvedAt = Date.now();
+    // Load email from Firestore instead of Map (new architecture)
+    const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+    if (!db) {
+      console.error('[FreeSequence] Firebase not available for approval');
+      return;
+    }
+    
+    try {
+      const emailDoc = await db.collection('emails').doc(emailId).get();
+      if (!emailDoc.exists) {
+        console.warn('[FreeSequence] Email not found for approval:', emailId);
+        return;
+      }
+      
+      const email = { id: emailId, ...emailDoc.data() };
+      const approvedAt = Date.now();
       
       // Update Firebase
-      const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
-      if (db) {
-        try {
-          await db.collection('emails').doc(emailId).update({
-            status: 'approved',
-            approvedAt: email.approvedAt,
-            updatedAt: new Date().toISOString()
-          });
-          
-          // Dispatch event to refresh emails page
-          window.dispatchEvent(new CustomEvent('pc:emails-updated'));
-        } catch (error) {
-          console.error('[FreeSequence] Failed to update approval status in Firebase:', error);
-        }
-      }
+      await db.collection('emails').doc(emailId).update({
+        status: 'approved',
+        approvedAt: approvedAt,
+        updatedAt: new Date().toISOString()
+      });
+      
+      // Dispatch event to refresh emails page
+      window.dispatchEvent(new CustomEvent('pc:emails-updated'));
       
       // Remove notification
       const notification = document.querySelector('.email-approval-notification');
       if (notification) notification.remove();
       
-      // Send the email
-      await this.sendEmail(email);
+      // Note: Email will be sent by server-side cron job (/api/send-scheduled-emails)
+      // No need to call sendEmail() here anymore
+      console.log(`[FreeSequence] Email ${emailId} approved. Will be sent by server at scheduled time.`);
+    } catch (error) {
+      console.error('[FreeSequence] Failed to approve email:', error);
+      throw error;
     }
   }
 
@@ -419,45 +380,78 @@ class FreeSequenceAutomation {
    * Reject an email
    */
   async rejectEmail(emailId) {
-    const email = this.scheduledEmails.get(emailId);
-    if (email) {
-      email.status = 'rejected';
-      email.rejectedAt = Date.now();
+    // Load email from Firestore instead of Map (new architecture)
+    const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+    if (!db) {
+      console.error('[FreeSequence] Firebase not available for rejection');
+      return;
+    }
+    
+    try {
+      const emailDoc = await db.collection('emails').doc(emailId).get();
+      if (!emailDoc.exists) {
+        console.warn('[FreeSequence] Email not found for rejection:', emailId);
+        return;
+      }
+      
+      const rejectedAt = Date.now();
       
       // Update Firebase
-      const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
-      if (db) {
-        try {
-          await db.collection('emails').doc(emailId).update({
-            status: 'rejected',
-            rejectedAt: email.rejectedAt,
-            updatedAt: new Date().toISOString()
-          });
-          
-          // Dispatch event to refresh emails page
-          window.dispatchEvent(new CustomEvent('pc:emails-updated'));
-        } catch (error) {
-          console.error('[FreeSequence] Failed to update rejection status in Firebase:', error);
-        }
-      }
+      await db.collection('emails').doc(emailId).update({
+        status: 'rejected',
+        rejectedAt: rejectedAt,
+        updatedAt: new Date().toISOString()
+      });
+      
+      // Dispatch event to refresh emails page
+      window.dispatchEvent(new CustomEvent('pc:emails-updated'));
       
       // Remove notification
       const notification = document.querySelector('.email-approval-notification');
       if (notification) notification.remove();
       
       console.log(`[FreeSequence] Email ${emailId} rejected`);
+    } catch (error) {
+      console.error('[FreeSequence] Failed to reject email:', error);
+      throw error;
     }
   }
 
   /**
    * Edit an email
    */
-  editEmail(emailId) {
-    const email = this.scheduledEmails.get(emailId);
-    if (email) {
+  async editEmail(emailId) {
+    // Load email from Firestore instead of Map (new architecture)
+    const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+    if (!db) {
+      console.error('[FreeSequence] Firebase not available for editing');
+      return;
+    }
+    
+    try {
+      const emailDoc = await db.collection('emails').doc(emailId).get();
+      if (!emailDoc.exists) {
+        console.warn('[FreeSequence] Email not found for editing:', emailId);
+        return;
+      }
+      
+      const email = { id: emailId, ...emailDoc.data() };
+      
       // Open email editor (you would implement this)
       console.log(`[FreeSequence] Edit email ${emailId}`);
       // This would open your email editor modal
+      // For now, just navigate to email detail page
+      if (window.crm && typeof window.crm.navigateToPage === 'function') {
+        window.crm.navigateToPage('emails');
+        // Trigger email detail view
+        setTimeout(() => {
+          if (window.EmailsPage && typeof window.EmailsPage.viewEmail === 'function') {
+            window.EmailsPage.viewEmail(emailId);
+          }
+        }, 100);
+      }
+    } catch (error) {
+      console.error('[FreeSequence] Failed to load email for editing:', error);
     }
   }
 

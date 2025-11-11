@@ -4666,7 +4666,8 @@ class PowerChoosersCRM {
         }, 3 * 60 * 60 * 1000);
         
         // Start email automation monitor
-        this.startEmailAutomation();
+        // Client-side email automation is now handled by Cloud Scheduler cron jobs
+        // this.startEmailAutomation();
     }
     
     // Email Automation Monitor - checks for emails that need generation/sending
