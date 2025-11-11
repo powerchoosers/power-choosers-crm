@@ -162,12 +162,19 @@
     return false;
   }
 
+  // Helper function to get account ID (normalize across different field names)
+  function getAccountId(account) {
+    if (!account) return null;
+    return account.id || account.accountId || account.docId || null;
+  }
+
   // Load selected account IDs from localStorage
   function loadSelectedAccounts() {
     try {
       const saved = localStorage.getItem('client-management-selected-accounts');
       if (saved) {
         state.selectedAccountIds = JSON.parse(saved);
+        console.log('[ClientManagement] Loaded selected account IDs:', state.selectedAccountIds);
       }
     } catch (e) {
       console.warn('[ClientManagement] Failed to load selected accounts:', e);
@@ -381,9 +388,10 @@
   // Calculate dashboard metrics from real data
   function calculateMetrics() {
     // Only calculate metrics for selected accounts (accounts in client management)
-    const accounts = state.data.accounts.filter(acc => 
-      state.selectedAccountIds.includes(acc.id)
-    );
+    const accounts = state.data.accounts.filter(acc => {
+      const accountId = getAccountId(acc);
+      return accountId && state.selectedAccountIds.includes(accountId);
+    });
     const tasks = state.data.tasks;
     const contacts = state.data.contacts;
 
@@ -546,7 +554,32 @@
 
   // Render contract renewal dashboard
   function renderContractRenewalDashboard(metrics) {
-    const contractCard = els.dashboard.querySelector('.dashboard-card:has(.card-title:contains("Contract Renewals"))');
+    if (!els.dashboard) return;
+    
+    // Find the Contract Renewals section
+    const allSections = els.dashboard.querySelectorAll('.dashboard-section');
+    let contractCard = null;
+    
+    for (const section of allSections) {
+      const sectionTitle = section.querySelector('.section-title');
+      if (sectionTitle && sectionTitle.textContent.trim() === 'Contract Renewals') {
+        contractCard = section.querySelector('.dashboard-card');
+        break;
+      }
+    }
+    
+    // Fallback: find by card-title
+    if (!contractCard) {
+      const allCards = els.dashboard.querySelectorAll('.dashboard-card');
+      for (const card of allCards) {
+        const title = card.querySelector('.card-title');
+        if (title && title.textContent.trim() === 'Contract Renewals') {
+          contractCard = card;
+          break;
+        }
+      }
+    }
+    
     if (!contractCard) return;
 
     const metricRows = contractCard.querySelectorAll('.metric-row');
@@ -584,16 +617,69 @@
 
   // Render client list with real data
   function renderClientList() {
-    const clientListCard = els.dashboard.querySelector('.dashboard-card:has(.card-title:contains("Client List"))');
-    if (!clientListCard) return;
+    if (!els.dashboard) {
+      console.warn('[ClientManagement] Dashboard not found, cannot render client list');
+      return;
+    }
+
+    // Find the Client List card by looking for the section title first, then the card
+    const allSections = els.dashboard.querySelectorAll('.dashboard-section');
+    let clientListCard = null;
+    
+    // Find section with "Client List" title
+    for (const section of allSections) {
+      const sectionTitle = section.querySelector('.section-title');
+      if (sectionTitle && sectionTitle.textContent.trim() === 'Client List') {
+        // Find the dashboard-card within this section
+        clientListCard = section.querySelector('.dashboard-card');
+        break;
+      }
+    }
+    
+    // Fallback: try to find by card-title text content
+    if (!clientListCard) {
+      const allCards = els.dashboard.querySelectorAll('.dashboard-card');
+      for (const card of allCards) {
+        const title = card.querySelector('.card-title');
+        if (title && title.textContent.trim() === 'Client List') {
+          clientListCard = card;
+          break;
+        }
+      }
+    }
+    
+    if (!clientListCard) {
+      console.warn('[ClientManagement] Client List card not found. Dashboard sections:', 
+        Array.from(els.dashboard.querySelectorAll('.dashboard-section')).map(s => {
+          const title = s.querySelector('.section-title');
+          return title ? title.textContent.trim() : 'No title';
+        })
+      );
+      return;
+    }
 
     const clientList = clientListCard.querySelector('.client-list');
-    if (!clientList) return;
+    if (!clientList) {
+      console.warn('[ClientManagement] .client-list element not found in card');
+      return;
+    }
 
     // Filter to only show selected accounts (accounts added to client management)
-    let filteredAccounts = state.data.accounts.filter(acc => 
-      state.selectedAccountIds.includes(acc.id)
-    );
+    let filteredAccounts = state.data.accounts.filter(acc => {
+      const accountId = getAccountId(acc);
+      return accountId && state.selectedAccountIds.includes(accountId);
+    });
+    
+    console.log('[ClientManagement] Rendering client list:', {
+      totalAccounts: state.data.accounts.length,
+      selectedIds: state.selectedAccountIds,
+      filteredCount: filteredAccounts.length,
+      accountIdsInData: state.data.accounts.map(a => getAccountId(a)).filter(Boolean),
+      filteredAccounts: filteredAccounts.map(a => ({ 
+        id: getAccountId(a), 
+        name: a.accountName || a.name 
+      }))
+    });
 
     // Apply contract status filter
     if (state.filters.contractStatus !== 'all') {
@@ -611,6 +697,19 @@
       });
     }
 
+    // Show empty state if no accounts
+    if (filteredAccounts.length === 0) {
+      clientList.innerHTML = `
+        <div style="padding: 40px; text-align: center; color: var(--text-secondary);">
+          <p style="margin: 0; font-size: 0.95rem;">No clients added yet.</p>
+          <p style="margin: 8px 0 0 0; font-size: 0.85rem; color: var(--text-muted);">
+            Click "Add Account" to add clients to Client Management.
+          </p>
+        </div>
+      `;
+      return;
+    }
+
     // Sort by contract end date (expiring soon first)
     filteredAccounts.sort((a, b) => {
       const daysA = getDaysUntilExpiry(a.contractEndDate) || 9999;
@@ -620,18 +719,20 @@
 
     // Render client items
     clientList.innerHTML = filteredAccounts.slice(0, state.pageSize).map(account => {
+      // Get account ID using helper function
+      const accountId = getAccountId(account) || '';
       const daysUntilExpiry = getDaysUntilExpiry(account.contractEndDate);
       const contractStatus = getContractStatus(account.contractEndDate);
       const clientSize = getClientSize(account.employees);
       
       // Find primary contact for this account
       const primaryContact = state.data.contacts.find(contact => 
-        contact.accountId === account.id || contact.companyName === account.accountName
+        contact.accountId === accountId || contact.companyName === account.accountName
       );
 
       // Find tasks for this account
       const accountTasks = state.data.tasks.filter(task => 
-        task.accountId === account.id || task.account === account.accountName
+        task.accountId === accountId || task.account === account.accountName
       );
 
       const overdueTasks = accountTasks.filter(task => {
@@ -641,14 +742,14 @@
       }).length;
 
       return `
-        <div class="client-item" data-account-id="${account.id}">
+        <div class="client-item" data-account-id="${accountId}">
           <div class="client-header">
             <div class="client-name">
               <h4>${account.accountName || account.name || 'Unnamed Client'}</h4>
               <span class="client-size ${clientSize}">${clientSize.toUpperCase()}</span>
             </div>
             <div class="client-actions">
-              <button class="btn-sm btn-primary" onclick="window.ClientManagement.createRenewalTask('${account.id}')">
+              <button class="btn-sm btn-primary" onclick="window.ClientManagement.createRenewalTask('${accountId}')">
                 Create Task
               </button>
             </div>
@@ -714,7 +815,32 @@
 
   // Render task management dashboard
   function renderTaskDashboard(metrics) {
-    const taskCard = els.dashboard.querySelector('.dashboard-card:has(.card-title:contains("Task Management"))');
+    if (!els.dashboard) return;
+    
+    // Find the Task Management section
+    const allSections = els.dashboard.querySelectorAll('.dashboard-section');
+    let taskCard = null;
+    
+    for (const section of allSections) {
+      const sectionTitle = section.querySelector('.section-title');
+      if (sectionTitle && sectionTitle.textContent.trim() === 'Task Management') {
+        taskCard = section.querySelector('.dashboard-card');
+        break;
+      }
+    }
+    
+    // Fallback: find by card-title
+    if (!taskCard) {
+      const allCards = els.dashboard.querySelectorAll('.dashboard-card');
+      for (const card of allCards) {
+        const title = card.querySelector('.card-title');
+        if (title && title.textContent.trim() === 'Task Management') {
+          taskCard = card;
+          break;
+        }
+      }
+    }
+    
     if (!taskCard) return;
 
     const metricRows = taskCard.querySelectorAll('.metric-row');
@@ -745,7 +871,32 @@
 
   // Render client segmentation
   function renderClientSegmentation(metrics) {
-    const segmentCard = els.dashboard.querySelector('.dashboard-card:has(.card-title:contains("Client Segmentation"))');
+    if (!els.dashboard) return;
+    
+    // Find the Client Segmentation section
+    const allSections = els.dashboard.querySelectorAll('.dashboard-section');
+    let segmentCard = null;
+    
+    for (const section of allSections) {
+      const sectionTitle = section.querySelector('.section-title');
+      if (sectionTitle && sectionTitle.textContent.trim() === 'Client Segmentation') {
+        segmentCard = section.querySelector('.dashboard-card');
+        break;
+      }
+    }
+    
+    // Fallback: find by card-title
+    if (!segmentCard) {
+      const allCards = els.dashboard.querySelectorAll('.dashboard-card');
+      for (const card of allCards) {
+        const title = card.querySelector('.card-title');
+        if (title && title.textContent.trim() === 'Client Segmentation') {
+          segmentCard = card;
+          break;
+        }
+      }
+    }
+    
     if (!segmentCard) return;
 
     const segmentItems = segmentCard.querySelectorAll('.segment-item');
@@ -1006,8 +1157,11 @@
         size: 48
       }) || `<div style="width: 48px; height: 48px; background: var(--grey-700); border-radius: 6px;"></div>`;
 
+      // Get account ID using helper function
+      const accountId = getAccountId(account) || '';
+      
       return `
-        <div class="account-search-result" data-account-id="${account.id || ''}">
+        <div class="account-search-result" data-account-id="${accountId}">
           <div class="company-icon-wrap">
             ${iconHTML}
           </div>
@@ -1026,7 +1180,11 @@
     container.querySelectorAll('.account-search-result').forEach(resultEl => {
       resultEl.addEventListener('click', () => {
         const accountId = resultEl.dataset.accountId;
-        handleAccountSelected(accountId);
+        if (accountId) {
+          handleAccountSelected(accountId);
+        } else {
+          console.warn('[ClientManagement] No account ID found for selected account');
+        }
       });
     });
   }
@@ -1034,6 +1192,11 @@
   // Handle account selection
   function handleAccountSelected(accountId) {
     console.log('[ClientManagement] Account selected:', accountId);
+    console.log('[ClientManagement] Current selected IDs:', state.selectedAccountIds);
+    console.log('[ClientManagement] Available accounts:', state.data.accounts.map(a => ({
+      id: getAccountId(a),
+      name: a.accountName || a.name
+    })));
     
     if (!accountId) {
       console.warn('[ClientManagement] No account ID provided');
@@ -1045,6 +1208,7 @@
       state.selectedAccountIds.push(accountId);
       saveSelectedAccounts();
       console.log('[ClientManagement] Account added to client management:', accountId);
+      console.log('[ClientManagement] Updated selected IDs:', state.selectedAccountIds);
     } else {
       console.log('[ClientManagement] Account already in client management:', accountId);
     }
@@ -1070,9 +1234,10 @@
 
   // Public API methods
   async function createRenewalTask(accountId) {
-    const account = state.data.accounts.find(acc => acc.id === accountId);
+    const account = state.data.accounts.find(acc => getAccountId(acc) === accountId);
     if (!account) {
-      console.error('Account not found:', accountId);
+      console.error('[ClientManagement] Account not found:', accountId);
+      console.log('[ClientManagement] Available account IDs:', state.data.accounts.map(a => getAccountId(a)));
       return;
     }
     await createTaskForAccount(account, 'contract-renewal');
