@@ -8,7 +8,8 @@
     pageSize: 25,
     currentFolder: 'inbox',
     hasMore: false, // Track if more emails are available
-    totalCount: 0   // Total emails in database (for footer display)
+    totalCount: 0,  // Overall total emails (reference only)
+    folderCount: 0  // Total emails for current folder (for footer/pagination)
   };
   const els = {};
 
@@ -221,38 +222,44 @@
       }
       
       // Ensure all emails have required fields and preserve content fields
-      state.data = emailsData.map(email => {
-        // Normalize 'to' field - handle both string and array formats
-        let normalizedTo = '';
-        if (Array.isArray(email.to)) {
-          normalizedTo = email.to.length > 0 ? email.to[0] : '';
-        } else {
-          normalizedTo = email.to || '';
+      // Deduplicate by email ID
+      const emailMap = new Map();
+      emailsData.forEach(email => {
+        if (!emailMap.has(email.id)) {
+          // Normalize 'to' field - handle both string and array formats
+          let normalizedTo = '';
+          if (Array.isArray(email.to)) {
+            normalizedTo = email.to.length > 0 ? email.to[0] : '';
+          } else {
+            normalizedTo = email.to || '';
+          }
+          
+          emailMap.set(email.id, {
+            ...email,
+            type: email.type || 'received',
+            from: email.from || 'Unknown',
+            to: normalizedTo,
+            subject: email.subject || '(No Subject)',
+            date: email.date || email.timestamp || email.createdAt || new Date(),
+            // Preserve all content fields like old system
+            html: email.html || '',
+            text: email.text || '',
+            content: email.content || '',
+            originalContent: email.originalContent || '',
+            // Add tracking data
+            openCount: email.openCount || 0,
+            clickCount: email.clickCount || 0,
+            lastOpened: email.lastOpened,
+            lastClicked: email.lastClicked,
+            isSentEmail: email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail,
+            starred: email.starred || false,
+            deleted: email.deleted || false,
+            unread: email.unread !== false
+          });
         }
-        
-        return {
-        ...email,
-        type: email.type || 'received',
-        from: email.from || 'Unknown',
-        to: normalizedTo,
-        subject: email.subject || '(No Subject)',
-        date: email.date || email.timestamp || email.createdAt || new Date(),
-        // Preserve all content fields like old system
-        html: email.html || '',
-        text: email.text || '',
-        content: email.content || '',
-        originalContent: email.originalContent || '',
-        // Add tracking data
-        openCount: email.openCount || 0,
-        clickCount: email.clickCount || 0,
-        lastOpened: email.lastOpened,
-        lastClicked: email.lastClicked,
-        isSentEmail: email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail,
-        starred: email.starred || false,
-        deleted: email.deleted || false,
-        unread: email.unread !== false
-        };
       });
+      
+      state.data = Array.from(emailMap.values());
       
       // Sort by date (newest first)
       state.data.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -359,6 +366,9 @@
     const neededForPage = state.currentPage * state.pageSize;
     console.log('[EmailsPage] Filter check - filtered:', state.filtered.length, 'needed:', neededForPage, 'hasMore:', state.hasMore, 'loader available:', !!window.BackgroundEmailsLoader);
     
+    // Update folder total count asynchronously (do not block UI)
+    updateFolderCount().catch(() => {});
+    
     if (state.filtered.length < neededForPage && state.hasMore && window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.loadMore === 'function') {
       console.log('[EmailsPage] Not enough filtered results, loading more...');
       // Load more data until we have enough filtered results
@@ -374,6 +384,30 @@
         });
       }
       render();
+    }
+  }
+  
+  // Update total count for the current folder without loading all records
+  async function updateFolderCount() {
+    try {
+      const searchTerm = els.searchInput?.value?.trim() || '';
+      // In search mode, show filtered count
+      if (searchTerm) {
+        state.folderCount = state.filtered.length;
+        renderPagination();
+        return;
+      }
+      if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.getTotalCountByFolder === 'function') {
+        const cnt = await window.BackgroundEmailsLoader.getTotalCountByFolder(state.currentFolder || 'inbox');
+        state.folderCount = cnt || state.filtered.length;
+      } else {
+        state.folderCount = state.filtered.length;
+      }
+      renderPagination();
+    } catch (e) {
+      console.warn('[EmailsPage] Failed to update folder count:', e);
+      state.folderCount = state.filtered.length;
+      renderPagination();
     }
   }
 
@@ -395,36 +429,44 @@
       }
       console.log(`[EmailsPage] Loaded ${result.loaded} more emails, total now: ${state.data.length}`);
       
-      // Reload data from background loader
+      // Reload data from background loader with deduplication
       const updatedData = window.BackgroundEmailsLoader.getEmailsData() || [];
-      state.data = updatedData.map(email => {
-        let normalizedTo = '';
-        if (Array.isArray(email.to)) {
-          normalizedTo = email.to.length > 0 ? email.to[0] : '';
-        } else {
-          normalizedTo = email.to || '';
+      const emailMap = new Map();
+      
+      // Deduplicate by email ID
+      updatedData.forEach(email => {
+        if (!emailMap.has(email.id)) {
+          let normalizedTo = '';
+          if (Array.isArray(email.to)) {
+            normalizedTo = email.to.length > 0 ? email.to[0] : '';
+          } else {
+            normalizedTo = email.to || '';
+          }
+          
+          emailMap.set(email.id, {
+            ...email,
+            type: email.type || 'received',
+            from: email.from || 'Unknown',
+            to: normalizedTo,
+            subject: email.subject || '(No Subject)',
+            date: email.date || email.timestamp || email.createdAt || new Date(),
+            html: email.html || '',
+            text: email.text || '',
+            content: email.content || '',
+            originalContent: email.originalContent || '',
+            openCount: email.openCount || 0,
+            clickCount: email.clickCount || 0,
+            lastOpened: email.lastOpened,
+            lastClicked: email.lastClicked,
+            isSentEmail: email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail,
+            starred: email.starred || false,
+            deleted: email.deleted || false,
+            unread: email.unread !== false
+          });
         }
-        return {
-          ...email,
-          type: email.type || 'received',
-          from: email.from || 'Unknown',
-          to: normalizedTo,
-          subject: email.subject || '(No Subject)',
-          date: email.date || email.timestamp || email.createdAt || new Date(),
-          html: email.html || '',
-          text: email.text || '',
-          content: email.content || '',
-          originalContent: email.originalContent || '',
-          openCount: email.openCount || 0,
-          clickCount: email.clickCount || 0,
-          lastOpened: email.lastOpened,
-          lastClicked: email.lastClicked,
-          isSentEmail: email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail,
-          starred: email.starred || false,
-          deleted: email.deleted || false,
-          unread: email.unread !== false
-        };
       });
+      
+      state.data = Array.from(emailMap.values());
       state.data.sort((a, b) => new Date(b.date) - new Date(a.date));
       state.hasMore = result.hasMore || false;
       
@@ -528,11 +570,12 @@
     els.tbody.innerHTML = rows.map(email => rowHtml(email)).join('');
     
     // Update summary and count
-    // Use filtered count (current folder's emails), not total database count
-    const totalToShow = state.filtered.length;
+  // Use folder total count (queried from Firestore), fallback to filtered length in search mode
+  const searchTermNow = els.searchInput?.value?.trim() || '';
+  const totalToShow = searchTermNow ? state.filtered.length : (state.folderCount || state.filtered.length);
     if (els.summary) {
-      const start = totalToShow === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1;
-      const end = Math.min(state.currentPage * state.pageSize, state.filtered.length);
+    const start = totalToShow === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1;
+    const end = Math.min(state.currentPage * state.pageSize, totalToShow);
       els.summary.textContent = `${start}-${end} of ${totalToShow} emails`;
     }
     
@@ -1071,9 +1114,9 @@
   function renderPagination() {
     if (!els.pagination) return;
     
-    // Use filtered count (current folder's emails), not total database count
-    // Unlike people.js which shows all contacts, emails are filtered by folder
-    const totalRecords = state.filtered.length;
+    // Use folder total count (queried, not fully loaded) unless search is active
+    const searchTermNow = els.searchInput?.value?.trim() || '';
+    const totalRecords = searchTermNow ? state.filtered.length : (state.folderCount || state.filtered.length);
     const totalPages = Math.max(1, Math.ceil(totalRecords / state.pageSize));
     const currentPage = Math.min(state.currentPage, totalPages);
     

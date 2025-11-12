@@ -239,6 +239,91 @@
     }
   }
 
+  // Get total count for a specific folder without loading all records
+  // folder: 'inbox' | 'sent' | 'scheduled' | 'starred' | 'trash'
+  async function getTotalCountByFolder(folder) {
+    if (!window.firebaseDB) return 0;
+    const db = window.firebaseDB.collection('emails');
+    const isEmployee = window.currentUserRole !== 'admin';
+    const user = (window.currentUserEmail || '').toLowerCase();
+    const idSet = new Set();
+    
+    const runQuery = async (builder) => {
+      try {
+        const snap = await builder.get();
+        snap.forEach(d => idSet.add(d.id));
+      } catch (e) {
+        console.warn('[BackgroundEmailsLoader] Count query failed for folder', folder, e);
+      }
+    };
+    
+    try {
+      switch (folder) {
+        case 'inbox': {
+          // Union of: type == 'received' OR provider == 'sendgrid_inbound'
+          if (isEmployee && user) {
+            await runQuery(db.where('ownerId','==',user).where('type','==','received'));
+            await runQuery(db.where('assignedTo','==',user).where('type','==','received'));
+            await runQuery(db.where('ownerId','==',user).where('provider','==','sendgrid_inbound'));
+            await runQuery(db.where('assignedTo','==',user).where('provider','==','sendgrid_inbound'));
+          } else {
+            await runQuery(db.where('type','==','received'));
+            await runQuery(db.where('provider','==','sendgrid_inbound'));
+          }
+          break;
+        }
+        case 'sent': {
+          // Union of: type == 'sent' OR provider == 'sendgrid'
+          if (isEmployee && user) {
+            await runQuery(db.where('ownerId','==',user).where('type','==','sent'));
+            await runQuery(db.where('assignedTo','==',user).where('type','==','sent'));
+            await runQuery(db.where('ownerId','==',user).where('provider','==','sendgrid'));
+            await runQuery(db.where('assignedTo','==',user).where('provider','==','sendgrid'));
+          } else {
+            await runQuery(db.where('type','==','sent'));
+            await runQuery(db.where('provider','==','sendgrid'));
+          }
+          break;
+        }
+        case 'scheduled': {
+          if (isEmployee && user) {
+            await runQuery(db.where('ownerId','==',user).where('type','==','scheduled'));
+            await runQuery(db.where('assignedTo','==',user).where('type','==','scheduled'));
+          } else {
+            await runQuery(db.where('type','==','scheduled'));
+          }
+          break;
+        }
+        case 'starred': {
+          if (isEmployee && user) {
+            await runQuery(db.where('ownerId','==',user).where('starred','==',true));
+            await runQuery(db.where('assignedTo','==',user).where('starred','==',true));
+          } else {
+            await runQuery(db.where('starred','==',true));
+          }
+          break;
+        }
+        case 'trash': {
+          if (isEmployee && user) {
+            await runQuery(db.where('ownerId','==',user).where('deleted','==',true));
+            await runQuery(db.where('assignedTo','==',user).where('deleted','==',true));
+          } else {
+            await runQuery(db.where('deleted','==',true));
+          }
+          break;
+        }
+        default: {
+          // Fallback to total
+          return await getTotalCount();
+        }
+      }
+      return idSet.size;
+    } catch (error) {
+      console.error('[BackgroundEmailsLoader] Failed to get folder count:', folder, error);
+      return 0;
+    }
+  }
+
   // Start a real-time listener for emails collection
   function startRealtimeListener() {
     try {
@@ -616,7 +701,8 @@
     unsubscribe: () => { try { if (_unsubscribe) { _unsubscribe(); _unsubscribe = null; } } catch(_) {} },
     getCount: () => emailsData.length,
     hasMore: () => hasMoreData,
-    getTotalCount: getTotalCount
+    getTotalCount: getTotalCount,
+    getTotalCountByFolder: getTotalCountByFolder
   };
   
   console.log('[BackgroundEmailsLoader] Module initialized');
