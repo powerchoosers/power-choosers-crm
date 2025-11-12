@@ -3233,10 +3233,10 @@ function toggleSectionCollapse(section) {
         // Collapse
         if (isInitialRender) {
             // No animation on initial render
-            section.classList.add('collapsed');
-            if (collapseBtn) {
-                collapseBtn.setAttribute('aria-label', 'Expand section');
-            }
+        section.classList.add('collapsed');
+        if (collapseBtn) {
+            collapseBtn.setAttribute('aria-label', 'Expand section');
+        }
             return;
         }
         

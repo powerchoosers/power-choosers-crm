@@ -173,7 +173,7 @@
         }
         els.senderName.textContent = extractName(recipientEmail) || 'Unknown Recipient';
       } else {
-        els.senderName.textContent = extractName(email.from);
+      els.senderName.textContent = extractName(email.from);
       }
     }
 
@@ -189,7 +189,7 @@
         }
         els.senderEmail.textContent = recipientEmail || 'Unknown';
       } else {
-        els.senderEmail.textContent = email.from || 'Unknown';
+      els.senderEmail.textContent = email.from || 'Unknown';
       }
     }
 
@@ -218,12 +218,12 @@
         els.senderAvatar.innerHTML = faviconHtml;
       } else {
         // Use domain favicon for received emails
-        const domain = extractDomain(email.from);
-        const faviconHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
-          domain: domain,
-          size: 40
-        });
-        els.senderAvatar.innerHTML = faviconHtml;
+      const domain = extractDomain(email.from);
+      const faviconHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
+        domain: domain,
+        size: 40
+      });
+      els.senderAvatar.innerHTML = faviconHtml;
       }
     }
 
@@ -2750,9 +2750,9 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       extractedName = quotedMatch[1];
       emailAddress = quotedMatch[2].toLowerCase().trim();
     } else {
-      // Handle format: Name <email@domain.com>
-      const angleMatch = email.match(/^([^<]+)\s*<(.+)>$/);
-      if (angleMatch) {
+    // Handle format: Name <email@domain.com>
+    const angleMatch = email.match(/^([^<]+)\s*<(.+)>$/);
+    if (angleMatch) {
         extractedName = angleMatch[1].trim();
         emailAddress = angleMatch[2].toLowerCase().trim();
       } else {
@@ -2815,7 +2815,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     // If no contact found, format email username as "First Last"
     if (emailAddress && emailAddress.includes('@')) {
       const emailMatch = emailAddress.match(/^(.+)@/);
-      if (emailMatch) {
+    if (emailMatch) {
         const emailUsername = emailMatch[1];
         const formattedName = formatEmailAsName(emailUsername);
         return formattedName;

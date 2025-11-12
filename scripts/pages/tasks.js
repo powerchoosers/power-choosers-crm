@@ -199,7 +199,7 @@
   function attachEvents(){
     if(els.selectAll){
       els.selectAll.addEventListener('change',()=>{
-        if(els.selectAll.checked) openBulkPopover(); else { state.selected.clear(); render(); closeBulkPopover(); hideBulkBar(); }
+        if(els.selectAll.checked) openBulkSelectModal(); else { state.selected.clear(); render(); closeBulkSelectModal(); hideBulkBar(); }
       });
     }
     // Handle Tasks filter tabs locally and silence global handler in main.js
@@ -850,70 +850,333 @@
       </tr>`;
   }
 
-  // Bulk selection popover
-  function openBulkPopover(){ if(!els.container) return; closeBulkPopover();
-    const backdrop=document.createElement('div'); backdrop.className='bulk-select-backdrop'; backdrop.addEventListener('click',()=>{ if(els.selectAll) els.selectAll.checked = state.selected.size>0; closeBulkPopover(); }); document.body.appendChild(backdrop);
-    const total=state.filtered.length; const page=getPageItems().length;
-    const pop=document.createElement('div'); pop.id='tasks-bulk-popover'; pop.className='bulk-select-popover'; pop.setAttribute('role','dialog'); pop.setAttribute('aria-label','Bulk selection');
-    pop.innerHTML = `
-      <div class="option"><label><input type="radio" name="bulk-mode" value="custom" checked/> Select</label>
-      <input type="number" id="bulk-custom-count" min="1" max="${total}" value="${Math.min(50,total)}"/>
-      <span class="hint">items from current filters</span></div>
-      <div class="option"><label><input type="radio" name="bulk-mode" value="page"/> Select current page</label><span class="hint">${page} visible</span></div>
-      <div class="option"><label><input type="radio" name="bulk-mode" value="all"/> Select all</label><span class="hint">${total} items</span></div>
-      <div class="actions"><button class="btn-text" id="bulk-cancel">Cancel</button><button class="btn-primary" id="bulk-apply">Apply</button></div>`;
-    els.container.appendChild(pop);
-
-    function positionPopover(){ if(!els.selectAll) return; const cb=els.selectAll.getBoundingClientRect(); const ct=els.container.getBoundingClientRect(); pop.style.left=(cb.left-ct.left)+'px'; pop.style.top=(cb.bottom-ct.top+8)+'px'; }
-    positionPopover();
-    const reposition=()=>positionPopover();
-    window.addEventListener('resize',reposition);
-    window.addEventListener('scroll',reposition,true);
-    if(els.page){ if(els.page._bulkPopoverCleanup) els.page._bulkPopoverCleanup(); els.page._bulkPopoverCleanup=()=>{ window.removeEventListener('resize',reposition); window.removeEventListener('scroll',reposition,true); }; }
-
-    const firstInput = pop.querySelector('#bulk-custom-count') || pop.querySelector('input,button'); if(firstInput && typeof firstInput.focus==='function') firstInput.focus();
-    pop.querySelector('#bulk-cancel').addEventListener('click',()=>{ if(els.selectAll) els.selectAll.checked=false; closeBulkPopover(); });
-    pop.querySelector('#bulk-apply').addEventListener('click',()=>{
-      const m=(pop.querySelector('input[name="bulk-mode"]:checked')||{}).value;
-      if(m==='custom'){
-        const n=Math.max(1,parseInt(pop.querySelector('#bulk-custom-count').value||'0',10));
-        selectIds(state.filtered.slice(0,Math.min(n,total)).map(r=>r.id));
-      } else if(m==='page'){
-        selectIds(getPageItems().map(r=>r.id));
-      } else {
-        selectIds(state.filtered.map(r=>r.id));
-      }
-      closeBulkPopover(); render(); showBulkBar();
+  // Bulk selection modal (using pc-modal style)
+  function openBulkSelectModal(){
+    if(!els.container) return;
+    closeBulkSelectModal();
+    
+    const total = state.filtered.length;
+    const page = getPageItems().length;
+    
+    const modal = document.createElement('div');
+    modal.id = 'tasks-bulk-select-modal';
+    modal.className = 'pc-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'tasks-bulk-modal-title');
+    
+    modal.innerHTML = `
+      <div class="pc-modal__backdrop"></div>
+      <div class="pc-modal__dialog">
+        <div class="pc-modal__form">
+          <div class="pc-modal__header">
+            <h3 class="card-title" id="tasks-bulk-modal-title">Select Tasks</h3>
+            <button class="pc-modal__close" aria-label="Close" type="button">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          <div class="pc-modal__body">
+            <div class="option" style="display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: var(--spacing-md);">
+              <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-primary);">
+                <input type="radio" name="bulk-mode" value="custom" checked style="accent-color: var(--orange-subtle);">
+                <span>Select</span>
+              </label>
+              <input type="number" id="bulk-custom-count" min="1" max="${total}" value="${Math.min(50,total)}" style="width: 120px; height: 40px; padding: 0 14px; background: var(--bg-item); color: var(--text-primary); border: 2px solid var(--border-light); border-radius: 8px; transition: all 0.3s ease;">
+              <span class="hint" style="color: var(--text-secondary); font-size: 0.85rem;">items from current filters</span>
+            </div>
+            <div class="option" style="display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: var(--spacing-md);">
+              <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-primary);">
+                <input type="radio" name="bulk-mode" value="page" style="accent-color: var(--orange-subtle);">
+                <span>Select current page</span>
+              </label>
+              <span class="hint" style="color: var(--text-secondary); font-size: 0.85rem;">${page} visible</span>
+            </div>
+            <div class="option" style="display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: 0;">
+              <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-primary);">
+                <input type="radio" name="bulk-mode" value="all" style="accent-color: var(--orange-subtle);">
+                <span>Select all</span>
+              </label>
+              <span class="hint" style="color: var(--text-secondary); font-size: 0.85rem;">${total} items</span>
+            </div>
+          </div>
+          <div class="pc-modal__footer">
+            <button type="button" class="btn-text" id="bulk-cancel">Cancel</button>
+            <button type="button" class="btn-primary" id="bulk-apply">Apply</button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Show modal with animation
+    requestAnimationFrame(() => {
+      modal.classList.add('show');
     });
-
-    setTimeout(()=>{ function outside(e){ if(!pop.contains(e.target) && e.target!==els.selectAll){ document.removeEventListener('mousedown',outside); if(els.selectAll) els.selectAll.checked = state.selected.size>0; closeBulkPopover(); } } document.addEventListener('mousedown',outside); },0);
+    
+    // Enable/disable custom count input
+    const customInput = modal.querySelector('#bulk-custom-count');
+    const radios = Array.from(modal.querySelectorAll('input[name="bulk-mode"]'));
+    function updateCustomEnabled() {
+      const isCustom = !!modal.querySelector('input[name="bulk-mode"][value="custom"]:checked');
+      if (customInput) {
+        customInput.disabled = !isCustom;
+        if (isCustom) customInput.removeAttribute('aria-disabled');
+        else customInput.setAttribute('aria-disabled', 'true');
+      }
+    }
+    radios.forEach((r) => r.addEventListener('change', () => {
+      updateCustomEnabled();
+      if (r.value === 'custom' && customInput && !customInput.disabled) customInput.focus();
+    }));
+    updateCustomEnabled();
+    
+    // Event handlers
+    const close = () => {
+      modal.classList.remove('show');
+      setTimeout(() => {
+        if (modal.parentNode) modal.parentNode.removeChild(modal);
+      }, 300);
+      if (els.selectAll) els.selectAll.checked = state.selected.size > 0;
+    };
+    
+    modal.querySelector('.pc-modal__backdrop').addEventListener('click', close);
+    modal.querySelector('.pc-modal__close').addEventListener('click', close);
+    modal.querySelector('#bulk-cancel').addEventListener('click', () => {
+      if (els.selectAll) els.selectAll.checked = false;
+      close();
+    });
+    
+    modal.querySelector('#bulk-apply').addEventListener('click', () => {
+      const mode = (modal.querySelector('input[name="bulk-mode"]:checked') || {}).value;
+      if (mode === 'custom') {
+        const n = Math.max(1, parseInt(modal.querySelector('#bulk-custom-count').value || '0', 10));
+        selectIds(state.filtered.slice(0, Math.min(n, total)).map(r => r.id));
+      } else if (mode === 'page') {
+        selectIds(getPageItems().map(r => r.id));
+      } else {
+        selectIds(state.filtered.map(r => r.id));
+      }
+      close();
+      render();
+      showBulkBar();
+    });
+    
+    // Keyboard support
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    modal._keydownHandler = handleKeyDown;
+    
+    // Focus first input
+    setTimeout(() => {
+      const firstInput = customInput || modal.querySelector('input, button');
+      if (firstInput && typeof firstInput.focus === 'function') firstInput.focus();
+    }, 100);
   }
 
-  function closeBulkPopover(){ const ex = els.page ? els.page.querySelector('#tasks-bulk-popover') : null; if(ex&&ex.parentNode) ex.parentNode.removeChild(ex); if(els.page && typeof els.page._bulkPopoverCleanup==='function'){ els.page._bulkPopoverCleanup(); delete els.page._bulkPopoverCleanup; } const bd=document.querySelector('.bulk-select-backdrop'); if(bd&&bd.parentNode) bd.parentNode.removeChild(bd); }
+  function closeBulkSelectModal(){
+    const modal = document.getElementById('tasks-bulk-select-modal');
+    if (modal) {
+      if (modal._keydownHandler) {
+        document.removeEventListener('keydown', modal._keydownHandler);
+        delete modal._keydownHandler;
+      }
+      modal.classList.remove('show');
+      setTimeout(() => {
+        if (modal.parentNode) modal.parentNode.removeChild(modal);
+      }, 300);
+    }
+  }
   function selectIds(ids){ state.selected = new Set(ids); }
 
+  // Check if user is admin
+  function isAdmin() {
+    try {
+      if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+        return window.DataManager.isCurrentUserAdmin();
+      }
+      return window.currentUserRole === 'admin';
+    } catch (_) {
+      return window.currentUserRole === 'admin';
+    }
+  }
+
   // Bulk actions bar
-  function showBulkBar(){ updateBulkBar(true); }
-  function hideBulkBar(){ const bar = els.page ? els.page.querySelector('#tasks-bulk-actions') : document.getElementById('tasks-bulk-actions'); if(bar&&bar.parentNode) bar.parentNode.removeChild(bar); }
-  function updateBulkBar(force=false){ if(!els.container) return; const count=state.selected.size; const shouldShow=force || count>0; let container = els.page ? els.page.querySelector('#tasks-bulk-actions') : null; if(!shouldShow){ if(container) container.remove(); return; }
+  function showBulkBar(){ 
+    updateBulkBar(true); 
+  }
+  
+  function hideBulkBar(){ 
+    const bar = els.page ? els.page.querySelector('#tasks-bulk-actions') : document.getElementById('tasks-bulk-actions'); 
+    if(bar && bar.parentNode) {
+      bar.classList.remove('--show');
+      setTimeout(() => {
+        if (bar.parentNode) bar.parentNode.removeChild(bar);
+      }, 200);
+    }
+  }
+  
+  function updateBulkBar(force=false){ 
+    if(!els.container) return; 
+    const count = state.selected.size; 
+    const shouldShow = force || count > 0; 
+    let container = els.page ? els.page.querySelector('#tasks-bulk-actions') : null; 
+    if(!shouldShow){ 
+      if(container) {
+        container.classList.remove('--show');
+        setTimeout(() => {
+          if (container.parentNode) container.parentNode.removeChild(container);
+        }, 200);
+      }
+      return; 
+    }
+    
+    const adminOnly = isAdmin();
     const html = `
       <div class="bar">
         <button class="action-btn-sm" id="bulk-clear">${svgIcon('clear')}<span>Clear ${count} selected</span></button>
         <span class="spacer"></span>
-        <button class="action-btn-sm" id="bulk-complete">${svgIcon('complete')}<span>Complete</span></button>
-        <button class="action-btn-sm" id="bulk-assign">${svgIcon('assign')}<span>Assign</span></button>
-        <button class="action-btn-sm" id="bulk-edit">${svgIcon('edit')}<span>Edit</span></button>
+        <button class="action-btn-sm" id="bulk-complete">${svgIcon('complete')}<span>Complete Task</span></button>
+        ${adminOnly ? `<button class="action-btn-sm" id="bulk-assign">${svgIcon('assign')}<span>Assign</span></button>` : ''}
         <button class="action-btn-sm" id="bulk-export">${svgIcon('export')}<span>Export</span></button>
         <button class="action-btn-sm danger" id="bulk-delete">${svgIcon('delete')}<span>Delete</span></button>
       </div>`;
-    if(!container){ container=document.createElement('div'); container.id='tasks-bulk-actions'; container.className='bulk-actions-modal'; els.container.appendChild(container); }
+    
+    if(!container){ 
+      container = document.createElement('div'); 
+      container.id = 'tasks-bulk-actions'; 
+      container.className = 'bulk-actions-modal'; 
+      els.container.appendChild(container); 
+    }
     container.innerHTML = html;
-    container.querySelector('#bulk-clear').addEventListener('click',()=>{ state.selected.clear(); render(); hideBulkBar(); if(els.selectAll){ els.selectAll.checked=false; els.selectAll.indeterminate=false; } });
-    container.querySelector('#bulk-complete').addEventListener('click',()=>{ state.data.forEach(r=>{ if(state.selected.has(r.id)) r.status='completed'; }); applyFilters(); });
-    container.querySelector('#bulk-assign').addEventListener('click',()=>console.log('Bulk assign', Array.from(state.selected)));
-    container.querySelector('#bulk-edit').addEventListener('click',()=>console.log('Bulk edit', Array.from(state.selected)));
-    container.querySelector('#bulk-export').addEventListener('click',()=>console.log('Bulk export', Array.from(state.selected)));
-    container.querySelector('#bulk-delete').addEventListener('click',()=>console.log('Bulk delete', Array.from(state.selected)));
+    
+    // Show with animation
+    requestAnimationFrame(() => {
+      container.classList.add('--show');
+    });
+    
+    // Event handlers
+    container.querySelector('#bulk-clear').addEventListener('click', () => { 
+      state.selected.clear(); 
+      render(); 
+      hideBulkBar(); 
+      if(els.selectAll){ 
+        els.selectAll.checked = false; 
+        els.selectAll.indeterminate = false; 
+      } 
+    });
+    
+    container.querySelector('#bulk-complete').addEventListener('click', async () => { 
+      const selectedIds = Array.from(state.selected);
+      for (const id of selectedIds) {
+        const task = state.data.find(r => r.id === id);
+        if (task) {
+          task.status = 'completed';
+          // Save to localStorage
+          try {
+            const key = getUserTasksKey();
+            const current = JSON.parse(localStorage.getItem(key) || '[]');
+            const taskIndex = current.findIndex(t => t.id === id);
+            if (taskIndex !== -1) {
+              current[taskIndex].status = 'completed';
+              localStorage.setItem(key, JSON.stringify(current));
+            }
+          } catch (e) { console.warn('Could not update task in localStorage:', e); }
+          // Save to Firebase
+          try {
+            const db = window.firebaseDB;
+            if (db) {
+              const snap = await db.collection('tasks').where('id', '==', id).limit(5).get();
+              const batch = db.batch();
+              snap.forEach(doc => batch.update(doc.ref, { status: 'completed' }));
+              if (!snap.empty) await batch.commit();
+            }
+          } catch (e) { console.warn('Could not update task in Firebase:', e); }
+        }
+      }
+      state.selected.clear();
+      applyFilters();
+      updateTodaysTasksWidget();
+    });
+    
+    if (adminOnly) {
+      container.querySelector('#bulk-assign').addEventListener('click', () => {
+        console.log('Bulk assign', Array.from(state.selected));
+        // TODO: Implement bulk assign functionality
+      });
+    }
+    
+    container.querySelector('#bulk-export').addEventListener('click', () => {
+      const selectedIds = Array.from(state.selected);
+      const selectedTasks = state.data.filter(r => selectedIds.includes(r.id));
+      
+      // Convert to CSV
+      const headers = ['Title', 'Contact', 'Account', 'Type', 'Priority', 'Due Date', 'Due Time', 'Status'];
+      const rows = selectedTasks.map(t => [
+        escapeHtml(t.title || ''),
+        escapeHtml(t.contact || ''),
+        escapeHtml(t.account || ''),
+        escapeHtml(t.type || ''),
+        escapeHtml(t.priority || ''),
+        escapeHtml(t.dueDate || ''),
+        escapeHtml(t.dueTime || ''),
+        escapeHtml(t.status || '')
+      ]);
+      
+      const csv = [
+        headers.join(','),
+        ...rows.map(r => r.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+      
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tasks-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+    
+    container.querySelector('#bulk-delete').addEventListener('click', async () => {
+      if (!confirm(`Are you sure you want to delete ${count} task(s)?`)) return;
+      
+      const selectedIds = Array.from(state.selected);
+      for (const id of selectedIds) {
+        const recIdx = state.data.findIndex(x => x.id === id);
+        if (recIdx !== -1) {
+          state.data.splice(recIdx, 1);
+          // Remove from localStorage
+          try {
+            const key = getUserTasksKey();
+            const current = JSON.parse(localStorage.getItem(key) || '[]');
+            const filtered = current.filter(t => t.id !== id);
+            localStorage.setItem(key, JSON.stringify(filtered));
+          } catch (e) { console.warn('Could not remove task from localStorage:', e); }
+          // Remove from Firebase
+          try {
+            const db = window.firebaseDB;
+            if (db) {
+              const snap = await db.collection('tasks').where('id', '==', id).limit(5).get();
+              const batch = db.batch();
+              snap.forEach(doc => batch.delete(doc.ref));
+              if (!snap.empty) await batch.commit();
+            }
+          } catch (e) { console.warn('Could not remove task from Firebase:', e); }
+        }
+      }
+      state.selected.clear();
+      applyFilters();
+      updateTodaysTasksWidget();
+    });
   }
 
   // Task creation modal

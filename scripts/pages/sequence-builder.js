@@ -28,7 +28,7 @@ class FreeSequenceAutomation {
         }
       };
       const userEmail = getUserEmail();
-      
+        
       // Get Firebase database reference
       const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
       if (!db) {
@@ -47,7 +47,7 @@ class FreeSequenceAutomation {
       const activationId = activationRef.id;
       
       const sequenceActivationData = {
-        sequenceId: sequence.id,
+          sequenceId: sequence.id,
         contactIds: [contactData.id], // Single contact for this method
         status: 'pending',
         processedContacts: 0,
@@ -78,12 +78,12 @@ class FreeSequenceAutomation {
         if (response.ok) {
           const result = await response.json();
           console.log('[FreeSequence] Activation processing triggered:', result);
-          
+      
           // Dispatch event to refresh emails page
           window.dispatchEvent(new CustomEvent('pc:emails-updated'));
-          
-          return {
-            success: true,
+      
+      return {
+        success: true,
             scheduledEmailCount: 0, // Will be updated by server
             message: 'Sequence queued for processing'
           };
@@ -1336,7 +1336,7 @@ class FreeSequenceAutomation {
     if (pageHeader && headerEl) {
       pageHeader.id = 'sequence-builder-header';
       pageHeader.classList.add('page-header');
-      pageHeader.innerHTML = headerEl.innerHTML;
+          pageHeader.innerHTML = headerEl.innerHTML;
     } else if (pageContainer && headerEl) {
       pageContainer.prepend(headerEl);
     }
@@ -3519,26 +3519,26 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       // Only fetch from Firebase if cache is completely empty (last resort - costs money)
       if (contactsData.length === 0 && window.firebaseDB) {
         console.warn('[SequenceBuilder] No cached contacts found, fetching from Firestore (costs money)');
-        const email = window.currentUserEmail || '';
-        let snapshot;
-        if (window.currentUserRole !== 'admin' && email) {
-          // Non-admin: use scoped query
-          const [ownedSnap, assignedSnap] = await Promise.all([
-            window.firebaseDB.collection('contacts').where('ownerId','==',email).get(),
-            window.firebaseDB.collection('contacts').where('assignedTo','==',email).get()
-          ]);
-          const map = new Map();
-          ownedSnap.forEach(d=>map.set(d.id, d));
-          assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
-          snapshot = { forEach: (callback) => map.forEach(callback) };
-        } else {
-          // Admin: use unfiltered query
-          snapshot = await window.firebaseDB.collection('contacts').get();
-        }
-        
+      const email = window.currentUserEmail || '';
+      let snapshot;
+      if (window.currentUserRole !== 'admin' && email) {
+        // Non-admin: use scoped query
+        const [ownedSnap, assignedSnap] = await Promise.all([
+          window.firebaseDB.collection('contacts').where('ownerId','==',email).get(),
+          window.firebaseDB.collection('contacts').where('assignedTo','==',email).get()
+        ]);
+        const map = new Map();
+        ownedSnap.forEach(d=>map.set(d.id, d));
+        assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
+        snapshot = { forEach: (callback) => map.forEach(callback) };
+      } else {
+        // Admin: use unfiltered query
+        snapshot = await window.firebaseDB.collection('contacts').get();
+      }
+      
         // Convert snapshot to array
         contactsData = [];
-        snapshot.forEach(doc => {
+      snapshot.forEach(doc => {
           contactsData.push({ id: doc.id, ...doc.data() });
         });
       }
@@ -5538,7 +5538,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       contactsBtn.addEventListener('click', async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         // Toggle behavior: close if already open
         if (document.getElementById('sequence-contacts-panel')) {
           closeSequenceContactsPanel();
@@ -5706,8 +5706,8 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         const stepBody = card.querySelector('.step-body');
         if (!stepBody) {
           // Fallback to simple toggle if body not found
-          step.collapsed = !step.collapsed;
-          render();
+        step.collapsed = !step.collapsed;
+        render();
           return;
         }
         
@@ -7898,7 +7898,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           const result = await response.json();
           console.log('[SequenceBuilder] Sequence activation triggered:', result);
           
-          if (window.crm && typeof window.crm.showToast === 'function') {
+      if (window.crm && typeof window.crm.showToast === 'function') {
             window.crm.showToast(`✓ Sequence started for ${contactData.name || contactData.email}!`, 'success');
           }
           
