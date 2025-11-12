@@ -1,3 +1,4 @@
+
 'use strict';
 
 // Silence verbose logs from this module unless explicitly enabled via localStorage CRM_DEBUG_ACCOUNT_DETAIL=1

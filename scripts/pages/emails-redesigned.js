@@ -6,7 +6,9 @@
     selected: new Set(),
     currentPage: 1,
     pageSize: 25,
-    currentFolder: 'inbox'
+    currentFolder: 'inbox',
+    hasMore: false, // Track if more emails are available
+    totalCount: 0   // Total emails in database (for footer display)
   };
   const els = {};
 
@@ -171,7 +173,21 @@
       // Priority 1: Get data from background loader (already loaded on app init)
       if (window.BackgroundEmailsLoader) {
         emailsData = window.BackgroundEmailsLoader.getEmailsData() || [];
-        console.log('[EmailsPage] Got', emailsData.length, 'emails from BackgroundEmailsLoader');
+        state.hasMore = window.BackgroundEmailsLoader.hasMore ? window.BackgroundEmailsLoader.hasMore() : false;
+        console.log('[EmailsPage] Got', emailsData.length, 'emails from BackgroundEmailsLoader', state.hasMore ? '(more available)' : '(all loaded)');
+        
+        // Get total count (non-blocking) for reference, but we'll use filtered count for display
+        state.totalCount = emailsData.length;
+        if (typeof window.BackgroundEmailsLoader.getTotalCount === 'function') {
+          window.BackgroundEmailsLoader.getTotalCount()
+            .then((cnt) => { 
+              state.totalCount = cnt;
+              // Note: We keep totalCount for reference but display filtered count per folder
+            })
+            .catch((error) => { 
+              console.warn('[EmailsPage] Failed to get total count, keeping loaded count:', error); 
+            });
+        }
       }
       
       // Priority 2: Fallback to CacheManager if background loader empty
@@ -338,13 +354,161 @@
     }
 
     state.filtered = filtered;
+    
+    // Check if we need to load more data to fill the current page
+    const neededForPage = state.currentPage * state.pageSize;
+    console.log('[EmailsPage] Filter check - filtered:', state.filtered.length, 'needed:', neededForPage, 'hasMore:', state.hasMore, 'loader available:', !!window.BackgroundEmailsLoader);
+    
+    if (state.filtered.length < neededForPage && state.hasMore && window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.loadMore === 'function') {
+      console.log('[EmailsPage] Not enough filtered results, loading more...');
+      // Load more data until we have enough filtered results
+      loadMoreUntilEnough();
+    } else {
+      if (state.filtered.length < neededForPage) {
+        console.log('[EmailsPage] Not enough results but cannot load more:', {
+          filtered: state.filtered.length,
+          needed: neededForPage,
+          hasMore: state.hasMore,
+          loaderExists: !!window.BackgroundEmailsLoader,
+          loadMoreExists: !!(window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.loadMore === 'function')
+        });
+      }
+      render();
+    }
+  }
+
+  // Load more emails until we have enough filtered results for the current page
+  async function loadMoreUntilEnough() {
+    const neededForPage = state.currentPage * state.pageSize;
+    let attempts = 0;
+    const maxAttempts = 20; // Prevent infinite loops
+    
+    console.log('[EmailsPage] loadMoreUntilEnough started - filtered:', state.filtered.length, 'needed:', neededForPage);
+    
+    while (state.filtered.length < neededForPage && state.hasMore && attempts < maxAttempts) {
+      attempts++;
+      console.log(`[EmailsPage] Loading more emails (attempt ${attempts}/${maxAttempts})...`);
+      const result = await window.BackgroundEmailsLoader.loadMore();
+      if (!result || result.loaded === 0) {
+        console.log('[EmailsPage] No more emails to load');
+        break;
+      }
+      console.log(`[EmailsPage] Loaded ${result.loaded} more emails, total now: ${state.data.length}`);
+      
+      // Reload data from background loader
+      const updatedData = window.BackgroundEmailsLoader.getEmailsData() || [];
+      state.data = updatedData.map(email => {
+        let normalizedTo = '';
+        if (Array.isArray(email.to)) {
+          normalizedTo = email.to.length > 0 ? email.to[0] : '';
+        } else {
+          normalizedTo = email.to || '';
+        }
+        return {
+          ...email,
+          type: email.type || 'received',
+          from: email.from || 'Unknown',
+          to: normalizedTo,
+          subject: email.subject || '(No Subject)',
+          date: email.date || email.timestamp || email.createdAt || new Date(),
+          html: email.html || '',
+          text: email.text || '',
+          content: email.content || '',
+          originalContent: email.originalContent || '',
+          openCount: email.openCount || 0,
+          clickCount: email.clickCount || 0,
+          lastOpened: email.lastOpened,
+          lastClicked: email.lastClicked,
+          isSentEmail: email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail,
+          starred: email.starred || false,
+          deleted: email.deleted || false,
+          unread: email.unread !== false
+        };
+      });
+      state.data.sort((a, b) => new Date(b.date) - new Date(a.date));
+      state.hasMore = result.hasMore || false;
+      
+      // Re-apply filters to update filtered array
+      let filtered = [...state.data];
+      
+      // Filter by folder
+      if (state.currentFolder === 'inbox') {
+        filtered = filtered.filter(email => {
+          return (email.type === 'received' || 
+                  email.emailType === 'received' || 
+                  email.provider === 'sendgrid_inbound' ||
+                  (!email.type && !email.emailType && !email.isSentEmail)) && 
+                 !email.deleted;
+        });
+      } else if (state.currentFolder === 'sent') {
+        filtered = filtered.filter(email => {
+          const isSent = (
+            email.type === 'sent' ||
+            email.emailType === 'sent' ||
+            email.isSentEmail === true ||
+            email.status === 'sent' ||
+            email.provider === 'sendgrid'
+          );
+          return isSent && !email.deleted;
+        });
+      } else if (state.currentFolder === 'scheduled') {
+        filtered = filtered.filter(email => {
+          const isScheduled = email.type === 'scheduled';
+          const hasSendTime = email.scheduledSendTime && typeof email.scheduledSendTime === 'number';
+          const isFutureOrNow = hasSendTime && email.scheduledSendTime >= (Date.now() - 60000);
+          const isPending = email.status === 'not_generated' || email.status === 'pending_approval' || !email.status;
+          const notDeleted = !email.deleted;
+          const notSent = email.status !== 'sent' && email.status !== 'delivered';
+          return isScheduled && hasSendTime && (isFutureOrNow || isPending) && notDeleted && notSent;
+        });
+        filtered.sort((a, b) => a.scheduledSendTime - b.scheduledSendTime);
+      } else if (state.currentFolder === 'starred') {
+        filtered = filtered.filter(email => email.starred && !email.deleted);
+      } else if (state.currentFolder === 'trash') {
+        filtered = filtered.filter(email => email.deleted);
+      }
+      
+      // Filter by search
+      const searchTerm = els.searchInput?.value?.toLowerCase() || '';
+      if (searchTerm) {
+        filtered = filtered.filter(email => 
+          email.subject?.toLowerCase().includes(searchTerm) ||
+          email.from?.toLowerCase().includes(searchTerm) ||
+          email.to?.toLowerCase().includes(searchTerm)
+        );
+      }
+      
+      state.filtered = filtered;
+      
+      // If we have enough now, break
+      if (state.filtered.length >= neededForPage || !state.hasMore) {
+        console.log(`[EmailsPage] Stopping load - filtered: ${state.filtered.length}, needed: ${neededForPage}, hasMore: ${state.hasMore}`);
+        break;
+      }
+    }
+    
+    console.log(`[EmailsPage] loadMoreUntilEnough complete - filtered: ${state.filtered.length}, needed: ${neededForPage}`);
     render();
   }
 
   // Get paginated items for current page
   function getPageItems() {
     const start = (state.currentPage - 1) * state.pageSize;
-    return state.filtered.slice(start, start + state.pageSize);
+    const end = start + state.pageSize;
+    
+    // Check if we need to load more data for this page (similar to people.js)
+    // We need to check if we have enough filtered results for the current page
+    const neededForPage = state.currentPage * state.pageSize;
+    
+    if (state.filtered.length < neededForPage && state.hasMore && window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.loadMore === 'function') {
+      console.log(`[EmailsPage] getPageItems: Not enough filtered results (${state.filtered.length}) for page ${state.currentPage} (need ${neededForPage}), loading more...`);
+      // Trigger async loading (non-blocking)
+      loadMoreUntilEnough().catch(error => {
+        console.error('[EmailsPage] Failed to load more in getPageItems:', error);
+      });
+    }
+    
+    return state.filtered.slice(start, end);
   }
 
   // Render email table
@@ -364,14 +528,16 @@
     els.tbody.innerHTML = rows.map(email => rowHtml(email)).join('');
     
     // Update summary and count
+    // Use filtered count (current folder's emails), not total database count
+    const totalToShow = state.filtered.length;
     if (els.summary) {
-      const start = (state.currentPage - 1) * state.pageSize + 1;
+      const start = totalToShow === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1;
       const end = Math.min(state.currentPage * state.pageSize, state.filtered.length);
-      els.summary.textContent = `${start}-${end} of ${state.filtered.length} emails`;
+      els.summary.textContent = `${start}-${end} of ${totalToShow} emails`;
     }
     
     if (els.count) {
-      els.count.textContent = `${state.filtered.length} emails`;
+      els.count.textContent = `${totalToShow} emails`;
     }
     
     // Update select all checkbox
@@ -905,13 +1071,64 @@
   function renderPagination() {
     if (!els.pagination) return;
     
-    const totalPages = Math.max(1, Math.ceil(state.filtered.length / state.pageSize));
+    // Use filtered count (current folder's emails), not total database count
+    // Unlike people.js which shows all contacts, emails are filtered by folder
+    const totalRecords = state.filtered.length;
+    const totalPages = Math.max(1, Math.ceil(totalRecords / state.pageSize));
     const currentPage = Math.min(state.currentPage, totalPages);
     
     // Use unified pagination component
     if (window.crm && window.crm.createPagination) {
-      window.crm.createPagination(currentPage, totalPages, (page) => {
+      window.crm.createPagination(currentPage, totalPages, async (page) => {
         state.currentPage = page;
+        
+        // Check if we need to load more data for this page
+        const neededIndex = (page - 1) * state.pageSize + state.pageSize - 1;
+        if (neededIndex >= state.data.length && state.hasMore && window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.loadMore === 'function') {
+          // Show loading indicator
+          if (els.tbody) {
+            els.tbody.innerHTML = '<tr><td colspan="20" style="text-align: center; padding: 40px; color: var(--grey-400);">Loading more emails...</td></tr>';
+          }
+          
+          // Load more data
+          const result = await window.BackgroundEmailsLoader.loadMore();
+          if (result && result.loaded > 0) {
+            // Reload data from background loader
+            const updatedData = window.BackgroundEmailsLoader.getEmailsData() || [];
+            state.data = updatedData.map(email => {
+              let normalizedTo = '';
+              if (Array.isArray(email.to)) {
+                normalizedTo = email.to.length > 0 ? email.to[0] : '';
+              } else {
+                normalizedTo = email.to || '';
+              }
+              return {
+                ...email,
+                type: email.type || 'received',
+                from: email.from || 'Unknown',
+                to: normalizedTo,
+                subject: email.subject || '(No Subject)',
+                date: email.date || email.timestamp || email.createdAt || new Date(),
+                html: email.html || '',
+                text: email.text || '',
+                content: email.content || '',
+                originalContent: email.originalContent || '',
+                openCount: email.openCount || 0,
+                clickCount: email.clickCount || 0,
+                lastOpened: email.lastOpened,
+                lastClicked: email.lastClicked,
+                isSentEmail: email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail,
+                starred: email.starred || false,
+                deleted: email.deleted || false,
+                unread: email.unread !== false
+              };
+            });
+            state.data.sort((a, b) => new Date(b.date) - new Date(a.date));
+            state.hasMore = result.hasMore || false;
+            applyFilters(); // Re-apply filters with new data
+          }
+        }
+        
         render();
       }, els.pagination.id);
     }
