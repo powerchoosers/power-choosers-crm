@@ -323,11 +323,26 @@ export default async function handler(req, res) {
       return;
     }
 
+    // Extract recipient email for ownership assignment
+    // Inbound emails are assigned to the recipient user
+    function extractEmailAddress(emailString) {
+      if (!emailString) return '';
+      // Handle formats: "Name" <email@domain.com> or email@domain.com
+      const match = emailString.match(/<([^>]+)>/) || emailString.match(/([^\s<>]+@[^\s<>]+)/);
+      return match ? match[1].toLowerCase().trim() : emailString.toLowerCase().trim();
+    }
+    
+    const recipientEmail = extractEmailAddress(emailData.to || '');
+    
     // Save to Firebase with proper error handling
     try {
       const emailDoc = {
         ...emailData,
         threadId,
+        // Add ownership fields (required for non-admin user queries)
+        ownerId: recipientEmail || '',
+        assignedTo: recipientEmail || '',
+        createdBy: recipientEmail || '',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };
