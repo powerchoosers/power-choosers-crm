@@ -29,33 +29,55 @@ export default async function handler(req, res) {
   }
 
   const isProduction = process.env.NODE_ENV === 'production';
+  // Always log key events (even in production, but keep detailed logs conditional)
+  const logAlways = (msg) => console.log(`[ProcessSequenceActivations] [${new Date().toISOString()}] ${msg}`);
 
   try {
     const { immediate, activationId } = req.body || {};
     
-    if (!isProduction) {
-      console.log('[ProcessSequenceActivations] Starting, immediate:', immediate, 'activationId:', activationId);
-    }
+    logAlways(`Starting - immediate: ${immediate}, activationId: ${activationId || 'none'}`);
     
     // If specific activation ID provided (immediate trigger), process just that one
     if (immediate && activationId) {
       await processSingleActivation(activationId, isProduction);
+      logAlways(`Processed immediate activation: ${activationId}`);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, message: 'Activation processed' }));
       return;
     }
     
     // Otherwise, process all pending activations (cron job)
-    const activationsQuery = db.collection('sequenceActivations')
-      .where('status', 'in', ['pending', 'processing'])
-      .limit(5);
-    
-    const activationsSnapshot = await activationsQuery.get();
+    // Query pending first (most common case), then processing (stale ones)
+    let activationsSnapshot;
+    try {
+      // Try pending first
+      activationsSnapshot = await db.collection('sequenceActivations')
+        .where('status', '==', 'pending')
+        .limit(5)
+        .get();
+      
+      // If no pending, check for stale processing ones
+      if (activationsSnapshot.empty) {
+        activationsSnapshot = await db.collection('sequenceActivations')
+          .where('status', '==', 'processing')
+          .limit(5)
+          .get();
+      }
+    } catch (queryError) {
+      // If query fails (e.g., missing index), log and return error
+      logAlways(`Query error: ${queryError.message}`);
+      console.error('[ProcessSequenceActivations] Query failed:', queryError);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: false,
+        error: queryError.message,
+        hint: 'Check if Firestore composite index is required'
+      }));
+      return;
+    }
     
     if (activationsSnapshot.empty) {
-      if (!isProduction) {
-        console.log('[ProcessSequenceActivations] No pending activations found');
-      }
+      logAlways('No pending or processing activations found');
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         success: true, 
@@ -65,9 +87,7 @@ export default async function handler(req, res) {
       return;
     }
     
-    if (!isProduction) {
-      console.log('[ProcessSequenceActivations] Found', activationsSnapshot.size, 'activations to process');
-    }
+    logAlways(`Found ${activationsSnapshot.size} activations to process`);
     
     let processedCount = 0;
     const errors = [];
@@ -85,9 +105,7 @@ export default async function handler(req, res) {
       }
     }
     
-    if (!isProduction) {
-      console.log('[ProcessSequenceActivations] Complete. Processed:', processedCount, 'Errors:', errors.length);
-    }
+    logAlways(`Complete. Processed: ${processedCount}, Errors: ${errors.length}`);
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -109,6 +127,9 @@ export default async function handler(req, res) {
 
 async function processSingleActivation(activationId, isProduction) {
   const activationRef = db.collection('sequenceActivations').doc(activationId);
+  const logAlways = (msg) => console.log(`[ProcessSequenceActivations] [${new Date().toISOString()}] ${msg}`);
+  
+  logAlways(`Processing activation: ${activationId}`);
   
   try {
     // Use transaction to ensure idempotency
@@ -253,6 +274,7 @@ async function processSingleActivation(activationId, isProduction) {
     
     // Write emails in batches
     if (emailsToCreate.length > 0) {
+      logAlways(`Creating ${emailsToCreate.length} emails for activation ${activationId}`);
       for (let i = 0; i < emailsToCreate.length; i += BATCH_SIZE) {
         const chunk = emailsToCreate.slice(i, i + BATCH_SIZE);
         const batch = db.batch();
@@ -263,11 +285,10 @@ async function processSingleActivation(activationId, isProduction) {
         });
         
         await batch.commit();
-        
-        if (!isProduction) {
-          console.log(`[ProcessSequenceActivations] Created ${chunk.length} emails (batch ${Math.floor(i / BATCH_SIZE) + 1})`);
-        }
+        logAlways(`Created ${chunk.length} emails (batch ${Math.floor(i / BATCH_SIZE) + 1})`);
       }
+    } else {
+      logAlways(`No emails to create for activation ${activationId} (all contacts missing email or no email steps)`);
     }
     
     // Update activation progress
@@ -283,9 +304,7 @@ async function processSingleActivation(activationId, isProduction) {
       failedContactIds: failedContactIds.length > 0 ? admin.firestore.FieldValue.arrayUnion(...failedContactIds) : data.failedContactIds || []
     });
     
-    if (!isProduction) {
-      console.log(`[ProcessSequenceActivations] Updated activation ${activationId}: ${newProcessedCount}/${contactIds.length} contacts, ${emailsToCreate.length} emails created`);
-    }
+    logAlways(`Updated activation ${activationId}: ${newProcessedCount}/${contactIds.length} contacts, ${emailsToCreate.length} emails created, status: ${isDone ? 'completed' : 'processing'}`);
     
   } catch (error) {
     console.error(`[ProcessSequenceActivations] Error processing activation ${activationId}:`, error);

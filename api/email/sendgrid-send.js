@@ -56,7 +56,7 @@ export default async function handler(req, res) {
         signatureImageEnabled: true
       }
     };
-    
+
     console.log('[SendGrid] Sending email:', { to, subject, trackingId });
 
     const sendGridService = new SendGridService();

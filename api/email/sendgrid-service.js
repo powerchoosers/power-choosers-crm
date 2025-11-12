@@ -272,7 +272,7 @@ export class SendGridService {
                 email: finalFromEmail,
                 name: finalFromName
               });
-              
+      
               const msg = {
         to: allowedRecipients,
         from: {
@@ -322,7 +322,7 @@ export class SendGridService {
               }
               if (references && references.length) {
                 msg.headers = { ...(msg.headers || {}), 'References': references.join(' ') };
-              }
+      }
 
       // Add custom headers based on deliverability settings
       if (deliverabilitySettings.includePriorityHeaders) {
@@ -405,7 +405,7 @@ export class SendGridService {
             body: sendError.response.body,
             headers: sendError.response.headers
           };
-          
+        
           // Extract detailed error messages from SendGrid response
           if (sendError.response.body && sendError.response.body.errors) {
             errorDetails.sendGridErrors = sendError.response.body.errors.map(err => ({

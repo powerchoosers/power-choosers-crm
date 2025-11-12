@@ -34,7 +34,7 @@ export default async function handler(req, res) {
 
   try {
     if (!isProduction) {
-      console.log('[SendScheduledEmails] Starting send process');
+    console.log('[SendScheduledEmails] Starting send process');
     }
     
     const now = Date.now();
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
     
     if (readyToSendSnapshot.empty) {
       if (!isProduction) {
-        console.log('[SendScheduledEmails] No emails ready to send');
+      console.log('[SendScheduledEmails] No emails ready to send');
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
@@ -65,7 +65,7 @@ export default async function handler(req, res) {
     }
     
     if (!isProduction) {
-      console.log('[SendScheduledEmails] Found', readyToSendSnapshot.size, 'emails ready to send');
+    console.log('[SendScheduledEmails] Found', readyToSendSnapshot.size, 'emails ready to send');
     }
     
     let sentCount = 0;
@@ -104,7 +104,7 @@ export default async function handler(req, res) {
         }
         
         if (!isProduction) {
-          console.log('[SendScheduledEmails] Sending email:', emailDoc.id);
+        console.log('[SendScheduledEmails] Sending email:', emailDoc.id);
         }
         
         // Prepare SendGrid message
@@ -140,7 +140,7 @@ export default async function handler(req, res) {
         // Send email via SendGrid
         const sendResult = await sgMail.send(msg);
         if (!isProduction) {
-          console.log('[SendScheduledEmails] Email sent successfully:', emailDoc.id, sendResult[0].statusCode);
+        console.log('[SendScheduledEmails] Email sent successfully:', emailDoc.id, sendResult[0].statusCode);
         }
         
         // Update email record
@@ -180,7 +180,7 @@ export default async function handler(req, res) {
     }
     
     if (!isProduction) {
-      console.log('[SendScheduledEmails] Send process complete. Sent:', sentCount, 'Errors:', errors.length);
+    console.log('[SendScheduledEmails] Send process complete. Sent:', sentCount, 'Errors:', errors.length);
     }
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -199,4 +199,4 @@ export default async function handler(req, res) {
       error: error.message
     }));
   }
-}
+  }
