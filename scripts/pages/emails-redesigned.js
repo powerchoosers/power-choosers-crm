@@ -74,6 +74,7 @@
     els.summary = document.getElementById('emails-summary');
     els.count = document.getElementById('emails-count');
     els.pagination = document.getElementById('emails-pagination');
+    els.container = els.page ? els.page.querySelector('.table-container') : null;
     
     return els.page && els.tbody;
   }
@@ -145,16 +146,17 @@
 
     // AI functionality is now handled by email-compose-global.js
 
-    // Select all checkbox
+    // Select all checkbox - opens bulk selection modal
     if (els.selectAll) {
       els.selectAll.addEventListener('change', () => {
         if (els.selectAll.checked) {
-          const pageItems = getPageItems();
-          pageItems.forEach(email => state.selected.add(email.id));
+          openBulkSelectModal();
         } else {
           state.selected.clear();
+          render();
+          closeBulkSelectModal();
+          hideBulkBar();
         }
-        render();
       });
     }
   }
@@ -383,6 +385,9 @@
     // Update pagination
     renderPagination();
     
+    // Update bulk actions bar
+    updateBulkBar();
+    
     // Bind row events
     bindRowEvents();
   }
@@ -554,6 +559,7 @@
         } else {
           state.selected.delete(emailId);
         }
+        updateBulkBar();
         render();
       });
     });
@@ -1149,6 +1155,343 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  // SVG icon helper
+  function svgIcon(name) {
+    switch(name) {
+      case 'clear': return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l14 14M19 5L5 19"/></svg>';
+      case 'delete': return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
+      case 'read': return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+      case 'unread': return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+      case 'star': return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+      case 'export': return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+      default: return '';
+    }
+  }
+
+  // Bulk selection modal (using pc-modal style)
+  function openBulkSelectModal() {
+    if (!els.page) return;
+    closeBulkSelectModal();
+    
+    const total = state.filtered.length;
+    const page = getPageItems().length;
+    
+    const modal = document.createElement('div');
+    modal.id = 'emails-bulk-select-modal';
+    modal.className = 'pc-modal';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'emails-bulk-modal-title');
+    
+    modal.innerHTML = `
+      <div class="pc-modal__backdrop"></div>
+      <div class="pc-modal__dialog">
+        <div class="pc-modal__form">
+          <div class="pc-modal__header">
+            <h3 class="card-title" id="emails-bulk-modal-title">Select Emails</h3>
+            <button class="pc-modal__close" aria-label="Close" type="button">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          <div class="pc-modal__body">
+            <div class="option" style="display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: var(--spacing-md);">
+              <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-primary);">
+                <input type="radio" name="bulk-mode" value="custom" checked style="accent-color: var(--orange-subtle);">
+                <span>Select</span>
+              </label>
+              <input type="number" id="bulk-custom-count" min="1" max="${total}" value="${Math.min(50,total)}" style="width: 120px; height: 40px; padding: 0 14px; background: var(--bg-item); color: var(--text-primary); border: 2px solid var(--border-light); border-radius: 8px; transition: all 0.3s ease;">
+              <span class="hint" style="color: var(--text-secondary); font-size: 0.85rem;">emails from current filters</span>
+            </div>
+            <div class="option" style="display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: var(--spacing-md);">
+              <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-primary);">
+                <input type="radio" name="bulk-mode" value="page" style="accent-color: var(--orange-subtle);">
+                <span>Select current page</span>
+              </label>
+              <span class="hint" style="color: var(--text-secondary); font-size: 0.85rem;">${page} visible</span>
+            </div>
+            <div class="option" style="display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: 0;">
+              <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-primary);">
+                <input type="radio" name="bulk-mode" value="all" style="accent-color: var(--orange-subtle);">
+                <span>Select all</span>
+              </label>
+              <span class="hint" style="color: var(--text-secondary); font-size: 0.85rem;">${total} emails</span>
+            </div>
+          </div>
+          <div class="pc-modal__footer">
+            <button type="button" class="btn-text" id="bulk-cancel">Cancel</button>
+            <button type="button" class="btn-primary" id="bulk-apply">Apply</button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Show modal with animation
+    requestAnimationFrame(() => {
+      modal.classList.add('show');
+    });
+    
+    // Enable/disable custom count input
+    const customInput = modal.querySelector('#bulk-custom-count');
+    const radios = Array.from(modal.querySelectorAll('input[name="bulk-mode"]'));
+    function updateCustomEnabled() {
+      const isCustom = !!modal.querySelector('input[name="bulk-mode"][value="custom"]:checked');
+      if (customInput) {
+        customInput.disabled = !isCustom;
+        if (isCustom) customInput.removeAttribute('aria-disabled');
+        else customInput.setAttribute('aria-disabled', 'true');
+      }
+    }
+    radios.forEach((r) => r.addEventListener('change', () => {
+      updateCustomEnabled();
+      if (r.value === 'custom' && customInput && !customInput.disabled) customInput.focus();
+    }));
+    updateCustomEnabled();
+    
+    // Event handlers
+    const close = () => {
+      modal.classList.remove('show');
+      setTimeout(() => {
+        if (modal.parentNode) modal.parentNode.removeChild(modal);
+      }, 300);
+      if (els.selectAll) els.selectAll.checked = state.selected.size > 0;
+    };
+    
+    modal.querySelector('.pc-modal__backdrop').addEventListener('click', close);
+    modal.querySelector('.pc-modal__close').addEventListener('click', close);
+    modal.querySelector('#bulk-cancel').addEventListener('click', () => {
+      if (els.selectAll) els.selectAll.checked = false;
+      close();
+    });
+    
+    modal.querySelector('#bulk-apply').addEventListener('click', () => {
+      const mode = (modal.querySelector('input[name="bulk-mode"]:checked') || {}).value;
+      if (mode === 'custom') {
+        const n = Math.max(1, parseInt(modal.querySelector('#bulk-custom-count').value || '0', 10));
+        const selectedIds = state.filtered.slice(0, Math.min(n, total)).map(e => e.id);
+        selectedIds.forEach(id => state.selected.add(id));
+      } else if (mode === 'page') {
+        const pageItems = getPageItems();
+        pageItems.forEach(email => state.selected.add(email.id));
+      } else {
+        state.filtered.forEach(email => state.selected.add(email.id));
+      }
+      close();
+      render();
+      showBulkBar();
+    });
+    
+    // Keyboard support
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    modal._keydownHandler = handleKeyDown;
+    
+    // Focus first input
+    setTimeout(() => {
+      const firstInput = customInput || modal.querySelector('input, button');
+      if (firstInput && typeof firstInput.focus === 'function') firstInput.focus();
+    }, 100);
+  }
+
+  function closeBulkSelectModal() {
+    const modal = document.getElementById('emails-bulk-select-modal');
+    if (modal) {
+      if (modal._keydownHandler) {
+        document.removeEventListener('keydown', modal._keydownHandler);
+        delete modal._keydownHandler;
+      }
+      modal.classList.remove('show');
+      setTimeout(() => {
+        if (modal.parentNode) modal.parentNode.removeChild(modal);
+      }, 300);
+    }
+  }
+
+  // Bulk actions bar
+  function showBulkBar() {
+    updateBulkBar(true);
+  }
+
+  function hideBulkBar() {
+    const bar = els.page ? els.page.querySelector('#emails-bulk-actions') : document.getElementById('emails-bulk-actions');
+    if (bar && bar.parentNode) {
+      bar.classList.remove('--show');
+      setTimeout(() => {
+        if (bar.parentNode) bar.parentNode.removeChild(bar);
+      }, 200);
+    }
+  }
+
+  function updateBulkBar(force = false) {
+    if (!els.page) return;
+    const count = state.selected.size;
+    const shouldShow = force || count > 0;
+    const container = els.page.querySelector('#emails-bulk-actions');
+    
+    if (!shouldShow) {
+      if (container) {
+        container.classList.remove('--show');
+        setTimeout(() => {
+          if (container.parentNode) container.parentNode.removeChild(container);
+        }, 200);
+      }
+      return;
+    }
+    
+    // Get selected emails to check their states
+    const selectedEmails = state.data.filter(e => state.selected.has(e.id));
+    const allRead = selectedEmails.length > 0 && selectedEmails.every(e => !e.unread);
+    const allStarred = selectedEmails.length > 0 && selectedEmails.every(e => e.starred);
+    
+    const html = `
+      <div class="bar">
+        <button class="action-btn-sm" id="bulk-clear">${svgIcon('clear')}<span>Clear ${count} selected</span></button>
+        <span class="spacer"></span>
+        <button class="action-btn-sm" id="bulk-mark-read">${svgIcon(allRead ? 'unread' : 'read')}<span>Mark as ${allRead ? 'Unread' : 'Read'}</span></button>
+        <button class="action-btn-sm" id="bulk-star">${svgIcon('star')}<span>${allStarred ? 'Unstar' : 'Star'}</span></button>
+        <button class="action-btn-sm" id="bulk-export">${svgIcon('export')}<span>Export</span></button>
+        <button class="action-btn-sm danger" id="bulk-delete">${svgIcon('delete')}<span>Delete</span></button>
+      </div>`;
+    
+    let barContainer = container;
+    if (!barContainer) {
+      barContainer = document.createElement('div');
+      barContainer.id = 'emails-bulk-actions';
+      barContainer.className = 'bulk-actions-modal';
+      const tableContainer = els.page.querySelector('.table-container');
+      if (tableContainer) {
+        tableContainer.appendChild(barContainer);
+      } else {
+        els.page.appendChild(barContainer);
+      }
+    }
+    barContainer.innerHTML = html;
+    
+    // Show with animation
+    requestAnimationFrame(() => {
+      barContainer.classList.add('--show');
+    });
+    
+    // Event handlers
+    barContainer.querySelector('#bulk-clear').addEventListener('click', () => {
+      state.selected.clear();
+      render();
+      hideBulkBar();
+      if (els.selectAll) {
+        els.selectAll.checked = false;
+        els.selectAll.indeterminate = false;
+      }
+    });
+    
+    barContainer.querySelector('#bulk-mark-read').addEventListener('click', async () => {
+      const selectedIds = Array.from(state.selected);
+      const newUnreadState = !allRead;
+      
+      for (const id of selectedIds) {
+        const email = state.data.find(e => e.id === id);
+        if (email) {
+          email.unread = newUnreadState;
+          // Update in Firebase if needed
+          try {
+            const db = window.firebaseDB;
+            if (db) {
+              await db.collection('emails').doc(id).update({ unread: newUnreadState });
+            }
+          } catch (e) {
+            console.warn('Could not update email in Firebase:', e);
+          }
+        }
+      }
+      state.selected.clear();
+      applyFilters();
+    });
+    
+    barContainer.querySelector('#bulk-star').addEventListener('click', async () => {
+      const selectedIds = Array.from(state.selected);
+      const newStarredState = !allStarred;
+      
+      for (const id of selectedIds) {
+        const email = state.data.find(e => e.id === id);
+        if (email) {
+          email.starred = newStarredState;
+          // Update in Firebase if needed
+          try {
+            const db = window.firebaseDB;
+            if (db) {
+              await db.collection('emails').doc(id).update({ starred: newStarredState });
+            }
+          } catch (e) {
+            console.warn('Could not update email in Firebase:', e);
+          }
+        }
+      }
+      state.selected.clear();
+      applyFilters();
+    });
+    
+    barContainer.querySelector('#bulk-export').addEventListener('click', () => {
+      const selectedIds = Array.from(state.selected);
+      const selectedEmails = state.data.filter(e => selectedIds.includes(e.id));
+      
+      // Convert to CSV
+      const headers = ['From', 'To', 'Subject', 'Date', 'Unread', 'Starred'];
+      const rows = selectedEmails.map(e => [
+        escapeHtml(e.from || ''),
+        escapeHtml(Array.isArray(e.to) ? e.to.join('; ') : (e.to || '')),
+        escapeHtml(e.subject || ''),
+        escapeHtml(formatDate(e.date) || ''),
+        e.unread ? 'Yes' : 'No',
+        e.starred ? 'Yes' : 'No'
+      ]);
+      
+      const csv = [
+        headers.join(','),
+        ...rows.map(r => r.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+      ].join('\n');
+      
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `emails-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+    
+    barContainer.querySelector('#bulk-delete').addEventListener('click', async () => {
+      if (!confirm(`Are you sure you want to delete ${count} email(s)?`)) return;
+      
+      const selectedIds = Array.from(state.selected);
+      for (const id of selectedIds) {
+        const emailIndex = state.data.findIndex(e => e.id === id);
+        if (emailIndex !== -1) {
+          state.data.splice(emailIndex, 1);
+          // Delete from Firebase
+          try {
+            const db = window.firebaseDB;
+            if (db) {
+              await db.collection('emails').doc(id).delete();
+            }
+          } catch (e) {
+            console.warn('Could not delete email from Firebase:', e);
+          }
+        }
+      }
+      state.selected.clear();
+      applyFilters();
+    });
   }
 
   function debounce(func, wait) {

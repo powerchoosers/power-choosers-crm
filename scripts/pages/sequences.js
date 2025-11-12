@@ -279,7 +279,7 @@
         }
         return;
       }
-      
+
       if (unresolvedCount > 0) {
         console.warn(`[Sequences] ${unresolvedCount} member(s) could not be resolved. Proceeding with ${contacts.length} resolved contact(s).`);
         if (window.crm?.showToast) {

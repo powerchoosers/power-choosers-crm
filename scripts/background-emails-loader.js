@@ -259,8 +259,11 @@
             if (window.currentUserRole !== 'admin' && email) {
               const e = String(email).toLowerCase();
               emailsData = (cached||[]).filter(x => {
-                const fields = [x && x.ownerId, x && x.assignedTo, x && x.from];
-                return fields.some(v => String(v||'').toLowerCase() === e);
+                // Only check ownership fields (ownerId, assignedTo)
+                // Don't check 'from' - that's the sender, not the owner
+                const ownerId = String(x && x.ownerId || '').toLowerCase();
+                const assignedTo = String(x && x.assignedTo || '').toLowerCase();
+                return ownerId === e || assignedTo === e;
               });
             } else {
               emailsData = cached;
@@ -274,7 +277,12 @@
           }));
 
           // Ensure realtime listener is running even when using cache first
-          startRealtimeListener();
+          // Use scoped listener for non-admin users, full listener for admins
+          if (window.currentUserRole !== 'admin') {
+            startRealtimeListenerScoped(window.currentUserEmail || '');
+          } else {
+            startRealtimeListener();
+          }
         } else {
           // Cache empty, load from Firestore
           console.log('[BackgroundEmailsLoader] Cache empty, loading from Firestore');
@@ -296,8 +304,11 @@
               if (window.currentUserRole !== 'admin' && email) {
                 const e = String(email).toLowerCase();
                 emailsData = (cached||[]).filter(x => {
-                  const fields = [x && x.ownerId, x && x.assignedTo, x && x.from];
-                  return fields.some(v => String(v||'').toLowerCase() === e);
+                  // Only check ownership fields (ownerId, assignedTo)
+                  // Don't check 'from' - that's the sender, not the owner
+                  const ownerId = String(x && x.ownerId || '').toLowerCase();
+                  const assignedTo = String(x && x.assignedTo || '').toLowerCase();
+                  return ownerId === e || assignedTo === e;
                 });
               } else {
                 emailsData = cached;
