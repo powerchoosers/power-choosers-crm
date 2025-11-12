@@ -15,6 +15,8 @@
   let emailsData = [];
   let _unsubscribe = null;
   let _cacheWritePending = false;
+  let lastLoadedDoc = null; // For pagination
+  let hasMoreData = true; // For pagination
   const tsToIso = (v) => {
     try {
       if (!v) return null;
@@ -68,6 +70,7 @@
         // Sort newest first
         emailsData.sort((a,b)=> new Date(b.timestamp||0) - new Date(a.timestamp||0));
       } else {
+        // Admin: Load initial 100 emails (pagination will load more as needed)
         const snapshot = await window.firebaseDB.collection('emails')
           .orderBy('createdAt', 'desc')
           .limit(100)
@@ -95,6 +98,14 @@
             emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
           };
         });
+        
+        // Track pagination state
+        if (snapshot.docs.length > 0) {
+          lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
+          hasMoreData = snapshot.docs.length === 100;
+        } else {
+          hasMoreData = false;
+        }
       }
       
       console.log('[BackgroundEmailsLoader] ✓ Loaded', emailsData.length, 'emails from Firestore');
@@ -114,6 +125,117 @@
       if (window.currentUserRole !== 'admin') startRealtimeListenerScoped(window.currentUserEmail || ''); else startRealtimeListener();
     } catch (error) {
       console.error('[BackgroundEmailsLoader] Failed to load from Firestore:', error);
+    }
+  }
+
+  // Load more emails (pagination) - similar to background-contacts-loader.js
+  async function loadMoreEmails() {
+    if (!hasMoreData) {
+      console.log('[BackgroundEmailsLoader] No more data to load');
+      return { loaded: 0, hasMore: false };
+    }
+    
+    if (!window.firebaseDB) {
+      console.warn('[BackgroundEmailsLoader] firebaseDB not available');
+      return { loaded: 0, hasMore: false };
+    }
+    
+    try {
+      if (window.currentUserRole !== 'admin') {
+        // For employees, we already scoped and disabled pagination (100 limit)
+        return { loaded: 0, hasMore: false };
+      }
+      
+      if (!lastLoadedDoc) {
+        console.warn('[BackgroundEmailsLoader] No lastLoadedDoc, cannot paginate');
+        return { loaded: 0, hasMore: false };
+      }
+      
+      console.log('[BackgroundEmailsLoader] Loading next batch...');
+      const snapshot = await window.firebaseDB.collection('emails')
+        .orderBy('createdAt', 'desc')
+        .startAfter(lastLoadedDoc)
+        .limit(100)
+        .get();
+      
+      const newEmails = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const createdAt = tsToIso(data.createdAt);
+        const updatedAt = tsToIso(data.updatedAt);
+        const sentAt = tsToIso(data.sentAt);
+        const receivedAt = tsToIso(data.receivedAt);
+        const scheduledSendTime = tsToIso(data.scheduledSendTime);
+        const generatedAt = tsToIso(data.generatedAt);
+        const timestamp = sentAt || receivedAt || scheduledSendTime || createdAt || new Date().toISOString();
+        return {
+          id: doc.id,
+          ...data,
+          createdAt,
+          updatedAt,
+          sentAt,
+          receivedAt,
+          scheduledSendTime,
+          generatedAt,
+          timestamp,
+          emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
+        };
+      });
+      
+      // Append to existing data
+      emailsData = [...emailsData, ...newEmails];
+      
+      // Update pagination tracking
+      if (snapshot.docs.length > 0) {
+        lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
+        hasMoreData = snapshot.docs.length === 100;
+      } else {
+        hasMoreData = false;
+      }
+      
+      console.log('[BackgroundEmailsLoader] ✓ Loaded', newEmails.length, 'more emails. Total:', emailsData.length, hasMoreData ? '(more available)' : '(all loaded)');
+      
+      // Update cache
+      if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+        await window.CacheManager.set('emails', emailsData);
+      }
+      
+      // Notify listeners
+      document.dispatchEvent(new CustomEvent('pc:emails-loaded-more', { 
+        detail: { count: newEmails.length, total: emailsData.length, hasMore: hasMoreData } 
+      }));
+      
+      return { loaded: newEmails.length, hasMore: hasMoreData };
+    } catch (error) {
+      console.error('[BackgroundEmailsLoader] Failed to load more:', error);
+      return { loaded: 0, hasMore: false };
+    }
+  }
+
+  // Get total count from Firestore without loading all records
+  async function getTotalCount() {
+    if (!window.firebaseDB) return 0;
+    
+    try {
+      const email = window.currentUserEmail || '';
+      if (window.currentUserRole !== 'admin' && email) {
+        // Non-admin: count only owned/assigned emails
+        const e = String(email).toLowerCase();
+        const [ownedSnap, assignedSnap] = await Promise.all([
+          window.firebaseDB.collection('emails').where('ownerId','==',e).get(),
+          window.firebaseDB.collection('emails').where('assignedTo','==',e).get()
+        ]);
+        const map = new Map();
+        ownedSnap.forEach(d=>map.set(d.id, d.id));
+        assignedSnap.forEach(d=>map.set(d.id, d.id));
+        return map.size;
+      } else {
+        // Admin: count all emails
+        const snapshot = await window.firebaseDB.collection('emails').get();
+        return snapshot.size;
+      }
+    } catch (error) {
+      console.error('[BackgroundEmailsLoader] Failed to get total count:', error);
+      return emailsData.length; // Fallback to loaded count
     }
   }
 
@@ -271,6 +393,49 @@
           } catch(_) { emailsData = cached; }
           console.log('[BackgroundEmailsLoader] ✓ Loaded', cached.length, 'emails from cache');
           
+          // Check if there are more emails in Firestore (even if we loaded from cache)
+          // For admin users: if we have 100 emails (batch size), assume there might be more
+          // For non-admin: assume cache has all their data
+          if (window.currentUserRole === 'admin') {
+            // If we have 100 emails (our batch size), there might be more
+            if (emailsData.length >= 100) {
+              hasMoreData = true; // Assume there might be more
+              // Try to get lastLoadedDoc by querying for the oldest email
+              // This ensures we can paginate correctly
+              try {
+                const sorted = [...emailsData].sort((a, b) => {
+                  const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                  const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                  return aTime - bTime; // Oldest first
+                });
+                const oldestEmail = sorted[0];
+                if (oldestEmail && oldestEmail.id && window.firebaseDB) {
+                  // Get the document by ID (simpler than querying by createdAt)
+                  const docRef = window.firebaseDB.collection('emails').doc(oldestEmail.id);
+                  const docSnap = await docRef.get();
+                  if (docSnap.exists) {
+                    lastLoadedDoc = docSnap;
+                    console.log('[BackgroundEmailsLoader] Set lastLoadedDoc from cache (oldest email ID)');
+                  }
+                }
+              } catch (error) {
+                console.warn('[BackgroundEmailsLoader] Could not set lastLoadedDoc from cache:', error);
+                // If we can't set it now, loadMore will try to reload from Firestore
+                lastLoadedDoc = null;
+              }
+              console.log('[BackgroundEmailsLoader] Cache has 100+ emails, assuming more available. hasMoreData:', hasMoreData);
+            } else {
+              // Less than 100, probably all data
+              hasMoreData = false;
+              lastLoadedDoc = null;
+              console.log('[BackgroundEmailsLoader] Cache has <100 emails, assuming all loaded');
+            }
+          } else {
+            // For non-admin users, assume cache has all their data (they have limited access)
+            lastLoadedDoc = null;
+            hasMoreData = false;
+          }
+          
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:emails-loaded', { 
             detail: { count: cached.length, cached: true } 
@@ -315,6 +480,40 @@
               }
             } catch(_) { emailsData = cached; }
             console.log('[BackgroundEmailsLoader] ✓ Loaded', emailsData.length, 'emails from cache (delayed, filtered)');
+            
+            // Check if there are more emails (same logic as main cache load)
+            if (window.currentUserRole === 'admin') {
+              if (emailsData.length >= 100) {
+                hasMoreData = true;
+                // Try to get lastLoadedDoc by document ID
+                try {
+                  const sorted = [...emailsData].sort((a, b) => {
+                    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                    return aTime - bTime;
+                  });
+                  const oldestEmail = sorted[0];
+                  if (oldestEmail && oldestEmail.id && window.firebaseDB) {
+                    const docRef = window.firebaseDB.collection('emails').doc(oldestEmail.id);
+                    const docSnap = await docRef.get();
+                    if (docSnap.exists) {
+                      lastLoadedDoc = docSnap;
+                    }
+                  }
+                } catch (error) {
+                  console.warn('[BackgroundEmailsLoader] Could not set lastLoadedDoc from cache (delayed):', error);
+                  lastLoadedDoc = null;
+                }
+                console.log('[BackgroundEmailsLoader] Cache has 100+ emails (delayed), assuming more available');
+              } else {
+                hasMoreData = false;
+                lastLoadedDoc = null;
+              }
+            } else {
+              lastLoadedDoc = null;
+              hasMoreData = false;
+            }
+            
             document.dispatchEvent(new CustomEvent('pc:emails-loaded', { 
               detail: { count: cached.length, cached: true } 
             }));
@@ -326,12 +525,98 @@
     }
   })();
   
+  // Load more emails (pagination)
+  async function loadMoreEmails() {
+    if (!hasMoreData) {
+      console.log('[BackgroundEmailsLoader] No more data to load');
+      return { loaded: 0, hasMore: false };
+    }
+    
+    if (!window.firebaseDB) {
+      console.warn('[BackgroundEmailsLoader] firebaseDB not available');
+      return { loaded: 0, hasMore: false };
+    }
+    
+    try {
+      if (window.currentUserRole !== 'admin') {
+        // For employees, pagination is disabled (they get all their emails in initial load)
+        return { loaded: 0, hasMore: false };
+      }
+      
+      if (!lastLoadedDoc) {
+        console.warn('[BackgroundEmailsLoader] No lastLoadedDoc for pagination');
+        return { loaded: 0, hasMore: false };
+      }
+      
+      console.log('[BackgroundEmailsLoader] Loading next batch...');
+      const snapshot = await window.firebaseDB.collection('emails')
+        .orderBy('createdAt', 'desc')
+        .startAfter(lastLoadedDoc)
+        .limit(100)
+        .get();
+      
+      const newEmails = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const createdAt = tsToIso(data.createdAt);
+        const updatedAt = tsToIso(data.updatedAt);
+        const sentAt = tsToIso(data.sentAt);
+        const receivedAt = tsToIso(data.receivedAt);
+        const scheduledSendTime = tsToIso(data.scheduledSendTime);
+        const generatedAt = tsToIso(data.generatedAt);
+        const timestamp = sentAt || receivedAt || scheduledSendTime || createdAt || new Date().toISOString();
+        return {
+          id: doc.id,
+          ...data,
+          createdAt,
+          updatedAt,
+          sentAt,
+          receivedAt,
+          scheduledSendTime,
+          generatedAt,
+          timestamp,
+          emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
+        };
+      });
+      
+      // Append to existing data
+      emailsData = [...emailsData, ...newEmails];
+      
+      // Update pagination tracking
+      if (snapshot.docs.length > 0) {
+        lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
+        hasMoreData = snapshot.docs.length === 100;
+      } else {
+        hasMoreData = false;
+      }
+      
+      console.log('[BackgroundEmailsLoader] ✓ Loaded', newEmails.length, 'more emails. Total:', emailsData.length, hasMoreData ? '(more available)' : '(all loaded)');
+      
+      // Update cache
+      if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+        await window.CacheManager.set('emails', emailsData);
+      }
+      
+      // Notify listeners
+      document.dispatchEvent(new CustomEvent('pc:emails-loaded-more', { 
+        detail: { count: newEmails.length, total: emailsData.length, hasMore: hasMoreData } 
+      }));
+      
+      return { loaded: newEmails.length, hasMore: hasMoreData };
+    } catch (error) {
+      console.error('[BackgroundEmailsLoader] Failed to load more:', error);
+      return { loaded: 0, hasMore: false };
+    }
+  }
+
   // Export public API
   window.BackgroundEmailsLoader = {
     getEmailsData: () => emailsData,
     reload: loadFromFirestore,
+    loadMore: loadMoreEmails,
     unsubscribe: () => { try { if (_unsubscribe) { _unsubscribe(); _unsubscribe = null; } } catch(_) {} },
-    getCount: () => emailsData.length
+    getCount: () => emailsData.length,
+    hasMore: () => hasMoreData,
+    getTotalCount: getTotalCount
   };
   
   console.log('[BackgroundEmailsLoader] Module initialized');

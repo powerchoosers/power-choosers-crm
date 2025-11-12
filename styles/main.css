@@ -8748,7 +8748,7 @@ html, body {
 }
 .list-card-count { 
     color: var(--text-secondary); 
-    font-size: 0.9rem; 
+    font-size: 0.9rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
