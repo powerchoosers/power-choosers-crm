@@ -951,16 +951,19 @@
     
     modal.querySelector('#bulk-apply').addEventListener('click', () => {
       const mode = (modal.querySelector('input[name="bulk-mode"]:checked') || {}).value;
+      let selectedIds = [];
       if (mode === 'custom') {
         const n = Math.max(1, parseInt(modal.querySelector('#bulk-custom-count').value || '0', 10));
-        selectIds(state.filtered.slice(0, Math.min(n, total)).map(r => r.id));
+        selectedIds = state.filtered.slice(0, Math.min(n, total)).map(r => r.id);
       } else if (mode === 'page') {
-        selectIds(getPageItems().map(r => r.id));
+        selectedIds = getPageItems().map(r => r.id);
       } else {
-        selectIds(state.filtered.map(r => r.id));
+        selectedIds = state.filtered.map(r => r.id);
       }
+      selectIds(selectedIds);
       close();
       render();
+      updateBulkBar();
       showBulkBar();
     });
     
@@ -1020,6 +1023,118 @@
       setTimeout(() => {
         if (bar.parentNode) bar.parentNode.removeChild(bar);
       }, 200);
+    }
+  }
+
+  async function deleteSelectedTasks() {
+    const ids = Array.from(state.selected || []);
+    if (!ids.length) return;
+    
+    if (!confirm(`Are you sure you want to delete ${ids.length} task(s)?`)) return;
+    
+    // Store current page before deletion to preserve pagination
+    const currentPageBeforeDeletion = state.currentPage;
+    
+    // Show progress toast
+    const progressToast = window.crm?.showProgressToast ? 
+      window.crm.showProgressToast(`Deleting ${ids.length} ${ids.length === 1 ? 'task' : 'tasks'}...`, ids.length, 0) : null;
+    
+    let failed = 0;
+    let completed = 0;
+    
+    try {
+      // Process deletions sequentially to show progress
+      for (const id of ids) {
+        try {
+          // Remove from localStorage
+          try {
+            const key = getUserTasksKey();
+            const current = JSON.parse(localStorage.getItem(key) || '[]');
+            const filtered = current.filter(t => t.id !== id);
+            localStorage.setItem(key, JSON.stringify(filtered));
+          } catch (e) { 
+            console.warn('Could not remove task from localStorage:', e); 
+          }
+          
+          // Remove from Firebase
+          if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
+            const db = window.firebaseDB;
+            const snap = await db.collection('tasks').where('id', '==', id).limit(5).get();
+            if (!snap.empty) {
+              const batch = db.batch();
+              snap.forEach(doc => batch.delete(doc.ref));
+              await batch.commit();
+            }
+          }
+          
+          // Remove from local state
+          const recIdx = state.data.findIndex(x => x.id === id);
+          if (recIdx !== -1) {
+            state.data.splice(recIdx, 1);
+          }
+          
+          completed++;
+          if (progressToast && typeof progressToast.update === 'function') {
+            progressToast.update(completed, ids.length);
+          }
+        } catch (e) {
+          failed++;
+          completed++;
+          console.warn('Delete failed for task id', id, e);
+          if (progressToast && typeof progressToast.update === 'function') {
+            progressToast.update(completed, ids.length);
+          }
+        }
+        
+        // Small delay to prevent UI blocking
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    } catch (err) {
+      console.warn('Bulk delete error', err);
+      if (progressToast && typeof progressToast.error === 'function') {
+        progressToast.error('Delete operation failed');
+      }
+    } finally {
+      // Update filtered data
+      const idSet = new Set(ids);
+      state.filtered = Array.isArray(state.filtered) ? state.filtered.filter(t => !idSet.has(t.id)) : [];
+      
+      // Calculate new total pages after deletion
+      const newTotalPages = Math.max(1, Math.ceil(state.filtered.length / state.pageSize));
+      
+      // Only adjust page if current page is beyond the new total
+      if (currentPageBeforeDeletion > newTotalPages) {
+        state.currentPage = newTotalPages;
+      }
+      
+      state.selected.clear();
+      applyFilters();
+      updateTodaysTasksWidget();
+      hideBulkBar();
+      if (els.selectAll) { 
+        els.selectAll.checked = false; 
+        els.selectAll.indeterminate = false; 
+      }
+      
+      const successCount = Math.max(0, ids.length - failed);
+      
+      if (progressToast) {
+        if (failed === 0) {
+          progressToast.complete(`Successfully deleted ${successCount} ${successCount === 1 ? 'task' : 'tasks'}`);
+        } else if (successCount > 0) {
+          progressToast.complete(`Deleted ${successCount} of ${ids.length} ${ids.length === 1 ? 'task' : 'tasks'}`);
+        } else {
+          progressToast.error(`Failed to delete all ${ids.length} ${ids.length === 1 ? 'task' : 'tasks'}`);
+        }
+      } else {
+        // Fallback to regular toasts if progress toast not available
+        if (successCount > 0) {
+          window.crm?.showToast && window.crm.showToast(`Deleted ${successCount} ${successCount === 1 ? 'task' : 'tasks'}`);
+        }
+        if (failed > 0) {
+          window.crm?.showToast && window.crm.showToast(`Failed to delete ${failed} ${failed === 1 ? 'task' : 'tasks'}`, 'error');
+        }
+      }
     }
   }
   
@@ -1147,35 +1262,7 @@
     });
     
     container.querySelector('#bulk-delete').addEventListener('click', async () => {
-      if (!confirm(`Are you sure you want to delete ${count} task(s)?`)) return;
-      
-      const selectedIds = Array.from(state.selected);
-      for (const id of selectedIds) {
-        const recIdx = state.data.findIndex(x => x.id === id);
-        if (recIdx !== -1) {
-          state.data.splice(recIdx, 1);
-          // Remove from localStorage
-          try {
-            const key = getUserTasksKey();
-            const current = JSON.parse(localStorage.getItem(key) || '[]');
-            const filtered = current.filter(t => t.id !== id);
-            localStorage.setItem(key, JSON.stringify(filtered));
-          } catch (e) { console.warn('Could not remove task from localStorage:', e); }
-          // Remove from Firebase
-          try {
-            const db = window.firebaseDB;
-            if (db) {
-              const snap = await db.collection('tasks').where('id', '==', id).limit(5).get();
-              const batch = db.batch();
-              snap.forEach(doc => batch.delete(doc.ref));
-              if (!snap.empty) await batch.commit();
-            }
-          } catch (e) { console.warn('Could not remove task from Firebase:', e); }
-        }
-      }
-      state.selected.clear();
-      applyFilters();
-      updateTodaysTasksWidget();
+      await deleteSelectedTasks();
     });
   }
 
