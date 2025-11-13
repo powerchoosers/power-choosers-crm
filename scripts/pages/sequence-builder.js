@@ -6333,8 +6333,11 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
         .replace(/\bPower Choosers helps\b/gi, 'We help')
         .replace(/\bPower Choosers can help\b/gi, 'We can help')
-        .replace(/\bPower Choosers\b/gi, 'We');
-      return { subject: cleanSubject, html };
+        .replace(/\bPower Choosers\b/gi, 'We')
+        .replace(/\[\d+\]/g, ''); // Remove citation brackets
+      // Also clean HTML content
+      const cleanHtml = String(html).replace(/\[\d+\]/g, '');
+      return { subject: cleanSubject, html: cleanHtml };
     } catch (error) {
       console.error('Error formatting templated email:', error);
       return { subject: 'Energy Solutions', html: '<p>Error generating email content.</p>' };
@@ -6367,12 +6370,13 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
           .replace(/\bPower Choosers helps\b/gi, 'We help')
           .replace(/\bPower Choosers can help\b/gi, 'We can help')
-          .replace(/\bPower Choosers\b/gi, 'We');
+          .replace(/\bPower Choosers\b/gi, 'We')
+          .replace(/\[\d+\]/g, ''); // Remove citation brackets
         const paragraphs = [];
-        if (jsonData.greeting) paragraphs.push(jsonData.greeting);
-        if (jsonData.paragraph1) paragraphs.push(jsonData.paragraph1);
-        if (jsonData.paragraph2) paragraphs.push(jsonData.paragraph2);
-        if (jsonData.paragraph3) paragraphs.push(jsonData.paragraph3);
+        if (jsonData.greeting) paragraphs.push(jsonData.greeting.replace(/\[\d+\]/g, ''));
+        if (jsonData.paragraph1) paragraphs.push(jsonData.paragraph1.replace(/\[\d+\]/g, ''));
+        if (jsonData.paragraph2) paragraphs.push(jsonData.paragraph2.replace(/\[\d+\]/g, ''));
+        if (jsonData.paragraph3) paragraphs.push(jsonData.paragraph3.replace(/\[\d+\]/g, ''));
 
         // Always enforce closing as "Best regards, <FirstName>"
         const enforcedClosing = `Best regards,\n${senderFirst}`;
@@ -6384,7 +6388,8 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
           .replace(/\bPower Choosers helps\b/gi, 'We help')
           .replace(/\bPower Choosers can help\b/gi, 'We can help')
-          .replace(/\bPower Choosers\b/gi, 'We');
+          .replace(/\bPower Choosers\b/gi, 'We')
+          .replace(/\[\d+\]/g, ''); // Remove citation brackets
 
         // Convert to HTML with readable color
         const htmlBody = body
@@ -6407,7 +6412,8 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
           .replace(/\bPower Choosers helps\b/gi, 'We help')
           .replace(/\bPower Choosers can help\b/gi, 'We can help')
-          .replace(/\bPower Choosers\b/gi, 'We');
+          .replace(/\bPower Choosers\b/gi, 'We')
+          .replace(/\[\d+\]/g, ''); // Remove citation brackets
         const hasClosing = /best\s*regards[\s,]*$/i.test(sanitizedRaw.trim());
         const appended = hasClosing ? sanitizedRaw : `${sanitizedRaw}\n\nBest regards,\n${senderFirst}`;
         const html = '<p style="color:#222;">'
