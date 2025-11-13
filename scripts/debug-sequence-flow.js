@@ -47,7 +47,14 @@ window.debugSequenceFlow = async function() {
           createdAt: data.createdAt?.toDate?.() || 'N/A'
         });
       });
-      console.table(activations);
+      // Display activations (fallback for browsers without console.table)
+      if (typeof console.table === 'function') {
+        console.table(activations);
+      } else {
+        activations.forEach(a => {
+          console.log(`  ${a.id}: ${a.status} | Contacts: ${a.processedContacts}/${a.contactIds} | Created: ${a.createdAt}`);
+        });
+      }
       
       // Check for pending ones
       const pending = activations.filter(a => a.status === 'pending');
@@ -70,7 +77,21 @@ window.debugSequenceFlow = async function() {
       return;
     }
   } catch (error) {
-    console.error('Error checking activations:', error);
+    if (error.message?.includes('index')) {
+      console.error('❌ MISSING INDEX: sequenceActivations');
+      console.log('📝 Create this index in Firebase Console:');
+      console.log('   Collection: sequenceActivations');
+      console.log('   Fields: ownerId (Ascending), createdAt (Descending)');
+      console.log('   Query scope: Collection');
+      if (error.message.includes('create it here:')) {
+        const match = error.message.match(/https:\/\/[^\s]+/);
+        if (match) {
+          console.log(`   Direct link: ${match[0]}`);
+        }
+      }
+    } else {
+      console.error('Error checking activations:', error);
+    }
   }
   
   // Step 2: Check for scheduled emails
@@ -111,10 +132,22 @@ window.debugSequenceFlow = async function() {
       });
       
       console.log('\nBreakdown by status:');
-      console.table(byStatus);
+      if (typeof console.table === 'function') {
+        console.table(byStatus);
+      } else {
+        Object.entries(byStatus).forEach(([status, count]) => {
+          console.log(`  ${status}: ${count}`);
+        });
+      }
       
       console.log('\nAll scheduled emails:');
-      console.table(emails);
+      if (typeof console.table === 'function') {
+        console.table(emails);
+      } else {
+        emails.forEach(e => {
+          console.log(`  ${e.id}: ${e.status} | To: ${e.to} | Scheduled: ${e.scheduledTime} (${e.minutesUntil} min)`);
+        });
+      }
       
       // Check for not_generated
       const notGenerated = emails.filter(e => e.status === 'not_generated');
@@ -146,7 +179,21 @@ window.debugSequenceFlow = async function() {
       console.log('   3. OR sequence has no auto-email steps');
     }
   } catch (error) {
-    console.error('Error checking scheduled emails:', error);
+    if (error.message?.includes('index')) {
+      console.error('❌ MISSING INDEX: emails');
+      console.log('📝 Create this index in Firebase Console:');
+      console.log('   Collection: emails');
+      console.log('   Fields: type (Ascending), ownerId (Ascending), scheduledSendTime (Ascending)');
+      console.log('   Query scope: Collection');
+      if (error.message.includes('create it here:')) {
+        const match = error.message.match(/https:\/\/[^\s]+/);
+        if (match) {
+          console.log(`   Direct link: ${match[0]}`);
+        }
+      }
+    } else {
+      console.error('Error checking scheduled emails:', error);
+    }
   }
   
   // Step 3: Check sequences
@@ -154,10 +201,10 @@ window.debugSequenceFlow = async function() {
   try {
     const sequencesQuery = await db.collection('sequences')
       .where('ownerId', '==', currentUserEmail)
-      .where('enabled', '==', true)
+      .where('status', '==', 'active')
       .get();
     
-    console.log(`Found ${sequencesQuery.size} enabled sequence(s)`);
+    console.log(`Found ${sequencesQuery.size} active sequence(s)`);
     
     if (!sequencesQuery.empty) {
       const sequences = [];
@@ -167,12 +214,18 @@ window.debugSequenceFlow = async function() {
         sequences.push({
           id: doc.id,
           name: data.name,
-          enabled: data.enabled,
+          status: data.status,
           totalSteps: data.steps?.length || 0,
           autoEmailSteps: autoEmailSteps
         });
       });
-      console.table(sequences);
+      if (typeof console.table === 'function') {
+        console.table(sequences);
+      } else {
+        sequences.forEach(s => {
+          console.log(`  ${s.name}: ${s.totalSteps} steps (${s.autoEmailSteps} auto-emails) | Status: ${s.status}`);
+        });
+      }
     }
   } catch (error) {
     console.error('Error checking sequences:', error);
@@ -198,7 +251,13 @@ window.debugSequenceFlow = async function() {
       });
       
       console.log('Members by sequence:');
-      console.table(bySequence);
+      if (typeof console.table === 'function') {
+        console.table(bySequence);
+      } else {
+        Object.entries(bySequence).forEach(([seqId, count]) => {
+          console.log(`  ${seqId}: ${count} member(s)`);
+        });
+      }
     }
   } catch (error) {
     console.error('Error checking members:', error);
