@@ -1,12 +1,4 @@
-import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
-
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = getFirestore();
+import { db } from './_firebase.js';
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -27,6 +19,17 @@ export default async function handler(req, res) {
   }
 
   const isProduction = process.env.NODE_ENV === 'production';
+
+  // Ensure Firebase Admin is initialized with credentials
+  if (!db) {
+    console.error('[GenerateScheduledEmails] Firestore not initialized. Missing Firebase service account env vars.');
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      success: false,
+      error: 'Firebase Admin not initialized. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY on localhost.'
+    }));
+    return;
+  }
 
   // Check for Perplexity API key
   if (!process.env.PERPLEXITY_API_KEY) {

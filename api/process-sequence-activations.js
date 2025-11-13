@@ -1,12 +1,5 @@
 import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
-
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = getFirestore();
+import { db } from './_firebase.js';
 const BATCH_SIZE = 25;
 const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -33,6 +26,15 @@ export default async function handler(req, res) {
   const logAlways = (msg) => console.log(`[ProcessSequenceActivations] [${new Date().toISOString()}] ${msg}`);
 
   try {
+    if (!db) {
+      console.error('[ProcessSequenceActivations] Firestore not initialized. Missing Firebase service account env vars.');
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: false,
+        error: 'Firebase Admin not initialized. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY on localhost.'
+      }));
+      return;
+    }
     const { immediate, activationId } = req.body || {};
     
     logAlways(`Starting - immediate: ${immediate}, activationId: ${activationId || 'none'}`);

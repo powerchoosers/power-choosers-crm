@@ -1,13 +1,6 @@
 import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
+import { db } from './_firebase.js';
 import sgMail from '@sendgrid/mail';
-
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = getFirestore();
 
 // Initialize SendGrid
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -33,6 +26,16 @@ export default async function handler(req, res) {
   const isProduction = process.env.NODE_ENV === 'production';
 
   try {
+    // Ensure Firebase Admin is initialized with credentials
+    if (!db) {
+      console.error('[SendScheduledEmails] Firestore not initialized. Missing Firebase service account env vars.');
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: false,
+        error: 'Firebase Admin not initialized. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY on localhost.'
+      }));
+      return;
+    }
     if (!isProduction) {
     console.log('[SendScheduledEmails] Starting send process');
     }
