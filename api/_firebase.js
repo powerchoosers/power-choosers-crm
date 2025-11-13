@@ -23,12 +23,26 @@ try {
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
     // Always convert literal \n to real newlines
     const rawKey = process.env.FIREBASE_PRIVATE_KEY || '';
-    const privateKey = rawKey.replace(/\\n/g, '\n');
+    
+    // Remove surrounding quotes if present (dotenv sometimes includes them)
+    let cleanedKey = rawKey.trim();
+    if ((cleanedKey.startsWith('"') && cleanedKey.endsWith('"')) || 
+        (cleanedKey.startsWith("'") && cleanedKey.endsWith("'"))) {
+      cleanedKey = cleanedKey.slice(1, -1);
+    }
+    
+    const privateKey = cleanedKey.replace(/\\n/g, '\n');
 
     console.log('Firebase Env Vars Check:');
     console.log('projectId:', projectId ? 'SET' : 'NOT SET');
     console.log('clientEmail:', clientEmail ? 'SET' : 'NOT SET');
-    console.log('privateKey length:', privateKey.length); // Avoid logging raw private key
+    console.log('privateKey length (raw):', rawKey.length);
+    console.log('privateKey length (after processing):', privateKey.length);
+    console.log('privateKey starts with:', privateKey.substring(0, 30));
+    console.log('privateKey ends with:', privateKey.substring(Math.max(0, privateKey.length - 30)));
+    console.log('privateKey contains BEGIN:', privateKey.includes('BEGIN PRIVATE KEY'));
+    console.log('privateKey contains END:', privateKey.includes('END PRIVATE KEY'));
+    console.log('privateKey newline count:', (privateKey.match(/\n/g) || []).length);
 
     if (projectId && clientEmail && privateKey) {
       try {
