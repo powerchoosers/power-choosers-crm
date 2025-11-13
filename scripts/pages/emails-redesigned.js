@@ -56,12 +56,23 @@
   // Subscribe to background email update events once
   if (!document._emailsRealtimeBound) {
     try {
+      let updateTimeout = null;
+      const debouncedLoadData = () => {
+        clearTimeout(updateTimeout);
+        updateTimeout = setTimeout(() => {
+          try { 
+            // Only reload if we're on the emails page
+            if (els.page && els.page.style.display !== 'none') {
+              loadData(); 
+            }
+          } catch(_) {}
+        }, 1000); // 1 second debounce
+      };
+      
       document.addEventListener('pc:emails-loaded', () => {
         try { loadData(); } catch(_) {}
       });
-      document.addEventListener('pc:emails-updated', () => {
-        try { loadData(); } catch(_) {}
-      });
+      document.addEventListener('pc:emails-updated', debouncedLoadData);
       document._emailsRealtimeBound = true;
     } catch(_) {}
   }
@@ -338,39 +349,32 @@
       // Scheduled emails are already filtered by ownership in BackgroundEmailsLoader
       // Only shows scheduled emails owned by or assigned to current user
       
-      // Debug: Sample a scheduled email to check its structure
-      const sampleScheduled = state.data.find(e => e.type === 'scheduled');
-      if (sampleScheduled) {
-        console.log('[EmailsPage] Sample scheduled email:', {
-          id: sampleScheduled.id,
-          type: sampleScheduled.type,
-          status: sampleScheduled.status,
-          scheduledSendTime: sampleScheduled.scheduledSendTime,
-          scheduledSendTimeType: typeof sampleScheduled.scheduledSendTime,
-          deleted: sampleScheduled.deleted
-        });
-      }
-      
       filtered = filtered.filter(email => {
         const isScheduled = email.type === 'scheduled';
-        const hasSendTime = email.scheduledSendTime && typeof email.scheduledSendTime === 'number';
         const isPending = email.status === 'not_generated' || email.status === 'pending_approval';
+        const isGenerating = email.status === 'generating';
         const isApproved = email.status === 'approved';
         const notDeleted = !email.deleted;
         const notSent = email.status !== 'sent' && email.status !== 'delivered';
         
         // Show email if:
-        // 1. It's scheduled AND has send time AND not deleted AND not sent
+        // 1. It's scheduled AND not deleted AND not sent
         // 2. AND one of:
-        //    a. It's pending (needs generation or approval) - SHOW REGARDLESS OF TIME
-        //    b. It's approved and scheduled for future (within 1 min buffer)
-        const shouldShow = isScheduled && hasSendTime && notDeleted && notSent && 
-                          (isPending || (isApproved && email.scheduledSendTime >= (Date.now() - 60000)));
+        //    a. It's pending (needs generation or approval) - SHOW REGARDLESS OF TIME OR SEND TIME
+        //    b. It's generating - SHOW REGARDLESS OF TIME OR SEND TIME
+        //    c. It's approved with send time and scheduled for future (within 1 min buffer)
+        const hasSendTime = email.scheduledSendTime && typeof email.scheduledSendTime === 'number';
+        const shouldShow = isScheduled && notDeleted && notSent && 
+                          (isPending || isGenerating || (isApproved && hasSendTime && email.scheduledSendTime >= (Date.now() - 60000)));
         
         return shouldShow;
       });
-      // Sort by scheduled send time (earliest first)
-      filtered.sort((a, b) => a.scheduledSendTime - b.scheduledSendTime);
+      // Sort by scheduled send time (earliest first), emails without send time go to end
+      filtered.sort((a, b) => {
+        const aTime = a.scheduledSendTime || Number.MAX_SAFE_INTEGER;
+        const bTime = b.scheduledSendTime || Number.MAX_SAFE_INTEGER;
+        return aTime - bTime;
+      });
       console.log('[EmailsPage] Scheduled filter applied. Filtered count:', filtered.length);
     } else if (state.currentFolder === 'starred') {
       filtered = filtered.filter(email => email.starred && !email.deleted);
@@ -398,6 +402,14 @@
     
     // Update folder total count asynchronously (do not block UI)
     updateFolderCount().catch(() => {});
+    
+    // For scheduled tab: proactively load more if we have very few results
+    // This ensures we see all scheduled emails even if they're not in the initial 200
+    if (state.currentFolder === 'scheduled' && state.filtered.length < 50 && state.hasMore && window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.loadMore === 'function' && !state.isLoadingMore) {
+      console.log('[EmailsPage] Scheduled tab: Only', state.filtered.length, 'scheduled emails found, loading more to find all scheduled emails...');
+      // Load more emails to find all scheduled ones (non-blocking)
+      loadMoreUntilEnough().catch(() => {});
+    }
     
     if (state.filtered.length < neededForPage && state.hasMore && window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.loadMore === 'function') {
       console.log('[EmailsPage] Not enough filtered results, loading more...');
@@ -427,12 +439,24 @@
         renderPagination();
         return;
       }
+      
+      // Get real count from Firestore first (more accurate)
+      // Show filtered count as fallback if query fails
       if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.getTotalCountByFolder === 'function') {
-        const cnt = await window.BackgroundEmailsLoader.getTotalCountByFolder(state.currentFolder || 'inbox');
-        state.folderCount = cnt || state.filtered.length;
-      } else {
-        state.folderCount = state.filtered.length;
+        try {
+          const cnt = await window.BackgroundEmailsLoader.getTotalCountByFolder(state.currentFolder || 'inbox');
+          if (cnt !== null && cnt !== undefined) {
+            state.folderCount = cnt;
+            renderPagination();
+            return;
+          }
+        } catch (e) {
+          console.warn('[EmailsPage] Failed to get folder count from Firestore:', e);
+        }
       }
+      
+      // Fallback to filtered count if query fails or loader unavailable
+      state.folderCount = state.filtered.length;
       renderPagination();
     } catch (e) {
       console.warn('[EmailsPage] Failed to update folder count:', e);
@@ -451,12 +475,14 @@
     state.isLoadingMore = true;
     try {
       const neededForPage = state.currentPage * state.pageSize;
+      // For scheduled tab, load until we have at least 50 scheduled emails (or all available)
+      const targetCount = state.currentFolder === 'scheduled' ? Math.max(neededForPage, 50) : neededForPage;
       let attempts = 0;
-      const maxAttempts = 20; // Prevent infinite loops
+      const maxAttempts = state.currentFolder === 'scheduled' ? 50 : 20; // More attempts for scheduled to find all emails
       
-      console.log('[EmailsPage] loadMoreUntilEnough started - filtered:', state.filtered.length, 'needed:', neededForPage);
+      console.log('[EmailsPage] loadMoreUntilEnough started - filtered:', state.filtered.length, 'needed:', neededForPage, 'target:', targetCount);
       
-      while (state.filtered.length < neededForPage && state.hasMore && attempts < maxAttempts) {
+      while (state.filtered.length < targetCount && state.hasMore && attempts < maxAttempts) {
       attempts++;
       console.log(`[EmailsPage] Loading more emails (attempt ${attempts}/${maxAttempts})...`);
       const result = await window.BackgroundEmailsLoader.loadMore();
@@ -533,23 +559,29 @@
       } else if (state.currentFolder === 'scheduled') {
         filtered = filtered.filter(email => {
           const isScheduled = email.type === 'scheduled';
-          const hasSendTime = email.scheduledSendTime && typeof email.scheduledSendTime === 'number';
           const isPending = email.status === 'not_generated' || email.status === 'pending_approval';
+          const isGenerating = email.status === 'generating';
           const isApproved = email.status === 'approved';
           const notDeleted = !email.deleted;
           const notSent = email.status !== 'sent' && email.status !== 'delivered';
           
           // Show email if:
-          // 1. It's scheduled AND has send time AND not deleted AND not sent
+          // 1. It's scheduled AND not deleted AND not sent
           // 2. AND one of:
-          //    a. It's pending (needs generation or approval) - SHOW REGARDLESS OF TIME
-          //    b. It's approved and scheduled for future (within 1 min buffer)
-          const shouldShow = isScheduled && hasSendTime && notDeleted && notSent && 
-                            (isPending || (isApproved && email.scheduledSendTime >= (Date.now() - 60000)));
+          //    a. It's pending (needs generation or approval) - SHOW REGARDLESS OF TIME OR SEND TIME
+          //    b. It's generating - SHOW REGARDLESS OF TIME OR SEND TIME
+          //    c. It's approved with send time and scheduled for future (within 1 min buffer)
+          const hasSendTime = email.scheduledSendTime && typeof email.scheduledSendTime === 'number';
+          const shouldShow = isScheduled && notDeleted && notSent && 
+                            (isPending || isGenerating || (isApproved && hasSendTime && email.scheduledSendTime >= (Date.now() - 60000)));
           
           return shouldShow;
         });
-        filtered.sort((a, b) => a.scheduledSendTime - b.scheduledSendTime);
+        filtered.sort((a, b) => {
+          const aTime = a.scheduledSendTime || Number.MAX_SAFE_INTEGER;
+          const bTime = b.scheduledSendTime || Number.MAX_SAFE_INTEGER;
+          return aTime - bTime;
+        });
       } else if (state.currentFolder === 'starred') {
         filtered = filtered.filter(email => email.starred && !email.deleted);
       } else if (state.currentFolder === 'trash') {
@@ -569,13 +601,18 @@
       state.filtered = filtered;
       
       // If we have enough now, break
-      if (state.filtered.length >= neededForPage || !state.hasMore) {
-        console.log(`[EmailsPage] Stopping load - filtered: ${state.filtered.length}, needed: ${neededForPage}, hasMore: ${state.hasMore}`);
+      const targetCount = state.currentFolder === 'scheduled' ? Math.max(neededForPage, 50) : neededForPage;
+      if (state.filtered.length >= targetCount || !state.hasMore) {
+        console.log(`[EmailsPage] Stopping load - filtered: ${state.filtered.length}, needed: ${neededForPage}, target: ${targetCount}, hasMore: ${state.hasMore}`);
         break;
       }
       }
       
       console.log(`[EmailsPage] loadMoreUntilEnough complete - filtered: ${state.filtered.length}, needed: ${neededForPage}`);
+      
+      // Update folder count after loading more (especially important for scheduled)
+      updateFolderCount().catch(() => {});
+      
       render();
     } finally {
       state.isLoadingMore = false;
@@ -587,11 +624,19 @@
     const start = (state.currentPage - 1) * state.pageSize;
     const end = start + state.pageSize;
     
-    // Check if we need to load more data for this page (similar to people.js)
-    // We need to check if we have enough filtered results for the current page
+    // Check if we need to load more data for this page
     const neededForPage = state.currentPage * state.pageSize;
     
-    if (state.filtered.length < neededForPage && state.hasMore && window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.loadMore === 'function') {
+    // Only trigger loading if:
+    // 1. We don't have enough filtered results
+    // 2. More data is available (hasMore)
+    // 3. We're not already loading
+    // 4. BackgroundEmailsLoader is available
+    if (state.filtered.length < neededForPage && 
+        state.hasMore && 
+        !state.isLoadingMore && 
+        window.BackgroundEmailsLoader && 
+        typeof window.BackgroundEmailsLoader.loadMore === 'function') {
       console.log(`[EmailsPage] getPageItems: Not enough filtered results (${state.filtered.length}) for page ${state.currentPage} (need ${neededForPage}), loading more...`);
       // Trigger async loading (non-blocking)
       loadMoreUntilEnough().catch(error => {
@@ -650,6 +695,9 @@
     bindRowEvents();
   }
 
+  // Favicon cache to prevent regeneration on each render
+  const faviconCache = new Map();
+
   // Helper function to get account logoUrl from recipient email
   function getRecipientAccountInfo(recipientEmail) {
     if (!recipientEmail) return { logoUrl: null, domain: null };
@@ -701,19 +749,35 @@
       
       // Get account info for recipient
       const accountInfo = getRecipientAccountInfo(recipientEmail);
-      avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
-        logoUrl: accountInfo.logoUrl,
-        domain: accountInfo.domain,
-        size: 28
-      });
+      const cacheKey = `favicon-${accountInfo.logoUrl || accountInfo.domain || recipientEmail}-28`;
+      
+      // Use cached favicon HTML if available
+      if (faviconCache.has(cacheKey)) {
+        avatarHtml = faviconCache.get(cacheKey);
+      } else {
+        avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
+          logoUrl: accountInfo.logoUrl,
+          domain: accountInfo.domain,
+          size: 28
+        });
+        faviconCache.set(cacheKey, avatarHtml);
+      }
     } else {
       // For received emails, show sender with domain favicon
-    const senderDomain = extractDomain(email.from);
+      const senderDomain = extractDomain(email.from);
       displayName = extractName(email.from) || 'Unknown';
-      avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
-      domain: senderDomain,
-      size: 28
-    });
+      const cacheKey = `favicon-${senderDomain}-28`;
+      
+      // Use cached favicon HTML if available
+      if (faviconCache.has(cacheKey)) {
+        avatarHtml = faviconCache.get(cacheKey);
+      } else {
+        avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
+          domain: senderDomain,
+          size: 28
+        });
+        faviconCache.set(cacheKey, avatarHtml);
+      }
     }
 
     const isSelected = state.selected.has(email.id);
