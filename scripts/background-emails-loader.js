@@ -148,7 +148,7 @@
       // Start realtime listener after a delay to let the page render first (performance optimization)
       setTimeout(() => {
         console.log('[BackgroundEmailsLoader] Starting real-time listener...');
-        if (window.currentUserRole !== 'admin') startRealtimeListenerScoped(window.currentUserEmail || ''); else startRealtimeListener();
+      if (window.currentUserRole !== 'admin') startRealtimeListenerScoped(window.currentUserEmail || ''); else startRealtimeListener();
       }, 2000); // 2 second delay
     } catch (error) {
       console.error('[BackgroundEmailsLoader] Failed to load from Firestore:', error);

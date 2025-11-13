@@ -199,11 +199,16 @@
     '_sequencePreviewDocClickBound',
     '_sequenceVarsPopoverDocClickBound',
     '_sequenceDelayPopoverDocClickBound',
-    '_sequenceDeletePopoverDocClickBound'
+    '_sequenceDeletePopoverDocClickBound',
     
-    // NOTE: _composeToolbarClickBound removed - it was preventing the listener from being attached at all
-    // The compose toolbar uses its own guard logic in setupToolbarEventListeners()
+    // NEW: Task Detail page event listener guards (task-detail.js)
+    '_taskDetailContactHandlersBound',
+    '_taskDetailPhoneHandlersBound',
+    '_taskDetailContactCreationBound'
   ];
+  
+  // NOTE: _composeToolbarClickBound removed - it was preventing the listener from being attached at all
+  // The compose toolbar uses its own guard logic in setupToolbarEventListeners()
   
   guards.forEach(guard => {
     if (!document[guard]) {

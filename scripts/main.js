@@ -964,6 +964,36 @@ class PowerChoosersCRM {
 
             const ref = await db.collection('contacts').add(finalDoc);
 
+            // If LinkedIn URL provided and contact is linked to an account, update account's LinkedIn
+            if (doc.linkedin) {
+              let accountId = doc.accountId;
+              
+              // If no accountId but has companyName, try to find account by name
+              if (!accountId && doc.companyName) {
+                try {
+                  const accountQuery = await db.collection('accounts')
+                    .where('accountName', '==', doc.companyName)
+                    .limit(1)
+                    .get();
+                  if (!accountQuery.empty) {
+                    accountId = accountQuery.docs[0].id;
+                  }
+                } catch (_) {}
+              }
+              
+              if (accountId) {
+                try {
+                  await db.collection('accounts').doc(accountId).update({
+                    linkedin: doc.linkedin,
+                    updatedAt: now
+                  });
+                  console.log('[AddContact] Updated account LinkedIn from contact');
+                } catch (err) {
+                  console.warn('[AddContact] Failed to update account LinkedIn:', err);
+                }
+              }
+            }
+
             // Broadcast for optional listeners (e.g., People page refresh)
             // Use UI-friendly timestamps so the table doesn't show N/A while serverTimestamp resolves
             try {
@@ -3916,16 +3946,19 @@ class PowerChoosersCRM {
                             const value = typeof raw === 'string' ? raw.trim() : raw;
                             if (value) {
                                 // Special handling for service addresses
-                                if (crmField === 'serviceaddresses') {
+                                const fieldKey = crmField;
+                                const fieldLc = String(crmField).toLowerCase();
+                                if (fieldLc === 'serviceaddresses') {
                                     // Split by semicolon and create array of address objects
-                                    const addresses = value.split(';').map((addr, idx) => ({
+                                    const addresses = String(value).split(';').map((addr, idx) => ({
                                         address: addr.trim(),
                                         isPrimary: idx === 0
                                     })).filter(a => a.address.length > 0);
-                                    doc[crmField] = addresses;
+                                    // Preserve the selected field name (camelCase) on the document
+                                    doc[fieldKey] = addresses;
                                 } else {
                                     // Field-specific normalization (e.g., strip Excel leading apostrophe on phone)
-                                    doc[crmField] = this.normalizeForField(crmField, value);
+                                    doc[fieldKey] = this.normalizeForField(fieldKey, value);
                                 }
                             }
                         });

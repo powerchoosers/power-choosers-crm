@@ -90,8 +90,15 @@
         const cached = await window.CacheManager.get('tasks');
         if (cached && Array.isArray(cached) && cached.length > 0) {
           if (window.currentUserRole !== 'admin') {
-            const email = window.currentUserEmail || '';
-            tasksData = (cached || []).filter(t => (t && (t.ownerId === email || t.assignedTo === email)));
+            const email = (window.currentUserEmail || '').toLowerCase();
+            // CRITICAL FIX: Include createdBy field in ownership check to match filterTasksByOwnership()
+            tasksData = (cached || []).filter(t => {
+              if (!t) return false;
+              const ownerId = (t.ownerId || '').toLowerCase();
+              const assignedTo = (t.assignedTo || '').toLowerCase();
+              const createdBy = (t.createdBy || '').toLowerCase();
+              return ownerId === email || assignedTo === email || createdBy === email;
+            });
           } else {
             tasksData = cached;
           }
@@ -118,8 +125,15 @@
           const cached = await window.CacheManager.get('tasks');
           if (cached && Array.isArray(cached) && cached.length > 0) {
             if (window.currentUserRole !== 'admin') {
-              const email = window.currentUserEmail || '';
-              tasksData = (cached || []).filter(t => (t && (t.ownerId === email || t.assignedTo === email)));
+              const email = (window.currentUserEmail || '').toLowerCase();
+              // CRITICAL FIX: Include createdBy field in ownership check to match filterTasksByOwnership()
+              tasksData = (cached || []).filter(t => {
+                if (!t) return false;
+                const ownerId = (t.ownerId || '').toLowerCase();
+                const assignedTo = (t.assignedTo || '').toLowerCase();
+                const createdBy = (t.createdBy || '').toLowerCase();
+                return ownerId === email || assignedTo === email || createdBy === email;
+              });
             } else {
               tasksData = cached;
             }
