@@ -460,6 +460,15 @@ function deSalesify(text) {
     .replace(/\bPower Choosers\b/gi, 'We');
 }
 
+// Remove citation brackets from text (e.g., [1], [2], [3])
+function removeCitationBrackets(text) {
+  if (!text) return text;
+  return String(text)
+    .replace(/\[\d+\]/g, '') // Remove [1], [2], [3], etc.
+    .replace(/\s+/g, ' ') // Normalize multiple spaces
+    .trim();
+}
+
 // Industry/size-aware post-processor to avoid generic "your industry" and inaccurate size references
 function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory, job }) {
   if (!text) return text;
@@ -2867,11 +2876,22 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           sizeCategory,
           job: recipient?.title || recipient?.job || recipient?.role || null
         };
-        if (jsonData.greeting) jsonData.greeting = deSalesify(personalizeIndustryAndSize(jsonData.greeting, personalizeCtx));
-        if (jsonData.opening_hook) jsonData.opening_hook = deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx));
-        if (jsonData.value_proposition) jsonData.value_proposition = deSalesify(personalizeIndustryAndSize(jsonData.value_proposition, personalizeCtx));
-        if (jsonData.social_proof_optional) jsonData.social_proof_optional = deSalesify(personalizeIndustryAndSize(jsonData.social_proof_optional, personalizeCtx));
-        if (jsonData.cta_text) jsonData.cta_text = deSalesify(personalizeIndustryAndSize(jsonData.cta_text, personalizeCtx));
+        if (jsonData.greeting) jsonData.greeting = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.greeting, personalizeCtx)));
+        if (jsonData.opening_hook) jsonData.opening_hook = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx)));
+        if (jsonData.value_proposition) jsonData.value_proposition = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.value_proposition, personalizeCtx)));
+        if (jsonData.social_proof_optional) jsonData.social_proof_optional = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.social_proof_optional, personalizeCtx)));
+        if (jsonData.cta_text) jsonData.cta_text = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.cta_text, personalizeCtx)));
+        
+        // Clean all other string fields in jsonData to remove citations
+        Object.keys(jsonData).forEach(key => {
+          if (typeof jsonData[key] === 'string') {
+            jsonData[key] = removeCitationBrackets(jsonData[key]);
+          } else if (Array.isArray(jsonData[key])) {
+            jsonData[key] = jsonData[key].map(item => 
+              typeof item === 'string' ? removeCitationBrackets(item) : item
+            );
+          }
+        });
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ 
@@ -2910,7 +2930,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
       sizeCategory: sizeCategoryStd,
       job: recipient?.title || recipient?.job || recipient?.role || null
     };
-    const polished = deSalesify(personalizeIndustryAndSize(content, personalizeCtxStd));
+    const polished = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(content, personalizeCtxStd)));
     return res.end(JSON.stringify({ 
       ok: true, 
       output: polished,
