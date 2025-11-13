@@ -6325,6 +6325,19 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
   // Helper functions for AI email formatting
   function formatTemplatedEmail(result, recipient, templateType) {
     try {
+      // Clean all string fields in result to remove citations
+      if (result && typeof result === 'object') {
+        Object.keys(result).forEach(key => {
+          if (typeof result[key] === 'string') {
+            result[key] = result[key].replace(/\[\d+\]/g, '').trim();
+          } else if (Array.isArray(result[key])) {
+            result[key] = result[key].map(item => 
+              typeof item === 'string' ? item.replace(/\[\d+\]/g, '').trim() : item
+            );
+          }
+        });
+      }
+      
       const subject = (result.subject || 'Energy Solutions');
       const html = result.output || result.html || '<p>Email content</p>';
       // Light de-salesify on subject only (avoid mutating structured HTML templates)
@@ -6333,10 +6346,9 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
         .replace(/\bPower Choosers helps\b/gi, 'We help')
         .replace(/\bPower Choosers can help\b/gi, 'We can help')
-        .replace(/\bPower Choosers\b/gi, 'We')
-        .replace(/\[\d+\]/g, ''); // Remove citation brackets
-      // Also clean HTML content
-      const cleanHtml = String(html).replace(/\[\d+\]/g, '');
+        .replace(/\bPower Choosers\b/gi, 'We');
+      // HTML content is already cleaned above
+      const cleanHtml = String(html);
       return { subject: cleanSubject, html: cleanHtml };
     } catch (error) {
       console.error('Error formatting templated email:', error);
@@ -6365,18 +6377,28 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       }
 
       if (jsonData) {
+        // Clean all string fields in jsonData to remove citations
+        Object.keys(jsonData).forEach(key => {
+          if (typeof jsonData[key] === 'string') {
+            jsonData[key] = jsonData[key].replace(/\[\d+\]/g, '').trim();
+          } else if (Array.isArray(jsonData[key])) {
+            jsonData[key] = jsonData[key].map(item => 
+              typeof item === 'string' ? item.replace(/\[\d+\]/g, '').trim() : item
+            );
+          }
+        });
+        
         const subject = (jsonData.subject || 'Energy Solutions')
           .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
           .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
           .replace(/\bPower Choosers helps\b/gi, 'We help')
           .replace(/\bPower Choosers can help\b/gi, 'We can help')
-          .replace(/\bPower Choosers\b/gi, 'We')
-          .replace(/\[\d+\]/g, ''); // Remove citation brackets
+          .replace(/\bPower Choosers\b/gi, 'We');
         const paragraphs = [];
-        if (jsonData.greeting) paragraphs.push(jsonData.greeting.replace(/\[\d+\]/g, ''));
-        if (jsonData.paragraph1) paragraphs.push(jsonData.paragraph1.replace(/\[\d+\]/g, ''));
-        if (jsonData.paragraph2) paragraphs.push(jsonData.paragraph2.replace(/\[\d+\]/g, ''));
-        if (jsonData.paragraph3) paragraphs.push(jsonData.paragraph3.replace(/\[\d+\]/g, ''));
+        if (jsonData.greeting) paragraphs.push(jsonData.greeting);
+        if (jsonData.paragraph1) paragraphs.push(jsonData.paragraph1);
+        if (jsonData.paragraph2) paragraphs.push(jsonData.paragraph2);
+        if (jsonData.paragraph3) paragraphs.push(jsonData.paragraph3);
 
         // Always enforce closing as "Best regards, <FirstName>"
         const enforcedClosing = `Best regards,\n${senderFirst}`;
@@ -6388,8 +6410,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
           .replace(/\bPower Choosers helps\b/gi, 'We help')
           .replace(/\bPower Choosers can help\b/gi, 'We can help')
-          .replace(/\bPower Choosers\b/gi, 'We')
-          .replace(/\[\d+\]/g, ''); // Remove citation brackets
+          .replace(/\bPower Choosers\b/gi, 'We');
 
         // Convert to HTML with readable color
         const htmlBody = body

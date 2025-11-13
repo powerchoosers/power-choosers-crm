@@ -108,8 +108,8 @@
       // Populate email details
       populateEmailDetails(state.currentEmail);
       
-      // Add approve/reject buttons for scheduled emails
-      if (state.currentEmail.type === 'scheduled' && state.currentEmail.status === 'pending_approval') {
+      // Add action buttons for scheduled emails (all statuses)
+      if (state.currentEmail.type === 'scheduled') {
         addScheduledEmailActions();
       }
       
@@ -2349,34 +2349,58 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     }
   }
 
-  // Add approve/reject/regenerate buttons for scheduled emails
+  // Add action buttons for scheduled emails (all statuses)
   function addScheduledEmailActions() {
     if (!els.actionBar || !state.currentEmail) return;
 
+    const status = state.currentEmail.status || 'not_generated';
+
     // Remove any existing scheduled email buttons
-    const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .regenerate-btn');
+    const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .regenerate-btn, .generate-btn');
     existingBtns.forEach(btn => btn.remove());
 
-    // Create approve button
-    const approveBtn = document.createElement('button');
-    approveBtn.className = 'btn-primary approve-btn';
-    approveBtn.textContent = 'Approve';
-    approveBtn.addEventListener('click', () => approveScheduledEmail(state.currentEmail.id));
-    els.actionBar.insertBefore(approveBtn, els.deleteBtn);
+    // Show different buttons based on status
+    if (status === 'not_generated') {
+      // For not_generated: Show Generate button
+      const generateBtn = document.createElement('button');
+      generateBtn.className = 'btn-primary generate-btn';
+      generateBtn.textContent = 'Generate Email';
+      generateBtn.addEventListener('click', () => generateScheduledEmail(state.currentEmail.id));
+      els.actionBar.insertBefore(generateBtn, els.deleteBtn);
+    } else if (status === 'pending_approval') {
+      // For pending_approval: Show Approve, Reject, and Regenerate buttons
+      const approveBtn = document.createElement('button');
+      approveBtn.className = 'btn-primary approve-btn';
+      approveBtn.textContent = 'Approve';
+      approveBtn.addEventListener('click', () => approveScheduledEmail(state.currentEmail.id));
+      els.actionBar.insertBefore(approveBtn, els.deleteBtn);
 
-    // Create reject button
-    const rejectBtn = document.createElement('button');
-    rejectBtn.className = 'btn-secondary reject-btn';
-    rejectBtn.textContent = 'Reject';
-    rejectBtn.addEventListener('click', () => rejectScheduledEmail(state.currentEmail.id));
-    els.actionBar.insertBefore(rejectBtn, els.deleteBtn);
+      const rejectBtn = document.createElement('button');
+      rejectBtn.className = 'btn-secondary reject-btn';
+      rejectBtn.textContent = 'Reject';
+      rejectBtn.addEventListener('click', () => rejectScheduledEmail(state.currentEmail.id));
+      els.actionBar.insertBefore(rejectBtn, els.deleteBtn);
 
-    // Create regenerate button
-    const regenerateBtn = document.createElement('button');
-    regenerateBtn.className = 'btn-secondary regenerate-btn';
-    regenerateBtn.textContent = 'Regenerate';
-    regenerateBtn.addEventListener('click', () => regenerateScheduledEmail(state.currentEmail.id));
-    els.actionBar.insertBefore(regenerateBtn, els.deleteBtn);
+      const regenerateBtn = document.createElement('button');
+      regenerateBtn.className = 'btn-secondary regenerate-btn';
+      regenerateBtn.textContent = 'Regenerate';
+      regenerateBtn.addEventListener('click', () => regenerateScheduledEmail(state.currentEmail.id));
+      els.actionBar.insertBefore(regenerateBtn, els.deleteBtn);
+    } else if (status === 'approved') {
+      // For approved: Show Regenerate button (can regenerate before sending)
+      const regenerateBtn = document.createElement('button');
+      regenerateBtn.className = 'btn-secondary regenerate-btn';
+      regenerateBtn.textContent = 'Regenerate';
+      regenerateBtn.addEventListener('click', () => regenerateScheduledEmail(state.currentEmail.id));
+      els.actionBar.insertBefore(regenerateBtn, els.deleteBtn);
+    } else if (status === 'rejected') {
+      // For rejected: Show Regenerate button (can regenerate after rejection)
+      const regenerateBtn = document.createElement('button');
+      regenerateBtn.className = 'btn-primary regenerate-btn';
+      regenerateBtn.textContent = 'Regenerate';
+      regenerateBtn.addEventListener('click', () => regenerateScheduledEmail(state.currentEmail.id));
+      els.actionBar.insertBefore(regenerateBtn, els.deleteBtn);
+    }
 
     // Hide reply/forward buttons for scheduled emails
     if (els.replyBtn) els.replyBtn.style.display = 'none';
@@ -2453,7 +2477,67 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     }
   }
 
-  // Regenerate scheduled email
+  // Generate scheduled email (for not_generated status)
+  async function generateScheduledEmail(emailId) {
+    try {
+      const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+      if (!db) {
+        throw new Error('Firebase not available');
+      }
+
+      // Get email data
+      const emailDoc = await db.collection('emails').doc(emailId).get();
+      if (!emailDoc.exists) {
+        throw new Error('Email not found');
+      }
+
+      const emailData = emailDoc.data();
+
+      // Show loading state
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Generating email content...');
+      }
+
+      // Update status to generating
+      await db.collection('emails').doc(emailId).update({
+        status: 'generating',
+        updatedAt: new Date().toISOString()
+      });
+
+      // Generate email using the same logic as generate-scheduled-emails.js
+      await generateEmailContentForScheduledEmail(emailId, emailData);
+
+      // Show success message
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Email generated successfully');
+      }
+
+      // Reload email detail
+      await show(emailId);
+    } catch (error) {
+      console.error('[EmailDetail] Failed to generate email:', error);
+      
+      // Update status back to not_generated on error
+      try {
+        const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+        if (db) {
+          await db.collection('emails').doc(emailId).update({
+            status: 'not_generated',
+            errorMessage: error.message,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      } catch (updateError) {
+        console.error('[EmailDetail] Failed to update error status:', updateError);
+      }
+      
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Failed to generate email: ' + error.message);
+      }
+    }
+  }
+
+  // Regenerate scheduled email (for pending_approval, approved, or rejected status)
   async function regenerateScheduledEmail(emailId) {
     try {
       const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
@@ -2469,52 +2553,231 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
 
       const emailData = emailDoc.data();
 
+      // Show loading state
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Regenerating email content...');
+      }
+
       // Update status to generating
       await db.collection('emails').doc(emailId).update({
         status: 'generating',
         updatedAt: new Date().toISOString()
       });
 
-      // Call AI generation API
-      const baseUrl = window.API_BASE_URL || window.location.origin || '';
-      const response = await fetch(`${baseUrl}/api/generate-email-content`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: emailData.aiPrompt || 'Write a professional follow-up email',
-          contactName: emailData.contactName || '',
-          contactCompany: emailData.contactCompany || ''
-        })
-      });
+      // Generate email using the same logic as generate-scheduled-emails.js
+      await generateEmailContentForScheduledEmail(emailId, emailData);
 
-      if (response.ok) {
-        const result = await response.json();
-        
-        // Update email with new generated content
-        await db.collection('emails').doc(emailId).update({
-          subject: result.subject,
-          html: result.html,
-          text: result.text,
-          status: 'pending_approval',
-          generatedAt: Date.now(),
-          updatedAt: new Date().toISOString()
-        });
-
-        // Show success message
-        if (window.crm && window.crm.showToast) {
-          window.crm.showToast('Email regenerated');
-        }
-
-        // Reload email detail
-        await show(emailId);
-      } else {
-        throw new Error('Failed to generate email content');
+      // Show success message
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Email regenerated successfully');
       }
+
+      // Reload email detail
+      await show(emailId);
     } catch (error) {
       console.error('[EmailDetail] Failed to regenerate email:', error);
-      if (window.crm && window.crm.showToast) {
-        window.crm.showToast('Failed to regenerate email');
+      
+      // Update status back to previous status on error
+      try {
+        const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+        if (db) {
+          const emailDoc = await db.collection('emails').doc(emailId).get();
+          const emailData = emailDoc.data();
+          const previousStatus = emailData.status === 'generating' ? 'pending_approval' : emailData.status;
+          
+          await db.collection('emails').doc(emailId).update({
+            status: previousStatus,
+            errorMessage: error.message,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      } catch (updateError) {
+        console.error('[EmailDetail] Failed to update error status:', updateError);
       }
+      
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Failed to regenerate email: ' + error.message);
+      }
+    }
+  }
+
+  // Helper: Generate email content for a scheduled email (uses perplexity-email endpoint)
+  async function generateEmailContentForScheduledEmail(emailId, emailData) {
+    const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+    
+    // Lookup contact data if contactId exists
+    let recipient = null;
+    if (emailData.contactId) {
+      try {
+        const contactDoc = await db.collection('people').doc(emailData.contactId).get();
+        if (contactDoc.exists) {
+          const contact = contactDoc.data();
+          
+          // Try to get account data
+          let account = null;
+          if (contact.accountId || contact.account_id) {
+            const accountId = contact.accountId || contact.account_id;
+            const accountDoc = await db.collection('accounts').doc(accountId).get();
+            if (accountDoc.exists) {
+              account = { id: accountDoc.id, ...accountDoc.data() };
+            }
+          }
+          
+          recipient = {
+            id: contactDoc.id,
+            email: emailData.to || contact.email || '',
+            name: contact.name || contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
+            firstName: contact.firstName || '',
+            lastName: contact.lastName || '',
+            fullName: contact.fullName || contact.name || '',
+            company: contact.company || account?.accountName || account?.name || '',
+            title: contact.title || contact.job || contact.role || '',
+            phone: contact.phone || contact.mobile || '',
+            account: account ? {
+              id: account.id,
+              name: account.accountName || account.name || '',
+              industry: account.industry || '',
+              domain: account.domain || account.website || '',
+              annualUsage: account.annualUsage || ''
+            } : null
+          };
+        }
+      } catch (error) {
+        console.warn('[EmailDetail] Failed to lookup contact:', error);
+      }
+    }
+    
+    // Build recipient from email data if contact lookup failed
+    if (!recipient) {
+      recipient = {
+        email: emailData.to || '',
+        name: emailData.contactName || '',
+        firstName: (emailData.contactName || '').split(' ')[0] || '',
+        company: emailData.contactCompany || ''
+      };
+    }
+    
+    // Get settings for AI generation
+    const settings = (window.SettingsPage?.getSettings?.()) || {};
+    const g = settings?.general || {};
+    const senderName = (g.firstName && g.lastName) 
+      ? `${g.firstName} ${g.lastName}`.trim()
+      : (g.agentName || 'Power Choosers Team');
+    
+    const aiTemplates = settings?.aiTemplates || {};
+    const whoWeAre = aiTemplates.who_we_are || 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.';
+    const industrySegmentation = settings?.industrySegmentation || null;
+    
+    // Call Perplexity API (same as email-compose-global.js)
+    const baseUrl = window.API_BASE_URL || window.location.origin || '';
+    const genUrl = `${baseUrl}/api/perplexity-email`;
+    
+    const response = await fetch(genUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: emailData.aiPrompt || 'Write a professional follow-up email',
+        recipient: recipient,
+        mode: 'standard', // Use standard mode for scheduled emails
+        senderName: senderName,
+        whoWeAre: whoWeAre,
+        marketContext: aiTemplates.marketContext,
+        meetingPreferences: aiTemplates.meetingPreferences,
+        industrySegmentation: industrySegmentation
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    // Format the output (similar to email-compose-global.js formatGeneratedEmail)
+    let subject = '';
+    let html = '';
+    let text = '';
+    
+    if (result.templateType) {
+      // HTML template mode
+      const formatted = formatTemplatedEmailForScheduled(result.output, recipient, result.templateType);
+      subject = formatted.subject;
+      html = formatted.html;
+      text = stripHtml(html);
+    } else {
+      // Standard mode
+      const formatted = formatStandardEmailForScheduled(result.output, recipient);
+      subject = formatted.subject;
+      html = formatted.html;
+      text = formatted.text || stripHtml(html);
+    }
+    
+    // Update email with generated content
+    await db.collection('emails').doc(emailId).update({
+      subject: subject,
+      html: html,
+      text: text,
+      status: 'pending_approval',
+      generatedAt: Date.now(),
+      generatedBy: 'manual',
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  // Helper: Format templated email for scheduled emails
+  function formatTemplatedEmailForScheduled(result, recipient, templateType) {
+    // Use the same logic as email-compose-global.js formatTemplatedEmail
+    // For now, use a simplified version
+    const subject = result.subject || 'Energy Solutions';
+    const html = result.html || result.output || '<p>Email content</p>';
+    
+    return { subject, html };
+  }
+
+  // Helper: Format standard email for scheduled emails
+  function formatStandardEmailForScheduled(output, recipient) {
+    // Parse JSON if needed
+    let jsonData = null;
+    try {
+      if (typeof output === 'string') {
+        let jsonText = output.trim()
+          .replace(/^\s*```json\s*/i, '')
+          .replace(/^\s*```\s*/i, '')
+          .replace(/\s*```\s*$/i, '');
+        const match = jsonText.match(/\{[\s\S]*\}/);
+        if (match) {
+          jsonData = JSON.parse(match[0]);
+        }
+      } else if (typeof output === 'object') {
+        jsonData = output;
+      }
+    } catch (e) {
+      console.warn('[EmailDetail] JSON parse failed, treating as plain text');
+    }
+    
+    if (jsonData) {
+      const subject = jsonData.subject || 'Energy Solutions';
+      const paragraphs = [
+        jsonData.greeting,
+        jsonData.paragraph1,
+        jsonData.paragraph2,
+        jsonData.paragraph3
+      ].filter(Boolean);
+      
+      const senderFirstName = (window.SettingsPage?.getSettings?.()?.general?.firstName || 'Power Choosers Team').split(' ')[0];
+      const closing = `Best regards,\n${senderFirstName}`;
+      
+      const html = paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('') + `<p>${escapeHtml(closing)}</p>`;
+      const text = paragraphs.join('\n\n') + '\n\n' + closing;
+      
+      return { subject, html, text };
+    } else {
+      // Plain text fallback
+      const subject = 'Energy Solutions';
+      const text = typeof output === 'string' ? output : JSON.stringify(output);
+      const html = text.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
+      return { subject, html: `<p>${html}</p>`, text };
     }
   }
 
