@@ -230,9 +230,31 @@ async function processSingleActivation(activationId, isProduction) {
     // Filter out nulls
     const validContacts = contactsData.filter(c => c !== null);
     
-    // Create scheduled emails for each step in the sequence
+    // Create scheduled emails ONLY for the FIRST step (step 0)
+    // Future steps will be created after previous steps are sent
     const emailsToCreate = [];
     const failedContactIds = [];
+    
+    // Find the first auto-email step
+    let firstAutoEmailStep = null;
+    let firstAutoEmailStepIndex = -1;
+    
+    for (let i = 0; i < (sequence.steps?.length || 0); i++) {
+      if (sequence.steps[i].type === 'auto-email') {
+        firstAutoEmailStep = sequence.steps[i];
+        firstAutoEmailStepIndex = i;
+        break;
+      }
+    }
+    
+    if (!firstAutoEmailStep) {
+      logAlways(`[ProcessSequenceActivations] No auto-email steps found in sequence ${data.sequenceId}`);
+      await db.collection('sequenceActivations').doc(activationId).update({
+        status: 'completed',
+        completedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      return;
+    }
     
     for (const contact of validContacts) {
       if (!contact.email) {
@@ -240,35 +262,34 @@ async function processSingleActivation(activationId, isProduction) {
         continue;
       }
       
-      // Create email for each auto-email step
-      sequence.steps?.forEach((step, stepIndex) => {
-        if (step.type === 'auto-email') {
-          const delayMs = (step.delayMinutes || 0) * 60 * 1000;
-          const scheduledSendTime = Date.now() + delayMs;
-          
-          const emailId = `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          
-          emailsToCreate.push({
-            id: emailId,
-            type: 'scheduled',
-            status: 'not_generated',
-            scheduledSendTime,
-            contactId: contact.id,
-            contactName: contact.firstName ? `${contact.firstName} ${contact.lastName || ''}`.trim() : contact.name,
-            contactCompany: contact.company || contact.companyName || '',
-            to: contact.email,
-            sequenceId: data.sequenceId,
-            sequenceName: sequence.name,
-            stepIndex,
-            totalSteps: sequence.steps?.length || 1,
-            activationId,
-            aiPrompt: step.emailSettings?.aiPrompt || step.data?.aiPrompt || step.aiPrompt || step.content || 'Write a professional email',
-            ownerId: data.ownerId || data.userId,
-            assignedTo: data.ownerId || data.userId,
-            createdBy: data.ownerId || data.userId,
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
-          });
-        }
+      // Create email ONLY for the first auto-email step
+      const step = firstAutoEmailStep;
+      const stepIndex = firstAutoEmailStepIndex;
+      
+      const delayMs = (step.delayMinutes || 0) * 60 * 1000;
+      const scheduledSendTime = Date.now() + delayMs;
+      
+      const emailId = `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      emailsToCreate.push({
+        id: emailId,
+        type: 'scheduled',
+        status: 'not_generated',
+        scheduledSendTime,
+        contactId: contact.id,
+        contactName: contact.firstName ? `${contact.firstName} ${contact.lastName || ''}`.trim() : contact.name,
+        contactCompany: contact.company || contact.companyName || '',
+        to: contact.email,
+        sequenceId: data.sequenceId,
+        sequenceName: sequence.name,
+        stepIndex,
+        totalSteps: sequence.steps?.length || 1,
+        activationId,
+        aiPrompt: step.emailSettings?.aiPrompt || step.data?.aiPrompt || step.aiPrompt || step.content || 'Write a professional email',
+        ownerId: data.ownerId || data.userId,
+        assignedTo: data.ownerId || data.userId,
+        createdBy: data.ownerId || data.userId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
     }
     

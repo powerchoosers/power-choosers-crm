@@ -28,11 +28,23 @@ export default async function handler(req, res) {
 
   const isProduction = process.env.NODE_ENV === 'production';
 
+  // Check for Perplexity API key
+  if (!process.env.PERPLEXITY_API_KEY) {
+    console.error('[GenerateScheduledEmails] CRITICAL: PERPLEXITY_API_KEY environment variable is not set!');
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      success: false,
+      error: 'PERPLEXITY_API_KEY environment variable is not set. Email generation cannot proceed.'
+    }));
+    return;
+  }
+
   try {
     const { immediate = false } = req.body || {};
     
     if (!isProduction) {
       console.log('[GenerateScheduledEmails] Starting generation process, immediate:', immediate);
+      console.log('[GenerateScheduledEmails] Perplexity API key present:', !!process.env.PERPLEXITY_API_KEY);
     }
     
     // Calculate time range for emails to generate
@@ -58,13 +70,13 @@ export default async function handler(req, res) {
     
     // Query for scheduled emails that need generation
     // Use >= and <= to include boundary times
-    // Limit to 10 emails per run to prevent Perplexity API rate limits
+    // Limit to 40 emails per run to stay under 50 RPM rate limit (Tier 0)
     const scheduledEmailsQuery = db.collection('emails')
       .where('type', '==', 'scheduled')
       .where('status', '==', 'not_generated')
       .where('scheduledSendTime', '>=', startTime)
       .where('scheduledSendTime', '<=', endTime)
-      .limit(10);
+      .limit(40);
     
     const scheduledEmailsSnapshot = await scheduledEmailsQuery.get();
     
@@ -83,13 +95,29 @@ export default async function handler(req, res) {
     
     if (!isProduction) {
       console.log('[GenerateScheduledEmails] Found', scheduledEmailsSnapshot.size, 'emails to generate');
+      console.log('[GenerateScheduledEmails] Rate limit: 50 RPM (Tier 0) - processing in batches');
     }
     
     let generatedCount = 0;
     const errors = [];
     
-    // Process each email
-    for (const emailDoc of scheduledEmailsSnapshot.docs) {
+    // Process emails with rate limiting
+    // Perplexity Tier 0: 50 RPM limit
+    // Process in smaller batches of 10 with delays to avoid rate limiting
+    const BATCH_SIZE = 10;
+    const DELAY_BETWEEN_BATCHES = 12000; // 12 seconds (allows 5 batches per minute = 50 requests)
+    const docs = scheduledEmailsSnapshot.docs;
+    
+    for (let batchStart = 0; batchStart < docs.length; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, docs.length);
+      const batch = docs.slice(batchStart, batchEnd);
+      
+      if (!isProduction) {
+        console.log(`[GenerateScheduledEmails] Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}/${Math.ceil(docs.length / BATCH_SIZE)} (${batch.length} emails)`);
+      }
+      
+      // Process batch in parallel (10 at a time)
+      await Promise.all(batch.map(async (emailDoc) => {
       try {
         const emailData = emailDoc.data();
         if (!isProduction) {
@@ -163,7 +191,7 @@ export default async function handler(req, res) {
         
         generatedCount++;
         if (!isProduction) {
-          console.log('[GenerateScheduledEmails] Generated email:', emailDoc.id);
+          console.log('[GenerateScheduledEmails] ✓ Generated email:', emailDoc.id);
         }
         
       } catch (error) {
@@ -184,7 +212,16 @@ export default async function handler(req, res) {
           console.error('[GenerateScheduledEmails] Failed to update error status:', updateError);
         }
       }
-    }
+    })); // End Promise.all
+      
+      // Add delay between batches to respect rate limit (except after last batch)
+      if (batchEnd < docs.length) {
+        if (!isProduction) {
+          console.log(`[GenerateScheduledEmails] Waiting ${DELAY_BETWEEN_BATCHES/1000}s before next batch to respect rate limit...`);
+        }
+        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
+      }
+    } // End batch loop
     
     if (!isProduction) {
       console.log('[GenerateScheduledEmails] Generation complete. Generated:', generatedCount, 'Errors:', errors.length);
@@ -237,32 +274,67 @@ async function generateEmailContent({ prompt, contactName, contactCompany, seque
       });
     }
     
-    // Call Perplexity API
-    const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'llama-3.1-sonar-small-128k-online',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert email writer for business development and sales. Write professional, personalized emails that build relationships and drive engagement. Always use natural language personalization - never use bracketed placeholders like {{name}}. Instead, use actual contact names and company information provided. Generate both HTML and plain text versions of the email.'
-          },
-          {
-            role: 'user',
-            content: enhancedPrompt
-          }
-        ],
-        max_tokens: 1000,
-        temperature: 0.7
-      })
-    });
+    // Call Perplexity API with retry logic for rate limits
+    let perplexityResponse;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 5000; // 5 seconds
     
-    if (!perplexityResponse.ok) {
-      throw new Error(`Perplexity API error: ${perplexityResponse.status}`);
+    while (retryCount <= MAX_RETRIES) {
+      try {
+        perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'llama-3.1-sonar-small-128k-online',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are an expert email writer for business development and sales. Write professional, personalized emails that build relationships and drive engagement. Always use natural language personalization - never use bracketed placeholders like {{name}}. Instead, use actual contact names and company information provided. Generate both HTML and plain text versions of the email.'
+              },
+              {
+                role: 'user',
+                content: enhancedPrompt
+              }
+            ],
+            max_tokens: 1000,
+            temperature: 0.7
+          })
+        });
+        
+        // Check for rate limiting (429)
+        if (perplexityResponse.status === 429) {
+          retryCount++;
+          if (retryCount <= MAX_RETRIES) {
+            const waitTime = RETRY_DELAY * retryCount; // Exponential backoff
+            console.warn(`[GenerateScheduledEmails] Rate limited (429), retrying in ${waitTime/1000}s... (attempt ${retryCount}/${MAX_RETRIES})`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            continue;
+          }
+          throw new Error(`Perplexity API rate limit exceeded after ${MAX_RETRIES} retries`);
+        }
+        
+        // Check for other errors
+        if (!perplexityResponse.ok) {
+          const errorText = await perplexityResponse.text();
+          throw new Error(`Perplexity API error ${perplexityResponse.status}: ${errorText}`);
+        }
+        
+        // Success - break out of retry loop
+        break;
+        
+      } catch (error) {
+        if (retryCount >= MAX_RETRIES) {
+          throw error;
+        }
+        retryCount++;
+        const waitTime = RETRY_DELAY * retryCount;
+        console.warn(`[GenerateScheduledEmails] API call failed, retrying in ${waitTime/1000}s... (attempt ${retryCount}/${MAX_RETRIES})`, error.message);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
     }
     
     const perplexityData = await perplexityResponse.json();
@@ -301,12 +373,14 @@ async function generateEmailContent({ prompt, contactName, contactCompany, seque
     
   } catch (error) {
     console.error('[GenerateScheduledEmails] Perplexity API error:', error);
+    console.error('[GenerateScheduledEmails] Error details:', {
+      message: error.message,
+      status: error.status,
+      response: error.response
+    });
     
-    // Fallback content
-    return {
-      subject: `Follow-up from ${contactCompany || 'our team'}`,
-      html: `<p>Hi ${contactName},</p><p>I hope this email finds you well. I wanted to follow up on our recent conversation.</p><p>Best regards,<br>Your Team</p>`,
-      text: `Hi ${contactName},\n\nI hope this email finds you well. I wanted to follow up on our recent conversation.\n\nBest regards,\nYour Team`
-    };
+    // Re-throw the error instead of silently failing with fallback content
+    // This ensures the email stays in 'not_generated' status so we can retry
+    throw new Error(`Perplexity API failed: ${error.message}`);
   }
 }

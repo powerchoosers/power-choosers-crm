@@ -333,7 +333,7 @@ export default async function handler(req, res) {
     }
     
     const recipientEmail = extractEmailAddress(emailData.to || '');
-    
+
     // Save to Firebase with proper error handling
     try {
       const emailDoc = {
