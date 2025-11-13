@@ -680,14 +680,14 @@
 
   // Generate email row HTML with favicon integration and snippet
   function rowHtml(email) {
-    const isSentEmail = email.isSentEmail || email.type === 'sent';
+    const isSentEmail = email.isSentEmail || email.type === 'sent' || email.type === 'scheduled';
     
-    // For sent emails, show recipient info with logo; otherwise show sender info
+    // For sent/scheduled emails, show recipient info with logo; otherwise show sender info
     let avatarHtml = '';
     let displayName = '';
     
     if (isSentEmail) {
-      // For sent emails, show recipient with account logo
+      // For sent/scheduled emails, show recipient with account logo
       // Handle both string and array formats for email.to
       let recipientEmail = '';
       if (Array.isArray(email.to)) {
@@ -697,7 +697,7 @@
       }
       
       const recipientName = extractName(recipientEmail);
-      displayName = recipientName;
+      displayName = recipientName || 'Unknown Recipient';
       
       // Get account info for recipient
       const accountInfo = getRecipientAccountInfo(recipientEmail);
@@ -709,7 +709,7 @@
     } else {
       // For received emails, show sender with domain favicon
     const senderDomain = extractDomain(email.from);
-      displayName = extractName(email.from);
+      displayName = extractName(email.from) || 'Unknown';
       avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
       domain: senderDomain,
       size: 28

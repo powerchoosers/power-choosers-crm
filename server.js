@@ -3,6 +3,11 @@ import fs from 'fs';
 import path from 'path';
 import url from 'url';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file (for localhost)
+dotenv.config();
+
 // Simple logging function for Cloud Run cost optimization
 const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
 const currentLogLevel = logLevels[process.env.LOG_LEVEL || 'info'];
@@ -1073,9 +1078,9 @@ async function handleApiUploadHostGoogleAvatar(req, res) {
 
 async function handleApiUploadSignatureImage(req, res) {
   try {
-    if (req.method === 'POST') {
-      req.body = await parseRequestBody(req);
-    }
+  if (req.method === 'POST') {
+    req.body = await parseRequestBody(req);
+  }
     const result = await uploadSignatureImageHandler(req, res);
     return result;
   } catch (error) {
