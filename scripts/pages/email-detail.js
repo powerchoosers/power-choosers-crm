@@ -129,8 +129,8 @@
       els.title.textContent = email.subject || '(No Subject)';
     }
 
-    // Check if this is a sent email
-    const isSentEmail = email.isSentEmail || email.type === 'sent';
+    // Check if this is a sent or scheduled email (show recipient instead of sender)
+    const isSentEmail = email.isSentEmail || email.type === 'sent' || email.type === 'scheduled';
 
     // Helper function to get account logoUrl from recipient email
     function getRecipientAccountInfo(recipientEmail) {
@@ -163,7 +163,7 @@
     // Set sender/recipient info
     if (els.senderName) {
       if (isSentEmail) {
-        // For sent emails, show recipient name
+        // For sent/scheduled emails, show recipient name
         // Handle both string and array formats for email.to
         let recipientEmail = '';
         if (Array.isArray(email.to)) {
@@ -173,7 +173,7 @@
         }
         els.senderName.textContent = extractName(recipientEmail) || 'Unknown Recipient';
       } else {
-      els.senderName.textContent = extractName(email.from);
+      els.senderName.textContent = extractName(email.from) || 'Unknown';
       }
     }
 
