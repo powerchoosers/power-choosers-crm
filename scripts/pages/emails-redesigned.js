@@ -1580,18 +1580,20 @@
     
     modal.querySelector('#bulk-apply').addEventListener('click', () => {
       const mode = (modal.querySelector('input[name="bulk-mode"]:checked') || {}).value;
+      let selectedIds = [];
       if (mode === 'custom') {
         const n = Math.max(1, parseInt(modal.querySelector('#bulk-custom-count').value || '0', 10));
-        const selectedIds = state.filtered.slice(0, Math.min(n, total)).map(e => e.id);
-        selectedIds.forEach(id => state.selected.add(id));
+        selectedIds = state.filtered.slice(0, Math.min(n, total)).map(e => e.id);
       } else if (mode === 'page') {
-        const pageItems = getPageItems();
-        pageItems.forEach(email => state.selected.add(email.id));
+        selectedIds = getPageItems().map(e => e.id);
       } else {
-        state.filtered.forEach(email => state.selected.add(email.id));
+        selectedIds = state.filtered.map(e => e.id);
       }
+      // Add all selected IDs to the set
+      selectedIds.forEach(id => state.selected.add(id));
       close();
       render();
+      updateBulkBar();
       showBulkBar();
     });
     
@@ -1638,6 +1640,109 @@
       setTimeout(() => {
         if (bar.parentNode) bar.parentNode.removeChild(bar);
       }, 200);
+    }
+  }
+
+  async function deleteSelectedEmails() {
+    const ids = Array.from(state.selected || []);
+    if (!ids.length) return;
+    
+    if (!confirm(`Are you sure you want to delete ${ids.length} email(s)?`)) return;
+    
+    // Store current page before deletion to preserve pagination
+    const currentPageBeforeDeletion = state.currentPage;
+    
+    // Show progress toast
+    const progressToast = window.crm?.showProgressToast ? 
+      window.crm.showProgressToast(`Deleting ${ids.length} ${ids.length === 1 ? 'email' : 'emails'}...`, ids.length, 0) : null;
+    
+    let failed = 0;
+    let completed = 0;
+    
+    try {
+      if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
+        // Process deletions sequentially to show progress
+        for (const id of ids) {
+          try {
+            // Delete from Firebase
+            await window.firebaseDB.collection('emails').doc(id).delete();
+            
+            // Remove from local state
+            const emailIndex = state.data.findIndex(e => e.id === id);
+            if (emailIndex !== -1) {
+              state.data.splice(emailIndex, 1);
+            }
+            
+            completed++;
+            if (progressToast && typeof progressToast.update === 'function') {
+              progressToast.update(completed, ids.length);
+            }
+          } catch (e) {
+            failed++;
+            completed++;
+            console.warn('Delete failed for email id', id, e);
+            if (progressToast && typeof progressToast.update === 'function') {
+              progressToast.update(completed, ids.length);
+            }
+          }
+          
+          // Small delay to prevent UI blocking
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      } else {
+        // If no database, just remove from local state
+        const idSet = new Set(ids);
+        state.data = Array.isArray(state.data) ? state.data.filter(e => !idSet.has(e.id)) : [];
+        completed = ids.length;
+        if (progressToast && typeof progressToast.update === 'function') {
+          progressToast.update(completed, ids.length);
+        }
+      }
+    } catch (err) {
+      console.warn('Bulk delete error', err);
+      if (progressToast && typeof progressToast.error === 'function') {
+        progressToast.error('Delete operation failed');
+      }
+    } finally {
+      // Update filtered data
+      const idSet = new Set(ids);
+      state.filtered = Array.isArray(state.filtered) ? state.filtered.filter(e => !idSet.has(e.id)) : [];
+      
+      // Calculate new total pages after deletion
+      const newTotalPages = Math.max(1, Math.ceil(state.filtered.length / state.pageSize));
+      
+      // Only adjust page if current page is beyond the new total
+      if (currentPageBeforeDeletion > newTotalPages) {
+        state.currentPage = newTotalPages;
+      }
+      
+      state.selected.clear();
+      applyFilters();
+      hideBulkBar();
+      if (els.selectAll) { 
+        els.selectAll.checked = false; 
+        els.selectAll.indeterminate = false; 
+      }
+      
+      const successCount = Math.max(0, ids.length - failed);
+      
+      if (progressToast) {
+        if (failed === 0) {
+          progressToast.complete(`Successfully deleted ${successCount} ${successCount === 1 ? 'email' : 'emails'}`);
+        } else if (successCount > 0) {
+          progressToast.complete(`Deleted ${successCount} of ${ids.length} ${ids.length === 1 ? 'email' : 'emails'}`);
+        } else {
+          progressToast.error(`Failed to delete all ${ids.length} ${ids.length === 1 ? 'email' : 'emails'}`);
+        }
+      } else {
+        // Fallback to regular toasts if progress toast not available
+        if (successCount > 0) {
+          window.crm?.showToast && window.crm.showToast(`Deleted ${successCount} ${successCount === 1 ? 'email' : 'emails'}`);
+        }
+        if (failed > 0) {
+          window.crm?.showToast && window.crm.showToast(`Failed to delete ${failed} ${failed === 1 ? 'email' : 'emails'}`, 'error');
+        }
+      }
     }
   }
 
@@ -1780,26 +1885,7 @@
     });
     
     barContainer.querySelector('#bulk-delete').addEventListener('click', async () => {
-      if (!confirm(`Are you sure you want to delete ${count} email(s)?`)) return;
-      
-      const selectedIds = Array.from(state.selected);
-      for (const id of selectedIds) {
-        const emailIndex = state.data.findIndex(e => e.id === id);
-        if (emailIndex !== -1) {
-          state.data.splice(emailIndex, 1);
-          // Delete from Firebase
-          try {
-            const db = window.firebaseDB;
-            if (db) {
-              await db.collection('emails').doc(id).delete();
-            }
-          } catch (e) {
-            console.warn('Could not delete email from Firebase:', e);
-          }
-        }
-      }
-      state.selected.clear();
-      applyFilters();
+      await deleteSelectedEmails();
     });
   }
 
