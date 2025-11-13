@@ -296,7 +296,7 @@ async function generateEmailContent({ prompt, contactName, contactCompany, seque
             messages: [
               {
                 role: 'system',
-                content: 'You are an expert email writer for business development and sales. Write professional, personalized emails that build relationships and drive engagement. Always use natural language personalization - never use bracketed placeholders like {{name}}. Instead, use actual contact names and company information provided. Generate both HTML and plain text versions of the email.'
+                content: 'You are an expert email writer for Power Choosers, an energy brokerage helping businesses secure lower electricity and natural gas rates. Follow ALL instructions in the prompt exactly. When writing emails:\n\n1. ALWAYS use actual contact names and company information provided - NEVER use bracketed placeholders like {{name}} or [contact_first_name] in the final output\n2. OUTPUT FORMAT: Write ONLY the email body and subject line - no metadata, no version labels, no markdown formatting, no statistics\n3. Subject line should appear first as "Subject: [your subject]" followed by the email body\n4. Use proper paragraph spacing (double line breaks between paragraphs)\n5. End with "Best regards," followed by sender name\n6. Do NOT include: **bold markdown**, # headers, ```code blocks```, "HTML Version" labels, "Email Stats", "Word Count", or any metadata sections\n7. Research proof: If the prompt asks you to research the company, do so and incorporate specific details naturally'
               },
               {
                 role: 'user',
@@ -343,35 +343,125 @@ async function generateEmailContent({ prompt, contactName, contactCompany, seque
     const perplexityData = await perplexityResponse.json();
     const generatedText = perplexityData.choices[0].message.content;
     
-    // Parse the generated content to extract subject and body
-    const subjectMatch = generatedText.match(/Subject:\s*(.+)/i);
-    const subject = subjectMatch ? subjectMatch[1].trim() : 'Follow-up Email';
+    // Extract subject line (look for various patterns)
+    let subject = 'Follow-up Email';
+    const subjectPatterns = [
+      /Subject[:\s]+(.+?)(?:\n|$)/i,
+      /Subject Line[:\s]+(.+?)(?:\n|$)/i,
+      /^#\s+(.+?)(?:\n|$)/m,
+      /^\*\*Subject[:\s]*\*\*\s*(.+?)(?:\n|$)/i
+    ];
     
-    // Extract body content (everything after subject or first line)
-    let bodyContent = generatedText;
-    if (subjectMatch) {
-      bodyContent = generatedText.replace(/Subject:\s*.+/i, '').trim();
+    for (const pattern of subjectPatterns) {
+      const match = generatedText.match(pattern);
+      if (match && match[1]) {
+        subject = match[1].trim()
+          .replace(/^\*\*|\*\*$/g, '') // Remove markdown bold
+          .replace(/^#+\s*/, '') // Remove markdown headers
+          .trim();
+        if (subject) break;
+      }
     }
     
-    // Clean up the body content
-    bodyContent = bodyContent.replace(/^(Subject:|Email:|Message:)\s*/i, '').trim();
+    // Extract clean email body - remove all metadata and formatting artifacts
+    let bodyContent = generatedText;
     
-    // Create HTML version
+    // Remove subject line and all its variations
+    bodyContent = bodyContent.replace(/Subject[:\s]+.+?(?:\n|$)/gi, '');
+    bodyContent = bodyContent.replace(/Subject Line[:\s]+.+?(?:\n|$)/gi, '');
+    bodyContent = bodyContent.replace(/^\*\*Subject[:\s]*\*\*\s*.+?(?:\n|$)/gim, '');
+    
+    // Remove version markers (HTML Version, Plain Text Version, etc.)
+    bodyContent = bodyContent.replace(/---[\s\S]*?---/g, '');
+    bodyContent = bodyContent.replace(/HTML Version[:\s]*/gi, '');
+    bodyContent = bodyContent.replace(/Plain Text Version[:\s]*/gi, '');
+    bodyContent = bodyContent.replace(/```html[\s\S]*?```/gi, '');
+    bodyContent = bodyContent.replace(/```[\s\S]*?```/g, '');
+    
+    // Remove markdown headers and formatting
+    bodyContent = bodyContent.replace(/^#+\s+.+?(?:\n|$)/gm, '');
+    bodyContent = bodyContent.replace(/\*\*(.+?)\*\*/g, '$1'); // Remove bold markdown
+    bodyContent = bodyContent.replace(/\*(.+?)\*/g, '$1'); // Remove italic markdown
+    bodyContent = bodyContent.replace(/\[(.+?)\]\(.+?\)/g, '$1'); // Remove links, keep text
+    
+    // Remove email metadata sections
+    bodyContent = bodyContent.replace(/Email Sequence[:\s]+.+?(?:\n|$)/gi, '');
+    bodyContent = bodyContent.replace(/Step \d+ of \d+/gi, '');
+    bodyContent = bodyContent.replace(/Email Breakdown[:\s]*/gi, '');
+    bodyContent = bodyContent.replace(/Email Stats[:\s]*/gi, '');
+    bodyContent = bodyContent.replace(/Email Specifications[:\s]*/gi, '');
+    bodyContent = bodyContent.replace(/Research Proof[:\s]*/gi, '');
+    bodyContent = bodyContent.replace(/Tone[:\s]*/gi, '');
+    bodyContent = bodyContent.replace(/Word Count[:\s]*/gi, '');
+    bodyContent = bodyContent.replace(/Paragraphs[:\s]*/gi, '');
+    bodyContent = bodyContent.replace(/CTA[:\s]*/gi, '');
+    bodyContent = bodyContent.replace(/Personalization[:\s]*/gi, '');
+    
+    // Remove "Hi [Name]," if it appears multiple times (from examples)
+    const lines = bodyContent.split('\n');
+    let foundGreeting = false;
+    bodyContent = lines.filter(line => {
+      const trimmed = line.trim();
+      if (/^Hi\s+\w+,?$/i.test(trimmed) || /^Hey\s+\w+,?$/i.test(trimmed)) {
+        if (foundGreeting) return false; // Skip duplicate greetings
+        foundGreeting = true;
+      }
+      return true;
+    }).join('\n');
+    
+    // Clean up excessive whitespace
+    bodyContent = bodyContent
+      .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
+      .replace(/^\s+|\s+$/gm, '') // Trim each line
+      .replace(/^\s+|\s+$/g, '') // Trim entire content
+      .replace(/\n\s*\n\s*\n/g, '\n\n'); // Clean up paragraph breaks
+    
+    // Remove any remaining HTML tags that shouldn't be there
+    bodyContent = bodyContent.replace(/<[^>]+>/g, '');
+    
+    // Find the actual email content (usually starts with greeting)
+    const greetingMatch = bodyContent.match(/(?:^|\n)(Hi|Hey|Hello|Dear)\s+\w+[,\n]/i);
+    if (greetingMatch) {
+      const startIndex = bodyContent.indexOf(greetingMatch[0]);
+      bodyContent = bodyContent.substring(startIndex).trim();
+    }
+    
+    // Remove signature placeholders and add proper signature
+    bodyContent = bodyContent.replace(/—\s*\[Your Name\]/g, '');
+    bodyContent = bodyContent.replace(/Thanks?,\s*\[Your Name\]/gi, '');
+    bodyContent = bodyContent.replace(/\[Your Name\]/g, '');
+    bodyContent = bodyContent.replace(/—\s*$/gm, '');
+    
+    // Add proper signature if not present
+    const hasSignature = /(Best regards|Regards|Thanks|Thank you|Sincerely)/i.test(bodyContent);
+    if (!hasSignature && bodyContent.trim()) {
+      // Get sender name from settings or use default
+      const senderName = 'Power Choosers Team'; // You can enhance this to get from settings
+      bodyContent = bodyContent.trim() + '\n\nBest regards,\n' + senderName;
+    }
+    
+    // Ensure proper paragraph spacing (double line breaks between paragraphs)
+    bodyContent = bodyContent
+      .replace(/\n\n\n+/g, '\n\n') // Max 2 newlines
+      .trim();
+    
+    // Create HTML version with proper paragraph tags
     const htmlContent = bodyContent
-      .replace(/\n\n/g, '</p><p>')
-      .replace(/\n/g, '<br>')
-      .replace(/^/, '<p>')
-      .replace(/$/, '</p>');
+      .split(/\n\n+/) // Split by double newlines (paragraphs)
+      .map(para => para.trim().replace(/\n/g, '<br>')) // Convert single newlines to <br>
+      .filter(para => para.length > 0) // Remove empty paragraphs
+      .map(para => `<p>${para}</p>`) // Wrap in <p> tags
+      .join('\n');
     
-    // Create plain text version
+    // Create plain text version (clean, with proper spacing)
     const textContent = bodyContent
-      .replace(/\n\n/g, '\n\n')
-      .replace(/\n/g, '\n');
+      .replace(/\n{3,}/g, '\n\n') // Max 2 newlines
+      .trim();
     
     return {
-      subject,
-      html: htmlContent,
-      text: textContent
+      subject: subject.trim() || 'Follow-up Email',
+      html: htmlContent || `<p>${bodyContent.replace(/\n/g, '<br>')}</p>`,
+      text: textContent || bodyContent
     };
     
   } catch (error) {
