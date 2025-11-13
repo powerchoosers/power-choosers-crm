@@ -4,7 +4,11 @@
 // - FIREBASE_CLIENT_EMAIL
 // - FIREBASE_PRIVATE_KEY (use \n escapes for newlines)
 
+import dotenv from 'dotenv';
 import admin from 'firebase-admin';
+
+// Load environment variables from .env file (for localhost)
+dotenv.config();
 
 let db;
 
