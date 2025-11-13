@@ -154,6 +154,64 @@ export default async function handler(req, res) {
         
         sentCount++;
         
+        // If this email is part of a sequence, create the next step's email
+        if (emailData.sequenceId && typeof emailData.stepIndex === 'number') {
+          try {
+            // Get sequence details
+            const sequenceDoc = await db.collection('sequences').doc(emailData.sequenceId).get();
+            if (sequenceDoc.exists) {
+              const sequence = sequenceDoc.data();
+              
+              // Find the next auto-email step after current step
+              let nextAutoEmailStep = null;
+              let nextStepIndex = -1;
+              
+              for (let i = emailData.stepIndex + 1; i < (sequence.steps?.length || 0); i++) {
+                if (sequence.steps[i].type === 'auto-email') {
+                  nextAutoEmailStep = sequence.steps[i];
+                  nextStepIndex = i;
+                  break;
+                }
+              }
+              
+              // If there's a next step, create the email for it
+              if (nextAutoEmailStep) {
+                const delayMs = (nextAutoEmailStep.delayMinutes || 0) * 60 * 1000;
+                const nextScheduledSendTime = Date.now() + delayMs;
+                
+                const nextEmailId = `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                
+                await db.collection('emails').doc(nextEmailId).set({
+                  type: 'scheduled',
+                  status: 'not_generated',
+                  scheduledSendTime: nextScheduledSendTime,
+                  contactId: emailData.contactId,
+                  contactName: emailData.contactName,
+                  contactCompany: emailData.contactCompany,
+                  to: emailData.to,
+                  sequenceId: emailData.sequenceId,
+                  sequenceName: emailData.sequenceName,
+                  stepIndex: nextStepIndex,
+                  totalSteps: sequence.steps?.length || 1,
+                  activationId: emailData.activationId,
+                  aiPrompt: nextAutoEmailStep.emailSettings?.aiPrompt || nextAutoEmailStep.data?.aiPrompt || nextAutoEmailStep.aiPrompt || nextAutoEmailStep.content || 'Write a professional email',
+                  ownerId: emailData.ownerId,
+                  assignedTo: emailData.assignedTo,
+                  createdBy: emailData.createdBy,
+                  createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                
+                if (!isProduction) {
+                  console.log(`[SendScheduledEmails] Created next step email (step ${nextStepIndex}) for contact ${emailData.contactId}`);
+                }
+              }
+            }
+          } catch (error) {
+            console.error('[SendScheduledEmails] Failed to create next step email:', error);
+            // Don't fail the whole process if next step creation fails
+          }
+        }
+        
         // Add small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 100));
         
