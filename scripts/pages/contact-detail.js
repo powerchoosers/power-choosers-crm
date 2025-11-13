@@ -684,6 +684,37 @@
       if (db && id) {
         try { await db.collection('contacts').doc(id).update(updates); } catch (err) { console.warn('Failed to save contact', err); }
       }
+      
+      // If LinkedIn URL provided and contact is linked to an account, update account's LinkedIn
+      if (updates.linkedin) {
+        let accountId = state.currentContact?.accountId;
+        
+        // If no accountId but has companyName, try to find account by name
+        if (!accountId && updates.companyName) {
+          try {
+            const accountQuery = await db.collection('accounts')
+              .where('accountName', '==', updates.companyName)
+              .limit(1)
+              .get();
+            if (!accountQuery.empty) {
+              accountId = accountQuery.docs[0].id;
+            }
+          } catch (_) {}
+        }
+        
+        if (accountId) {
+          try {
+            await db.collection('accounts').doc(accountId).update({
+              linkedin: updates.linkedin,
+              updatedAt: Date.now()
+            });
+            console.log('[EditContact] Updated account LinkedIn from contact');
+          } catch (err) {
+            console.warn('[EditContact] Failed to update account LinkedIn:', err);
+          }
+        }
+      }
+      
       // Update local state
       try { Object.assign(state.currentContact, updates); } catch (_) {}
       

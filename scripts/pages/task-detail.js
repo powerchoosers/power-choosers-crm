@@ -8,6 +8,7 @@
     contact: null,
     account: null,
     navigating: false,
+    loadingTask: false, // CRITICAL FIX: Guard against concurrent loadTaskData calls
     widgets: {
       maps: null,
       energy: null,
@@ -813,6 +814,12 @@
           }
           
           await doc.ref.delete();
+          
+          // CRITICAL FIX: Invalidate cache after deletion to prevent stale data
+          if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+            await window.CacheManager.invalidate('tasks');
+            console.log('[TaskDetail] Invalidated tasks cache after deletion');
+          }
         }
       }
     } catch (e) {
@@ -831,6 +838,16 @@
       }
     } catch (e) {
       console.warn('Could not refresh Today\'s Tasks widget:', e);
+    }
+    
+    // CRITICAL FIX: Invalidate cache after task completion to prevent stale data
+    try {
+      if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+        await window.CacheManager.invalidate('tasks');
+        console.log('[TaskDetail] Invalidated tasks cache after completion');
+      }
+    } catch (cacheError) {
+      console.warn('[TaskDetail] Failed to invalidate cache:', cacheError);
     }
     
     // Trigger tasks updated event for other components
@@ -1107,12 +1124,26 @@
         // Clean up any existing avatars/icons before loading new task
         cleanupExistingAvatarsAndIcons();
         
-        // Load the target task data directly instead of calling TaskDetail.open
-        await loadTaskData(targetTask.id);
+        // CRITICAL FIX: Add error handling for navigation
+        try {
+          // Load the target task data directly instead of calling TaskDetail.open
+          await loadTaskData(targetTask.id);
+        } catch (loadError) {
+          console.error('[TaskDetail] Failed to load adjacent task:', loadError);
+          // Show user-friendly error
+          if (window.crm && typeof window.crm.showToast === 'function') {
+            window.crm.showToast('Failed to load next task. Please try again.', 'error');
+          }
+          // Don't navigate away - stay on current task
+        }
       }
       
     } catch (error) {
       console.error('Error navigating to adjacent task:', error);
+      // Show user-friendly error
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast('Navigation error. Please refresh the page.', 'error');
+      }
     } finally {
       // Reset navigation flag after a short delay
       setTimeout(() => {
@@ -1322,22 +1353,49 @@
   }
 
   async function loadTaskData(taskId) {
-    // CRITICAL: Re-initialize DOM refs to ensure els.content exists
-    if (!initDomRefs()) {
-      console.warn('[TaskDetail] DOM not ready, retrying...');
-      // Retry after a short delay
-      setTimeout(() => {
-        if (initDomRefs()) {
-          loadTaskData(taskId);
-        } else {
-          console.error('[TaskDetail] Failed to initialize DOM refs');
-        }
-      }, 100);
+    // CRITICAL FIX: Prevent race conditions - if already loading, wait or skip
+    if (state.loadingTask) {
+      console.warn('[TaskDetail] Task load already in progress, skipping duplicate call');
       return;
     }
     
-    // Load task from localStorage and Firebase with ownership filtering
-    let task = null;
+    if (!taskId) {
+      console.error('[TaskDetail] No taskId provided to loadTaskData');
+      showTaskError('No task ID provided');
+      return;
+    }
+    
+    state.loadingTask = true;
+    
+    try {
+      // CRITICAL: Re-initialize DOM refs to ensure els.content exists
+      if (!initDomRefs()) {
+        console.warn('[TaskDetail] DOM not ready, retrying...');
+        // Retry after a short delay (max 5 attempts)
+        let retryCount = 0;
+        const maxRetries = 5;
+        const retry = () => {
+          if (retryCount >= maxRetries) {
+            console.error('[TaskDetail] Failed to initialize DOM refs after', maxRetries, 'attempts');
+            showTaskError('Page not ready. Please refresh.');
+            state.loadingTask = false;
+            return;
+          }
+          retryCount++;
+          setTimeout(() => {
+            if (initDomRefs()) {
+              loadTaskData(taskId);
+            } else {
+              retry();
+            }
+          }, 100);
+        };
+        retry();
+        return;
+      }
+      
+      // Load task from localStorage and Firebase with ownership filtering
+      let task = null;
     
     // Try localStorage first (with ownership filtering)
     try {
@@ -1442,12 +1500,19 @@
     
     if (!task) {
       console.error('Task not found:', taskId);
-      // Show error message to user
-      if (els.content) {
-        els.content.innerHTML = '<div class="empty" style="padding: 2rem; text-align: center; color: var(--text-secondary);">Task not found or you do not have access to this task.</div>';
-      }
+      showTaskError('Task not found or you do not have access to this task.');
+      state.loadingTask = false;
       return;
     }
+    
+    // CRITICAL FIX: Validate task data before normalization
+    if (typeof task !== 'object' || !task.id) {
+      console.error('[TaskDetail] Invalid task data:', task);
+      showTaskError('Invalid task data. Please refresh the page.');
+      state.loadingTask = false;
+      return;
+    }
+    
     // Normalize legacy task shapes/titles/types
     const normType = (t)=>{
       const s = String(t||'').toLowerCase().trim();
@@ -1480,6 +1545,37 @@
     
     // Render the task page
     renderTaskPage();
+    } catch (error) {
+      console.error('[TaskDetail] Error loading task data:', error);
+      showTaskError('Failed to load task. Please try again.');
+    } finally {
+      state.loadingTask = false;
+    }
+  }
+  
+  // CRITICAL FIX: Helper function to show errors even if DOM isn't ready
+  function showTaskError(message) {
+    try {
+      if (els.content) {
+        els.content.innerHTML = `<div class="empty" style="padding: 2rem; text-align: center; color: var(--text-secondary);">${escapeHtml(message)}</div>`;
+      } else {
+        // Fallback: try to find content element or create error display
+        const page = document.getElementById('task-detail-page');
+        if (page) {
+          const errorDiv = document.createElement('div');
+          errorDiv.className = 'empty';
+          errorDiv.style.cssText = 'padding: 2rem; text-align: center; color: var(--text-secondary); position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius-lg); z-index: 10000;';
+          errorDiv.textContent = message;
+          page.appendChild(errorDiv);
+        } else {
+          // Last resort: alert
+          alert(message);
+        }
+      }
+    } catch (e) {
+      console.error('[TaskDetail] Failed to show error message:', e);
+      alert(message); // Final fallback
+    }
   }
 
   function loadContactAccountData(task) {
@@ -2780,9 +2876,9 @@
 
   // Setup phone click handlers for contact phones (capture-phase to win race vs ClickToCall)
   function setupPhoneClickHandlers() {
-    // Prevent duplicate event listeners
-    if (state._phoneHandlersSetup) return;
-    state._phoneHandlersSetup = true;
+    // CRITICAL FIX: Use document-level guard like fix-duplicate-listeners.js pattern
+    if (document._taskDetailPhoneHandlersBound) return;
+    document._taskDetailPhoneHandlersBound = true;
 
     // Helper: resolve person from current task contact name
     function resolvePerson() {
@@ -2824,9 +2920,9 @@
 
   // Setup contact link handlers
   function setupContactLinkHandlers() {
-    // Prevent duplicate event listeners
-    if (state._contactHandlersSetup) return;
-    state._contactHandlersSetup = true;
+    // CRITICAL FIX: Use document-level guard like fix-duplicate-listeners.js pattern
+    if (document._taskDetailContactHandlersBound) return;
+    document._taskDetailContactHandlersBound = true;
 
     // Handle contact link clicks in header
     document.addEventListener('click', (e) => {
@@ -2857,19 +2953,29 @@
         if (window.crm && typeof window.crm.navigateToPage === 'function') {
           window.crm.navigateToPage('people');
           
-          // Use retry pattern to ensure ContactDetail module is ready
+          // CRITICAL FIX: Use retry pattern with timeout and error handling
           requestAnimationFrame(() => {
             let attempts = 0;
-            const maxAttempts = 15; // 1.2 seconds at 80ms intervals (faster)
+            const maxAttempts = 25; // 2 seconds at 80ms intervals (increased for reliability)
             
             const tryShowContact = () => {
               if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-                window.ContactDetail.show(contactId);
+                try {
+                  window.ContactDetail.show(contactId);
+                } catch (error) {
+                  console.error('[TaskDetail] Error showing contact:', error);
+                  if (window.crm && typeof window.crm.showToast === 'function') {
+                    window.crm.showToast('Failed to open contact. Please try again.', 'error');
+                  }
+                }
               } else if (attempts < maxAttempts) {
                 attempts++;
                 setTimeout(tryShowContact, 80);
               } else {
-                console.warn('ContactDetail module not ready after 1.2 seconds');
+                console.warn('[TaskDetail] ContactDetail module not ready after 2 seconds');
+                if (window.crm && typeof window.crm.showToast === 'function') {
+                  window.crm.showToast('Contact page is loading. Please try again in a moment.', 'error');
+                }
               }
             };
             
@@ -2940,9 +3046,9 @@
 
   // Setup contact creation listener to refresh contacts list
   function setupContactCreationListener() {
-    // Prevent duplicate event listeners
-    if (state._contactCreationListenerSetup) return;
-    state._contactCreationListenerSetup = true;
+    // CRITICAL FIX: Use document-level guard like fix-duplicate-listeners.js pattern
+    if (document._taskDetailContactCreationBound) return;
+    document._taskDetailContactCreationBound = true;
 
     document.addEventListener('pc:contact-created', (e) => {
       if (state.currentTask && isAccountTask(state.currentTask)) {

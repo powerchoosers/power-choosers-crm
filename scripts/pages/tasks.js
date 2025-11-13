@@ -1517,6 +1517,12 @@
           ...newTask,
           timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
         });
+        
+        // CRITICAL FIX: Invalidate cache after task creation to prevent stale data
+        if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+          await window.CacheManager.invalidate('tasks');
+          console.log('[Tasks] Invalidated tasks cache after creation');
+        }
       }
     } catch (err) {
       console.warn('Failed to save task to Firebase:', err);
