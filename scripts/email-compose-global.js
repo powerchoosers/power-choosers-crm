@@ -2359,6 +2359,15 @@
     return div.innerHTML;
   }
 
+  // Remove citation brackets from text (e.g., [1], [2], [3])
+  function removeCitationBrackets(text) {
+    if (!text) return text;
+    return String(text)
+      .replace(/\[\d+\]/g, '') // Remove [1], [2], [3], etc.
+      .replace(/\s+/g, ' ') // Normalize multiple spaces
+      .trim();
+  }
+
   // ========== AI HELPER FUNCTIONS ==========
   
   async function lookupPersonByEmail(email) {
@@ -4048,6 +4057,19 @@
     try {
       console.log('[AI] Formatting templated email, type:', templateType);
       
+      // Clean all string fields in result to remove citations
+      if (result && typeof result === 'object') {
+        Object.keys(result).forEach(key => {
+          if (typeof result[key] === 'string') {
+            result[key] = removeCitationBrackets(result[key]);
+          } else if (Array.isArray(result[key])) {
+            result[key] = result[key].map(item => 
+              typeof item === 'string' ? removeCitationBrackets(item) : item
+            );
+          }
+        });
+      }
+      
       // Extract data from JSON response
       const subject = result.subject || 'Energy Solutions';
       
@@ -4192,6 +4214,17 @@
         const jsonData = JSON.parse(jsonText);
         console.log('[AI] Parsed JSON successfully:', jsonData);
 
+        // Clean all string fields in jsonData to remove citations
+        Object.keys(jsonData).forEach(key => {
+          if (typeof jsonData[key] === 'string') {
+            jsonData[key] = removeCitationBrackets(jsonData[key]);
+          } else if (Array.isArray(jsonData[key])) {
+            jsonData[key] = jsonData[key].map(item => 
+              typeof item === 'string' ? removeCitationBrackets(item) : item
+            );
+          }
+        });
+
         subject = jsonData.subject || 'Energy Solutions';
 
         // Build body from JSON fields with proper paragraph structure
@@ -4256,13 +4289,16 @@
         
         for (const line of lines) {
           if (line.startsWith('Subject:')) {
-            subject = line.replace('Subject:', '').trim();
+            subject = removeCitationBrackets(line.replace('Subject:', '').trim());
           } else if (line.trim() === '') {
             inBody = true;
           } else if (inBody) {
-            body += line + '\n';
+            body += removeCitationBrackets(line) + '\n';
           }
         }
+        
+        // Clean the body
+        body = removeCitationBrackets(body);
         
         // If no subject found, use a default
         if (!subject) {
