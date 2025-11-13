@@ -25,6 +25,17 @@
       return null;
     } catch (_) { return null; }
   };
+  
+  // Convert timestamp to milliseconds (for scheduledSendTime which needs numeric comparison)
+  const tsToMs = (v) => {
+    try {
+      if (!v) return null;
+      if (typeof v === 'number') return v;
+      if (typeof v.toDate === 'function') return v.toDate().getTime();
+      if (typeof v === 'string') return new Date(v).getTime();
+      return null;
+    } catch (_) { return null; }
+  };
   const isAdmin = () => {
     try { if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin==='function') return window.DataManager.isCurrentUserAdmin(); return window.currentUserRole==='admin'; } catch(_) { return false; }
   };
@@ -39,6 +50,12 @@
     }
     
     try {
+      // Clear old cache format (scheduledSendTime was string, now it's number)
+      if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+        await window.CacheManager.invalidate('emails');
+        console.log('[BackgroundEmailsLoader] Cleared old email cache');
+      }
+      
       console.log('[BackgroundEmailsLoader] Loading from Firestore...');
       if (window.currentUserRole !== 'admin') {
         // Employee: scope by ownership
@@ -62,18 +79,18 @@
           const updatedAt = tsToIso(data.updatedAt);
           const sentAt = tsToIso(data.sentAt);
           const receivedAt = tsToIso(data.receivedAt);
-          const scheduledSendTime = tsToIso(data.scheduledSendTime);
+          const scheduledSendTime = tsToMs(data.scheduledSendTime); // Keep as milliseconds for numeric comparison
           const generatedAt = tsToIso(data.generatedAt);
-          const timestamp = sentAt || receivedAt || scheduledSendTime || createdAt || new Date().toISOString();
+          const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
           return { ...data, createdAt, updatedAt, sentAt, receivedAt, scheduledSendTime, generatedAt, timestamp, emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent') };
         });
         // Sort newest first
         emailsData.sort((a,b)=> new Date(b.timestamp||0) - new Date(a.timestamp||0));
       } else {
-        // Admin: Load initial 100 emails (pagination will load more as needed)
+        // Admin: Load initial 200 emails to cover more date range (pagination will load more as needed)
         const snapshot = await window.firebaseDB.collection('emails')
           .orderBy('createdAt', 'desc')
-          .limit(100)
+          .limit(200)
           .get();
         
         emailsData = snapshot.docs.map(doc => {
@@ -82,9 +99,10 @@
           const updatedAt = tsToIso(data.updatedAt);
           const sentAt = tsToIso(data.sentAt);
           const receivedAt = tsToIso(data.receivedAt);
-          const scheduledSendTime = tsToIso(data.scheduledSendTime);
+          const scheduledSendTime = tsToMs(data.scheduledSendTime); // Keep as milliseconds for numeric comparison
           const generatedAt = tsToIso(data.generatedAt);
-          const timestamp = sentAt || receivedAt || scheduledSendTime || createdAt || new Date().toISOString();
+          // Prioritize actual sent/received dates over creation date for display
+          const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
           return {
             id: doc.id,
             ...data,
@@ -99,13 +117,19 @@
           };
         });
         
+        // Sort by timestamp (actual sent/received date) instead of createdAt for better date continuity
+        emailsData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
         // Track pagination state
         if (snapshot.docs.length > 0) {
           lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
-          hasMoreData = snapshot.docs.length === 100;
+          hasMoreData = snapshot.docs.length === 200;
         } else {
           hasMoreData = false;
         }
+        
+        console.log('[BackgroundEmailsLoader] Admin loaded, date range:', 
+                    emailsData.length > 0 ? `${emailsData[emailsData.length-1].timestamp} to ${emailsData[0].timestamp}` : 'none');
       }
       
       console.log('[BackgroundEmailsLoader] ✓ Loaded', emailsData.length, 'emails from Firestore');
@@ -121,8 +145,11 @@
         detail: { count: emailsData.length, fromFirestore: true } 
       }));
 
-      // Start realtime listener after initial load
-      if (window.currentUserRole !== 'admin') startRealtimeListenerScoped(window.currentUserEmail || ''); else startRealtimeListener();
+      // Start realtime listener after a delay to let the page render first (performance optimization)
+      setTimeout(() => {
+        console.log('[BackgroundEmailsLoader] Starting real-time listener...');
+        if (window.currentUserRole !== 'admin') startRealtimeListenerScoped(window.currentUserEmail || ''); else startRealtimeListener();
+      }, 2000); // 2 second delay
     } catch (error) {
       console.error('[BackgroundEmailsLoader] Failed to load from Firestore:', error);
     }
@@ -164,9 +191,9 @@
         const updatedAt = tsToIso(data.updatedAt);
         const sentAt = tsToIso(data.sentAt);
         const receivedAt = tsToIso(data.receivedAt);
-        const scheduledSendTime = tsToIso(data.scheduledSendTime);
+        const scheduledSendTime = tsToMs(data.scheduledSendTime); // Keep as milliseconds for numeric comparison
         const generatedAt = tsToIso(data.generatedAt);
-        const timestamp = sentAt || receivedAt || scheduledSendTime || createdAt || new Date().toISOString();
+        const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
         return {
           id: doc.id,
           ...data,
@@ -342,9 +369,9 @@
             const updatedAt = tsToIso(data.updatedAt);
             const sentAt = tsToIso(data.sentAt);
             const receivedAt = tsToIso(data.receivedAt);
-            const scheduledSendTime = tsToIso(data.scheduledSendTime);
+            const scheduledSendTime = tsToMs(data.scheduledSendTime); // Keep as milliseconds for numeric comparison
             const generatedAt = tsToIso(data.generatedAt);
-            const timestamp = sentAt || receivedAt || scheduledSendTime || createdAt || new Date().toISOString();
+            const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
             updated.push({
               id: doc.id,
               ...data,
@@ -410,9 +437,9 @@
           const updatedAt = tsToIso(data.updatedAt);
           const sentAt = tsToIso(data.sentAt);
           const receivedAt = tsToIso(data.receivedAt);
-          const scheduledSendTime = tsToIso(data.scheduledSendTime);
+          const scheduledSendTime = tsToMs(data.scheduledSendTime); // Keep as milliseconds for numeric comparison
           const generatedAt = tsToIso(data.generatedAt);
-          const timestamp = sentAt || receivedAt || scheduledSendTime || createdAt || new Date().toISOString();
+          const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
           updated.push({ id: doc.id, ...data, createdAt, updatedAt, sentAt, receivedAt, scheduledSendTime, generatedAt, timestamp, emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent') });
         });
         // Merge into emailsData by id
@@ -531,7 +558,7 @@
           if (window.currentUserRole !== 'admin') {
             startRealtimeListenerScoped(window.currentUserEmail || '');
           } else {
-            startRealtimeListener();
+          startRealtimeListener();
           }
         } else {
           // Cache empty, load from Firestore
@@ -646,9 +673,9 @@
         const updatedAt = tsToIso(data.updatedAt);
         const sentAt = tsToIso(data.sentAt);
         const receivedAt = tsToIso(data.receivedAt);
-        const scheduledSendTime = tsToIso(data.scheduledSendTime);
+        const scheduledSendTime = tsToMs(data.scheduledSendTime); // Keep as milliseconds for numeric comparison
         const generatedAt = tsToIso(data.generatedAt);
-        const timestamp = sentAt || receivedAt || scheduledSendTime || createdAt || new Date().toISOString();
+        const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
         return {
           id: doc.id,
           ...data,
@@ -692,7 +719,7 @@
       return { loaded: 0, hasMore: false };
     }
   }
-
+  
   // Export public API
   window.BackgroundEmailsLoader = {
     getEmailsData: () => emailsData,

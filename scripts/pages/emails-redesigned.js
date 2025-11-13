@@ -9,7 +9,9 @@
     currentFolder: 'inbox',
     hasMore: false, // Track if more emails are available
     totalCount: 0,  // Overall total emails (reference only)
-    folderCount: 0  // Total emails for current folder (for footer/pagination)
+    folderCount: 0,  // Total emails for current folder (for footer/pagination)
+    isLoading: false,    // Prevent multiple simultaneous loads
+    isLoadingMore: false // Prevent multiple loadMore calls
   };
   const els = {};
 
@@ -156,7 +158,7 @@
           openBulkSelectModal();
         } else {
           state.selected.clear();
-          render();
+        render();
           closeBulkSelectModal();
           hideBulkBar();
         }
@@ -166,7 +168,13 @@
 
   // Load email data from BackgroundEmailsLoader (cache-first)
   async function loadData() {
+    if (state.isLoading) {
+      console.log('[EmailsPage] Already loading, skipping duplicate request');
+      return;
+    }
+    
     try {
+      state.isLoading = true;
       console.log('[EmailsPage] Loading emails from BackgroundEmailsLoader...');
       
       let emailsData = [];
@@ -235,26 +243,26 @@
           }
           
           emailMap.set(email.id, {
-            ...email,
-            type: email.type || 'received',
-            from: email.from || 'Unknown',
+        ...email,
+        type: email.type || 'received',
+        from: email.from || 'Unknown',
             to: normalizedTo,
-            subject: email.subject || '(No Subject)',
-            date: email.date || email.timestamp || email.createdAt || new Date(),
-            // Preserve all content fields like old system
-            html: email.html || '',
-            text: email.text || '',
-            content: email.content || '',
-            originalContent: email.originalContent || '',
-            // Add tracking data
-            openCount: email.openCount || 0,
-            clickCount: email.clickCount || 0,
-            lastOpened: email.lastOpened,
-            lastClicked: email.lastClicked,
-            isSentEmail: email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail,
-            starred: email.starred || false,
-            deleted: email.deleted || false,
-            unread: email.unread !== false
+        subject: email.subject || '(No Subject)',
+        date: email.date || email.timestamp || email.createdAt || new Date(),
+        // Preserve all content fields like old system
+        html: email.html || '',
+        text: email.text || '',
+        content: email.content || '',
+        originalContent: email.originalContent || '',
+        // Add tracking data
+        openCount: email.openCount || 0,
+        clickCount: email.clickCount || 0,
+        lastOpened: email.lastOpened,
+        lastClicked: email.lastClicked,
+        isSentEmail: email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail,
+        starred: email.starred || false,
+        deleted: email.deleted || false,
+        unread: email.unread !== false
           });
         }
       });
@@ -281,6 +289,8 @@
       console.error('[EmailsPage] Failed to load emails:', error);
       state.data = [];
       applyFilters();
+    } finally {
+      state.isLoading = false;
     }
   }
 
@@ -327,17 +337,37 @@
     } else if (state.currentFolder === 'scheduled') {
       // Scheduled emails are already filtered by ownership in BackgroundEmailsLoader
       // Only shows scheduled emails owned by or assigned to current user
+      
+      // Debug: Sample a scheduled email to check its structure
+      const sampleScheduled = state.data.find(e => e.type === 'scheduled');
+      if (sampleScheduled) {
+        console.log('[EmailsPage] Sample scheduled email:', {
+          id: sampleScheduled.id,
+          type: sampleScheduled.type,
+          status: sampleScheduled.status,
+          scheduledSendTime: sampleScheduled.scheduledSendTime,
+          scheduledSendTimeType: typeof sampleScheduled.scheduledSendTime,
+          deleted: sampleScheduled.deleted
+        });
+      }
+      
       filtered = filtered.filter(email => {
-        // CRITICAL FIX: Show emails that are scheduled for now or future (not just future)
-        // Also include emails with status 'not_generated' or 'pending_approval' that haven't been sent yet
         const isScheduled = email.type === 'scheduled';
         const hasSendTime = email.scheduledSendTime && typeof email.scheduledSendTime === 'number';
-        const isFutureOrNow = hasSendTime && email.scheduledSendTime >= (Date.now() - 60000); // Allow 1 minute buffer for "due now" emails
-        const isPending = email.status === 'not_generated' || email.status === 'pending_approval' || !email.status;
+        const isPending = email.status === 'not_generated' || email.status === 'pending_approval';
+        const isApproved = email.status === 'approved';
         const notDeleted = !email.deleted;
         const notSent = email.status !== 'sent' && email.status !== 'delivered';
         
-        return isScheduled && hasSendTime && (isFutureOrNow || isPending) && notDeleted && notSent;
+        // Show email if:
+        // 1. It's scheduled AND has send time AND not deleted AND not sent
+        // 2. AND one of:
+        //    a. It's pending (needs generation or approval) - SHOW REGARDLESS OF TIME
+        //    b. It's approved and scheduled for future (within 1 min buffer)
+        const shouldShow = isScheduled && hasSendTime && notDeleted && notSent && 
+                          (isPending || (isApproved && email.scheduledSendTime >= (Date.now() - 60000)));
+        
+        return shouldShow;
       });
       // Sort by scheduled send time (earliest first)
       filtered.sort((a, b) => a.scheduledSendTime - b.scheduledSendTime);
@@ -413,13 +443,20 @@
 
   // Load more emails until we have enough filtered results for the current page
   async function loadMoreUntilEnough() {
-    const neededForPage = state.currentPage * state.pageSize;
-    let attempts = 0;
-    const maxAttempts = 20; // Prevent infinite loops
+    if (state.isLoadingMore) {
+      console.log('[EmailsPage] Already loading more, skipping duplicate request');
+      return;
+    }
     
-    console.log('[EmailsPage] loadMoreUntilEnough started - filtered:', state.filtered.length, 'needed:', neededForPage);
-    
-    while (state.filtered.length < neededForPage && state.hasMore && attempts < maxAttempts) {
+    state.isLoadingMore = true;
+    try {
+      const neededForPage = state.currentPage * state.pageSize;
+      let attempts = 0;
+      const maxAttempts = 20; // Prevent infinite loops
+      
+      console.log('[EmailsPage] loadMoreUntilEnough started - filtered:', state.filtered.length, 'needed:', neededForPage);
+      
+      while (state.filtered.length < neededForPage && state.hasMore && attempts < maxAttempts) {
       attempts++;
       console.log(`[EmailsPage] Loading more emails (attempt ${attempts}/${maxAttempts})...`);
       const result = await window.BackgroundEmailsLoader.loadMore();
@@ -497,11 +534,20 @@
         filtered = filtered.filter(email => {
           const isScheduled = email.type === 'scheduled';
           const hasSendTime = email.scheduledSendTime && typeof email.scheduledSendTime === 'number';
-          const isFutureOrNow = hasSendTime && email.scheduledSendTime >= (Date.now() - 60000);
-          const isPending = email.status === 'not_generated' || email.status === 'pending_approval' || !email.status;
+          const isPending = email.status === 'not_generated' || email.status === 'pending_approval';
+          const isApproved = email.status === 'approved';
           const notDeleted = !email.deleted;
           const notSent = email.status !== 'sent' && email.status !== 'delivered';
-          return isScheduled && hasSendTime && (isFutureOrNow || isPending) && notDeleted && notSent;
+          
+          // Show email if:
+          // 1. It's scheduled AND has send time AND not deleted AND not sent
+          // 2. AND one of:
+          //    a. It's pending (needs generation or approval) - SHOW REGARDLESS OF TIME
+          //    b. It's approved and scheduled for future (within 1 min buffer)
+          const shouldShow = isScheduled && hasSendTime && notDeleted && notSent && 
+                            (isPending || (isApproved && email.scheduledSendTime >= (Date.now() - 60000)));
+          
+          return shouldShow;
         });
         filtered.sort((a, b) => a.scheduledSendTime - b.scheduledSendTime);
       } else if (state.currentFolder === 'starred') {
@@ -527,10 +573,13 @@
         console.log(`[EmailsPage] Stopping load - filtered: ${state.filtered.length}, needed: ${neededForPage}, hasMore: ${state.hasMore}`);
         break;
       }
+      }
+      
+      console.log(`[EmailsPage] loadMoreUntilEnough complete - filtered: ${state.filtered.length}, needed: ${neededForPage}`);
+      render();
+    } finally {
+      state.isLoadingMore = false;
     }
-    
-    console.log(`[EmailsPage] loadMoreUntilEnough complete - filtered: ${state.filtered.length}, needed: ${neededForPage}`);
-    render();
   }
 
   // Get paginated items for current page
@@ -659,12 +708,12 @@
       });
     } else {
       // For received emails, show sender with domain favicon
-      const senderDomain = extractDomain(email.from);
+    const senderDomain = extractDomain(email.from);
       displayName = extractName(email.from);
       avatarHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
-        domain: senderDomain,
-        size: 28
-      });
+      domain: senderDomain,
+      size: 28
+    });
     }
 
     const isSelected = state.selected.has(email.id);
@@ -703,8 +752,8 @@
               <button class="qa-btn ${isStarred ? 'starred' : ''}" data-action="star" data-email-id="${email.id}" title="${isStarred ? 'Unstar' : 'Star'}">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="${isStarred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                </svg>
-              </button>
+              </svg>
+            </button>
             ` : ''}
             ${email.type === 'scheduled' && email.status === 'pending_approval' ? `
               <button class="qa-btn" data-action="approve" data-email-id="${email.id}" title="Approve" style="color: #28a745;">
@@ -1319,9 +1368,9 @@
       extractedName = quotedMatch[1];
       emailAddress = quotedMatch[2].toLowerCase().trim();
     } else {
-      // Handle format: Name <email@domain.com>
-      const angleMatch = email.match(/^([^<]+)\s*<(.+)>$/);
-      if (angleMatch) {
+    // Handle format: Name <email@domain.com>
+    const angleMatch = email.match(/^([^<]+)\s*<(.+)>$/);
+    if (angleMatch) {
         extractedName = angleMatch[1].trim();
         emailAddress = angleMatch[2].toLowerCase().trim();
       } else {
@@ -1342,8 +1391,8 @@
       // Priority 1: Check cache (populated by Firebase lookups)
       if (contactNameCache.has(normalizedEmail)) {
         return contactNameCache.get(normalizedEmail);
-      }
-      
+    }
+    
       // Priority 2: Use cached people data - no API calls needed
       try {
         const people = window.getPeopleData ? window.getPeopleData() : [];
@@ -1384,7 +1433,7 @@
     // If no contact found, format email username as "First Last"
     if (emailAddress && emailAddress.includes('@')) {
       const emailMatch = emailAddress.match(/^(.+)@/);
-      if (emailMatch) {
+    if (emailMatch) {
         const emailUsername = emailMatch[1];
         const formattedName = formatEmailAsName(emailUsername);
         return formattedName;
