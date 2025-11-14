@@ -162,9 +162,9 @@ function mapApolloContactToLushaFormat(apolloPerson) {
       type: p.type || 'work'
     }));
   
-  // Extract emails
+  // Extract emails (filter out Apollo's placeholder emails)
   const emails = [];
-  if (apolloPerson.email) {
+  if (apolloPerson.email && !apolloPerson.email.includes('email_not_unlocked')) {
     emails.push({
       address: apolloPerson.email,
       type: 'work',
