@@ -1,4 +1,6 @@
 import { db } from './_firebase.js';
+import NEPQHelpers from '../scripts/utils/nepq-helpers.js';
+import NEPQ_CONFIG from '../scripts/config/nepq-email-config.js';
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -129,11 +131,55 @@ export default async function handler(req, res) {
         
         // Get contact data for personalization
         let contactData = {};
+        let accountData = {};
+        let nepqAngleData = null;
+        
         if (emailData.contactId) {
           try {
             const contactDoc = await db.collection('people').doc(emailData.contactId).get();
             if (contactDoc.exists) {
               contactData = contactDoc.data();
+            }
+            
+            // Get account data if available
+            if (contactData.accountId || contactData.account_id) {
+              try {
+                const accountId = contactData.accountId || contactData.account_id;
+                const accountDoc = await db.collection('accounts').doc(accountId).get();
+                if (accountDoc.exists) {
+                  accountData = accountDoc.data();
+                }
+              } catch (accountError) {
+                console.warn('[GenerateScheduledEmails] Failed to get account data:', accountError);
+              }
+            }
+            
+            // Build NEPQ angle data for first step emails
+            if ((emailData.stepIndex === 0 || emailData.stepIndex === undefined) && Object.keys(contactData).length > 0 && Object.keys(accountData).length > 0) {
+              try {
+                const contact = {
+                  firstName: contactData.firstName || contactData.first_name,
+                  email: contactData.email,
+                  role: contactData.role || contactData.title || contactData.jobTitle
+                };
+                
+                const account = {
+                  companyName: accountData.name || accountData.companyName,
+                  industry: accountData.industry,
+                  city: accountData.city,
+                  state: accountData.state,
+                  numberOfFacilities: accountData.numberOfFacilities,
+                  contractExpirationDate: accountData.contractExpirationDate || accountData.contractEnd,
+                  marketDeregulated: accountData.marketDeregulated
+                };
+                
+                nepqAngleData = NEPQHelpers.buildAngleData({ contact, account });
+                if (!isProduction) {
+                  console.log('[GenerateScheduledEmails] NEPQ angle selected:', nepqAngleData.angleKey);
+                }
+              } catch (nepqError) {
+                console.warn('[GenerateScheduledEmails] Failed to build NEPQ angle:', nepqError);
+              }
             }
           } catch (error) {
             console.warn('[GenerateScheduledEmails] Failed to get contact data:', error);
@@ -171,7 +217,9 @@ export default async function handler(req, res) {
             stepNumber: (emailData.stepIndex || 0) + 1,
             totalSteps: emailData.totalSteps || 1,
             previousInteractions: previousEmails
-          }
+          },
+          // NEPQ integration
+          nepqAngleData: nepqAngleData
         });
         
         // Update email with generated content
@@ -189,6 +237,14 @@ export default async function handler(req, res) {
         if (emailData.ownerId) updateData.ownerId = emailData.ownerId;
         if (emailData.assignedTo) updateData.assignedTo = emailData.assignedTo;
         if (emailData.createdBy) updateData.createdBy = emailData.createdBy;
+        
+        // Add NEPQ metadata if available
+        if (nepqAngleData) {
+          updateData.angle_used = nepqAngleData.angleKey;
+          updateData.exemption_type = nepqAngleData.taxExemptStatus;
+          updateData.news_hook_used = nepqAngleData.newsHook?.key || null;
+          updateData.nepq_version = 'v1';
+        }
         
         await emailDoc.ref.update(updateData);
         
@@ -249,7 +305,7 @@ export default async function handler(req, res) {
 }
 
 // Generate email content using Perplexity API
-async function generateEmailContent({ prompt, contactName, contactCompany, sequenceContext }) {
+async function generateEmailContent({ prompt, contactName, contactCompany, sequenceContext, nepqAngleData = null }) {
   try {
     // Build enhanced prompt with context
     let enhancedPrompt = prompt;
@@ -260,6 +316,34 @@ async function generateEmailContent({ prompt, contactName, contactCompany, seque
     
     if (contactCompany) {
       enhancedPrompt = `Company: ${contactCompany}\n` + enhancedPrompt;
+    }
+    
+    // Add NEPQ context if available (for first-step emails)
+    if (nepqAngleData && sequenceContext.stepNumber === 1) {
+      enhancedPrompt = `**NEPQ MODE ENABLED**
+
+SELECTED ANGLE: ${nepqAngleData.angle?.name || nepqAngleData.angleKey}
+${nepqAngleData.exemptionDetails ? `
+TAX EXEMPTION OPPORTUNITY (PRIORITY):
+- Type: ${nepqAngleData.exemptionDetails.description}
+- Refund Potential: ${nepqAngleData.exemptionDetails.refundPotential}
+- Lead with exemption recovery if contact is in Finance/Operations/Executive role
+- This is 2-5x more valuable than rate savings alone
+` : ''}
+${nepqAngleData.newsHook ? `
+MARKET CONTEXT (2025):
+- ${nepqAngleData.newsHook.headline}
+- Hook: "${nepqAngleData.newsHook.emailHook}"
+- Weave naturally into situational relevance
+` : ''}
+${nepqAngleData.renewalUrgency ? `
+RENEWAL URGENCY: ${nepqAngleData.renewalUrgency.urgency} (${nepqAngleData.renewalUrgency.timeframe})
+` : ''}
+
+NEPQ STRUCTURE REQUIRED:
+1. Connection Question → 2. Situational Relevance → 3. Outcome Teaser → 4. One Clear CTA
+
+` + enhancedPrompt;
     }
     
     if (sequenceContext.stepNumber > 1) {

@@ -3,6 +3,8 @@
 // Expects POST { prompt, mode: 'standard'|'html', recipient, to, senderName, fromEmail }
 
 import { cors } from './_cors.js';
+import NEPQHelpers from '../scripts/utils/nepq-helpers.js';
+import NEPQ_CONFIG from '../scripts/config/nepq-email-config.js';
 
 // ========== SUBJECT LINE VARIANTS ==========
 // Multiple subject line options that randomly select to reduce template-like appearance
@@ -2086,6 +2088,21 @@ ${locationContextData ? '✓ Use location context: "Given ' + (city || '[locatio
 ${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
 ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant for context' : ''}
 
+NEPQ STRUCTURE (IF NEPQ MODE ENABLED):
+When nepqMode is true, use NEPQ framework:
+1. CONNECTION QUESTION: Start with disarming question positioning you as expert (not needy)
+   - Examples: "Quick one—" "Real question—" "Out of curiosity—"
+   - Make it specific to their situation (exemption, timing, multi-site)
+   - NOT biographical facts - YES curious question
+2. SITUATIONAL RELEVANCE: ONE line why this matters NOW
+   - Tie to their role/industry/exemption/market conditions
+   - Specific trigger (exemption window, rate spike, contract timing)
+3. OUTCOME TEASER: Specific, not generic "10-20% savings"
+   - If exemption-eligible: "$50K-$500K refund potential"
+   - If timing: "6 months early = 8-15% savings"
+   - If multi-site: "Prevents 2-4% scatter overpay"
+4. ONE CLEAR CTA: Single yes/no question (mobile-friendly)
+
 CONVERSATIONAL FLOW PATTERNS:
 ✓ GOOD: "I noticed ${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
 ✓ GOOD: "Given your role as ${job || '[role]'}, you're probably dealing with ${roleContext?.painPoints[0] || '[pain point]'}. Here's what I've found..."
@@ -2676,7 +2693,26 @@ export default async function handler(req, res) {
       return;
     }
 
-    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext, meetingPreferences, industrySegmentation } = req.body || {};
+    const { 
+      prompt, 
+      mode = 'standard', 
+      recipient = null, 
+      to = '', 
+      fromEmail = '', 
+      senderName = 'Lewis Patterson', 
+      whoWeAre, 
+      marketContext, 
+      meetingPreferences, 
+      industrySegmentation,
+      // NEPQ parameters
+      taxExemptStatus = null,
+      angle = null,
+      angleData = null,
+      exemptionDetails = null,
+      newsHook = null,
+      renewalUrgency = null,
+      nepqMode = false
+    } = req.body || {};
     
     // Detect template type for both HTML and standard modes
     const templateType = getTemplateType(prompt);
@@ -2694,6 +2730,36 @@ export default async function handler(req, res) {
     
     const meetingTimes = getSuggestedMeetingTimes(meetingPreferences);
     
+    // Build NEPQ context if enabled
+    let nepqContext = '';
+    if (nepqMode && templateType === 'cold_email') {
+      nepqContext = `
+**NEPQ MODE ENABLED** - Use NEPQ framework for this email:
+
+SELECTED ANGLE: ${angleData?.name || angle || 'Standard outreach'}
+${exemptionDetails ? `
+TAX EXEMPTION OPPORTUNITY (PRIORITY):
+- Type: ${exemptionDetails.description}
+- Refund Potential: ${exemptionDetails.refundPotential}
+- IMPORTANT: Lead with exemption recovery if contact is in Finance/Operations/Executive role
+- This is 2-5x more valuable than rate savings alone
+` : ''}
+${newsHook ? `
+MARKET CONTEXT (2025):
+- ${newsHook.headline}
+- Hook: "${newsHook.emailHook}"
+- Weave naturally into situational relevance
+` : ''}
+${renewalUrgency ? `
+RENEWAL URGENCY: ${renewalUrgency.urgency} (${renewalUrgency.timeframe})
+` : ''}
+
+NEPQ STRUCTURE REQUIRED:
+1. Connection Question → 2. Situational Relevance → 3. Outcome Teaser → 4. One Clear CTA
+
+`;
+    }
+    
     // Only suggest meeting times for follow-up emails, not cold emails
     const dateContext = templateType === 'cold_email' ? `TODAY'S DATE: ${todayLabel}
 
@@ -2703,7 +2769,7 @@ COLD EMAIL RULES:
 - Keep CTAs under 12 words
 - Use role-specific qualifying questions
 
-` : `TODAY'S DATE: ${todayLabel}
+${nepqContext}` : `TODAY'S DATE: ${todayLabel}
 
 SUGGESTED MEETING TIMES (2+ business days out):
 - Option 1: ${meetingTimes.slot1} ${meetingTimes.slot1Time}
@@ -2904,7 +2970,12 @@ CRITICAL: Use these EXACT meeting times in your CTA.
             subject_style: jsonData.subject_style || null,
             cta_type: jsonData.cta_type || null,
             opening_style: templateType === 'cold_email' ? (openingStyleUsed || null) : null,
-            generated_at: new Date().toISOString()
+            generated_at: new Date().toISOString(),
+            // NEPQ metadata
+            angle_used: angle || null,
+            exemption_type: taxExemptStatus || null,
+            news_hook_used: newsHook?.key || null,
+            nepq_mode: nepqMode
           }
         }));
       } catch (e) {
@@ -2934,7 +3005,15 @@ CRITICAL: Use these EXACT meeting times in your CTA.
     return res.end(JSON.stringify({ 
       ok: true, 
       output: polished,
-      citations: citations
+      citations: citations,
+      metadata: {
+        generated_at: new Date().toISOString(),
+        // NEPQ metadata
+        angle_used: angle || null,
+        exemption_type: taxExemptStatus || null,
+        news_hook_used: newsHook?.key || null,
+        nepq_mode: nepqMode
+      }
     }));
     
   } catch (e) {
