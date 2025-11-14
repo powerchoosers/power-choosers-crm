@@ -80,7 +80,24 @@
     if (entityType === 'account') {
       currentAccountId = entityId;
     }
-    // Preserve lastCompanyResult so we can pre-render company summary on reopen
+    // CRITICAL: Clear lastCompanyResult when opening for a new company to prevent stale data
+    // Only preserve if we're reopening the same company (check by entityId)
+    const previousEntityId = window.__lushaLastEntityId;
+    const previousEntityType = window.__lushaLastEntityType;
+    if (previousEntityId !== entityId || previousEntityType !== entityType) {
+      lastCompanyResult = null;
+      window.__lushaLastRequestId = null;
+      window.__lushaOpenedFromCache = false;
+      // Clear the company panel to force fresh render
+      const companyPanel = document.getElementById('lusha-panel-company');
+      if (companyPanel) {
+        companyPanel.innerHTML = '';
+        companyPanel.removeAttribute('data-content-hash');
+      }
+      lushaLog('Cleared lastCompanyResult for new entity:', { entityId, entityType, previousEntityId, previousEntityType });
+    }
+    window.__lushaLastEntityId = entityId;
+    window.__lushaLastEntityType = entityType;
     
     // Get account name for search
     let accountName = '';
@@ -333,11 +350,12 @@
       } catch(_) {}
     }
 
-    // derive company + domain from page context (no input fields)
+      // derive company + domain from page context (no input fields)
     const ctx = getContextDefaults(currentEntityType);
     let companyName = ctx.companyName;
     let domain = ctx.domain;
-    lushaLog('Context derived:', { companyName, domain, entityType: currentEntityType });
+    lushaLog('Context derived:', { companyName, domain, entityType: currentEntityType, currentAccountId, currentContactId });
+    console.log('[Apollo Widget] Search context:', { companyName, domain, entityType: currentEntityType, currentAccountId, currentContactId, lastCompanyResult: lastCompanyResult?.name });
 
     try {
       if (!companyName && !domain) {
@@ -577,13 +595,19 @@
         // Prioritize company ID for account-specific searches (most accurate)
         if (company.id) {
           requestBody.filters.companies.include.ids = [company.id];
+          console.log('[Apollo Widget] Using company ID for contacts search:', company.id, 'Company name:', company.name);
         } else if (company.domain) {
           requestBody.filters.companies.include.domains = [company.domain];
+          console.log('[Apollo Widget] Using company domain for contacts search:', company.domain);
         } else if (company.name) {
           requestBody.filters.companies.include.names = [company.name];
+          console.log('[Apollo Widget] Using company name for contacts search:', company.name);
+        } else {
+          console.warn('[Apollo Widget] No company identifier available for contacts search!', company);
         }
 
         lushaLog('Fetching contacts page:', page, 'requestBody:', requestBody);
+        console.log('[Apollo Widget] Contacts search request:', JSON.stringify(requestBody, null, 2));
         const r = await fetch(`${base}/api/apollo/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const data = await r.json();
@@ -939,7 +963,9 @@
     try { if (!window.__lushaCompanyRenderedOnce) { shouldAnimate = (isUncachedLiveSearch || isFromCache); } } catch(_) {}
     
     // If content is unchanged and summary already exists, and it's not an uncached live search, don't re-render
-    if (contentUnchanged && existingSummary && !isUncachedLiveSearch) {
+    // BUT: Always re-render if lastCompanyResult was cleared (new company search)
+    const isNewCompany = !lastCompanyResult || (lastCompanyResult && lastCompanyResult.name !== name);
+    if (contentUnchanged && existingSummary && !isUncachedLiveSearch && !isNewCompany) {
       return;
     }
     
