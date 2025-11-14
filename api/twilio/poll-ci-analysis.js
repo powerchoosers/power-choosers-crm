@@ -1,0 +1,251 @@
+import twilio from 'twilio';
+import { corsMiddleware } from '../_cors.js';
+
+export default async function handler(req, res) {
+    corsMiddleware(req, res, () => {});
+    
+    if (req.method !== 'POST') {
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
+    }
+    
+    try {
+        const _start = Date.now();
+        const { transcriptSid, callSid: callSidInput } = req.body;
+        try { console.log('[Poll CI Analysis] Start', { transcriptSid, callSid: callSidInput, ts: new Date().toISOString() }); } catch(_) {}
+        
+        if (!transcriptSid) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'transcriptSid is required' }));
+            return;
+        }
+        
+        console.log('[Poll CI Analysis] Checking analysis status for:', { transcriptSid, callSid: callSidInput });
+        
+        // Create Twilio client
+        const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+        
+        // Get transcript details
+        const transcript = await client.intelligence.v2.transcripts(transcriptSid).fetch();
+        
+        // Resolve a reliable Call SID using multiple fallbacks
+        let resolvedCallSid = (callSidInput && /^CA[0-9a-zA-Z]+$/.test(String(callSidInput))) ? callSidInput : '';
+        try {
+            if (!resolvedCallSid) {
+                const fromCustomerKey = (transcript && transcript.customerKey) ? String(transcript.customerKey) : '';
+                if (fromCustomerKey && /^CA[0-9a-zA-Z]+$/.test(fromCustomerKey)) {
+                    resolvedCallSid = fromCustomerKey;
+                }
+            }
+            if (!resolvedCallSid) {
+                const sourceSid = transcript && (transcript.sourceSid || transcript.source_sid || transcript.media_properties?.source_sid) || '';
+                if (sourceSid && /^RE[0-9a-zA-Z]+$/.test(String(sourceSid))) {
+                    try {
+                        const rec = await client.recordings(sourceSid).fetch();
+                        const recCallSid = rec && (rec.callSid || rec.call_sid);
+                        if (recCallSid && /^CA[0-9a-zA-Z]+$/.test(String(recCallSid))) {
+                            resolvedCallSid = String(recCallSid);
+                        }
+                    } catch (e) {
+                        try { console.warn('[Poll CI Analysis] Failed to fetch recording to resolve Call SID:', e?.message); } catch(_) {}
+                    }
+                }
+            }
+        } catch(_) {}
+        
+        console.log('[Poll CI Analysis] Transcript status:', {
+            sid: transcript.sid,
+            status: transcript.status,
+            analysisStatus: transcript.analysisStatus,
+            ciStatus: transcript.ciStatus,
+            processingStatus: transcript.processingStatus
+        });
+        
+        // Check if analysis is complete or failed
+        const isAnalysisComplete = transcript.analysisStatus === 'completed' || 
+                                 transcript.ciStatus === 'completed' ||
+                                 transcript.processingStatus === 'completed';
+        
+        const isAnalysisFailed = transcript.analysisStatus === 'failed' ||
+                               transcript.ciStatus === 'failed' ||
+                               transcript.processingStatus === 'failed';
+        
+        if (isAnalysisFailed) {
+            console.error('[Poll CI Analysis] CI analysis failed:', {
+                transcriptStatus: transcript.status,
+                analysisStatus: transcript.analysisStatus,
+                ciStatus: transcript.ciStatus,
+                processingStatus: transcript.processingStatus
+            });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                success: true,
+                analysisComplete: false,
+                analysisFailed: true,
+                status: {
+                    transcriptStatus: transcript.status,
+                    analysisStatus: transcript.analysisStatus,
+                    ciStatus: transcript.ciStatus,
+                    processingStatus: transcript.processingStatus
+                },
+                message: 'CI analysis failed - manual review needed'
+            }));
+            return;
+        }
+        
+        if (!isAnalysisComplete) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                success: true,
+                analysisComplete: false,
+                status: {
+                    transcriptStatus: transcript.status,
+                    analysisStatus: transcript.analysisStatus,
+                    ciStatus: transcript.ciStatus,
+                    processingStatus: transcript.processingStatus
+                },
+                message: 'Analysis still in progress'
+            }));
+            return;
+        }
+        
+        // Compute agent/customer channel mapping (align with webhook)
+        let channelRoleMap = { agentChannel: '1', customerChannel: '2' };
+        try {
+            let callResource = null;
+            try { callResource = resolvedCallSid ? await client.calls(resolvedCallSid).fetch() : null; } catch(_) {}
+            const fromStr = callResource?.from || '';
+            const toStr = callResource?.to || '';
+            const norm = (s) => (s == null ? '' : String(s)).replace(/\D/g, '').slice(-10);
+            const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
+              .split(',').map(norm).filter(Boolean);
+            const from10 = norm(fromStr);
+            const to10 = norm(toStr);
+            const isBiz = (p) => !!p && envBiz.includes(p);
+            const fromIsClient = /^client:/i.test(fromStr);
+            const fromIsAgent = fromIsClient || isBiz(from10) || (!isBiz(to10) && fromStr && fromStr !== toStr);
+            channelRoleMap.agentChannel = fromIsAgent ? '1' : '2';
+            channelRoleMap.customerChannel = fromIsAgent ? '2' : '1';
+            console.log('[Poll CI Analysis] Channel-role mapping', channelRoleMap, { from: fromStr, to: toStr, callSid: resolvedCallSid });
+        } catch(e) {
+            console.warn('[Poll CI Analysis] Failed to compute channel-role mapping, defaulting:', e?.message);
+        }
+
+        // Analysis is complete, fetch sentences
+        let sentences = [];
+        try {
+            const sentencesResponse = await client.intelligence.v2
+                .transcripts(transcriptSid)
+                .sentences.list();
+            
+            // Validate sentence segmentation quality
+            if (sentencesResponse.length <= 2) {
+                console.warn('[Poll CI Analysis] Very few sentences detected - possible segmentation failure:', {
+                    sentenceCount: sentencesResponse.length,
+                    message: 'Expected 5-20+ sentences for typical 1-2 minute calls'
+                });
+            }
+            
+            sentences = sentencesResponse.map(s => {
+                // Handle edge cases for channel values (same as webhook handler)
+                let channel = s.channel;
+                let channelNum = null;
+                
+                if (channel === null || channel === undefined) {
+                    console.warn('[Poll CI Analysis] Null/undefined channel detected');
+                    channelNum = 1;
+                } else if (typeof channel === 'string') {
+                    if (channel.toLowerCase() === 'a') channelNum = 1;
+                    else if (channel.toLowerCase() === 'b') channelNum = 2;
+                    else channelNum = Number(channel) || 1;
+                } else {
+                    channelNum = Number(channel) || 1;
+                }
+                
+                return {
+                    text: s.text || '',
+                    confidence: s.confidence,
+                    startTime: s.startTime,
+                    endTime: s.endTime,
+                    channel: channel,
+                    channelNum: channelNum,
+                    speaker: channelNum === Number(channelRoleMap.agentChannel || '1') ? 'Agent' : 'Customer'
+                };
+            });
+            
+            console.log(`[Poll CI Analysis] Retrieved ${sentences.length} sentences`, {
+                segmentationQuality: sentences.length >= 5 ? 'Good' : sentences.length >= 2 ? 'Poor' : 'Failed'
+            });
+        } catch (error) {
+            console.error('[Poll CI Analysis] Error fetching sentences:', error);
+        }
+        
+        // Build transcript strings and proactively upsert to /api/calls (fallback if webhook races/fails)
+        try {
+            const transcriptText = sentences.map(s => s.text || '').filter(Boolean).join(' ');
+            const formattedTranscript = sentences
+              .filter(s => s.text && s.text.trim())
+              .map(s => `${s.speaker}: ${s.text.trim()}`)
+              .join('\n\n');
+            if (transcriptText || sentences.length > 0) {
+                const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
+                const ai = {
+                    summary: `Analysis of ${transcriptText.split(/\s+/).filter(Boolean).length}-word conversation.`,
+                    sentiment: 'Neutral',
+                    keyTopics: [],
+                    nextSteps: ['Follow up'],
+                    painPoints: [],
+                    decisionMakers: [],
+                    speakerTurns: sentences.map(x=>({ role: x.speaker.toLowerCase(), t: Math.max(0, Math.floor(x.startTime||0)), text: x.text||'' })),
+                    conversationalIntelligence: {
+                        transcriptSid,
+                        status: transcript.status,
+                        sentenceCount: sentences.length,
+                        channelRoleMap
+                    },
+                    source: 'twilio-conversational-intelligence'
+                };
+                const finalCallSid = resolvedCallSid || callSidInput || '';
+                if (!finalCallSid) {
+                    console.warn('[Poll CI Analysis] Unable to upsert /api/calls due to missing Call SID', { transcriptSid });
+                } else {
+                    await fetch(`${base}/api/calls`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ callSid: finalCallSid, transcript: transcriptText, formattedTranscript, aiInsights: ai, conversationalIntelligence: ai.conversationalIntelligence })
+                    }).catch(()=>{});
+                }
+            }
+        } catch(e) {
+            console.warn('[Poll CI Analysis] Fallback upsert failed:', e?.message || e);
+        }
+
+        const elapsed = Date.now() - _start;
+        try { console.log('[Poll CI Analysis] Done', { transcriptSid, callSid, elapsedMs: elapsed, sentenceCount: sentences.length }); } catch(_) {}
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            success: true,
+            analysisComplete: true,
+            callSid: resolvedCallSid || callSidInput || '',
+            status: {
+                transcriptStatus: transcript.status,
+                analysisStatus: transcript.analysisStatus,
+                ciStatus: transcript.ciStatus,
+                processingStatus: transcript.processingStatus
+            },
+            sentences: sentences,
+            sentenceCount: sentences.length,
+            updated: true,
+            message: 'Analysis completed (background)'
+        }));
+        
+    } catch (error) {
+        console.error('[Poll CI Analysis] Error:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+            error: 'Failed to poll CI analysis',
+            details: error.message 
+        }));
+        return;
+    }
+}
