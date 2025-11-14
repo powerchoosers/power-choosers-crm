@@ -69,7 +69,7 @@ steps:
     - '--set-env-vars'
     - 'CORESIGNAL_API_KEY=${_CORESIGNAL_API_KEY}'
     - '--set-env-vars'
-    - 'LUSHA_API_KEY=${_LUSHA_API_KEY}'
+    - 'APOLLO_API_KEY=${_APOLLO_API_KEY}'
     - '--set-env-vars'
     - 'TWILIO_INTELLIGENCE_SERVICE_SID=${_TWILIO_INTELLIGENCE_SERVICE_SID}'
     - '--set-env-vars'
