@@ -1,9 +1,0 @@
-{
-  "name": "power-choosers-crm",
-  "version": "1.0.0",
-  "description": "Power Choosers CRM with Twilio integration",
-  "dependencies": {
-    "twilio": "^4.23.0",
-    "@google/generative-ai": "^0.21.0"
-  }
-}
