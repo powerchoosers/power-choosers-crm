@@ -91,6 +91,7 @@ import apolloCompanyHandler from './api/apollo/company.js';
 import apolloContactsHandler from './api/apollo/contacts.js';
 import apolloEnrichHandler from './api/apollo/enrich.js';
 import apolloUsageHandler from './api/apollo/usage.js';
+import apolloHealthHandler from './api/apollo/health.js';
 import uploadHostGoogleAvatarHandler from './api/upload/host-google-avatar.js';
 import uploadSignatureImageHandler from './api/upload/signature-image.js';
 import algoliaReindexHandler from './api/algolia/reindex.js';
@@ -694,6 +695,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/apollo/contacts' ||
     pathname === '/api/apollo/enrich' ||
     pathname === '/api/apollo/usage' ||
+    pathname === '/api/apollo/health' ||
     pathname === '/api/upload/host-google-avatar' ||
     pathname === '/api/upload/signature-image' ||
     pathname === '/api/algolia/reindex' ||
@@ -859,6 +861,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/apollo/usage') {
     return handleApiApolloUsage(req, res, parsedUrl);
+  }
+  if (pathname === '/api/apollo/health') {
+    return handleApiApolloHealth(req, res, parsedUrl);
   }
   if (pathname === '/api/upload/host-google-avatar') {
     return handleApiUploadHostGoogleAvatar(req, res);
@@ -1046,7 +1051,7 @@ async function handleApiApolloCompany(req, res, parsedUrl) {
 async function handleApiApolloContacts(req, res, parsedUrl) {
   if (req.method === 'POST') {
     req.body = await parseRequestBody(req);
-  }
+}
   req.query = { ...parsedUrl.query };
   return await apolloContactsHandler(req, res);
 }
@@ -1062,6 +1067,11 @@ async function handleApiApolloEnrich(req, res, parsedUrl) {
 async function handleApiApolloUsage(req, res, parsedUrl) {
   req.query = { ...parsedUrl.query };
   return await apolloUsageHandler(req, res);
+}
+
+async function handleApiApolloHealth(req, res, parsedUrl) {
+  req.query = { ...parsedUrl.query };
+  return await apolloHealthHandler(req, res);
 }
 
 // Upload handlers
