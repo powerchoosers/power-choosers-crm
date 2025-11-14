@@ -11494,6 +11494,71 @@ input[type="number"]::-webkit-inner-spin-button {
     transition: all 0.3s ease;
 }
 
+/* Company description expand/collapse */
+.company-desc-container {
+    margin-top: 8px;
+    width: 100%;
+    border-left: 2px solid var(--border-light);
+    padding-left: 12px;
+    transition: border-color 0.3s ease;
+}
+
+.company-desc-container:hover {
+    border-left-color: var(--accent-color);
+}
+
+.company-desc-preview,
+.company-desc-more {
+    color: var(--text-muted);
+    line-height: 1.5;
+    width: 100%;
+    font-size: 13px;
+}
+
+.company-desc-more {
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.desc-ellipsis {
+    color: var(--text-muted);
+    font-style: italic;
+    opacity: 0.6;
+}
+
+.lusha-desc-toggle {
+    background: var(--bg-item);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    margin-top: 8px;
+    padding: 6px 12px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.lusha-desc-toggle:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-color);
+    color: var(--text-inverse);
+    text-decoration: none;
+    transform: translateY(-1px);
+}
+
+.lusha-desc-toggle:active {
+    transform: translateY(0);
+}
+
+.lusha-desc-toggle svg {
+    transition: transform 0.3s ease;
+}
+
 /* Animation helper */
 .lusha-anim {
     will-change: height, opacity, transform;
