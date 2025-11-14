@@ -29,22 +29,35 @@ export default async function handler(req, res) {
     const APOLLO_API_KEY = getApiKey();
     
     // Build Apollo search request
-    const searchBody = {};
+    // IMPORTANT: Apollo Organization Search does NOT support direct domain filtering!
+    // We must use company name search or organization IDs
+    const searchBody = {
+      page: 1,
+      per_page: 1
+    };
     
-    if (domain) {
-      const normalizedDomain = normalizeDomain(domain);
-      searchBody.q_organization_domains = [normalizedDomain];
+    // Priority order: ID > Company Name > Domain (not supported, will fall back to name)
+    if (companyId) {
+      searchBody.organization_ids = [companyId];
+      console.log('[Apollo Company] Searching by organization ID:', companyId);
     } else if (company) {
       searchBody.q_organization_name = company;
-    } else if (companyId) {
-      searchBody.organization_ids = [companyId];
+      console.log('[Apollo Company] Searching by company name:', company);
+    } else if (domain) {
+      // Domain-only search: Use company name derived from domain as fallback
+      const domainParts = normalizeDomain(domain).split('.');
+      const companyGuess = domainParts[0].replace(/-/g, ' ');
+      searchBody.q_organization_name = companyGuess;
+      console.log('[Apollo Company] No company name provided, guessing from domain:', domain, '-> ', companyGuess);
+    } else {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Missing required parameter: domain, company, or companyId' 
+      }));
+      return;
     }
     
-    // Set page size to 1 since we only need the first result
-    searchBody.page = 1;
-    searchBody.per_page = 1;
-    
-    console.log('[Apollo Company] Search request:', JSON.stringify(searchBody, null, 2));
+    console.log('[Apollo Company] Full search request:', JSON.stringify(searchBody, null, 2));
     
     const searchUrl = `${APOLLO_BASE_URL}/mixed_companies/search`;
     const searchResp = await fetchWithRetry(searchUrl, {
@@ -70,9 +83,10 @@ export default async function handler(req, res) {
 
     const searchData = await searchResp.json();
     
-    console.log('[Apollo Company] Search response:', JSON.stringify(searchData, null, 2));
+    console.log('[Apollo Company] Search response - found', searchData.organizations?.length || 0, 'organizations');
     
     if (!searchData.organizations || searchData.organizations.length === 0) {
+      console.log('[Apollo Company] No organizations found for search');
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         error: 'Company not found' 
@@ -80,12 +94,38 @@ export default async function handler(req, res) {
       return;
     }
 
-    const apolloOrg = searchData.organizations[0];
+    let apolloOrg = searchData.organizations[0];
+    
+    // DOMAIN VERIFICATION: If we searched by company name but also have a domain,
+    // verify the returned company's primary_domain matches (helps catch wrong matches)
+    if (company && domain && apolloOrg.primary_domain) {
+      const normalizedInputDomain = normalizeDomain(domain);
+      const normalizedResultDomain = normalizeDomain(apolloOrg.primary_domain);
+      
+      if (normalizedInputDomain !== normalizedResultDomain) {
+        console.log('[Apollo Company] ⚠️  Domain mismatch! Expected:', normalizedInputDomain, 'Got:', normalizedResultDomain);
+        console.log('[Apollo Company] Checking remaining results for exact domain match...');
+        
+        // Try to find a better match in the remaining results
+        const matchingOrg = searchData.organizations.find(org => 
+          normalizeDomain(org.primary_domain || '') === normalizedInputDomain
+        );
+        
+        if (matchingOrg) {
+          console.log('[Apollo Company] ✅ Found exact domain match:', matchingOrg.name, '-', matchingOrg.primary_domain);
+          apolloOrg = matchingOrg;
+        } else {
+          console.log('[Apollo Company] ⚠️  No exact domain match found, using first result:', apolloOrg.name);
+        }
+      } else {
+        console.log('[Apollo Company] ✅ Domain verified:', normalizedResultDomain);
+      }
+    }
     
     // Map to Lusha format with bonus company phone & address fields
     const companyData = mapApolloCompanyToLushaFormat(apolloOrg);
     
-    console.log('[Apollo Company] Mapped company data:', JSON.stringify(companyData, null, 2));
+    console.log('[Apollo Company] Final company data:', companyData.name, '-', companyData.domain);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(companyData));
