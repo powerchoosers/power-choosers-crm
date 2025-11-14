@@ -11181,12 +11181,15 @@ input[type="number"]::-webkit-inner-spin-button {
     border-radius: var(--border-radius);
     padding: var(--spacing-md);
     transition: var(--transition-fast);
+    position: relative;
+    cursor: pointer;
 }
 
 .lusha-contact-item:hover {
     border-color: var(--accent-color);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+    z-index: 100;
 }
 
 .lusha-contact-header {
@@ -11403,31 +11406,62 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 /* Contact field styles */
+.lusha-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
 .lusha-field {
-    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+/* Location field spans both columns */
+.lusha-field:last-child {
+    grid-column: 1 / -1;
 }
 
 .lusha-field-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
     margin-bottom: 4px;
+    width: 100%;
+    flex-wrap: nowrap;
 }
 
 .lusha-label {
     font-weight: 500;
     color: var(--text-secondary);
     font-size: 0.85rem;
+    min-width: 0;
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 .lusha-field-body {
     color: var(--text-primary);
     font-size: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-height: 20px;
+    transition: height 0.3s ease;
+    overflow: hidden;
 }
 
 .lusha-value-item {
     color: var(--text-primary);
-    margin-bottom: 2px;
+    font-size: 14px;
+    word-break: break-word;
+    white-space: normal;
+    line-height: 1.4;
+    padding: 2px 0;
 }
 
 .lusha-value-item a {
@@ -11447,8 +11481,17 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .lusha-placeholder {
-    color: var(--text-muted);
-    font-style: italic;
+    color: transparent;
+    font-style: normal;
+    border: 1px dashed var(--text-muted);
+    border-radius: 4px;
+    background: transparent;
+    opacity: 0.8;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    transition: all 0.3s ease;
 }
 
 /* Animation helper */
