@@ -87,11 +87,10 @@ import emailBackfillThreadsHandler from './api/email/backfill-threads.js';
 import emailUnsubscribeHandler from './api/email/unsubscribe.js';
 import processCallHandler from './api/process-call.js';
 import trackEmailPerformanceHandler from './api/track-email-performance.js';
-import lushaCompanyHandler from './api/lusha/company.js';
-import lushaContactsHandler from './api/lusha/contacts.js';
-import lushaEnrichHandler from './api/lusha/enrich.js';
-import lushaSearchHandler from './api/lusha/search.js';
-import lushaUsageHandler from './api/lusha/usage.js';
+import apolloCompanyHandler from './api/apollo/company.js';
+import apolloContactsHandler from './api/apollo/contacts.js';
+import apolloEnrichHandler from './api/apollo/enrich.js';
+import apolloUsageHandler from './api/apollo/usage.js';
 import uploadHostGoogleAvatarHandler from './api/upload/host-google-avatar.js';
 import uploadSignatureImageHandler from './api/upload/signature-image.js';
 import algoliaReindexHandler from './api/algolia/reindex.js';
@@ -691,11 +690,10 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/perplexity-email' ||
     pathname === '/api/process-call' ||
     pathname === '/api/track-email-performance' ||
-    pathname === '/api/lusha/company' ||
-    pathname === '/api/lusha/contacts' ||
-    pathname === '/api/lusha/enrich' ||
-    pathname === '/api/lusha/search' ||
-    pathname === '/api/lusha/usage' ||
+    pathname === '/api/apollo/company' ||
+    pathname === '/api/apollo/contacts' ||
+    pathname === '/api/apollo/enrich' ||
+    pathname === '/api/apollo/usage' ||
     pathname === '/api/upload/host-google-avatar' ||
     pathname === '/api/upload/signature-image' ||
     pathname === '/api/algolia/reindex' ||
@@ -850,20 +848,17 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/track-email-performance') {
     return handleApiTrackEmailPerformance(req, res);
   }
-  if (pathname === '/api/lusha/company') {
-    return handleApiLushaCompany(req, res, parsedUrl);
+  if (pathname === '/api/apollo/company') {
+    return handleApiApolloCompany(req, res, parsedUrl);
   }
-  if (pathname === '/api/lusha/contacts') {
-    return handleApiLushaContacts(req, res, parsedUrl);
+  if (pathname === '/api/apollo/contacts') {
+    return handleApiApolloContacts(req, res, parsedUrl);
   }
-  if (pathname === '/api/lusha/enrich') {
-    return handleApiLushaEnrich(req, res, parsedUrl);
+  if (pathname === '/api/apollo/enrich') {
+    return handleApiApolloEnrich(req, res, parsedUrl);
   }
-  if (pathname === '/api/lusha/search') {
-    return handleApiLushaSearch(req, res, parsedUrl);
-  }
-  if (pathname === '/api/lusha/usage') {
-    return handleApiLushaUsage(req, res, parsedUrl);
+  if (pathname === '/api/apollo/usage') {
+    return handleApiApolloUsage(req, res, parsedUrl);
   }
   if (pathname === '/api/upload/host-google-avatar') {
     return handleApiUploadHostGoogleAvatar(req, res);
@@ -1042,30 +1037,31 @@ async function handleApiTrackEmailPerformance(req, res) {
   return await trackEmailPerformanceHandler(req, res);
 }
 
-// Lusha API handlers
-async function handleApiLushaCompany(req, res, parsedUrl) {
+// Apollo API handlers
+async function handleApiApolloCompany(req, res, parsedUrl) {
   req.query = { ...parsedUrl.query };
-  return await lushaCompanyHandler(req, res);
+  return await apolloCompanyHandler(req, res);
 }
 
-async function handleApiLushaContacts(req, res, parsedUrl) {
+async function handleApiApolloContacts(req, res, parsedUrl) {
+  if (req.method === 'POST') {
+    req.body = await parseRequestBody(req);
+  }
   req.query = { ...parsedUrl.query };
-  return await lushaContactsHandler(req, res);
+  return await apolloContactsHandler(req, res);
 }
 
-async function handleApiLushaEnrich(req, res, parsedUrl) {
+async function handleApiApolloEnrich(req, res, parsedUrl) {
+  if (req.method === 'POST') {
+    req.body = await parseRequestBody(req);
+  }
   req.query = { ...parsedUrl.query };
-  return await lushaEnrichHandler(req, res);
+  return await apolloEnrichHandler(req, res);
 }
 
-async function handleApiLushaSearch(req, res, parsedUrl) {
+async function handleApiApolloUsage(req, res, parsedUrl) {
   req.query = { ...parsedUrl.query };
-  return await lushaSearchHandler(req, res);
-}
-
-async function handleApiLushaUsage(req, res, parsedUrl) {
-  req.query = { ...parsedUrl.query };
-  return await lushaUsageHandler(req, res);
+  return await apolloUsageHandler(req, res);
 }
 
 // Upload handlers

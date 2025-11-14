@@ -59,12 +59,12 @@ export default async function handler(req, res) {
     console.log('[Apollo Usage] Raw response:', JSON.stringify(usageData, null, 2));
     
     // Map Apollo usage stats to Lusha format
-    const mappedUsage = mapApolloUsageToLushaFormat(usageData);
+    const response = mapApolloUsageToLushaFormat(usageData);
     
-    console.log('[Apollo Usage] Mapped usage:', JSON.stringify(mappedUsage, null, 2));
+    console.log('[Apollo Usage] Mapped response:', JSON.stringify(response, null, 2));
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(mappedUsage));
+    res.end(JSON.stringify(response));
   } catch (e) {
     console.error('[Apollo Usage] Error:', e);
     res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -76,46 +76,52 @@ export default async function handler(req, res) {
 }
 
 function mapApolloUsageToLushaFormat(apolloUsage) {
-  // Apollo returns detailed usage stats
-  // We need to extract credits used and remaining
+  // Apollo returns rate limit stats per endpoint
+  // Extract relevant endpoints for the widget
+  const peopleSearchStats = apolloUsage['["api/v1/mixed_people", "search"]'] || {};
+  const orgSearchStats = apolloUsage['["api/v1/mixed_companies", "search"]'] || {};
+  const peopleMatchStats = apolloUsage['["api/v1/people", "match"]'] || {};
   
-  // Apollo usage structure (from docs):
-  // {
-  //   "credits": {
-  //     "email_credits": { "used": 100, "limit": 1000 },
-  //     "export_credits": { "used": 50, "limit": 500 },
-  //     "mobile_credits": { "used": 25, "limit": 250 }
-  //   }
-  // }
+  // Calculate total consumed today
+  const totalConsumed = 
+    (peopleSearchStats.day?.consumed || 0) +
+    (orgSearchStats.day?.consumed || 0) +
+    (peopleMatchStats.day?.consumed || 0);
   
-  const credits = apolloUsage.credits || {};
+  // Get day limits
+  const dailyLimit = 
+    (peopleSearchStats.day?.limit || 6000) +
+    (orgSearchStats.day?.limit || 6000) +
+    (peopleMatchStats.day?.limit || 6000);
   
-  // Sum up all credit types
-  let totalUsed = 0;
-  let totalLimit = 0;
-  
-  Object.keys(credits).forEach(creditType => {
-    const creditInfo = credits[creditType] || {};
-    totalUsed += creditInfo.used || 0;
-    totalLimit += creditInfo.limit || 0;
-  });
-  
-  const remaining = totalLimit - totalUsed;
-  
-  // Map to Lusha format for widget
-  return {
+  // Map Apollo usage response to Lusha format
+  const usage = {
+    total: dailyLimit,
+    used: totalConsumed,
+    remaining: dailyLimit - totalConsumed,
+    // Additional fields for compatibility
     credits: {
-      used: totalUsed,
-      remaining: remaining,
-      total: totalLimit,
-      percentage: totalLimit > 0 ? Math.round((totalUsed / totalLimit) * 100) : 0
+      total: dailyLimit,
+      used: totalConsumed,
+      limit: dailyLimit
     },
-    // Include breakdown for debugging
-    breakdown: {
-      email: credits.email_credits || { used: 0, limit: 0 },
-      export: credits.export_credits || { used: 0, limit: 0 },
-      mobile: credits.mobile_credits || { used: 0, limit: 0 }
+    // Include per-endpoint stats for debugging
+    byEndpoint: {
+      peopleSearch: peopleSearchStats,
+      orgSearch: orgSearchStats,
+      peopleMatch: peopleMatchStats
     }
   };
+  
+  const response = {
+    usage: usage,
+    headers: {
+      'x-credits-used': totalConsumed,
+      'x-credits-remaining': dailyLimit - totalConsumed
+    }
+  };
+  
+  return response;
 }
+
 
