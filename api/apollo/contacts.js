@@ -45,16 +45,20 @@ export default async function handler(req, res) {
       per_page: Math.min(size, 100) // Apollo max is 100
     };
     
+    // Apollo API uses q_organization_domains_list[] for domain filtering
     if (domains.length > 0) {
-      const normalizedDomain = normalizeDomain(domains[0]);
-      searchBody.organization_domains = [normalizedDomain];
+      const normalizedDomains = domains.map(d => normalizeDomain(d));
+      searchBody.q_organization_domains_list = normalizedDomains;
     } else if (companyIds.length > 0) {
+      // Apollo API uses organization_ids[] for company ID filtering
       searchBody.organization_ids = companyIds;
     } else if (companyNames.length > 0) {
+      // Apollo API uses q_organization_name for company name search
       searchBody.q_organization_name = companyNames[0];
     }
     
     console.log('[Apollo Contacts] Search request:', JSON.stringify(searchBody, null, 2));
+    console.log('[Apollo Contacts] Input filters - domains:', domains, 'companyIds:', companyIds, 'companyNames:', companyNames);
     
     const searchUrl = `${APOLLO_BASE_URL}/mixed_people/search`;
     const searchResp = await fetchWithRetry(searchUrl, {
@@ -81,6 +85,9 @@ export default async function handler(req, res) {
     const searchData = await searchResp.json();
     
     console.log('[Apollo Contacts] Search response:', searchData.people?.length || 0, 'contacts found');
+    if (searchData.people && searchData.people.length > 0) {
+      console.log('[Apollo Contacts] First contact company:', searchData.people[0].organization?.name, 'Company ID:', searchData.people[0].organization_id);
+    }
     
     const apolloPeople = searchData.people || [];
     
@@ -167,5 +174,6 @@ function mapApolloContactToLushaFormat(apolloPerson) {
     isSuccess: true
   };
 }
+
 
 
