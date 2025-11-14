@@ -71,7 +71,7 @@ export default async function handler(req, res) {
       
       if (domains.length > 0) {
         const normalizedDomains = domains.map(d => normalizeDomain(d));
-        searchBody.q_organization_domains = normalizedDomains;
+        searchBody.q_organization_domains_list = normalizedDomains;
         filtersApplied++;
         console.log('[Apollo Contacts] Added domain filter:', normalizedDomains);
       }

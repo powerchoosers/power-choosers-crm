@@ -58,11 +58,11 @@ export default async function handler(req, res) {
       return;
     }
     
+    const searchUrl = `${APOLLO_BASE_URL}/mixed_companies/search`;
+    
     console.log('[Apollo Company] Full search request to Apollo API:');
     console.log('[Apollo Company]   URL:', searchUrl);
     console.log('[Apollo Company]   Body:', JSON.stringify(searchBody, null, 2));
-    
-    const searchUrl = `${APOLLO_BASE_URL}/mixed_companies/search`;
     const searchResp = await fetchWithRetry(searchUrl, {
       method: 'POST',
       headers: {
