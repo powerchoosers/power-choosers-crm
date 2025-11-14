@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     // We must use company name search or organization IDs
     const searchBody = {
       page: 1,
-      per_page: 1
+      per_page: 10 // Increased from 1 to get more potential matches
     };
     
     // Priority order: ID > Company Name > Domain (not supported, will fall back to name)
@@ -43,6 +43,7 @@ export default async function handler(req, res) {
     } else if (company) {
       searchBody.q_organization_name = company;
       console.log('[Apollo Company] Searching by company name:', company);
+      console.log('[Apollo Company] Also have domain for verification:', domain || 'none');
     } else if (domain) {
       // Domain-only search: Use company name derived from domain as fallback
       const domainParts = normalizeDomain(domain).split('.');
@@ -57,7 +58,9 @@ export default async function handler(req, res) {
       return;
     }
     
-    console.log('[Apollo Company] Full search request:', JSON.stringify(searchBody, null, 2));
+    console.log('[Apollo Company] Full search request to Apollo API:');
+    console.log('[Apollo Company]   URL:', searchUrl);
+    console.log('[Apollo Company]   Body:', JSON.stringify(searchBody, null, 2));
     
     const searchUrl = `${APOLLO_BASE_URL}/mixed_companies/search`;
     const searchResp = await fetchWithRetry(searchUrl, {
@@ -85,12 +88,46 @@ export default async function handler(req, res) {
     
     console.log('[Apollo Company] Search response - found', searchData.organizations?.length || 0, 'organizations');
     
+    // Log all returned companies for debugging
+    if (searchData.organizations && searchData.organizations.length > 0) {
+      console.log('[Apollo Company] All returned companies:');
+      searchData.organizations.forEach((org, idx) => {
+        console.log(`  ${idx + 1}. "${org.name}" - domain: ${org.primary_domain || 'none'} - id: ${org.id}`);
+      });
+    }
+    
     if (!searchData.organizations || searchData.organizations.length === 0) {
-      console.log('[Apollo Company] No organizations found for search');
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        error: 'Company not found' 
-      }));
+      console.log('[Apollo Company] No organizations found in Apollo DB for:', company || domain);
+      console.log('[Apollo Company] Returning minimal company data to allow contacts search');
+      
+      // CRITICAL: Return minimal company data instead of 404
+      // This allows contacts search to proceed with domain/name filters
+      const minimalCompany = {
+        id: null, // No Apollo ID since company not found
+        name: company || '',
+        domain: domain ? normalizeDomain(domain) : '',
+        website: domain ? `https://${normalizeDomain(domain)}` : '',
+        description: '',
+        employees: '',
+        industry: '',
+        city: '',
+        state: '',
+        country: '',
+        address: '',
+        companyPhone: '',
+        location: '',
+        linkedin: '',
+        logoUrl: null,
+        foundedYear: '',
+        revenue: '',
+        companyType: '',
+        _notFoundInApollo: true // Flag to indicate this is minimal data
+      };
+      
+      console.log('[Apollo Company] Minimal company:', minimalCompany.name, '-', minimalCompany.domain);
+      
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(minimalCompany));
       return;
     }
 
