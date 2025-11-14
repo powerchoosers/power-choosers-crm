@@ -946,6 +946,21 @@
       }
     }catch(e){ console.error('Employees load failed', e); }
   }
+  function formatCompanyPhone(phone) {
+    if (!phone) return '';
+    const cleaned = phone.replace(/\D/g, '');
+    
+    // Format as +1 (XXX) XXX-XXXX for US numbers
+    if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      return `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+    } else if (cleaned.length === 10) {
+      return `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+    }
+    
+    // For international, return as-is
+    return phone;
+  }
+
   function mapProspectingContact(c){
     const isEnriched = Array.isArray(c.emails) || Array.isArray(c.phones);
     
@@ -1102,6 +1117,12 @@
             </div>
             <div class="lusha-company-meta">
               ${website ? `<a href="${website}" target="_blank" rel="noopener" class="lusha-weblink">${website}</a>` : ''}
+              ${company.companyPhone ? `<div class="lusha-company-phone" style="margin-top:4px;color:var(--text-muted);font-size:14px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:4px;">
+                  <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+                </svg>
+                <span class="clickable-phone" data-phone="${escapeHtml(company.companyPhone)}" data-company-name="${escapeHtml(company.name)}" data-account-id="${company.id || ''}" style="cursor:pointer;transition:opacity 0.2s ease;">${escapeHtml(formatCompanyPhone(company.companyPhone))}</span>
+              </div>` : ''}
             </div>
           </div>
         </div>
@@ -1208,6 +1229,14 @@
 
     // Mark that we've rendered the company summary at least once (enables smooth animation on next renders)
     try { window.__lushaCompanyRenderedOnce = true; } catch(_) {}
+
+    // Make company phone clickable
+    try {
+      const companyPhoneEl = el.querySelector('.clickable-phone');
+      if (companyPhoneEl && window.ClickToCall) {
+        window.ClickToCall.processSpecificPhoneElements();
+      }
+    } catch(_) {}
 
     // Hook up account Add/Enrich — avoid flicker on refresh by skipping async existence check
     try {
@@ -1348,14 +1377,7 @@
         }).join('');
       } else {
         // Show placeholder for unrevealed data
-        if (attr === 'email') {
-          // Show placeholder email with domain if available
-          const domain = lastCompanyResult?.domain || contact.fqdn || contact.companyDomain || 'domain.com';
-          const placeholderEmail = `email_not_unlocked@${domain}`;
-          return `<div class="lusha-placeholder">${escapeHtml(placeholderEmail)}</div>`;
-        } else {
-          return `<div class="lusha-placeholder">—</div>`;
-        }
+        return `<div class="lusha-placeholder">—</div>`;
       }
     };
 
