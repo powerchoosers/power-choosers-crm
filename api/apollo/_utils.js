@@ -96,10 +96,26 @@ export function getApiKey() {
   const apiKey = process.env.APOLLO_API_KEY;
   
   if (!apiKey) {
+    console.error('[Apollo API] APOLLO_API_KEY environment variable is not set');
     throw new Error('APOLLO_API_KEY environment variable is not set');
   }
   
-  return apiKey;
+  // Trim whitespace that might have been accidentally added
+  const trimmedKey = apiKey.trim();
+  
+  // Validate API key format (basic check)
+  if (trimmedKey.length < 10) {
+    console.error('[Apollo API] API key appears to be too short:', trimmedKey.length, 'characters');
+    throw new Error('APOLLO_API_KEY appears to be invalid (too short)');
+  }
+  
+  // Log API key info (first/last 4 chars only for security)
+  const keyPreview = trimmedKey.length > 8 
+    ? `${trimmedKey.substring(0, 4)}...${trimmedKey.substring(trimmedKey.length - 4)}`
+    : '****';
+  console.log('[Apollo API] Using API key:', keyPreview, '(length:', trimmedKey.length, 'chars)');
+  
+  return trimmedKey;
 }
 
 /**
