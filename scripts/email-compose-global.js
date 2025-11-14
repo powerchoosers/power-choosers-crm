@@ -7,6 +7,10 @@
  * Usage: window.EmailCompose.openTo('email@example.com', 'Contact Name')
  */
 
+// Import NEPQ helpers for angle selection and exemption detection
+import NEPQHelpers from './utils/nepq-helpers.js';
+import NEPQ_CONFIG from './config/nepq-email-config.js';
+
 (function() {
   if (!window.EmailCompose) window.EmailCompose = {};
   
@@ -2616,12 +2620,40 @@
 
       // Get recipient data with enrichment
       let recipient = null;
+      let nepqAngleData = null;
       try {
         const toVal = toInput?.value || '';
         if (toVal) {
           recipient = await lookupPersonByEmail(toVal);
           // Enrich with account data
           recipient = await enrichRecipientWithAccountData(recipient);
+          
+          // NEPQ Integration: Build angle data from recipient
+          if (recipient) {
+            try {
+              const contact = {
+                firstName: recipient.firstName || recipient.first_name,
+                email: recipient.email,
+                role: recipient.role || recipient.title || recipient.jobTitle
+              };
+              
+              const account = {
+                companyName: recipient.company || recipient.account?.name,
+                industry: recipient.industry || recipient.account?.industry,
+                city: recipient.city || recipient.account?.city,
+                state: recipient.state || recipient.account?.state,
+                numberOfFacilities: recipient.numberOfFacilities || recipient.account?.numberOfFacilities,
+                contractExpirationDate: recipient.contractExpirationDate || recipient.account?.contractExpirationDate,
+                marketDeregulated: recipient.marketDeregulated || recipient.account?.marketDeregulated
+              };
+              
+              // Build NEPQ angle data
+              nepqAngleData = NEPQHelpers.buildAngleData({ contact, account });
+              console.log('[AI] NEPQ angle selected:', nepqAngleData.angleKey, nepqAngleData);
+            } catch (nepqError) {
+              console.warn('[AI] NEPQ angle selection failed:', nepqError);
+            }
+          }
         }
       } catch (error) {
         console.warn('[AI] Failed to lookup recipient:', error);
@@ -2651,12 +2683,20 @@
           mode: mode,
           senderName: senderName,
           whoWeAre: whoWeAre,
-          // NEW: Pass market context
+          // Market context
           marketContext: aiTemplates.marketContext,
-          // NEW: Pass meeting preferences
+          // Meeting preferences
           meetingPreferences: aiTemplates.meetingPreferences,
-          // NEW: Pass industry segmentation
-          industrySegmentation: industrySegmentation
+          // Industry segmentation
+          industrySegmentation: industrySegmentation,
+          // NEPQ Integration: Pass angle data
+          taxExemptStatus: nepqAngleData?.taxExemptStatus || null,
+          angle: nepqAngleData?.angleKey || null,
+          angleData: nepqAngleData?.angle || null,
+          exemptionDetails: nepqAngleData?.exemptionDetails || null,
+          newsHook: nepqAngleData?.newsHook || null,
+          renewalUrgency: nepqAngleData?.renewalUrgency || null,
+          nepqMode: !!nepqAngleData // Flag to use NEPQ structure
         })
       });
 
