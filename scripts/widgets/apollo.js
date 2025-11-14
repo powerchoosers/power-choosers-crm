@@ -543,6 +543,77 @@
             lushaLog('Open-live stored requestId:', data.requestId);
           }
 
+          // SMART FALLBACK: If company search returned minimal data (not found in Apollo), 
+          // but we have contacts, extract company info from first contact's organization
+          if (contacts.length > 0 && lastCompanyResult && lastCompanyResult._notFoundInApollo) {
+            const firstContact = contacts[0];
+            if (firstContact.companyId) {
+              // We have a company ID from the contact - fetch full company details!
+              console.log('[Apollo Widget] Company not found by name, but found via contact. Fetching full details by ID:', firstContact.companyId);
+              try {
+                const companyByIdResp = await fetch(`${base}/api/apollo/company?companyId=${firstContact.companyId}`);
+                if (companyByIdResp.ok) {
+                  const fullCompanyData = await companyByIdResp.json();
+                  lastCompanyResult = fullCompanyData;
+                  console.log('[Apollo Widget] Successfully fetched full company details:', fullCompanyData.name);
+                  try { renderCompanyPanel(fullCompanyData, false); } catch(_) {}
+                } else {
+                  // Fallback to basic data from contact
+                  console.log('[Apollo Widget] Could not fetch full company details, using contact data');
+                  lastCompanyResult = {
+                    id: firstContact.companyId,
+                    name: firstContact.companyName || companyName,
+                    domain: firstContact.fqdn || domain,
+                    website: firstContact.fqdn ? `https://${firstContact.fqdn}` : (domain ? `https://${domain}` : ''),
+                    description: '',
+                    employees: '',
+                    industry: '',
+                    city: firstContact.city || '',
+                    state: firstContact.state || '',
+                    country: firstContact.country || '',
+                    address: '',
+                    companyPhone: '',
+                    location: firstContact.location || '',
+                    linkedin: '',
+                    logoUrl: null,
+                    foundedYear: '',
+                    revenue: '',
+                    companyType: '',
+                    _fromContact: true
+                  };
+                  try { renderCompanyPanel(lastCompanyResult, false); } catch(_) {}
+                }
+              } catch (e) {
+                console.error('[Apollo Widget] Error fetching company by ID:', e);
+              }
+            } else if (firstContact.companyName) {
+              // No company ID, use basic data from contact
+              console.log('[Apollo Widget] Company not found, extracting basic info from first contact:', firstContact.companyName);
+              lastCompanyResult = {
+                id: null,
+                name: firstContact.companyName || companyName,
+                domain: firstContact.fqdn || domain,
+                website: firstContact.fqdn ? `https://${firstContact.fqdn}` : (domain ? `https://${domain}` : ''),
+                description: '',
+                employees: '',
+                industry: '',
+                city: firstContact.city || '',
+                state: firstContact.state || '',
+                country: firstContact.country || '',
+                address: '',
+                companyPhone: '',
+                location: firstContact.location || '',
+                linkedin: '',
+                logoUrl: null,
+                foundedYear: '',
+                revenue: '',
+                companyType: '',
+                _fromContact: true
+              };
+              try { renderCompanyPanel(lastCompanyResult, false); } catch(_) {}
+            }
+          }
+
           // Save to cache immediately for future free opens
           try { await saveCache({ company: lastCompanyResult || { name: companyName, domain }, contacts }); } catch(_) {}
 
