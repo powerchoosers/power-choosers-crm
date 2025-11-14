@@ -1,5 +1,9 @@
 'use strict';
 
+// Import NEPQ helpers for angle selection and exemption detection
+import NEPQHelpers from '../utils/nepq-helpers.js';
+import NEPQ_CONFIG from '../config/nepq-email-config.js';
+
 // Free Sequence Automation Class - Zero Cost Email Automation
 class FreeSequenceAutomation {
   constructor() {
@@ -2772,8 +2776,51 @@ class FreeSequenceAutomation {
   }
 
   // Build improved first email introduction prompt with dynamic CTA
-  function buildFirstEmailIntroPrompt(ctaVariant = true, role = 'all') {
+  function buildFirstEmailIntroPrompt(ctaVariant = true, role = 'all', contact = null, account = null) {
     const cta = ctaVariant ? getRandomCTA(role) : COLD_EMAIL_CTA_VARIANTS[0].text;
+    
+    // NEPQ Integration: Select angle and build context
+    let nepqContext = '';
+    let angleGuidance = '';
+    
+    if (contact && account) {
+      try {
+        // Build NEPQ angle data
+        const angleData = NEPQHelpers.buildAngleData({ contact, account });
+        
+        if (angleData.exemptionDetails) {
+          nepqContext += `
+
+**TAX EXEMPTION OPPORTUNITY (HIGHEST PRIORITY):**
+- Type: ${angleData.exemptionDetails.description}
+- Refund Potential: ${angleData.exemptionDetails.refundPotential} over 4 years
+- This is 2-5x more valuable than rate savings alone
+- LEAD WITH THIS if applicable to the contact's role
+
+**IMPORTANT:** If contact is in Finance, Operations, or Executive role, prioritize exemption recovery message over rate savings.`;
+        }
+        
+        if (angleData.newsHook) {
+          nepqContext += `
+
+**CURRENT MARKET CONTEXT (2025):**
+- ${angleData.newsHook.headline}
+- Email Hook: "${angleData.newsHook.emailHook}"
+- Weave this market context naturally if it adds relevance (don't force it)`;
+        }
+        
+        // Add angle-specific guidance
+        const angleName = angleData.angle?.name || 'Unknown';
+        angleGuidance = `
+
+**SELECTED ANGLE:** ${angleName}
+- Use NEPQ structure: Connection Question → Situational Relevance → Outcome Teaser → Clear CTA
+- Make the angle specific to this contact's role and industry
+- Rotate outcomes - avoid generic "10-20% savings" unless specifically relevant`;
+      } catch (error) {
+        console.warn('[SequenceBuilder] NEPQ angle selection failed:', error);
+      }
+    }
     
     return `Write a cold introduction email that MUST:
 
@@ -2784,29 +2831,25 @@ class FreeSequenceAutomation {
      * "Hello [contact_first_name],"
    - DO NOT use "Hi [contact_first_name] there," or add extra words
 
-2. OPEN WITH OBSERVATION (CRITICAL - MUST USE RESEARCH)
-   - YOU MUST reference something SPECIFIC about [contact_company] that proves you researched them
-   - REQUIRED: Include at least ONE of these research elements:
-     * Location/facility details: "I noticed [contact_company] operates in [city], [state]..."
-     * Recent activity from LinkedIn: "I saw [contact_company] recently..." (if [contact_linkedin_recent_activity] available)
-     * Website insight: "On your website, I noticed..." (if [company_website] available)
-     * Industry pattern with peer context: "I've been talking to [role]s across [state], and..."
-   - NEVER: "I hope you're well" or "I wanted to reach out" or "I hope this email finds you well"
-   - MUST: Prove you researched - include specific details (location, facility size, operations type, operational model)
+2. NEPQ CONNECTION QUESTION (DISARMING, STATUS-FRAME)
+   - Start with a disarming question that positions you as expert, not needy
+   - Examples: "Quick one—" "Real question—" "Out of curiosity—"
+   - Make it specific to their situation (exemption, timing, multi-site, etc.)
+   - NOT: biographical facts about their company (no Wikipedia-style intros)
+   - YES: Question that makes them curious about their own situation
 
-3. ACKNOWLEDGE THEIR SITUATION (ROLE-SPECIFIC)
-   - For [contact_job_title]: Show you understand what they actually deal with daily
-   - For [company_industry]: Reference industry-specific pain points naturally (not generic)
-   - Use their role language (CFOs care about predictability/budgets, Operations care about uptime/reliability)
-   - Make it about THEM, not about us (don't lead with "We help...")
+3. SITUATIONAL RELEVANCE (WHY NOW, NOT SOMEDAY)
+   - ONE line explaining why this matters NOW
+   - Tie to their role/industry/exemption status/market conditions
+   - NOT: "I hope you're well" or "I wanted to reach out"
+   - YES: Specific trigger (exemption window, rate spike, contract timing, expansion)
 
-4. ONE INSIGHT (SPECIFIC, NOT GENERIC)
-   - Provide ONE concrete observation about why this matters to them NOW
-   - Use SPECIFIC numbers and timing: "6 months early = 15-20% savings" NOT "thousands annually"
-   - NOT: "Companies save 10-20%" (too generic)
-   - YES: "With 4 facilities in Texas, timing is critical - locking in 6 months out vs 90 days is usually 15-20% difference"
-   - Include timing context: early renewal (6 months) vs late (90 days) = money difference
-   - CRITICAL: Mention the 15-20% savings figure ONLY ONCE in the entire email - do not repeat it multiple times
+4. OUTCOME TEASER (SPECIFIC, NOT GENERIC)
+   - If exemption-eligible: Focus on "$50K-$500K refund potential" NOT "10-20% savings"
+   - If timing angle: "6 months early = 8-15% savings" with specific context
+   - If multi-site: "Prevents 2-4% scatter overpay across facilities"
+   - AVOID: Generic "typically save 10-20%" (too repetitive)
+   - Use angle-specific outcomes that rotate message variety
 
 5. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
    - Write like a peer, not a salesperson (conversational, confident, direct)
@@ -2818,25 +2861,28 @@ class FreeSequenceAutomation {
    - NO: "Would you be open to..." (permission-based, weak)
    - YES: Ask specific questions that assume conversation is happening
 
-6. CALL TO ACTION (ASSERTIVE, NOT PERMISSION-BASED)
+6. CALL TO ACTION (ONE QUESTION, YES/NO ANSWER)
    - Use THIS specific CTA (don't change it, use exactly as written):
    "${cta}"
+   - MUST: Single yes/no question (mobile-friendly, low friction)
    - MUST: Assume the conversation is happening - don't ask for permission to talk
-   - NO: "Would you be open to a conversation?" or "Let's schedule a call"
-   - YES: Ask specific question about their contract, timing, or process
+   - NO: "Would you be open to..." or "Let's schedule a call" (too much friction)
+   - NO: Multiple questions (reduces reply rate)
+   - YES: One clear binary question
 
 7. SUBJECT LINE (SPECIFIC, NOT VAGUE)
-   - MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
-   - Examples: "[FirstName], contract timing question" or "[FirstName], rate lock timing question"
-   - NOT generic: "thoughts on energy planning" or "insight to ease costs" or "thoughts on energy strategy"
-   - Focus on: contract renewal, rate lock timing, budget cycle, facility renewal
-   - Role-specific: For Controllers/CFO: "budget question about energy renewal timing"
-   - For Operations/Facilities: "facility renewal timing question"
+   - MUST be specific to their role and the angle
+   - Exemption angle: "[FirstName], exemption recovery check" or "[FirstName], tax refund question"
+   - Timing angle: "[FirstName], contract timing question" or "[FirstName], rate lock timing"
+   - Multi-site angle: "[FirstName], multi-site consolidation check"
+   - NOT generic: "thoughts on energy planning" or "insight to ease costs"
+   - Role-specific: For Controllers/CFO use "budget" or "tax" language
+   - For Operations/Facilities use "facility" or "operations" language
 
 8. FORMAT
-   - 100-130 words max (scannable, not overwhelming)
-   - 2-3 short paragraphs (break up visually)
-   - Scannable on mobile (short lines, clear breaks)
+   - 75-130 words max (scannable on mobile)
+   - 2-3 short paragraphs (visual breaks)
+   - Mobile-friendly (short lines, clear breaks)
    - One CTA at end (the specific CTA provided above)
 
 9. PERSONALIZATION
@@ -2844,11 +2890,22 @@ class FreeSequenceAutomation {
    - Reference [company_name] specifically (not "your company")
    - For [company_industry], use industry-specific language naturally
    - Reference location if available ([city], [state]) for regional context
+   - If manufacturing/nonprofit/RV park/government: mention exemption eligibility
 
-10. PROOF OF RESEARCH
-   - Include at least ONE specific detail that proves you researched (not just role description)
-   - Examples: "4 locations across Texas," "24/7 operations," "both electricity and natural gas"
-   - This makes you stand out from generic templates
+10. PROOF OF RESEARCH (OPTIONAL, NOT REQUIRED)
+   - Include specific detail if it strengthens the hook (location, facilities, operations)
+   - BUT: Don't lead with biographical facts (no Wikipedia intros)
+   - Keep research brief - focus on the question and relevance
+
+${nepqContext}${angleGuidance}
+
+**CRITICAL REMINDERS:**
+- NO biographical company intros ("I noticed Company X is a U.S.-based manufacturer...")
+- NO generic "10-20% savings" unless specifically angle-relevant
+- NO multiple questions in CTA (kills mobile replies)
+- YES to exemption-first if contact is tax-exempt industry
+- YES to NEPQ structure: Question → Relevance → Outcome → CTA
+- YES to varied angles (rotate messages, not same email every time)
 
 ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should sound like their peer—a 29-year-old Texas business pro who knows the industry and has talked to others in their situation. Be conversational, confident, and direct.`;
   }
@@ -5217,7 +5274,8 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                   // Try to detect role from step or contact if available
                   const stepId = stepCard.getAttribute('data-step-id');
                   const step = state.currentSequence?.steps?.find(s => s.id === stepId);
-                  const contactRole = step?.data?.previewContact?.title || step?.data?.previewContact?.job || 'all';
+                  const previewContact = step?.data?.previewContact;
+                  const contactRole = previewContact?.title || previewContact?.job || 'all';
                   
                   // Determine if finance role for CTA selection
                   const role = (contactRole && typeof contactRole === 'string' && 
@@ -5226,7 +5284,17 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                                 contactRole.toLowerCase().includes('controller') ||
                                 contactRole.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
                   
-                  prompt = buildFirstEmailIntroPrompt(true, role);
+                  // Build account object from preview contact data
+                  const previewAccount = previewContact ? {
+                    companyName: previewContact.company || previewContact.companyName,
+                    industry: previewContact.industry || previewContact.companyIndustry,
+                    city: previewContact.city,
+                    state: previewContact.state,
+                    numberOfFacilities: previewContact.numberOfFacilities,
+                    contractExpirationDate: previewContact.contractExpirationDate
+                  } : null;
+                  
+                  prompt = buildFirstEmailIntroPrompt(true, role, previewContact, previewAccount);
                   break;
                   
                 case 'follow-up-value':
@@ -6481,7 +6549,17 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                               contactRole.toLowerCase().includes('controller') ||
                               contactRole.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
                 
-                prompt = buildFirstEmailIntroPrompt(true, role);
+                // Build account object from selected contact data
+                const selectedAccount = selectedContact ? {
+                  companyName: selectedContact.company || selectedContact.companyName,
+                  industry: selectedContact.industry || selectedContact.companyIndustry,
+                  city: selectedContact.city,
+                  state: selectedContact.state,
+                  numberOfFacilities: selectedContact.numberOfFacilities,
+                  contractExpirationDate: selectedContact.contractExpirationDate
+                } : null;
+                
+                prompt = buildFirstEmailIntroPrompt(true, role, selectedContact, selectedAccount);
                 break;
                 
               case 'follow-up-value':
