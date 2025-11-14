@@ -38,8 +38,36 @@ export default async function handler(req, res) {
     
     // Priority order: ID > Company Name > Domain (not supported, will fall back to name)
     if (companyId) {
-      searchBody.organization_ids = [companyId];
-      console.log('[Apollo Company] Searching by organization ID:', companyId);
+      // Use the Organizations Enrich endpoint for full company data when we have an ID
+      console.log('[Apollo Company] Enriching organization by ID:', companyId);
+      const enrichUrl = `${APOLLO_BASE_URL}/organizations/enrich`;
+      const enrichResp = await fetchWithRetry(enrichUrl, {
+        method: 'POST',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Content-Type': 'application/json',
+          'X-Api-Key': APOLLO_API_KEY
+        },
+        body: JSON.stringify({ id: companyId })
+      });
+
+      if (!enrichResp.ok) {
+        const text = await enrichResp.text();
+        console.error('[Apollo Company] Enrich error:', enrichResp.status, text);
+        // Fall back to search if enrich fails
+        searchBody.organization_ids = [companyId];
+      } else {
+        const enrichData = await enrichResp.json();
+        console.log('[Apollo Company] Enriched organization data received:', enrichData.organization?.name);
+        
+        if (enrichData.organization) {
+          const companyData = mapApolloCompanyToLushaFormat(enrichData.organization);
+          console.log('[Apollo Company] Final enriched company data:', companyData.name, '-', companyData.domain);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(companyData));
+          return;
+        }
+      }
     } else if (company) {
       searchBody.q_organization_name = company;
       console.log('[Apollo Company] Searching by company name:', company);
