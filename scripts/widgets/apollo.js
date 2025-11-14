@@ -520,9 +520,9 @@
             }
           }
 
-          // Minimal contacts page (pageSize=40 limited to maxPages=1 for rich preview)
+          // Minimal contacts page (10 contacts = 1 page = 1 credit)
           const requestBody = {
-            pages: { page: 0, size: 40 },
+            pages: { page: 0, size: 10 },
             filters: { companies: { include: {} } }
           };
           // Use company ID if available (most accurate for account-specific searches)
@@ -544,74 +544,32 @@
           }
 
           // SMART FALLBACK: If company search returned minimal data (not found in Apollo), 
-          // but we have contacts, extract company info from first contact's organization
+          // extract basic company info from first contact's organization (NO extra API call - saves 1 credit!)
           if (contacts.length > 0 && lastCompanyResult && lastCompanyResult._notFoundInApollo) {
             const firstContact = contacts[0];
-            if (firstContact.companyId) {
-              // We have a company ID from the contact - fetch full company details!
-              console.log('[Apollo Widget] Company not found by name, but found via contact. Fetching full details by ID:', firstContact.companyId);
-              try {
-                const companyByIdResp = await fetch(`${base}/api/apollo/company?companyId=${firstContact.companyId}`);
-                if (companyByIdResp.ok) {
-                  const fullCompanyData = await companyByIdResp.json();
-                  lastCompanyResult = fullCompanyData;
-                  console.log('[Apollo Widget] Successfully fetched full company details:', fullCompanyData.name);
-                  try { renderCompanyPanel(fullCompanyData, false); } catch(_) {}
-                } else {
-                  // Fallback to basic data from contact
-                  console.log('[Apollo Widget] Could not fetch full company details, using contact data');
-                  lastCompanyResult = {
-                    id: firstContact.companyId,
-                    name: firstContact.companyName || companyName,
-                    domain: firstContact.fqdn || domain,
-                    website: firstContact.fqdn ? `https://${firstContact.fqdn}` : (domain ? `https://${domain}` : ''),
-                    description: '',
-                    employees: '',
-                    industry: '',
-                    city: firstContact.city || '',
-                    state: firstContact.state || '',
-                    country: firstContact.country || '',
-                    address: '',
-                    companyPhone: '',
-                    location: firstContact.location || '',
-                    linkedin: '',
-                    logoUrl: null,
-                    foundedYear: '',
-                    revenue: '',
-                    companyType: '',
-                    _fromContact: true
-                  };
-                  try { renderCompanyPanel(lastCompanyResult, false); } catch(_) {}
-                }
-              } catch (e) {
-                console.error('[Apollo Widget] Error fetching company by ID:', e);
-              }
-            } else if (firstContact.companyName) {
-              // No company ID, use basic data from contact
-              console.log('[Apollo Widget] Company not found, extracting basic info from first contact:', firstContact.companyName);
-              lastCompanyResult = {
-                id: null,
-                name: firstContact.companyName || companyName,
-                domain: firstContact.fqdn || domain,
-                website: firstContact.fqdn ? `https://${firstContact.fqdn}` : (domain ? `https://${domain}` : ''),
-                description: '',
-                employees: '',
-                industry: '',
-                city: firstContact.city || '',
-                state: firstContact.state || '',
-                country: firstContact.country || '',
-                address: '',
-                companyPhone: '',
-                location: firstContact.location || '',
-                linkedin: '',
-                logoUrl: null,
-                foundedYear: '',
-                revenue: '',
-                companyType: '',
-                _fromContact: true
-              };
-              try { renderCompanyPanel(lastCompanyResult, false); } catch(_) {}
-            }
+            console.log('[Apollo Widget] Company not found by domain, using contact data (no extra credit charge)');
+            lastCompanyResult = {
+              id: firstContact.companyId || null,
+              name: firstContact.companyName || companyName,
+              domain: firstContact.fqdn || domain,
+              website: firstContact.fqdn ? `https://${firstContact.fqdn}` : (domain ? `https://${domain}` : ''),
+              description: '',
+              employees: '',
+              industry: '',
+              city: firstContact.city || '',
+              state: firstContact.state || '',
+              country: firstContact.country || '',
+              address: '',
+              companyPhone: '',
+              location: firstContact.location || '',
+              linkedin: '',
+              logoUrl: null,
+              foundedYear: '',
+              revenue: '',
+              companyType: '',
+              _fromContact: true
+            };
+            try { renderCompanyPanel(lastCompanyResult, false); } catch(_) {}
           }
 
           // Save to cache immediately for future free opens
@@ -619,7 +577,10 @@
 
           updateResults(contacts, true);
           try { crossfadeToResults(); } catch(_) {}
-          showCreditsUsed(1, 'live');
+          // Credit usage: Company enrichment (1) + People search (1) = 2 credits
+          // If company data was cached, only 1 credit for people search
+          const creditsUsed = hasCompanyData ? 1 : 2;
+          showCreditsUsed(creditsUsed, 'live');
           try { renderUsageBar(); } catch(_) {}
           return;
         } else {
@@ -756,8 +717,8 @@
         }
       } catch(_) {}
       
-      // Prospecting search is unbilled; indicate live but 0 credits
-      showCreditsUsed(0, 'live');
+      // People search costs 1 credit per page (we fetch 1 page of 10 contacts)
+      showCreditsUsed(1, 'live');
       try { renderUsageBar(); } catch(_) {}
     } catch (error) {
       lushaLog('Search error:', error);
@@ -884,9 +845,9 @@
         base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
       }
       
-      // Build request body with correct Lusha API structure
+      // Build request body with correct Lusha API structure (10 contacts = 1 credit)
       const requestBody = { 
-        pages: { page: 0, size: kind==='all' ? 40 : 20 },
+        pages: { page: 0, size: 10 },
         filters: {
           companies: {
             include: {}
