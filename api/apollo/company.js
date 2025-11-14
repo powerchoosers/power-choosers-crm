@@ -1,6 +1,7 @@
 /**
- * Apollo Company Search Endpoint
+ * Apollo Company Enrichment Endpoint
  * Replaces Lusha /api/lusha/company endpoint
+ * Uses Apollo's Organization Enrichment API (domain-based) for accurate company data
  * Maps Apollo organization data to Lusha format with bonus company phone & address
  */
 
@@ -18,184 +19,163 @@ export default async function handler(req, res) {
   try {
     const { domain, company, companyId } = req.query || {};
     
-    if (!domain && !company && !companyId) {
+    if (!domain && !companyId) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
-        error: 'Missing required parameter: domain, company, or companyId' 
+        error: 'Missing required parameter: domain or companyId required for enrichment' 
       }));
       return;
     }
 
     const APOLLO_API_KEY = getApiKey();
     
-    // Build Apollo search request
-    // IMPORTANT: Apollo Organization Search does NOT support direct domain filtering!
-    // We must use company name search or organization IDs
-    const searchBody = {
-      page: 1,
-      per_page: 10 // Increased from 1 to get more potential matches
-    };
+    // ============================================================================
+    // PRIMARY METHOD: Organization Enrichment by Domain (most accurate!)
+    // Apollo's Organization Enrichment endpoint supports domain-based lookups
+    // This eliminates name-matching issues and uses domain as source of truth
+    // ============================================================================
     
-    // Priority order: ID > Company Name > Domain (not supported, will fall back to name)
-    if (companyId) {
-      // Use the Organizations Enrich endpoint for full company data when we have an ID
-      console.log('[Apollo Company] Enriching organization by ID:', companyId);
-      const enrichUrl = `${APOLLO_BASE_URL}/organizations/enrich`;
+    if (domain) {
+      const normalizedDomain = normalizeDomain(domain);
+      const enrichUrl = `${APOLLO_BASE_URL}/organizations/enrich?domain=${encodeURIComponent(normalizedDomain)}`;
+      
+      console.log('[Apollo Company] 🔍 Enriching by domain (primary method):', normalizedDomain);
+      console.log('[Apollo Company] Request URL:', enrichUrl);
+      
       const enrichResp = await fetchWithRetry(enrichUrl, {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Cache-Control': 'no-cache',
           'Content-Type': 'application/json',
           'X-Api-Key': APOLLO_API_KEY
-        },
-        body: JSON.stringify({ id: companyId })
+        }
       });
 
-      if (!enrichResp.ok) {
-        const text = await enrichResp.text();
-        console.error('[Apollo Company] Enrich error:', enrichResp.status, text);
-        // Fall back to search if enrich fails
-        searchBody.organization_ids = [companyId];
-      } else {
+      if (enrichResp.ok) {
         const enrichData = await enrichResp.json();
-        console.log('[Apollo Company] Enriched organization data received:', enrichData.organization?.name);
+        console.log('[Apollo Company] ✅ Organization enriched successfully:', enrichData.organization?.name);
+        console.log('[Apollo Company] Description length:', enrichData.organization?.short_description?.length || 0, 'chars');
+        console.log('[Apollo Company] Company phone:', enrichData.organization?.phone || 'none');
         
         if (enrichData.organization) {
           const companyData = mapApolloCompanyToLushaFormat(enrichData.organization);
-          console.log('[Apollo Company] Final enriched company data:', companyData.name, '-', companyData.domain);
+          console.log('[Apollo Company] 📦 Final enriched company data:', companyData.name, '-', companyData.domain);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(companyData));
           return;
         }
+      } else if (enrichResp.status === 404) {
+        console.log('[Apollo Company] ⚠️  Company not found in Apollo DB for domain:', normalizedDomain);
+        console.log('[Apollo Company] Returning minimal data to allow contacts search');
+        
+        // Return minimal company data instead of error
+        // This allows contacts search to proceed with domain/name filters
+        const minimalCompany = {
+          id: null,
+          name: company || '',
+          domain: normalizedDomain,
+          website: `https://${normalizedDomain}`,
+          description: '',
+          employees: '',
+          industry: '',
+          city: '',
+          state: '',
+          country: '',
+          address: '',
+          companyPhone: '',
+          location: '',
+          linkedin: '',
+          logoUrl: null,
+          foundedYear: '',
+          revenue: '',
+          companyType: '',
+          _notFoundInApollo: true
+        };
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(minimalCompany));
+        return;
+      } else {
+        const text = await enrichResp.text();
+        console.error('[Apollo Company] ❌ Enrichment error:', enrichResp.status, text);
+        
+        // Return minimal data on error to allow contacts search
+        const minimalCompany = {
+          id: null,
+          name: company || '',
+          domain: normalizedDomain,
+          website: `https://${normalizedDomain}`,
+          description: '',
+          employees: '',
+          industry: '',
+          city: '',
+          state: '',
+          country: '',
+          address: '',
+          companyPhone: '',
+          location: '',
+          linkedin: '',
+          logoUrl: null,
+          foundedYear: '',
+          revenue: '',
+          companyType: '',
+          _notFoundInApollo: true
+        };
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(minimalCompany));
+        return;
       }
-    } else if (company) {
-      searchBody.q_organization_name = company;
-      console.log('[Apollo Company] Searching by company name:', company);
-      console.log('[Apollo Company] Also have domain for verification:', domain || 'none');
-    } else if (domain) {
-      // Domain-only search: Use company name derived from domain as fallback
-      const domainParts = normalizeDomain(domain).split('.');
-      const companyGuess = domainParts[0].replace(/-/g, ' ');
-      searchBody.q_organization_name = companyGuess;
-      console.log('[Apollo Company] No company name provided, guessing from domain:', domain, '-> ', companyGuess);
-    } else {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        error: 'Missing required parameter: domain, company, or companyId' 
-      }));
-      return;
     }
     
-    const searchUrl = `${APOLLO_BASE_URL}/mixed_companies/search`;
+    // ============================================================================
+    // FALLBACK METHOD: Enrichment by Company ID
+    // Used when widget extracts company ID from contact data
+    // ============================================================================
     
-    console.log('[Apollo Company] Full search request to Apollo API:');
-    console.log('[Apollo Company]   URL:', searchUrl);
-    console.log('[Apollo Company]   Body:', JSON.stringify(searchBody, null, 2));
-    const searchResp = await fetchWithRetry(searchUrl, {
-      method: 'POST',
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Content-Type': 'application/json',
-        'X-Api-Key': APOLLO_API_KEY
-      },
-      body: JSON.stringify(searchBody)
-    });
-
-    if (!searchResp.ok) {
-      const text = await searchResp.text();
-      console.error('[Apollo Company] Search error:', searchResp.status, text);
-      res.writeHead(searchResp.status, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        error: 'Apollo company search error', 
-        details: text 
-      }));
-      return;
-    }
-
-    const searchData = await searchResp.json();
-    
-    console.log('[Apollo Company] Search response - found', searchData.organizations?.length || 0, 'organizations');
-    
-    // Log all returned companies for debugging
-    if (searchData.organizations && searchData.organizations.length > 0) {
-      console.log('[Apollo Company] All returned companies:');
-      searchData.organizations.forEach((org, idx) => {
-        console.log(`  ${idx + 1}. "${org.name}" - domain: ${org.primary_domain || 'none'} - id: ${org.id}`);
+    if (companyId) {
+      console.log('[Apollo Company] 🔍 Enriching by organization ID (fallback method):', companyId);
+      const enrichUrl = `${APOLLO_BASE_URL}/organizations/enrich?domain=placeholder.com`; // Note: ID enrichment uses GET with query param
+      
+      // Try GET with ID in query string
+      const enrichUrlWithId = `${APOLLO_BASE_URL}/organizations/${companyId}`;
+      console.log('[Apollo Company] Request URL:', enrichUrlWithId);
+      
+      const enrichResp = await fetchWithRetry(enrichUrlWithId, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Content-Type': 'application/json',
+          'X-Api-Key': APOLLO_API_KEY
+        }
       });
-    }
-    
-    if (!searchData.organizations || searchData.organizations.length === 0) {
-      console.log('[Apollo Company] No organizations found in Apollo DB for:', company || domain);
-      console.log('[Apollo Company] Returning minimal company data to allow contacts search');
-      
-      // CRITICAL: Return minimal company data instead of 404
-      // This allows contacts search to proceed with domain/name filters
-      const minimalCompany = {
-        id: null, // No Apollo ID since company not found
-        name: company || '',
-        domain: domain ? normalizeDomain(domain) : '',
-        website: domain ? `https://${normalizeDomain(domain)}` : '',
-        description: '',
-        employees: '',
-        industry: '',
-        city: '',
-        state: '',
-        country: '',
-        address: '',
-        companyPhone: '',
-        location: '',
-        linkedin: '',
-        logoUrl: null,
-        foundedYear: '',
-        revenue: '',
-        companyType: '',
-        _notFoundInApollo: true // Flag to indicate this is minimal data
-      };
-      
-      console.log('[Apollo Company] Minimal company:', minimalCompany.name, '-', minimalCompany.domain);
-      
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(minimalCompany));
-      return;
-    }
 
-    let apolloOrg = searchData.organizations[0];
-    
-    // DOMAIN VERIFICATION: If we searched by company name but also have a domain,
-    // verify the returned company's primary_domain matches (helps catch wrong matches)
-    if (company && domain && apolloOrg.primary_domain) {
-      const normalizedInputDomain = normalizeDomain(domain);
-      const normalizedResultDomain = normalizeDomain(apolloOrg.primary_domain);
-      
-      if (normalizedInputDomain !== normalizedResultDomain) {
-        console.log('[Apollo Company] ⚠️  Domain mismatch! Expected:', normalizedInputDomain, 'Got:', normalizedResultDomain);
-        console.log('[Apollo Company] Checking remaining results for exact domain match...');
+      if (enrichResp.ok) {
+        const enrichData = await enrichResp.json();
+        console.log('[Apollo Company] ✅ Organization enriched by ID:', enrichData.organization?.name);
         
-        // Try to find a better match in the remaining results
-        const matchingOrg = searchData.organizations.find(org => 
-          normalizeDomain(org.primary_domain || '') === normalizedInputDomain
-        );
-        
-        if (matchingOrg) {
-          console.log('[Apollo Company] ✅ Found exact domain match:', matchingOrg.name, '-', matchingOrg.primary_domain);
-          apolloOrg = matchingOrg;
-        } else {
-          console.log('[Apollo Company] ⚠️  No exact domain match found, using first result:', apolloOrg.name);
+        if (enrichData.organization) {
+          const companyData = mapApolloCompanyToLushaFormat(enrichData.organization);
+          console.log('[Apollo Company] 📦 Final company data:', companyData.name, '-', companyData.domain);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(companyData));
+          return;
         }
       } else {
-        console.log('[Apollo Company] ✅ Domain verified:', normalizedResultDomain);
+        const text = await enrichResp.text();
+        console.error('[Apollo Company] ❌ ID enrichment error:', enrichResp.status, text);
       }
     }
     
-    // Map to Lusha format with bonus company phone & address fields
-    const companyData = mapApolloCompanyToLushaFormat(apolloOrg);
+    // If we get here, both methods failed
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      error: 'Unable to enrich company data',
+      details: 'Domain or company ID required'
+    }));
     
-    console.log('[Apollo Company] Final company data:', companyData.name, '-', companyData.domain);
-
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(companyData));
   } catch (e) {
-    console.error('[Apollo Company] Error:', e);
+    console.error('[Apollo Company] ❌ Server error:', e);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Server error', 
