@@ -507,8 +507,14 @@
             pages: { page: 0, size: 40 },
             filters: { companies: { include: {} } }
           };
-          if (domain) requestBody.filters.companies.include.domains = [domain];
-          else if (companyName) requestBody.filters.companies.include.names = [companyName];
+          // Use company ID if available (most accurate for account-specific searches)
+          if (lastCompanyResult && lastCompanyResult.id) {
+            requestBody.filters.companies.include.ids = [lastCompanyResult.id];
+          } else if (domain) {
+            requestBody.filters.companies.include.domains = [domain];
+          } else if (companyName) {
+            requestBody.filters.companies.include.names = [companyName];
+          }
 
           const r = await fetch(`${base}/api/apollo/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -568,9 +574,14 @@
           pages: { page, size: pageSize },
           filters: { companies: { include: {} } }
         };
-        if (company.domain) requestBody.filters.companies.include.domains = [company.domain];
-        else if (company.id) requestBody.filters.companies.include.ids = [company.id];
-        else if (company.name) requestBody.filters.companies.include.names = [company.name];
+        // Prioritize company ID for account-specific searches (most accurate)
+        if (company.id) {
+          requestBody.filters.companies.include.ids = [company.id];
+        } else if (company.domain) {
+          requestBody.filters.companies.include.domains = [company.domain];
+        } else if (company.name) {
+          requestBody.filters.companies.include.names = [company.name];
+        }
 
         lushaLog('Fetching contacts page:', page, 'requestBody:', requestBody);
         const r = await fetch(`${base}/api/apollo/contacts`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
@@ -1240,7 +1251,14 @@
         }).join('');
       } else {
         // Show placeholder for unrevealed data
-        return `<div class="lusha-placeholder"></div>`;
+        if (attr === 'email') {
+          // Show placeholder email with domain if available
+          const domain = lastCompanyResult?.domain || contact.fqdn || contact.companyDomain || 'domain.com';
+          const placeholderEmail = `email_not_unlocked@${domain}`;
+          return `<div class="lusha-placeholder">${escapeHtml(placeholderEmail)}</div>`;
+        } else {
+          return `<div class="lusha-placeholder">—</div>`;
+        }
       }
     };
 
