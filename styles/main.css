@@ -11269,6 +11269,188 @@ input[type="number"]::-webkit-inner-spin-button {
     margin-bottom: 0;
 }
 
+/* Company summary styles */
+.lusha-company-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.lusha-company-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.lusha-company-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.lusha-linkedin-link {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-inverse) !important;
+    text-decoration: none;
+    transition: var(--transition-fast);
+}
+
+.lusha-linkedin-link:hover {
+    color: var(--text-inverse) !important;
+    opacity: 0.8;
+    text-decoration: none;
+}
+
+.lusha-linkedin-link svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+}
+
+.lusha-weblink {
+    color: var(--text-inverse) !important;
+    text-decoration: none;
+    transition: var(--transition-fast);
+}
+
+.lusha-weblink:hover {
+    color: var(--text-inverse) !important;
+    opacity: 0.8;
+    text-decoration: none;
+}
+
+.lusha-weblink:visited {
+    color: var(--text-inverse) !important;
+}
+
+/* Mini buttons (Reveal/Enrich) */
+.lusha-mini-btn {
+    padding: 4px 8px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.lusha-mini-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-color);
+    color: var(--text-inverse);
+}
+
+.lusha-mini-btn:active {
+    transform: translateY(0.5px);
+}
+
+/* Pagination styles */
+.lusha-pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.lusha-pagination-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.lusha-pagination-arrow:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--accent-color);
+    color: var(--text-inverse);
+}
+
+.lusha-pagination-arrow:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.lusha-pagination-arrow svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+}
+
+.lusha-pagination-current-container {
+    display: flex;
+    align-items: center;
+    min-width: 40px;
+    justify-content: center;
+}
+
+.lusha-pagination-current {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+/* Contact field styles */
+.lusha-field {
+    margin-bottom: 8px;
+}
+
+.lusha-field-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.lusha-label {
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.lusha-field-body {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.lusha-value-item {
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.lusha-value-item a {
+    color: var(--text-inverse) !important;
+    text-decoration: none;
+    transition: var(--transition-fast);
+}
+
+.lusha-value-item a:hover {
+    color: var(--text-inverse) !important;
+    opacity: 0.8;
+    text-decoration: none;
+}
+
+.lusha-value-item a:visited {
+    color: var(--text-inverse) !important;
+}
+
+.lusha-placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
 /* Animation helper */
 .lusha-anim {
     will-change: height, opacity, transform;

@@ -72,11 +72,21 @@ export default async function handler(req, res) {
           console.log('[Apollo Enrich] Using Apollo ID strategy for:', matchBody.id);
         }
         // Strategy 3: Use name + domain (ACCEPTABLE - still works)
-        else if (cachedContact?.firstName && cachedContact?.lastName && company?.domain) {
-          matchBody.first_name = cachedContact.firstName;
-          matchBody.last_name = cachedContact.lastName;
-          matchBody.domain = company.domain;
-          console.log('[Apollo Enrich] Using name+domain strategy for:', matchBody.first_name, matchBody.last_name);
+        // Apollo supports either first_name+last_name OR single name parameter
+        else if (company?.domain) {
+          // Try first_name + last_name first (more specific)
+          if (cachedContact?.firstName && cachedContact?.lastName) {
+            matchBody.first_name = cachedContact.firstName;
+            matchBody.last_name = cachedContact.lastName;
+            matchBody.domain = company.domain;
+            console.log('[Apollo Enrich] Using first_name+last_name+domain strategy for:', matchBody.first_name, matchBody.last_name);
+          }
+          // Fallback to single name parameter if fullName is available
+          else if (cachedContact?.fullName || cachedContact?.name) {
+            matchBody.name = cachedContact.fullName || cachedContact.name;
+            matchBody.domain = company.domain;
+            console.log('[Apollo Enrich] Using name+domain strategy for:', matchBody.name);
+          }
         }
         // Strategy 4: Fallback to contactId as Apollo person ID
         else {
