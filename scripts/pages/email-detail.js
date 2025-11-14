@@ -2369,23 +2369,23 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       els.actionBar.insertBefore(generateBtn, els.deleteBtn);
     } else if (status === 'pending_approval') {
       // For pending_approval: Show Approve, Reject, and Regenerate buttons
-      const approveBtn = document.createElement('button');
-      approveBtn.className = 'btn-primary approve-btn';
-      approveBtn.textContent = 'Approve';
-      approveBtn.addEventListener('click', () => approveScheduledEmail(state.currentEmail.id));
-      els.actionBar.insertBefore(approveBtn, els.deleteBtn);
+    const approveBtn = document.createElement('button');
+    approveBtn.className = 'btn-primary approve-btn';
+    approveBtn.textContent = 'Approve';
+    approveBtn.addEventListener('click', () => approveScheduledEmail(state.currentEmail.id));
+    els.actionBar.insertBefore(approveBtn, els.deleteBtn);
 
-      const rejectBtn = document.createElement('button');
-      rejectBtn.className = 'btn-secondary reject-btn';
-      rejectBtn.textContent = 'Reject';
-      rejectBtn.addEventListener('click', () => rejectScheduledEmail(state.currentEmail.id));
-      els.actionBar.insertBefore(rejectBtn, els.deleteBtn);
+    const rejectBtn = document.createElement('button');
+    rejectBtn.className = 'btn-secondary reject-btn';
+    rejectBtn.textContent = 'Reject';
+    rejectBtn.addEventListener('click', () => rejectScheduledEmail(state.currentEmail.id));
+    els.actionBar.insertBefore(rejectBtn, els.deleteBtn);
 
-      const regenerateBtn = document.createElement('button');
-      regenerateBtn.className = 'btn-secondary regenerate-btn';
-      regenerateBtn.textContent = 'Regenerate';
-      regenerateBtn.addEventListener('click', () => regenerateScheduledEmail(state.currentEmail.id));
-      els.actionBar.insertBefore(regenerateBtn, els.deleteBtn);
+    const regenerateBtn = document.createElement('button');
+    regenerateBtn.className = 'btn-secondary regenerate-btn';
+    regenerateBtn.textContent = 'Regenerate';
+    regenerateBtn.addEventListener('click', () => regenerateScheduledEmail(state.currentEmail.id));
+    els.actionBar.insertBefore(regenerateBtn, els.deleteBtn);
     } else if (status === 'approved') {
       // For approved: Show Regenerate button (can regenerate before sending)
       const regenerateBtn = document.createElement('button');
@@ -2669,14 +2669,14 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     const industrySegmentation = settings?.industrySegmentation || null;
     
     // Call Perplexity API (same as email-compose-global.js)
-    const baseUrl = window.API_BASE_URL || window.location.origin || '';
+      const baseUrl = window.API_BASE_URL || window.location.origin || '';
     const genUrl = `${baseUrl}/api/perplexity-email`;
     
     const response = await fetch(genUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: emailData.aiPrompt || 'Write a professional follow-up email',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: emailData.aiPrompt || 'Write a professional follow-up email',
         recipient: recipient,
         mode: 'standard', // Use standard mode for scheduled emails
         senderName: senderName,
@@ -2684,16 +2684,16 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         marketContext: aiTemplates.marketContext,
         meetingPreferences: aiTemplates.meetingPreferences,
         industrySegmentation: industrySegmentation
-      })
-    });
+        })
+      });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || `API error: ${response.status}`);
     }
 
-    const result = await response.json();
-    
+        const result = await response.json();
+        
     // Format the output (similar to email-compose-global.js formatGeneratedEmail)
     let subject = '';
     let html = '';
@@ -2714,15 +2714,15 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     }
     
     // Update email with generated content
-    await db.collection('emails').doc(emailId).update({
+        await db.collection('emails').doc(emailId).update({
       subject: subject,
       html: html,
       text: text,
-      status: 'pending_approval',
-      generatedAt: Date.now(),
+          status: 'pending_approval',
+          generatedAt: Date.now(),
       generatedBy: 'manual',
-      updatedAt: new Date().toISOString()
-    });
+          updatedAt: new Date().toISOString()
+        });
   }
 
   // Helper: Format templated email for scheduled emails
@@ -2733,7 +2733,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     const html = result.html || result.output || '<p>Email content</p>';
     
     return { subject, html };
-  }
+        }
 
   // Helper: Format standard email for scheduled emails
   function formatStandardEmailForScheduled(output, recipient) {
