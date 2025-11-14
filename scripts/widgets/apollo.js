@@ -1075,16 +1075,19 @@
       const remainingLines = hasMoreThan5Lines ? lines.slice(5) : [];
       
       descHtml = `
-        <div class="company-desc-container" style="margin-top:6px;width:100%;">
-          <div class="company-desc-preview" style="color:var(--text-muted);line-height:1.35;width:100%;">
+        <div class="company-desc-container">
+          <div class="company-desc-preview">
             ${previewLines.map(line => escapeHtml(line)).join('<br>')}
-            ${hasMoreThan5Lines ? '<br><span class="desc-ellipsis" style="color:var(--text-muted);font-style:italic;">...</span>' : ''}
+            ${hasMoreThan5Lines ? '<br><span class="desc-ellipsis">...</span>' : ''}
           </div>
           ${hasMoreThan5Lines ? `
-            <div class="company-desc-more" style="color:var(--text-muted);line-height:1.35;display:none;width:100%;overflow:hidden;">
+            <div class="company-desc-more" style="display:none;">
               ${remainingLines.map(line => escapeHtml(line)).join('<br>')}
             </div>
-            <button class="lusha-desc-toggle" style="background:none;border:none;color:var(--text-primary);cursor:pointer;font-size:12px;margin-top:4px;padding:0;text-decoration:underline;">
+            <button class="lusha-desc-toggle">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
               Show more
             </button>
           ` : ''}
@@ -1177,7 +1180,7 @@
               if (!prefersReduce) {
                 // Show ellipsis immediately so layout doesn't jump at the end
                 if (ellipsis) ellipsis.style.display = 'inline';
-                toggleBtn.textContent = 'Show more';
+                toggleBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>Show more`;
                 
                 more.style.overflow = 'hidden';
                 more.style.maxHeight = more.scrollHeight + 'px';
@@ -1195,13 +1198,13 @@
               } else {
                 more.style.display = 'none';
                 if (ellipsis) ellipsis.style.display = 'inline';
-                toggleBtn.textContent = 'Show more';
+                toggleBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>Show more`;
               }
             } else {
               // Expand with animation
               more.style.display = 'block';
               if (ellipsis) ellipsis.style.display = 'none';
-              toggleBtn.textContent = 'Show less';
+              toggleBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform:rotate(180deg)"><polyline points="6 9 12 15 18 9"></polyline></svg>Show less`;
               
               const prefersReduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
               if (!prefersReduce) {
