@@ -2215,16 +2215,14 @@
     
     console.log('[AI] Rendering AI bar...');
     
-    // Get custom prompts from settings (Phase 1 integration)
-    const aiTemplates = getAITemplatesFromSettings();
-    
+    // Hardcoded prompt suggestions (no settings dependency)
     const suggestions = [
-      { text: 'Warm intro after a call', prompt: aiTemplates.warm_intro, template: 'warm_intro' },
-      { text: 'Follow-up with value props', prompt: aiTemplates.follow_up, template: 'follow_up' },
-      { text: 'Energy Health Check', prompt: aiTemplates.energy_health, template: 'energy_health' },
-      { text: 'Proposal delivery', prompt: aiTemplates.proposal, template: 'proposal' },
-      { text: 'Cold email outreach', prompt: aiTemplates.cold_email, template: 'cold_email' },
-      { text: 'Invoice request', prompt: aiTemplates.invoice, template: 'invoice' }
+      { text: 'Warm intro after a call', prompt: 'warm intro email after our call', template: 'warm_intro' },
+      { text: 'Follow-up with value', prompt: 'follow-up email with value proposition', template: 'follow_up' },
+      { text: 'Energy Health Check', prompt: 'energy health check email', template: 'energy_health' },
+      { text: 'Proposal delivery', prompt: 'proposal delivery email', template: 'proposal' },
+      { text: 'Cold email outreach', prompt: 'cold email outreach', template: 'cold_email' },
+      { text: 'Invoice request', prompt: 'invoice request email', template: 'invoice' }
     ];
     
     aiBar.innerHTML = `
@@ -2289,68 +2287,6 @@
     });
   }
 
-  // Helper function to get AI templates from settings
-  function getAITemplatesFromSettings() {
-    try {
-      const settings = window.SettingsPage?.getSettings?.() || {};
-      const aiTemplates = settings?.aiTemplates || {};
-      
-      return {
-        warm_intro: aiTemplates.warm_intro || 'Warm intro after a call',
-        follow_up: aiTemplates.follow_up || 'Follow-up with tailored value props',
-        energy_health: aiTemplates.energy_health || 'Schedule an Energy Health Check',
-        proposal: aiTemplates.proposal || 'Proposal delivery with next steps',
-        cold_email: aiTemplates.cold_email || 'Cold email outreach to energy procurement decision maker',
-        invoice: aiTemplates.invoice || 'Standard Invoice Request',
-        who_we_are: aiTemplates.who_we_are || 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates. Write in first person ("we"/"I"). Avoid brand-first openers like "At Power Choosers," — use "We help" or "I help".',
-        // NEW: Market Context
-        marketContext: aiTemplates.marketContext || {
-          enabled: true,
-          rateIncrease: '15-25%',
-          renewalYears: '2025-2026',
-          earlyRenewalSavings: '20-30%',
-          typicalClientSavings: '10-20%',
-          marketInsights: 'due to data center demand'
-        },
-        // NEW: Meeting Preferences
-        meetingPreferences: aiTemplates.meetingPreferences || {
-          enabled: true,
-          useHardcodedTimes: true,
-          slot1Time: '2-3pm',
-          slot2Time: '10-11am',
-          callDuration: '15-minute',
-          timeZone: 'EST'
-        }
-      };
-    } catch (error) {
-      console.warn('[AI] Error getting templates from settings:', error);
-      return {
-        warm_intro: 'Warm intro after a call',
-        follow_up: 'Follow-up with tailored value props',
-        energy_health: 'Schedule an Energy Health Check',
-        proposal: 'Proposal delivery with next steps',
-        cold_email: 'Cold email outreach to energy procurement decision maker',
-        invoice: 'Standard Invoice Request',
-        who_we_are: 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates. Write in first person ("we"/"I"). Avoid brand-first openers like "At Power Choosers," — use "We help" or "I help".',
-        marketContext: {
-          enabled: true,
-          rateIncrease: '15-25%',
-          renewalYears: '2025-2026',
-          earlyRenewalSavings: '20-30%',
-          typicalClientSavings: '10-20%',
-          marketInsights: 'due to data center demand'
-        },
-        meetingPreferences: {
-          enabled: true,
-          useHardcodedTimes: true,
-          slot1Time: '2-3pm',
-          slot2Time: '10-11am',
-          callDuration: '15-minute',
-          timeZone: 'EST'
-        }
-      };
-    }
-  }
 
   // Helper function to escape HTML
   function escapeHtml(text) {
@@ -2589,184 +2525,191 @@
   // ========== AI GENERATION CORE ==========
   
   /**
-   * Detect user intent from manual input
-   * Parses user's typed context and extracts angle, tone, signals, and CTA preferences
+   * AUTHENTIC TONE OPENERS - Matching Lewis's voice (29-year-old professional)
    */
-  function parseUserIntent(manualInput) {
-    if (!manualInput || manualInput.trim().length === 0) {
-      return { angleOverride: null, toneOverride: null, signals: [], ctaStyle: null, newsContext: [] };
-    }
-    
-    const input = manualInput.toLowerCase();
-    const intent = {
-      angleOverride: detectAngleIntent(input),
-      toneOverride: detectToneIntent(input),
-      signals: detectCompanySignals(input),
-      ctaStyle: detectCTAStyle(input),
-      newsContext: extractNewsReferences(input),
-    };
-    
-    console.log('[User Intent] Detected:', intent);
-    return intent;
-  }
+  window.AUTHENTIC_TONE_OPENERS = {
+    disarming: [
+      "Real talk—",
+      "Straight up—",
+      "Let me ask you something—",
+      "Been wondering—",
+      "You ever considered—",
+      "So here's the thing—",
+      "Honestly—",
+      "Looking at your situation—",
+    ],
+    observation: [
+      "Here's what I'm seeing—",
+      "Most people I talk to—",
+      "From what I'm hearing—",
+      "I've found that teams like yours—",
+    ],
+  };
 
   /**
-   * ANGLE DETECTION: What selling point is user requesting?
+   * RANDOMIZED ANGLES BY INDUSTRY
+   * Each industry gets multiple angles with weighted probability
    */
-  function detectAngleIntent(input) {
-    const anglePatterns = {
-      'exemption_recovery': [
-        'exemption', 'tax recovery', 'sales tax', 'refund', 'tax exempt',
-        'tax file', 'exempt filing', 'electricity exemption'
+  window.RANDOMIZED_ANGLES_BY_INDUSTRY = {
+    Manufacturing: {
+      angles: [
+        {
+          id: 'exemption_recovery',
+          weight: 0.30,
+          primaryMessage: 'electricity sales tax exemption recovery',
+          openingTemplate: 'Are you currently claiming electricity exemptions on your production facilities?',
+          primaryValue: '$75K–$500K in 4-year refund potential',
+        },
+        {
+          id: 'demand_efficiency',
+          weight: 0.25,
+          primaryMessage: 'demand-side efficiency optimization',
+          openingTemplate: 'When you look at energy spend, are you focusing on rates or consumption?',
+          primaryValue: '12–20% reduction before rate negotiation',
+        },
+        {
+          id: 'timing_strategy',
+          weight: 0.25,
+          primaryMessage: 'early renewal timing strategy',
+          openingTemplate: 'How do you typically handle contract renewals—locking in early or waiting?',
+          primaryValue: '8–15% protection from market spikes',
+        },
+        {
+          id: 'multi_site_consolidation',
+          weight: 0.20,
+          primaryMessage: 'multi-plant contract consolidation',
+          openingTemplate: 'Do you manage energy renewals centrally across your plants?',
+          primaryValue: '2–4% savings + operational simplicity',
+        },
       ],
-      'demand_efficiency': [
-        'demand', 'consumption', 'efficiency', 'optimization', 'usage reduction',
-        'load reduction', 'demand reduction', 'optimize'
+    },
+    Nonprofit: {
+      angles: [
+        {
+          id: 'exemption_recovery',
+          weight: 0.40,
+          primaryMessage: 'tax exemption + refund recovery',
+          openingTemplate: 'Is your nonprofit filing electricity exemption certificates with your utility?',
+          primaryValue: '$40K–$200K+ in 4-year refund recovery',
+        },
+        {
+          id: 'mission_funding',
+          weight: 0.35,
+          primaryMessage: 'mission-focused budget optimization',
+          openingTemplate: 'How are you managing energy costs so more funding goes to your mission?',
+          primaryValue: 'Redirect savings to program impact',
+        },
+        {
+          id: 'budget_predictability',
+          weight: 0.25,
+          primaryMessage: 'budget predictability for board reporting',
+          openingTemplate: 'When budgeting for energy, are you locking in costs or dealing with volatility?',
+          primaryValue: '12–18% cost stability improvement',
+        },
       ],
-      'timing_strategy': [
-        'timing', 'early renewal', 'renewal timing', 'lock in', 'contract timing',
-        'renewal date', 'expiration', 'market spike'
+    },
+    Retail: {
+      angles: [
+        {
+          id: 'multi_site_consolidation',
+          weight: 0.40,
+          primaryMessage: 'multi-location contract consolidation',
+          openingTemplate: 'Are all your locations renewing on different schedules?',
+          primaryValue: '2–4% savings + one renewal calendar',
+        },
+        {
+          id: 'timing_strategy',
+          weight: 0.35,
+          primaryMessage: 'early renewal timing strategy',
+          openingTemplate: 'When your locations renew, are you coordinating timing?',
+          primaryValue: '8–15% savings from coordinated renewal',
+        },
+        {
+          id: 'operational_simplicity',
+          weight: 0.25,
+          primaryMessage: 'centralized energy operations',
+          openingTemplate: 'How much time are you spending managing energy renewals across your network?',
+          primaryValue: 'Centralized management reduces complexity',
+        },
       ],
-      'multi_site_consolidation': [
-        'consolidat', 'multi-site', 'multiple location', 'centrali', 'network',
-        'all location', 'across location'
+    },
+    Healthcare: {
+      angles: [
+        {
+          id: 'exemption_recovery',
+          weight: 0.35,
+          primaryMessage: 'tax exemption + mission-aligned savings',
+          openingTemplate: 'Is your healthcare organization claiming electricity exemptions?',
+          primaryValue: '$100K–$300K+ in refund + ongoing savings',
+        },
+        {
+          id: 'multi_site_consolidation',
+          weight: 0.40,
+          primaryMessage: 'multi-facility consolidation',
+          openingTemplate: 'How many facilities are you managing energy for?',
+          primaryValue: '$100K–$500K network-wide optimization',
+        },
+        {
+          id: 'operational_continuity',
+          weight: 0.25,
+          primaryMessage: 'uptime guarantee + budget certainty',
+          openingTemplate: 'What's more critical—energy savings or guaranteed uptime?',
+          primaryValue: 'Predictable costs + operational continuity',
+        },
       ],
-      'mission_funding': [
-        'mission', 'nonprofit', 'program', 'fund program', 'mission impact'
-      ],
-      'budget_predictability': [
-        'budget', 'predictab', 'volatil', 'forecast', 'financial', 'stability'
-      ],
-      'operational_simplicity': [
-        'simplif', 'operational', 'vendor', 'chaos', 'management', 'time saving'
-      ],
-    };
+    },
+  };
+
+  /**
+   * Select randomized angle based on industry weights
+   */
+  function selectRandomizedAngle(industry, manualAngleOverride, accountData) {
+    // If user manually specified angle, use it
+    if (manualAngleOverride) {
+      return findAngleById(manualAngleOverride, industry);
+    }
     
-    for (const [angle, patterns] of Object.entries(anglePatterns)) {
-      if (patterns.some(pattern => input.includes(pattern))) {
-        console.log(`[Angle Detection] Matched: ${angle}`);
+    // Get angles for this industry
+    const industryAngles = window.RANDOMIZED_ANGLES_BY_INDUSTRY[industry];
+    if (!industryAngles || !industryAngles.angles.length) {
+      // Fallback to generic angles
+      return {
+        id: 'timing_strategy',
+        primaryMessage: 'strategic contract timing',
+        openingTemplate: 'When does your contract renew?',
+        primaryValue: '8–15% savings from early renewal',
+      };
+    }
+    
+    // Randomize based on weights
+    const totalWeight = industryAngles.angles.reduce((sum, angle) => sum + angle.weight, 0);
+    let random = Math.random() * totalWeight;
+    
+    for (let angle of industryAngles.angles) {
+      random -= angle.weight;
+      if (random <= 0) {
         return angle;
       }
     }
     
-    return null; // No specific angle detected
+    return industryAngles.angles[0]; // Fallback
   }
 
   /**
-   * TONE DETECTION: What communication style is user requesting?
+   * Find angle by ID
    */
-  function detectToneIntent(input) {
-    const tonePatterns = {
-      'professional': [
-        'professional', 'formal', 'corporate', 'business-like', 'executive', 'polished'
-      ],
-      'casual': [
-        'casual', 'chill', 'laid back', 'relax', 'informal', 'conversational', 'friendly'
-      ],
-      'direct': [
-        'aggressive', 'hard sell', 'push', 'urgency', 'asap', 'immediate', 'direct'
-      ],
-      'soft': [
-        'soft', 'consultative', 'advisory', 'gentle', 'subtle', 'exploratory'
-      ],
-    };
-    
-    for (const [tone, patterns] of Object.entries(tonePatterns)) {
-      if (patterns.some(pattern => input.includes(pattern))) {
-        console.log(`[Tone Detection] Matched: ${tone}`);
-        return tone;
-      }
-    }
-    
-    return null; // No tone override - use default
+  function findAngleById(angleId, industry) {
+    const industryAngles = window.RANDOMIZED_ANGLES_BY_INDUSTRY[industry];
+    if (!industryAngles) return null;
+    return industryAngles.angles.find(a => a.id === angleId) || null;
   }
 
   /**
-   * COMPANY SIGNALS: What's happening with this company?
+   * Select random authentic tone opener
    */
-  function detectCompanySignals(input) {
-    const signals = [];
-    
-    // Growth signals
-    if (input.includes('expand') || input.includes('grow') || input.includes('new market')) {
-      signals.push('expansion');
-    }
-    if (input.includes('acquire') || input.includes('acquired') || input.includes('merger')) {
-      signals.push('acquisition');
-    }
-    
-    // Leadership changes
-    if (input.includes('new ceo') || input.includes('new cfo') || input.includes('new leadership')) {
-      signals.push('leadership_change');
-    }
-    
-    // Financial/Operational
-    if (input.includes('struggling') || input.includes('challenges') || input.includes('pain')) {
-      signals.push('operational_pain');
-    }
-    if (input.includes('well-fund') || input.includes('well fund') || input.includes('vc-back')) {
-      signals.push('well_funded');
-    }
-    
-    // Timing signals
-    if (input.includes('contract renew') || input.includes('renewal coming')) {
-      signals.push('renewal_imminent');
-    }
-    if (input.includes('contract just') || input.includes('just renewed')) {
-      signals.push('recently_renewed');
-    }
-    
-    if (signals.length > 0) {
-      console.log('[Company Signals] Detected:', signals);
-    }
-    
-    return signals;
-  }
-
-  /**
-   * CTA STYLE: How should we ask for the next step?
-   */
-  function detectCTAStyle(input) {
-    if (input.includes('soft') || input.includes('exploratory') || input.includes('no pressure')) {
-      console.log('[CTA Style] Detected: soft');
-      return 'soft';
-    }
-    if (input.includes('hard') || input.includes('direct') || input.includes('ask for meeting')) {
-      console.log('[CTA Style] Detected: direct');
-      return 'direct';
-    }
-    if (input.includes('educational') || input.includes('send info') || input.includes('resource')) {
-      console.log('[CTA Style] Detected: educational');
-      return 'educational';
-    }
-    
-    return null; // Use standard
-  }
-
-  /**
-   * NEWS REFERENCES: What market context did user mention?
-   */
-  function extractNewsReferences(input) {
-    const newsHooks = [];
-    
-    if (input.includes('rate') && (input.includes('spike') || input.includes('up') || input.includes('increase'))) {
-      newsHooks.push('rate_spike');
-    }
-    if (input.includes('ai') || input.includes('artificial intelligence')) {
-      newsHooks.push('ai_adoption');
-    }
-    if (input.includes('expansion')) {
-      newsHooks.push('expansion_opportunity');
-    }
-    if (input.includes('deregul')) {
-      newsHooks.push('deregulation_risk');
-    }
-    
-    if (newsHooks.length > 0) {
-      console.log('[News Context] Detected:', newsHooks);
-    }
-    
-    return newsHooks;
+  function selectRandomToneOpener() {
+    const openings = window.AUTHENTIC_TONE_OPENERS.disarming;
+    return openings[Math.floor(Math.random() * openings.length)];
   }
 
   async function generateWithAI(aiBar, mode = 'standard') {
@@ -2785,10 +2728,6 @@
       aiBar.setAttribute('aria-hidden', 'true');
     }
 
-    // Parse user intent from manual prompt
-    const userIntent = parseUserIntent(prompt);
-    console.log('[AI] User intent parsed:', userIntent);
-
     // Start generating animation with appropriate mode
     startGeneratingAnimation(compose, mode);
     if (status) status.textContent = 'Generating...';
@@ -2797,7 +2736,7 @@
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
       const genUrl = `${base}/api/perplexity-email`;
       
-      console.log('[AI] Calling Perplexity Sonar with user intent...');
+      console.log('[AI] Calling Perplexity Sonar...');
 
       // Get recipient data with enrichment
       let recipient = null;
@@ -2812,61 +2751,23 @@
         console.warn('[AI] Failed to lookup recipient:', error);
       }
 
-      // NEPQ ENHANCEMENT: Detect exemption status from recipient industry
-      let exemptionStatus = null;
-      let exemptionDetails = null;
-      if (recipient && recipient.industry) {
-        // Industry to exemption mapping (inline for email-compose-global)
-        const industryExemptionMap = {
-          'Manufacturing': 'Manufacturing',
-          'Manufacturer': 'Manufacturing',
-          'Industrial': 'Manufacturing',
-          'Nonprofit': 'Nonprofit',
-          'Non-Profit': 'Nonprofit',
-          'Charity': 'Nonprofit',
-          'Foundation': 'Nonprofit',
-          '501(c)(3)': 'Nonprofit',
-          'Government': 'Government',
-          'Municipality': 'Government',
-          'Public Sector': 'Government',
-          'Healthcare': 'Nonprofit',
-          'Hospital': 'Nonprofit',
-          'RV Park': 'RVPark',
-          'Mobile Home Park': 'RVPark',
-          'Hospitality': 'RVPark',
-          'Campground': 'RVPark'
-        };
-        
-        const normalizedIndustry = String(recipient.industry).trim();
-        exemptionStatus = industryExemptionMap[normalizedIndustry] || null;
-        
-        if (exemptionStatus) {
-          // Basic exemption details (inline for email-compose-global)
-          const exemptionDetailsMap = {
-            'Manufacturing': { typical_amount: '$75K–$200K', description: 'manufacturing facility electricity exemption' },
-            'Nonprofit': { typical_amount: '$40K–$100K', description: '501(c)(3) tax-exempt organization electricity exemption' },
-            'Government': { typical_amount: '$50K–$150K', description: 'government entity electricity exemption' },
-            'RVPark': { typical_amount: '$75K–$300K', description: 'predominant use exemption (residential)' }
-          };
-          exemptionDetails = exemptionDetailsMap[exemptionStatus] || null;
-          
-          console.log('[NEPQ] Exemption detected:', exemptionStatus, exemptionDetails);
-        }
-      }
-
-      // Get settings once
+      // Get sender name from settings (only thing we need from settings)
       const settings = (window.SettingsPage?.getSettings?.()) || {};
       const g = settings?.general || {};
       const senderName = (g.firstName && g.lastName) 
         ? `${g.firstName} ${g.lastName}`.trim()
-        : (g.agentName || 'Power Choosers Team');
+        : 'Lewis Patterson';
 
-      // Get "who we are" information from settings
-      const aiTemplates = getAITemplatesFromSettings();
-      const whoWeAre = aiTemplates.who_we_are || 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.';
+      // Hardcoded identity - focus on electricity only
+      const whoWeAre = 'You are an Energy Strategist at Power Choosers. We help businesses secure better electricity rates and manage energy procurement more effectively.';
 
-      // Get industry segmentation from settings
-      const industrySegmentation = settings?.industrySegmentation || null;
+      // Select randomized angle based on recipient industry
+      const recipientIndustry = recipient?.industry || recipient?.account?.industry || 'Manufacturing';
+      const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient);
+      const toneOpener = selectRandomToneOpener();
+
+      console.log('[AI] Selected angle:', selectedAngle?.id, 'for industry:', recipientIndustry);
+      console.log('[AI] Using tone opener:', toneOpener);
 
       // Call the API
       const response = await fetch(genUrl, {
@@ -2878,17 +2779,9 @@
           mode: mode,
           senderName: senderName,
           whoWeAre: whoWeAre,
-          // Pass market context
-          marketContext: aiTemplates.marketContext,
-          // Pass meeting preferences
-          meetingPreferences: aiTemplates.meetingPreferences,
-          // Pass industry segmentation
-          industrySegmentation: industrySegmentation,
-          // NEPQ: Pass exemption data for exemption-first strategy
-          exemptionStatus: exemptionStatus,
-          exemptionDetails: exemptionDetails,
-          // DYNAMIC: Pass user intent for adaptive prompting
-          userIntent: userIntent
+          // Pass selected angle and tone
+          selectedAngle: selectedAngle,
+          toneOpener: toneOpener
         })
       });
 
