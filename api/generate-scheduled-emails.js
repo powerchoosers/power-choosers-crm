@@ -1,6 +1,4 @@
 import { db } from './_firebase.js';
-import NEPQHelpers from '../scripts/utils/nepq-helpers.js';
-import NEPQ_CONFIG from '../scripts/config/nepq-email-config.js';
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -48,7 +46,7 @@ export default async function handler(req, res) {
     const { immediate = false } = req.body || {};
     
     if (!isProduction) {
-      console.log('[GenerateScheduledEmails] Starting generation process, immediate:', immediate);
+    console.log('[GenerateScheduledEmails] Starting generation process, immediate:', immediate);
       console.log('[GenerateScheduledEmails] Perplexity API key present:', !!process.env.PERPLEXITY_API_KEY);
     }
     
@@ -87,7 +85,7 @@ export default async function handler(req, res) {
     
     if (scheduledEmailsSnapshot.empty) {
       if (!isProduction) {
-        console.log('[GenerateScheduledEmails] No emails to generate');
+      console.log('[GenerateScheduledEmails] No emails to generate');
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
@@ -99,7 +97,7 @@ export default async function handler(req, res) {
     }
     
     if (!isProduction) {
-      console.log('[GenerateScheduledEmails] Found', scheduledEmailsSnapshot.size, 'emails to generate');
+    console.log('[GenerateScheduledEmails] Found', scheduledEmailsSnapshot.size, 'emails to generate');
       console.log('[GenerateScheduledEmails] Rate limit: 50 RPM (Tier 0) - processing in batches');
     }
     
@@ -126,59 +124,29 @@ export default async function handler(req, res) {
       try {
         const emailData = emailDoc.data();
         if (!isProduction) {
-          console.log('[GenerateScheduledEmails] Processing email:', emailDoc.id);
+        console.log('[GenerateScheduledEmails] Processing email:', emailDoc.id);
         }
         
         // Get contact data for personalization
         let contactData = {};
         let accountData = {};
-        let nepqAngleData = null;
-        
         if (emailData.contactId) {
           try {
             const contactDoc = await db.collection('people').doc(emailData.contactId).get();
             if (contactDoc.exists) {
               contactData = contactDoc.data();
-            }
-            
-            // Get account data if available
-            if (contactData.accountId || contactData.account_id) {
-              try {
-                const accountId = contactData.accountId || contactData.account_id;
-                const accountDoc = await db.collection('accounts').doc(accountId).get();
-                if (accountDoc.exists) {
-                  accountData = accountDoc.data();
+              
+              // Get account data for industry/exemption detection
+              const accountId = contactData.accountId || contactData.account_id;
+              if (accountId) {
+                try {
+                  const accountDoc = await db.collection('accounts').doc(accountId).get();
+                  if (accountDoc.exists) {
+                    accountData = accountDoc.data();
+                  }
+                } catch (error) {
+                  console.warn('[GenerateScheduledEmails] Failed to get account data:', error);
                 }
-              } catch (accountError) {
-                console.warn('[GenerateScheduledEmails] Failed to get account data:', accountError);
-              }
-            }
-            
-            // Build NEPQ angle data for first step emails
-            if ((emailData.stepIndex === 0 || emailData.stepIndex === undefined) && Object.keys(contactData).length > 0 && Object.keys(accountData).length > 0) {
-              try {
-                const contact = {
-                  firstName: contactData.firstName || contactData.first_name,
-                  email: contactData.email,
-                  role: contactData.role || contactData.title || contactData.jobTitle
-                };
-                
-                const account = {
-                  companyName: accountData.name || accountData.companyName,
-                  industry: accountData.industry,
-                  city: accountData.city,
-                  state: accountData.state,
-                  numberOfFacilities: accountData.numberOfFacilities,
-                  contractExpirationDate: accountData.contractExpirationDate || accountData.contractEnd,
-                  marketDeregulated: accountData.marketDeregulated
-                };
-                
-                nepqAngleData = NEPQHelpers.buildAngleData({ contact, account });
-                if (!isProduction) {
-                  console.log('[GenerateScheduledEmails] NEPQ angle selected:', nepqAngleData.angleKey);
-                }
-              } catch (nepqError) {
-                console.warn('[GenerateScheduledEmails] Failed to build NEPQ angle:', nepqError);
               }
             }
           } catch (error) {
@@ -212,14 +180,15 @@ export default async function handler(req, res) {
         const generatedContent = await generateEmailContent({
           prompt: emailData.aiPrompt || 'Write a professional follow-up email',
           contactName: contactData.firstName || contactData.name || emailData.contactName || 'there',
-          contactCompany: contactData.company || emailData.contactCompany || '',
+          contactCompany: contactData.company || accountData.companyName || accountData.name || emailData.contactCompany || '',
+          contactRole: contactData.role || contactData.title || contactData.job || '',
+          accountIndustry: accountData.industry || contactData.industry || '',
+          accountData: accountData,
           sequenceContext: {
             stepNumber: (emailData.stepIndex || 0) + 1,
             totalSteps: emailData.totalSteps || 1,
             previousInteractions: previousEmails
-          },
-          // NEPQ integration
-          nepqAngleData: nepqAngleData
+          }
         });
         
         // Update email with generated content
@@ -237,14 +206,6 @@ export default async function handler(req, res) {
         if (emailData.ownerId) updateData.ownerId = emailData.ownerId;
         if (emailData.assignedTo) updateData.assignedTo = emailData.assignedTo;
         if (emailData.createdBy) updateData.createdBy = emailData.createdBy;
-        
-        // Add NEPQ metadata if available
-        if (nepqAngleData) {
-          updateData.angle_used = nepqAngleData.angleKey;
-          updateData.exemption_type = nepqAngleData.taxExemptStatus;
-          updateData.news_hook_used = nepqAngleData.newsHook?.key || null;
-          updateData.nepq_version = 'v1';
-        }
         
         await emailDoc.ref.update(updateData);
         
@@ -283,7 +244,7 @@ export default async function handler(req, res) {
     } // End batch loop
     
     if (!isProduction) {
-      console.log('[GenerateScheduledEmails] Generation complete. Generated:', generatedCount, 'Errors:', errors.length);
+    console.log('[GenerateScheduledEmails] Generation complete. Generated:', generatedCount, 'Errors:', errors.length);
     }
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -302,11 +263,54 @@ export default async function handler(req, res) {
       error: error.message
     }));
   }
-}
+  }
 
 // Generate email content using Perplexity API
-async function generateEmailContent({ prompt, contactName, contactCompany, sequenceContext, nepqAngleData = null }) {
+async function generateEmailContent({ prompt, contactName, contactCompany, contactRole, accountIndustry, accountData, sequenceContext }) {
   try {
+    // NEPQ ENHANCEMENT: Detect exemption status from industry
+    let exemptionStatus = null;
+    let exemptionDetails = null;
+    
+    if (accountIndustry) {
+      // Industry to exemption mapping (same as email-compose-global.js)
+      const industryExemptionMap = {
+        'Manufacturing': 'Manufacturing',
+        'Manufacturer': 'Manufacturing',
+        'Industrial': 'Manufacturing',
+        'Nonprofit': 'Nonprofit',
+        'Non-Profit': 'Nonprofit',
+        'Charity': 'Nonprofit',
+        'Foundation': 'Nonprofit',
+        '501(c)(3)': 'Nonprofit',
+        'Government': 'Government',
+        'Municipality': 'Government',
+        'Public Sector': 'Government',
+        'Healthcare': 'Nonprofit',
+        'Hospital': 'Nonprofit',
+        'RV Park': 'RVPark',
+        'Mobile Home Park': 'RVPark',
+        'Hospitality': 'RVPark',
+        'Campground': 'RVPark'
+      };
+      
+      const normalizedIndustry = String(accountIndustry).trim();
+      exemptionStatus = industryExemptionMap[normalizedIndustry] || null;
+      
+      if (exemptionStatus) {
+        // Exemption details (same as email-compose-global.js)
+        const exemptionDetailsMap = {
+          'Manufacturing': { typical_amount: '$75K–$200K', description: 'manufacturing facility electricity exemption' },
+          'Nonprofit': { typical_amount: '$40K–$100K', description: '501(c)(3) tax-exempt organization electricity exemption' },
+          'Government': { typical_amount: '$50K–$150K', description: 'government entity electricity exemption' },
+          'RVPark': { typical_amount: '$75K–$300K', description: 'predominant use exemption (residential)' }
+        };
+        exemptionDetails = exemptionDetailsMap[exemptionStatus] || null;
+        
+        console.log('[NEPQ] Exemption detected for sequence email:', exemptionStatus, exemptionDetails?.typical_amount);
+      }
+    }
+    
     // Build enhanced prompt with context
     let enhancedPrompt = prompt;
     
@@ -318,32 +322,12 @@ async function generateEmailContent({ prompt, contactName, contactCompany, seque
       enhancedPrompt = `Company: ${contactCompany}\n` + enhancedPrompt;
     }
     
-    // Add NEPQ context if available (for first-step emails)
-    if (nepqAngleData && sequenceContext.stepNumber === 1) {
-      enhancedPrompt = `**NEPQ MODE ENABLED**
-
-SELECTED ANGLE: ${nepqAngleData.angle?.name || nepqAngleData.angleKey}
-${nepqAngleData.exemptionDetails ? `
-TAX EXEMPTION OPPORTUNITY (PRIORITY):
-- Type: ${nepqAngleData.exemptionDetails.description}
-- Refund Potential: ${nepqAngleData.exemptionDetails.refundPotential}
-- Lead with exemption recovery if contact is in Finance/Operations/Executive role
-- This is 2-5x more valuable than rate savings alone
-` : ''}
-${nepqAngleData.newsHook ? `
-MARKET CONTEXT (2025):
-- ${nepqAngleData.newsHook.headline}
-- Hook: "${nepqAngleData.newsHook.emailHook}"
-- Weave naturally into situational relevance
-` : ''}
-${nepqAngleData.renewalUrgency ? `
-RENEWAL URGENCY: ${nepqAngleData.renewalUrgency.urgency} (${nepqAngleData.renewalUrgency.timeframe})
-` : ''}
-
-NEPQ STRUCTURE REQUIRED:
-1. Connection Question → 2. Situational Relevance → 3. Outcome Teaser → 4. One Clear CTA
-
-` + enhancedPrompt;
+    if (contactRole) {
+      enhancedPrompt = `Contact Role: ${contactRole}\n` + enhancedPrompt;
+    }
+    
+    if (accountIndustry) {
+      enhancedPrompt = `Industry: ${accountIndustry}\n` + enhancedPrompt;
     }
     
     if (sequenceContext.stepNumber > 1) {
@@ -370,28 +354,51 @@ NEPQ STRUCTURE REQUIRED:
     while (retryCount <= MAX_RETRIES) {
       try {
         perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
             model: 'sonar',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are an expert email writer for Power Choosers, an energy brokerage helping businesses secure lower electricity and natural gas rates. Follow ALL instructions in the prompt exactly. When writing emails:\n\n1. ALWAYS use actual contact names and company information provided - NEVER use bracketed placeholders like {{name}} or [contact_first_name] in the final output\n2. OUTPUT FORMAT: Write ONLY the email body and subject line - no metadata, no version labels, no markdown formatting, no statistics\n3. Subject line should appear first as "Subject: [your subject]" followed by the email body\n4. Use proper paragraph spacing (double line breaks between paragraphs)\n5. End with "Best regards," followed by sender name\n6. Do NOT include: **bold markdown**, # headers, ```code blocks```, "HTML Version" labels, "Email Stats", "Word Count", or any metadata sections\n7. Research proof: If the prompt asks you to research the company, do so and incorporate specific details naturally'
-              },
-              {
-                role: 'user',
-                content: enhancedPrompt
-              }
-            ],
-            max_tokens: 1000,
-            temperature: 0.7
-          })
-        });
-        
+        messages: [
+          {
+            role: 'system',
+                content: `You are an expert email writer for Power Choosers, an energy brokerage helping businesses secure lower electricity and natural gas rates. Follow ALL instructions in the prompt exactly.
+
+${exemptionStatus && exemptionDetails ? `
+🎯 NEPQ EXEMPTION-FIRST STRATEGY ACTIVE:
+This is a ${exemptionStatus} organization - PRIORITIZE TAX EXEMPTION RECOVERY
+- Exemption Type: ${exemptionDetails.description}
+- Typical Refund Value: ${exemptionDetails.typical_amount} over 4 years
+- Strategy: Lead with disarming question about exemption filing (not generic "10-20% savings")
+- Example Hook: "Quick one—has your ${accountIndustry} facility filed for electricity sales tax exemption, or are you still paying sales tax on power?"
+- Value Emphasis: "${exemptionDetails.typical_amount} in refunds + ongoing tax elimination" (2-5x more valuable than rate savings)
+- CTA Format: Use yes/no questions (mobile-friendly, low friction)
+- Position: Strategic tax consultant, not commodity broker
+- AVOID: Repetitive "10-20% savings" messaging - exemption recovery is the priority
+` : ''}
+
+When writing emails:
+1. ALWAYS use actual contact names and company information provided - NEVER use bracketed placeholders like {{name}} or [contact_first_name] in the final output
+2. OUTPUT FORMAT: Write ONLY the email body and subject line - no metadata, no version labels, no markdown formatting, no statistics
+3. Subject line should appear first as "Subject: [your subject]" followed by the email body${exemptionStatus ? ' (for exemption emails: "[FirstName], electricity tax exemption question")' : ''}
+4. Use proper paragraph spacing (double line breaks between paragraphs)
+5. End with "Best regards," followed by sender name
+6. Do NOT include: **bold markdown**, # headers, \`\`\`code blocks\`\`\`, "HTML Version" labels, "Email Stats", "Word Count", or any metadata sections
+7. Research proof: If the prompt asks you to research the company, do so and incorporate specific details naturally
+8. NEPQ Principles: Use disarming questions (curious, not defensive), yes/no CTAs, angle variation (not repetitive messaging)${exemptionStatus ? '\n9. EXEMPTION PRIORITY: Start with exemption question, emphasize refund value, position as tax consultant' : ''}`
+          },
+          {
+            role: 'user',
+            content: enhancedPrompt
+          }
+        ],
+        max_tokens: 1000,
+        temperature: 0.7
+      })
+    });
+    
         // Check for rate limiting (429)
         if (perplexityResponse.status === 429) {
           retryCount++;
@@ -405,7 +412,7 @@ NEPQ STRUCTURE REQUIRED:
         }
         
         // Check for other errors
-        if (!perplexityResponse.ok) {
+    if (!perplexityResponse.ok) {
           const errorText = await perplexityResponse.text();
           throw new Error(`Perplexity API error ${perplexityResponse.status}: ${errorText}`);
         }
