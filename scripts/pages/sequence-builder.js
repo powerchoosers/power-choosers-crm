@@ -1,9 +1,5 @@
 'use strict';
 
-// Import NEPQ helpers for angle selection and exemption detection
-import NEPQHelpers from '../utils/nepq-helpers.js';
-import NEPQ_CONFIG from '../config/nepq-email-config.js';
-
 // Free Sequence Automation Class - Zero Cost Email Automation
 class FreeSequenceAutomation {
   constructor() {
@@ -601,6 +597,275 @@ class FreeSequenceAutomation {
   };
 
   const els = {};
+
+  // ========== NEPQ EMAIL CONFIGURATION ==========
+  // Industry to Tax Exemption Status Mapping
+  const INDUSTRY_EXEMPTION_MAP = {
+    'Manufacturing': 'Manufacturing',
+    'Manufacturer': 'Manufacturing',
+    'Industrial': 'Manufacturing',
+    'Nonprofit': 'Nonprofit',
+    'Non-Profit': 'Nonprofit',
+    'Charity': 'Nonprofit',
+    'Foundation': 'Nonprofit',
+    '501(c)(3)': 'Nonprofit',
+    'Government': 'Government',
+    'Municipality': 'Government',
+    'Public Sector': 'Government',
+    'Healthcare': 'Nonprofit', // Many healthcare orgs are nonprofits
+    'Hospital': 'Nonprofit',
+    'RV Park': 'RVPark',
+    'Mobile Home Park': 'RVPark',
+    'Hospitality': 'RVPark',
+    'Campground': 'RVPark'
+  };
+
+  // Exemption Details by Type
+  const EXEMPTION_DETAILS = {
+    'Manufacturing': {
+      description: 'Manufacturing facility electricity exemption',
+      refundPotential: '$50K–$500K over 4 years',
+      qualifyingUsage: 'Electricity used in manufacturing process',
+      claimProcess: 'File Form 01-339 with electricity provider',
+      typical_amount: '$75K–$200K'
+    },
+    'Nonprofit': {
+      description: '501(c)(3) tax-exempt organization electricity exemption',
+      refundPotential: '$20K–$150K over 4 years',
+      qualifyingUsage: 'Electricity for exempt purposes',
+      claimProcess: 'Submit 501(c)(3) certificate + Form 01-339',
+      typical_amount: '$40K–$100K'
+    },
+    'Government': {
+      description: 'Government entity electricity exemption',
+      refundPotential: '$30K–$200K over 4 years',
+      qualifyingUsage: 'All government facility electricity',
+      claimProcess: 'Government exemption certificate submission',
+      typical_amount: '$50K–$150K'
+    },
+    'RVPark': {
+      description: 'Predominant use exemption (residential)',
+      refundPotential: '$50K–$500K over 4 years',
+      qualifyingUsage: '>50% electricity for long-term residents (30+ days)',
+      claimProcess: 'Predominant use study + Form 01-339',
+      typical_amount: '$75K–$300K'
+    }
+  };
+
+  // 2025 News Hooks (Current Market Context)
+  const NEWS_HOOKS_2025 = {
+    'national_rate_spike': {
+      headline: 'Electricity rates up 11% nationally in 2025',
+      fact: 'Residential electricity prices increased 11% nationally (Jan-Aug 2025)',
+      date: '2025',
+      usage: 'With electricity rates up 11% this year, timing matters'
+    },
+    'nj_rate_spike': {
+      headline: 'New Jersey electricity rates spike 17% in June 2025',
+      fact: 'NJ residential rates jumped 17% effective June 2025',
+      date: '2025-06',
+      usage: 'Residential rates spiked 17% in New Jersey—commercial markets tracking similar'
+    },
+    'rate_hike_approvals': {
+      headline: '$34 billion in rate hike approvals in 2025',
+      fact: 'Rate increase requests totaled $34 billion in first 3 quarters (vs. $16B in 2024)',
+      date: '2025',
+      usage: 'With $34 billion in rate hikes approved this year, early lock-in protects your budget'
+    },
+    'ai_data_center_demand': {
+      headline: 'AI demand drove electricity rates up 50% in 2023-2024',
+      fact: 'Data centers and AI infrastructure pushed electricity rates up 50% between 2023-2024',
+      date: '2023-2024',
+      usage: 'Data center demand pushed rates up 50% recently—early renewal prevents rate shock'
+    },
+    'deregulation_risk': {
+      headline: 'Texas deregulation saw rates spike 7x in early years',
+      fact: 'Deregulation in Texas caused residential rates to spike 7x; long-term costs exceeded $24B',
+      date: '2025',
+      usage: 'In deregulated markets like Texas, timing your renewal strategically is critical'
+    },
+    'renewable_mandates': {
+      headline: 'Renewable energy now second-highest sustainability priority',
+      fact: 'Renewable energy is second-highest sustainability priority for executives in 2025',
+      date: '2025',
+      usage: 'With renewable mandates tightening, many facilities are re-evaluating energy contracts'
+    }
+  };
+
+  // 13 NEPQ-Driven Angles with Hooks, Situational Relevance, Outcomes, CTAs
+  const NEPQ_ANGLES = {
+    'exemption_recovery': {
+      name: 'Tax Exemption Recovery',
+      priority: 1, // Highest priority for eligible industries
+      hook: 'Quick one—has your [industry] facility filed for electricity sales tax exemption, or are you still paying sales tax on power?',
+      situational: '[Industry] electricity is federally/state exempt, but most facilities never claim it. Over 4 years, that's typically [refund_amount] in refundable tax, plus ongoing elimination.',
+      outcome: 'Exemption recovery typically nets [refund_amount] plus ongoing tax elimination',
+      cta: 'Should I send an exemption audit for your facility—yes/no?',
+      news_hooks: ['national_rate_spike', 'rate_hike_approvals'],
+      applicable_roles: ['CFO', 'Finance Director', 'Controller', 'Facilities Manager', 'CEO'],
+      requires_exemption: true
+    },
+    'timing_risk': {
+      name: 'Contract Timing / Early Lock-In',
+      priority: 2,
+      hook: 'Quick one—with electricity rates up 11% this year, are you locking in early, or waiting closer to renewal?',
+      situational: 'Locking in 6 months early typically prevents the 8–15% market spike most teams see at renewal.',
+      outcome: 'Early lock-in prevents the 8–15% spike + budget predictability',
+      cta: 'Worth a 15-minute timing strategy check before rates jump further—yes/no?',
+      news_hooks: ['national_rate_spike', 'nj_rate_spike', 'rate_hike_approvals'],
+      applicable_roles: ['CFO', 'Finance Director', 'Controller', 'Procurement', 'Operations'],
+      requires_exemption: false
+    },
+    'multi_site_consolidation': {
+      name: 'Multi-Site Consolidation',
+      priority: 3,
+      hook: 'With [facility_count] facilities in different rate zones, are you consolidating contracts, or managing them separately?',
+      situational: 'Consolidating gives you one renewal calendar instead of multiple different dates, preventing 2–4% scatter overpay.',
+      outcome: 'Consolidation prevents 2–4% overpay + simplifies renewal management',
+      cta: 'Open to a quick consolidation check across your sites—yes/no?',
+      news_hooks: ['rate_hike_approvals'],
+      applicable_roles: ['CFO', 'VP Operations', 'Facilities Manager', 'Procurement'],
+      requires_exemption: false
+    },
+    'demand_efficiency': {
+      name: 'Demand-Side Efficiency',
+      priority: 4,
+      hook: 'Before locking in rates, have you analyzed demand-side efficiency, or just focusing on rate negotiation?',
+      situational: 'Rate locks matter, but demand-side efficiency often cuts 12–20% before rate negotiation even starts.',
+      outcome: 'Demand optimization cuts 12–20% before rate negotiation',
+      cta: 'Want to see the efficiency potential before rate lock—yes/no?',
+      news_hooks: ['ai_data_center_demand'],
+      applicable_roles: ['Facilities Manager', 'Operations', 'Sustainability', 'Engineering'],
+      requires_exemption: false
+    },
+    'volatility_protection': {
+      name: 'Rate Volatility Protection',
+      priority: 5,
+      hook: 'Given the 11% rate spike this year, are you locking in fixed rates, or staying variable?',
+      situational: 'With $34 billion in rate hikes approved nationally, fixed-rate contracts protect your budget from market volatility.',
+      outcome: 'Fixed-rate protection prevents budget surprises from rate spikes',
+      cta: 'Worth reviewing your rate structure for volatility risk—yes/no?',
+      news_hooks: ['national_rate_spike', 'nj_rate_spike', 'rate_hike_approvals'],
+      applicable_roles: ['CFO', 'Finance Director', 'Controller'],
+      requires_exemption: false
+    },
+    'budget_predictability': {
+      name: 'Budget Predictability',
+      priority: 6,
+      hook: 'As you plan next year's budget, are energy costs locked in, or still variable?',
+      situational: 'With rate volatility hitting hard this year, budget predictability matters more than rate savings alone.',
+      outcome: 'Fixed budgets prevent mid-year surprises + financial planning confidence',
+      cta: 'Should I send a budget predictability analysis—yes/no?',
+      news_hooks: ['rate_hike_approvals', 'national_rate_spike'],
+      applicable_roles: ['CFO', 'Finance Director', 'Controller', 'CEO'],
+      requires_exemption: false
+    },
+    'renewable_compliance': {
+      name: 'Renewable Energy Compliance',
+      priority: 7,
+      hook: 'With renewable mandates tightening, are you bundling renewable credits with your energy contract?',
+      situational: 'Many facilities are combining rate locks with renewable credits—often saving 15–25% total while meeting ESG goals.',
+      outcome: 'Renewable bundling = cost savings + compliance in one contract',
+      cta: 'Want to see renewable bundling options for your facilities—yes/no?',
+      news_hooks: ['renewable_mandates'],
+      applicable_roles: ['Sustainability', 'CEO', 'CFO', 'Operations'],
+      requires_exemption: false
+    },
+    'deregulation_risk': {
+      name: 'Deregulation Market Risk',
+      priority: 8,
+      hook: 'Operating in a deregulated market like Texas—are you timing renewals strategically, or renewing when contracts expire?',
+      situational: 'Texas deregulation saw rates spike 7x in early years. Strategic timing in deregulated markets is critical.',
+      outcome: 'Strategic timing prevents deregulation rate volatility',
+      cta: 'Worth a deregulation timing strategy check—yes/no?',
+      news_hooks: ['deregulation_risk'],
+      applicable_roles: ['CFO', 'Procurement', 'Operations', 'Facilities Manager'],
+      requires_exemption: false
+    },
+    'expansion_window': {
+      name: 'Expansion / New Facility Planning',
+      priority: 9,
+      hook: 'As you expand to new facilities, does energy cost control come up in expansion planning?',
+      situational: 'Expanding to new markets? Contract timing in new regions often locks in 8–15% better rates than waiting.',
+      outcome: 'Early energy planning during expansion = 8–15% better rates',
+      cta: 'Should I send expansion energy planning checklist—yes/no?',
+      news_hooks: ['rate_hike_approvals'],
+      applicable_roles: ['CEO', 'CFO', 'VP Operations', 'Development'],
+      requires_exemption: false
+    },
+    'audit_risk': {
+      name: 'Audit Risk / Compliance',
+      priority: 10,
+      hook: 'For nonprofits like yours, are you confident your electricity exemptions are properly filed, or potential audit risk?',
+      situational: 'Tax exemption slip-ups = audit exposure for nonprofits. We prevent that—plus recover missed years.',
+      outcome: 'Audit protection + exemption compliance + refund recovery',
+      cta: 'Want an exemption compliance audit—yes/no?',
+      news_hooks: [],
+      applicable_roles: ['CFO', 'Finance Director', 'Executive Director'],
+      requires_exemption: true
+    },
+    'news_triggered': {
+      name: 'Current Market News Hook',
+      priority: 11,
+      hook: 'With [news_headline], are you reviewing your energy strategy proactively, or waiting until renewal?',
+      situational: '[news_fact]. Early review prevents surprises.',
+      outcome: 'Proactive review = protected from market shifts',
+      cta: 'Should I send a current market analysis for your region—yes/no?',
+      news_hooks: ['national_rate_spike', 'nj_rate_spike', 'rate_hike_approvals', 'ai_data_center_demand'],
+      applicable_roles: ['CFO', 'Procurement', 'Operations'],
+      requires_exemption: false
+    },
+    'ai_demand_spike': {
+      name: 'AI/Data Center Demand Impact',
+      priority: 12,
+      hook: 'With AI and data centers pushing electricity rates up 50% recently, does that affect your facility planning?',
+      situational: 'Data center demand drove rates up 50% in 2023–2024. If your facilities are capacity-sensitive, early contract review prevents rate shock.',
+      outcome: 'Early review prevents AI-driven rate shock',
+      cta: 'Worth reviewing capacity impact on your rates—yes/no?',
+      news_hooks: ['ai_data_center_demand'],
+      applicable_roles: ['IT Director', 'CTO', 'Facilities Manager', 'Operations'],
+      requires_exemption: false
+    },
+    'tax_compliance': {
+      name: 'Tax Compliance / Documentation',
+      priority: 13,
+      hook: 'For your [industry] operations, are all tax exemptions properly documented with your utility, or potential gaps?',
+      situational: 'Most [industry] facilities qualify for exemptions but lack proper documentation. Simple audit prevents overpay.',
+      outcome: 'Proper documentation = ongoing tax elimination + compliance',
+      cta: 'Should I send a tax compliance checklist—yes/no?',
+      news_hooks: [],
+      applicable_roles: ['CFO', 'Finance Director', 'Controller', 'Tax Director'],
+      requires_exemption: true
+    }
+  };
+
+  // Role to Angle Priority Mapping
+  const ROLE_ANGLE_PRIORITY = {
+    'CFO': ['exemption_recovery', 'budget_predictability', 'timing_risk', 'volatility_protection', 'tax_compliance'],
+    'Finance Director': ['exemption_recovery', 'budget_predictability', 'timing_risk', 'tax_compliance'],
+    'Controller': ['exemption_recovery', 'budget_predictability', 'tax_compliance', 'audit_risk'],
+    'Facilities Manager': ['exemption_recovery', 'multi_site_consolidation', 'demand_efficiency', 'timing_risk'],
+    'VP Operations': ['multi_site_consolidation', 'demand_efficiency', 'expansion_window', 'timing_risk'],
+    'Operations Manager': ['demand_efficiency', 'multi_site_consolidation', 'deregulation_risk'],
+    'CEO': ['budget_predictability', 'exemption_recovery', 'expansion_window', 'renewable_compliance'],
+    'Procurement': ['timing_risk', 'multi_site_consolidation', 'deregulation_risk'],
+    'Sustainability': ['renewable_compliance', 'demand_efficiency'],
+    'IT Director': ['ai_demand_spike', 'demand_efficiency'],
+    'CTO': ['ai_demand_spike', 'demand_efficiency']
+  };
+
+  // Industry to Angle Priority Mapping
+  const INDUSTRY_ANGLE_PRIORITY = {
+    'Manufacturing': ['exemption_recovery', 'multi_site_consolidation', 'timing_risk', 'demand_efficiency'],
+    'Nonprofit': ['exemption_recovery', 'audit_risk', 'budget_predictability', 'tax_compliance'],
+    'Government': ['exemption_recovery', 'tax_compliance', 'budget_predictability'],
+    'RV Park': ['exemption_recovery', 'tax_compliance', 'multi_site_consolidation'],
+    'Healthcare': ['exemption_recovery', 'budget_predictability', 'audit_risk'],
+    'Retail': ['multi_site_consolidation', 'timing_risk', 'demand_efficiency'],
+    'Hospitality': ['demand_efficiency', 'timing_risk', 'renewable_compliance'],
+    'Technology': ['ai_demand_spike', 'demand_efficiency', 'timing_risk'],
+    'Data Center': ['ai_demand_spike', 'demand_efficiency', 'timing_risk']
+  };
 
   function initDomRefs() {
     els.page = document.getElementById('sequence-builder-page');
@@ -2775,54 +3040,22 @@ class FreeSequenceAutomation {
     return random.text;
   }
 
-  // Build improved first email introduction prompt with dynamic CTA
-  function buildFirstEmailIntroPrompt(ctaVariant = true, role = 'all', contact = null, account = null) {
-    const cta = ctaVariant ? getRandomCTA(role) : COLD_EMAIL_CTA_VARIANTS[0].text;
+  // Build improved first email introduction prompt with NEPQ structure + dynamic angle selection
+  function buildFirstEmailIntroPrompt(ctaVariant = true, role = 'all', industry = null, accountData = {}) {
+    // Detect exemption status from industry
+    const exemptionStatus = industry ? getExemptionStatusFromIndustry(industry) : null;
+    const exemptionDetails = exemptionStatus ? getExemptionDetails(exemptionStatus) : null;
     
-    // NEPQ Integration: Select angle and build context
-    let nepqContext = '';
-    let angleGuidance = '';
+    // Select angle using NEPQ strategy (exemption-first if eligible)
+    const selectedAngle = selectAngleForContact(role, industry, exemptionStatus, accountData);
+    const angleConfig = NEPQ_ANGLES[selectedAngle] || NEPQ_ANGLES['timing_risk'];
+    const newsHook = getNewsHookForAngle(selectedAngle);
     
-    if (contact && account) {
-      try {
-        // Build NEPQ angle data
-        const angleData = NEPQHelpers.buildAngleData({ contact, account });
-        
-        if (angleData.exemptionDetails) {
-          nepqContext += `
-
-**TAX EXEMPTION OPPORTUNITY (HIGHEST PRIORITY):**
-- Type: ${angleData.exemptionDetails.description}
-- Refund Potential: ${angleData.exemptionDetails.refundPotential} over 4 years
-- This is 2-5x more valuable than rate savings alone
-- LEAD WITH THIS if applicable to the contact's role
-
-**IMPORTANT:** If contact is in Finance, Operations, or Executive role, prioritize exemption recovery message over rate savings.`;
-        }
-        
-        if (angleData.newsHook) {
-          nepqContext += `
-
-**CURRENT MARKET CONTEXT (2025):**
-- ${angleData.newsHook.headline}
-- Email Hook: "${angleData.newsHook.emailHook}"
-- Weave this market context naturally if it adds relevance (don't force it)`;
-        }
-        
-        // Add angle-specific guidance
-        const angleName = angleData.angle?.name || 'Unknown';
-        angleGuidance = `
-
-**SELECTED ANGLE:** ${angleName}
-- Use NEPQ structure: Connection Question → Situational Relevance → Outcome Teaser → Clear CTA
-- Make the angle specific to this contact's role and industry
-- Rotate outcomes - avoid generic "10-20% savings" unless specifically relevant`;
-      } catch (error) {
-        console.warn('[SequenceBuilder] NEPQ angle selection failed:', error);
-      }
-    }
+    // Get CTA (prefer yes/no format from angle, fallback to existing CTAs)
+    const cta = angleConfig.cta || (ctaVariant ? getRandomCTA(role) : COLD_EMAIL_CTA_VARIANTS[0].text);
     
-    return `Write a cold introduction email that MUST:
+    // Build NEPQ-enhanced prompt
+    let prompt = `Write a cold introduction email using NEPQ methodology that MUST:
 
 1. GREETING (RANDOMIZE FOR VARIETY)
    - RANDOMLY choose ONE of these greetings:
@@ -2831,114 +3064,189 @@ class FreeSequenceAutomation {
      * "Hello [contact_first_name],"
    - DO NOT use "Hi [contact_first_name] there," or add extra words
 
-2. NEPQ CONNECTION QUESTION (DISARMING, STATUS-FRAME)
-   - Start with a disarming question that positions you as expert, not needy
-   - Examples: "Quick one—" "Real question—" "Out of curiosity—"
-   - Make it specific to their situation (exemption, timing, multi-site, etc.)
-   - NOT: biographical facts about their company (no Wikipedia-style intros)
-   - YES: Question that makes them curious about their own situation
+2. CONNECTION QUESTION (NEPQ - DISARMING, NOT ALARMING)
+   - START with a disarming question that creates curiosity
+   - This is the HOOK - make them think, not defend`;
+
+    // Add exemption-specific opening if eligible
+    if (exemptionStatus && exemptionDetails) {
+      prompt += `
+   - EXEMPTION-FIRST STRATEGY (CRITICAL): Since this is a ${exemptionStatus} organization, LEAD with exemption recovery:
+     * "${angleConfig.hook.replace('[industry]', industry || 'manufacturing')}"
+     * Example: "Quick one—has your ${industry || 'manufacturing'} facility filed for electricity sales tax exemption, or are you still paying sales tax on power?"
+     * DO NOT lead with generic "10-20% savings" - exemption recovery is worth ${exemptionDetails.typical_amount}, which is 2-5x more valuable
+   - Prove you understand their specific exemption opportunity (not just generic energy savings)`;
+    } else {
+      prompt += `
+   - Use angle-based hook: "${angleConfig.hook}"
+   - Examples based on angle:
+     * Timing: "Quick one—with electricity rates up 11% this year, are you locking in early, or waiting closer to renewal?"
+     * Multi-site: "With [facility_count] facilities, are you consolidating contracts, or managing them separately?"
+     * Demand efficiency: "Before locking in rates, have you analyzed demand-side efficiency, or just focusing on rate negotiation?"`;
+    }
+
+    prompt += `
+   - NEVER: "I hope you're well" or "I wanted to reach out"
+   - YES: Ask ONE specific question that assumes expert status
 
 3. SITUATIONAL RELEVANCE (WHY NOW, NOT SOMEDAY)
-   - ONE line explaining why this matters NOW
-   - Tie to their role/industry/exemption status/market conditions
-   - NOT: "I hope you're well" or "I wanted to reach out"
-   - YES: Specific trigger (exemption window, rate spike, contract timing, expansion)
+   - ONE line tying their role/industry to a current trigger
+   - Use the selected angle's situational relevance: "${angleConfig.situational}"`;
 
-4. OUTCOME TEASER (SPECIFIC, NOT GENERIC)
-   - If exemption-eligible: Focus on "$50K-$500K refund potential" NOT "10-20% savings"
-   - If timing angle: "6 months early = 8-15% savings" with specific context
-   - If multi-site: "Prevents 2-4% scatter overpay across facilities"
-   - AVOID: Generic "typically save 10-20%" (too repetitive)
-   - Use angle-specific outcomes that rotate message variety
+    // Add news hook if available
+    if (newsHook) {
+      prompt += `
+   - Weave in current market context: "${newsHook.usage}"
+   - Reference: ${newsHook.fact}`;
+    }
 
-5. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
+    // Add exemption context if applicable
+    if (exemptionStatus && exemptionDetails) {
+      prompt += `
+   - Exemption context: "${exemptionDetails.description} — most ${industry || 'facilities'} don't know they can recover ${exemptionDetails.refundPotential}"`;
+    }
+
+    prompt += `
+   - AVOID Wikipedia-style company bio (no 2-3 sentence history lessons)
+   - AVOID generic "companies save 10-20%" repetition
+   - Make it about THEIR specific situation NOW
+
+4. OUTCOME TEASER (SPECIFIC, NOT GENERIC "SAVINGS")
+   - Use angle-specific outcome: "${angleConfig.outcome}"`;
+
+    if (exemptionStatus && exemptionDetails) {
+      prompt += `
+   - Emphasize exemption value: "${exemptionDetails.typical_amount} in refunds + ongoing tax elimination"`;
+    } else {
+      prompt += `
+   - Rotate outcomes by angle - DO NOT use generic "10-20% savings" in every email
+   - Examples:
+     * Timing: "Early lock-in prevents the 8-15% spike + budget predictability"
+     * Multi-site: "Consolidation prevents 2-4% overpay + simplifies renewal management"
+     * Demand: "Demand optimization cuts 12-20% before rate negotiation even starts"`;
+    }
+
+    prompt += `
+   - Keep it concrete and credible (not "thousands annually" vague claims)
+
+5. CALL TO ACTION (YES/NO, MOBILE-FRIENDLY)
+   - Use THIS specific CTA: "${cta}"
+   - MUST be ONE clear question with yes/no path
+   - NO double questions like "When does your contract renew, and how often do you review rates?"
+   - YES single question: "Should I send an exemption audit—yes/no?" or "Worth a 15-minute timing check—yes/no?"
+   - Low friction, easy on mobile, implies expert status
+
+6. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
    - Write like a peer, not a salesperson (conversational, confident, direct)
    - Use contractions: "we're," "don't," "it's," "you're," "I'm"
    - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
-   - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy," "dive into," "solution," "at Power Choosers"
+   - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy," "dive into," "solution"
    - Sound like: colleague who knows their industry and has talked to others like them
    - Use casual confidence: "Quick question—" "Real question—" "Out of curiosity—"
-   - NO: "Would you be open to..." (permission-based, weak)
-   - YES: Ask specific questions that assume conversation is happening
+   - NEPQ principle: Disarm them with curiosity, don't trigger defense mode
 
-6. CALL TO ACTION (ONE QUESTION, YES/NO ANSWER)
-   - Use THIS specific CTA (don't change it, use exactly as written):
-   "${cta}"
-   - MUST: Single yes/no question (mobile-friendly, low friction)
-   - MUST: Assume the conversation is happening - don't ask for permission to talk
-   - NO: "Would you be open to..." or "Let's schedule a call" (too much friction)
-   - NO: Multiple questions (reduces reply rate)
-   - YES: One clear binary question
+7. SUBJECT LINE (SPECIFIC TO ANGLE)`;
 
-7. SUBJECT LINE (SPECIFIC, NOT VAGUE)
-   - MUST be specific to their role and the angle
-   - Exemption angle: "[FirstName], exemption recovery check" or "[FirstName], tax refund question"
-   - Timing angle: "[FirstName], contract timing question" or "[FirstName], rate lock timing"
-   - Multi-site angle: "[FirstName], multi-site consolidation check"
+    if (exemptionStatus) {
+      prompt += `
+   - For exemption angle: "[FirstName], electricity tax exemption question" or "[FirstName], sales tax recovery question"`;
+    } else {
+      prompt += `
+   - Match the angle: "[FirstName], contract timing question" or "[FirstName], rate lock timing question"`;
+    }
+
+    prompt += `
    - NOT generic: "thoughts on energy planning" or "insight to ease costs"
-   - Role-specific: For Controllers/CFO use "budget" or "tax" language
-   - For Operations/Facilities use "facility" or "operations" language
+   - Focus on: exemption recovery, contract timing, rate lock timing, budget cycle, facility renewal
+   - Role-specific when possible
 
 8. FORMAT
-   - 75-130 words max (scannable on mobile)
-   - 2-3 short paragraphs (visual breaks)
-   - Mobile-friendly (short lines, clear breaks)
-   - One CTA at end (the specific CTA provided above)
+   - 100-130 words max (scannable, not overwhelming)
+   - 2-3 short paragraphs (break up visually)
+   - Structure: Greeting → Disarming Question → Situational Relevance → Outcome → CTA
+   - Scannable on mobile (short lines, clear breaks)
+   - One CTA at end
 
 9. PERSONALIZATION
    - Include [contact_first_name] naturally in randomized greeting
    - Reference [company_name] specifically (not "your company")
-   - For [company_industry], use industry-specific language naturally
+   - For [company_industry], use industry-specific language naturally`;
+
+    if (exemptionStatus) {
+      prompt += `
+   - Reference ${industry} exemption specifics (not generic)`;
+    }
+
+    prompt += `
    - Reference location if available ([city], [state]) for regional context
-   - If manufacturing/nonprofit/RV park/government: mention exemption eligibility
 
-10. PROOF OF RESEARCH (OPTIONAL, NOT REQUIRED)
-   - Include specific detail if it strengthens the hook (location, facilities, operations)
-   - BUT: Don't lead with biographical facts (no Wikipedia intros)
-   - Keep research brief - focus on the question and relevance
+10. PROOF OF RESEARCH (BUT DON'T OVERDO IT)
+   - Include ONE specific detail that proves you researched (not 3-4 sentences of company history)
+   - Examples: "4 locations across Texas," "24/7 operations," "both electricity and natural gas"`;
 
-${nepqContext}${angleGuidance}
+    if (exemptionStatus) {
+      prompt += `
+   - Show you know they qualify for exemption (research = exemption awareness, not Wikipedia bio)`;
+    }
 
-**CRITICAL REMINDERS:**
-- NO biographical company intros ("I noticed Company X is a U.S.-based manufacturer...")
-- NO generic "10-20% savings" unless specifically angle-relevant
-- NO multiple questions in CTA (kills mobile replies)
-- YES to exemption-first if contact is tax-exempt industry
-- YES to NEPQ structure: Question → Relevance → Outcome → CTA
-- YES to varied angles (rotate messages, not same email every time)
+    prompt += `
+
+CRITICAL NEPQ PRINCIPLES:
+- Disarming questions make them curious, not defensive
+- Exemption-first for eligible industries (Manufacturing, Nonprofit, Government, RV Park)
+- Angle variation prevents repetitive "10-20% savings" messaging
+- Yes/no CTAs reduce friction (no double questions)
+- Position as strategic consultant, not commodity broker
 
 ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should sound like their peer—a 29-year-old Texas business pro who knows the industry and has talked to others in their situation. Be conversational, confident, and direct.`;
+
+    return prompt;
   }
 
   // ========== FOLLOW-UP PROMPT BUILDERS ==========
 
-  function buildFollowUpValuePrompt(ctaVariant = true, role = 'all') {
+  function buildFollowUpValuePrompt(ctaVariant = true, role = 'all', industry = null, exemptionStatus = null) {
     const cta = ctaVariant ? getRandomFollowUpCTA1(role) : FOLLOWUP_CTA_VARIANTS_STEP2[0].text;
+    
+    // Add exemption/angle-specific insights
+    let exemptionContext = '';
+    if (exemptionStatus) {
+      const exemptionDetails = getExemptionDetails(exemptionStatus);
+      if (exemptionDetails) {
+        exemptionContext = `
+   - EXEMPTION ANGLE: If intro mentioned exemption, add new exemption insight:
+     * "Just realized—most ${industry || 'facilities'} miss this: exemption claims can go back 4 years (${exemptionDetails.refundPotential})"
+     * "Quick note: ${exemptionDetails.qualifyingUsage} qualifies for exemption in most states"`;
+      }
+    }
     
     return `Write Follow-Up #1 (DAY 2 - VALUE ADD, NO RESPONSE):
 
 CONTEXT: This is 2 days after the intro email. They haven't responded. DON'T mention the first email.
 
-FRAMEWORK (2025 Best Practice - Day 2 Follow-Up):
+FRAMEWORK (NEPQ-Enhanced - Day 2 Follow-Up):
 1. GREETING (RANDOMIZE): Use "Hi [contact_first_name]," OR "Hey [contact_first_name]," OR "Hello [contact_first_name],"
 
-2. NEW VALUE/INSIGHT (NOT a repeat of intro):
-   - Share ONE new insight they'd find valuable (NOT generic)
-   - Examples:
-     * "Here's a rate trend your peers noticed this spring..."
-     * "I just saw [company_industry] contracts in [state] locked in at..."
-     * "Quick insight about [company_industry] renewal timing..."
+2. NEW VALUE/INSIGHT (ANGLE VARIATION - NOT a repeat of intro):
+   - Share ONE new insight they'd find valuable (NOT generic "10-20% savings")
+   - Rotate by angle/context:
+     * News-based: "With rates up 11% nationally, I'm seeing ${role || 'teams'} lock in early..."
+     * Timing-based: "Quick insight about ${industry || 'your industry'} renewal timing in Q2..."
+     * Multi-site: "Just noticed a pattern with multi-site ${industry || 'operations'}—consolidation prevents 2-4% overpay"
+     * Demand: "Before rate negotiation, demand-side efficiency often cuts 12-20% (peer data)"${exemptionContext}
    - Make it about THEM discovering something useful, not you selling
+   - AVOID repetitive "10-20% savings" claim
 
 3. SOFT, CURIOUS CTA: Use THIS specific CTA (don't change it):
    "${cta}"
 
 KEY DIFFERENCES FROM INTRO:
 - SHORTER: 50-80 words max (40-50% shorter than intro)
-- NEW ANGLE: Different observation/insight than intro
+- NEW ANGLE: Different observation/insight than intro (rotate outcome/value prop)
 - NO "just following up" or "checking in" language
 - VALUE FOCUSED: Give them something useful without asking for anything
 - Consultative tone, not pushy
+- NEPQ: Curiosity-driven, not defense-triggering
 
 TONE: 29-year-old Texas professional, genuinely helpful, peer-to-peer
 
@@ -2947,28 +3255,41 @@ AVOID:
 - "Just checking in..."
 - "Wanted to follow up"
 - Repeating intro content
+- Generic "10-20% savings" repetition
 
 LENGTH: 50-80 words max
-PURPOSE: Provide new value to keep conversation alive`;
+PURPOSE: Provide new value with angle variation to keep conversation alive`;
   }
 
-  function buildFollowUpCuriosityPrompt(ctaVariant = true, role = 'all') {
+  function buildFollowUpCuriosityPrompt(ctaVariant = true, role = 'all', industry = null, exemptionStatus = null) {
     const cta = ctaVariant ? getRandomFollowUpCTA2(role) : FOLLOWUP_CTA_VARIANTS_STEP3[0].text;
+    
+    // Add exemption/angle-specific objections
+    let angleSpecificObjections = '';
+    if (exemptionStatus) {
+      angleSpecificObjections = `
+     * EXEMPTION: "Most ${industry || 'facilities'} think they're too small for exemption recovery—but even single-facility ops recover $20K-$50K"`;
+    } else {
+      angleSpecificObjections = `
+     * TIMING: "Most ${role || 'teams'} wait until 90 days before renewal—that's when rates are 8-15% higher"
+     * MULTI-SITE: "Companies managing sites separately overpay 2-4% vs. consolidated contracts"
+     * DEMAND: "Rate locks matter, but demand-side cuts 12-20% before negotiation even starts"`;
+    }
     
     return `Write Follow-Up #2 (DAY 5 - ADDRESS OBJECTION/FAQ):
 
-CONTEXT: This is 5 days after intro. Still no response. Address a common objection or FAQ.
+CONTEXT: This is 5 days after intro. Still no response. Address a common objection or FAQ with NEPQ curiosity.
 
-FRAMEWORK (2025 Best Practice - Day 5 Follow-Up):
+FRAMEWORK (NEPQ-Enhanced - Day 5 Follow-Up):
 1. GREETING (RANDOMIZE): Use "Hi [contact_first_name]," OR "Hey [contact_first_name]," OR "Hello [contact_first_name],"
 
-2. ADDRESS OBJECTION/FAQ:
+2. ADDRESS OBJECTION/FAQ (ANGLE VARIATION):
    - Lead with a common challenge or mistake companies make
-   - Examples:
-     * "A lot of companies wait until the last minute—here's why early review matters..."
-     * "Most [role]s I talk to don't realize timing costs them 15-20%..."
-     * "The biggest mistake I see in [company_industry] is..."
+   - Vary by angle (NOT generic "10-20% savings"):${angleSpecificObjections}
+     * NEWS-DRIVEN: "With $34 billion in rate hikes approved this year, teams that waited got caught off-guard"
+     * VOLATILITY: "Fixed vs. variable—most don't realize variable rates can spike 20-30% mid-contract"
    - Make it educational, not salesy
+   - NEPQ: Frame as "most people don't realize..." (disarming, not threatening)
 
 3. CURIOSITY CTA: Use THIS specific CTA (don't change it):
    "${cta}"
@@ -2977,6 +3298,8 @@ KEY DIFFERENCES FROM FOLLOW-UP #1:
 - Address an objection/FAQ (not another value insight)
 - Educational tone (not another pitch)
 - Focus on WHY timing/planning matters
+- NEPQ: Curiosity-driven, not pushy
+- Angle variation (avoid repetitive messaging)
 
 TONE: Genuine curiosity, genuinely helpful, peer-to-peer
 
@@ -2985,9 +3308,10 @@ AVOID:
 - "Just wanted to follow up again..."
 - Being pushy about meeting
 - Generic "checking in"
+- Generic "10-20% savings" repetition
 
 LENGTH: 60-90 words max
-PURPOSE: Address why they haven't responded, educate on common mistake`;
+PURPOSE: Address why they haven't responded with NEPQ curiosity, educate on common mistake`;
   }
 
   function buildNurtureValuePrompt() {
@@ -3284,39 +3608,51 @@ LENGTH: 60-90 words max`;
 
   // ========== BREAKUP EMAIL (FINAL TOUCH) ==========
 
-  function buildBreakupEmailPrompt() {
+  function buildBreakupEmailPrompt(industry = null, exemptionStatus = null) {
+    // Add angle-specific final value options
+    let finalValueOptions = '';
+    if (exemptionStatus) {
+      finalValueOptions = `
+     * EXEMPTION ANGLE: "If you ever want that exemption audit, reach out—refund window is open for 4 years."`;
+    } else {
+      finalValueOptions = `
+     * TIMING ANGLE: "If contract renewal comes up, timing matters—reach out early."
+     * NEWS-BASED: "If rates keep climbing, early planning helps."`;
+    }
+    
     return `Write BREAKUP EMAIL (DAY 20+ - FINAL LAST CHANCE):
 
-CONTEXT: Final email in sequence. Give them a clear out or last chance to engage.
+CONTEXT: Final email in sequence. Give them a clear out or last chance to engage. NEPQ principle: Respectful exit.
 
-FRAMEWORK (2025 Best Practice - Breakup Email):
+FRAMEWORK (NEPQ-Enhanced - Breakup Email):
 1. GREETING (RANDOMIZE): Use "Hi [contact_first_name]," OR "Hey [contact_first_name]," OR "Hello [contact_first_name],"
 
-2. ACKNOWLEDGE THE SILENCE (RESPECTFULLY):
+2. ACKNOWLEDGE THE SILENCE (RESPECTFULLY - NEPQ: NO GUILT TRIPS):
    - Recognize they haven't responded (don't be passive-aggressive)
    - Examples:
-     * "I haven't heard back, so I'm guessing [topic] isn't a priority right now..."
+     * "I haven't heard back, so I'm guessing energy planning isn't a priority right now..."
      * "Since I haven't heard from you, I'll assume the timing isn't right..."
-     * "It seems like [topic] might not be on your radar at the moment..."
+     * "It seems like this might not be on your radar at the moment..."
 
-3. GIVE THEM AN OUT (GENUINELY):
+3. GIVE THEM AN OUT (GENUINELY - NEPQ: PERMISSION TO SAY NO):
    - Make it EASY for them to say "remove me" or "not interested"
    - Examples:
      * "Should I keep you on my list for future updates, or would you prefer I remove you?"
      * "If the timing's not right, just let me know and I'll take you off my list."
-     * "Quick question: Keep you posted on [topic], or remove you for now?"
+     * "Quick question: Keep you posted, or remove you for now?"
 
-4. FINAL VALUE (OPTIONAL - LIGHT TOUCH):
-   - One last tiny piece of value or reminder (keep brief)
-   - "If things change and you want to revisit [topic], I'm happy to help."
+4. FINAL VALUE (OPTIONAL - LIGHT TOUCH WITH ANGLE VARIATION):
+   - One last tiny piece of value or reminder (keep brief)${finalValueOptions}
+   - "If things change and you want to revisit this, I'm happy to help."
    - "Feel free to reach out if your situation changes."
 
-KEY PRINCIPLES:
+KEY PRINCIPLES (NEPQ):
 - Be GENUINE and respectful (not manipulative)
 - Give them permission to say no
 - Make it easy to respond either way
 - No guilt trips, no FOMO tactics
 - Professional and classy exit
+- NEPQ: Respect their decision, keep door open
 
 TONE: Respectful, professional, genuine, not desperate
 
@@ -3326,12 +3662,196 @@ AVOID:
 - Being passive-aggressive
 - "I'm shocked you haven't responded..."
 - Long explanations about why they should care
+- Generic "10-20% savings" one last time
 
 LENGTH: 40-60 words max (SHORT and respectful)
-PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
+PURPOSE: Clear final touchpoint - give them an out or a last chance to engage with NEPQ respect`;
   }
 
   // ========== END BREAKUP EMAIL ==========
+
+  // ========== NEPQ HELPER FUNCTIONS ==========
+  
+  /**
+   * Get exemption status from industry name
+   * @param {string} industry - Industry name from account/contact data
+   * @returns {string|null} - Exemption type or null if not exempt
+   */
+  function getExemptionStatusFromIndustry(industry) {
+    if (!industry) return null;
+    const normalizedIndustry = String(industry).trim();
+    return INDUSTRY_EXEMPTION_MAP[normalizedIndustry] || null;
+  }
+
+  /**
+   * Get exemption details for a given exemption type
+   * @param {string} exemptionStatus - 'Manufacturing', 'Nonprofit', 'Government', 'RVPark'
+   * @returns {object|null} - Exemption details or null
+   */
+  function getExemptionDetails(exemptionStatus) {
+    if (!exemptionStatus) return null;
+    return EXEMPTION_DETAILS[exemptionStatus] || null;
+  }
+
+  /**
+   * Select best angle for contact based on role, industry, and exemption status
+   * NEPQ Strategy: Exemption-first for eligible industries, then role/industry priority
+   * @param {string} role - Contact role/title
+   * @param {string} industry - Company industry
+   * @param {string} exemptionStatus - Tax exemption status
+   * @param {object} accountData - Optional account data for multi-site detection
+   * @returns {string} - Selected angle key
+   */
+  function selectAngleForContact(role, industry, exemptionStatus, accountData = {}) {
+    // EXEMPTION-FIRST STRATEGY: If eligible for exemption, prioritize exemption_recovery
+    if (exemptionStatus && EXEMPTION_DETAILS[exemptionStatus]) {
+      return 'exemption_recovery';
+    }
+
+    // Check for multi-site scenario
+    const facilityCount = accountData?.numberOfFacilities || accountData?.facilityCount || 0;
+    if (facilityCount && facilityCount > 2) {
+      return 'multi_site_consolidation';
+    }
+
+    // Role-based priority
+    if (role) {
+      const normalizedRole = String(role).trim();
+      const roleAngles = ROLE_ANGLE_PRIORITY[normalizedRole];
+      if (roleAngles && roleAngles.length > 0) {
+        // Filter out angles that require exemption if not eligible
+        const availableAngles = roleAngles.filter(angle => {
+          const angleConfig = NEPQ_ANGLES[angle];
+          return !angleConfig.requires_exemption || exemptionStatus;
+        });
+        if (availableAngles.length > 0) {
+          // Randomize among top 2 angles for variety
+          const topAngles = availableAngles.slice(0, 2);
+          return topAngles[Math.floor(Math.random() * topAngles.length)];
+        }
+      }
+    }
+
+    // Industry-based priority
+    if (industry) {
+      const normalizedIndustry = String(industry).trim();
+      const industryAngles = INDUSTRY_ANGLE_PRIORITY[normalizedIndustry];
+      if (industryAngles && industryAngles.length > 0) {
+        const availableAngles = industryAngles.filter(angle => {
+          const angleConfig = NEPQ_ANGLES[angle];
+          return !angleConfig.requires_exemption || exemptionStatus;
+        });
+        if (availableAngles.length > 0) {
+          const topAngles = availableAngles.slice(0, 2);
+          return topAngles[Math.floor(Math.random() * topAngles.length)];
+        }
+      }
+    }
+
+    // Fallback: Random non-exemption angle
+    const fallbackAngles = ['timing_risk', 'demand_efficiency', 'budget_predictability', 'volatility_protection'];
+    return fallbackAngles[Math.floor(Math.random() * fallbackAngles.length)];
+  }
+
+  /**
+   * Get relevant news hook for an angle
+   * @param {string} angle - Selected angle key
+   * @returns {object|null} - News hook object or null
+   */
+  function getNewsHookForAngle(angle) {
+    if (!angle || !NEPQ_ANGLES[angle]) return null;
+    
+    const angleConfig = NEPQ_ANGLES[angle];
+    const newsHookKeys = angleConfig.news_hooks || [];
+    
+    if (newsHookKeys.length === 0) return null;
+    
+    // Randomize news hook for variety
+    const randomKey = newsHookKeys[Math.floor(Math.random() * newsHookKeys.length)];
+    return NEWS_HOOKS_2025[randomKey] || null;
+  }
+
+  /**
+   * Get angle-specific outcome text (replaces generic "10-20% savings")
+   * @param {string} angle - Selected angle key
+   * @param {string} role - Contact role (for personalization)
+   * @param {string} exemptionStatus - Tax exemption status
+   * @returns {string} - Outcome text
+   */
+  function getAngleOutcome(angle, role, exemptionStatus) {
+    if (!angle || !NEPQ_ANGLES[angle]) {
+      return 'Early planning typically saves 8-15% on energy costs';
+    }
+    
+    const angleConfig = NEPQ_ANGLES[angle];
+    let outcome = angleConfig.outcome || 'Strategic energy planning provides cost control and budget certainty';
+    
+    // Replace placeholders if exemption-based
+    if (angle === 'exemption_recovery' && exemptionStatus) {
+      const exemptionDetails = getExemptionDetails(exemptionStatus);
+      if (exemptionDetails) {
+        outcome = outcome.replace('[refund_amount]', exemptionDetails.typical_amount);
+      }
+    }
+    
+    return outcome;
+  }
+
+  /**
+   * Build personalized variables object for prompt generation
+   * @param {object} contact - Contact data
+   * @param {object} account - Account/company data
+   * @param {string} angle - Selected angle
+   * @param {string} exemptionStatus - Tax exemption status
+   * @returns {object} - Variables for prompt substitution
+   */
+  function buildPromptVariables(contact, account, angle, exemptionStatus) {
+    const exemptionDetails = getExemptionDetails(exemptionStatus);
+    const newsHook = getNewsHookForAngle(angle);
+    const angleConfig = NEPQ_ANGLES[angle] || {};
+    
+    return {
+      contact_first_name: contact?.firstName || 'there',
+      contact_full_name: contact?.name || `${contact?.firstName || ''} ${contact?.lastName || ''}`.trim(),
+      contact_job_title: contact?.role || contact?.title || contact?.job || 'decision maker',
+      company_name: account?.companyName || account?.name || contact?.company || 'your company',
+      company_industry: account?.industry || 'your industry',
+      facility_count: account?.numberOfFacilities || account?.facilityCount || 'multiple',
+      city: account?.city || contact?.city || '',
+      state: account?.state || contact?.state || '',
+      industry: account?.industry || 'business',
+      refund_amount: exemptionDetails?.typical_amount || '$50K–$200K',
+      exemption_description: exemptionDetails?.description || 'tax exemption',
+      news_headline: newsHook?.headline || '',
+      news_fact: newsHook?.fact || '',
+      news_usage: newsHook?.usage || '',
+      angle_hook: angleConfig.hook || '',
+      angle_situational: angleConfig.situational || '',
+      angle_outcome: angleConfig.outcome || '',
+      angle_cta: angleConfig.cta || 'Should I send more information—yes/no?'
+    };
+  }
+
+  /**
+   * Apply variables to template text
+   * @param {string} template - Template text with [variable] placeholders
+   * @param {object} variables - Variables object
+   * @returns {string} - Text with variables replaced
+   */
+  function applyVariablesToTemplate(template, variables) {
+    if (!template || !variables) return template;
+    
+    let result = template;
+    Object.keys(variables).forEach(key => {
+      const placeholder = `[${key}]`;
+      const value = variables[key] || '';
+      result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value);
+    });
+    
+    return result;
+  }
+
+  // ========== END NEPQ HELPER FUNCTIONS ==========
 
   // Get signature HTML for preview if settings allow it
   function getSignatureForPreview(step, isAuto) {
@@ -5274,8 +5794,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                   // Try to detect role from step or contact if available
                   const stepId = stepCard.getAttribute('data-step-id');
                   const step = state.currentSequence?.steps?.find(s => s.id === stepId);
-                  const previewContact = step?.data?.previewContact;
-                  const contactRole = previewContact?.title || previewContact?.job || 'all';
+                  const contactRole = step?.data?.previewContact?.title || step?.data?.previewContact?.job || 'all';
                   
                   // Determine if finance role for CTA selection
                   const role = (contactRole && typeof contactRole === 'string' && 
@@ -5284,17 +5803,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                                 contactRole.toLowerCase().includes('controller') ||
                                 contactRole.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
                   
-                  // Build account object from preview contact data
-                  const previewAccount = previewContact ? {
-                    companyName: previewContact.company || previewContact.companyName,
-                    industry: previewContact.industry || previewContact.companyIndustry,
-                    city: previewContact.city,
-                    state: previewContact.state,
-                    numberOfFacilities: previewContact.numberOfFacilities,
-                    contractExpirationDate: previewContact.contractExpirationDate
-                  } : null;
-                  
-                  prompt = buildFirstEmailIntroPrompt(true, role, previewContact, previewAccount);
+                  prompt = buildFirstEmailIntroPrompt(true, role);
                   break;
                   
                 case 'follow-up-value':
@@ -6549,17 +7058,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                               contactRole.toLowerCase().includes('controller') ||
                               contactRole.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
                 
-                // Build account object from selected contact data
-                const selectedAccount = selectedContact ? {
-                  companyName: selectedContact.company || selectedContact.companyName,
-                  industry: selectedContact.industry || selectedContact.companyIndustry,
-                  city: selectedContact.city,
-                  state: selectedContact.state,
-                  numberOfFacilities: selectedContact.numberOfFacilities,
-                  contractExpirationDate: selectedContact.contractExpirationDate
-                } : null;
-                
-                prompt = buildFirstEmailIntroPrompt(true, role, selectedContact, selectedAccount);
+                prompt = buildFirstEmailIntroPrompt(true, role);
                 break;
                 
               case 'follow-up-value':

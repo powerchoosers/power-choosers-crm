@@ -7,10 +7,6 @@
  * Usage: window.EmailCompose.openTo('email@example.com', 'Contact Name')
  */
 
-// Import NEPQ helpers for angle selection and exemption detection
-import NEPQHelpers from './utils/nepq-helpers.js';
-import NEPQ_CONFIG from './config/nepq-email-config.js';
-
 (function() {
   if (!window.EmailCompose) window.EmailCompose = {};
   
@@ -2620,43 +2616,57 @@ import NEPQ_CONFIG from './config/nepq-email-config.js';
 
       // Get recipient data with enrichment
       let recipient = null;
-      let nepqAngleData = null;
       try {
         const toVal = toInput?.value || '';
         if (toVal) {
           recipient = await lookupPersonByEmail(toVal);
           // Enrich with account data
           recipient = await enrichRecipientWithAccountData(recipient);
-          
-          // NEPQ Integration: Build angle data from recipient
-          if (recipient) {
-            try {
-              const contact = {
-                firstName: recipient.firstName || recipient.first_name,
-                email: recipient.email,
-                role: recipient.role || recipient.title || recipient.jobTitle
-              };
-              
-              const account = {
-                companyName: recipient.company || recipient.account?.name,
-                industry: recipient.industry || recipient.account?.industry,
-                city: recipient.city || recipient.account?.city,
-                state: recipient.state || recipient.account?.state,
-                numberOfFacilities: recipient.numberOfFacilities || recipient.account?.numberOfFacilities,
-                contractExpirationDate: recipient.contractExpirationDate || recipient.account?.contractExpirationDate,
-                marketDeregulated: recipient.marketDeregulated || recipient.account?.marketDeregulated
-              };
-              
-              // Build NEPQ angle data
-              nepqAngleData = NEPQHelpers.buildAngleData({ contact, account });
-              console.log('[AI] NEPQ angle selected:', nepqAngleData.angleKey, nepqAngleData);
-            } catch (nepqError) {
-              console.warn('[AI] NEPQ angle selection failed:', nepqError);
-            }
-          }
         }
       } catch (error) {
         console.warn('[AI] Failed to lookup recipient:', error);
+      }
+
+      // NEPQ ENHANCEMENT: Detect exemption status from recipient industry
+      let exemptionStatus = null;
+      let exemptionDetails = null;
+      if (recipient && recipient.industry) {
+        // Industry to exemption mapping (inline for email-compose-global)
+        const industryExemptionMap = {
+          'Manufacturing': 'Manufacturing',
+          'Manufacturer': 'Manufacturing',
+          'Industrial': 'Manufacturing',
+          'Nonprofit': 'Nonprofit',
+          'Non-Profit': 'Nonprofit',
+          'Charity': 'Nonprofit',
+          'Foundation': 'Nonprofit',
+          '501(c)(3)': 'Nonprofit',
+          'Government': 'Government',
+          'Municipality': 'Government',
+          'Public Sector': 'Government',
+          'Healthcare': 'Nonprofit',
+          'Hospital': 'Nonprofit',
+          'RV Park': 'RVPark',
+          'Mobile Home Park': 'RVPark',
+          'Hospitality': 'RVPark',
+          'Campground': 'RVPark'
+        };
+        
+        const normalizedIndustry = String(recipient.industry).trim();
+        exemptionStatus = industryExemptionMap[normalizedIndustry] || null;
+        
+        if (exemptionStatus) {
+          // Basic exemption details (inline for email-compose-global)
+          const exemptionDetailsMap = {
+            'Manufacturing': { typical_amount: '$75K–$200K', description: 'manufacturing facility electricity exemption' },
+            'Nonprofit': { typical_amount: '$40K–$100K', description: '501(c)(3) tax-exempt organization electricity exemption' },
+            'Government': { typical_amount: '$50K–$150K', description: 'government entity electricity exemption' },
+            'RVPark': { typical_amount: '$75K–$300K', description: 'predominant use exemption (residential)' }
+          };
+          exemptionDetails = exemptionDetailsMap[exemptionStatus] || null;
+          
+          console.log('[NEPQ] Exemption detected:', exemptionStatus, exemptionDetails);
+        }
       }
 
       // Get settings once
@@ -2683,20 +2693,15 @@ import NEPQ_CONFIG from './config/nepq-email-config.js';
           mode: mode,
           senderName: senderName,
           whoWeAre: whoWeAre,
-          // Market context
+          // Pass market context
           marketContext: aiTemplates.marketContext,
-          // Meeting preferences
+          // Pass meeting preferences
           meetingPreferences: aiTemplates.meetingPreferences,
-          // Industry segmentation
+          // Pass industry segmentation
           industrySegmentation: industrySegmentation,
-          // NEPQ Integration: Pass angle data
-          taxExemptStatus: nepqAngleData?.taxExemptStatus || null,
-          angle: nepqAngleData?.angleKey || null,
-          angleData: nepqAngleData?.angle || null,
-          exemptionDetails: nepqAngleData?.exemptionDetails || null,
-          newsHook: nepqAngleData?.newsHook || null,
-          renewalUrgency: nepqAngleData?.renewalUrgency || null,
-          nepqMode: !!nepqAngleData // Flag to use NEPQ structure
+          // NEPQ: Pass exemption data for exemption-first strategy
+          exemptionStatus: exemptionStatus,
+          exemptionDetails: exemptionDetails
         })
       });
 
