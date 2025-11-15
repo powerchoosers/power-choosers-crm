@@ -1838,7 +1838,7 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const contractEndLabel = toMonthYear(energy.contractEnd || '');
   
   // Get dynamic patterns for cold emails (needed for both HTML and standard modes)
-  const ctaPattern = templateType === 'cold_email' ? getCTAPattern(recipient, meetingPreferences, templateType) : null;
+  const ctaPattern = templateType === 'cold_email' ? getCTAPattern(recipient, null, templateType) : null;
   const openingStyle = templateType === 'cold_email' ? getOpeningStyle(recipient) : null;
   
   // Get role-specific context
@@ -1859,8 +1859,8 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const suggestedSubject = templateType === 'cold_email' ? 
     getRandomSubjectLine('cold-email', roleCategory, firstName, company) : null;
   
-  // Get industry-specific content (prefer settings if provided)
-  const industryContent = industry ? getIndustrySpecificContentFromSettings(industry, industrySegmentation) : null;
+  // Get industry-specific content (no settings dependency - use defaults)
+  const industryContent = industry ? getIndustrySpecificContentFromSettings(industry, null) : null;
   
   // Get company size context
   const companySizeContext = getCompanySizeContext(r.account || {});
@@ -2279,7 +2279,7 @@ IMPORTANT: The closing field must include a newline between "Best regards," and 
   const isColdEmailStandard = /cold.*email|could.*not.*reach/i.test(String(prompt || ''));
   
   if (isColdEmailStandard) {
-    const ctaPattern = getCTAPattern(recipient, meetingPreferences, 'cold_email');
+    const ctaPattern = getCTAPattern(recipient, null, 'cold_email');
     const openingStyle = getOpeningStyle(recipient);
     
     const coldEmailRules = `
@@ -2293,15 +2293,12 @@ GREETING (MANDATORY - MUST BE FIRST LINE):
 
 CRITICAL QUALITY RULES:
 - OBSERVATION-BASED OPENING: MUST start with SPECIFIC observation about ${company || 'their company'}, NOT generic market facts
-  ${marketContext?.enabled ? `
-  - Market context is ENABLED - you may reference general market trends if relevant
-  - BUT: Still lead with specific observation about ${company} first` : `
-  - Market context is DISABLED - DO NOT use generic market statistics like "rates rising 15-25%"
+  - DO NOT use generic market statistics like "rates rising 15-25%"
   - DO NOT mention "data center demand" or generic rate increases
   - Focus ONLY on ${company}'s specific situation, industry challenges they face, or operational details
-  - Use phrases like "I noticed ${company} operates..." or "With ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'your facilities'}..."`}
+  - Use phrases like "I noticed ${company} operates..." or "With ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'your facilities'}..."
 - SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
-- MEASURABLE CLAIMS: "save ${marketContext?.typicalClientSavings || '10-20%'}" or "$X annually" NOT "significant savings"
+- MEASURABLE CLAIMS: "save 10-20%" or "$X annually" NOT "significant savings"
 - COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
 - QUALIFYING CTAs: Prefer questions over meeting requests for cold emails
 - SOCIAL PROOF: Use real outcomes when mentioning similar companies
@@ -2315,19 +2312,18 @@ CRITICAL QUALITY RULES:
 
 HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Write like a knowledgeable energy expert who researched ${company || 'their company'} deeply
-- ${marketContext?.enabled ? 'Market context is ENABLED, but still lead with specific observation' : 'Market context is DISABLED - focus on THEIR specific situation only'}
+- Focus on THEIR specific situation only
 - Show you did homework: When you have specific data, use phrases like:
   * "I noticed ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail about their company]'}" ${accountDescription ? '(you have account description - USE THIS)' : ''}
   * "I saw ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}" ${recentActivityContext ? '(you have recent activity - USE THIS)' : ''}
   * "On your website, I noticed..." ${websiteContext ? '(you have website context - USE THIS)' : ''}
-  * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." ${city && marketContext?.enabled ? '(you have location)' : '(skip if market context disabled)'}
-  ${!marketContext?.enabled ? '* "With ' + (contractEndLabel ? 'your contract ending ' + contractEndLabel : 'your current energy setup') + '..." (use contract timing if available)' : ''}
+  * "With ${contractEndLabel ? 'your contract ending ' + contractEndLabel : 'your current energy setup'}..." (use contract timing if available)
 - Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : '[specific situation]'}..."
 - Include micro-observations: Reference their website, recent posts, industry trends they'd recognize
 - Vary sentence length: Mix short punchy statements with longer explanatory ones
 - Use conversational connectors: "Here's the thing...", "The reality is...", "What I've found..."
 - Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", "I've been tracking how companies..." or other template phrases
-${marketContext?.enabled ? '- You may reference general market trends, but lead with specific observation first' : '- DO NOT mention generic market statistics - focus on their specific situation'}
+- DO NOT mention generic market statistics - focus on their specific situation
 - Show expertise subtly: "In my experience with ${industry || '[industry]'} companies", "I've noticed [specific trend about their company]"
 ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\'ve likely seen..." (tenure available)' : ''}
 
@@ -2375,25 +2371,20 @@ FORMATTING REQUIREMENTS:
 OPENING (1-2 sentences):
 Style: ${openingStyle.type}
 ${openingStyle.prompt}
-${marketContext?.enabled ? `
-Lead with SPECIFIC OBSERVATION about ${company} FIRST, then optionally reference market context:
-- "I noticed ${company} operates in ${city || '[location]'}. With contracts renewing in 2025, you're likely seeing..."
-- "Given ${accountDescription ? accountDescription.substring(0, 60) + '...' : company + '\'s operations'}, energy costs are probably..."
-- "${industry || 'Your industry'} companies like ${company} are facing [specific challenge]. I've noticed..."` : `
 Lead with SPECIFIC OBSERVATION about ${company} - NO generic market statistics:
 - "I noticed ${company} operates ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'with facilities in ' + (city || '[location]')}..."
 - "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : 'your current energy setup'}, you're likely dealing with..."
 - "${company} likely sees energy as [specific to their situation] given [specific detail about their operations]"
 - "Companies with ${industryContent?.painPoints[0] || '[specific pain point]'} typically benefit from early planning"
-DO NOT mention: "rates rising 15-25%", "data center demand", generic market statistics`}
+DO NOT mention: "rates rising 15-25%", "data center demand", generic market statistics
 IMPORTANT: Always reference ${company} specifically, not other companies.
 
 VALUE PROPOSITION (1-2 sentences MINIMUM):
 - Explain how Power Choosers helps with SPECIFIC MEASURABLE VALUE
-- MUST include: (1) What we do, (2) Concrete numbers: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X", "clients typically see Y"
+- MUST include: (1) What we do, (2) Concrete numbers: "save 10-20%", "reduce costs by $X", "clients typically see Y"
 - Reference: ${accountDescription ? '"' + accountDescription + '"' : 'their business type'}
 - Add social proof if relevant: "helped similar companies achieve [specific result]"
-- Example: "We help ${industry || 'businesses'} secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs."
+- Example: "We help ${industry || 'businesses'} secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs."
 - NEVER end with incomplete phrases or "within [company name]"
 - ALWAYS include a complete value proposition - never skip this field
 - THIS FIELD IS MANDATORY - NEVER LEAVE BLANK
@@ -2597,7 +2588,7 @@ export default async function handler(req, res) {
       day: 'numeric' 
     });
     
-    const meetingTimes = getSuggestedMeetingTimes(meetingPreferences);
+    const meetingTimes = getSuggestedMeetingTimes(null);
     
     // Only suggest meeting times for follow-up emails, not cold emails
     const dateContext = templateType === 'cold_email' ? `TODAY'S DATE: ${todayLabel}
@@ -2692,7 +2683,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
             console.warn('[Validation] Incomplete value prop detected, fixing...');
             jsonData.value_proposition = jsonData.value_proposition.replace(
               /\b(within|like|such as|including)\s+[A-Z][^.!?]*$/i,
-              `secure better energy rates before contracts expire. Clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual costs.`
+              `secure better energy rates before contracts expire. Clients typically save 10-20% on annual costs.`
             );
           }
         }
@@ -2710,7 +2701,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         if (templateType === 'cold_email' && (!jsonData.value_proposition || jsonData.value_proposition.trim() === '')) {
           console.warn('[Validation] Missing value proposition detected, adding default...');
           const industry = recipient?.industry || 'businesses';
-          jsonData.value_proposition = `We help ${industry} companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs.`;
+          jsonData.value_proposition = `We help ${industry} companies secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs.`;
         }
         
         // Validate missing opening_hook for cold emails
@@ -2768,7 +2759,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
             console.warn(`[Validation] Email too short (${wordCount} words), expanding value proposition...`);
             // Only expand if value prop is very short
             if (jsonData.value_proposition && jsonData.value_proposition.length < 40) {
-              jsonData.value_proposition = `${jsonData.value_proposition} Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs.`;
+              jsonData.value_proposition = `${jsonData.value_proposition} Our clients typically save 10-20% on annual energy costs.`;
             }
           }
         }
