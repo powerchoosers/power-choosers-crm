@@ -199,7 +199,10 @@ export default async function handler(req, res) {
           text: generatedContent.text,
           status: 'pending_approval',
           generatedAt: Date.now(),
-          generatedBy: 'scheduled_job'
+          generatedBy: 'scheduled_job',
+          // Add angle metadata for tracking effectiveness
+          angle_used: generatedContent.angle_used || null,
+          exemption_type: generatedContent.exemption_type || null
         };
         
         // Add ownership fields if not already present
@@ -372,7 +375,7 @@ This is a ${exemptionStatus} organization - PRIORITIZE TAX EXEMPTION RECOVERY
 - Exemption Type: ${exemptionDetails.description}
 - Typical Refund Value: ${exemptionDetails.typical_amount} over 4 years
 - Strategy: Lead with disarming question about exemption filing (not generic "10-20% savings")
-- Example Hook: "Quick one—has your ${accountIndustry} facility filed for electricity sales tax exemption, or are you still paying sales tax on power?"
+- Example Hook: "Has your ${accountIndustry} facility filed for electricity sales tax exemption, or are you still paying sales tax on power?"
 - Value Emphasis: "${exemptionDetails.typical_amount} in refunds + ongoing tax elimination" (2-5x more valuable than rate savings)
 - CTA Format: Use yes/no questions (mobile-friendly, low friction)
 - Position: Strategic tax consultant, not commodity broker
@@ -552,7 +555,11 @@ When writing emails:
     return {
       subject: subject.trim() || 'Follow-up Email',
       html: htmlContent || `<p>${bodyContent.replace(/\n/g, '<br>')}</p>`,
-      text: textContent || bodyContent
+      text: textContent || bodyContent,
+      // Metadata for tracking angle effectiveness
+      angle_used: exemptionStatus ? 'exemption_recovery' : 'timing_risk', // Default if not specified
+      exemption_type: exemptionStatus || null,
+      exemption_details: exemptionDetails || null
     };
     
   } catch (error) {
