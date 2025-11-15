@@ -697,7 +697,7 @@ class FreeSequenceAutomation {
     'exemption_recovery': {
       name: 'Tax Exemption Recovery',
       priority: 1, // Highest priority for eligible industries
-      hook: 'Quick one—has your [industry] facility filed for electricity sales tax exemption, or are you still paying sales tax on power?',
+      hook: 'Has your [industry] facility filed for electricity sales tax exemption, or are you still paying sales tax on power?',
       situational: '[Industry] electricity is federally/state exempt, but most facilities never claim it. Over 4 years, that's typically [refund_amount] in refundable tax, plus ongoing elimination.',
       outcome: 'Exemption recovery typically nets [refund_amount] plus ongoing tax elimination',
       cta: 'Should I send an exemption audit for your facility—yes/no?',
@@ -708,7 +708,7 @@ class FreeSequenceAutomation {
     'timing_risk': {
       name: 'Contract Timing / Early Lock-In',
       priority: 2,
-      hook: 'Quick one—with electricity rates up 11% this year, are you locking in early, or waiting closer to renewal?',
+      hook: 'With electricity rates up 11% this year, are you locking in early, or waiting closer to renewal?',
       situational: 'Locking in 6 months early typically prevents the 8–15% market spike most teams see at renewal.',
       outcome: 'Early lock-in prevents the 8–15% spike + budget predictability',
       cta: 'Worth a 15-minute timing strategy check before rates jump further—yes/no?',
@@ -865,6 +865,74 @@ class FreeSequenceAutomation {
     'Hospitality': ['demand_efficiency', 'timing_risk', 'renewable_compliance'],
     'Technology': ['ai_demand_spike', 'demand_efficiency', 'timing_risk'],
     'Data Center': ['ai_demand_spike', 'demand_efficiency', 'timing_risk']
+  };
+
+  // ========== WEIGHTED ANGLE SYSTEM (Multi-Angle Randomization) ==========
+  // Each industry gets 4-5 angles with weights for dynamic selection
+  // This ensures manufacturers don't always get exemption, retail gets variety, etc.
+  const WEIGHTED_ANGLES_BY_INDUSTRY = {
+    'Manufacturing': [
+      { angle: 'exemption_recovery', weight: 0.30 }, // 30% exemption
+      { angle: 'demand_efficiency', weight: 0.25 }, // 25% efficiency
+      { angle: 'timing_risk', weight: 0.25 }, // 25% timing
+      { angle: 'multi_site_consolidation', weight: 0.20 } // 20% consolidation
+    ],
+    'Nonprofit': [
+      { angle: 'exemption_recovery', weight: 0.40 }, // 40% exemption (higher for nonprofits)
+      { angle: 'budget_predictability', weight: 0.35 }, // 35% budget
+      { angle: 'audit_risk', weight: 0.25 } // 25% audit
+    ],
+    'Government': [
+      { angle: 'exemption_recovery', weight: 0.45 }, // 45% exemption
+      { angle: 'tax_compliance', weight: 0.30 }, // 30% compliance
+      { angle: 'budget_predictability', weight: 0.25 } // 25% budget
+    ],
+    'RV Park': [
+      { angle: 'exemption_recovery', weight: 0.50 }, // 50% exemption (very valuable for RV parks)
+      { angle: 'tax_compliance', weight: 0.30 }, // 30% compliance
+      { angle: 'multi_site_consolidation', weight: 0.20 } // 20% multi-site
+    ],
+    'Healthcare': [
+      { angle: 'exemption_recovery', weight: 0.35 }, // 35% exemption (if nonprofit)
+      { angle: 'multi_site_consolidation', weight: 0.35 }, // 35% consolidation
+      { angle: 'budget_predictability', weight: 0.30 } // 30% budget
+    ],
+    'Retail': [
+      { angle: 'multi_site_consolidation', weight: 0.40 }, // 40% consolidation (primary for multi-site)
+      { angle: 'timing_risk', weight: 0.35 }, // 35% timing
+      { angle: 'demand_efficiency', weight: 0.25 } // 25% efficiency
+    ],
+    'Hospitality': [
+      { angle: 'demand_efficiency', weight: 0.45 }, // 45% efficiency
+      { angle: 'timing_risk', weight: 0.35 }, // 35% timing
+      { angle: 'renewable_compliance', weight: 0.20 } // 20% renewable
+    ],
+    'Technology': [
+      { angle: 'ai_demand_spike', weight: 0.40 }, // 40% AI/data center angle
+      { angle: 'demand_efficiency', weight: 0.35 }, // 35% efficiency
+      { angle: 'timing_risk', weight: 0.25 } // 25% timing
+    ],
+    'Data Center': [
+      { angle: 'ai_demand_spike', weight: 0.45 }, // 45% AI demand
+      { angle: 'demand_efficiency', weight: 0.35 }, // 35% efficiency
+      { angle: 'timing_risk', weight: 0.20 } // 20% timing
+    ],
+    'Logistics': [
+      { angle: 'multi_site_consolidation', weight: 0.45 }, // 45% consolidation
+      { angle: 'timing_risk', weight: 0.35 }, // 35% timing
+      { angle: 'demand_efficiency', weight: 0.20 } // 20% efficiency
+    ],
+    'Education': [
+      { angle: 'exemption_recovery', weight: 0.40 }, // 40% exemption (many are nonprofits)
+      { angle: 'budget_predictability', weight: 0.35 }, // 35% budget
+      { angle: 'multi_site_consolidation', weight: 0.25 } // 25% multi-site (campuses)
+    ],
+    // Default for unrecognized industries
+    'default': [
+      { angle: 'timing_risk', weight: 0.40 },
+      { angle: 'demand_efficiency', weight: 0.30 },
+      { angle: 'budget_predictability', weight: 0.30 }
+    ]
   };
 
   function initDomRefs() {
@@ -3072,17 +3140,20 @@ class FreeSequenceAutomation {
     if (exemptionStatus && exemptionDetails) {
       prompt += `
    - EXEMPTION-FIRST STRATEGY (CRITICAL): Since this is a ${exemptionStatus} organization, LEAD with exemption recovery:
-     * "${angleConfig.hook.replace('[industry]', industry || 'manufacturing')}"
-     * Example: "Quick one—has your ${industry || 'manufacturing'} facility filed for electricity sales tax exemption, or are you still paying sales tax on power?"
+     * Use this hook structure: "${angleConfig.hook.replace('[industry]', industry || 'manufacturing').replace('Quick one—', '').trim()}"
+     * Example approaches:
+       - "Has your ${industry || 'manufacturing'} facility filed for electricity sales tax exemption, or are you still paying sales tax on power?"
+       - "Question about your electricity costs—are you currently claiming tax exemptions on your ${industry || 'facility'} bills?"
      * DO NOT lead with generic "10-20% savings" - exemption recovery is worth ${exemptionDetails.typical_amount}, which is 2-5x more valuable
    - Prove you understand their specific exemption opportunity (not just generic energy savings)`;
     } else {
       prompt += `
-   - Use angle-based hook: "${angleConfig.hook}"
-   - Examples based on angle:
-     * Timing: "Quick one—with electricity rates up 11% this year, are you locking in early, or waiting closer to renewal?"
-     * Multi-site: "With [facility_count] facilities, are you consolidating contracts, or managing them separately?"
-     * Demand efficiency: "Before locking in rates, have you analyzed demand-side efficiency, or just focusing on rate negotiation?"`;
+   - Use angle-based hook (remove casual prefixes, keep direct and professional):
+     * Base structure: "${angleConfig.hook.replace('Quick one—', '').replace('Quick question—', '').trim()}"
+     * Examples based on angle:
+       - Timing: "With electricity rates up 11% this year, are you locking in early, or waiting closer to renewal?"
+       - Multi-site: "With [facility_count] facilities, are you consolidating contracts, or managing them separately?"
+       - Demand efficiency: "Before locking in rates, have you analyzed demand-side efficiency, or just focusing on rate negotiation?"`;
     }
 
     prompt += `
@@ -3142,8 +3213,9 @@ class FreeSequenceAutomation {
    - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
    - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy," "dive into," "solution"
    - Sound like: colleague who knows their industry and has talked to others like them
-   - Use casual confidence: "Quick question—" "Real question—" "Out of curiosity—"
+   - Professional but conversational: Direct questions, confident statements, natural flow
    - NEPQ principle: Disarm them with curiosity, don't trigger defense mode
+   - Keep it professional (not casual slang like "real talk" or "straight up")
 
 7. SUBJECT LINE (SPECIFIC TO ANGLE)`;
 
@@ -3694,63 +3766,82 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage wi
   }
 
   /**
-   * Select best angle for contact based on role, industry, and exemption status
-   * NEPQ Strategy: Exemption-first for eligible industries, then role/industry priority
+   * Select angle using weighted randomization
+   * WEIGHTED SYSTEM: Each industry gets 3-4 angles with different probabilities
+   * This ensures variety - manufacturers don't always get exemption, retail gets different angles, etc.
    * @param {string} role - Contact role/title
    * @param {string} industry - Company industry
    * @param {string} exemptionStatus - Tax exemption status
    * @param {object} accountData - Optional account data for multi-site detection
+   * @param {string} manualAngleOverride - Optional manual angle selection (respects user choice)
    * @returns {string} - Selected angle key
    */
-  function selectAngleForContact(role, industry, exemptionStatus, accountData = {}) {
-    // EXEMPTION-FIRST STRATEGY: If eligible for exemption, prioritize exemption_recovery
-    if (exemptionStatus && EXEMPTION_DETAILS[exemptionStatus]) {
-      return 'exemption_recovery';
+  function selectAngleForContact(role, industry, exemptionStatus, accountData = {}, manualAngleOverride = null) {
+    // STEP 1: If user manually specified an angle, ALWAYS use it (respect user intent)
+    if (manualAngleOverride) {
+      return manualAngleOverride;
     }
 
-    // Check for multi-site scenario
+    // STEP 2: Get weighted angles for this industry
+    const normalizedIndustry = industry ? String(industry).trim() : null;
+    let weightedAngles = WEIGHTED_ANGLES_BY_INDUSTRY[normalizedIndustry] || WEIGHTED_ANGLES_BY_INDUSTRY['default'];
+
+    // STEP 3: Filter out angles that require exemption if contact is not eligible
+    const validAngles = weightedAngles.filter(item => {
+      const angleConfig = NEPQ_ANGLES[item.angle];
+      if (!angleConfig) return false;
+      
+      // If angle requires exemption, check if contact is eligible
+      if (angleConfig.requires_exemption && !exemptionStatus) {
+        return false;
+      }
+      
+      return true;
+    });
+
+    if (validAngles.length === 0) {
+      // Fallback if no valid angles
+      return 'timing_risk';
+    }
+
+    // STEP 4: Apply multi-site boost (if account has multiple facilities)
     const facilityCount = accountData?.numberOfFacilities || accountData?.facilityCount || 0;
+    let adjustedAngles = validAngles;
+    
     if (facilityCount && facilityCount > 2) {
-      return 'multi_site_consolidation';
+      // Boost multi_site_consolidation weight by 1.5x if they have multiple facilities
+      adjustedAngles = validAngles.map(item => {
+        if (item.angle === 'multi_site_consolidation') {
+          return { ...item, weight: item.weight * 1.5 };
+        }
+        return item;
+      });
     }
 
-    // Role-based priority
-    if (role) {
-      const normalizedRole = String(role).trim();
-      const roleAngles = ROLE_ANGLE_PRIORITY[normalizedRole];
-      if (roleAngles && roleAngles.length > 0) {
-        // Filter out angles that require exemption if not eligible
-        const availableAngles = roleAngles.filter(angle => {
-          const angleConfig = NEPQ_ANGLES[angle];
-          return !angleConfig.requires_exemption || exemptionStatus;
-        });
-        if (availableAngles.length > 0) {
-          // Randomize among top 2 angles for variety
-          const topAngles = availableAngles.slice(0, 2);
-          return topAngles[Math.floor(Math.random() * topAngles.length)];
-        }
+    // STEP 5: Weighted random selection
+    const selectedAngle = selectWeightedRandom(adjustedAngles);
+    
+    return selectedAngle;
+  }
+
+  /**
+   * Helper: Weighted random selection
+   * @param {Array} items - Array of {angle, weight} objects
+   * @returns {string} - Selected angle key
+   */
+  function selectWeightedRandom(items) {
+    const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+    let random = Math.random() * totalWeight;
+    
+    for (let item of items) {
+      random -= item.weight;
+      if (random <= 0) {
+        return item.angle;
       }
     }
-
-    // Industry-based priority
-    if (industry) {
-      const normalizedIndustry = String(industry).trim();
-      const industryAngles = INDUSTRY_ANGLE_PRIORITY[normalizedIndustry];
-      if (industryAngles && industryAngles.length > 0) {
-        const availableAngles = industryAngles.filter(angle => {
-          const angleConfig = NEPQ_ANGLES[angle];
-          return !angleConfig.requires_exemption || exemptionStatus;
-        });
-        if (availableAngles.length > 0) {
-          const topAngles = availableAngles.slice(0, 2);
-          return topAngles[Math.floor(Math.random() * topAngles.length)];
-        }
-      }
-    }
-
-    // Fallback: Random non-exemption angle
-    const fallbackAngles = ['timing_risk', 'demand_efficiency', 'budget_predictability', 'volatility_protection'];
-    return fallbackAngles[Math.floor(Math.random() * fallbackAngles.length)];
+    
+    // Fallback (should never reach here)
+    return items[0].angle;
   }
 
   /**
