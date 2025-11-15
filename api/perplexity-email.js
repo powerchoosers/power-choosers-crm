@@ -1692,7 +1692,7 @@ function getRoleSpecificLanguage(role) {
   };
 }
 
-async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation, exemptionStatus = null, exemptionDetails = null }) {
+async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation, exemptionStatus = null, exemptionDetails = null, userIntent = null }) {
   // Analyze manual prompt for enhanced context understanding
   const promptAnalysis = analyzeManualPrompt(prompt);
   
@@ -1931,20 +1931,32 @@ ${notes ? '- Additional Notes: ' + notes : ''}
 INDUSTRY-SPECIFIC CONTEXT:
 ${industryContent ? '- Industry Focus: ' + industryContent.language + '\n- Key Pain Points: ' + industryContent.painPoints.join(', ') + '\n- Average Savings: ' + industryContent.avgSavings + '\n- Key Benefit: ' + industryContent.keyBenefit + '\n- Urgency Drivers: ' + industryContent.urgencyDrivers.join(', ') : ''}
 
+USER INTENT OVERRIDES (HIGHEST PRIORITY - RESPECT USER CHOICES):
+${userIntent && (userIntent.angleOverride || userIntent.toneOverride || userIntent.signals?.length > 0 || userIntent.ctaStyle || userIntent.newsContext?.length > 0) ? `
+🎯 USER EXPLICITLY REQUESTED:
+${userIntent.angleOverride ? `- ANGLE OVERRIDE: Focus on ${userIntent.angleOverride} (user chose this - DO NOT change angle)` : ''}
+${userIntent.toneOverride ? `- TONE OVERRIDE: Use ${userIntent.toneOverride} tone (user specified - match this style)` : ''}
+${userIntent.signals && userIntent.signals.length > 0 ? `- COMPANY SIGNALS: ${userIntent.signals.join(', ')} (integrate these context clues naturally)` : ''}
+${userIntent.ctaStyle ? `- CTA STYLE: Use ${userIntent.ctaStyle} approach (${userIntent.ctaStyle === 'soft' ? 'exploratory, no pressure' : userIntent.ctaStyle === 'direct' ? 'clear ask, specific next step' : userIntent.ctaStyle === 'educational' ? 'offer resource/info' : 'standard yes/no'})` : ''}
+${userIntent.newsContext && userIntent.newsContext.length > 0 ? `- NEWS CONTEXT: ${userIntent.newsContext.join(', ')} (reference these market conditions naturally)` : ''}
+
+CRITICAL: User intent ALWAYS wins. If user specified angle/tone/CTA, DO NOT override with system defaults.
+` : '- No user overrides detected - use system-selected angle and tone'}
+
 NEPQ TAX EXEMPTION OPPORTUNITY (EXEMPTION-FIRST STRATEGY):
-${exemptionStatus && exemptionDetails ? `
+${exemptionStatus && exemptionDetails && !userIntent?.angleOverride ? `
 🎯 CRITICAL: This is a ${exemptionStatus} organization - PRIORITIZE EXEMPTION RECOVERY ANGLE
 - Exemption Type: ${exemptionDetails.description}
 - Typical Refund Value: ${exemptionDetails.typical_amount} over 4 years
 - Why They Care: Most ${industry || 'facilities'} know they're exempt but DON'T know how to claim exemption on electricity bills
 - NEPQ Strategy: Lead with disarming question about exemption filing (not generic "10-20% savings")
-- Hook Example: "Quick one—has your ${industry || 'facility'} filed for electricity sales tax exemption, or are you still paying sales tax on power?"
+- Hook Example: "Has your ${industry || 'facility'} filed for electricity sales tax exemption, or are you still paying sales tax on power?"
 - Value Emphasis: "${exemptionDetails.typical_amount} in refunds + ongoing tax elimination" (2-5x more valuable than rate savings)
 - Subject Line: "[FirstName], electricity tax exemption question" or "[FirstName], sales tax recovery question"
 - CTA: "Should I send an exemption audit for your facility—yes/no?" (single yes/no question, mobile-friendly)
 - AVOID: Generic "10-20% savings" messaging - exemption recovery is worth 2-5x more
 - Position: Strategic tax consultant, not commodity broker
-` : '- No tax exemption opportunity detected - use timing/multi-site/demand angles instead'}
+` : exemptionStatus && userIntent?.angleOverride ? '- Tax exemption available, but user specified different angle - respect user choice' : '- No tax exemption opportunity detected - use timing/multi-site/demand angles instead'}
 
 COMPANY SIZE CONTEXT (USE FOR FOCUS/PROACH ONLY - NEVER SAY "SMALL COMPANY"):
 - Focus Area: ${companySizeContext.focus}
@@ -2059,13 +2071,13 @@ TEMPLATE: Cold Email Outreach (NEPQ-Enhanced)
 ${exemptionStatus && exemptionDetails ? `
 🎯 EXEMPTION-FIRST STRATEGY ACTIVE: This is a ${exemptionStatus} organization
 - PRIORITY: Lead with tax exemption recovery (worth ${exemptionDetails.typical_amount})
-- Use disarming question: "Quick one—has your facility filed for electricity sales tax exemption?"
+- Use disarming question: "Has your facility filed for electricity sales tax exemption?"
 - Avoid generic "10-20% savings" - exemption is 2-5x more valuable
 - Position as strategic tax consultant, not rates guy
 ` : ''}
 Generate text for these fields:
 - greeting: "Hello ${firstName},"
-- opening_hook: ${exemptionStatus ? 'START WITH EXEMPTION QUESTION: "Quick one—has your ' + industry + ' facility filed for electricity sales tax exemption, or are you still paying sales tax on power?" (NEPQ disarming question, not alarming)' : 'Start with SPECIFIC problem awareness or market condition (1-2 sentences).'} ${accountDescription && !exemptionStatus ? 'MUST reference: "' + accountDescription + '"' : exemptionStatus ? 'Follow exemption question with brief context.' : 'Reference their specific business challenges.'} ${exemptionStatus ? '' : 'Focus on industry-specific energy challenges:'}
+- opening_hook: ${exemptionStatus ? 'START WITH EXEMPTION QUESTION: "Has your ' + industry + ' facility filed for electricity sales tax exemption, or are you still paying sales tax on power?" (NEPQ disarming question, not alarming)' : 'Start with SPECIFIC problem awareness or market condition (1-2 sentences).'} ${accountDescription && !exemptionStatus ? 'MUST reference: "' + accountDescription + '"' : exemptionStatus ? 'Follow exemption question with brief context.' : 'Reference their specific business challenges.'} ${exemptionStatus ? '' : 'Focus on industry-specific energy challenges:'}
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
   * Retail: Multiple locations, unpredictable costs, seasonal demand
@@ -2215,19 +2227,19 @@ ${modeInstructions ? `
 - CTA Style: ${modeInstructions.ctaStyle}
 ${generationMode === 'consultative' ? `
   * Focus on discovery questions to understand their situation
-  * Use softer language: "I'm curious..." "Out of curiosity..." "How do you typically..."
+  * Use softer language: "I'm curious..." "How do you typically..."
   * Lower pressure: Ask about their process rather than demanding action
   * Example CTA: "How do you typically handle your energy renewals?"` : ''}
 ${generationMode === 'direct' ? `
   * Lead with specific insights and concrete value upfront
-  * Use confident language: "Here's what I found..." "The reality is..." "Quick question—"
+  * Use confident language: "Here's what I found..." "The reality is..." 
   * Assertive but respectful: Present facts and ask direct questions
   * Example CTA: "When does your contract renew? That timing difference is usually worth 15-20%."` : ''}
 ${generationMode === 'balanced' ? `
   * Combine observation with specific value proposition
-  * Professional but conversational: "I noticed..." followed by "Here's what I've found..."
+  * Professional but conversational: Show industry knowledge with specific insights
   * Balanced approach: Show expertise without being pushy
-  * Example CTA: "Question for you—what's your renewal timeline?"` : ''}
+  * Example CTA: "What's your renewal timeline?"` : ''}
 ` : ''}
 
 SUBJECT LINE RULES (CRITICAL - MUST BE SPECIFIC, NOT VAGUE):
@@ -2453,7 +2465,7 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Include micro-observations: Reference their website, recent posts, industry trends they'd recognize
 - Vary sentence length: Mix short punchy statements with longer explanatory ones
 - Use conversational connectors: "Here's the thing...", "The reality is...", "What I've found..."
-- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", "I've been tracking how companies..." or other template phrases
+- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", or other template phrases
 ${marketContext?.enabled ? '- You may reference general market trends, but lead with specific observation first' : '- DO NOT mention generic market statistics - focus on their specific situation'}
 - Show expertise subtly: "In my experience with ${industry || '[industry]'} companies", "I've noticed [specific trend about their company]"
 ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\'ve likely seen..." (tenure available)' : ''}
@@ -2529,10 +2541,10 @@ CTA (ASSERTIVE, NOT PERMISSION-BASED):
 ${ctaPattern ? 'Use assertive question pattern: "' + ctaPattern.template + '"' : 'Create an assertive qualifying question'}
 - ASSERTIVE PATTERNS (use these - they assume conversation is happening):
   * "When does your current contract renew? And how often do you typically review your rates?"
-  * "Quick question—are you locking in 6 months early or waiting closer to renewal?"
-  * "Out of curiosity—when you renew your contract, do you shop around or just renew what you had?"
-  * "Question for you—what's your renewal timeline? That timing difference is usually worth 15-20%."
-  * "Real question—does energy cost predictability matter for your budget planning?" (for finance roles)
+  * "Are you locking in 6 months early or waiting closer to renewal?"
+  * "When you renew your contract, do you shop around or just renew what you had?"
+  * "What's your renewal timeline? That timing difference is usually worth 15-20%."
+  * "Does energy cost predictability matter for your budget planning?" (for finance roles)
 - FORBIDDEN PERMISSION-BASED PATTERNS (DO NOT USE):
   * "Would you be open to a conversation?" (asking permission, weak)
   * "Are you interested in learning more?" (permission-based)
@@ -2559,10 +2571,10 @@ ${generationMode === 'consultative' ? `
 * Use discovery questions: "I'm curious..." "How do you typically..." "What matters more to you..."
 * Lower pressure approach - understand their situation first` : ''}
 ${generationMode === 'direct' ? `
-* Lead with specific insights: "Here's what I found..." "The reality is..." "Quick question—"
+* Lead with specific insights: "Here's what I found..." "The reality is..." 
 * Assertive but respectful - present facts and ask direct questions` : ''}
 ${generationMode === 'balanced' ? `
-* Combine observation + value: "I noticed..." followed by "Here's what I've found..."
+* Combine observation with specific value proposition
 * Professional but conversational - show expertise without being pushy` : ''}
 ` : ''}
 
@@ -2586,7 +2598,7 @@ TONE: Write like a 29-year-old Texas business pro - conversational, confident, d
 - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
 - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy"
 - Sound like: colleague who knows their industry and has talked to others like them
-- Use casual confidence: "Quick question—" "Real question—" "Out of curiosity—"
+- Use direct questions without prefixes: "When does your contract renew?" not "Quick question—when does your contract renew?"
 `;
 
     return { 
@@ -2706,7 +2718,12 @@ export default async function handler(req, res) {
       return;
     }
 
-    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext, meetingPreferences, industrySegmentation, exemptionStatus = null, exemptionDetails = null } = req.body || {};
+    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext, meetingPreferences, industrySegmentation, exemptionStatus = null, exemptionDetails = null, userIntent = null } = req.body || {};
+    
+    // Log user intent for debugging
+    if (userIntent && (userIntent.angleOverride || userIntent.toneOverride || userIntent.signals?.length > 0)) {
+      console.log('[Perplexity] User intent detected:', userIntent);
+    }
     
     // Detect template type for both HTML and standard modes
     const templateType = getTemplateType(prompt);
@@ -2745,7 +2762,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation, exemptionStatus, exemptionDetails });
+    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation, exemptionStatus, exemptionDetails, userIntent });
     const fullSystemPrompt = dateContext + systemPrompt;
     
     // Call Perplexity API
@@ -2777,7 +2794,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         const fallbackBody = {
           model: 'sonar',
           messages: [
-            { role: 'system', content: dateContext + (await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation, exemptionStatus, exemptionDetails })).prompt },
+            { role: 'system', content: dateContext + (await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation, exemptionStatus, exemptionDetails, userIntent })).prompt },
             { role: 'user', content: prompt || 'Draft a professional email' }
           ],
           max_tokens: 600
