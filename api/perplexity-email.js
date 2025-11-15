@@ -1113,39 +1113,39 @@ function getOpeningStyle(recipient) {
   const styles = [
     {
       type: 'problem_aware',
-      prompt: 'Start with industry-specific energy problem or market condition affecting their business',
-      example: '[Industry] companies are facing rising electricity costs as contracts renew in 2025. [Company] is likely seeing significant rate increases...',
-      energyFocus: 'Contract renewal timing and rate increases'
+      prompt: 'Start with authentic voice + specific company observation. NO role intro, NO generic market statistics.',
+      example: 'Been wondering—with your fabrication operations in Houston, early renewal timing tends to lock in better rates than last-minute scrambles. Teams that plan 60-120 days out avoid the calendar crunch.',
+      energyFocus: 'Contract renewal timing and specific operations'
     },
     {
       type: 'role_specific',
-      prompt: 'Focus on energy challenges specific to their role',
-      example: 'As a [job title], you\'re likely dealing with unpredictable energy costs affecting your operations. [Company]...',
-      energyFocus: 'Role-specific energy pain points'
+      prompt: 'Start with disarming opener + specific observation about their company. NO "As a [role]" pattern.',
+      example: 'Let me ask you something—are you locking in early or waiting close to expiration? With your [specific operations], timing tends to matter more than squeezing a last-minute rate.',
+      energyFocus: 'Role-specific challenges with authentic tone'
     },
     {
       type: 'timing_urgency',
-      prompt: 'Open with timing-related urgency relevant to their energy situation',
-      example: 'Companies renewing electricity contracts in 2025 are facing 15-25% higher rates. Early procurement could save [company] significant costs...',
+      prompt: 'Open with authentic voice + timing observation. NO generic rate statistics.',
+      example: 'Here\'s what I\'m seeing—most teams I talk to in [industry] lock in 90-120 days before renewal. Waiting till the last 30 days usually means paying whatever the market demands.',
       energyFocus: 'Contract timing and early renewal benefits'
     },
     {
       type: 'budget_pressure',
-      prompt: 'Lead with budget or cost pressure relevant to their energy spend',
-      example: 'Rising electricity costs are putting pressure on operational budgets across [industry]. [Company] may be experiencing...',
-      energyFocus: 'Budget pressure from energy cost increases'
+      prompt: 'Lead with observation + budget context specific to their business.',
+      example: 'Looking at your situation—when budgeting for energy, are you locking in costs or dealing with volatility? With [company details], predictability usually matters as much as the rate itself.',
+      energyFocus: 'Budget predictability and cost management'
     },
     {
       type: 'compliance_risk',
-      prompt: 'Reference regulatory or compliance considerations for energy procurement',
-      example: 'Energy procurement regulations are evolving, and companies need strategic approaches to compliance. [Company] may need to consider...',
-      energyFocus: 'Regulatory compliance and energy procurement'
+      prompt: 'Reference specific compliance observation. NO corporate speak.',
+      example: 'Question for you—is your [industry type] organization claiming electricity exemptions? A lot of facilities miss this, but the refund potential can be significant.',
+      energyFocus: 'Tax exemptions and compliance opportunities'
     },
     {
       type: 'operational_efficiency',
-      prompt: 'Focus on operational efficiency challenges related to energy management',
-      example: 'Managing multiple energy suppliers and contracts is becoming increasingly complex. [Company] likely faces...',
-      energyFocus: 'Energy management complexity and operational efficiency'
+      prompt: 'Focus on operational challenge with conversational tone.',
+      example: 'From what I\'m hearing—how many facilities are you managing energy for? Consolidating renewals across locations usually saves more than negotiating each one separately.',
+      energyFocus: 'Multi-site consolidation and operational efficiency'
     }
   ];
   
@@ -1959,12 +1959,12 @@ ${companySizeContext && companySizeContext.size === 'large' ? '- Size Context: "
 ${companySizeContext && companySizeContext.size !== 'large' ? '- Industry Context: "As a ' + (industry || 'company') + ', ' + companySizeContext.focus + ' is key..." (NEVER say "small company" or "small business" - use industry instead)' : ''}
 ${contractUrgency ? '- Urgency Level: "With ' + contractUrgency.level + ' timing, ' + contractUrgency.focus + '..."' : ''}
 
-ROLE-SPECIFIC OPENING HOOK EXAMPLES:
-${job?.toLowerCase().includes('cfo') || job?.toLowerCase().includes('finance') ? '- CFO: "As CFO of ' + company + ', you\'re likely planning 2025 budgets with energy costs rising..."' : ''}
-${job?.toLowerCase().includes('facilities') || job?.toLowerCase().includes('maintenance') ? '- Facilities: "Managing energy procurement on top of facilities operations can be time-consuming..."' : ''}
-${job?.toLowerCase().includes('procurement') || job?.toLowerCase().includes('purchasing') ? '- Procurement: "As procurement manager, you know the energy market is competitive..."' : ''}
-${job?.toLowerCase().includes('operations') || job?.toLowerCase().includes('manager') ? '- Operations: "Energy costs can be one of the most unpredictable operational expenses..."' : ''}
-${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo') ? '- Executive: "As President of ' + company + ', you understand the importance of managing operational costs..."' : ''}
+ROLE-SPECIFIC OPENING HOOK EXAMPLES (USE AUTHENTIC TONE):
+${job?.toLowerCase().includes('cfo') || job?.toLowerCase().includes('finance') ? '- CFO: "Question for you—does energy cost predictability matter for your budget planning? With ' + company + '\'s operations, locking in early usually gives CFOs more control than waiting..."' : ''}
+${job?.toLowerCase().includes('facilities') || job?.toLowerCase().includes('maintenance') ? '- Facilities: "Let me ask you something—how are you handling energy renewals on top of everything else? Most facilities teams consolidate this to free up time for actual operations..."' : ''}
+${job?.toLowerCase().includes('procurement') || job?.toLowerCase().includes('purchasing') ? '- Procurement: "Here\'s what I\'m seeing—when procurement teams lock in 90+ days early, they avoid the last-minute rate spikes. Waiting usually means taking whatever the market offers..."' : ''}
+${job?.toLowerCase().includes('operations') || job?.toLowerCase().includes('manager') ? '- Operations: "Looking at your situation—are rising energy costs affecting your operational budget? With ' + company + ', predictable costs usually matter as much as the actual rate..."' : ''}
+${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo') ? '- Executive: "Been wondering—when budgeting for energy, are you locking in costs or dealing with volatility? Most CEOs I talk to prefer predictability over squeezing the lowest possible rate..."' : ''}
 `;
 
   // Debug log for recipient context
@@ -2391,12 +2391,13 @@ VALUE PROPOSITION (1-2 sentences MINIMUM):
 
 CTA (ASSERTIVE, NOT PERMISSION-BASED):
 ${ctaPattern ? 'Use assertive question pattern: "' + ctaPattern.template + '"' : 'Create an assertive qualifying question'}
-- ASSERTIVE PATTERNS (use these - they assume conversation is happening):
-  * "When does your current contract renew? And how often do you typically review your rates?"
-  * "Quick question—are you locking in 6 months early or waiting closer to renewal?"
-  * "Out of curiosity—when you renew your contract, do you shop around or just renew what you had?"
-  * "Question for you—what's your renewal timeline? That timing difference is usually worth 15-20%."
-  * "Real question—does energy cost predictability matter for your budget planning?" (for finance roles)
+- CRITICAL: Generate EXACTLY ONE question. Pick ONE pattern below, not multiple.
+- ASSERTIVE PATTERNS (pick ONE only):
+  * "When does your current contract renew?"
+  * "Are you locking in early or waiting close to expiration?"
+  * "When you renew, do you shop around or just renew what you had?"
+  * "What's your renewal timeline?"
+  * "Does energy cost predictability matter for your budget planning?" (for finance roles)
 - FORBIDDEN PERMISSION-BASED PATTERNS (DO NOT USE):
   * "Would you be open to a conversation?" (asking permission, weak)
   * "Are you interested in learning more?" (permission-based)
@@ -2404,7 +2405,7 @@ ${ctaPattern ? 'Use assertive question pattern: "' + ctaPattern.template + '"' :
   * "Open to discussing your energy setup?" (permission-based)
 - MUST: Assume the conversation is happening - don't ask for permission to talk
 - YES: Ask specific question about their contract, timing, or process
-- Role-specific CTAs:
+- Role-specific CTAs (choose ONE):
   * Finance roles (CFO, Controller): Focus on predictability, budget cycles, timing
   * Operations roles: Focus on renewal timing, early lock-in, facility operations
   * Executive roles: Focus on contract timing, strategic planning
@@ -2412,7 +2413,7 @@ ${ctaPattern ? 'Use assertive question pattern: "' + ctaPattern.template + '"' :
 - Complete sentence with proper punctuation (? or .)
 - MUST be complete sentence with proper ending punctuation
 - NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .)
-- Generate ONLY ONE CTA
+- Generate ONLY ONE CTA - no second questions, no follow-up questions
 
 EMAIL GENERATION MODE: ${generationMode.toUpperCase()}
 ${modeInstructions ? `
@@ -2423,7 +2424,7 @@ ${generationMode === 'consultative' ? `
 * Use discovery questions: "I'm curious..." "How do you typically..." "What matters more to you..."
 * Lower pressure approach - understand their situation first` : ''}
 ${generationMode === 'direct' ? `
-* Lead with specific insights: "Here's what I found..." "The reality is..." "Quick question—"
+* Lead with specific insights: "Here's what I found..." "The reality is..." "Let me ask you something—"
 * Assertive but respectful - present facts and ask direct questions` : ''}
 ${generationMode === 'balanced' ? `
 * Combine observation + value: "I noticed..." followed by "Here's what I've found..."
@@ -2450,7 +2451,7 @@ TONE: Write like a 29-year-old Texas business pro - conversational, confident, d
 - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
 - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy"
 - Sound like: colleague who knows their industry and has talked to others like them
-- Use casual confidence: "Quick question—" "Real question—" "Out of curiosity—"
+- Use casual confidence: "Let me ask you something—" "Question for you—" "Been wondering—"
 `;
 
     return { 
@@ -2516,8 +2517,9 @@ QUALITY REQUIREMENTS:
 ✓ Length: 90-130 words total
 ✓ Use "${firstName || 'there'}," in greeting ONCE (no duplicate names)
 ✓ Middle paragraph: 3-4 complete sentences
-✓ MUST mention "15-25%" rate increase
-✓ CTA: Use qualifying questions only (e.g., "When does your contract expire?", "Are rising costs affecting your budget?")
+✓ Reference company-specific observation or timing, NEVER generic rate statistics
+✓ NO generic market statistics — use accountDescription and company context only
+✓ CTA: Use EXACTLY ONE qualifying question (pick ONE: "When does your contract expire?" OR "Are rising costs affecting your budget?" — not both)
 ✓ Subject line: Under 50 chars, include ${firstName || 'recipient name'}
 ✓ Closing: "Best regards," on its own line, followed by sender name on next line
 ✓ DO NOT include citation markers like [1], [2], [3]
@@ -2526,7 +2528,7 @@ PARAGRAPH STRUCTURE (CRITICAL):
 ✓ Paragraph 1: Greeting line - "Hi ${firstName || 'there'},"
 ✓ Paragraph 2: Opening context (2-3 sentences) 
 ✓ Paragraph 3: Main message and value proposition (3-4 sentences)
-✓ Paragraph 4: Call to action (1-2 sentences)
+✓ Paragraph 4: Call to action (1 sentence only — EXACTLY ONE question, must end with ?)
 ✓ Use DOUBLE LINE BREAKS between paragraphs
 ✓ Each paragraph must be separated by blank line
 
@@ -2764,6 +2766,24 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           }
         }
         
+        // Enforce single CTA for cold emails (remove extra questions)
+        function enforceSingleCTA(text) {
+          if (!text) return text;
+          // Find all sentences ending with ?
+          const questions = text.match(/[^.!?]*\?/g) || [];
+          
+          // If more than one question, keep only the last one (the CTA)
+          if (questions.length > 1) {
+            console.warn('[CTA Cleanup] Multiple questions detected, keeping only last one');
+            // Remove all but the last question
+            for (let i = 0; i < questions.length - 1; i++) {
+              text = text.replace(questions[i], '');
+            }
+          }
+          
+          return text.trim();
+        }
+        
         // Final language polishing: de-salesify and personalize industry/size
         const sizeCategory = (recipient?.account ? (recipient.account.annualUsage ? (recipient.account.annualUsage < 500000 ? 'small' : (recipient.account.annualUsage < 5000000 ? 'medium' : 'large')) : null) : null);
         const personalizeCtx = { 
@@ -2773,10 +2793,10 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           job: recipient?.title || recipient?.job || recipient?.role || null
         };
         if (jsonData.greeting) jsonData.greeting = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.greeting, personalizeCtx)));
-        if (jsonData.opening_hook) jsonData.opening_hook = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx)));
+        if (jsonData.opening_hook) jsonData.opening_hook = enforceSingleCTA(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx))));
         if (jsonData.value_proposition) jsonData.value_proposition = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.value_proposition, personalizeCtx)));
         if (jsonData.social_proof_optional) jsonData.social_proof_optional = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.social_proof_optional, personalizeCtx)));
-        if (jsonData.cta_text) jsonData.cta_text = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.cta_text, personalizeCtx)));
+        if (jsonData.cta_text) jsonData.cta_text = enforceSingleCTA(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.cta_text, personalizeCtx))));
         
         // Clean all other string fields in jsonData to remove citations
         Object.keys(jsonData).forEach(key => {
