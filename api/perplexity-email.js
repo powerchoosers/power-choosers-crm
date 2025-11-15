@@ -3,8 +3,6 @@
 // Expects POST { prompt, mode: 'standard'|'html', recipient, to, senderName, fromEmail }
 
 import { cors } from './_cors.js';
-import NEPQHelpers from '../scripts/utils/nepq-helpers.js';
-import NEPQ_CONFIG from '../scripts/config/nepq-email-config.js';
 
 // ========== SUBJECT LINE VARIANTS ==========
 // Multiple subject line options that randomly select to reduce template-like appearance
@@ -1694,7 +1692,7 @@ function getRoleSpecificLanguage(role) {
   };
 }
 
-async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation }) {
+async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation, exemptionStatus = null, exemptionDetails = null }) {
   // Analyze manual prompt for enhanced context understanding
   const promptAnalysis = analyzeManualPrompt(prompt);
   
@@ -1706,6 +1704,11 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const job = r.title || r.job || r.role || '';
   const industry = r.industry || '';
   const energy = r.energy || {};
+  
+  // NEPQ: Log exemption detection
+  if (exemptionStatus && exemptionDetails) {
+    console.log(`[NEPQ] Exemption-first strategy activated for ${company}: ${exemptionStatus} (${exemptionDetails.typical_amount})`);
+  }
   const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 1000);
   const notes = [r.notes, r.account?.notes].filter(Boolean).join('\n').slice(0, 500);
   // Debug log to see what account data is available
@@ -1928,6 +1931,21 @@ ${notes ? '- Additional Notes: ' + notes : ''}
 INDUSTRY-SPECIFIC CONTEXT:
 ${industryContent ? '- Industry Focus: ' + industryContent.language + '\n- Key Pain Points: ' + industryContent.painPoints.join(', ') + '\n- Average Savings: ' + industryContent.avgSavings + '\n- Key Benefit: ' + industryContent.keyBenefit + '\n- Urgency Drivers: ' + industryContent.urgencyDrivers.join(', ') : ''}
 
+NEPQ TAX EXEMPTION OPPORTUNITY (EXEMPTION-FIRST STRATEGY):
+${exemptionStatus && exemptionDetails ? `
+🎯 CRITICAL: This is a ${exemptionStatus} organization - PRIORITIZE EXEMPTION RECOVERY ANGLE
+- Exemption Type: ${exemptionDetails.description}
+- Typical Refund Value: ${exemptionDetails.typical_amount} over 4 years
+- Why They Care: Most ${industry || 'facilities'} know they're exempt but DON'T know how to claim exemption on electricity bills
+- NEPQ Strategy: Lead with disarming question about exemption filing (not generic "10-20% savings")
+- Hook Example: "Quick one—has your ${industry || 'facility'} filed for electricity sales tax exemption, or are you still paying sales tax on power?"
+- Value Emphasis: "${exemptionDetails.typical_amount} in refunds + ongoing tax elimination" (2-5x more valuable than rate savings)
+- Subject Line: "[FirstName], electricity tax exemption question" or "[FirstName], sales tax recovery question"
+- CTA: "Should I send an exemption audit for your facility—yes/no?" (single yes/no question, mobile-friendly)
+- AVOID: Generic "10-20% savings" messaging - exemption recovery is worth 2-5x more
+- Position: Strategic tax consultant, not commodity broker
+` : '- No tax exemption opportunity detected - use timing/multi-site/demand angles instead'}
+
 COMPANY SIZE CONTEXT (USE FOR FOCUS/PROACH ONLY - NEVER SAY "SMALL COMPANY"):
 - Focus Area: ${companySizeContext.focus}
 - Pain Points: ${companySizeContext.painPoints.join(', ')}
@@ -2037,10 +2055,17 @@ Generate text for these fields:
 - cta_text: Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation). Examples: "Let's Discuss Your Proposal", "Schedule a Proposal Review", "Book Your Consultation". Vary based on conversation context but always focus on scheduling.`,
 
       cold_email: `
-TEMPLATE: Cold Email Outreach
+TEMPLATE: Cold Email Outreach (NEPQ-Enhanced)
+${exemptionStatus && exemptionDetails ? `
+🎯 EXEMPTION-FIRST STRATEGY ACTIVE: This is a ${exemptionStatus} organization
+- PRIORITY: Lead with tax exemption recovery (worth ${exemptionDetails.typical_amount})
+- Use disarming question: "Quick one—has your facility filed for electricity sales tax exemption?"
+- Avoid generic "10-20% savings" - exemption is 2-5x more valuable
+- Position as strategic tax consultant, not rates guy
+` : ''}
 Generate text for these fields:
 - greeting: "Hello ${firstName},"
-- opening_hook: Start with SPECIFIC problem awareness or market condition (1-2 sentences). ${accountDescription ? 'MUST reference: "' + accountDescription + '"' : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
+- opening_hook: ${exemptionStatus ? 'START WITH EXEMPTION QUESTION: "Quick one—has your ' + industry + ' facility filed for electricity sales tax exemption, or are you still paying sales tax on power?" (NEPQ disarming question, not alarming)' : 'Start with SPECIFIC problem awareness or market condition (1-2 sentences).'} ${accountDescription && !exemptionStatus ? 'MUST reference: "' + accountDescription + '"' : exemptionStatus ? 'Follow exemption question with brief context.' : 'Reference their specific business challenges.'} ${exemptionStatus ? '' : 'Focus on industry-specific energy challenges:'}
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
   * Retail: Multiple locations, unpredictable costs, seasonal demand
@@ -2048,14 +2073,17 @@ Generate text for these fields:
   * Education: Facility maintenance, student safety, budget optimization
   * Use company-specific data: current supplier, rate, contract timing, recent achievements
 IMPORTANT: Always reference ${company} specifically. Use qualitative language (rising, increasing, higher) NOT percentages (15-25%, 20-30%). Keep it natural and conversational. NEVER mention company size ("small company", "small business") - focus on role, industry, and operational challenges instead.
-- value_proposition: How we help (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X annually", "helped similar companies achieve Y". Include role-specific benefits:
+- value_proposition: ${exemptionStatus && exemptionDetails ? `EXEMPTION VALUE PROP: "Most ${industry} facilities don't know they can recover electricity sales tax paid over the last 4 years. Over 4 years, that's typically ${exemptionDetails.typical_amount} in refundable tax, plus ongoing elimination." (Emphasize exemption recovery, not generic rate savings)` : `How we help (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X annually", "helped similar companies achieve Y".`} Include role-specific benefits:
   * CFOs: Budget predictability, cost reduction, risk mitigation
   * Facilities Managers: Operational efficiency, maintenance cost reduction
   * Procurement Managers: Vendor management, contract optimization
   * Operations Managers: Cost control, efficiency improvements
 Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs while reducing procurement complexity." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK. Statistics ARE allowed here (value prop only), just not in opening_hook.
 - social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional). Use specific outcomes: "We recently helped [similar company] reduce energy costs by 18%", "Our clients in [industry] typically save $X annually", "Companies like [company] have achieved 15-20% savings". Be specific and credible. NEVER use vague phrases like "similar companies" or "many businesses".
-${ctaPattern ? `
+${exemptionStatus && exemptionDetails ? `
+- cta_text: EXEMPTION CTA (NEPQ yes/no format): "Should I send an exemption audit for your facility—yes/no?" or "Want to see the potential refund from unclaimed exemptions—yes/no?" (Single question, mobile-friendly, low friction)
+- cta_type: Return "qualifying"
+` : ctaPattern ? `
 - cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
 - cta_type: Return "${ctaPattern.type}"
 ` : `
@@ -2087,21 +2115,6 @@ ${recentActivityContext ? '✓ Use recent activity: "I saw ${company} recently..
 ${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
 ${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
 ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant for context' : ''}
-
-NEPQ STRUCTURE (IF NEPQ MODE ENABLED):
-When nepqMode is true, use NEPQ framework:
-1. CONNECTION QUESTION: Start with disarming question positioning you as expert (not needy)
-   - Examples: "Quick one—" "Real question—" "Out of curiosity—"
-   - Make it specific to their situation (exemption, timing, multi-site)
-   - NOT biographical facts - YES curious question
-2. SITUATIONAL RELEVANCE: ONE line why this matters NOW
-   - Tie to their role/industry/exemption/market conditions
-   - Specific trigger (exemption window, rate spike, contract timing)
-3. OUTCOME TEASER: Specific, not generic "10-20% savings"
-   - If exemption-eligible: "$50K-$500K refund potential"
-   - If timing: "6 months early = 8-15% savings"
-   - If multi-site: "Prevents 2-4% scatter overpay"
-4. ONE CLEAR CTA: Single yes/no question (mobile-friendly)
 
 CONVERSATIONAL FLOW PATTERNS:
 ✓ GOOD: "I noticed ${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
@@ -2693,26 +2706,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    const { 
-      prompt, 
-      mode = 'standard', 
-      recipient = null, 
-      to = '', 
-      fromEmail = '', 
-      senderName = 'Lewis Patterson', 
-      whoWeAre, 
-      marketContext, 
-      meetingPreferences, 
-      industrySegmentation,
-      // NEPQ parameters
-      taxExemptStatus = null,
-      angle = null,
-      angleData = null,
-      exemptionDetails = null,
-      newsHook = null,
-      renewalUrgency = null,
-      nepqMode = false
-    } = req.body || {};
+    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext, meetingPreferences, industrySegmentation, exemptionStatus = null, exemptionDetails = null } = req.body || {};
     
     // Detect template type for both HTML and standard modes
     const templateType = getTemplateType(prompt);
@@ -2730,36 +2724,6 @@ export default async function handler(req, res) {
     
     const meetingTimes = getSuggestedMeetingTimes(meetingPreferences);
     
-    // Build NEPQ context if enabled
-    let nepqContext = '';
-    if (nepqMode && templateType === 'cold_email') {
-      nepqContext = `
-**NEPQ MODE ENABLED** - Use NEPQ framework for this email:
-
-SELECTED ANGLE: ${angleData?.name || angle || 'Standard outreach'}
-${exemptionDetails ? `
-TAX EXEMPTION OPPORTUNITY (PRIORITY):
-- Type: ${exemptionDetails.description}
-- Refund Potential: ${exemptionDetails.refundPotential}
-- IMPORTANT: Lead with exemption recovery if contact is in Finance/Operations/Executive role
-- This is 2-5x more valuable than rate savings alone
-` : ''}
-${newsHook ? `
-MARKET CONTEXT (2025):
-- ${newsHook.headline}
-- Hook: "${newsHook.emailHook}"
-- Weave naturally into situational relevance
-` : ''}
-${renewalUrgency ? `
-RENEWAL URGENCY: ${renewalUrgency.urgency} (${renewalUrgency.timeframe})
-` : ''}
-
-NEPQ STRUCTURE REQUIRED:
-1. Connection Question → 2. Situational Relevance → 3. Outcome Teaser → 4. One Clear CTA
-
-`;
-    }
-    
     // Only suggest meeting times for follow-up emails, not cold emails
     const dateContext = templateType === 'cold_email' ? `TODAY'S DATE: ${todayLabel}
 
@@ -2769,7 +2733,7 @@ COLD EMAIL RULES:
 - Keep CTAs under 12 words
 - Use role-specific qualifying questions
 
-${nepqContext}` : `TODAY'S DATE: ${todayLabel}
+` : `TODAY'S DATE: ${todayLabel}
 
 SUGGESTED MEETING TIMES (2+ business days out):
 - Option 1: ${meetingTimes.slot1} ${meetingTimes.slot1Time}
@@ -2781,7 +2745,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation });
+    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation, exemptionStatus, exemptionDetails });
     const fullSystemPrompt = dateContext + systemPrompt;
     
     // Call Perplexity API
@@ -2813,7 +2777,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         const fallbackBody = {
           model: 'sonar',
           messages: [
-            { role: 'system', content: dateContext + (await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation })).prompt },
+            { role: 'system', content: dateContext + (await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation, exemptionStatus, exemptionDetails })).prompt },
             { role: 'user', content: prompt || 'Draft a professional email' }
           ],
           max_tokens: 600
@@ -2970,12 +2934,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
             subject_style: jsonData.subject_style || null,
             cta_type: jsonData.cta_type || null,
             opening_style: templateType === 'cold_email' ? (openingStyleUsed || null) : null,
-            generated_at: new Date().toISOString(),
-            // NEPQ metadata
-            angle_used: angle || null,
-            exemption_type: taxExemptStatus || null,
-            news_hook_used: newsHook?.key || null,
-            nepq_mode: nepqMode
+            generated_at: new Date().toISOString()
           }
         }));
       } catch (e) {
@@ -3005,15 +2964,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
     return res.end(JSON.stringify({ 
       ok: true, 
       output: polished,
-      citations: citations,
-      metadata: {
-        generated_at: new Date().toISOString(),
-        // NEPQ metadata
-        angle_used: angle || null,
-        exemption_type: taxExemptStatus || null,
-        news_hook_used: newsHook?.key || null,
-        nepq_mode: nepqMode
-      }
+      citations: citations
     }));
     
   } catch (e) {
