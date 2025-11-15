@@ -2588,6 +2588,187 @@
 
   // ========== AI GENERATION CORE ==========
   
+  /**
+   * Detect user intent from manual input
+   * Parses user's typed context and extracts angle, tone, signals, and CTA preferences
+   */
+  function parseUserIntent(manualInput) {
+    if (!manualInput || manualInput.trim().length === 0) {
+      return { angleOverride: null, toneOverride: null, signals: [], ctaStyle: null, newsContext: [] };
+    }
+    
+    const input = manualInput.toLowerCase();
+    const intent = {
+      angleOverride: detectAngleIntent(input),
+      toneOverride: detectToneIntent(input),
+      signals: detectCompanySignals(input),
+      ctaStyle: detectCTAStyle(input),
+      newsContext: extractNewsReferences(input),
+    };
+    
+    console.log('[User Intent] Detected:', intent);
+    return intent;
+  }
+
+  /**
+   * ANGLE DETECTION: What selling point is user requesting?
+   */
+  function detectAngleIntent(input) {
+    const anglePatterns = {
+      'exemption_recovery': [
+        'exemption', 'tax recovery', 'sales tax', 'refund', 'tax exempt',
+        'tax file', 'exempt filing', 'electricity exemption'
+      ],
+      'demand_efficiency': [
+        'demand', 'consumption', 'efficiency', 'optimization', 'usage reduction',
+        'load reduction', 'demand reduction', 'optimize'
+      ],
+      'timing_strategy': [
+        'timing', 'early renewal', 'renewal timing', 'lock in', 'contract timing',
+        'renewal date', 'expiration', 'market spike'
+      ],
+      'multi_site_consolidation': [
+        'consolidat', 'multi-site', 'multiple location', 'centrali', 'network',
+        'all location', 'across location'
+      ],
+      'mission_funding': [
+        'mission', 'nonprofit', 'program', 'fund program', 'mission impact'
+      ],
+      'budget_predictability': [
+        'budget', 'predictab', 'volatil', 'forecast', 'financial', 'stability'
+      ],
+      'operational_simplicity': [
+        'simplif', 'operational', 'vendor', 'chaos', 'management', 'time saving'
+      ],
+    };
+    
+    for (const [angle, patterns] of Object.entries(anglePatterns)) {
+      if (patterns.some(pattern => input.includes(pattern))) {
+        console.log(`[Angle Detection] Matched: ${angle}`);
+        return angle;
+      }
+    }
+    
+    return null; // No specific angle detected
+  }
+
+  /**
+   * TONE DETECTION: What communication style is user requesting?
+   */
+  function detectToneIntent(input) {
+    const tonePatterns = {
+      'professional': [
+        'professional', 'formal', 'corporate', 'business-like', 'executive', 'polished'
+      ],
+      'casual': [
+        'casual', 'chill', 'laid back', 'relax', 'informal', 'conversational', 'friendly'
+      ],
+      'direct': [
+        'aggressive', 'hard sell', 'push', 'urgency', 'asap', 'immediate', 'direct'
+      ],
+      'soft': [
+        'soft', 'consultative', 'advisory', 'gentle', 'subtle', 'exploratory'
+      ],
+    };
+    
+    for (const [tone, patterns] of Object.entries(tonePatterns)) {
+      if (patterns.some(pattern => input.includes(pattern))) {
+        console.log(`[Tone Detection] Matched: ${tone}`);
+        return tone;
+      }
+    }
+    
+    return null; // No tone override - use default
+  }
+
+  /**
+   * COMPANY SIGNALS: What's happening with this company?
+   */
+  function detectCompanySignals(input) {
+    const signals = [];
+    
+    // Growth signals
+    if (input.includes('expand') || input.includes('grow') || input.includes('new market')) {
+      signals.push('expansion');
+    }
+    if (input.includes('acquire') || input.includes('acquired') || input.includes('merger')) {
+      signals.push('acquisition');
+    }
+    
+    // Leadership changes
+    if (input.includes('new ceo') || input.includes('new cfo') || input.includes('new leadership')) {
+      signals.push('leadership_change');
+    }
+    
+    // Financial/Operational
+    if (input.includes('struggling') || input.includes('challenges') || input.includes('pain')) {
+      signals.push('operational_pain');
+    }
+    if (input.includes('well-fund') || input.includes('well fund') || input.includes('vc-back')) {
+      signals.push('well_funded');
+    }
+    
+    // Timing signals
+    if (input.includes('contract renew') || input.includes('renewal coming')) {
+      signals.push('renewal_imminent');
+    }
+    if (input.includes('contract just') || input.includes('just renewed')) {
+      signals.push('recently_renewed');
+    }
+    
+    if (signals.length > 0) {
+      console.log('[Company Signals] Detected:', signals);
+    }
+    
+    return signals;
+  }
+
+  /**
+   * CTA STYLE: How should we ask for the next step?
+   */
+  function detectCTAStyle(input) {
+    if (input.includes('soft') || input.includes('exploratory') || input.includes('no pressure')) {
+      console.log('[CTA Style] Detected: soft');
+      return 'soft';
+    }
+    if (input.includes('hard') || input.includes('direct') || input.includes('ask for meeting')) {
+      console.log('[CTA Style] Detected: direct');
+      return 'direct';
+    }
+    if (input.includes('educational') || input.includes('send info') || input.includes('resource')) {
+      console.log('[CTA Style] Detected: educational');
+      return 'educational';
+    }
+    
+    return null; // Use standard
+  }
+
+  /**
+   * NEWS REFERENCES: What market context did user mention?
+   */
+  function extractNewsReferences(input) {
+    const newsHooks = [];
+    
+    if (input.includes('rate') && (input.includes('spike') || input.includes('up') || input.includes('increase'))) {
+      newsHooks.push('rate_spike');
+    }
+    if (input.includes('ai') || input.includes('artificial intelligence')) {
+      newsHooks.push('ai_adoption');
+    }
+    if (input.includes('expansion')) {
+      newsHooks.push('expansion_opportunity');
+    }
+    if (input.includes('deregul')) {
+      newsHooks.push('deregulation_risk');
+    }
+    
+    if (newsHooks.length > 0) {
+      console.log('[News Context] Detected:', newsHooks);
+    }
+    
+    return newsHooks;
+  }
+
   async function generateWithAI(aiBar, mode = 'standard') {
     const compose = document.getElementById('compose-window');
     const editor = compose?.querySelector('.body-input');
@@ -2604,6 +2785,10 @@
       aiBar.setAttribute('aria-hidden', 'true');
     }
 
+    // Parse user intent from manual prompt
+    const userIntent = parseUserIntent(prompt);
+    console.log('[AI] User intent parsed:', userIntent);
+
     // Start generating animation with appropriate mode
     startGeneratingAnimation(compose, mode);
     if (status) status.textContent = 'Generating...';
@@ -2612,7 +2797,7 @@
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
       const genUrl = `${base}/api/perplexity-email`;
       
-      console.log('[AI] Calling Perplexity Sonar...');
+      console.log('[AI] Calling Perplexity Sonar with user intent...');
 
       // Get recipient data with enrichment
       let recipient = null;
@@ -2701,7 +2886,9 @@
           industrySegmentation: industrySegmentation,
           // NEPQ: Pass exemption data for exemption-first strategy
           exemptionStatus: exemptionStatus,
-          exemptionDetails: exemptionDetails
+          exemptionDetails: exemptionDetails,
+          // DYNAMIC: Pass user intent for adaptive prompting
+          userIntent: userIntent
         })
       });
 
