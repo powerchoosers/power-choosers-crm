@@ -13,93 +13,6 @@ class SettingsPage {
                         height: 100
                     }
                 },
-                aiTemplates: {
-                    warm_intro: '',
-                    follow_up: '',
-                    energy_health: '',
-                    proposal: '',
-                    cold_email: '',
-                    invoice: '',
-                    who_we_are: '',
-                    // NEW: Market Context Settings
-                    marketContext: {
-                        enabled: true,
-                        rateIncrease: '15-25%',
-                        renewalYears: '2025-2026',
-                        earlyRenewalSavings: '20-30%',
-                        typicalClientSavings: '10-20%',
-                        marketInsights: 'due to data center demand'
-                    },
-                    // NEW: Meeting Preferences Settings
-                    meetingPreferences: {
-                        enabled: true,
-                        useHardcodedTimes: false,
-                        slot1Time: '2-3pm',
-                        slot2Time: '10-11am',
-                        callDuration: '15-minute',
-                        timeZone: 'EST'
-                    }
-                },
-                // NEW: A/B Testing Configuration
-                abTesting: {
-                    enabled: true,
-                    minSampleSize: 100,
-                    testVariables: [
-                        'subject_line',
-                        'opening_hook', 
-                        'value_prop_format',
-                        'cta_type'
-                    ],
-                    winnerThreshold: 0.05,
-                    autoPromoteWinner: true
-                },
-                // NEW: Industry Segmentation Rules
-                industrySegmentation: {
-                    enabled: true,
-                    rules: {
-                        manufacturing: {
-                            painPoints: ['production downtime', 'energy-intensive operations', 'equipment reliability'],
-                            avgSavings: '15-25%',
-                            keyBenefit: 'operational continuity',
-                            urgencyDrivers: ['production schedules', 'equipment uptime']
-                        },
-                        healthcare: {
-                            painPoints: ['budget constraints', 'regulatory compliance', 'patient care continuity'],
-                            avgSavings: '10-18%',
-                            keyBenefit: 'cost predictability',
-                            urgencyDrivers: ['budget cycles', 'compliance deadlines']
-                        },
-                        retail: {
-                            painPoints: ['multiple locations', 'unpredictable costs', 'seasonal demand'],
-                            avgSavings: '12-20%',
-                            keyBenefit: 'centralized management',
-                            urgencyDrivers: ['lease renewals', 'expansion plans']
-                        },
-                        hospitality: {
-                            painPoints: ['seasonal demand', 'guest comfort', 'operational costs'],
-                            avgSavings: '12-18%',
-                            keyBenefit: 'cost stability',
-                            urgencyDrivers: ['seasonal planning', 'guest satisfaction']
-                        },
-                        education: {
-                            painPoints: ['budget constraints', 'facility maintenance', 'student safety'],
-                            avgSavings: '10-15%',
-                            keyBenefit: 'budget optimization',
-                            urgencyDrivers: ['academic year cycles', 'facility upgrades']
-                        }
-                    }
-                },
-                // NEW: Cold Email Configuration
-                coldEmailSettings: {
-                    useMarketContext: false,  // Turn OFF market context for cold emails (user preference)
-                    useHardcodedMeetings: false,  // Turn OFF meeting requests for cold emails (user preference)
-                    industrySegmentationEnabled: true,  // Use industry rules from industrySegmentation
-                    requireObservationBased: true,  // Enforce observation-based opens
-                    avoidAIPhrases: true,  // Remove ChatGPT patterns
-                    varySubjectLineFormat: true,  // Multiple subject line options
-                    maxEmailLength: 120,  // Keep emails short
-                    requireLowCommitmentCTA: true  // Ask for chat, not meeting
-                },
                 emailDeliverability: {
                     // SendGrid Settings
                     enableTracking: true,        // SendGrid Open Tracking (tracks email opens)
@@ -445,71 +358,6 @@ class SettingsPage {
             });
         }
 
-        // AI Template fields
-        const templateFields = [
-            'template-warm-intro',
-            'template-follow-up',
-            'template-energy-health',
-            'template-proposal',
-            'template-cold-email',
-            'template-invoice',
-            'who-we-are'
-        ];
-        templateFields.forEach(fieldId => {
-            const field = document.getElementById(fieldId);
-            if (field) {
-                field.addEventListener('input', () => this.markDirty());
-            }
-        });
-
-        // Market Context Toggle
-        const marketContextCheckbox = document.getElementById('market-context-enabled');
-        const marketContextFields = document.getElementById('market-context-fields');
-
-        if (marketContextCheckbox && marketContextFields) {
-            marketContextCheckbox.addEventListener('change', function() {
-                if (this.checked) {
-                    marketContextFields.classList.remove('disabled');
-                } else {
-                    marketContextFields.classList.add('disabled');
-                }
-                this.markDirty();
-            }.bind(this));
-            
-            // Add input listeners for market context fields
-            ['market-rate-increase', 'market-renewal-years', 'market-early-renewal', 
-             'market-client-savings', 'market-insights'].forEach(id => {
-                const field = document.getElementById(id);
-                if (field) {
-                    field.addEventListener('input', () => this.markDirty());
-                }
-            });
-        }
-
-        // NEW: Meeting Preferences Event Listeners
-        const meetingPreferencesCheckbox = document.getElementById('meeting-preferences-enabled');
-        const meetingPreferencesFields = document.querySelector('.meeting-preferences-fields');
-
-        if (meetingPreferencesCheckbox && meetingPreferencesFields) {
-            meetingPreferencesCheckbox.addEventListener('change', function() {
-                if (this.checked) {
-                    meetingPreferencesFields.classList.remove('disabled');
-                } else {
-                    meetingPreferencesFields.classList.add('disabled');
-                }
-                this.markDirty();
-            }.bind(this));
-            
-            // Add input listeners for meeting preferences fields
-            ['meeting-use-hardcoded', 'meeting-slot1-time', 'meeting-slot2-time', 
-             'meeting-call-duration', 'meeting-timezone'].forEach(id => {
-                const field = document.getElementById(id);
-                if (field) {
-                    field.addEventListener('input', () => this.markDirty());
-                    field.addEventListener('change', () => this.markDirty());
-                }
-            });
-        }
 
         // Twilio phone numbers
         const addPhoneBtn = document.getElementById('add-phone-number');
@@ -594,47 +442,6 @@ class SettingsPage {
             });
         });
 
-        // Cold email settings event listeners
-        const coldEmailFields = [
-            'cold-email-industry-segment',
-            'cold-email-observation',
-            'cold-email-avoid-ai',
-            'cold-email-vary-subject',
-            'cold-email-low-commitment',
-            'cold-email-max-length'
-        ];
-        coldEmailFields.forEach(id => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            el.addEventListener('change', () => {
-                const v = el.type === 'checkbox' ? !!el.checked : el.value;
-                // Initialize coldEmailSettings if it doesn't exist
-                if (!this.state.settings.coldEmailSettings) {
-                    this.state.settings.coldEmailSettings = {};
-                }
-                switch(id){
-                    case 'cold-email-industry-segment': 
-                        this.state.settings.coldEmailSettings.industrySegmentationEnabled = v; 
-                        break;
-                    case 'cold-email-observation': 
-                        this.state.settings.coldEmailSettings.requireObservationBased = v; 
-                        break;
-                    case 'cold-email-avoid-ai': 
-                        this.state.settings.coldEmailSettings.avoidAIPhrases = v; 
-                        break;
-                    case 'cold-email-vary-subject': 
-                        this.state.settings.coldEmailSettings.varySubjectLineFormat = v; 
-                        break;
-                    case 'cold-email-low-commitment': 
-                        this.state.settings.coldEmailSettings.requireLowCommitmentCTA = v; 
-                        break;
-                    case 'cold-email-max-length': 
-                        this.state.settings.coldEmailSettings.maxEmailLength = parseInt(v) || 120; 
-                        break;
-                }
-                this.markDirty();
-            });
-        });
 
         // Phone number actions
         document.addEventListener('click', (e) => {
@@ -994,35 +801,6 @@ class SettingsPage {
 
     async saveSettings() {
         try {
-            // Before saving, capture AI template values
-            const aiTemplateFields = {
-                warm_intro: document.getElementById('template-warm-intro')?.value || '',
-                follow_up: document.getElementById('template-follow-up')?.value || '',
-                energy_health: document.getElementById('template-energy-health')?.value || '',
-                proposal: document.getElementById('template-proposal')?.value || '',
-                cold_email: document.getElementById('template-cold-email')?.value || '',
-                invoice: document.getElementById('template-invoice')?.value || '',
-                who_we_are: document.getElementById('who-we-are')?.value || '',
-                // NEW: Market Context
-                marketContext: {
-                    enabled: document.getElementById('market-context-enabled')?.checked ?? true,
-                    rateIncrease: document.getElementById('market-rate-increase')?.value || '15-25%',
-                    renewalYears: document.getElementById('market-renewal-years')?.value || '2025-2026',
-                    earlyRenewalSavings: document.getElementById('market-early-renewal')?.value || '20-30%',
-                    typicalClientSavings: document.getElementById('market-client-savings')?.value || '10-20%',
-                    marketInsights: document.getElementById('market-insights')?.value || 'due to data center demand'
-                },
-                // NEW: Meeting Preferences
-                meetingPreferences: {
-                    enabled: document.getElementById('meeting-preferences-enabled')?.checked ?? true,
-                    useHardcodedTimes: document.getElementById('meeting-use-hardcoded')?.checked ?? false,
-                    slot1Time: document.getElementById('meeting-slot1-time')?.value || '2-3pm',
-                    slot2Time: document.getElementById('meeting-slot2-time')?.value || '10-11am',
-                    callDuration: document.getElementById('meeting-call-duration')?.value || '15-minute',
-                    timeZone: document.getElementById('meeting-timezone')?.value || 'EST'
-                }
-            };
-            this.state.settings.aiTemplates = aiTemplateFields;
 
             // Save to Firebase first
             if (window.firebaseDB) {
@@ -1175,72 +953,6 @@ class SettingsPage {
     renderSettings() {
         // Render email signature section (text + image preview + controls)
         this.renderSignatureSection();
-
-        // Render AI Templates
-        const aiTemplates = this.state.settings.aiTemplates || {};
-
-        const warmIntro = document.getElementById('template-warm-intro');
-        if (warmIntro) warmIntro.value = aiTemplates.warm_intro || '';
-
-        const followUp = document.getElementById('template-follow-up');
-        if (followUp) followUp.value = aiTemplates.follow_up || '';
-
-        const energyHealth = document.getElementById('template-energy-health');
-        if (energyHealth) energyHealth.value = aiTemplates.energy_health || '';
-
-        const proposal = document.getElementById('template-proposal');
-        if (proposal) proposal.value = aiTemplates.proposal || '';
-
-        const coldEmail = document.getElementById('template-cold-email');
-        if (coldEmail) coldEmail.value = aiTemplates.cold_email || '';
-
-        const invoice = document.getElementById('template-invoice');
-        if (invoice) invoice.value = aiTemplates.invoice || '';
-
-        const whoWeAre = document.getElementById('who-we-are');
-        if (whoWeAre) whoWeAre.value = aiTemplates.who_we_are || '';
-
-        // NEW: Render Market Context
-        const marketContext = aiTemplates.marketContext || {};
-
-        const marketEnabled = document.getElementById('market-context-enabled');
-        if (marketEnabled) marketEnabled.checked = marketContext.enabled !== false;
-
-        const rateIncrease = document.getElementById('market-rate-increase');
-        if (rateIncrease) rateIncrease.value = marketContext.rateIncrease || '15-25%';
-
-        const renewalYears = document.getElementById('market-renewal-years');
-        if (renewalYears) renewalYears.value = marketContext.renewalYears || '2025-2026';
-
-        const earlyRenewal = document.getElementById('market-early-renewal');
-        if (earlyRenewal) earlyRenewal.value = marketContext.earlyRenewalSavings || '20-30%';
-
-        const clientSavings = document.getElementById('market-client-savings');
-        if (clientSavings) clientSavings.value = marketContext.typicalClientSavings || '10-20%';
-
-        const marketInsights = document.getElementById('market-insights');
-        if (marketInsights) marketInsights.value = marketContext.marketInsights || 'due to data center demand';
-
-        // NEW: Render Meeting Preferences
-        const meetingPreferences = aiTemplates.meetingPreferences || {};
-
-        const meetingEnabled = document.getElementById('meeting-preferences-enabled');
-        if (meetingEnabled) meetingEnabled.checked = meetingPreferences.enabled !== false;
-
-        const useHardcoded = document.getElementById('meeting-use-hardcoded');
-        if (useHardcoded) useHardcoded.checked = meetingPreferences.useHardcodedTimes !== false;
-
-        const slot1Time = document.getElementById('meeting-slot1-time');
-        if (slot1Time) slot1Time.value = meetingPreferences.slot1Time || '2-3pm';
-
-        const slot2Time = document.getElementById('meeting-slot2-time');
-        if (slot2Time) slot2Time.value = meetingPreferences.slot2Time || '10-11am';
-
-        const callDuration = document.getElementById('meeting-call-duration');
-        if (callDuration) callDuration.value = meetingPreferences.callDuration || '15-minute';
-
-        const timeZone = document.getElementById('meeting-timezone');
-        if (timeZone) timeZone.value = meetingPreferences.timeZone || 'EST';
 
         // Render Twilio phone numbers
         this.renderPhoneNumbers();
@@ -1451,26 +1163,6 @@ class SettingsPage {
         if (gdpr) gdpr.checked = !!d.gdprCompliant;
         const spam = document.getElementById('spam-score-check');
         if (spam) spam.checked = !!d.spamScoreCheck;
-
-        // Render cold email settings
-        const cold = this.state.settings.coldEmailSettings || {};
-        const industrySegment = document.getElementById('cold-email-industry-segment');
-        if (industrySegment) industrySegment.checked = cold.industrySegmentationEnabled !== false; // Default true
-        
-        const observation = document.getElementById('cold-email-observation');
-        if (observation) observation.checked = cold.requireObservationBased !== false; // Default true
-        
-        const avoidAI = document.getElementById('cold-email-avoid-ai');
-        if (avoidAI) avoidAI.checked = cold.avoidAIPhrases !== false; // Default true
-        
-        const varySubject = document.getElementById('cold-email-vary-subject');
-        if (varySubject) varySubject.checked = cold.varySubjectLineFormat !== false; // Default true
-        
-        const lowCommitment = document.getElementById('cold-email-low-commitment');
-        if (lowCommitment) lowCommitment.checked = cold.requireLowCommitmentCTA !== false; // Default true
-        
-        const maxLength = document.getElementById('cold-email-max-length');
-        if (maxLength) maxLength.value = cold.maxEmailLength || 120;
 
         this.updateSaveButton();
     }
