@@ -84,6 +84,157 @@ function getRandomGenerationMode() {
   return random;
 }
 
+// ========== NEWS LIBRARY: 2025 Market Triggers ==========
+const NEWS_LIBRARY = {
+  ratespike11pct: {
+    headline: 'Electricity rates up 11% nationally in 2025',
+    fact: 'National average increase Jan-Aug 2025. Some states seeing 17%+ jumps.',
+    date: 'November 2025',
+    relevance: 'Creates urgency for early renewal timing',
+    integrate: 'With rates up 11% nationally, teams that lock in early are protecting their budgets.'
+  },
+  
+  rateapprovals34b: {
+    headline: '$34B in rate hike approvals in 2025 alone',
+    fact: '34 billion in rate increase requests approved in first 3 quarters of 2025 (vs. 16B in 2024)',
+    date: 'September 2025',
+    relevance: 'Creates urgency for consolidation and early planning',
+    integrate: 'With 34B in rate hikes approved so far this year, consolidating energy agreements prevents being caught off-guard.'
+  },
+  
+  datacenterdemand50pct: {
+    headline: 'AI demand driving electricity rates up 50% (2023-2024)',
+    fact: 'Data center energy demands drove rates up 50% in 18 months. Energy demand projected to grow 42% by 2035.',
+    date: 'October 2025',
+    relevance: 'Especially relevant for data centers, capacity-sensitive operations',
+    integrate: 'Data center demand pushed rates up 50% in the last 18 months. If your facilities are capacity-sensitive, early review prevents rate shock.'
+  },
+  
+  deregulationrisk: {
+    headline: 'Deregulation volatility in Texas, PA, MD',
+    fact: 'Texas deregulation saw rates spike 7x in early years. Long-term costs exceeded $24B; $5,100 per household.',
+    date: 'November 2025',
+    relevance: 'Especially relevant in deregulated markets',
+    integrate: 'If you operate in a deregulated market like Texas, timing your renewal strategically is critical—deregulation often leads to rate volatility.'
+  },
+  
+  renewablescompliance: {
+    headline: 'Renewable energy priority #2 for executives (after AI)',
+    fact: 'Corporate net-zero goals resuming after 2024 pause. Clean energy mandates tightening.',
+    date: 'October 2025',
+    relevance: 'Relevant for ESG-conscious companies',
+    integrate: 'With renewable mandates tightening, companies are bundling rate locks with renewable credits—often saving 15-25% total.'
+  }
+};
+
+// ========== ROLE-SPECIFIC CTA VARIATIONS ==========
+const CTA_BY_ROLE = {
+  operations: [
+    'When does your current electricity contract expire?',
+    'Are you locking in early, or waiting closer to expiration?',
+    'With your production schedule, does contract timing usually sync with cash flow or market opportunity?'
+  ],
+  
+  finance: [
+    'With rates up 11%, are you locking in early or waiting?',
+    'Are rising electricity costs affecting your 2025 budget planning?',
+    'Would energy cost predictability help your financial forecasting?'
+  ],
+  
+  ceo: [
+    'Is energy contract renewal on your agenda for this quarter?',
+    'Are market spikes affecting your profit margin on energy?',
+    'When budgeting for energy, are you locking in costs or dealing with volatility?'
+  ],
+  
+  procurement: [
+    'Are you managing renewals centrally, or does each location handle independently?',
+    'How many energy suppliers are you currently managing?',
+    'When locations renew, do you shop around or just renew what you had?'
+  ],
+  
+  nonprofit_executive: [
+    'How are you making sure more funding goes to your mission, not vendors?',
+    'What if optimization could redirect $50K to programs annually?',
+    'Is energy cost management part of your strategic cost-reduction plan?'
+  ],
+  
+  nonprofit_finance: [
+    'Is your nonprofit currently filing electricity exemption certificates?',
+    'How much could exemption recovery impact your program funding?',
+    'Would energy strategy optimization help you reallocate budget to programs?'
+  ]
+};
+
+// Helper: Map news hook keys to NEWS_LIBRARY
+function mapNewsHookKey(hookKey) {
+  const mapping = {
+    'rate_spike_national': 'ratespike11pct',
+    'rate_spike_regional': 'ratespike11pct',
+    'rate_approvals': 'rateapprovals34b',
+    'datacenter_demand_spike': 'datacenterdemand50pct',
+    'deregulation_risk': 'deregulationrisk',
+    'renewables_compliance': 'renewablescompliance'
+  };
+  return mapping[hookKey] || hookKey;
+}
+
+// Helper: Build news context for prompt
+function buildNewsContext(newsHooks, prospect, angle) {
+  if (!newsHooks || newsHooks.length === 0) return '';
+  
+  const hookKey = mapNewsHookKey(newsHooks[0]);
+  const hook = NEWS_LIBRARY[hookKey];
+  if (!hook) return '';
+  
+  return `
+CURRENT MARKET CONTEXT (integrate naturally if relevant):
+- Headline: ${hook.headline}
+- Fact: ${hook.fact}
+- Date: ${hook.date}
+- Relevance: ${prospect?.industry || 'their'} company considering ${angle?.primaryMessage || 'energy strategy'}
+- Integration: Weave this naturally into the email if it strengthens the hook. Don't force it.
+Example: "${hook.integrate}"
+`;
+}
+
+// Helper: Get role-specific CTA
+function getRoleSpecificCTA(role, industry = null) {
+  // Normalize role
+  const normalizedRole = role?.toLowerCase() || 'operations';
+  
+  // Check for nonprofit roles
+  if (normalizedRole.includes('nonprofit') || normalizedRole.includes('executive director')) {
+    return CTA_BY_ROLE.nonprofit_executive?.[Math.floor(Math.random() * CTA_BY_ROLE.nonprofit_executive.length)] || 
+           CTA_BY_ROLE.operations[0];
+  }
+  
+  if (normalizedRole.includes('nonprofit') && (normalizedRole.includes('finance') || normalizedRole.includes('cfo'))) {
+    return CTA_BY_ROLE.nonprofit_finance?.[Math.floor(Math.random() * CTA_BY_ROLE.nonprofit_finance.length)] || 
+           CTA_BY_ROLE.finance[0];
+  }
+  
+  // Map common roles
+  if (normalizedRole.includes('finance') || normalizedRole.includes('cfo') || normalizedRole.includes('controller')) {
+    return CTA_BY_ROLE.finance?.[Math.floor(Math.random() * CTA_BY_ROLE.finance.length)] || 
+           CTA_BY_ROLE.operations[0];
+  }
+  
+  if (normalizedRole.includes('ceo') || normalizedRole.includes('president') || normalizedRole.includes('owner') || normalizedRole.includes('executive')) {
+    return CTA_BY_ROLE.ceo?.[Math.floor(Math.random() * CTA_BY_ROLE.ceo.length)] || 
+           CTA_BY_ROLE.operations[0];
+  }
+  
+  if (normalizedRole.includes('procurement') || normalizedRole.includes('purchasing') || normalizedRole.includes('buyer')) {
+    return CTA_BY_ROLE.procurement?.[Math.floor(Math.random() * CTA_BY_ROLE.procurement.length)] || 
+           CTA_BY_ROLE.operations[0];
+  }
+  
+  // Default to operations
+  return CTA_BY_ROLE.operations?.[Math.floor(Math.random() * CTA_BY_ROLE.operations.length)] || 
+         'When does your current contract renew?';
+}
+
 // Company research cache (session-level)
 const companyResearchCache = new Map();
 const linkedinResearchCache = new Map();
@@ -1114,7 +1265,7 @@ function getOpeningStyle(recipient) {
     {
       type: 'problem_aware',
       prompt: 'Start with authentic voice + specific company observation. NO role intro, NO generic market statistics.',
-      example: 'Been wondering—with your fabrication operations in Houston, early renewal timing tends to lock in better rates than last-minute scrambles. Teams that plan 60-120 days out avoid the calendar crunch.',
+      example: 'Been wondering—with your fabrication operations in Houston, early renewal timing tends to lock in better rates than last-minute scrambles. Best practice is renewing 6 months to 1 year in advance, though most companies wait until 30-60 days out or scramble at the last minute.',
       energyFocus: 'Contract renewal timing and specific operations'
     },
     {
@@ -1126,7 +1277,7 @@ function getOpeningStyle(recipient) {
     {
       type: 'timing_urgency',
       prompt: 'Open with authentic voice + timing observation. NO generic rate statistics.',
-      example: 'Here\'s what I\'m seeing—most teams I talk to in [industry] lock in 90-120 days before renewal. Waiting till the last 30 days usually means paying whatever the market demands.',
+      example: 'Here\'s what I\'m seeing—best practice is renewing 6 months to 1 year in advance, though most companies in [industry] wait until 30-60 days out or scramble at the last minute. Waiting till the last minute usually means paying whatever the market demands.',
       energyFocus: 'Contract timing and early renewal benefits'
     },
     {
@@ -1962,7 +2113,7 @@ ${contractUrgency ? '- Urgency Level: "With ' + contractUrgency.level + ' timing
 ROLE-SPECIFIC OPENING HOOK EXAMPLES (USE AUTHENTIC TONE):
 ${job?.toLowerCase().includes('cfo') || job?.toLowerCase().includes('finance') ? '- CFO: "Question for you—does energy cost predictability matter for your budget planning? With ' + company + '\'s operations, locking in early usually gives CFOs more control than waiting..."' : ''}
 ${job?.toLowerCase().includes('facilities') || job?.toLowerCase().includes('maintenance') ? '- Facilities: "Let me ask you something—how are you handling energy renewals on top of everything else? Most facilities teams consolidate this to free up time for actual operations..."' : ''}
-${job?.toLowerCase().includes('procurement') || job?.toLowerCase().includes('purchasing') ? '- Procurement: "Here\'s what I\'m seeing—when procurement teams lock in 90+ days early, they avoid the last-minute rate spikes. Waiting usually means taking whatever the market offers..."' : ''}
+${job?.toLowerCase().includes('procurement') || job?.toLowerCase().includes('purchasing') ? '- Procurement: "Here\'s what I\'m seeing—best practice is renewing 6 months to 1 year in advance, though most procurement teams wait until 30-60 days out. Waiting usually means taking whatever the market offers..."' : ''}
 ${job?.toLowerCase().includes('operations') || job?.toLowerCase().includes('manager') ? '- Operations: "Looking at your situation—are rising energy costs affecting your operational budget? With ' + company + ', predictable costs usually matter as much as the actual rate..."' : ''}
 ${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo') ? '- Executive: "Been wondering—when budgeting for energy, are you locking in costs or dealing with volatility? Most CEOs I talk to prefer predictability over squeezing the lowest possible rate..."' : ''}
 `;
@@ -2050,6 +2201,8 @@ SELECTED ANGLE (PRIMARY FOCUS):
 - Message: ${selectedAngle.primaryMessage}
 - Value: ${selectedAngle.primaryValue}
 - Opening: ${selectedAngle.openingTemplate}
+${selectedAngle.situationalContext ? `- Context: ${selectedAngle.situationalContext}` : ''}
+${selectedAngle.newsHooks && selectedAngle.newsHooks.length > 0 ? buildNewsContext(selectedAngle.newsHooks, { industry, company: recipient?.company || company }, selectedAngle) : ''}
 ` : ''}
 
 ${toneOpener ? `TONE OPENER: "${toneOpener}" (use this to start)` : ''}
@@ -2064,16 +2217,22 @@ Generate text for these fields:
   * Education: Facility maintenance, student safety
 IMPORTANT: ${company ? 'Reference ' + company + ' naturally. ' : ''}Keep it conversational, avoid over-specific details (no exact sq ft, employee counts, or contract rates). Focus on industry patterns, not hyper-specific data.
 
-- value_proposition: ${selectedAngle ? 'Based on ' + selectedAngle.id + ' angle: ' + selectedAngle.primaryValue : 'How we help'} (1-2 sentences). Example: "We help ${industry || 'companies'} secure better electricity rates and manage procurement more effectively. Clients typically save 10-20% annually." Keep it simple and concrete.
+- value_proposition: ${selectedAngle ? 'Based on ' + selectedAngle.id + ' angle: ' + selectedAngle.primaryValue : 'How we help'} (1-2 sentences). ${selectedAngle?.id === 'timing_strategy' && selectedAngle?.situationalContext ? 'Include timing context: ' + selectedAngle.situationalContext + '. ' : ''}Example: ${selectedAngle?.id === 'timing_strategy' ? '"Best practice is renewing 6 months to 1 year in advance, though most companies wait until 30-60 days out. Teams that plan ahead typically save ' + selectedAngle.primaryValue + '."' : '"We help ' + (industry || 'companies') + ' secure better electricity rates and manage procurement more effectively. Clients typically save 10-20% annually."'} Keep it simple and concrete.
 
 - social_proof_optional: Brief credibility IF relevant (1 sentence, optional). Example: "Companies in ${industry || '[industry]'} typically save 10-20%." Keep it general, not hyper-specific.
-${ctaPattern ? `
-- cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
-- cta_type: Return "${ctaPattern.type}"
-` : `
-- cta_text: ${selectedAngle ? 'Related to ' + selectedAngle.id + ': ' + selectedAngle.openingTemplate : 'Simple yes/no question'} (under 12 words, ending with ?).
-- cta_type: Return "qualifying"
-`}
+${(() => {
+  const roleCTA = getRoleSpecificCTA(job || recipient?.role || 'operations', industry);
+  if (roleCTA) {
+    return `- cta_text: "${roleCTA}" (use this exact CTA). Keep under 15 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
+- cta_type: Return "qualifying"`;
+  } else if (ctaPattern) {
+    return `- cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
+- cta_type: Return "${ctaPattern.type}"`;
+  } else {
+    return `- cta_text: ${selectedAngle ? 'Related to ' + selectedAngle.id + ': ' + selectedAngle.openingTemplate : 'Simple yes/no question'} (under 12 words, ending with ?).
+- cta_type: Return "qualifying"`;
+  }
+})()}
 
 AUTHENTIC TONE REQUIREMENTS:
 - Sound like ${senderName} (29, conversational, direct, no corporate speak)
@@ -2290,6 +2449,8 @@ SELECTED ANGLE (PRIMARY FOCUS - USE THIS):
 - Primary Message: ${selectedAngle.primaryMessage}
 - Value Proposition: ${selectedAngle.primaryValue}
 - Opening Template: ${selectedAngle.openingTemplate}
+${selectedAngle.situationalContext ? `- Context: ${selectedAngle.situationalContext}` : ''}
+${selectedAngle.newsHooks && selectedAngle.newsHooks.length > 0 ? buildNewsContext(selectedAngle.newsHooks, { industry, company }, selectedAngle) : ''}
 ` : ''}
 
 ${toneOpener ? `AUTHENTIC TONE OPENER: "${toneOpener}" (MUST use this to start the opening paragraph)` : ''}
@@ -2402,18 +2563,25 @@ CRITICAL:
 
 VALUE PROPOSITION (1-2 sentences MINIMUM):
 ${selectedAngle ? `PRIMARY FOCUS: ${selectedAngle.primaryValue}` : 'Explain how Power Choosers helps with SPECIFIC MEASURABLE VALUE'}
+${selectedAngle?.id === 'timing_strategy' && selectedAngle?.situationalContext ? `- TIMING CONTEXT: ${selectedAngle.situationalContext} (reference this when explaining value)` : ''}
 - MUST include: (1) What we do, (2) Concrete numbers: "save 10-20%", "reduce costs by $X", "clients typically see Y"
 ${selectedAngle ? `- Use angle value: ${selectedAngle.primaryValue}` : '- Reference their business type and industry challenges'}
-- Example: ${selectedAngle ? `"${selectedAngle.primaryValue}"` : '"We help ' + (industry || 'businesses') + ' secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs."'}
+- Example: ${selectedAngle?.id === 'timing_strategy' ? `"Best practice is renewing 6 months to 1 year in advance, though most companies wait until 30-60 days out. Teams that plan ahead typically save ${selectedAngle.primaryValue}."` : (selectedAngle ? `"${selectedAngle.primaryValue}"` : '"We help ' + (industry || 'businesses') + ' secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs."')}
 - NEVER end with incomplete phrases or "within [company name]"
 - ALWAYS include a complete value proposition - never skip this field
 - THIS FIELD IS MANDATORY - NEVER LEAVE BLANK
 
 CTA (ASSERTIVE, NOT PERMISSION-BASED):
-${selectedAngle ? `RELATED TO SELECTED ANGLE: Use a question related to ${selectedAngle.primaryMessage}` : ctaPattern ? 'Use assertive question pattern: "' + ctaPattern.template + '"' : 'Create an assertive qualifying question'}
+${(() => {
+  const roleCTA = getRoleSpecificCTA(job || recipient?.role || 'operations', industry);
+  return roleCTA ? `ROLE-SPECIFIC CTA (USE THIS): "${roleCTA}"` : (selectedAngle ? `RELATED TO SELECTED ANGLE: Use a question related to ${selectedAngle.primaryMessage}` : ctaPattern ? 'Use assertive question pattern: "' + ctaPattern.template + '"' : 'Create an assertive qualifying question');
+})()}
 - CRITICAL: Generate EXACTLY ONE question. Pick ONE pattern below, not multiple.
-${selectedAngle ? `- ANGLE-SPECIFIC: ${selectedAngle.openingTemplate} (adapt this as your CTA question)` : ''}
-- ASSERTIVE PATTERNS (pick ONE only):
+${(() => {
+  const roleCTA = getRoleSpecificCTA(job || recipient?.role || 'operations', industry);
+  return roleCTA ? `- PRIMARY CTA: "${roleCTA}"` : (selectedAngle ? `- ANGLE-SPECIFIC: ${selectedAngle.openingTemplate} (adapt this as your CTA question)` : '');
+})()}
+- ASSERTIVE PATTERNS (pick ONE only - use role-specific CTA above if available):
   * "When does your current contract renew?"
   * "Are you locking in early or waiting close to expiration?"
   * "When you renew, do you shop around or just renew what you had?"
