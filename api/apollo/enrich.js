@@ -58,8 +58,19 @@ export default async function handler(req, res) {
         
         const matchBody = {
           reveal_personal_emails: revealEmails !== false,
-          reveal_phone_number: false  // Initially false to avoid webhook requirement
+          reveal_phone_number: revealPhones === true  // Enable phone reveals with webhook
         };
+        
+        // If phone reveals are requested, provide webhook URL
+        if (revealPhones === true) {
+          // Construct webhook URL from request host
+          const protocol = req.headers['x-forwarded-proto'] || 'https';
+          const host = req.headers['host'] || req.headers['x-forwarded-host'];
+          const webhookUrl = `${protocol}://${host}/api/apollo/phone-webhook`;
+          
+          matchBody.webhook_url = webhookUrl;
+          console.log('[Apollo Enrich] 📞 Phone reveals enabled with webhook:', webhookUrl);
+        }
         
         // Strategy 1: Use cached email (BEST - most reliable match)
         if (cachedContact?.email) {
