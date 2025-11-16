@@ -2812,6 +2812,108 @@
   }
 
   /**
+   * Helper: Infer industry from company name
+   */
+  function inferIndustryFromCompanyName(companyName) {
+    if (!companyName) return '';
+    
+    const name = String(companyName).toLowerCase();
+    
+    // Hospitality keywords
+    if (/\b(inn|hotel|motel|resort|lodge|suites|hospitality|accommodation|bed\s*and\s*breakfast|b&b|b\s*&\s*b)\b/i.test(name)) {
+      return 'Hospitality';
+    }
+    
+    // Restaurant/Food Service
+    if (/\b(restaurant|cafe|diner|bistro|grill|bar\s*&?\s*grill|tavern|pub|eatery|food\s*service)\b/i.test(name)) {
+      return 'Hospitality';
+    }
+    
+    // Manufacturing
+    if (/\b(manufacturing|manufacturer|industrial|factory|plant|production|fabrication)\b/i.test(name)) {
+      return 'Manufacturing';
+    }
+    
+    // Healthcare
+    if (/\b(hospital|clinic|medical|healthcare|health\s*care|physician|doctor|dental|pharmacy)\b/i.test(name)) {
+      return 'Healthcare';
+    }
+    
+    // Retail
+    if (/\b(retail|store|shop|market|outlet|merchandise|boutique)\b/i.test(name)) {
+      return 'Retail';
+    }
+    
+    // Logistics/Transportation
+    if (/\b(logistics|transportation|warehouse|shipping|freight|delivery|distribution|trucking)\b/i.test(name)) {
+      return 'Logistics';
+    }
+    
+    // Data Center
+    if (/\b(data\s*center|datacenter|server|hosting|cloud|colo)\b/i.test(name)) {
+      return 'DataCenter';
+    }
+    
+    // Nonprofit
+    if (/\b(nonprofit|non-profit|charity|foundation|501c3|501\(c\)\(3\))\b/i.test(name)) {
+      return 'Nonprofit';
+    }
+    
+    return '';
+  }
+
+  /**
+   * Helper: Infer industry from account description
+   */
+  function inferIndustryFromDescription(description) {
+    if (!description) return '';
+    
+    const desc = String(description).toLowerCase();
+    
+    // Hospitality
+    if (/\b(hotel|inn|motel|resort|lodge|accommodation|hospitality|guest|room|booking|stay)\b/i.test(desc)) {
+      return 'Hospitality';
+    }
+    
+    // Restaurant/Food
+    if (/\b(restaurant|cafe|dining|food|beverage|menu|cuisine|chef)\b/i.test(desc)) {
+      return 'Hospitality';
+    }
+    
+    // Manufacturing
+    if (/\b(manufacturing|production|factory|plant|industrial|assembly|fabrication)\b/i.test(desc)) {
+      return 'Manufacturing';
+    }
+    
+    // Healthcare
+    if (/\b(hospital|clinic|medical|healthcare|patient|treatment|diagnosis|surgery)\b/i.test(desc)) {
+      return 'Healthcare';
+    }
+    
+    // Retail
+    if (/\b(retail|store|merchandise|shopping|customer|product|sale)\b/i.test(desc)) {
+      return 'Retail';
+    }
+    
+    // Logistics
+    if (/\b(logistics|warehouse|shipping|distribution|freight|transportation|delivery)\b/i.test(desc)) {
+      return 'Logistics';
+    }
+    
+    // Data Center
+    if (/\b(data\s*center|server|hosting|cloud|infrastructure|computing)\b/i.test(desc)) {
+      return 'DataCenter';
+    }
+    
+    // Nonprofit
+    if (/\b(nonprofit|charity|foundation|mission|donation|volunteer)\b/i.test(desc)) {
+      return 'Nonprofit';
+    }
+    
+    return '';
+  }
+
+  /**
    * Normalize industry name to match RANDOMIZED_ANGLES_BY_INDUSTRY keys
    */
   function normalizeIndustry(industry) {
@@ -3059,7 +3161,7 @@ TONE & VOICE:
 EMAIL STRUCTURE:
 1. Authentic opening question (using "${toneOpener}" style)
 2. Situational relevance (1-2 sentences, ${selectedAngle?.primaryMessage || 'their energy situation'})
-3. Specific value prop (use "${selectedAngle?.primaryValue || 'how we help'}")
+3. Specific value prop (use "${selectedAngle?.primaryValue || 'observation-based value with specific numbers'}")
 4. ONE yes/no CTA (conversational, not formal)
 
 ${newsHooks ? buildNewsContext(newsHooks, selectedAngle) : ''}
@@ -3104,7 +3206,7 @@ ${manualInput}
 
 PRIMARY ANGLE (use if relevant):
 - ${finalAngle?.primaryMessage || 'their energy situation'}
-- Value: ${finalAngle?.primaryValue || 'how we help'}
+- Value: ${finalAngle?.primaryValue || 'observation-based value with specific numbers'}
 
 TONE:
 - Sound authentic, not corporate
@@ -3176,10 +3278,31 @@ Generate ONLY email body.
         : 'Lewis Patterson';
 
       // Hardcoded identity - focus on electricity only
-      const whoWeAre = 'You are an Energy Strategist at Power Choosers. We help businesses secure better electricity rates and manage energy procurement more effectively.';
+      const whoWeAre = 'You are an Energy Strategist at Power Choosers. You help businesses secure better electricity rates and manage energy procurement more effectively.';
 
-      // Select randomized angle based on recipient industry
-      const recipientIndustry = recipient?.industry || recipient?.account?.industry || 'Manufacturing';
+      // Select randomized angle based on recipient industry (with inference fallbacks)
+      let recipientIndustry = recipient?.industry || recipient?.account?.industry || '';
+      
+      // If no industry field, infer from company name
+      if (!recipientIndustry && recipient?.company) {
+        recipientIndustry = inferIndustryFromCompanyName(recipient.company);
+      }
+      
+      // If still no industry, try to infer from account description
+      if (!recipientIndustry && recipient?.account) {
+        const accountDesc = recipient.account?.shortDescription || recipient.account?.short_desc || 
+                           recipient.account?.descriptionShort || recipient.account?.description || 
+                           recipient.account?.companyDescription || recipient.account?.accountDescription || '';
+        if (accountDesc) {
+          recipientIndustry = inferIndustryFromDescription(accountDesc);
+        }
+      }
+      
+      // Fallback to Default if still no industry detected
+      if (!recipientIndustry) {
+        recipientIndustry = 'Default';
+      }
+      
       const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient);
       const toneOpener = selectRandomToneOpener();
 
@@ -4137,7 +4260,7 @@ Generate ONLY email body.
     </div>
     <div class="solution-box">
       <h3>✓ How Power Choosers Helps</h3>
-      <p>${data.value_proposition || (industry ? `We help ${industry} companies like ${company} reduce energy costs through competitive procurement. Our team handles the entire process—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>` : 'We help businesses like yours reduce energy costs through competitive procurement and efficiency solutions. Our team handles the entire process—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>')}</p>
+      <p>${data.value_proposition || (industry ? `Most ${industry} companies like ${company} see 10-20% savings through competitive procurement. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>` : 'Most businesses see 10-20% savings through competitive procurement and efficiency solutions. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>')}</p>
       ${valueProps.length > 0 ? `
       <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #d1fae5;">
         <ul style="margin: 0; padding-left: 20px; list-style: none;">
@@ -4342,8 +4465,8 @@ Generate ONLY email body.
     const displaySubject = simplifySubject(data.subject);
     
     const sections = data.sections || [
-      'We\'ve secured exclusive rates for facilities that are 15-25% below typical renewal offers',
-      'Our team handles all supplier negotiations and contract reviews at no cost to you',
+      'Most facilities see 10-20% savings when securing rates early, before typical renewal windows',
+      'Supplier negotiations and contract reviews handled at no cost to you',
       'You maintain complete control and transparency throughout the entire process',
       'Early action now protects you from anticipated rate increases'
     ];

@@ -6344,8 +6344,8 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       const cleanSubject = String(subject)
         .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
         .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
-        .replace(/\bPower Choosers helps\b/gi, 'We help')
-        .replace(/\bPower Choosers can help\b/gi, 'We can help')
+        .replace(/\bPower Choosers helps\b/gi, 'Most teams see')
+        .replace(/\bPower Choosers can help\b/gi, 'Most teams see')
         .replace(/\bPower Choosers\b/gi, 'We');
       // HTML content is already cleaned above
       const cleanHtml = String(html);
@@ -6391,8 +6391,8 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         const subject = (jsonData.subject || 'Energy Solutions')
           .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
           .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
-          .replace(/\bPower Choosers helps\b/gi, 'We help')
-          .replace(/\bPower Choosers can help\b/gi, 'We can help')
+          .replace(/\bPower Choosers helps\b/gi, 'Most teams see')
+          .replace(/\bPower Choosers can help\b/gi, 'Most teams see')
           .replace(/\bPower Choosers\b/gi, 'We');
         const paragraphs = [];
         if (jsonData.greeting) paragraphs.push(jsonData.greeting);
@@ -6408,8 +6408,8 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         const body = paragraphs.join('\n\n')
           .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
           .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
-          .replace(/\bPower Choosers helps\b/gi, 'We help')
-          .replace(/\bPower Choosers can help\b/gi, 'We can help')
+          .replace(/\bPower Choosers helps\b/gi, 'Most teams see')
+          .replace(/\bPower Choosers can help\b/gi, 'Most teams see')
           .replace(/\bPower Choosers\b/gi, 'We');
 
         // Convert to HTML with readable color
@@ -6431,8 +6431,8 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         const sanitizedRaw = raw
           .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
           .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
-          .replace(/\bPower Choosers helps\b/gi, 'We help')
-          .replace(/\bPower Choosers can help\b/gi, 'We can help')
+          .replace(/\bPower Choosers helps\b/gi, 'Most teams see')
+          .replace(/\bPower Choosers can help\b/gi, 'Most teams see')
           .replace(/\bPower Choosers\b/gi, 'We')
           .replace(/\[\d+\]/g, ''); // Remove citation brackets
         const hasClosing = /best\s*regards[\s,]*$/i.test(sanitizedRaw.trim());
