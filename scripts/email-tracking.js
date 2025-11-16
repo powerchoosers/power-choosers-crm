@@ -716,8 +716,8 @@ class EmailTrackingManager {
                 id: 'demo_email_1',
                 to: ['john.doe@example.com'],
                 subject: 'Energy Proposal for Your Business',
-                content: '<p>Hi John, I hope this email finds you well. I wanted to follow up on our conversation about energy solutions for your business...</p>',
-                originalContent: '<p>Hi John, I hope this email finds you well. I wanted to follow up on our conversation about energy solutions for your business...</p>',
+                content: '<p>Hi John, Been wondering—when does your current electricity contract expire?</p>',
+                originalContent: '<p>Hi John, Been wondering—when does your current electricity contract expire?</p>',
                 from: 'noreply@powerchoosers.com',
                 sentAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
                 opens: [
@@ -772,8 +772,8 @@ class EmailTrackingManager {
                 id: 'demo_email_3',
                 to: ['mike.johnson@business.com'],
                 subject: 'Energy savings opportunity for your facility',
-                content: '<p>Hi Mike, I noticed your facility in Houston and wanted to reach out about potential energy savings...</p>',
-                originalContent: '<p>Hi Mike, I noticed your facility in Houston and wanted to reach out about potential energy savings...</p>',
+                content: '<p>Hi Mike, Been wondering—with your facility in Houston, are you locking in energy rates early or waiting closer to expiration?</p>',
+                originalContent: '<p>Hi Mike, Been wondering—with your facility in Houston, are you locking in energy rates early or waiting closer to expiration?</p>',
                 from: 'noreply@powerchoosers.com',
                 sentAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days ago
                 opens: [],

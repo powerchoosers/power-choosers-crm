@@ -2641,12 +2641,12 @@ class FreeSequenceAutomation {
   const COLD_EMAIL_CTA_VARIANTS = [
     {
       id: 'direct-question',
-      text: 'When does your current contract renew? And how often do you typically review your rates?',
+      text: 'When does your current contract renew?',
       role: 'all'
     },
     {
       id: 'discovery-question',
-      text: 'Out of curiosity—when you renew your contract, do you shop around or just renew what you had?',
+      text: 'When you renew your contract, do you shop around or just renew what you had?',
       role: 'all'
     },
     {
@@ -2786,13 +2786,13 @@ class FreeSequenceAutomation {
 
 2. OPEN WITH OBSERVATION (CRITICAL - MUST USE RESEARCH)
    - YOU MUST reference something SPECIFIC about [contact_company] that proves you researched them
-   - REQUIRED: Include at least ONE of these research elements:
-     * Location/facility details: "I noticed [contact_company] operates in [city], [state]..."
-     * Recent activity from LinkedIn: "I saw [contact_company] recently..." (if [contact_linkedin_recent_activity] available)
-     * Website insight: "On your website, I noticed..." (if [company_website] available)
+   - REQUIRED: Include at least ONE of these research elements (reference naturally WITHOUT saying "I noticed" or "I saw"):
+     * Location/facility details: "[contact_company] operates in [city], [state]..." or "With operations in [city]..."
+     * Recent activity from LinkedIn: Reference naturally, e.g., "[contact_company] recently..." (if [contact_linkedin_recent_activity] available)
+     * Website insight: Reference naturally, e.g., "On your website..." or "Your website mentions..." (if [company_website] available)
      * Industry pattern with peer context: "I've been talking to [role]s across [state], and..."
-   - NEVER: "I hope you're well" or "I wanted to reach out" or "I hope this email finds you well"
-   - MUST: Prove you researched - include specific details (location, facility size, operations type, operational model)
+   - NEVER: "I noticed...", "I saw...", "I hope you're well", "I wanted to reach out", or "I hope this email finds you well"
+   - MUST: Prove you researched - include specific details (location, facility size, operations type, operational model) - but weave it in naturally
 
 3. ACKNOWLEDGE THEIR SITUATION (ROLE-SPECIFIC)
    - For [contact_job_title]: Show you understand what they actually deal with daily
@@ -2814,7 +2814,7 @@ class FreeSequenceAutomation {
    - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
    - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy," "dive into," "solution," "at Power Choosers"
    - Sound like: colleague who knows their industry and has talked to others like them
-   - Use casual confidence: "Quick question—" "Real question—" "Out of curiosity—"
+   - Use casual confidence: "Quick question—" "Real question—" "Been wondering—" "Here's what I'm seeing—"
    - NO: "Would you be open to..." (permission-based, weak)
    - YES: Ask specific questions that assume conversation is happening
 

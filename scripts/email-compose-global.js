@@ -2560,6 +2560,7 @@
           primaryMessage: 'electricity sales tax exemption recovery',
           openingTemplate: 'Are you currently claiming electricity exemptions on your production facilities, or haven\'t filed yet?',
           primaryValue: '$75K–$500K 4-year refund potential',
+          condition: '!accountData || !accountData.industry || accountData.industry.toLowerCase().includes("manufacturing") || accountData.industry.toLowerCase().includes("manufacturer") || accountData.industry.toLowerCase().includes("industrial") || accountData.taxExemptStatus === "Manufacturing"',
           newsHooks: [],
         },
         {
@@ -2733,6 +2734,64 @@
         },
       ],
     },
+    Hospitality: {
+      angles: [
+        {
+          id: 'consolidation',
+          weight: 0.40,
+          primaryMessage: 'multi-property contract consolidation',
+          openingTemplate: 'How many properties are you managing energy for, and are they all on different renewal schedules?',
+          primaryValue: '2–4% overpay prevention + unified renewal calendar',
+          newsHooks: [],
+        },
+        {
+          id: 'timing_strategy',
+          weight: 0.35,
+          primaryMessage: 'seasonal planning + early renewal timing',
+          openingTemplate: 'When do you typically renew energy contracts—before peak season or waiting until the last minute?',
+          primaryValue: '8–15% savings from strategic timing',
+          situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
+          newsHooks: ['rate_spike_national', 'rate_spike_regional'],
+        },
+        {
+          id: 'operational_efficiency',
+          weight: 0.25,
+          primaryMessage: 'guest comfort + cost control balance',
+          openingTemplate: 'For your properties, what drives energy costs more—guest comfort requirements or operational efficiency?',
+          primaryValue: 'Optimize consumption without impacting guest experience',
+          newsHooks: [],
+        },
+      ],
+    },
+    Default: {
+      angles: [
+        {
+          id: 'timing_strategy',
+          weight: 0.40,
+          primaryMessage: 'strategic contract renewal timing',
+          openingTemplate: 'When does your current electricity contract renew?',
+          primaryValue: '8–15% savings from early renewal',
+          situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
+          newsHooks: ['rate_spike_national', 'rate_spike_regional'],
+        },
+        {
+          id: 'cost_control',
+          weight: 0.35,
+          primaryMessage: 'energy cost predictability and budget control',
+          openingTemplate: 'Are you locking in energy costs ahead of time, or dealing with rate volatility?',
+          primaryValue: 'Predictable costs + 10–20% savings opportunity',
+          newsHooks: [],
+        },
+        {
+          id: 'operational_simplicity',
+          weight: 0.25,
+          primaryMessage: 'simplified energy procurement management',
+          openingTemplate: 'How much time are you spending managing energy procurement versus focusing on your core business?',
+          primaryValue: 'Streamlined process + better rates',
+          newsHooks: [],
+        },
+      ],
+    },
   };
 
   /**
@@ -2753,6 +2812,72 @@
   }
 
   /**
+   * Normalize industry name to match RANDOMIZED_ANGLES_BY_INDUSTRY keys
+   */
+  function normalizeIndustry(industry) {
+    if (!industry) return 'Default';
+    
+    const normalized = String(industry).trim();
+    
+    // Industry mapping for common variations
+    const industryMap = {
+      'Transportation and Warehousing': 'Logistics',
+      'Transportation': 'Logistics',
+      'Warehousing': 'Logistics',
+      'Logistics and Supply Chain': 'Logistics',
+      'Supply Chain': 'Logistics',
+      'Manufacturing': 'Manufacturing',
+      'Manufacturer': 'Manufacturing',
+      'Industrial': 'Manufacturing',
+      'Nonprofit': 'Nonprofit',
+      'Non-Profit': 'Nonprofit',
+      'Charity': 'Nonprofit',
+      'Foundation': 'Nonprofit',
+      '501(c)(3)': 'Nonprofit',
+      'Healthcare': 'Healthcare',
+      'Hospital': 'Healthcare',
+      'Medical': 'Healthcare',
+      'Data Center': 'DataCenter',
+      'DataCentre': 'DataCenter',
+      'Retail': 'Retail',
+      'Retail Trade': 'Retail',
+      'Hospitality': 'Hospitality',
+      'Hotel': 'Hospitality',
+      'Hotels': 'Hospitality',
+      'Restaurant': 'Hospitality',
+      'Restaurants': 'Hospitality',
+      'Food Service': 'Hospitality',
+      'Food & Beverage': 'Hospitality',
+      'Food and Beverage': 'Hospitality',
+      'Accommodation': 'Hospitality',
+      'Lodging': 'Hospitality',
+      'Resort': 'Hospitality',
+      'Resorts': 'Hospitality',
+    };
+    
+    // Check exact match first
+    if (industryMap[normalized]) {
+      return industryMap[normalized];
+    }
+    
+    // Check partial match (case-insensitive)
+    const normalizedLower = normalized.toLowerCase();
+    for (const [key, value] of Object.entries(industryMap)) {
+      if (normalizedLower.includes(key.toLowerCase()) || key.toLowerCase().includes(normalizedLower)) {
+        return value;
+      }
+    }
+    
+    // Check if it matches any key in RANDOMIZED_ANGLES_BY_INDUSTRY directly
+    if (window.RANDOMIZED_ANGLES_BY_INDUSTRY[normalized]) {
+      return normalized;
+    }
+    
+    // Default fallback - use generic angles that work for any industry
+    return 'Default';
+  }
+
+  /**
    * Select randomized angle based on industry weights
    */
   function selectRandomizedAngle(industry, manualAngleOverride, accountData) {
@@ -2761,8 +2886,11 @@
       return findAngleById(manualAngleOverride, industry);
     }
     
+    // STEP 1.5: Normalize industry name
+    const normalizedIndustry = normalizeIndustry(industry);
+    
     // STEP 2: Get angles for this industry
-    const industryAngles = window.RANDOMIZED_ANGLES_BY_INDUSTRY[industry];
+    const industryAngles = window.RANDOMIZED_ANGLES_BY_INDUSTRY[normalizedIndustry];
     if (!industryAngles || !industryAngles.angles.length) {
       // Fallback to generic angles
       return {
@@ -2781,8 +2909,13 @@
         try {
           // Replace accountData references in condition string
           const conditionCode = angle.condition.replace(/accountData\?\./g, 'accountData?.');
-          // Create safe evaluation context
+          // Create safe evaluation context - accountData might be recipient object
           const accountDataSafe = accountData || {};
+          // If accountData is recipient object, extract account info for easier condition checking
+          if (accountDataSafe.account) {
+            accountDataSafe.industry = accountDataSafe.industry || accountDataSafe.account.industry || '';
+            accountDataSafe.taxExemptStatus = accountDataSafe.taxExemptStatus || accountDataSafe.account.taxExemptStatus || '';
+          }
           return eval(conditionCode);
         } catch (e) {
           console.warn('[Angle Selection] Condition evaluation failed:', e);
@@ -2794,8 +2927,16 @@
     
     // STEP 4: Randomize based on weights
     if (validAngles.length === 0) {
-      // If no valid angles after filtering, use all angles
-      validAngles = industryAngles.angles;
+      // If no valid angles after filtering, fall back to timing_strategy only
+      console.warn('[Angle Selection] No valid angles after filtering, using timing_strategy fallback');
+      return {
+        id: 'timing_strategy',
+        primaryMessage: 'strategic contract timing',
+        openingTemplate: 'When does your contract renew?',
+        primaryValue: '8-15% savings from early renewal',
+        situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
+        newsHooks: [],
+      };
     }
     
     return randomizeByWeight(validAngles);
@@ -2805,7 +2946,8 @@
    * Find angle by ID
    */
   function findAngleById(angleId, industry) {
-    const industryAngles = window.RANDOMIZED_ANGLES_BY_INDUSTRY[industry];
+    const normalizedIndustry = normalizeIndustry(industry);
+    const industryAngles = window.RANDOMIZED_ANGLES_BY_INDUSTRY[normalizedIndustry];
     if (!industryAngles) return null;
     return industryAngles.angles.find(a => a.id === angleId) || null;
   }
@@ -4266,7 +4408,7 @@ Generate ONLY email body.
     <div class="subject-blurb">${displaySubject}</div>
     <div class="intro">
       <p>${data.greeting || `Hi ${firstName},`}</p>
-      <p>${data.opening_paragraph || `I wanted to reach out about an interesting opportunity for ${company}.`}</p>
+      <p>${data.opening_paragraph || `Been wondering—when does ${company}'s energy contract renew?`}</p>
     </div>
     <div class="info-list">
       <strong>${data.list_header || 'How We Can Help:'}</strong>
