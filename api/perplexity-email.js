@@ -228,7 +228,7 @@ const CTA_BY_ANGLE = {
   ],
   operational_efficiency: [
     'Are you optimizing operations before negotiating energy rates?',
-    'How much time are you spending managing energy procurement?',
+    'How much time are you spending managing energy contracts?',
     'Are energy costs impacting your operational efficiency?'
   ],
   operational_simplicity: [
@@ -859,7 +859,13 @@ function deSalesify(text) {
     .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
     .replace(/\bPower Choosers helps\b/gi, 'Most teams see')
     .replace(/\bPower Choosers can help\b/gi, 'Most teams see')
-    .replace(/\bPower Choosers\b/gi, 'We');
+    .replace(/\bPower Choosers\b/gi, 'We')
+    // Remove corporate jargon
+    .replace(/\bstreamline\b/gi, 'simplify')
+    .replace(/\bstreamlining\b/gi, 'simplifying')
+    .replace(/\benergy procurement\b/gi, 'energy renewals')
+    .replace(/\bmanaging energy procurement\b/gi, 'managing energy contracts')
+    .replace(/\bmanage energy procurement\b/gi, 'manage energy contracts');
 }
 
 // Remove citation brackets from text (e.g., [1], [2], [3])
@@ -1263,7 +1269,7 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
       const facilitiesPatterns = [
         {
           type: 'operational_efficiency',
-          template: 'Is energy procurement adding to your operational workload?',
+          template: 'Is managing energy renewals adding to your operational workload?',
           guidance: 'Operational efficiency question for facilities managers'
         },
         {
@@ -1338,7 +1344,7 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
       },
       {
         type: 'decision_maker',
-        template: 'Are you the right person to discuss energy procurement?',
+        template: 'Are you the right person to discuss energy renewals?',
         guidance: 'Decision maker identification'
       },
       {
@@ -2263,7 +2269,15 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   // For prompt brevity, summarize to ~220 chars without destroying saved description
   if (accountDescription) {
     const trimmed = accountDescription.replace(/\s+/g, ' ').trim();
-    accountDescription = trimmed.length > 220 ? trimmed.slice(0, 217) + '…' : trimmed;
+    if (trimmed.length > 220) {
+      // Find last complete word before 217 chars to avoid cutting mid-word
+      let truncateAt = 217;
+      const lastSpace = trimmed.lastIndexOf(' ', 217);
+      if (lastSpace > 180) truncateAt = lastSpace; // Only use word boundary if not too short
+      accountDescription = trimmed.slice(0, truncateAt) + '…';
+    } else {
+      accountDescription = trimmed;
+    }
   }
   
   // Format contract end date
@@ -2395,7 +2409,7 @@ COMPANY-SPECIFIC DATA USAGE EXAMPLES:
 ${energy.supplier ? '- Current Supplier: "With ' + energy.supplier + ' as your current supplier, you may be missing competitive rates..."' : ''}
 ${energy.currentRate ? '- Current Rate: "At ' + energy.currentRate + '/kWh, there\'s likely room for improvement..."' : ''}
 ${contractEndLabel ? '- Contract Timing: "With your contract ending ' + contractEndLabel + ', timing is critical..."' : ''}
-${accountDescription ? '- Company Description: "As ' + accountDescription + ', energy costs are likely a significant expense..."' : ''}
+${accountDescription ? '- COMPANY CONTEXT (for your understanding only): ' + accountDescription + '. DO NOT insert this description into the email. Instead, use it to understand their business and reference their operations naturally (e.g., "With your production schedule..." or "For operations like yours..." - avoid "Given" which sounds formal)' : ''}
 ${industryContent ? '- Industry Focus: "Manufacturing companies like ' + company + ' typically face ' + industryContent.painPoints[0] + '..."' : ''}
 ${companySizeContext && companySizeContext.size === 'large' ? '- Size Context: "As a large ' + (industry || 'company') + ', ' + companySizeContext.focus + ' is key..."' : ''}
 ${companySizeContext && companySizeContext.size !== 'large' ? '- Industry Context: "As a ' + (industry || 'company') + ', ' + companySizeContext.focus + ' is key..." (NEVER say "small company" or "small business" - use industry instead)' : ''}
@@ -2500,7 +2514,7 @@ ${toneOpener ? `TONE OPENER: ` + JSON.stringify(toneOpener) + ` (use this to sta
 
 Generate text for these fields:
 - greeting: "Hi ${firstName},"
-- opening_hook: ${toneOpener || 'Use authentic, natural opener'} ${selectedAngle ? selectedAngle.openingTemplate : 'Start with a direct question about their energy situation.'} ${accountDescription ? 'Context: ' + accountDescription.substring(0, 100) + '...' : 'Reference their industry challenges.'} Keep it conversational, 1-2 sentences MAX. 
+- opening_hook: ${toneOpener || 'Use authentic, natural opener'} ${selectedAngle ? selectedAngle.openingTemplate : 'Start with a direct question about their energy situation.'} ${accountDescription ? 'CONTEXT (use for understanding, do not copy into email): ' + accountDescription.substring(0, 100) + '... Show you understand their operations without describing their business like Wikipedia' : 'Reference their industry challenges.'} Keep it conversational, 1-2 sentences MAX. AVOID corporate jargon ("streamline", "optimize", "leverage") and generic statements ("energy costs are likely significant"). 
 
 INDUSTRY ADAPTATION: ${industry ? `The recipient is in ${industry} industry. ` : ''}Adapt your messaging to this specific industry's challenges and context. If the industry is not in the examples below, use your knowledge of that industry to craft relevant messaging. Examples:
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
@@ -2519,11 +2533,13 @@ IMPORTANT: ${company ? 'Reference ' + company + ' naturally. ' : ''}Keep it conv
   * OBSERVATION PATTERN: "Most [role] I talk to see [specific #] when they [action]"
   * ACTION-FOCUSED: What they'd experience, not what we deliver
   * FORBIDDEN TRANSITIONS: NEVER use "That's why...", "The reality is...", "We help...", "We work with...", "This approach..."
-  * USE INSTEAD: "Most [role] I talk to...", "Here's what typically happens...", "From what I'm seeing...", "Here's the thing..."
+  * FORBIDDEN JARGON: NO "streamline/streamlining", "optimize/optimizing" (as verbs), "leverage", "demanding", "procurement", generic phrases
+  * USE INSTEAD: "Most [role] I talk to...", "From what I'm seeing...", "Here's the thing..." (NOT "Here's what typically happens:" as opener - too formulaic)
+  * Use plain language: "simplify" not "streamline", "manage better" not "optimize", "improve" not "leverage"
   * Example (GOOD): "Most facilities teams I talk to either plan 6-12 months ahead or scramble the last 30 days. The ones that plan usually lock in 8-15% better terms."
   * Example (GOOD): "12-20% consumption reductions happen from efficiency alone, before they talk to a new supplier. Here's why that matters: you renew from strength instead of scrambling."
   * Example (BAD): "That's why most companies we work with typically reduce consumption by 12-20% through targeted efficiency measures."
-  * Example (BAD): "We help companies secure better rates and manage procurement. Clients typically save 10-20%."
+  * Example (BAD): "Most teams see 10-20% savings when they streamline energy procurement." (jargon: streamline, procurement)
 
 - social_proof_optional: Brief credibility IF relevant (1 sentence, optional). Example: "Most ${industry || '[industry]'} companies see 10-20% savings." Keep it general, not hyper-specific.
 ${(() => {
@@ -2558,9 +2574,11 @@ ${toneOpener ? `- REQUIRED OPENER: MUST use ` + JSON.stringify(toneOpener) + ` o
   ✗ "The reality is..." (statement-based, weak)
   ✗ "We help..." or "We work with..." (shifts focus from them to you)
   ✗ "This approach..." (too educational)
-- REQUIRED: Natural, conversational language like "Here's what I'm seeing...", "Most teams I talk to...", "From what I'm hearing...", "Been wondering—", "Here's what typically happens..."
+- REQUIRED: Natural, conversational language like "Here's what I'm seeing...", "Most teams I talk to...", "From what I'm hearing...", "Been wondering—"
+- AVOID CORPORATE JARGON: NO "streamline", "optimize" (as verbs), "leverage", "stabilize expenses", "demanding", "procurement", "unleash", "synergy". Use plain language instead: "simplify", "improve", "manage better". Say "energy renewals" or "energy contracts" not "energy procurement"
+- NO GENERIC STATEMENTS: Never say obvious things like "energy costs are likely a significant expense" or "with facilities demanding steady energy"
 - Be specific but not creepy: Reference industry patterns, not exact employee counts or sq ft
-${accountDescription ? '- Context available: Mention ' + accountDescription.substring(0, 80) + '... naturally WITHOUT saying "I noticed"' : ''}
+${accountDescription ? '- CONTEXT (DO NOT COPY): You researched and learned: ' + accountDescription.substring(0, 80) + '... Use this to understand their business, but reference their operations naturally, not as a factoid. Example: Instead of stating what they do, reference their operational reality (e.g., "With production running 24/7..." or "Managing multiple locations...")' : ''}
 ${company ? '- Reference ' + company + ' by name naturally' : ''}
 
 EMAIL RULES:
@@ -2570,8 +2588,10 @@ ${toneOpener ? `- REQUIRED: Start with ` + JSON.stringify(toneOpener) + ` or sim
 - OPENING PARAGRAPH: 1-2 sentences MAX. Remove explanatory text before value prop. Pattern: Opening question → Value prop → Proof
 - PARAGRAPH 2 (VALUE PROP): 
   * Lead with NUMBERS at start of sentence (e.g., "12-20% consumption reductions happen..." NOT "Through optimization, companies reduce by 12-20%")
-  * Use OBSERVATION-BASED transitions: "Most [role] I talk to...", "Here's what typically happens...", "From what I'm seeing..."
+  * Use OBSERVATION-BASED transitions: "Most [role] I talk to...", "From what I'm seeing..." (NOT "Here's what typically happens:" as opener - too formulaic)
   * FORBIDDEN: "That's why...", "The reality is...", "We help...", "We work with...", "This approach..."
+  * FORBIDDEN JARGON: "streamline", "optimize" (as verbs), "leverage", "demanding", "procurement" - use plain language instead
+  * NO GENERIC STATEMENTS: Never say obvious things like "energy costs are likely significant" or "facilities demanding steady energy"
   * ACTION-FOCUSED: What they'd experience, not what we deliver
 - FORBIDDEN: NO "I noticed...", NO "I'm Lewis...", NO "As [Role]...", NO "I wanted to reach out", NO "Hope this email finds you well"
 - FORBIDDEN: NO "15-25% rate increases" or similar generic statistics
@@ -2728,7 +2748,7 @@ CRITICAL: Return ONLY valid JSON with brief, friendly acknowledgment. No busines
   }
 
   // Standard text mode (existing logic)
-  const identity = whoWeAre || `You are ${senderName}, an Energy Strategist at Power Choosers. You help businesses secure better electricity rates and manage energy procurement more effectively. Write in first person ("we"/"I"). Do NOT use brand-first openers like "At Power Choosers," or "Power Choosers helps" — prefer observation-based language like "Most teams I talk to..." or "Here's what I'm seeing..." instead of "We help" or "I help".
+  const identity = whoWeAre || `You are ${senderName}, an Energy Strategist at Power Choosers. You help businesses secure better electricity rates and simplify energy renewals. Write in first person ("we"/"I"). Do NOT use brand-first openers like "At Power Choosers," or "Power Choosers helps" — prefer observation-based language like "Most teams I talk to..." or "Here's what I'm seeing..." instead of "We help" or "I help".
 
 ${selectedAngle ? `
 SELECTED ANGLE FOR THIS EMAIL:
@@ -2811,9 +2831,9 @@ CRITICAL QUALITY RULES:
 - COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
 - QUALIFYING CTAs: Prefer questions over meeting requests for cold emails
 - SOCIAL PROOF: Use real outcomes when mentioning similar companies
-- USE ACCOUNT DESCRIPTION: ${accountDescription ? 'Must naturally reference: "' + accountDescription + '"' : 'Reference their specific business'}
+- USE ACCOUNT DESCRIPTION FOR CONTEXT: ${accountDescription ? 'You know from research that: ' + accountDescription + '. Use this CONTEXT to understand their business, but DO NOT copy-paste this description. Instead, show you understand their operations naturally (e.g., "With your production facilities..." or "Managing energy for a facility like yours...")' : 'Reference their specific business based on industry'}
 - NATURAL LANGUAGE: Write like a real person researching their company
-- COMPANY SPECIFICITY: ALWAYS reference ${company} specifically. NEVER mention other companies by name in this email.
+- COMPANY NAME: Use "${company}" naturally (use the SHORT form, not full legal names like "Corporation" or "Inc." unless that's how they're commonly known). Reference them specifically, never mention other companies by name.
 - NO SIZE ASSUMPTIONS: NEVER use "small company", "small business", "as a small company", "as a small business", "limited resources" - these can insult business owners. Use role/industry focus instead: Reference their role naturally (e.g., "For CFOs like you...") or "As a ${industry} company", "companies in ${industry}". NEVER use "As [Role] of [Company]..." - that's corporate speak. Only use "large" if you have clear evidence it's a large enterprise.
 - COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
 - SINGLE CTA: Generate exactly ONE call to action per email
@@ -2834,7 +2854,7 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - ${selectedAngle ? `Focus on: ${selectedAngle.primaryMessage}` : 'Focus on their energy situation'}
 - Use natural, conversational language: ${toneOpener ? JSON.stringify(toneOpener) : `"Let me ask you something—"`} followed by ${selectedAngle ? selectedAngle.openingTemplate : 'a direct question'}
 - Reference context naturally WITHOUT saying "I noticed" or "I saw":
-  * ${accountDescription ? 'Reference: "' + accountDescription.substring(0, 80) + '..." naturally in conversation' : 'Reference their business type naturally'}
+  * ${accountDescription ? 'CONTEXT (use for understanding, not quoting): ' + accountDescription.substring(0, 80) + '... Show you understand their operations without stating what they do like a Wikipedia entry' : 'Reference their business type naturally'}
   * ${recentActivityContext ? 'Mention: ' + recentActivityContext.substring(0, 60) + '... naturally' : 'Reference industry trends naturally'}
   * ${contractEndLabel ? 'Use: "With your contract ending ' + contractEndLabel + '..." naturally' : 'Reference their energy situation naturally'}
 - Use natural transitions: "Here's the thing...", "Given that...", "Most teams I talk to...", "Here's what typically happens..."
@@ -2847,14 +2867,14 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\'ve likely seen..." (tenure available)' : ''}
 
 EVIDENCE OF RESEARCH (Show You Know Their Business - Reference Naturally, NOT "I noticed"):
-${accountDescription ? '✓ Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally in conversation' : ''}
+${accountDescription ? '✓ CONTEXT (do not copy-paste): From research you know: ' + accountDescription.substring(0, 100) + '... Use this to understand their business. Show understanding through operational references, not by stating what they do' : ''}
 ${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements naturally' : ''}
 ${websiteContext ? '✓ Use website info: Reference naturally WITHOUT saying "I noticed" or "I saw"' : ''}
 ${recentActivityContext ? '✓ Use recent activity: Reference ' + recentActivityContext.substring(0, 60) + '... naturally' : ''}
 ${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..." naturally' : ''}
-${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant (but avoid exact numbers in opening)' : ''}
-${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant (but avoid exact numbers in opening)' : ''}
-CRITICAL: Reference this data naturally in conversation - DO NOT say "I noticed" or "I saw" - just weave it into the conversation naturally
+${squareFootage ? '✓ CONTEXT: Facility is ' + squareFootage.toLocaleString() + ' sq ft. DO NOT mention exact square footage. Instead reference scale naturally (e.g., "With your production space..." or "Managing a facility like yours...")' : ''}
+${employees ? '✓ CONTEXT: ' + employees + ' employees. DO NOT mention exact employee counts. Instead reference operational scale naturally' : ''}
+CRITICAL: Use this research for CONTEXT to understand their business. DO NOT copy-paste descriptions. DO NOT say "I noticed" or "I saw". Show understanding through operational references (e.g., "With your production schedule..." not "Company X is a manufacturer founded in...")
 
 CONVERSATIONAL FLOW PATTERNS:
 ${toneOpener ? `✓ GOOD: ` + JSON.stringify(toneOpener) + `${selectedAngle ? ' ' + selectedAngle.openingTemplate : ' [direct question about their energy situation]'}` : `✓ GOOD: "Let me ask you something—[direct question about their energy situation]"`}
@@ -2883,7 +2903,9 @@ Paragraph 2 (Value Proposition - 2-3 sentences):
 - LEAD WITH NUMBERS: Put percentages/savings at START of sentence (e.g., "12-20% consumption reductions happen..." NOT "Through optimization, companies reduce by 12-20%")
 - OBSERVATION-BASED: "Most [role] I talk to see [specific #] when they [action]"
 - FORBIDDEN: "That's why...", "The reality is...", "We help...", "We work with...", "This approach..."
-- USE INSTEAD: "Most [role] I talk to...", "Here's what typically happens...", "From what I'm seeing...", "Here's the thing..."
+- FORBIDDEN JARGON: "streamline", "optimize" (as verbs), "leverage", "demanding", "procurement", generic obvious statements
+- USE INSTEAD: "Most [role] I talk to...", "From what I'm seeing...", "Here's the thing..." (NOT "Here's what typically happens:" as sentence opener)
+- Use plain language: "simplify" not "streamline", "manage better" not "optimize", "improve" not "leverage"
 - ACTION-FOCUSED: What they'd experience, not what we deliver
 - SPECIFIC measurable value: "save 10-20%", "reduce costs by $X" (with numbers at START of sentence)
 
@@ -2902,7 +2924,7 @@ OPENING (1-2 sentences):
 ${toneOpener ? `MUST START with: ` + JSON.stringify(toneOpener) : `Use authentic, natural opener (not "I wanted to reach out" or "Hope this email finds you well")`}
 ${selectedAngle ? `Focus on: ${selectedAngle.primaryMessage}` : 'Focus on their energy situation'}
 ${selectedAngle ? `Opening template: ${selectedAngle.openingTemplate}` : 'Start with a direct question about their energy situation'}
-${accountDescription ? `Context available: ${accountDescription.substring(0, 100)}...` : 'Reference their industry challenges'}
+${accountDescription ? `CONTEXT (for understanding only, do not insert): ${accountDescription.substring(0, 100)}... Use this context to understand their business, but reference their operations naturally without copying this description` : 'Reference their industry challenges'}
 CRITICAL: 
 - NO "I noticed..." bio openings (sounds like research, not authentic)
 - NO generic market statistics ("rates rising 15-25%", "data center demand")
@@ -2918,7 +2940,7 @@ ${selectedAngle?.id === 'timing_strategy' && selectedAngle?.situationalContext ?
 ${selectedAngle ? `- Use angle value: ${selectedAngle.primaryValue}` : '- Reference their business type and industry challenges'}
 - Example (GOOD): ${selectedAngle?.id === 'timing_strategy' ? `"Most facilities teams I talk to either plan 6-12 months ahead or scramble the last 30 days. The ones that plan usually lock in 8-15% better terms."` : (selectedAngle?.id === 'demand_efficiency' ? `"12-20% consumption reductions happen from efficiency alone, before they talk to a new supplier. Here's why that matters: you renew from strength instead of scrambling."` : (selectedAngle ? `"Most [role] I talk to see ${selectedAngle.primaryValue} when they [action]."` : '"Most companies here see 10-20% savings when they lock in rates early, before contracts expire."'))}
 - Example (BAD): "That's why most companies we work with typically reduce consumption by 12-20% through targeted efficiency measures."
-- Example (BAD): "We help companies secure better rates and manage procurement. Clients typically save 10-20%."
+- Example (BAD): "We help companies secure better rates and manage procurement." (jargon: procurement)
 - NEVER end with incomplete phrases or "within [company name]"
 - ALWAYS include a complete value proposition - never skip this field
 - THIS FIELD IS MANDATORY - NEVER LEAVE BLANK
