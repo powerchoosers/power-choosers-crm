@@ -2388,7 +2388,7 @@ ${selectedAngle.situationalContext ? `- Context: ${selectedAngle.situationalCont
 ${selectedAngle.newsHooks && selectedAngle.newsHooks.length > 0 ? buildNewsContext(selectedAngle.newsHooks, { industry, company: recipient?.company || company }, selectedAngle) : ''}
 ` : ''}
 
-${toneOpener ? `TONE OPENER: "${toneOpener}" (use this to start)` : ''}
+${toneOpener ? `TONE OPENER: ` + JSON.stringify(toneOpener) + ` (use this to start)` : ''}
 
 Generate text for these fields:
 - greeting: "Hi ${firstName},"
@@ -2428,7 +2428,7 @@ ${(() => {
 
 AUTHENTIC TONE REQUIREMENTS:
 - Sound like ${senderName} (29, conversational, direct, no corporate speak)
-${toneOpener ? `- REQUIRED OPENER: MUST use "${toneOpener}" or similar natural variation to start the opening paragraph` : '- REQUIRED: Use natural, disarming openers like "Been wondering—", "Here's what I'm seeing—", "Question for you—", "Let me ask you something—"'}
+${toneOpener ? `- REQUIRED OPENER: MUST use ` + JSON.stringify(toneOpener) + ` or similar natural variation to start the opening paragraph` : `- REQUIRED: Use natural, disarming openers like "Been wondering—", "Here's what I'm seeing—", "Question for you—", "Let me ask you something—"`}
 - FORBIDDEN PHRASES (NEVER USE):
   ✗ "I noticed..." or "I saw..." (sounds like research)
   ✗ "I'm Lewis..." or "I am..." (bio introductions)
@@ -2445,7 +2445,7 @@ ${company ? '- Reference ' + company + ' by name naturally' : ''}
 EMAIL RULES:
 - 75-130 words total (keep it short)
 - ONE clear CTA question ending with ? (ONLY ONE question mark in entire email)
-${toneOpener ? `- REQUIRED: Start with "${toneOpener}" or similar natural variation` : '- REQUIRED: Use authentic tone opener like "Been wondering—", "Here's what I'm seeing—", "Question for you—"'}
+${toneOpener ? `- REQUIRED: Start with ` + JSON.stringify(toneOpener) + ` or similar natural variation` : `- REQUIRED: Use authentic tone opener like "Been wondering—", "Here's what I'm seeing—", "Question for you—"`}
 - FORBIDDEN: NO "I noticed...", NO "I'm Lewis...", NO "As [Role]...", NO "I wanted to reach out", NO "Hope this email finds you well"
 - FORBIDDEN: NO "15-25% rate increases" or similar generic statistics
 - NO company size mentions: NEVER say "small company" or "small business"
@@ -2459,7 +2459,7 @@ ${generationMode === 'direct' ? '- Direct approach: Use "${toneOpener}", get to 
 ${generationMode === 'balanced' ? '- Balanced approach: Conversational but focused' : ''}
 
 SUBJECT LINE RULES (CRITICAL - MUST BE SPECIFIC, NOT VAGUE):
-${suggestedSubject ? `- SUGGESTED SUBJECT (use this pattern or similar): "${suggestedSubject}"` : ''}
+${suggestedSubject ? `- SUGGESTED SUBJECT (use this pattern or similar): ` + JSON.stringify(suggestedSubject) : ''}
 - Target: 4-6 words (specific questions get 30% higher open rates than vague statements)
 - Maximum: 50 characters (ensures full display on mobile)
 - MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
@@ -2610,7 +2610,7 @@ SELECTED ANGLE FOR THIS EMAIL:
 - Opening Template: ${selectedAngle.openingTemplate}
 ` : ''}
 
-${toneOpener ? `TONE: Start with "${toneOpener}" or similar authentic, natural opener
+${toneOpener ? `TONE: Start with ` + JSON.stringify(toneOpener) + ` or similar authentic, natural opener
 ` : ''}
 
 CONTEXT USAGE RULES:
@@ -2653,7 +2653,7 @@ ${selectedAngle.situationalContext ? `- Context: ${selectedAngle.situationalCont
 ${selectedAngle.newsHooks && selectedAngle.newsHooks.length > 0 ? buildNewsContext(selectedAngle.newsHooks, { industry, company }, selectedAngle) : ''}
 ` : ''}
 
-${toneOpener ? `AUTHENTIC TONE OPENER: "${toneOpener}" (MUST use this to start the opening paragraph)` : ''}
+${toneOpener ? `AUTHENTIC TONE OPENER: ` + JSON.stringify(toneOpener) + ` (MUST use this to start the opening paragraph)` : ''}
 
 GREETING (MANDATORY - MUST BE FIRST LINE):
 ✓ Start with "Hi ${firstName || 'there'},"
@@ -2662,7 +2662,7 @@ GREETING (MANDATORY - MUST BE FIRST LINE):
 ✓ Greeting must be on its own line with blank line after
 
 CRITICAL QUALITY RULES:
-- AUTHENTIC OPENING: ${toneOpener ? `MUST start with "${toneOpener}"` : 'Use authentic, conversational opener'} + ${selectedAngle ? selectedAngle.openingTemplate : 'direct question about their energy situation'}
+- AUTHENTIC OPENING: ${toneOpener ? `MUST start with ` + JSON.stringify(toneOpener) : 'Use authentic, conversational opener'} + ${selectedAngle ? selectedAngle.openingTemplate : 'direct question about their energy situation'}
   - FORBIDDEN OPENING PATTERNS (NEVER USE THESE):
     ✗ "I noticed..." (sounds like research, not authentic)
     ✗ "I'm Lewis, an Energy Strategist..." (corporate bio intro)
@@ -2672,7 +2672,7 @@ CRITICAL QUALITY RULES:
     ✗ "I wanted to reach out..." (corporate speak)
     ✗ "Hope this email finds you well..." (generic greeting)
     ✗ "Out of curiosity—" or "Quick one—" (AI patterns)
-  - REQUIRED: ${toneOpener ? `MUST start with "${toneOpener}" or similar natural variation (e.g., "Been wondering—", "Here's what I'm seeing—", "Question for you—", "Let me ask you something—")` : 'Use authentic, conversational opener like "Been wondering—", "Here's what I'm seeing—", "Question for you—", "Let me ask you something—"'}
+  - REQUIRED: ${toneOpener ? `MUST start with ` + JSON.stringify(toneOpener) + ` or similar natural variation (e.g., "Been wondering—", "Here's what I'm seeing—", "Question for you—", "Let me ask you something—")` : `Use authentic, conversational opener like "Been wondering—", "Here's what I'm seeing—", "Question for you—", "Let me ask you something—"`}
   - DO NOT use generic market statistics like "rates rising 15-25%" or "15-25% rate increases" (NEVER mention these percentages)
   - DO NOT mention "data center demand" or generic rate increases
   - Focus ONLY on ${company}'s specific situation, industry challenges they face, or operational details
@@ -2700,10 +2700,10 @@ CRITICAL QUALITY RULES:
 
 HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Write like a 29-year-old business professional - conversational, direct, authentic
-- ${toneOpener ? `MUST start with "${toneOpener}"` : 'Use authentic, conversational opener'}
+- ${toneOpener ? `MUST start with ` + JSON.stringify(toneOpener) : `Use authentic, conversational opener`}
 - Focus on THEIR specific situation only
 - ${selectedAngle ? `Focus on: ${selectedAngle.primaryMessage}` : 'Focus on their energy situation'}
-- Use natural, conversational language: ${toneOpener ? `"${toneOpener}"` : '"Let me ask you something—"'} followed by ${selectedAngle ? selectedAngle.openingTemplate : 'a direct question'}
+- Use natural, conversational language: ${toneOpener ? JSON.stringify(toneOpener) : `"Let me ask you something—"`} followed by ${selectedAngle ? selectedAngle.openingTemplate : 'a direct question'}
 - Reference context naturally WITHOUT saying "I noticed" or "I saw":
   * ${accountDescription ? 'Reference: "' + accountDescription.substring(0, 80) + '..." naturally in conversation' : 'Reference their business type naturally'}
   * ${recentActivityContext ? 'Mention: ' + recentActivityContext.substring(0, 60) + '... naturally' : 'Reference industry trends naturally'}
@@ -2727,7 +2727,7 @@ ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevan
 CRITICAL: Reference this data naturally in conversation - DO NOT say "I noticed" or "I saw" - just weave it into the conversation naturally
 
 CONVERSATIONAL FLOW PATTERNS:
-${toneOpener ? `✓ GOOD: "${toneOpener}${selectedAngle ? ' ' + selectedAngle.openingTemplate : ' [direct question about their energy situation]'}"` : '✓ GOOD: "Let me ask you something—[direct question about their energy situation]"'}
+${toneOpener ? `✓ GOOD: ` + JSON.stringify(toneOpener) + `${selectedAngle ? ' ' + selectedAngle.openingTemplate : ' [direct question about their energy situation]'}` : `✓ GOOD: "Let me ask you something—[direct question about their energy situation]"`}
 ✓ GOOD: "${toneOpener || 'Here\'s what I\'m seeing'}—${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
 ✓ GOOD: "Given your role as ${job || '[role]'}, you're probably dealing with ${roleContext?.painPoints[0] || '[pain point]'}. ${selectedAngle ? selectedAngle.primaryMessage : 'Here\'s what I\'ve found...'}"
 ✓ GOOD: "${industry || '[Industry]'} companies are facing [specific challenge]. ${company || '[Company]'} likely sees this in..."
@@ -2739,7 +2739,7 @@ ${toneOpener ? `✓ GOOD: "${toneOpener}${selectedAngle ? ' ' + selectedAngle.op
 
 PARAGRAPH STRUCTURE (CRITICAL):
 Paragraph 1 (Opening Hook - 1-2 sentences):
-${toneOpener ? `- MUST start with: "${toneOpener}"` : '- Use authentic, conversational opener'}
+${toneOpener ? `- MUST start with: ` + JSON.stringify(toneOpener) : `- Use authentic, conversational opener`}
 ${selectedAngle ? `- Focus on: ${selectedAngle.primaryMessage}` : '- Focus on their energy situation'}
 ${selectedAngle ? `- Use opening template: ${selectedAngle.openingTemplate}` : '- Start with a direct question about their energy situation'}
 - Reference ${company} specifically
@@ -2765,7 +2765,7 @@ FORMATTING REQUIREMENTS:
 - Ensure proper spacing for readability
 
 OPENING (1-2 sentences):
-${toneOpener ? `MUST START with: "${toneOpener}"` : 'Use authentic, natural opener (not "I wanted to reach out" or "Hope this email finds you well")'}
+${toneOpener ? `MUST START with: ` + JSON.stringify(toneOpener) : `Use authentic, natural opener (not "I wanted to reach out" or "Hope this email finds you well")`}
 ${selectedAngle ? `Focus on: ${selectedAngle.primaryMessage}` : 'Focus on their energy situation'}
 ${selectedAngle ? `Opening template: ${selectedAngle.openingTemplate}` : 'Start with a direct question about their energy situation'}
 ${accountDescription ? `Context available: ${accountDescription.substring(0, 100)}...` : 'Reference their industry challenges'}
@@ -2856,7 +2856,7 @@ ${generationMode === 'balanced' ? `
 ` : ''}
 
 SUBJECT LINE (MUST BE SPECIFIC, NOT VAGUE):
-${suggestedSubject ? `SUGGESTED SUBJECT: "${suggestedSubject}" (use this pattern or similar)` : ''}
+${suggestedSubject ? `SUGGESTED SUBJECT: ` + JSON.stringify(suggestedSubject) + ` (use this pattern or similar)` : ''}
 - Under 50 characters
 - MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
 - REQUIRED PATTERNS (use these):
