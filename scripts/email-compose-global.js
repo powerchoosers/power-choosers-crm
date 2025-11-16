@@ -2529,14 +2529,15 @@
    */
   window.AUTHENTIC_TONE_OPENERS = {
     disarming: [
-      "Real talk—",
-      "Straight up—",
+      "Genuine question—",
       "Let me ask you something—",
       "Been wondering—",
       "You ever considered—",
       "So here's the thing—",
+      "This might sound random, but—",
       "Honestly—",
       "Looking at your situation—",
+      "Question for you—",
     ],
     observation: [
       "Here's what I'm seeing—",
@@ -2557,29 +2558,34 @@
           id: 'exemption_recovery',
           weight: 0.30,
           primaryMessage: 'electricity sales tax exemption recovery',
-          openingTemplate: 'Are you currently claiming electricity exemptions on your production facilities?',
-          primaryValue: '$75K-$500K in 4-year refund potential',
+          openingTemplate: 'Are you currently claiming electricity exemptions on your production facilities, or haven\'t filed yet?',
+          primaryValue: '$75K–$500K 4-year refund potential',
+          newsHooks: [],
         },
         {
           id: 'demand_efficiency',
           weight: 0.25,
           primaryMessage: 'demand-side efficiency optimization',
-          openingTemplate: 'When you look at energy spend, are you focusing on rates or consumption?',
-          primaryValue: '12-20% reduction before rate negotiation',
+          openingTemplate: 'When you look at energy spend, are you focusing on rates, or have you already optimized consumption?',
+          primaryValue: '12–20% reduction before rate negotiation',
+          newsHooks: [],
         },
         {
           id: 'timing_strategy',
           weight: 0.25,
           primaryMessage: 'early renewal timing strategy',
-          openingTemplate: 'How do you typically handle contract renewals—locking in early or waiting?',
+          openingTemplate: 'How do you typically handle contract renewals—locking in early, or timing closer to expiration?',
           primaryValue: '8-15% protection from market spikes',
+          situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
+          newsHooks: ['rate_spike_national', 'rate_spike_regional'],
         },
         {
-          id: 'multi_site_consolidation',
+          id: 'consolidation',
           weight: 0.20,
           primaryMessage: 'multi-plant contract consolidation',
-          openingTemplate: 'Do you manage energy renewals centrally across your plants?',
-          primaryValue: '2-4% savings + operational simplicity',
+          openingTemplate: 'Do you manage energy renewals centrally across your plants, or does each location handle its own?',
+          primaryValue: '2-4% overpay prevention + operational simplicity',
+          newsHooks: [],
         },
       ],
     },
@@ -2589,47 +2595,54 @@
           id: 'exemption_recovery',
           weight: 0.40,
           primaryMessage: 'tax exemption + refund recovery',
-          openingTemplate: 'Is your nonprofit filing electricity exemption certificates with your utility?',
-          primaryValue: '$40K-$200K+ in 4-year refund recovery',
+          openingTemplate: 'Is your nonprofit currently filing electricity exemption certificates with your utility?',
+          primaryValue: '$40K–$200K+ in 4-year refund recovery',
+          newsHooks: [],
         },
         {
           id: 'mission_funding',
           weight: 0.35,
           primaryMessage: 'mission-focused budget optimization',
-          openingTemplate: 'How are you managing energy costs so more funding goes to your mission?',
-          primaryValue: 'Redirect savings to program impact',
+          openingTemplate: 'How are you currently managing energy costs so more funding goes to your mission?',
+          primaryValue: 'Redirect savings from operations to program impact',
+          newsHooks: [],
         },
         {
-          id: 'budget_predictability',
+          id: 'budget_stability',
           weight: 0.25,
           primaryMessage: 'budget predictability for board reporting',
-          openingTemplate: 'When budgeting for energy, are you locking in costs or dealing with volatility?',
-          primaryValue: '12-18% cost stability improvement',
+          openingTemplate: 'When budgeting for energy, are you locking in costs, or dealing with volatility year to year?',
+          primaryValue: '12–18% cost stability improvement',
+          newsHooks: [],
         },
       ],
     },
     Retail: {
       angles: [
         {
-          id: 'multi_site_consolidation',
+          id: 'consolidation',
           weight: 0.40,
           primaryMessage: 'multi-location contract consolidation',
-          openingTemplate: 'Are all your locations renewing on different schedules?',
-          primaryValue: '2-4% savings + one renewal calendar',
+          openingTemplate: 'How many locations do you have, and are they all renewing on different schedules?',
+          primaryValue: '2–4% overpay prevention + one renewal calendar',
+          newsHooks: [],
         },
         {
           id: 'timing_strategy',
           weight: 0.35,
           primaryMessage: 'early renewal timing strategy',
-          openingTemplate: 'When your locations renew, are you coordinating timing?',
-          primaryValue: '8-15% savings from coordinated renewal',
+          openingTemplate: 'When your locations renew, are you coordinating timing or letting each one handle it independently?',
+          primaryValue: '8–15% savings from coordinated renewal timing',
+          situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
+          newsHooks: ['rate_spike_national', 'rate_spike_regional'],
         },
         {
           id: 'operational_simplicity',
           weight: 0.25,
           primaryMessage: 'centralized energy operations',
-          openingTemplate: 'How much time are you spending managing energy renewals across your network?',
-          primaryValue: 'Centralized management reduces complexity',
+          openingTemplate: 'Right now, how much time are you spending managing energy renewals across your network?',
+          primaryValue: 'Centralized management reduces vendor complexity',
+          newsHooks: [],
         },
       ],
     },
@@ -2639,37 +2652,116 @@
           id: 'exemption_recovery',
           weight: 0.35,
           primaryMessage: 'tax exemption + mission-aligned savings',
-          openingTemplate: 'Is your healthcare organization claiming electricity exemptions?',
-          primaryValue: '$100K-$300K+ in refund + ongoing savings',
+          openingTemplate: 'Is your healthcare organization currently claiming electricity exemptions?',
+          primaryValue: '$100K–$300K+ in refund + ongoing savings',
+          condition: 'accountData?.taxExemptStatus === "Nonprofit"',
+          newsHooks: [],
         },
         {
-          id: 'multi_site_consolidation',
+          id: 'consolidation',
           weight: 0.40,
-          primaryMessage: 'multi-facility consolidation',
-          openingTemplate: 'How many facilities are you managing energy for?',
-          primaryValue: '$100K-$500K network-wide optimization',
+          primaryMessage: 'multi-facility consolidation + compliance',
+          openingTemplate: 'How many facilities are you managing energy for, and are they on different contracts?',
+          primaryValue: '$100K–$500K network-wide optimization',
+          newsHooks: [],
         },
         {
           id: 'operational_continuity',
           weight: 0.25,
           primaryMessage: 'uptime guarantee + budget certainty',
-          openingTemplate: 'What is more critical - energy savings or guaranteed uptime?',
+          openingTemplate: 'For healthcare operations, what\'s more critical—energy savings or guaranteed uptime?',
           primaryValue: 'Predictable costs + operational continuity',
+          newsHooks: [],
+        },
+      ],
+    },
+    DataCenter: {
+      angles: [
+        {
+          id: 'demand_efficiency',
+          weight: 0.45,
+          primaryMessage: 'demand-side efficiency + uptime resilience',
+          openingTemplate: 'For a data center like yours, what matters more—cutting energy spend or guaranteeing uptime?',
+          primaryValue: '12–20% consumption reduction + reliability',
+          newsHooks: [],
+        },
+        {
+          id: 'timing_strategy',
+          weight: 0.35,
+          primaryMessage: 'contract timing strategy (AI-driven demand)',
+          openingTemplate: 'With AI driving energy demand up, are you thinking about locking rates early?',
+          primaryValue: '8–15% protection from demand-driven spikes',
+          situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
+          newsHooks: ['datacenter_demand_spike'],
+        },
+        {
+          id: 'data_governance',
+          weight: 0.20,
+          primaryMessage: 'unified metering data + predictive planning',
+          openingTemplate: 'When you plan for energy, do you have unified metering across your data center?',
+          primaryValue: 'Better forecasting + uptime prediction',
+          newsHooks: [],
+        },
+      ],
+    },
+    Logistics: {
+      angles: [
+        {
+          id: 'consolidation',
+          weight: 0.45,
+          primaryMessage: 'multi-location volume leverage',
+          openingTemplate: 'With operations across multiple states, how are you coordinating energy contracts?',
+          primaryValue: '3–6% collective savings from volume negotiation',
+          newsHooks: [],
+        },
+        {
+          id: 'timing_strategy',
+          weight: 0.35,
+          primaryMessage: 'strategic renewal timing (avoid scramble)',
+          openingTemplate: 'Are you renewing energy contracts strategically, or waiting until the last minute?',
+          primaryValue: '8–15% vs. emergency renewals',
+          situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
+          newsHooks: ['rate_spike_national', 'rate_spike_regional'],
+        },
+        {
+          id: 'operational_efficiency',
+          weight: 0.20,
+          primaryMessage: 'warehouse efficiency optimization',
+          openingTemplate: 'For your warehouses, what drives energy costs more—facility size or operations model?',
+          primaryValue: 'Identify efficiency opportunities + rate savings',
+          newsHooks: [],
         },
       ],
     },
   };
 
   /**
+   * Helper: Randomize selection based on weights
+   */
+  function randomizeByWeight(angles) {
+    const totalWeight = angles.reduce((sum, angle) => sum + angle.weight, 0);
+    let random = Math.random() * totalWeight;
+    
+    for (let angle of angles) {
+      random -= angle.weight;
+      if (random <= 0) {
+        return angle;
+      }
+    }
+    
+    return angles[0]; // Fallback
+  }
+
+  /**
    * Select randomized angle based on industry weights
    */
   function selectRandomizedAngle(industry, manualAngleOverride, accountData) {
-    // If user manually specified angle, use it
+    // STEP 1: If user manually specified an angle, ALWAYS use it (respect user intent)
     if (manualAngleOverride) {
       return findAngleById(manualAngleOverride, industry);
     }
     
-    // Get angles for this industry
+    // STEP 2: Get angles for this industry
     const industryAngles = window.RANDOMIZED_ANGLES_BY_INDUSTRY[industry];
     if (!industryAngles || !industryAngles.angles.length) {
       // Fallback to generic angles
@@ -2678,21 +2770,35 @@
         primaryMessage: 'strategic contract timing',
         openingTemplate: 'When does your contract renew?',
         primaryValue: '8-15% savings from early renewal',
+        newsHooks: [],
       };
     }
     
-    // Randomize based on weights
-    const totalWeight = industryAngles.angles.reduce((sum, angle) => sum + angle.weight, 0);
-    let random = Math.random() * totalWeight;
-    
-    for (let angle of industryAngles.angles) {
-      random -= angle.weight;
-      if (random <= 0) {
-        return angle;
+    // STEP 3: Filter angles (check conditions)
+    let validAngles = industryAngles.angles.filter(angle => {
+      if (angle.condition) {
+        // Check if condition passes (e.g., "taxExemptStatus === 'Nonprofit'")
+        try {
+          // Replace accountData references in condition string
+          const conditionCode = angle.condition.replace(/accountData\?\./g, 'accountData?.');
+          // Create safe evaluation context
+          const accountDataSafe = accountData || {};
+          return eval(conditionCode);
+        } catch (e) {
+          console.warn('[Angle Selection] Condition evaluation failed:', e);
+          return false;
+        }
       }
+      return true;
+    });
+    
+    // STEP 4: Randomize based on weights
+    if (validAngles.length === 0) {
+      // If no valid angles after filtering, use all angles
+      validAngles = industryAngles.angles;
     }
     
-    return industryAngles.angles[0]; // Fallback
+    return randomizeByWeight(validAngles);
   }
 
   /**
@@ -2707,9 +2813,178 @@
   /**
    * Select random authentic tone opener
    */
-  function selectRandomToneOpener() {
+  function selectRandomToneOpener(angleId = null) {
     const openings = window.AUTHENTIC_TONE_OPENERS.disarming;
     return openings[Math.floor(Math.random() * openings.length)];
+  }
+
+  /**
+   * Helper: Detect if user's manual input specifies a different angle
+   */
+  function detectAngleFromInput(manualInput) {
+    if (!manualInput) return null;
+    const input = manualInput.toLowerCase();
+    
+    // Pattern matching for user intent
+    if (input.includes('exemption') || input.includes('tax recovery')) {
+      return 'exemption_recovery';
+    }
+    if (input.includes('demand') || input.includes('efficiency') || input.includes('consumption')) {
+      return 'demand_efficiency';
+    }
+    if (input.includes('timing') || input.includes('early renewal') || input.includes('renewal')) {
+      return 'timing_strategy';
+    }
+    if (input.includes('consolidat') || input.includes('multiple') || input.includes('multi-site')) {
+      return 'consolidation';
+    }
+    if (input.includes('mission') || input.includes('nonprofit')) {
+      return 'mission_funding';
+    }
+    
+    return null; // No specific angle detected
+  }
+
+  /**
+   * Helper: Build news context (if applicable)
+   */
+  function buildNewsContext(newsHooks, selectedAngle) {
+    if (!newsHooks || newsHooks.length === 0) return '';
+    
+    // Note: This would integrate with a MARKET_CONTEXT object if available
+    // For now, return empty string as news hooks are optional
+    return '';
+  }
+
+  /**
+   * Dynamic prompt builder that respects:
+   * 1. Manual angle override (if user types specific angle)
+   * 2. Authentic tone (matches your personality)
+   * 3. Account data (news, industry triggers)
+   * 4. News context (integrated naturally, not forced)
+   */
+  function buildDynamicPrompt(
+    contact,
+    account,
+    selectedAngle,
+    manualPromptOverride = null,
+    newsHooks = null
+  ) {
+    // STEP 1: If user provided manual prompt override, use it as context (don't force angle)
+    if (manualPromptOverride && manualPromptOverride.trim().length > 0) {
+      return buildManualPrompt(
+        contact,
+        account,
+        selectedAngle,
+        manualPromptOverride
+      );
+    }
+    
+    // STEP 2: Otherwise, build dynamic prompt based on selected angle
+    const toneOpener = selectRandomToneOpener(selectedAngle?.id);
+    
+    const prompt = `
+You are drafting a cold email to an energy procurement decision-maker.
+
+SENDER PROFILE:
+- Name: Lewis
+- Age: 29
+- Background: African American business professional
+- Tone: Conversational, direct, authentic (not corporate-speak, not British formalisms)
+- Personality: Human, relatable, genuine
+
+RECIPIENT:
+- Name: ${contact?.firstName || 'there'}
+- Role: ${contact?.role || ''}
+- Company: ${account?.name || ''}
+- Industry: ${account?.industry || ''}
+
+SELECTED ANGLE (use this as primary focus):
+- Angle ID: ${selectedAngle?.id || 'timing_strategy'}
+- Primary Message: ${selectedAngle?.primaryMessage || 'strategic contract timing'}
+- Value Prop: ${selectedAngle?.primaryValue || '8-15% savings from early renewal'}
+- Opening Template: ${selectedAngle?.openingTemplate || 'When does your contract renew?'}
+
+TONE & VOICE:
+- Opening tone: "${toneOpener}"
+- Style: Conversational, direct, no corporate jargon
+- Examples of YOUR tone:
+  ✅ "Let me ask you something—are you currently claiming exemptions?"
+  ✅ "Looking at your situation, here's what I'm noticing..."
+  ✅ "Been wondering—how are you handling this?"
+  ❌ DON'T: "Quick one—", "Out of curiosity—", corporate formal phrases
+
+EMAIL STRUCTURE:
+1. Authentic opening question (using "${toneOpener}" style)
+2. Situational relevance (1-2 sentences, ${selectedAngle?.primaryMessage || 'their energy situation'})
+3. Specific value prop (use "${selectedAngle?.primaryValue || 'how we help'}")
+4. ONE yes/no CTA (conversational, not formal)
+
+${newsHooks ? buildNewsContext(newsHooks, selectedAngle) : ''}
+
+IMPORTANT RULES:
+- 75-130 words total
+- Exactly ONE question in CTA
+- NO bio opening ("I noticed...")
+- NO generic "save 10-20%"
+- Sound like Lewis (29, direct, authentic)
+- If user selected this angle, commit to it (don't second-guess)
+
+Generate ONLY email body (no signature, no HTML).
+    `.trim();
+    
+    return prompt;
+  }
+
+  /**
+   * Handle manual prompt overrides (user typed specific context)
+   * This respects the user's intent while using the selected angle
+   */
+  function buildManualPrompt(contact, account, selectedAngle, manualInput) {
+    // Check if manual input mentions a specific angle or instruction
+    const manualAngle = detectAngleFromInput(manualInput);
+    const finalAngle = manualAngle ? findAngleById(manualAngle, account?.industry) : selectedAngle;
+    
+    const prompt = `
+You are drafting a cold email to an energy procurement decision-maker.
+
+SENDER PROFILE:
+- Name: Lewis
+- Tone: Conversational, direct, authentic
+
+RECIPIENT:
+- Name: ${contact?.firstName || 'there'}
+- Role: ${contact?.role || ''}
+- Company: ${account?.name || ''}
+
+CONTEXT FROM USER:
+${manualInput}
+
+PRIMARY ANGLE (use if relevant):
+- ${finalAngle?.primaryMessage || 'their energy situation'}
+- Value: ${finalAngle?.primaryValue || 'how we help'}
+
+TONE:
+- Sound authentic, not corporate
+- Use conversational openers like "Let me ask you something—", "Been wondering—", "Question for you—"
+
+EMAIL STRUCTURE:
+1. Natural opening question
+2. Situational relevance
+3. Specific value prop
+4. ONE yes/no CTA
+
+IMPORTANT:
+- 75-130 words
+- NO bio opening
+- NO generic claims
+- Sound like Lewis (29, African American professional)
+- Respect the user's intent from manual context
+
+Generate ONLY email body.
+    `.trim();
+    
+    return prompt;
   }
 
   async function generateWithAI(aiBar, mode = 'standard') {
