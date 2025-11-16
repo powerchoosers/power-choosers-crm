@@ -2093,13 +2093,25 @@
         const wrap = container.querySelector('[data-phones-list]');
         if (wrap) {
           const phones = Array.isArray(enriched.phones) ? enriched.phones.map(p => p.number).filter(Boolean) : [];
-          const newContent = phones.length ? phones.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('') : '<div class="lusha-value-item">—</div>';
-          animateRevealContent(wrap, newContent);
           
-          // Update contact object with revealed phones
-          contact.phones = enriched.phones || [];
+          // Check if we got phone numbers immediately (unlikely for reveals)
           if (phones.length > 0) {
+            const newContent = phones.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('');
+            animateRevealContent(wrap, newContent);
+            
+            // Update contact object with revealed phones
+            contact.phones = enriched.phones || [];
             contact.phone = phones[0]; // Set primary phone
+          } else {
+            // Phone numbers are delivered asynchronously via webhook
+            // Show loading indicator and poll for results
+            lushaLog('Phone reveal requested - polling for async delivery');
+            const loadingContent = '<div class="lusha-value-item" style="color: var(--text-muted); font-style: italic;">⏳ Revealing phone numbers...</div>';
+            animateRevealContent(wrap, loadingContent);
+            
+            // Poll for phone numbers (Apollo sends them to webhook asynchronously)
+            const personId = enriched.id || enriched.contactId || id;
+            pollForPhoneNumbers(personId, contact, wrap, container);
           }
         }
       }
@@ -3271,6 +3283,108 @@ function animateRevealContent(container, newContent) {
     console.warn('Animation failed, falling back to direct replacement:', e);
     container.innerHTML = newContent;
   }
+}
+
+// Helper function to poll for phone numbers delivered asynchronously via webhook
+async function pollForPhoneNumbers(personId, contact, wrap, container) {
+  const maxAttempts = 30; // Poll for up to 5 minutes (30 attempts * 10 seconds)
+  const pollInterval = 10000; // 10 seconds between polls
+  let attempts = 0;
+  
+  let base = (window.API_BASE_URL || '').replace(/\/$/, '');
+  if (!base || /localhost|127\.0\.0\.1/i.test(base)) base = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+  
+  const poll = async () => {
+    attempts++;
+    
+    try {
+      lushaLog(`Polling for phones (attempt ${attempts}/${maxAttempts}) for person:`, personId);
+      
+      const response = await fetch(`${base}/api/apollo/phone-retrieve?personId=${encodeURIComponent(personId)}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.ready && data.phones && data.phones.length > 0) {
+        // Phone numbers arrived!
+        lushaLog('Phone numbers received:', data.phones.length);
+        
+        // Extract phone numbers
+        const phones = data.phones.map(p => ({
+          number: p.sanitized_number || p.raw_number,
+          type: p.type || 'work'
+        }));
+        
+        // Update UI
+        const phoneNumbers = phones.map(p => p.number).filter(Boolean);
+        const newContent = phoneNumbers.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('');
+        animateRevealContent(wrap, newContent);
+        
+        // Update contact object
+        contact.phones = phones;
+        if (phoneNumbers.length > 0) {
+          contact.phone = phoneNumbers[0];
+        }
+        
+        // Update in allContacts cache
+        try {
+          const id = contact.id || contact.contactId;
+          const idx = allContacts.findIndex(c => (c.id || c.contactId) === id);
+          if (idx >= 0) {
+            allContacts[idx].phones = phones;
+            allContacts[idx].hasPhones = phones.length > 0;
+            if (phoneNumbers[0]) allContacts[idx].phone = phoneNumbers[0];
+            lushaLog('Updated phone numbers in cache for:', id);
+          }
+        } catch(e) {
+          lushaLog('Failed to update cache:', e);
+        }
+        
+        // Show success toast
+        if (window.crm?.showToast) {
+          window.crm.showToast(`✅ Revealed ${phoneNumbers.length} phone number(s)`, 'success');
+        }
+        
+        return; // Done!
+      }
+      
+      // Not ready yet, continue polling
+      if (attempts < maxAttempts) {
+        lushaLog('Phone numbers not ready yet, polling again in 10s...');
+        setTimeout(poll, pollInterval);
+      } else {
+        // Timeout - show error
+        lushaLog('Phone polling timeout after', attempts, 'attempts');
+        const timeoutContent = '<div class="lusha-value-item" style="color: var(--text-muted);">⏱️ Phone reveal timed out. Try again later.</div>';
+        animateRevealContent(wrap, timeoutContent);
+        
+        if (window.crm?.showToast) {
+          window.crm.showToast('Phone reveal is taking longer than expected. Try again later.', 'warning');
+        }
+      }
+      
+    } catch (error) {
+      lushaLog('Phone polling error:', error);
+      
+      // Retry on error (up to max attempts)
+      if (attempts < maxAttempts) {
+        setTimeout(poll, pollInterval);
+      } else {
+        const errorContent = '<div class="lusha-value-item">—</div>';
+        animateRevealContent(wrap, errorContent);
+        
+        if (window.crm?.showToast) {
+          window.crm.showToast('Failed to reveal phone numbers', 'error');
+        }
+      }
+    }
+  };
+  
+  // Start polling after a short delay
+  setTimeout(poll, 2000); // Initial 2-second delay before first poll
 }
 
 // Helper function to set credit total (can be called manually if needed)

@@ -1371,6 +1371,9 @@
       // CRITICAL: Re-initialize DOM refs to ensure els.content exists
       if (!initDomRefs()) {
         console.warn('[TaskDetail] DOM not ready, retrying...');
+        // CRITICAL FIX: Reset loading flag before retry to prevent deadlock
+        state.loadingTask = false;
+        
         // Retry after a short delay (max 5 attempts)
         let retryCount = 0;
         const maxRetries = 5;
@@ -1378,7 +1381,6 @@
           if (retryCount >= maxRetries) {
             console.error('[TaskDetail] Failed to initialize DOM refs after', maxRetries, 'attempts');
             showTaskError('Page not ready. Please refresh.');
-            state.loadingTask = false;
             return;
           }
           retryCount++;
@@ -1808,6 +1810,7 @@
         // Update the main title to include clickable contact name
         if (els.title && contactName) {
           const contactId = person.id || '';
+          console.log('[TaskDetail] Rendering contact link:', { contactName, contactId, hasPerson: !!person });
           const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(contactId)}" data-contact-name="${escapeHtml(contactName)}">${escapeHtml(contactName)}</a>`;
           els.title.innerHTML = `Call ${contactLinkHTML}`;
         }
@@ -2933,6 +2936,37 @@
       
       const contactId = contactLink.getAttribute('data-contact-id');
       const contactName = contactLink.getAttribute('data-contact-name');
+      
+      console.log('[TaskDetail] Contact link clicked:', { contactId, contactName });
+      
+      // If no contactId, try to find the contact by name
+      if (!contactId && contactName) {
+        console.log('[TaskDetail] No contactId, searching by name:', contactName);
+        try {
+          const people = (typeof window.getPeopleData === 'function') ? (window.getPeopleData() || []) : [];
+          const contact = people.find(p => {
+            const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+            return fullName && contactName && fullName.toLowerCase() === contactName.toLowerCase();
+          });
+          
+          if (contact && contact.id) {
+            console.log('[TaskDetail] Found contact by name:', contact.id);
+            // Update the link with the found ID
+            contactLink.setAttribute('data-contact-id', contact.id);
+            // Retry the click with the ID
+            contactLink.click();
+            return;
+          } else {
+            console.warn('[TaskDetail] Contact not found:', contactName);
+            if (window.crm && typeof window.crm.showToast === 'function') {
+              window.crm.showToast('Contact not found in system. Please check People page.', 'error');
+            }
+            return;
+          }
+        } catch (error) {
+          console.error('[TaskDetail] Error finding contact:', error);
+        }
+      }
       
       if (contactId && window.ContactDetail) {
         // Capture task detail state for back navigation
