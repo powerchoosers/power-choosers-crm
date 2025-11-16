@@ -123,7 +123,7 @@ const NEWS_LIBRARY = {
     fact: 'Corporate net-zero goals resuming after 2024 pause. Clean energy mandates tightening.',
     date: 'October 2025',
     relevance: 'Relevant for ESG-conscious companies',
-    integrate: 'With renewable mandates tightening, companies are bundling rate locks with renewable credits—often saving 15-25% total.'
+    integrate: 'With renewable mandates tightening, companies are bundling rate locks with renewable credits—often seeing significant total savings.'
   }
 };
 
@@ -222,12 +222,12 @@ const CTA_BY_ANGLE = {
     'How are you coordinating energy contracts across your locations?'
   ],
   demand_efficiency: [
-    'When you look at energy spend, are you focusing on rates, or have you already optimized consumption?',
-    'What drives your energy costs more—rates or consumption patterns?',
-    'Have you optimized consumption before negotiating rates?'
+    'Are you optimizing consumption before you renew your contract?',
+    'Have you optimized consumption before negotiating rates?',
+    'Are you managing consumption efficiency before rate shopping?'
   ],
   operational_efficiency: [
-    'What drives your energy costs more—facility size or operations model?',
+    'Are you optimizing operations before negotiating energy rates?',
     'How much time are you spending managing energy procurement?',
     'Are energy costs impacting your operational efficiency?'
   ],
@@ -274,6 +274,104 @@ function getAngleSpecificCTA(selectedAngle) {
   
   // Fallback: use openingTemplate as CTA if no specific mapping
   return selectedAngle.openingTemplate || null;
+}
+
+// Helper: Infer industry from company name
+function inferIndustryFromCompanyName(companyName) {
+  if (!companyName) return '';
+  
+  const name = String(companyName).toLowerCase();
+  
+  // Hospitality keywords
+  if (/\b(inn|hotel|motel|resort|lodge|suites|hospitality|accommodation|bed\s*and\s*breakfast|b&b|b\s*&\s*b)\b/i.test(name)) {
+    return 'Hospitality';
+  }
+  
+  // Restaurant/Food Service
+  if (/\b(restaurant|cafe|diner|bistro|grill|bar\s*&?\s*grill|tavern|pub|eatery|food\s*service)\b/i.test(name)) {
+    return 'Hospitality';
+  }
+  
+  // Manufacturing
+  if (/\b(manufacturing|manufacturer|industrial|factory|plant|production|fabrication)\b/i.test(name)) {
+    return 'Manufacturing';
+  }
+  
+  // Healthcare
+  if (/\b(hospital|clinic|medical|healthcare|health\s*care|physician|doctor|dental|pharmacy)\b/i.test(name)) {
+    return 'Healthcare';
+  }
+  
+  // Retail
+  if (/\b(retail|store|shop|market|outlet|merchandise|boutique)\b/i.test(name)) {
+    return 'Retail';
+  }
+  
+  // Logistics/Transportation
+  if (/\b(logistics|transportation|warehouse|shipping|freight|delivery|distribution|trucking)\b/i.test(name)) {
+    return 'Logistics';
+  }
+  
+  // Data Center
+  if (/\b(data\s*center|datacenter|server|hosting|cloud|colo)\b/i.test(name)) {
+    return 'DataCenter';
+  }
+  
+  // Nonprofit
+  if (/\b(nonprofit|non-profit|charity|foundation|501c3|501\(c\)\(3\))\b/i.test(name)) {
+    return 'Nonprofit';
+  }
+  
+  return '';
+}
+
+// Helper: Infer industry from account description
+function inferIndustryFromDescription(description) {
+  if (!description) return '';
+  
+  const desc = String(description).toLowerCase();
+  
+  // Hospitality
+  if (/\b(hotel|inn|motel|resort|lodge|accommodation|hospitality|guest|room|booking|stay)\b/i.test(desc)) {
+    return 'Hospitality';
+  }
+  
+  // Restaurant/Food
+  if (/\b(restaurant|cafe|dining|food|beverage|menu|cuisine|chef)\b/i.test(desc)) {
+    return 'Hospitality';
+  }
+  
+  // Manufacturing
+  if (/\b(manufacturing|production|factory|plant|industrial|assembly|fabrication)\b/i.test(desc)) {
+    return 'Manufacturing';
+  }
+  
+  // Healthcare
+  if (/\b(hospital|clinic|medical|healthcare|patient|treatment|diagnosis|surgery)\b/i.test(desc)) {
+    return 'Healthcare';
+  }
+  
+  // Retail
+  if (/\b(retail|store|merchandise|shopping|customer|product|sale)\b/i.test(desc)) {
+    return 'Retail';
+  }
+  
+  // Logistics
+  if (/\b(logistics|warehouse|shipping|distribution|freight|transportation|delivery)\b/i.test(desc)) {
+    return 'Logistics';
+  }
+  
+  // Data Center
+  if (/\b(data\s*center|server|hosting|cloud|infrastructure|computing)\b/i.test(desc)) {
+    return 'DataCenter';
+  }
+  
+  // Nonprofit
+  if (/\b(nonprofit|charity|foundation|mission|donation|volunteer)\b/i.test(desc)) {
+    return 'Nonprofit';
+  }
+  
+  return '';
 }
 
 // Helper: Get best CTA (angle-aware priority)
@@ -759,8 +857,8 @@ function deSalesify(text) {
   return String(text)
     .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
     .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
-    .replace(/\bPower Choosers helps\b/gi, 'We help')
-    .replace(/\bPower Choosers can help\b/gi, 'We can help')
+    .replace(/\bPower Choosers helps\b/gi, 'Most teams see')
+    .replace(/\bPower Choosers can help\b/gi, 'Most teams see')
     .replace(/\bPower Choosers\b/gi, 'We');
 }
 
@@ -1664,7 +1762,7 @@ const coldEmailSchema = {
         },
         greeting: { type: "string", description: "Hello {firstName}," },
         opening_hook: { type: "string", description: "Problem-aware opening about industry challenge or market condition (1-2 sentences, NO statistics)" },
-        value_proposition: { type: "string", description: "How we help with specific measurable value (include percentages or dollar amounts)" },
+        value_proposition: { type: "string", description: "Observation-based value prop with specific measurable value (include percentages or dollar amounts). Use patterns like 'Most [role] see [specific #] when they [action]' - NOT 'We help' or 'We work with'" },
         social_proof_optional: { type: "string", description: "Brief credibility with real outcomes (optional, 1 sentence)" },
         cta_text: { type: "string", description: "Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation, e.g., 'Schedule Your Free Assessment', 'Book a Consultation', 'Explore Your Savings Potential')" },
         cta_type: { type: "string", description: "CTA pattern used: qualifying_question, soft_ask_with_context, value_question, timing_question, or direct_meeting" }
@@ -1762,7 +1860,7 @@ function getIndustrySpecificContent(industry) {
   const industryMap = {
     manufacturing: {
       painPoints: ['production downtime', 'energy-intensive operations', 'equipment reliability'],
-      avgSavings: '15-25%',
+      avgSavings: '10-20%',
       keyBenefit: 'operational continuity',
       urgencyDrivers: ['production schedules', 'equipment uptime'],
       language: 'operational efficiency and production continuity'
@@ -2036,12 +2134,9 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const firstName = r.firstName || r.first_name || (name ? String(name).split(' ')[0] : '');
   const company = r.company || r.accountName || '';
   const job = r.title || r.job || r.role || '';
-  const industry = r.industry || '';
   const energy = r.energy || {};
   const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 1000);
   const notes = [r.notes, r.account?.notes].filter(Boolean).join('\n').slice(0, 500);
-  // Debug log to see what account data is available
-  console.log('[Debug] Full account data for', company, ':', JSON.stringify(r.account, null, 2));
   
   // Clean and sanitize account description - check multiple possible field names
   let accountDescription = (r.account?.shortDescription || r.account?.short_desc || r.account?.descriptionShort || r.account?.description || r.account?.companyDescription || r.account?.accountDescription || '')
@@ -2054,6 +2149,19 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
     .replace(/based in [^,]*, [^,]*/gi, '') // Remove location details
     .replace(/\s+/g, ' ') // Normalize whitespace
     .trim();
+
+  // Industry detection with fallbacks
+  let industry = r.industry || r.account?.industry || '';
+  
+  // If no industry field, infer from company name
+  if (!industry && company) {
+    industry = inferIndustryFromCompanyName(company);
+  }
+  
+  // If still no industry, try to infer from account description
+  if (!industry && accountDescription) {
+    industry = inferIndustryFromDescription(accountDescription);
+  }
 
   // Enhanced research with all personalization data sources
   let researchData = null;
@@ -2406,9 +2514,18 @@ INDUSTRY ADAPTATION: ${industry ? `The recipient is in ${industry} industry. ` :
 
 IMPORTANT: ${company ? 'Reference ' + company + ' naturally. ' : ''}Keep it conversational, avoid over-specific details (no exact sq ft, employee counts, or contract rates). Focus on industry patterns and common challenges, not hyper-specific data. If the industry is unfamiliar, focus on universal business concerns: cost control, budget predictability, operational efficiency.
 
-- value_proposition: ${selectedAngle ? 'Based on ' + selectedAngle.id + ' angle: ' + selectedAngle.primaryValue : 'How we help'} (1-2 sentences). ${selectedAngle?.id === 'timing_strategy' && selectedAngle?.situationalContext ? 'Include timing context: ' + selectedAngle.situationalContext + '. ' : ''}Example: ${selectedAngle?.id === 'timing_strategy' ? '"Best practice is renewing 6 months to 1 year in advance, though most companies wait until 30-60 days out. Teams that plan ahead typically save ' + selectedAngle.primaryValue + '."' : '"We help ' + (industry || 'companies') + ' secure better electricity rates and manage procurement more effectively. Clients typically save 10-20% annually."'} Keep it simple and concrete.
+- value_proposition: OBSERVATION-BASED VALUE PROP (2-3 sentences). CRITICAL RULES:
+  * LEAD WITH NUMBERS: Put percentages/savings at START of sentence, not buried mid-sentence
+  * OBSERVATION PATTERN: "Most [role] I talk to see [specific #] when they [action]"
+  * ACTION-FOCUSED: What they'd experience, not what we deliver
+  * FORBIDDEN TRANSITIONS: NEVER use "That's why...", "The reality is...", "We help...", "We work with...", "This approach..."
+  * USE INSTEAD: "Most [role] I talk to...", "Here's what typically happens...", "From what I'm seeing...", "Here's the thing..."
+  * Example (GOOD): "Most facilities teams I talk to either plan 6-12 months ahead or scramble the last 30 days. The ones that plan usually lock in 8-15% better terms."
+  * Example (GOOD): "12-20% consumption reductions happen from efficiency alone, before they talk to a new supplier. Here's why that matters: you renew from strength instead of scrambling."
+  * Example (BAD): "That's why most companies we work with typically reduce consumption by 12-20% through targeted efficiency measures."
+  * Example (BAD): "We help companies secure better rates and manage procurement. Clients typically save 10-20%."
 
-- social_proof_optional: Brief credibility IF relevant (1 sentence, optional). Example: "Companies in ${industry || '[industry]'} typically save 10-20%." Keep it general, not hyper-specific.
+- social_proof_optional: Brief credibility IF relevant (1 sentence, optional). Example: "Most ${industry || '[industry]'} companies see 10-20% savings." Keep it general, not hyper-specific.
 ${(() => {
   const bestCTA = getBestCTA(selectedAngle, recipient?.job || recipient?.title || recipient?.role || job || 'operations', industry, ctaPattern);
   const angleCTA = selectedAngle ? getAngleSpecificCTA(selectedAngle) : null;
@@ -2437,7 +2554,11 @@ ${toneOpener ? `- REQUIRED OPENER: MUST use ` + JSON.stringify(toneOpener) + ` o
   ✗ "Hope this email finds you well..." (generic greeting)
   ✗ "Out of curiosity—" or "Quick one—" (AI patterns)
   ✗ "15-25% rate increases" or "rates rising 15-25%" (generic statistics)
-- REQUIRED: Natural, conversational language like "Here's what I'm seeing...", "Most teams I talk to...", "From what I'm hearing...", "Been wondering—"
+  ✗ "That's why..." (too academic, explanatory)
+  ✗ "The reality is..." (statement-based, weak)
+  ✗ "We help..." or "We work with..." (shifts focus from them to you)
+  ✗ "This approach..." (too educational)
+- REQUIRED: Natural, conversational language like "Here's what I'm seeing...", "Most teams I talk to...", "From what I'm hearing...", "Been wondering—", "Here's what typically happens..."
 - Be specific but not creepy: Reference industry patterns, not exact employee counts or sq ft
 ${accountDescription ? '- Context available: Mention ' + accountDescription.substring(0, 80) + '... naturally WITHOUT saying "I noticed"' : ''}
 ${company ? '- Reference ' + company + ' by name naturally' : ''}
@@ -2446,10 +2567,16 @@ EMAIL RULES:
 - 75-130 words total (keep it short)
 - ONE clear CTA question ending with ? (ONLY ONE question mark in entire email)
 ${toneOpener ? `- REQUIRED: Start with ` + JSON.stringify(toneOpener) + ` or similar natural variation` : `- REQUIRED: Use authentic tone opener like "Been wondering—", "Here's what I'm seeing—", "Question for you—"`}
+- OPENING PARAGRAPH: 1-2 sentences MAX. Remove explanatory text before value prop. Pattern: Opening question → Value prop → Proof
+- PARAGRAPH 2 (VALUE PROP): 
+  * Lead with NUMBERS at start of sentence (e.g., "12-20% consumption reductions happen..." NOT "Through optimization, companies reduce by 12-20%")
+  * Use OBSERVATION-BASED transitions: "Most [role] I talk to...", "Here's what typically happens...", "From what I'm seeing..."
+  * FORBIDDEN: "That's why...", "The reality is...", "We help...", "We work with...", "This approach..."
+  * ACTION-FOCUSED: What they'd experience, not what we deliver
 - FORBIDDEN: NO "I noticed...", NO "I'm Lewis...", NO "As [Role]...", NO "I wanted to reach out", NO "Hope this email finds you well"
 - FORBIDDEN: NO "15-25% rate increases" or similar generic statistics
 - NO company size mentions: NEVER say "small company" or "small business"
-- Value prop must include HOW we help and WHAT results (e.g., "save 10-20%")
+- Value prop must include specific numbers (e.g., "save 10-20%") with numbers at START of sentence
 - Focus on ${selectedAngle ? selectedAngle.id + ' angle (' + selectedAngle.primaryMessage + ')' : 'industry challenges'}
 - Complete sentences only, no incomplete phrases
 
@@ -2601,7 +2728,7 @@ CRITICAL: Return ONLY valid JSON with brief, friendly acknowledgment. No busines
   }
 
   // Standard text mode (existing logic)
-  const identity = whoWeAre || `You are ${senderName}, an Energy Strategist at Power Choosers. We help businesses secure better electricity rates and manage energy procurement more effectively. Write in first person ("we"/"I"). Do NOT use brand-first openers like "At Power Choosers," or "Power Choosers helps" — prefer "We help" or "I help".
+  const identity = whoWeAre || `You are ${senderName}, an Energy Strategist at Power Choosers. You help businesses secure better electricity rates and manage energy procurement more effectively. Write in first person ("we"/"I"). Do NOT use brand-first openers like "At Power Choosers," or "Power Choosers helps" — prefer observation-based language like "Most teams I talk to..." or "Here's what I'm seeing..." instead of "We help" or "I help".
 
 ${selectedAngle ? `
 SELECTED ANGLE FOR THIS EMAIL:
@@ -2678,7 +2805,9 @@ CRITICAL QUALITY RULES:
   - Focus ONLY on ${company}'s specific situation, industry challenges they face, or operational details
   - INDUSTRY ADAPTATION: ${industry ? `The recipient is in ${industry} industry. ` : ''}Adapt your messaging to this specific industry's challenges. If the industry is unfamiliar, use your knowledge of that industry or focus on universal business concerns: cost control, budget predictability, operational efficiency.
 - SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
+- NUMBER PLACEMENT: LEAD WITH NUMBERS at start of sentence (e.g., "12-20% consumption reductions happen..." NOT "Through optimization, companies reduce by 12-20%")
 - MEASURABLE CLAIMS: "save 10-20%" or "$X annually" NOT "significant savings"
+- VALUE PROP TONE: Use OBSERVATION-BASED patterns ("Most [role] I talk to see [specific #] when they [action]") NOT explanatory ("That's why...", "We help...", "This approach...")
 - COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
 - QUALIFYING CTAs: Prefer questions over meeting requests for cold emails
 - SOCIAL PROOF: Use real outcomes when mentioning similar companies
@@ -2708,9 +2837,10 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
   * ${accountDescription ? 'Reference: "' + accountDescription.substring(0, 80) + '..." naturally in conversation' : 'Reference their business type naturally'}
   * ${recentActivityContext ? 'Mention: ' + recentActivityContext.substring(0, 60) + '... naturally' : 'Reference industry trends naturally'}
   * ${contractEndLabel ? 'Use: "With your contract ending ' + contractEndLabel + '..." naturally' : 'Reference their energy situation naturally'}
-- Use natural transitions: "That's why...", "Given that...", "Here's the thing..."
+- Use natural transitions: "Here's the thing...", "Given that...", "Most teams I talk to...", "Here's what typically happens..."
+- FORBIDDEN TRANSITIONS: NEVER use "That's why..." (too academic), "The reality is..." (statement-based, weak)
 - Vary sentence length: Mix short punchy statements with longer explanatory ones
-- Use conversational connectors: "Here's what I'm seeing...", "The reality is...", "Most teams I talk to..."
+- Use conversational connectors: "Here's what I'm seeing...", "Most teams I talk to...", "From what I'm hearing...", "Here's what typically happens..."
 - Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", "I noticed...", "I've been tracking..." or other template phrases
 - DO NOT mention generic market statistics - focus on their specific situation
 - Sound like a peer who knows their industry, not a researcher
@@ -2738,7 +2868,7 @@ ${toneOpener ? `✓ GOOD: ` + JSON.stringify(toneOpener) + `${selectedAngle ? ' 
 ✗ BAD: "I'm reaching out because..." (corporate speak)
 
 PARAGRAPH STRUCTURE (CRITICAL):
-Paragraph 1 (Opening Hook - 1-2 sentences):
+Paragraph 1 (Opening Hook - 1-2 sentences MAX):
 ${toneOpener ? `- MUST start with: ` + JSON.stringify(toneOpener) : `- Use authentic, conversational opener`}
 ${selectedAngle ? `- Focus on: ${selectedAngle.primaryMessage}` : '- Focus on their energy situation'}
 ${selectedAngle ? `- Use opening template: ${selectedAngle.openingTemplate}` : '- Start with a direct question about their energy situation'}
@@ -2746,12 +2876,16 @@ ${selectedAngle ? `- Use opening template: ${selectedAngle.openingTemplate}` : '
 - NO "I noticed..." or "I saw..." (sounds like research)
 - NO generic market statistics (rates rising 15-25%, data center demand)
 - NO corporate speak ("I wanted to reach out", "Hope this email finds you well")
+- REMOVE explanatory text before value prop - jump to value prop after opening question
 - Keep it conversational and human
 
 Paragraph 2 (Value Proposition - 2-3 sentences):
-- How Power Choosers helps
-- SPECIFIC measurable value: "save 10-20%", "reduce costs by $X"
-- Include both HOW we help AND WHAT results
+- LEAD WITH NUMBERS: Put percentages/savings at START of sentence (e.g., "12-20% consumption reductions happen..." NOT "Through optimization, companies reduce by 12-20%")
+- OBSERVATION-BASED: "Most [role] I talk to see [specific #] when they [action]"
+- FORBIDDEN: "That's why...", "The reality is...", "We help...", "We work with...", "This approach..."
+- USE INSTEAD: "Most [role] I talk to...", "Here's what typically happens...", "From what I'm seeing...", "Here's the thing..."
+- ACTION-FOCUSED: What they'd experience, not what we deliver
+- SPECIFIC measurable value: "save 10-20%", "reduce costs by $X" (with numbers at START of sentence)
 
 Paragraph 3 (CTA - 1 sentence):
 - Qualifying question or soft ask
@@ -2778,11 +2912,13 @@ CRITICAL:
 - Keep it conversational and human (like a 29-year-old business professional)
 
 VALUE PROPOSITION (1-2 sentences MINIMUM):
-${selectedAngle ? `PRIMARY FOCUS: ${selectedAngle.primaryValue}` : 'Explain how Power Choosers helps with SPECIFIC MEASURABLE VALUE'}
+${selectedAngle ? `PRIMARY FOCUS: ${selectedAngle.primaryValue}` : 'Observation-based value prop with SPECIFIC MEASURABLE VALUE (e.g., "Most [role] see [specific #] when they [action]")'}
 ${selectedAngle?.id === 'timing_strategy' && selectedAngle?.situationalContext ? `- TIMING CONTEXT: ${selectedAngle.situationalContext} (reference this when explaining value)` : ''}
-- MUST include: (1) What we do, (2) Concrete numbers: "save 10-20%", "reduce costs by $X", "clients typically see Y"
+- MUST include: (1) Observation-based pattern, (2) Concrete numbers at START: "10-20% savings happen when...", "Most teams see $X", "12-20% reductions occur..."
 ${selectedAngle ? `- Use angle value: ${selectedAngle.primaryValue}` : '- Reference their business type and industry challenges'}
-- Example: ${selectedAngle?.id === 'timing_strategy' ? `"Best practice is renewing 6 months to 1 year in advance, though most companies wait until 30-60 days out. Teams that plan ahead typically save ${selectedAngle.primaryValue}."` : (selectedAngle ? `"${selectedAngle.primaryValue}"` : '"We help ' + (industry || 'businesses') + ' secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs."')}
+- Example (GOOD): ${selectedAngle?.id === 'timing_strategy' ? `"Most facilities teams I talk to either plan 6-12 months ahead or scramble the last 30 days. The ones that plan usually lock in 8-15% better terms."` : (selectedAngle?.id === 'demand_efficiency' ? `"12-20% consumption reductions happen from efficiency alone, before they talk to a new supplier. Here's why that matters: you renew from strength instead of scrambling."` : (selectedAngle ? `"Most [role] I talk to see ${selectedAngle.primaryValue} when they [action]."` : '"Most companies here see 10-20% savings when they lock in rates early, before contracts expire."'))}
+- Example (BAD): "That's why most companies we work with typically reduce consumption by 12-20% through targeted efficiency measures."
+- Example (BAD): "We help companies secure better rates and manage procurement. Clients typically save 10-20%."
 - NEVER end with incomplete phrases or "within [company name]"
 - ALWAYS include a complete value proposition - never skip this field
 - THIS FIELD IS MANDATORY - NEVER LEAVE BLANK
@@ -2848,7 +2984,7 @@ ${generationMode === 'consultative' ? `
 * Use discovery questions: "I'm curious..." "How do you typically..." "What matters more to you..."
 * Lower pressure approach - understand their situation first` : ''}
 ${generationMode === 'direct' ? `
-* Lead with specific insights: "Here's what I found..." "The reality is..." "Let me ask you something—"
+* Lead with specific insights: "Here's what I found..." "Most teams I talk to..." "Let me ask you something—"
 * Assertive but respectful - present facts and ask direct questions` : ''}
 ${generationMode === 'balanced' ? `
 * Combine observation + value: Reference their situation naturally, then "Here's what I'm seeing..."
@@ -3109,7 +3245,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
             console.warn('[Validation] Incomplete value prop detected, fixing...');
             jsonData.value_proposition = jsonData.value_proposition.replace(
               /\b(within|like|such as|including)\s+[A-Z][^.!?]*$/i,
-              `secure better energy rates before contracts expire. Clients typically save 10-20% on annual costs.`
+              `secure better energy rates before contracts expire. Most teams see 10-20% savings on annual costs.`
             );
           }
         }
@@ -3127,7 +3263,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         if (templateType === 'cold_email' && (!jsonData.value_proposition || jsonData.value_proposition.trim() === '')) {
           console.warn('[Validation] Missing value proposition detected, adding default...');
           const industry = recipient?.industry || 'businesses';
-          jsonData.value_proposition = `We help ${industry} companies secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs.`;
+          jsonData.value_proposition = `Most ${industry} companies see 10-20% savings when they lock in rates early, before contracts expire.`;
         }
         
         // Validate missing opening_hook for cold emails
@@ -3185,7 +3321,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
             console.warn(`[Validation] Email too short (${wordCount} words), expanding value proposition...`);
             // Only expand if value prop is very short
             if (jsonData.value_proposition && jsonData.value_proposition.length < 40) {
-              jsonData.value_proposition = `${jsonData.value_proposition} Our clients typically save 10-20% on annual energy costs.`;
+              jsonData.value_proposition = `${jsonData.value_proposition} Most teams see 10-20% savings on annual energy costs.`;
             }
           }
         }
