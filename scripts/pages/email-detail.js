@@ -2194,7 +2194,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     <div class="subject-blurb">${displaySubject}</div>
     <div class="intro">
       <p>${data.greeting || `Hi ${firstName},`}</p>
-      <p>${data.opening_paragraph || `I wanted to reach out about an interesting opportunity for ${company}.`}</p>
+      <p>${data.opening_paragraph || `Been wondering—when does ${company}'s energy contract renew?`}</p>
     </div>
     <div class="info-list">
       <strong>${data.list_header || 'How We Can Help:'}</strong>

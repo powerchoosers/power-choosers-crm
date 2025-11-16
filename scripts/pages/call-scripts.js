@@ -1354,7 +1354,7 @@
     },
     gatekeeper_what_about: {
       stage: 'Gatekeeper',
-      text: "<span class=\"tone-marker confident\">confident, value-focused tone</span> I'm reaching out about timing for electricity contract renewals — a critical window right now where locking in early often saves companies 15-20% on their energy costs. <span class=\"pause-indicator\"></span> Would it be best to speak with the person managing those contracts?",
+      text: "<span class=\"tone-marker confident\">confident, value-focused tone</span> Question for you—when do electricity contract renewals typically happen for your company? Locking in early often saves companies 15-20% on their energy costs. <span class=\"pause-indicator\"></span> Would it be best to speak with the person managing those contracts?",
       responses: [
         { label: "They'll connect me", next: 'gatekeeper_transferred' },
         { label: "They need the person's name", next: 'gatekeeper_connect_request' },
