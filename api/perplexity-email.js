@@ -2280,10 +2280,19 @@ IMPORTANT: The closing field must include a newline between "Best regards," and 
   
   if (isColdEmailStandard) {
     const ctaPattern = getCTAPattern(recipient, null, 'cold_email');
-    const openingStyle = getOpeningStyle(recipient);
     
     const coldEmailRules = `
 EMAIL TYPE: Cold Email (Never Spoke Before)
+
+${selectedAngle ? `
+SELECTED ANGLE (PRIMARY FOCUS - USE THIS):
+- Angle: ${selectedAngle.id}
+- Primary Message: ${selectedAngle.primaryMessage}
+- Value Proposition: ${selectedAngle.primaryValue}
+- Opening Template: ${selectedAngle.openingTemplate}
+` : ''}
+
+${toneOpener ? `AUTHENTIC TONE OPENER: "${toneOpener}" (MUST use this to start the opening paragraph)` : ''}
 
 GREETING (MANDATORY - MUST BE FIRST LINE):
 ✓ Start with "Hi ${firstName || 'there'},"
@@ -2292,11 +2301,13 @@ GREETING (MANDATORY - MUST BE FIRST LINE):
 ✓ Greeting must be on its own line with blank line after
 
 CRITICAL QUALITY RULES:
-- OBSERVATION-BASED OPENING: MUST start with SPECIFIC observation about ${company || 'their company'}, NOT generic market facts
+- AUTHENTIC OPENING: ${toneOpener ? `MUST start with "${toneOpener}"` : 'Use authentic, conversational opener'} + ${selectedAngle ? selectedAngle.openingTemplate : 'direct question about their energy situation'}
+  - DO NOT use "I noticed..." (sounds like research, not authentic)
   - DO NOT use generic market statistics like "rates rising 15-25%"
   - DO NOT mention "data center demand" or generic rate increases
+  - DO NOT use corporate speak: "I wanted to reach out", "Hope this email finds you well"
   - Focus ONLY on ${company}'s specific situation, industry challenges they face, or operational details
-  - Use phrases like "I noticed ${company} operates..." or "With ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'your facilities'}..."
+  - ${toneOpener ? `Start with "${toneOpener}" followed by ${selectedAngle ? selectedAngle.openingTemplate : 'a direct question'}` : 'Use conversational, authentic opener'}
 - SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
 - MEASURABLE CLAIMS: "save 10-20%" or "$X annually" NOT "significant savings"
 - COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
@@ -2311,46 +2322,54 @@ CRITICAL QUALITY RULES:
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
 
 HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
-- Write like a knowledgeable energy expert who researched ${company || 'their company'} deeply
+- Write like a 29-year-old business professional - conversational, direct, authentic
+- ${toneOpener ? `MUST start with "${toneOpener}"` : 'Use authentic, conversational opener'}
 - Focus on THEIR specific situation only
-- Show you did homework: When you have specific data, use phrases like:
-  * "I noticed ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail about their company]'}" ${accountDescription ? '(you have account description - USE THIS)' : ''}
-  * "I saw ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}" ${recentActivityContext ? '(you have recent activity - USE THIS)' : ''}
-  * "On your website, I noticed..." ${websiteContext ? '(you have website context - USE THIS)' : ''}
-  * "With ${contractEndLabel ? 'your contract ending ' + contractEndLabel : 'your current energy setup'}..." (use contract timing if available)
-- Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : '[specific situation]'}..."
-- Include micro-observations: Reference their website, recent posts, industry trends they'd recognize
+- ${selectedAngle ? `Focus on: ${selectedAngle.primaryMessage}` : 'Focus on their energy situation'}
+- Use natural, conversational language: ${toneOpener ? `"${toneOpener}"` : '"Let me ask you something—"'} followed by ${selectedAngle ? selectedAngle.openingTemplate : 'a direct question'}
+- Reference context naturally WITHOUT saying "I noticed" or "I saw":
+  * ${accountDescription ? 'Reference: "' + accountDescription.substring(0, 80) + '..." naturally in conversation' : 'Reference their business type naturally'}
+  * ${recentActivityContext ? 'Mention: ' + recentActivityContext.substring(0, 60) + '... naturally' : 'Reference industry trends naturally'}
+  * ${contractEndLabel ? 'Use: "With your contract ending ' + contractEndLabel + '..." naturally' : 'Reference their energy situation naturally'}
+- Use natural transitions: "That's why...", "Given that...", "Here's the thing..."
 - Vary sentence length: Mix short punchy statements with longer explanatory ones
-- Use conversational connectors: "Here's the thing...", "The reality is...", "What I've found..."
-- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", "I've been tracking how companies..." or other template phrases
+- Use conversational connectors: "Here's what I'm seeing...", "The reality is...", "Most teams I talk to..."
+- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", "I noticed...", "I've been tracking..." or other template phrases
 - DO NOT mention generic market statistics - focus on their specific situation
-- Show expertise subtly: "In my experience with ${industry || '[industry]'} companies", "I've noticed [specific trend about their company]"
+- Sound like a peer who knows their industry, not a researcher
 ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\'ve likely seen..." (tenure available)' : ''}
 
-EVIDENCE OF RESEARCH (Show You Know Their Business):
-${accountDescription ? '✓ Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally' : ''}
-${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements' : ''}
-${websiteContext ? '✓ Use website info: "On your website, I noticed..." to show you visited' : ''}
-${recentActivityContext ? '✓ Use recent activity: "I saw ${company} recently..." + ' + recentActivityContext.substring(0, 60) + '...' : ''}
-${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
-${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
-${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant' : ''}
+EVIDENCE OF RESEARCH (Show You Know Their Business - Reference Naturally, NOT "I noticed"):
+${accountDescription ? '✓ Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally in conversation' : ''}
+${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements naturally' : ''}
+${websiteContext ? '✓ Use website info: Reference naturally WITHOUT saying "I noticed" or "I saw"' : ''}
+${recentActivityContext ? '✓ Use recent activity: Reference ' + recentActivityContext.substring(0, 60) + '... naturally' : ''}
+${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..." naturally' : ''}
+${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant (but avoid exact numbers in opening)' : ''}
+${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant (but avoid exact numbers in opening)' : ''}
+CRITICAL: Reference this data naturally in conversation - DO NOT say "I noticed" or "I saw" - just weave it into the conversation naturally
 
 CONVERSATIONAL FLOW PATTERNS:
-✓ GOOD: "I noticed ${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
-✓ GOOD: "Given your role as ${job || '[role]'}, you're probably dealing with ${roleContext?.painPoints[0] || '[pain point]'}. Here's what I've found..."
+${toneOpener ? `✓ GOOD: "${toneOpener}${selectedAngle ? ' ' + selectedAngle.openingTemplate : ' [direct question about their energy situation]'}"` : '✓ GOOD: "Let me ask you something—[direct question about their energy situation]"'}
+✓ GOOD: "${toneOpener || 'Here\'s what I\'m seeing'}—${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
+✓ GOOD: "Given your role as ${job || '[role]'}, you're probably dealing with ${roleContext?.painPoints[0] || '[pain point]'}. ${selectedAngle ? selectedAngle.primaryMessage : 'Here\'s what I\'ve found...'}"
 ✓ GOOD: "${industry || '[Industry]'} companies are facing [specific challenge]. ${company || '[Company]'} likely sees this in..."
 ✓ GOOD: "Companies in ${industry || '[industry]'}" (not "your industry")
-✗ BAD: "I wanted to reach out about..."
-✗ BAD: "I hope this email finds you well..."
-✗ BAD: "I'm reaching out because..."
+✗ BAD: "I noticed..." (sounds like research, not authentic)
+✗ BAD: "I wanted to reach out about..." (corporate speak)
+✗ BAD: "I hope this email finds you well..." (corporate speak)
+✗ BAD: "I'm reaching out because..." (corporate speak)
 
 PARAGRAPH STRUCTURE (CRITICAL):
 Paragraph 1 (Opening Hook - 1-2 sentences):
-- Industry-specific problem or market condition
+${toneOpener ? `- MUST start with: "${toneOpener}"` : '- Use authentic, conversational opener'}
+${selectedAngle ? `- Focus on: ${selectedAngle.primaryMessage}` : '- Focus on their energy situation'}
+${selectedAngle ? `- Use opening template: ${selectedAngle.openingTemplate}` : '- Start with a direct question about their energy situation'}
 - Reference ${company} specifically
-- Use qualitative language (rising, increasing, higher) NOT percentages
-- NO statistics in opening hook
+- NO "I noticed..." or "I saw..." (sounds like research)
+- NO generic market statistics (rates rising 15-25%, data center demand)
+- NO corporate speak ("I wanted to reach out", "Hope this email finds you well")
+- Keep it conversational and human
 
 Paragraph 2 (Value Proposition - 2-3 sentences):
 - How Power Choosers helps
@@ -2369,29 +2388,31 @@ FORMATTING REQUIREMENTS:
 - Ensure proper spacing for readability
 
 OPENING (1-2 sentences):
-Style: ${openingStyle.type}
-${openingStyle.prompt}
-Lead with SPECIFIC OBSERVATION about ${company} - NO generic market statistics:
-- "I noticed ${company} operates ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'with facilities in ' + (city || '[location]')}..."
-- "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : 'your current energy setup'}, you're likely dealing with..."
-- "${company} likely sees energy as [specific to their situation] given [specific detail about their operations]"
-- "Companies with ${industryContent?.painPoints[0] || '[specific pain point]'} typically benefit from early planning"
-DO NOT mention: "rates rising 15-25%", "data center demand", generic market statistics
-IMPORTANT: Always reference ${company} specifically, not other companies.
+${toneOpener ? `MUST START with: "${toneOpener}"` : 'Use authentic, natural opener (not "I wanted to reach out" or "Hope this email finds you well")'}
+${selectedAngle ? `Focus on: ${selectedAngle.primaryMessage}` : 'Focus on their energy situation'}
+${selectedAngle ? `Opening template: ${selectedAngle.openingTemplate}` : 'Start with a direct question about their energy situation'}
+${accountDescription ? `Context available: ${accountDescription.substring(0, 100)}...` : 'Reference their industry challenges'}
+CRITICAL: 
+- NO "I noticed..." bio openings (sounds like research, not authentic)
+- NO generic market statistics ("rates rising 15-25%", "data center demand")
+- NO corporate speak ("I wanted to reach out", "Hope this email finds you well")
+- Use ${toneOpener || 'authentic, conversational opener'} + ${selectedAngle ? selectedAngle.openingTemplate : 'direct question about their situation'}
+- Reference ${company} specifically, not other companies
+- Keep it conversational and human (like a 29-year-old business professional)
 
 VALUE PROPOSITION (1-2 sentences MINIMUM):
-- Explain how Power Choosers helps with SPECIFIC MEASURABLE VALUE
+${selectedAngle ? `PRIMARY FOCUS: ${selectedAngle.primaryValue}` : 'Explain how Power Choosers helps with SPECIFIC MEASURABLE VALUE'}
 - MUST include: (1) What we do, (2) Concrete numbers: "save 10-20%", "reduce costs by $X", "clients typically see Y"
-- Reference: ${accountDescription ? '"' + accountDescription + '"' : 'their business type'}
-- Add social proof if relevant: "helped similar companies achieve [specific result]"
-- Example: "We help ${industry || 'businesses'} secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs."
+${selectedAngle ? `- Use angle value: ${selectedAngle.primaryValue}` : '- Reference their business type and industry challenges'}
+- Example: ${selectedAngle ? `"${selectedAngle.primaryValue}"` : '"We help ' + (industry || 'businesses') + ' secure better rates before contracts expire. Our clients typically save 10-20% on annual energy costs."'}
 - NEVER end with incomplete phrases or "within [company name]"
 - ALWAYS include a complete value proposition - never skip this field
 - THIS FIELD IS MANDATORY - NEVER LEAVE BLANK
 
 CTA (ASSERTIVE, NOT PERMISSION-BASED):
-${ctaPattern ? 'Use assertive question pattern: "' + ctaPattern.template + '"' : 'Create an assertive qualifying question'}
+${selectedAngle ? `RELATED TO SELECTED ANGLE: Use a question related to ${selectedAngle.primaryMessage}` : ctaPattern ? 'Use assertive question pattern: "' + ctaPattern.template + '"' : 'Create an assertive qualifying question'}
 - CRITICAL: Generate EXACTLY ONE question. Pick ONE pattern below, not multiple.
+${selectedAngle ? `- ANGLE-SPECIFIC: ${selectedAngle.openingTemplate} (adapt this as your CTA question)` : ''}
 - ASSERTIVE PATTERNS (pick ONE only):
   * "When does your current contract renew?"
   * "Are you locking in early or waiting close to expiration?"
@@ -2457,7 +2478,7 @@ TONE: Write like a 29-year-old Texas business pro - conversational, confident, d
     return { 
       prompt: [identity, recipientContext, coldEmailRules, outputFormat].join('\n\n'),
       researchData: researchData,
-      openingStyle: openingStyle?.type || null
+      openingStyle: selectedAngle?.id || null
     };
   }
 
