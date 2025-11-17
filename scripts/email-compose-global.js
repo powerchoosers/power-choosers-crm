@@ -3058,8 +3058,12 @@
    * Select random authentic tone opener
    */
   function selectRandomToneOpener(angleId = null) {
-    const openings = window.AUTHENTIC_TONE_OPENERS.disarming;
-    return openings[Math.floor(Math.random() * openings.length)];
+    // Combine both disarming and observation openers for more variety
+    const allOpeners = [
+      ...window.AUTHENTIC_TONE_OPENERS.disarming,
+      ...window.AUTHENTIC_TONE_OPENERS.observation
+    ];
+    return allOpeners[Math.floor(Math.random() * allOpeners.length)];
   }
 
   /**
