@@ -898,12 +898,10 @@ function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory,
   // Remove ALL size assumptions - "small company/business" can be insulting to business owners
   // Use neutral, empowering language regardless of actual size
   const neutralGroup = industry ? `companies in ${industry}` : 'companies like yours';
-  
-  // Aggressive removal of "small" language - assume nothing about company size
-  // Replace with industry-based or role-based language
   const industryBased = industry ? `companies in ${industry}` : 'companies like yours';
   const roleBased = job ? `As ${job}` : (industry ? `As a ${industry} company` : 'As a company');
-  
+
+  // Aggressive removal of "small" language and sloppy industry phrases
   out = out
     // Catch "as a small" patterns first (most common)
     .replace(/\bAs a small (?:company|business|firm|organization|operation)\b/gi, industry ? `As a ${industry} company` : 'As a company')
@@ -939,6 +937,16 @@ function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory,
     // Additional catch-all patterns
     .replace(/\bsmall (?:company|business|firm|organization|operation)\b/gi, industry ? `${industry} company` : 'company')
     .replace(/\bsmaller (?:company|business|firm|organization|operation)\b/gi, industry ? `${industry} company` : 'company');
+
+  // If the CRM industry is NOT nonprofit, strip any accidental "nonprofit" labels
+  if (!/non[-\s]?profit/i.test(industry || '')) {
+    out = out
+      .replace(/\bnon[-\s]?profit(?:\s+company|companies)?\b/gi, 'organizations')
+      .replace(/\bnon[-\s]?profit\b/gi, 'organization');
+  } else {
+    // For true nonprofits, prefer "nonprofit organizations" over "nonprofit companies"
+    out = out.replace(/\bnon[-\s]?profit companies\b/gi, 'nonprofit organizations');
+  }
 
   return out;
 }
