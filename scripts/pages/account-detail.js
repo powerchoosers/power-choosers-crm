@@ -2940,6 +2940,38 @@ var console = {
       }
     });
 
+    // Listen for account update events (from Apollo widget enrich, etc.)
+    document.addEventListener('pc:account-updated', async (e) => {
+      if (state.currentAccount && e.detail) {
+        const { id, changes } = e.detail;
+        
+        // Only update if this is the current account being viewed
+        if (id === state.currentAccount.id) {
+          console.log('[AccountDetail] Account updated via pc:account-updated, refreshing display', changes);
+          
+          // Immediately merge changes into current state
+          state.currentAccount = { ...state.currentAccount, ...changes };
+          
+          // Re-render immediately to show changes
+          renderAccountDetail();
+          
+          // Also refresh from database after a short delay to ensure consistency
+          setTimeout(async () => {
+            try {
+              const refreshedAccount = await findAccountById(id);
+              if (refreshedAccount) {
+                state.currentAccount = refreshedAccount;
+                renderAccountDetail();
+                console.log('[AccountDetail] Refreshed from database after enrich');
+              }
+            } catch (err) {
+              console.warn('[AccountDetail] Failed to refresh from database:', err);
+            }
+          }, 300);
+        }
+      }
+    });
+
     // Listen for contact creation events to refresh the contacts list
     document.addEventListener('pc:contact-created', async (e) => {
       if (state.currentAccount && e.detail) {

@@ -2400,6 +2400,57 @@
   // Instead, let ensureLoadedThenRender() call applyFilters() after data is ready
   ensureLoadedThenRender();
   startLiveListsListeners();
+  
+  // Listen for list count updates from bulk import
+  if (!document._listsUpdateListenerBound) {
+    document.addEventListener('pc:list-updated', (e) => {
+      try {
+        const { id, recordCount, targetType } = e.detail || {};
+        if (!id || !recordCount) return;
+        
+        console.log('[ListsOverview] Received pc:list-updated event:', { id, recordCount, targetType });
+        
+        // Find the list in current state
+        const allLists = [...state.peopleLists, ...state.accountLists];
+        const list = allLists.find(l => l.id === id);
+        
+        if (list) {
+          // Update count locally
+          const currentCount = list.recordCount || list.count || 0;
+          const newCount = currentCount + recordCount;
+          list.recordCount = newCount;
+          list.count = newCount;
+          list.updatedAt = new Date();
+          
+          console.log('[ListsOverview] ✓ Updated list count locally:', { id, oldCount: currentCount, newCount });
+          
+          // Re-render the affected list card
+          renderFilteredItems(state.kind === 'people' ? state.peopleLists : state.accountLists);
+        } else {
+          // List not in current view - reload from BackgroundListsLoader
+          console.log('[ListsOverview] List not in current view, refreshing from BackgroundListsLoader...');
+          const listsData = window.BackgroundListsLoader?.getListsData() || [];
+          const updatedList = listsData.find(l => l.id === id);
+          
+          if (updatedList) {
+            // Update BackgroundListsLoader cache if needed
+            if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
+              const currentCount = updatedList.recordCount || updatedList.count || 0;
+              const newCount = currentCount + recordCount;
+              window.BackgroundListsLoader.updateListCountLocally(id, newCount);
+            }
+            
+            // Reload lists for current kind to pick up the update
+            loadLists(state.kind).catch(err => console.warn('[ListsOverview] Failed to reload lists:', err));
+          }
+        }
+      } catch (err) {
+        console.warn('[ListsOverview] Error handling pc:list-updated:', err);
+      }
+    });
+    document._listsUpdateListenerBound = true;
+    console.log('[ListsOverview] ✓ Bound pc:list-updated event listener');
+  }
 })();
 
 // ===== Preloader: cache members for instant detail opening =====

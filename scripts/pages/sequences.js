@@ -464,6 +464,8 @@
   function openCreateModal() {
     if (!els.modal) return;
     els.modal.hidden = false;
+    // Use shared modal animation pattern: .pc-modal.show controls visibility
+    els.modal.classList.add('show');
     if (els.inputName) {
       els.inputName.value = '';
       els.inputName.focus();
@@ -476,6 +478,7 @@
   function closeCreateModal() {
     if (!els.modal) return;
     els.modal.hidden = true;
+    els.modal.classList.remove('show');
     if (escHandler) {
       document.removeEventListener('keydown', escHandler);
       escHandler = null;
