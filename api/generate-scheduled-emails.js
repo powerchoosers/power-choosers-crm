@@ -439,9 +439,9 @@ export default async function handler(req, res) {
     let startTime, endTime;
     
     if (immediate) {
-      // For immediate generation, get all not_generated emails (including those scheduled for now or future)
-      // Use a small buffer to include emails scheduled for "now" (within last minute)
-      startTime = now - (60 * 1000); // 1 minute buffer to catch emails scheduled for "now"
+      // For immediate generation, get all not_generated emails (including past-due, current, and future)
+      // Look back 30 days to catch any emails that were scheduled in the past but not generated
+      startTime = now - (30 * 24 * 60 * 60 * 1000); // 30 days ago
       endTime = now + (365 * 24 * 60 * 60 * 1000); // 1 year from now
     } else {
       // For daily 8 AM job, get emails scheduled for today
