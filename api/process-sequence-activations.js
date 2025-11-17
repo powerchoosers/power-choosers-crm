@@ -258,6 +258,14 @@ async function processSingleActivation(activationId, isProduction) {
       return;
     }
     
+    // Determine default AI mode for this step (Standard vs HTML).
+    // We look at step.data.aiMode first (set by sequence-builder preview),
+    // then fall back to standard so emails default to NEPQ-style plain emails.
+    const defaultAiMode =
+      firstAutoEmailStep.data?.aiMode ||
+      firstAutoEmailStep.emailSettings?.aiMode ||
+      'standard';
+
     for (const contact of validContacts) {
       if (!contact.email) {
         failedContactIds.push(contact.id);
@@ -288,6 +296,7 @@ async function processSingleActivation(activationId, isProduction) {
         totalSteps: sequence.steps?.length || 1,
         activationId,
         aiPrompt: step.emailSettings?.aiPrompt || step.data?.aiPrompt || step.aiPrompt || step.content || 'Write a professional email',
+        aiMode: defaultAiMode,
         ownerId: data.ownerId || data.userId,
         assignedTo: data.ownerId || data.userId,
         createdBy: data.ownerId || data.userId,
