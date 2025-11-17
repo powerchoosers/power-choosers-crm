@@ -1,5 +1,389 @@
 import { db } from './_firebase.js';
 
+// ========== INDUSTRY DETECTION FUNCTIONS ==========
+
+// Infer industry from company name
+function inferIndustryFromCompanyName(companyName) {
+  if (!companyName) return '';
+  
+  const name = String(companyName).toLowerCase();
+  
+  // Manufacturing
+  if (/\b(manufacturing|manufacturer|industrial|factory|plant|fabrication|production|assembly)\b/i.test(name)) {
+    return 'Manufacturing';
+  }
+  
+  // Hospitality
+  if (/\b(hotel|inn|motel|resort|lodge|restaurant|cafe|dining|hospitality)\b/i.test(name)) {
+    return 'Hospitality';
+  }
+  
+  // Healthcare
+  if (/\b(hospital|clinic|medical|healthcare|health\s*care|physician|doctor|dental|pharmacy)\b/i.test(name)) {
+    return 'Healthcare';
+  }
+  
+  // Retail
+  if (/\b(retail|store|shop|market|outlet|merchandise|boutique)\b/i.test(name)) {
+    return 'Retail';
+  }
+  
+  // Logistics/Transportation
+  if (/\b(logistics|transportation|warehouse|shipping|freight|delivery|distribution|trucking)\b/i.test(name)) {
+    return 'Logistics';
+  }
+  
+  // Data Center
+  if (/\b(data\s*center|datacenter|server|hosting|cloud|colo)\b/i.test(name)) {
+    return 'DataCenter';
+  }
+  
+  // Nonprofit
+  if (/\b(nonprofit|non-profit|charity|foundation|501c3|501\(c\)\(3\))\b/i.test(name)) {
+    return 'Nonprofit';
+  }
+  
+  return '';
+}
+
+// Infer industry from account description
+function inferIndustryFromDescription(description) {
+  if (!description) return '';
+  
+  const desc = String(description).toLowerCase();
+  
+  // Hospitality
+  if (/\b(hotel|inn|motel|resort|lodge|accommodation|hospitality|guest|room|booking|stay)\b/i.test(desc)) {
+    return 'Hospitality';
+  }
+  
+  // Restaurant/Food
+  if (/\b(restaurant|cafe|dining|food|beverage|menu|cuisine|chef)\b/i.test(desc)) {
+    return 'Hospitality';
+  }
+  
+  // Manufacturing
+  if (/\b(manufacturing|production|factory|plant|industrial|assembly|fabrication)\b/i.test(desc)) {
+    return 'Manufacturing';
+  }
+  
+  // Healthcare
+  if (/\b(hospital|clinic|medical|healthcare|patient|treatment|diagnosis|surgery)\b/i.test(desc)) {
+    return 'Healthcare';
+  }
+  
+  // Retail
+  if (/\b(retail|store|merchandise|shopping|customer|product|sale)\b/i.test(desc)) {
+    return 'Retail';
+  }
+  
+  // Logistics
+  if (/\b(logistics|warehouse|shipping|distribution|freight|transportation|delivery)\b/i.test(desc)) {
+    return 'Logistics';
+  }
+  
+  // Data Center
+  if (/\b(data\s*center|server|hosting|cloud|infrastructure|computing)\b/i.test(desc)) {
+    return 'DataCenter';
+  }
+  
+  // Nonprofit
+  if (/\b(nonprofit|charity|foundation|mission|donation|volunteer)\b/i.test(desc)) {
+    return 'Nonprofit';
+  }
+  
+  return '';
+}
+
+// ========== ANGLE SELECTION SYSTEM ==========
+// Simplified RANDOMIZED_ANGLES_BY_INDUSTRY (matches email-compose-global.js structure)
+const RANDOMIZED_ANGLES_BY_INDUSTRY = {
+  Manufacturing: {
+    angles: [
+      {
+        id: 'exemption_recovery',
+        weight: 0.30,
+        primaryMessage: 'electricity tax exemption recovery',
+        openingTemplate: 'Are you currently claiming electricity exemptions on your production facilities?',
+        primaryValue: '$75K-$500K in unclaimed exemptions over 4 years',
+        condition: (accountData) => accountData?.taxExemptStatus === 'Manufacturing'
+      },
+      {
+        id: 'demand_efficiency',
+        weight: 0.25,
+        primaryMessage: 'consumption efficiency before renewal',
+        openingTemplate: 'Are you optimizing consumption before you renew your contract?',
+        primaryValue: '12-20% consumption reduction before rate shopping'
+      },
+      {
+        id: 'timing_strategy',
+        weight: 0.25,
+        primaryMessage: 'early contract renewal timing',
+        openingTemplate: 'When does your current electricity contract expire?',
+        primaryValue: '10-20% better rates when locking in 6 months early',
+        situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.'
+      },
+      {
+        id: 'consolidation',
+        weight: 0.20,
+        primaryMessage: 'multi-plant consolidation',
+        openingTemplate: 'How many facilities are you managing energy for, and are they on different contracts?',
+        primaryValue: '15-25% savings by consolidating all locations'
+      }
+    ]
+  },
+  Nonprofit: {
+    angles: [
+      {
+        id: 'exemption_recovery',
+        weight: 0.40,
+        primaryMessage: 'tax exemption + refund recovery',
+        openingTemplate: 'Is your organization filing electricity exemption certificates?',
+        primaryValue: '$50K-$300K redirected to programs annually',
+        condition: (accountData) => accountData?.taxExemptStatus === 'Nonprofit'
+      },
+      {
+        id: 'mission_funding',
+        weight: 0.35,
+        primaryMessage: 'mission-focused budget optimization',
+        openingTemplate: 'How are you making sure more funding goes to your mission, not vendors?',
+        primaryValue: '10-20% savings redirected to programs'
+      },
+      {
+        id: 'budget_stability',
+        weight: 0.25,
+        primaryMessage: 'budget predictability',
+        openingTemplate: 'When budgeting for energy, are you locking in costs or dealing with volatility?',
+        primaryValue: 'Fixed costs for better program planning'
+      }
+    ]
+  },
+  Retail: {
+    angles: [
+      {
+        id: 'consolidation',
+        weight: 0.40,
+        primaryMessage: 'multi-location consolidation',
+        openingTemplate: 'How many locations are you managing energy for?',
+        primaryValue: '15-25% savings by consolidating all locations'
+      },
+      {
+        id: 'timing_strategy',
+        weight: 0.35,
+        primaryMessage: 'early renewal timing',
+        openingTemplate: 'When does your current electricity contract expire?',
+        primaryValue: '10-20% better rates when locking in 6 months early'
+      },
+      {
+        id: 'operational_simplicity',
+        weight: 0.25,
+        primaryMessage: 'centralized operations',
+        openingTemplate: 'How much time are you spending managing energy renewals across your network?',
+        primaryValue: 'Single vendor, simplified management'
+      }
+    ]
+  },
+  Healthcare: {
+    angles: [
+      {
+        id: 'exemption_recovery',
+        weight: 0.35,
+        primaryMessage: 'tax exemption',
+        openingTemplate: 'Is your healthcare facility claiming electricity exemptions?',
+        primaryValue: '$50K-$200K in unclaimed exemptions',
+        condition: (accountData) => accountData?.taxExemptStatus === 'Nonprofit'
+      },
+      {
+        id: 'consolidation',
+        weight: 0.40,
+        primaryMessage: 'multi-facility consolidation',
+        openingTemplate: 'How many facilities are you managing energy for, and are they all renewing on different schedules?',
+        primaryValue: '15-25% savings by consolidating all facilities'
+      },
+      {
+        id: 'operational_continuity',
+        weight: 0.25,
+        primaryMessage: 'uptime guarantee',
+        openingTemplate: 'What\'s more critical—energy savings or guaranteed uptime?',
+        primaryValue: 'Predictable costs without operational disruption'
+      }
+    ]
+  },
+  DataCenter: {
+    angles: [
+      {
+        id: 'demand_efficiency',
+        weight: 0.45,
+        primaryMessage: 'demand-side efficiency',
+        openingTemplate: 'Are you optimizing consumption before you renew your contract?',
+        primaryValue: '12-20% consumption reduction before rate shopping'
+      },
+      {
+        id: 'timing_strategy',
+        weight: 0.35,
+        primaryMessage: 'AI-driven demand timing',
+        openingTemplate: 'When does your current electricity contract expire?',
+        primaryValue: '10-20% better rates when locking in 6 months early'
+      },
+      {
+        id: 'data_governance',
+        weight: 0.20,
+        primaryMessage: 'unified metering',
+        openingTemplate: 'How are you managing energy across your data centers?',
+        primaryValue: 'Unified metering and reporting'
+      }
+    ]
+  },
+  Logistics: {
+    angles: [
+      {
+        id: 'consolidation',
+        weight: 0.45,
+        primaryMessage: 'multi-location volume leverage',
+        openingTemplate: 'How many locations are you managing energy for?',
+        primaryValue: '15-25% savings by consolidating all locations'
+      },
+      {
+        id: 'timing_strategy',
+        weight: 0.35,
+        primaryMessage: 'strategic renewal timing',
+        openingTemplate: 'When does your current electricity contract expire?',
+        primaryValue: '10-20% better rates when locking in 6 months early'
+      },
+      {
+        id: 'operational_efficiency',
+        weight: 0.20,
+        primaryMessage: 'warehouse efficiency',
+        openingTemplate: 'Are you optimizing consumption before you renew your contract?',
+        primaryValue: '12-20% consumption reduction'
+      }
+    ]
+  },
+  Hospitality: {
+    angles: [
+      {
+        id: 'consolidation',
+        weight: 0.40,
+        primaryMessage: 'multi-property consolidation',
+        openingTemplate: 'How many properties are you managing energy for, and are they all on different renewal schedules?',
+        primaryValue: '15-25% savings by consolidating all properties'
+      },
+      {
+        id: 'timing_strategy',
+        weight: 0.35,
+        primaryMessage: 'seasonal planning',
+        openingTemplate: 'When does your current electricity contract expire?',
+        primaryValue: '10-20% better rates when locking in 6 months early'
+      },
+      {
+        id: 'operational_efficiency',
+        weight: 0.25,
+        primaryMessage: 'guest comfort + cost control',
+        openingTemplate: 'Are you optimizing consumption before you renew your contract?',
+        primaryValue: '12-20% consumption reduction'
+      }
+    ]
+  },
+  Default: {
+    angles: [
+      {
+        id: 'timing_strategy',
+        weight: 0.40,
+        primaryMessage: 'strategic contract renewal',
+        openingTemplate: 'When does your current electricity contract expire?',
+        primaryValue: '10-20% better rates when locking in 6 months early'
+      },
+      {
+        id: 'cost_control',
+        weight: 0.35,
+        primaryMessage: 'cost predictability',
+        openingTemplate: 'Are rising electricity costs affecting your budget?',
+        primaryValue: 'Predictable costs for better planning'
+      },
+      {
+        id: 'operational_simplicity',
+        weight: 0.25,
+        primaryMessage: 'simplified procurement',
+        openingTemplate: 'How much time are you spending managing energy procurement versus focusing on your core business?',
+        primaryValue: 'Single vendor, simplified management'
+      }
+    ]
+  }
+};
+
+// Select randomized angle based on industry
+function selectRandomizedAngle(industry, manualAngleOverride, accountData) {
+  // Normalize industry
+  let normalizedIndustry = (industry || '').toString().trim();
+  if (!normalizedIndustry) {
+    normalizedIndustry = 'Default';
+  }
+  
+  // Get angles for this industry
+  const industryConfig = RANDOMIZED_ANGLES_BY_INDUSTRY[normalizedIndustry] || RANDOMIZED_ANGLES_BY_INDUSTRY.Default;
+  let availableAngles = industryConfig.angles || [];
+  
+  // Filter angles by conditions if accountData provided
+  if (accountData) {
+    availableAngles = availableAngles.filter(angle => {
+      if (angle.condition && typeof angle.condition === 'function') {
+        return angle.condition(accountData);
+      }
+      return true;
+    });
+  }
+  
+  // If no angles available after filtering, use all angles
+  if (availableAngles.length === 0) {
+    availableAngles = industryConfig.angles || [];
+  }
+  
+  // If still no angles, use Default
+  if (availableAngles.length === 0) {
+    availableAngles = RANDOMIZED_ANGLES_BY_INDUSTRY.Default.angles;
+  }
+  
+  // Manual override takes precedence
+  if (manualAngleOverride) {
+    const overrideAngle = availableAngles.find(a => a.id === manualAngleOverride);
+    if (overrideAngle) return overrideAngle;
+  }
+  
+  // Weighted random selection
+  const random = Math.random();
+  let cumulative = 0;
+  
+  for (const angle of availableAngles) {
+    cumulative += angle.weight || 0;
+    if (random <= cumulative) {
+      return angle;
+    }
+  }
+  
+  // Fallback to first angle
+  return availableAngles[0] || RANDOMIZED_ANGLES_BY_INDUSTRY.Default.angles[0];
+}
+
+// Select random tone opener
+function selectRandomToneOpener(angleId = null) {
+  const openers = [
+    "Genuine question—",
+    "Let me ask you something—",
+    "Been wondering—",
+    "You ever considered—",
+    "So here's the thing—",
+    "This might sound random, but—",
+    "Honestly—",
+    "Looking at your situation—",
+    "Question for you—",
+    "Here's what I'm seeing—",
+    "Most people I talk to—",
+    "From what I'm hearing—",
+    "I've found that teams like yours—"
+  ];
+  return openers[Math.floor(Math.random() * openers.length)];
+}
+
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
