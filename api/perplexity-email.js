@@ -84,408 +84,6 @@ function getRandomGenerationMode() {
   return random;
 }
 
-// ========== NEWS LIBRARY: 2025 Market Triggers ==========
-const NEWS_LIBRARY = {
-  ratespike11pct: {
-    headline: 'Electricity rates up 11% nationally in 2025',
-    fact: 'National average increase Jan-Aug 2025. Some states seeing 17%+ jumps.',
-    date: 'November 2025',
-    relevance: 'Creates urgency for early renewal timing',
-    integrate: 'With rates up 11% nationally, teams that lock in early are protecting their budgets.'
-  },
-  
-  rateapprovals34b: {
-    headline: '$34B in rate hike approvals in 2025 alone',
-    fact: '34 billion in rate increase requests approved in first 3 quarters of 2025 (vs. 16B in 2024)',
-    date: 'September 2025',
-    relevance: 'Creates urgency for consolidation and early planning',
-    integrate: 'With 34B in rate hikes approved so far this year, consolidating energy agreements prevents being caught off-guard.'
-  },
-  
-  datacenterdemand50pct: {
-    headline: 'AI demand driving electricity rates up 50% (2023-2024)',
-    fact: 'Data center energy demands drove rates up 50% in 18 months. Energy demand projected to grow 42% by 2035.',
-    date: 'October 2025',
-    relevance: 'Especially relevant for data centers, capacity-sensitive operations',
-    integrate: 'Data center demand pushed rates up 50% in the last 18 months. If your facilities are capacity-sensitive, early review prevents rate shock.'
-  },
-  
-  deregulationrisk: {
-    headline: 'Deregulation volatility in Texas, PA, MD',
-    fact: 'Texas deregulation saw rates spike 7x in early years. Long-term costs exceeded $24B; $5,100 per household.',
-    date: 'November 2025',
-    relevance: 'Especially relevant in deregulated markets',
-    integrate: 'If you operate in a deregulated market like Texas, timing your renewal strategically is critical—deregulation often leads to rate volatility.'
-  },
-  
-  renewablescompliance: {
-    headline: 'Renewable energy priority #2 for executives (after AI)',
-    fact: 'Corporate net-zero goals resuming after 2024 pause. Clean energy mandates tightening.',
-    date: 'October 2025',
-    relevance: 'Relevant for ESG-conscious companies',
-    integrate: 'With renewable mandates tightening, companies are bundling rate locks with renewable credits—often seeing significant total savings.'
-  }
-};
-
-// ========== ROLE-SPECIFIC CTA VARIATIONS ==========
-const CTA_BY_ROLE = {
-  operations: [
-    'When does your current electricity contract expire?',
-    'Are you locking in early, or waiting closer to expiration?',
-    'With your production schedule, does contract timing usually sync with cash flow or market opportunity?'
-  ],
-  
-  finance: [
-    'With rates up 11%, are you locking in early or waiting?',
-    'Are rising electricity costs affecting your 2025 budget planning?',
-    'Would energy cost predictability help your financial forecasting?'
-  ],
-  
-  ceo: [
-    'Is energy contract renewal on your agenda for this quarter?',
-    'Are market spikes affecting your profit margin on energy?',
-    'When budgeting for energy, are you locking in costs or dealing with volatility?'
-  ],
-  
-  procurement: [
-    'Are you managing renewals centrally, or does each location handle independently?',
-    'How many energy suppliers are you currently managing?',
-    'When locations renew, do you shop around or just renew what you had?'
-  ],
-  
-  facilities: [
-    'How are you managing energy renewals across your facilities?',
-    'Are you coordinating energy contracts for all your locations?',
-    'When do your facilities typically renew energy contracts?'
-  ],
-  
-  nonprofit_executive: [
-    'How are you making sure more funding goes to your mission, not vendors?',
-    'What if optimization could redirect $50K to programs annually?',
-    'Is energy cost management part of your strategic cost-reduction plan?'
-  ],
-  
-  nonprofit_finance: [
-    'Is your nonprofit currently filing electricity exemption certificates?',
-    'How much could exemption recovery impact your program funding?',
-    'Would energy strategy optimization help you reallocate budget to programs?'
-  ]
-};
-
-// Helper: Map news hook keys to NEWS_LIBRARY
-function mapNewsHookKey(hookKey) {
-  const mapping = {
-    'rate_spike_national': 'ratespike11pct',
-    'rate_spike_regional': 'ratespike11pct',
-    'rate_approvals': 'rateapprovals34b',
-    'datacenter_demand_spike': 'datacenterdemand50pct',
-    'deregulation_risk': 'deregulationrisk',
-    'renewables_compliance': 'renewablescompliance'
-  };
-  return mapping[hookKey] || hookKey;
-}
-
-// Helper: Build news context for prompt
-function buildNewsContext(newsHooks, prospect, angle) {
-  if (!newsHooks || newsHooks.length === 0) return '';
-  
-  const hookKey = mapNewsHookKey(newsHooks[0]);
-  const hook = NEWS_LIBRARY[hookKey];
-  if (!hook) return '';
-  
-  return `
-CURRENT MARKET CONTEXT (integrate naturally if relevant):
-- Headline: ${hook.headline}
-- Fact: ${hook.fact}
-- Date: ${hook.date}
-- Relevance: ${prospect?.industry || 'their'} company considering ${angle?.primaryMessage || 'energy strategy'}
-- Integration: Weave this naturally into the email if it strengthens the hook. Don't force it.
-Example: "${hook.integrate}"
-`;
-}
-
-// ========== ANGLE-SPECIFIC CTA MAPPINGS ==========
-const CTA_BY_ANGLE = {
-  exemption_recovery: [
-    'Are you currently claiming electricity exemptions?',
-    'Is your organization filing electricity exemption certificates?',
-    'Have you filed for electricity sales tax exemptions yet?'
-  ],
-  timing_strategy: [
-    'When does your current electricity contract expire?',
-    'Are you locking in early, or waiting closer to expiration?',
-    'When do you typically renew energy contracts—before peak season or waiting until the last minute?'
-  ],
-  consolidation: [
-    'How many locations are you managing energy for?',
-    'Are you managing renewals centrally, or does each location handle independently?',
-    'How are you coordinating energy contracts across your locations?'
-  ],
-  demand_efficiency: [
-    'Are you optimizing consumption before you renew your contract?',
-    'Have you optimized consumption before negotiating rates?',
-    'Are you managing consumption efficiency before rate shopping?'
-  ],
-  operational_efficiency: [
-    'Are you optimizing operations before negotiating energy rates?',
-    'How much time are you spending managing energy contracts?',
-    'Are energy costs impacting your operational efficiency?'
-  ],
-  operational_simplicity: [
-    'How much time are you spending managing energy renewals?',
-    'Are you managing multiple energy suppliers or contracts?',
-    'How many energy suppliers are you currently managing?'
-  ],
-  operational_continuity: [
-    'What\'s more critical for your operations—energy savings or guaranteed uptime?',
-    'Does energy cost predictability matter for your operational planning?',
-    'Are you prioritizing cost savings or operational reliability?'
-  ],
-  cost_control: [
-    'Are you locking in energy costs ahead of time, or dealing with rate volatility?',
-    'Does energy cost predictability matter for your budget planning?',
-    'Are you dealing with rate volatility or locking in costs?'
-  ],
-  mission_funding: [
-    'How are you managing energy costs so more funding goes to your mission?',
-    'What if energy optimization could redirect savings to programs?',
-    'Is energy cost management part of your strategic cost-reduction plan?'
-  ],
-  budget_stability: [
-    'When budgeting for energy, are you locking in costs or dealing with volatility?',
-    'Does budget predictability matter for your financial planning?',
-    'Are you dealing with energy cost volatility year to year?'
-  ],
-  data_governance: [
-    'When you plan for energy, do you have unified metering?',
-    'Do you have visibility into energy usage across your facilities?',
-    'How are you tracking energy consumption and costs?'
-  ]
-};
-
-// Helper: Get angle-specific CTA
-function getAngleSpecificCTA(selectedAngle) {
-  if (!selectedAngle || !selectedAngle.id) return null;
-  
-  const angleCTAs = CTA_BY_ANGLE[selectedAngle.id];
-  if (angleCTAs && angleCTAs.length > 0) {
-    return angleCTAs[Math.floor(Math.random() * angleCTAs.length)];
-  }
-  
-  // Fallback: use openingTemplate as CTA if no specific mapping
-  return selectedAngle.openingTemplate || null;
-}
-
-// Helper: Infer industry from company name
-function inferIndustryFromCompanyName(companyName) {
-  if (!companyName) return '';
-  
-  const name = String(companyName).toLowerCase();
-  
-  // Hospitality keywords
-  if (/\b(inn|hotel|motel|resort|lodge|suites|hospitality|accommodation|bed\s*and\s*breakfast|b&b|b\s*&\s*b)\b/i.test(name)) {
-    return 'Hospitality';
-  }
-  
-  // Restaurant/Food Service
-  if (/\b(restaurant|cafe|diner|bistro|grill|bar\s*&?\s*grill|tavern|pub|eatery|food\s*service)\b/i.test(name)) {
-    return 'Hospitality';
-  }
-  
-  // Manufacturing
-  if (/\b(manufacturing|manufacturer|industrial|factory|plant|production|fabrication)\b/i.test(name)) {
-    return 'Manufacturing';
-  }
-  
-  // Healthcare
-  if (/\b(hospital|clinic|medical|healthcare|health\s*care|physician|doctor|dental|pharmacy)\b/i.test(name)) {
-    return 'Healthcare';
-  }
-  
-  // Retail
-  if (/\b(retail|store|shop|market|outlet|merchandise|boutique)\b/i.test(name)) {
-    return 'Retail';
-  }
-  
-  // Logistics/Transportation
-  if (/\b(logistics|transportation|warehouse|shipping|freight|delivery|distribution|trucking)\b/i.test(name)) {
-    return 'Logistics';
-  }
-  
-  // Data Center
-  if (/\b(data\s*center|datacenter|server|hosting|cloud|colo)\b/i.test(name)) {
-    return 'DataCenter';
-  }
-  
-  // Nonprofit
-  if (/\b(nonprofit|non-profit|charity|foundation|501c3|501\(c\)\(3\))\b/i.test(name)) {
-    return 'Nonprofit';
-  }
-  
-  return '';
-}
-
-// Helper: Infer industry from account description
-function inferIndustryFromDescription(description) {
-  if (!description) return '';
-  
-  const desc = String(description).toLowerCase();
-  
-  // Hospitality
-  if (/\b(hotel|inn|motel|resort|lodge|accommodation|hospitality|guest|room|booking|stay)\b/i.test(desc)) {
-    return 'Hospitality';
-  }
-  
-  // Restaurant/Food
-  if (/\b(restaurant|cafe|dining|food|beverage|menu|cuisine|chef)\b/i.test(desc)) {
-    return 'Hospitality';
-  }
-  
-  // Manufacturing
-  if (/\b(manufacturing|production|factory|plant|industrial|assembly|fabrication)\b/i.test(desc)) {
-    return 'Manufacturing';
-  }
-  
-  // Healthcare
-  if (/\b(hospital|clinic|medical|healthcare|patient|treatment|diagnosis|surgery)\b/i.test(desc)) {
-    return 'Healthcare';
-  }
-  
-  // Retail
-  if (/\b(retail|store|merchandise|shopping|customer|product|sale)\b/i.test(desc)) {
-    return 'Retail';
-  }
-  
-  // Logistics
-  if (/\b(logistics|warehouse|shipping|distribution|freight|transportation|delivery)\b/i.test(desc)) {
-    return 'Logistics';
-  }
-  
-  // Data Center
-  if (/\b(data\s*center|server|hosting|cloud|infrastructure|computing)\b/i.test(desc)) {
-    return 'DataCenter';
-  }
-  
-  // Nonprofit
-  if (/\b(nonprofit|charity|foundation|mission|donation|volunteer)\b/i.test(desc)) {
-    return 'Nonprofit';
-  }
-  
-  return '';
-}
-
-// Helper: Get best CTA (angle-aware priority)
-function getBestCTA(selectedAngle, role, industry, ctaPattern) {
-  // Priority 1: Angle-specific CTA (if angle exists)
-  if (selectedAngle) {
-    const angleCTA = getAngleSpecificCTA(selectedAngle);
-    if (angleCTA) {
-      return angleCTA;
-    }
-  }
-  
-  // Priority 2: Role-specific CTA (if role matches and angle doesn't override)
-  const roleCTA = getRoleSpecificCTA(role, industry);
-  if (roleCTA) {
-    return roleCTA;
-  }
-  
-  // Priority 3: Pattern-based CTA
-  if (ctaPattern && ctaPattern.template) {
-    return ctaPattern.template;
-  }
-  
-  // Priority 4: Angle openingTemplate as fallback
-  if (selectedAngle && selectedAngle.openingTemplate) {
-    return selectedAngle.openingTemplate;
-  }
-  
-  // Ultimate fallback
-  return 'When does your current electricity contract expire?';
-}
-
-// Helper: Get role-specific CTA
-function getRoleSpecificCTA(role, industry = null) {
-  if (!role) return CTA_BY_ROLE.operations?.[0] || 'When does your current contract renew?';
-  
-  // Normalize role - handle special characters and variations
-  let normalizedRole = role.toLowerCase()
-    .replace(/[\/&]/g, ' ')  // Replace / and & with spaces
-    .replace(/\s+/g, ' ')    // Normalize multiple spaces
-    .trim();
-  
-  // Check for nonprofit roles (must check first)
-  if (normalizedRole.includes('nonprofit') || normalizedRole.includes('executive director')) {
-    return CTA_BY_ROLE.nonprofit_executive?.[Math.floor(Math.random() * CTA_BY_ROLE.nonprofit_executive.length)] || 
-           CTA_BY_ROLE.operations[0];
-  }
-  
-  if (normalizedRole.includes('nonprofit') && (normalizedRole.includes('finance') || normalizedRole.includes('cfo'))) {
-    return CTA_BY_ROLE.nonprofit_finance?.[Math.floor(Math.random() * CTA_BY_ROLE.nonprofit_finance.length)] || 
-           CTA_BY_ROLE.finance[0];
-  }
-  
-  // Finance roles (comprehensive detection)
-  const financeKeywords = [
-    'cfo', 'chief financial officer', 'controller', 'director of finance', 
-    'accounting manager', 'accounting', 'ap coordinator', 'ap ', 'accounts payable',
-    'treasurer', 'business office manager', 'office manager', 'finance manager',
-    'financial', 'bookkeeper', 'accountant'
-  ];
-  if (financeKeywords.some(keyword => normalizedRole.includes(keyword))) {
-    return CTA_BY_ROLE.finance?.[Math.floor(Math.random() * CTA_BY_ROLE.finance.length)] || 
-           CTA_BY_ROLE.operations[0];
-  }
-  
-  // Executive/CEO roles (comprehensive detection)
-  const executiveKeywords = [
-    'ceo', 'chief executive', 'president', 'owner', 'coo', 'chief operating officer',
-    'general manager', 'gm', 'superintendent', 'director general',
-    'managing director', 'executive director', 'vp ', 'vice president'
-  ];
-  if (executiveKeywords.some(keyword => normalizedRole.includes(keyword))) {
-    return CTA_BY_ROLE.ceo?.[Math.floor(Math.random() * CTA_BY_ROLE.ceo.length)] || 
-           CTA_BY_ROLE.operations[0];
-  }
-  
-  // Facilities roles (comprehensive detection)
-  const facilitiesKeywords = [
-    'facilities', 'facility', 'facilities administrator', 'facilities manager',
-    'environmental health', 'ehs', 'safety', 'maintenance', 'maintenance manager',
-    'plant manager', 'warehouse manager', 'building manager', 'property manager',
-    'fulfillment', 'fulfillment facilities'
-  ];
-  if (facilitiesKeywords.some(keyword => normalizedRole.includes(keyword))) {
-    return CTA_BY_ROLE.facilities?.[Math.floor(Math.random() * CTA_BY_ROLE.facilities.length)] || 
-           CTA_BY_ROLE.operations[0];
-  }
-  
-  // Procurement roles
-  const procurementKeywords = [
-    'procurement', 'purchasing', 'buyer', 'sourcing', 'supply chain',
-    'vendor management', 'supplier relations'
-  ];
-  if (procurementKeywords.some(keyword => normalizedRole.includes(keyword))) {
-    return CTA_BY_ROLE.procurement?.[Math.floor(Math.random() * CTA_BY_ROLE.procurement.length)] || 
-           CTA_BY_ROLE.operations[0];
-  }
-  
-  // Operations roles (catch-all for managers and coordinators)
-  const operationsKeywords = [
-    'operations', 'operational', 'production', 'plant', 'hr manager', 'human resources',
-    'it manager', 'information technology', 'fulfillment', 'logistics', 'coordinator',
-    'manager', 'director', 'supervisor', 'administrator'
-  ];
-  if (operationsKeywords.some(keyword => normalizedRole.includes(keyword))) {
-    return CTA_BY_ROLE.operations?.[Math.floor(Math.random() * CTA_BY_ROLE.operations.length)] || 
-           CTA_BY_ROLE.operations[0];
-  }
-  
-  // Default to operations
-  return CTA_BY_ROLE.operations?.[Math.floor(Math.random() * CTA_BY_ROLE.operations.length)] || 
-         'When does your current contract renew?';
-}
-
 // Company research cache (session-level)
 const companyResearchCache = new Map();
 const linkedinResearchCache = new Map();
@@ -857,15 +455,9 @@ function deSalesify(text) {
   return String(text)
     .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
     .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
-    .replace(/\bPower Choosers helps\b/gi, 'Most teams see')
-    .replace(/\bPower Choosers can help\b/gi, 'Most teams see')
-    .replace(/\bPower Choosers\b/gi, 'We')
-    // Remove corporate jargon
-    .replace(/\bstreamline\b/gi, 'simplify')
-    .replace(/\bstreamlining\b/gi, 'simplifying')
-    .replace(/\benergy procurement\b/gi, 'energy renewals')
-    .replace(/\bmanaging energy procurement\b/gi, 'managing energy contracts')
-    .replace(/\bmanage energy procurement\b/gi, 'manage energy contracts');
+    .replace(/\bPower Choosers helps\b/gi, 'We help')
+    .replace(/\bPower Choosers can help\b/gi, 'We can help')
+    .replace(/\bPower Choosers\b/gi, 'We');
 }
 
 // Remove citation brackets from text (e.g., [1], [2], [3])
@@ -1225,19 +817,10 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
   // For cold emails, NEVER use meeting requests - always use qualifying questions
   if (templateType === 'cold_email') {
     // Role-specific CTA patterns (higher conversion rates)
-    const jobTitle = (recipient?.job || recipient?.title || recipient?.role || '').toLowerCase()
-      .replace(/[\/&]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const jobTitle = (recipient?.job || '').toLowerCase();
     
-    // Finance roles (comprehensive detection)
-    const financeKeywords = [
-      'cfo', 'chief financial officer', 'controller', 'director of finance', 
-      'accounting manager', 'accounting', 'ap coordinator', 'ap ', 'accounts payable',
-      'treasurer', 'business office manager', 'office manager', 'finance manager',
-      'financial', 'bookkeeper', 'accountant'
-    ];
-    if (financeKeywords.some(keyword => jobTitle.includes(keyword))) {
+    // CFO/Finance Director patterns (40% response rate)
+    if (jobTitle.includes('cfo') || jobTitle.includes('finance') || jobTitle.includes('controller') || jobTitle.includes('treasurer')) {
       const cfoPatterns = [
         {
           type: 'budget_focus',
@@ -1251,25 +834,19 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
         },
         {
           type: 'roi_question',
-          template: 'How do you typically evaluate energy suppliers when renewing?',
-          guidance: 'ROI-focused question that assumes evaluation process'
+          template: 'Would you like to see how we\'ve helped similar companies reduce energy spend?',
+          guidance: 'ROI-focused question with social proof'
         }
       ];
       return cfoPatterns[Math.floor(Math.random() * cfoPatterns.length)];
     }
     
-    // Facilities roles (comprehensive detection)
-    const facilitiesKeywords = [
-      'facilities', 'facility', 'facilities administrator', 'facilities manager',
-      'environmental health', 'ehs', 'safety', 'maintenance', 'maintenance manager',
-      'plant manager', 'warehouse manager', 'building manager', 'property manager',
-      'fulfillment', 'fulfillment facilities'
-    ];
-    if (facilitiesKeywords.some(keyword => jobTitle.includes(keyword))) {
+    // Facilities Manager patterns (35% response rate)
+    if (jobTitle.includes('facilities') || jobTitle.includes('facility') || jobTitle.includes('maintenance') || jobTitle.includes('operations manager')) {
       const facilitiesPatterns = [
         {
           type: 'operational_efficiency',
-          template: 'Is managing energy renewals adding to your operational workload?',
+          template: 'Is energy procurement adding to your operational workload?',
           guidance: 'Operational efficiency question for facilities managers'
         },
         {
@@ -1296,7 +873,7 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
         },
         {
           type: 'supplier_comparison',
-          template: 'How do you currently evaluate energy suppliers when renewing?',
+          template: 'Would you like to see our supplier comparison process?',
           guidance: 'Process-focused question for procurement professionals'
         },
         {
@@ -1330,7 +907,7 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
       return operationsPatterns[Math.floor(Math.random() * operationsPatterns.length)];
     }
     
-    // Generic qualifying patterns (fallback) - REDUCED WEIGHT for contract expire to increase variety
+    // Generic qualifying patterns (fallback)
     const patterns = [
       {
         type: 'contract_timing',
@@ -1344,7 +921,7 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
       },
       {
         type: 'decision_maker',
-        template: 'Are you the right person to discuss energy renewals?',
+        template: 'Are you the right person to discuss energy procurement?',
         guidance: 'Decision maker identification'
       },
       {
@@ -1358,24 +935,14 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
         guidance: 'Timing and urgency qualification'
       },
       {
-        type: 'renewal_process',
-        template: 'When you renew, do you shop around or just renew what you had?',
-        guidance: 'Renewal process question'
-      },
-      {
-        type: 'early_lock_in',
-        template: 'Are you locking in early or waiting closer to expiration?',
-        guidance: 'Early lock-in strategy question'
-      },
-      {
         type: 'industry_specific',
         template: `How is ${recipient?.company || 'your company'} approaching energy cost management for 2025?`,
         guidance: 'Company-specific strategic question'
       }
     ];
     
-    // Updated weights - REDUCED contract_timing weight from 0.25 to 0.10 to increase variety
-    const weights = [0.10, 0.15, 0.15, 0.15, 0.15, 0.15, 0.10, 0.05];
+    // Updated weights for new qualifying-focused patterns
+    const weights = [0.25, 0.20, 0.15, 0.15, 0.15, 0.10];
     const random = Math.random();
     let cumulative = 0;
     
@@ -1402,19 +969,10 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
   }
   
   // Fallback to role-specific patterns for other email types
-  const jobTitle = (recipient?.job || recipient?.title || recipient?.role || '').toLowerCase()
-    .replace(/[\/&]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const jobTitle = (recipient?.job || '').toLowerCase();
   
-  // Finance roles (comprehensive detection)
-  const financeKeywords = [
-    'cfo', 'chief financial officer', 'controller', 'director of finance', 
-    'accounting manager', 'accounting', 'ap coordinator', 'ap ', 'accounts payable',
-    'treasurer', 'business office manager', 'office manager', 'finance manager',
-    'financial', 'bookkeeper', 'accountant'
-  ];
-  if (financeKeywords.some(keyword => jobTitle.includes(keyword))) {
+  // CFO/Finance Director patterns (40% response rate)
+  if (jobTitle.includes('cfo') || jobTitle.includes('finance') || jobTitle.includes('controller') || jobTitle.includes('treasurer')) {
     const cfoPatterns = [
       {
         type: 'budget_focus',
@@ -1428,21 +986,15 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
       },
       {
         type: 'roi_question',
-        template: 'How do you typically evaluate energy suppliers when renewing?',
-        guidance: 'ROI-focused question that assumes evaluation process'
+        template: 'Would you like to see how we\'ve helped similar companies reduce energy spend?',
+        guidance: 'ROI-focused question with social proof'
       }
     ];
     return cfoPatterns[Math.floor(Math.random() * cfoPatterns.length)];
   }
   
-  // Facilities roles (comprehensive detection)
-  const facilitiesKeywords = [
-    'facilities', 'facility', 'facilities administrator', 'facilities manager',
-    'environmental health', 'ehs', 'safety', 'maintenance', 'maintenance manager',
-    'plant manager', 'warehouse manager', 'building manager', 'property manager',
-    'fulfillment', 'fulfillment facilities'
-  ];
-  if (facilitiesKeywords.some(keyword => jobTitle.includes(keyword))) {
+  // Facilities Manager patterns (35% response rate)
+  if (jobTitle.includes('facilities') || jobTitle.includes('facility') || jobTitle.includes('maintenance') || jobTitle.includes('operations manager')) {
     const facilitiesPatterns = [
       {
         type: 'operational_efficiency',
@@ -1507,7 +1059,7 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
     return operationsPatterns[Math.floor(Math.random() * operationsPatterns.length)];
   }
   
-  // Generic qualifying patterns (fallback) - REDUCED WEIGHT for contract expire to increase variety
+  // Generic qualifying patterns (fallback)
   const patterns = [
     {
       type: 'contract_timing',
@@ -1535,24 +1087,14 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
       guidance: 'Timing and urgency qualification'
     },
     {
-      type: 'renewal_process',
-      template: 'When you renew, do you shop around or just renew what you had?',
-      guidance: 'Renewal process question'
-    },
-    {
-      type: 'early_lock_in',
-      template: 'Are you locking in early or waiting closer to expiration?',
-      guidance: 'Early lock-in strategy question'
-    },
-    {
       type: 'industry_specific',
       template: `How is ${recipient?.company || 'your company'} approaching energy cost management for 2025?`,
       guidance: 'Company-specific strategic question'
     }
   ];
   
-  // Updated weights - REDUCED contract_timing weight from 0.25 to 0.10 to increase variety
-  const weights = [0.10, 0.15, 0.15, 0.15, 0.15, 0.15, 0.10, 0.05];
+  // Updated weights for new qualifying-focused patterns
+  const weights = [0.25, 0.20, 0.15, 0.15, 0.15, 0.10];
   const random = Math.random();
   let cumulative = 0;
   
@@ -1571,39 +1113,39 @@ function getOpeningStyle(recipient) {
   const styles = [
     {
       type: 'problem_aware',
-      prompt: 'Start with authentic voice + specific company observation. NO role intro, NO generic market statistics.',
-      example: 'Been wondering—with your fabrication operations in Houston, early renewal timing tends to lock in better rates than last-minute scrambles. Best practice is renewing 6 months to 1 year in advance, though most companies wait until 30-60 days out or scramble at the last minute.',
-      energyFocus: 'Contract renewal timing and specific operations'
+      prompt: 'Start with industry-specific energy problem or market condition affecting their business',
+      example: '[Industry] companies are facing rising electricity costs as contracts renew in 2025. [Company] is likely seeing significant rate increases...',
+      energyFocus: 'Contract renewal timing and rate increases'
     },
     {
       type: 'role_specific',
-      prompt: 'Start with disarming opener + specific observation about their company. NO "As a [role]" pattern.',
-      example: 'Let me ask you something—are you locking in early or waiting close to expiration? With your [specific operations], timing tends to matter more than squeezing a last-minute rate.',
-      energyFocus: 'Role-specific challenges with authentic tone'
+      prompt: 'Focus on energy challenges specific to their role',
+      example: 'As a [job title], you\'re likely dealing with unpredictable energy costs affecting your operations. [Company]...',
+      energyFocus: 'Role-specific energy pain points'
     },
     {
       type: 'timing_urgency',
-      prompt: 'Open with authentic voice + timing observation. NO generic rate statistics.',
-      example: 'Here\'s what I\'m seeing—best practice is renewing 6 months to 1 year in advance, though most companies in [industry] wait until 30-60 days out or scramble at the last minute. Waiting till the last minute usually means paying whatever the market demands.',
+      prompt: 'Open with timing-related urgency relevant to their energy situation',
+      example: 'Companies renewing electricity contracts in 2025 are facing 15-25% higher rates. Early procurement could save [company] significant costs...',
       energyFocus: 'Contract timing and early renewal benefits'
     },
     {
       type: 'budget_pressure',
-      prompt: 'Lead with observation + budget context specific to their business.',
-      example: 'Looking at your situation—when budgeting for energy, are you locking in costs or dealing with volatility? With [company details], predictability usually matters as much as the rate itself.',
-      energyFocus: 'Budget predictability and cost management'
+      prompt: 'Lead with budget or cost pressure relevant to their energy spend',
+      example: 'Rising electricity costs are putting pressure on operational budgets across [industry]. [Company] may be experiencing...',
+      energyFocus: 'Budget pressure from energy cost increases'
     },
     {
       type: 'compliance_risk',
-      prompt: 'Reference specific compliance observation. NO corporate speak.',
-      example: 'Question for you—is your [industry type] organization claiming electricity exemptions? A lot of facilities miss this, but the refund potential can be significant.',
-      energyFocus: 'Tax exemptions and compliance opportunities'
+      prompt: 'Reference regulatory or compliance considerations for energy procurement',
+      example: 'Energy procurement regulations are evolving, and companies need strategic approaches to compliance. [Company] may need to consider...',
+      energyFocus: 'Regulatory compliance and energy procurement'
     },
     {
       type: 'operational_efficiency',
-      prompt: 'Focus on operational challenge with conversational tone.',
-      example: 'From what I\'m hearing—how many facilities are you managing energy for? Consolidating renewals across locations usually saves more than negotiating each one separately.',
-      energyFocus: 'Multi-site consolidation and operational efficiency'
+      prompt: 'Focus on operational efficiency challenges related to energy management',
+      example: 'Managing multiple energy suppliers and contracts is becoming increasingly complex. [Company] likely faces...',
+      energyFocus: 'Energy management complexity and operational efficiency'
     }
   ];
   
@@ -1788,7 +1330,7 @@ const coldEmailSchema = {
         },
         greeting: { type: "string", description: "Hello {firstName}," },
         opening_hook: { type: "string", description: "Problem-aware opening about industry challenge or market condition (1-2 sentences, NO statistics)" },
-        value_proposition: { type: "string", description: "Observation-based value prop with specific measurable value (include percentages or dollar amounts). Use patterns like 'Most [role] see [specific #] when they [action]' - NOT 'We help' or 'We work with'" },
+        value_proposition: { type: "string", description: "How we help with specific measurable value (include percentages or dollar amounts)" },
         social_proof_optional: { type: "string", description: "Brief credibility with real outcomes (optional, 1 sentence)" },
         cta_text: { type: "string", description: "Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation, e.g., 'Schedule Your Free Assessment', 'Book a Consultation', 'Explore Your Savings Potential')" },
         cta_type: { type: "string", description: "CTA pattern used: qualifying_question, soft_ask_with_context, value_question, timing_question, or direct_meeting" }
@@ -1886,7 +1428,7 @@ function getIndustrySpecificContent(industry) {
   const industryMap = {
     manufacturing: {
       painPoints: ['production downtime', 'energy-intensive operations', 'equipment reliability'],
-      avgSavings: '10-20%',
+      avgSavings: '15-25%',
       keyBenefit: 'operational continuity',
       urgencyDrivers: ['production schedules', 'equipment uptime'],
       language: 'operational efficiency and production continuity'
@@ -2150,7 +1692,7 @@ function getRoleSpecificLanguage(role) {
   };
 }
 
-async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, selectedAngle = null, toneOpener = null }) {
+async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation }) {
   // Analyze manual prompt for enhanced context understanding
   const promptAnalysis = analyzeManualPrompt(prompt);
   
@@ -2160,9 +1702,12 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const firstName = r.firstName || r.first_name || (name ? String(name).split(' ')[0] : '');
   const company = r.company || r.accountName || '';
   const job = r.title || r.job || r.role || '';
+  const industry = r.industry || '';
   const energy = r.energy || {};
   const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 1000);
   const notes = [r.notes, r.account?.notes].filter(Boolean).join('\n').slice(0, 500);
+  // Debug log to see what account data is available
+  console.log('[Debug] Full account data for', company, ':', JSON.stringify(r.account, null, 2));
   
   // Clean and sanitize account description - check multiple possible field names
   let accountDescription = (r.account?.shortDescription || r.account?.short_desc || r.account?.descriptionShort || r.account?.description || r.account?.companyDescription || r.account?.accountDescription || '')
@@ -2175,19 +1720,6 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
     .replace(/based in [^,]*, [^,]*/gi, '') // Remove location details
     .replace(/\s+/g, ' ') // Normalize whitespace
     .trim();
-
-  // Industry detection with fallbacks
-  let industry = r.industry || r.account?.industry || '';
-  
-  // If no industry field, infer from company name
-  if (!industry && company) {
-    industry = inferIndustryFromCompanyName(company);
-  }
-  
-  // If still no industry, try to infer from account description
-  if (!industry && accountDescription) {
-    industry = inferIndustryFromDescription(accountDescription);
-  }
 
   // Enhanced research with all personalization data sources
   let researchData = null;
@@ -2289,15 +1821,7 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   // For prompt brevity, summarize to ~220 chars without destroying saved description
   if (accountDescription) {
     const trimmed = accountDescription.replace(/\s+/g, ' ').trim();
-    if (trimmed.length > 220) {
-      // Find last complete word before 217 chars to avoid cutting mid-word
-      let truncateAt = 217;
-      const lastSpace = trimmed.lastIndexOf(' ', 217);
-      if (lastSpace > 180) truncateAt = lastSpace; // Only use word boundary if not too short
-      accountDescription = trimmed.slice(0, truncateAt) + '…';
-    } else {
-      accountDescription = trimmed;
-    }
+    accountDescription = trimmed.length > 220 ? trimmed.slice(0, 217) + '…' : trimmed;
   }
   
   // Format contract end date
@@ -2314,7 +1838,7 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const contractEndLabel = toMonthYear(energy.contractEnd || '');
   
   // Get dynamic patterns for cold emails (needed for both HTML and standard modes)
-  const ctaPattern = templateType === 'cold_email' ? getCTAPattern(recipient, null, templateType) : null;
+  const ctaPattern = templateType === 'cold_email' ? getCTAPattern(recipient, meetingPreferences, templateType) : null;
   const openingStyle = templateType === 'cold_email' ? getOpeningStyle(recipient) : null;
   
   // Get role-specific context
@@ -2335,8 +1859,8 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const suggestedSubject = templateType === 'cold_email' ? 
     getRandomSubjectLine('cold-email', roleCategory, firstName, company) : null;
   
-  // Get industry-specific content (no settings dependency - use defaults)
-  const industryContent = industry ? getIndustrySpecificContentFromSettings(industry, null) : null;
+  // Get industry-specific content (prefer settings if provided)
+  const industryContent = industry ? getIndustrySpecificContentFromSettings(industry, industrySegmentation) : null;
   
   // Get company size context
   const companySizeContext = getCompanySizeContext(r.account || {});
@@ -2387,7 +1911,7 @@ RESEARCH DATA:
 ${linkedinContext ? '- Company LinkedIn: ' + linkedinContext : ''}
 ${websiteContext ? '- Company Website: ' + websiteContext : ''}
 ${contactLinkedinContext ? '- Contact LinkedIn Profile: ' + contactLinkedinContext + ' (use for tenure, career background, recent posts)' : ''}
-${recentActivityContext ? '- Recent Company Activity: ' + recentActivityContext + ' (reference naturally WITHOUT saying "I noticed" or "I saw"—just weave it into conversation)' : ''}
+${recentActivityContext ? '- Recent Company Activity: ' + recentActivityContext + ' (reference naturally: "I noticed..." or "I saw...")' : ''}
 ${locationContextData ? '- Regional Energy Market: ' + locationContextData + ' (use for location-specific context)' : ''}
 
 ENERGY DATA:
@@ -2429,18 +1953,18 @@ COMPANY-SPECIFIC DATA USAGE EXAMPLES:
 ${energy.supplier ? '- Current Supplier: "With ' + energy.supplier + ' as your current supplier, you may be missing competitive rates..."' : ''}
 ${energy.currentRate ? '- Current Rate: "At ' + energy.currentRate + '/kWh, there\'s likely room for improvement..."' : ''}
 ${contractEndLabel ? '- Contract Timing: "With your contract ending ' + contractEndLabel + ', timing is critical..."' : ''}
-${accountDescription ? '- COMPANY CONTEXT (for your understanding only): ' + accountDescription + '. DO NOT insert this description into the email. Instead, use it to understand their business and reference their operations naturally (e.g., "With your production schedule..." or "For operations like yours..." - avoid "Given" which sounds formal)' : ''}
+${accountDescription ? '- Company Description: "As ' + accountDescription + ', energy costs are likely a significant expense..."' : ''}
 ${industryContent ? '- Industry Focus: "Manufacturing companies like ' + company + ' typically face ' + industryContent.painPoints[0] + '..."' : ''}
 ${companySizeContext && companySizeContext.size === 'large' ? '- Size Context: "As a large ' + (industry || 'company') + ', ' + companySizeContext.focus + ' is key..."' : ''}
 ${companySizeContext && companySizeContext.size !== 'large' ? '- Industry Context: "As a ' + (industry || 'company') + ', ' + companySizeContext.focus + ' is key..." (NEVER say "small company" or "small business" - use industry instead)' : ''}
 ${contractUrgency ? '- Urgency Level: "With ' + contractUrgency.level + ' timing, ' + contractUrgency.focus + '..."' : ''}
 
-ROLE-SPECIFIC OPENING HOOK EXAMPLES (USE AUTHENTIC TONE):
-${job?.toLowerCase().includes('cfo') || job?.toLowerCase().includes('finance') ? '- CFO: "Question for you—does energy cost predictability matter for your budget planning? With ' + company + '\'s operations, locking in early usually gives CFOs more control than waiting..."' : ''}
-${job?.toLowerCase().includes('facilities') || job?.toLowerCase().includes('maintenance') ? '- Facilities: "Let me ask you something—how are you handling energy renewals on top of everything else? Most facilities teams consolidate this to free up time for actual operations..."' : ''}
-${job?.toLowerCase().includes('procurement') || job?.toLowerCase().includes('purchasing') ? '- Procurement: "Here\'s what I\'m seeing—best practice is renewing 6 months to 1 year in advance, though most procurement teams wait until 30-60 days out. Waiting usually means taking whatever the market offers..."' : ''}
-${job?.toLowerCase().includes('operations') || job?.toLowerCase().includes('manager') ? '- Operations: "Looking at your situation—are rising energy costs affecting your operational budget? With ' + company + ', predictable costs usually matter as much as the actual rate..."' : ''}
-${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo') ? '- Executive: "Been wondering—when budgeting for energy, are you locking in costs or dealing with volatility? Most CEOs I talk to prefer predictability over squeezing the lowest possible rate..."' : ''}
+ROLE-SPECIFIC OPENING HOOK EXAMPLES:
+${job?.toLowerCase().includes('cfo') || job?.toLowerCase().includes('finance') ? '- CFO: "As CFO of ' + company + ', you\'re likely planning 2025 budgets with energy costs rising..."' : ''}
+${job?.toLowerCase().includes('facilities') || job?.toLowerCase().includes('maintenance') ? '- Facilities: "Managing energy procurement on top of facilities operations can be time-consuming..."' : ''}
+${job?.toLowerCase().includes('procurement') || job?.toLowerCase().includes('purchasing') ? '- Procurement: "As procurement manager, you know the energy market is competitive..."' : ''}
+${job?.toLowerCase().includes('operations') || job?.toLowerCase().includes('manager') ? '- Operations: "Energy costs can be one of the most unpredictable operational expenses..."' : ''}
+${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo') ? '- Executive: "As President of ' + company + ', you understand the importance of managing operational costs..."' : ''}
 `;
 
   // Debug log for recipient context
@@ -2511,122 +2035,173 @@ Generate text for these fields:
 - cta_text: Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation). Examples: "Let's Discuss Your Proposal", "Schedule a Proposal Review", "Book Your Consultation". Vary based on conversation context but always focus on scheduling.`,
 
       cold_email: `
-TEMPLATE: Cold Email Outreach (Authentic Tone - Lewis's Voice)
-
-SENDER PROFILE:
-- Name: ${senderName}
-- Age: 29
-- Background: African American business professional
-- Tone: Conversational, direct, authentic (not corporate speak)
-- Voice: Natural, disarming openers (not ChatGPT patterns)
-
-${selectedAngle ? `
-SELECTED ANGLE (PRIMARY FOCUS):
-- Angle: ${selectedAngle.id}
-- Message: ${selectedAngle.primaryMessage}
-- Value: ${selectedAngle.primaryValue}
-- Opening: ${selectedAngle.openingTemplate}
-${selectedAngle.situationalContext ? `- Context: ${selectedAngle.situationalContext}` : ''}
-${selectedAngle.newsHooks && selectedAngle.newsHooks.length > 0 ? buildNewsContext(selectedAngle.newsHooks, { industry, company: recipient?.company || company }, selectedAngle) : ''}
-` : ''}
-
-${toneOpener ? `TONE OPENER: ` + JSON.stringify(toneOpener) + ` (use this to start)` : ''}
-
+TEMPLATE: Cold Email Outreach
 Generate text for these fields:
-- greeting: "Hi ${firstName},"
-- opening_hook: ${toneOpener || 'Use authentic, natural opener'} ${selectedAngle ? selectedAngle.openingTemplate : 'Start with a direct question about their energy situation.'} ${accountDescription ? 'CONTEXT (use for understanding, do not copy into email): ' + accountDescription.substring(0, 100) + '... Show you understand their operations without describing their business like Wikipedia' : 'Reference their industry challenges.'} Keep it conversational, 1-2 sentences MAX. AVOID corporate jargon ("streamline", "optimize", "leverage") and generic statements ("energy costs are likely significant"). 
-
-INDUSTRY ADAPTATION: ${industry ? `The recipient is in ${industry} industry. ` : ''}Adapt your messaging to this specific industry's challenges and context. If the industry is not in the examples below, use your knowledge of that industry to craft relevant messaging. Examples:
+- greeting: "Hello ${firstName},"
+- opening_hook: Start with SPECIFIC problem awareness or market condition (1-2 sentences). ${accountDescription ? 'MUST reference: "' + accountDescription + '"' : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
   * Retail: Multiple locations, unpredictable costs, seasonal demand
-  * Hospitality: Guest comfort, operational costs, seasonal demand
-  * Education: Facility maintenance, student safety, budget constraints
-  * Logistics/Transportation: Multi-location operations, fuel costs, operational efficiency
-  * Technology: Data center costs, uptime requirements, scalability
-  * ${industry && !['Manufacturing', 'Healthcare', 'Retail', 'Hospitality', 'Education'].includes(industry) ? `* ${industry}: Use your knowledge of this industry's energy challenges and operational context` : ''}
+  * Hospitality: Guest comfort, operational costs, seasonal planning
+  * Education: Facility maintenance, student safety, budget optimization
+  * Use company-specific data: current supplier, rate, contract timing, recent achievements
+IMPORTANT: Always reference ${company} specifically. Use qualitative language (rising, increasing, higher) NOT percentages (15-25%, 20-30%). Keep it natural and conversational. NEVER mention company size ("small company", "small business") - focus on role, industry, and operational challenges instead.
+- value_proposition: How we help (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X annually", "helped similar companies achieve Y". Include role-specific benefits:
+  * CFOs: Budget predictability, cost reduction, risk mitigation
+  * Facilities Managers: Operational efficiency, maintenance cost reduction
+  * Procurement Managers: Vendor management, contract optimization
+  * Operations Managers: Cost control, efficiency improvements
+Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs while reducing procurement complexity." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK. Statistics ARE allowed here (value prop only), just not in opening_hook.
+- social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional). Use specific outcomes: "We recently helped [similar company] reduce energy costs by 18%", "Our clients in [industry] typically save $X annually", "Companies like [company] have achieved 15-20% savings". Be specific and credible. NEVER use vague phrases like "similar companies" or "many businesses".
+${ctaPattern ? `
+- cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
+- cta_type: Return "${ctaPattern.type}"
+` : `
+- cta_text: Create a professional call-to-action question (under 12 words, ending with proper punctuation).
+- cta_type: Return "qualifying"
+`}
 
-IMPORTANT: ${company ? 'Reference ' + company + ' naturally. ' : ''}Keep it conversational, avoid over-specific details (no exact sq ft, employee counts, or contract rates). Focus on industry patterns and common challenges, not hyper-specific data. If the industry is unfamiliar, focus on universal business concerns: cost control, budget predictability, operational efficiency.
+HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
+- Write like a knowledgeable energy expert who researched their company deeply
+- Show you did homework: When you have specific data, use phrases like:
+  * "I noticed ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail]'}" (if account description available)
+  * "I saw ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}" (if recent activity found)
+  * "On your website, I noticed..." (if website context available)
+  * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." (if location context available)
+- Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : '[specific situation]'}..."
+- Include micro-observations: Reference their website, recent posts, industry trends they'd recognize
+- Vary sentence length: Mix short punchy statements with longer explanatory ones
+- Use conversational connectors: "Here's the thing...", "The reality is...", "What I've found..."
+- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", or other template phrases
+- Show expertise subtly: "In my experience with ${industry || '[industry]'} companies", "I've noticed ${industryContent ? industryContent.painPoints[0] : '[specific trend]'}"
+${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\'ve likely seen..." (if tenure available)' : ''}
+${contactLinkedinContext ? '- Reference contact profile: Use insights from their LinkedIn profile naturally' : ''}
 
-- value_proposition: OBSERVATION-BASED VALUE PROP (2-3 sentences). CRITICAL RULES:
-  * LEAD WITH NUMBERS: Put percentages/savings at START of sentence, not buried mid-sentence
-  * OBSERVATION PATTERN: "Most [role] I talk to see [specific #] when they [action]"
-  * ACTION-FOCUSED: What they'd experience, not what we deliver
-  * FORBIDDEN TRANSITIONS: NEVER use "That's why...", "The reality is...", "We help...", "We work with...", "This approach..."
-  * FORBIDDEN JARGON: NO "streamline/streamlining", "optimize/optimizing" (as verbs), "leverage", "demanding", "procurement", generic phrases
-  * USE INSTEAD: "Most [role] I talk to...", "From what I'm seeing...", "Here's the thing..." (NOT "Here's what typically happens:" as opener - too formulaic)
-  * Use plain language: "simplify" not "streamline", "manage better" not "optimize", "improve" not "leverage"
-  * Example (GOOD): "Most facilities teams I talk to either plan 6-12 months ahead or scramble the last 30 days. The ones that plan usually lock in 8-15% better terms."
-  * Example (GOOD): "12-20% consumption reductions happen from efficiency alone, before they talk to a new supplier. Here's why that matters: you renew from strength instead of scrambling."
-  * Example (BAD): "That's why most companies we work with typically reduce consumption by 12-20% through targeted efficiency measures."
-  * Example (BAD): "Most teams see 10-20% savings when they streamline energy procurement." (jargon: streamline, procurement)
+EVIDENCE OF RESEARCH (Show You Know Their Business):
+${accountDescription ? '✓ Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally in opening hook' : ''}
+${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements' : ''}
+${websiteContext ? '✓ Use website info: "On your website, I noticed..." to show you visited' : ''}
+${recentActivityContext ? '✓ Use recent activity: "I saw ${company} recently..." + ' + recentActivityContext.substring(0, 60) + '...' : ''}
+${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
+${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
+${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant for context' : ''}
 
-- social_proof_optional: Brief credibility IF relevant (1 sentence, optional). Example: "Most ${industry || '[industry]'} companies see 10-20% savings." Keep it general, not hyper-specific.
-${(() => {
-  const bestCTA = getBestCTA(selectedAngle, recipient?.job || recipient?.title || recipient?.role || job || 'operations', industry, ctaPattern);
-  const angleCTA = selectedAngle ? getAngleSpecificCTA(selectedAngle) : null;
-  const roleCTA = getRoleSpecificCTA(recipient?.job || recipient?.title || recipient?.role || job || 'operations', industry);
-  
-  if (angleCTA && angleCTA === bestCTA) {
-    return `- cta_text: "${bestCTA}" (ANGLE-SPECIFIC CTA - use this exact CTA related to ${selectedAngle.primaryMessage}). Keep under 15 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
-- cta_type: Return "qualifying"`;
-  } else if (roleCTA && roleCTA === bestCTA) {
-    return `- cta_text: "${bestCTA}" (ROLE-SPECIFIC CTA - use this exact CTA). Keep under 15 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
-- cta_type: Return "qualifying"`;
-  } else {
-    return `- cta_text: "${bestCTA}" (use this exact CTA${selectedAngle ? ' related to ' + selectedAngle.primaryMessage : ''}). Keep under 15 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
-- cta_type: Return "qualifying"`;
-  }
-})()}
+CONVERSATIONAL FLOW PATTERNS:
+✓ GOOD: "I noticed ${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
+✓ GOOD: "Given your role as ${job || '[role]'}, you're probably dealing with ${roleContext?.painPoints[0] || '[pain point]'}. Here's what I've found..."
+✓ GOOD: "${industry || '[Industry]'} companies are facing ${industryContent?.painPoints[0] || '[specific challenge]'}. ${company || '[Company]'} likely sees this in..."
+✓ GOOD: "Companies in ${industry || '[industry]'}" (not "your industry")
+✓ GOOD: "As ${job || '[role]'}" (not "As CEO of a small business")
+✗ BAD: "I wanted to reach out about..."
+✗ BAD: "I hope this email finds you well..."
+✗ BAD: "I'm reaching out because..."
 
-AUTHENTIC TONE REQUIREMENTS:
-- Sound like ${senderName} (29, conversational, direct, no corporate speak)
-${toneOpener ? `- REQUIRED OPENER: MUST use ` + JSON.stringify(toneOpener) + ` or similar natural variation to start the opening paragraph` : `- REQUIRED: Use natural, disarming openers like "Been wondering—", "Here's what I'm seeing—", "Question for you—", "Let me ask you something—"`}
-- FORBIDDEN PHRASES (NEVER USE):
-  ✗ "I noticed..." or "I saw..." (sounds like research)
-  ✗ "I'm Lewis..." or "I am..." (bio introductions)
-  ✗ "As [Role] of [Company]..." (corporate role intros)
-  ✗ "I wanted to reach out..." (corporate speak)
-  ✗ "Hope this email finds you well..." (generic greeting)
-  ✗ "Out of curiosity—" or "Quick one—" (AI patterns)
-  ✗ "15-25% rate increases" or "rates rising 15-25%" (generic statistics)
-  ✗ "That's why..." (too academic, explanatory)
-  ✗ "The reality is..." (statement-based, weak)
-  ✗ "We help..." or "We work with..." (shifts focus from them to you)
-  ✗ "This approach..." (too educational)
-- REQUIRED: Natural, conversational language like "Here's what I'm seeing...", "Most teams I talk to...", "From what I'm hearing...", "Been wondering—"
-- AVOID CORPORATE JARGON: NO "streamline", "optimize" (as verbs), "leverage", "stabilize expenses", "demanding", "procurement", "unleash", "synergy". Use plain language instead: "simplify", "improve", "manage better". Say "energy renewals" or "energy contracts" not "energy procurement"
-- NO GENERIC STATEMENTS: Never say obvious things like "energy costs are likely a significant expense" or "with facilities demanding steady energy"
-- Be specific but not creepy: Reference industry patterns, not exact employee counts or sq ft
-${accountDescription ? '- CONTEXT (use for question generation, NOT as bio): You researched: ' + accountDescription.substring(0, 80) + '... Use this ONLY to: (1) understand their operations, (2) generate relevant questions about their situation, (3) reference operations naturally. DO NOT copy-paste or use like Wikipedia bio. Example: Instead of stating what they do, use it to generate questions (e.g., "With production running 24/7, how do you manage energy costs?" or "Managing multiple locations, are they all on different renewal schedules?")' : ''}
-${company ? '- Reference ' + company + ' by name naturally' : ''}
+KNOWLEDGE DEMONSTRATION:
+- Reference specific operational details: ${accountDescription ? '"As ' + accountDescription.substring(0, 80) + '..."' : 'Company-specific details'}
+- Mention industry-specific challenges: ${industryContent ? industryContent.painPoints.join(', ') : 'Industry pain points'} (not generic "operational costs")
+- Show understanding of their role's pain points: ${roleContext?.painPoints.join(', ') || '[role pain points]'}
+${locationContextData ? '- Include location context: ' + locationContextData.substring(0, 80) + '...' : ''}
+${contractEndLabel ? '- Reference contract timing: "With your contract ending ' + contractEndLabel + '..."' : ''}
+${energy.supplier ? '- Reference current supplier: "With ' + energy.supplier + ' as your current supplier..."' : ''}
 
-EMAIL RULES:
-- 75-130 words total (keep it short)
-- ONE clear CTA question ending with ? (ONLY ONE question mark in entire email)
-${toneOpener ? `- REQUIRED: Start with ` + JSON.stringify(toneOpener) + ` or similar natural variation` : `- REQUIRED: Use authentic tone opener like "Been wondering—", "Here's what I'm seeing—", "Question for you—"`}
-- OPENING PARAGRAPH: 1-2 sentences MAX. Remove explanatory text before value prop. Pattern: Opening question → Value prop → Proof
-- PARAGRAPH 2 (VALUE PROP): 
-  * Lead with NUMBERS at start of sentence (e.g., "12-20% consumption reductions happen..." NOT "Through optimization, companies reduce by 12-20%")
-  * Use OBSERVATION-BASED transitions: "Most [role] I talk to...", "From what I'm seeing..." (NOT "Here's what typically happens:" as opener - too formulaic)
-  * FORBIDDEN: "That's why...", "The reality is...", "We help...", "We work with...", "This approach..."
-  * FORBIDDEN JARGON: "streamline", "optimize" (as verbs), "leverage", "demanding", "procurement" - use plain language instead
-  * NO GENERIC STATEMENTS: Never say obvious things like "energy costs are likely significant" or "facilities demanding steady energy"
-  * ACTION-FOCUSED: What they'd experience, not what we deliver
-- FORBIDDEN: NO "I noticed...", NO "I'm Lewis...", NO "As [Role]...", NO "I wanted to reach out", NO "Hope this email finds you well"
-- FORBIDDEN: NO "15-25% rate increases" or similar generic statistics
-- NO company size mentions: NEVER say "small company" or "small business"
-- Value prop must include specific numbers (e.g., "save 10-20%") with numbers at START of sentence
-- Focus on ${selectedAngle ? selectedAngle.id + ' angle (' + selectedAngle.primaryMessage + ')' : 'industry challenges'}
-- Complete sentences only, no incomplete phrases
+CRITICAL QUALITY RULES:
+- PROBLEM AWARENESS: Lead with industry-specific problem or market condition
+- SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
+- MEASURABLE CLAIMS: "save ${marketContext?.typicalClientSavings || '10-20%'}" or "$X annually" NOT "significant savings"
+- COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
+- QUALIFYING CTAs: Prefer questions over meeting requests for cold emails
+- SOCIAL PROOF: Use real outcomes when mentioning similar companies
+- USE ACCOUNT DESCRIPTION: ${accountDescription ? 'MUST naturally reference: "' + accountDescription + '"' : 'Reference their specific business'}
+- NATURAL LANGUAGE: Write like a real person researching their company
+- SPECIFIC TO THEM: Reference actual company details, not generic industry statements
+- COMPANY SPECIFICITY: ALWAYS reference ${company} specifically. NEVER mention other companies by name in this email.
+- TONE CONSISTENCY: Use professional but conversational tone throughout. Avoid mixing formal and casual language.
+- PERSONALIZATION DEPTH: Reference specific company data (supplier, rate, contract timing, recent achievements) when available.
+- COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
+- SINGLE CTA: Generate exactly ONE call to action per email
+- PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
+- EMAIL LENGTH: Keep total email body 90-130 words (research optimal range)
+- CTA LENGTH: CTAs should be 8-12 words maximum
+- VALUE PROP MUST: Include HOW we help AND WHAT results (e.g., "We help [industry] companies secure better rates before contracts expire. Clients typically save ${marketContext?.typicalClientSavings || '10-20%'}.")
+- MOBILE OPTIMIZATION: Keep paragraphs short (2-3 sentences max), use clear CTA placement, optimize for mobile preview text (52% of emails opened on mobile)
+- LENGTH VALIDATION: If email exceeds 130 words, prioritize: greeting + opening hook + value prop + CTA only
+- COMPANY DATA USAGE: MUST use current supplier, rate, contract timing, recent achievements when available
 
-GENERATION MODE: ${generationMode || 'balanced'}
-${generationMode === 'consultative' ? '- Softer approach: "Been wondering—", "How do you typically..."' : ''}
-${generationMode === 'direct' ? '- Direct approach: Use "${toneOpener}", get to the point quickly' : ''}
-${generationMode === 'balanced' ? '- Balanced approach: Conversational but focused' : ''}
+FORBIDDEN PHRASES (TWO-TIER APPROACH):
+TIER 1 - OPENING HOOK (NO statistics allowed):
+- "I've been tracking how [industry] companies..."
+- "Recently helped another [industry] company..."
+- "rising 15-25%"
+- "saving 20-30%"
+- "contracts ending in 2025-2026"
+- "driven by data center demand"
+- "15-25%"
+- "20-30%"
+- "10-20%"
+- "electricity rate increases of 15-25%"
+- "reduce annual energy costs by 20-30%"
+- "data centers drive up demand"
+- "data centers driving electricity rates up"
+- "sharp cost increases"
+- "data center-driven rate hikes"
+- "pushing electricity costs up 15-25%"
+- "rates up 15-25%"
+- "rates up 20-30%"
+- "electricity rates up 15-25%"
+
+TIER 2 - VALUE PROPOSITION (Statistics ENCOURAGED):
+✓ ALLOWED: "save 10-20%", "reduce costs by $X annually", "clients typically save 15-20%", "helped similar companies achieve 18% savings"
+✓ ALLOWED: Specific percentages and dollar amounts in value propositions
+✓ ALLOWED: Concrete outcomes and measurable results
+- "electricity rates up 20-30%"
+- "data center demand drives rates up"
+- "data center demand pushing"
+- "Does Tuesday 2-3pm or Thursday 10-11am work for a 15-minute call?"
+- "Would Tuesday [time] or Thursday [time] work"
+- Any meeting time suggestions (Tuesday, Thursday, etc.)
+
+PREFERRED LANGUAGE:
+- "Companies in [industry] are facing rising electricity costs..."
+- "[Company] likely sees energy as a significant operational expense..."
+- "With contracts renewing in 2025, [company] may be facing higher energy rates..."
+- "Given [company]'s focus on [business aspect], energy costs are probably on your radar..."
+- "[Company]'s [industry] operations typically require significant energy consumption..."
+- "As a [industry] company, [company] is probably seeing electricity rate increases..."
+- "Current market conditions are driving up energy costs for [industry] operations..."
+
+STYLE RULES:
+  - Use first-person voice ("we"/"I") instead of brand-first phrasing.
+  - Avoid starting any sentence with "At Power Choosers," or "Power Choosers helps".
+  - Prefer "We help…" / "I help…".
+  - NEVER assume company size. DO NOT use "small company", "small business", "as a small company", "as a small business", "limited resources", or similar phrases - these can be insulting to business owners. Use neutral language: "companies in ${industry}", "companies like yours", or focus on role/industry instead.
+  - Focus on role and industry specifics: "As CEO" (not "As CEO of a small business"), "As a ${industry} company" (not "As a small company"), "companies in manufacturing" (not "small manufacturing companies").
+  - If role and tenure are available (from LinkedIn), you may include them naturally (e.g., "In your 3 years as General Manager").
+  - CRITICAL: If you need to reference the company, use "As a ${industry} company" or "As ${job}" - NEVER say "as a small company" or "as a small business".
+
+EMAIL GENERATION MODE: ${generationMode.toUpperCase()}
+${modeInstructions ? `
+- Tone: ${modeInstructions.tone}
+- Approach: ${modeInstructions.approach}
+- CTA Style: ${modeInstructions.ctaStyle}
+${generationMode === 'consultative' ? `
+  * Focus on discovery questions to understand their situation
+  * Use softer language: "I'm curious..." "Out of curiosity..." "How do you typically..."
+  * Lower pressure: Ask about their process rather than demanding action
+  * Example CTA: "How do you typically handle your energy renewals?"` : ''}
+${generationMode === 'direct' ? `
+  * Lead with specific insights and concrete value upfront
+  * Use confident language: "Here's what I found..." "The reality is..." "Quick question—"
+  * Assertive but respectful: Present facts and ask direct questions
+  * Example CTA: "When does your contract renew? That timing difference is usually worth 15-20%."` : ''}
+${generationMode === 'balanced' ? `
+  * Combine observation with specific value proposition
+  * Professional but conversational: "I noticed..." followed by "Here's what I've found..."
+  * Balanced approach: Show expertise without being pushy
+  * Example CTA: "Question for you—what's your renewal timeline?"` : ''}
+` : ''}
 
 SUBJECT LINE RULES (CRITICAL - MUST BE SPECIFIC, NOT VAGUE):
-${suggestedSubject ? `- SUGGESTED SUBJECT (use this pattern or similar): ` + JSON.stringify(suggestedSubject) : ''}
+${suggestedSubject ? `- SUGGESTED SUBJECT (use this pattern or similar): "${suggestedSubject}"` : ''}
 - Target: 4-6 words (specific questions get 30% higher open rates than vague statements)
 - Maximum: 50 characters (ensures full display on mobile)
 - MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
@@ -2696,7 +2271,7 @@ Generate text for these fields:
 TEMPLATE: General Purpose Email (Manual Input)
 Generate text for these fields:
 - greeting: "Hello ${firstName}," or "Hi ${firstName},"
-- opening_paragraph: CRITICAL - This MUST be based on the user's specific prompt. Read what they typed and create a natural, conversational opening paragraph (2-3 sentences) that directly addresses their question or concern. DO NOT use generic text like "I wanted to reach out about an interesting opportunity." Instead, use their actual words and context. For example, if they mention "rates went down in October but now creeping back up," start with something like "Sean, rates dipped in October but they're climbing again now..." - Reference the situation naturally WITHOUT saying "I noticed" - Use their specific details, numbers, and concerns from the prompt.
+- opening_paragraph: CRITICAL - This MUST be based on the user's specific prompt. Read what they typed and create a natural, conversational opening paragraph (2-3 sentences) that directly addresses their question or concern. DO NOT use generic text like "I wanted to reach out about an interesting opportunity." Instead, use their actual words and context. For example, if they mention "rates went down in October but now creeping back up," start with something like "Sean, I noticed rates dipped in October but they're climbing again now..." - Use their specific details, numbers, and concerns from the prompt.
 - sections: Array of 2-5 content points - EACH MUST BE EXACTLY ONE SENTENCE (no multi-sentence items)
 - list_header: Choose a contextual header for the list section based on email content (e.g., "How We Can Help:", "Key Benefits:", "Why This Matters:", "What to Expect:", "Our Approach:")
 - cta_text: Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation, e.g., 'Schedule a Consultation', 'Book Your Free Assessment', 'Let's Schedule Time to Talk'). Vary the wording based on the conversation context but always focus on scheduling.
@@ -2768,24 +2343,20 @@ CRITICAL: Return ONLY valid JSON with brief, friendly acknowledgment. No busines
   }
 
   // Standard text mode (existing logic)
-  const identity = whoWeAre || `You are ${senderName}, an Energy Strategist at Power Choosers. You help businesses secure better electricity rates and simplify energy renewals. Write in first person ("we"/"I"). Do NOT use brand-first openers like "At Power Choosers," or "Power Choosers helps" — prefer observation-based language like "Most teams I talk to..." or "Here's what I'm seeing..." instead of "We help" or "I help".
-
-${selectedAngle ? `
-SELECTED ANGLE FOR THIS EMAIL:
-- Focus: ${selectedAngle.primaryMessage}
-- Value: ${selectedAngle.primaryValue}
-- Opening Template: ${selectedAngle.openingTemplate}
-` : ''}
-
-${toneOpener ? `TONE: Start with ` + JSON.stringify(toneOpener) + ` or similar authentic, natural opener
-` : ''}
+  const identity = whoWeAre || `You are ${senderName}, an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates. Write in first person ("we"/"I"). Do NOT use brand-first openers like "At Power Choosers," or "Power Choosers helps" — prefer "We help" or "I help".
 
 CONTEXT USAGE RULES:
-${contractEndLabel ? '- The recipient\'s contract ends ' + contractEndLabel + ' - reference this naturally' : ''}
+${contractEndLabel ? '- The recipient\'s contract ends ' + contractEndLabel + ' - YOU MUST REFERENCE THIS' : ''}
 ${notes || transcript ? '- Use call notes/transcript to add specific context from your conversation' : ''}
 ${job ? '- Acknowledge their role as ' + job : ''}
 - Personalize based on their industry and current situation
-- Make it feel like you just spoke with them`;
+- Make it feel like you just spoke with them
+
+${marketContext?.enabled ? `
+KEY CONTEXT:
+- Electricity rates rising ${marketContext.rateIncrease || '15-25%'} ${marketContext.marketInsights || 'due to data center demand'}
+- Companies with contracts ending ${marketContext.renewalYears || '2025-2026'} face higher renewal rates
+- Early renewals save ${marketContext.earlyRenewalSavings || '20-30%'} vs. waiting` : ''}`;
 
   const outputFormat = `
 OUTPUT FORMAT (JSON):
@@ -2805,22 +2376,11 @@ IMPORTANT: The closing field must include a newline between "Best regards," and 
   const isColdEmailStandard = /cold.*email|could.*not.*reach/i.test(String(prompt || ''));
   
   if (isColdEmailStandard) {
-    const ctaPattern = getCTAPattern(recipient, null, 'cold_email');
+    const ctaPattern = getCTAPattern(recipient, meetingPreferences, 'cold_email');
+    const openingStyle = getOpeningStyle(recipient);
     
     const coldEmailRules = `
 EMAIL TYPE: Cold Email (Never Spoke Before)
-
-${selectedAngle ? `
-SELECTED ANGLE (PRIMARY FOCUS - USE THIS):
-- Angle: ${selectedAngle.id}
-- Primary Message: ${selectedAngle.primaryMessage}
-- Value Proposition: ${selectedAngle.primaryValue}
-- Opening Template: ${selectedAngle.openingTemplate}
-${selectedAngle.situationalContext ? `- Context: ${selectedAngle.situationalContext}` : ''}
-${selectedAngle.newsHooks && selectedAngle.newsHooks.length > 0 ? buildNewsContext(selectedAngle.newsHooks, { industry, company }, selectedAngle) : ''}
-` : ''}
-
-${toneOpener ? `AUTHENTIC TONE OPENER: ` + JSON.stringify(toneOpener) + ` (MUST use this to start the opening paragraph)` : ''}
 
 GREETING (MANDATORY - MUST BE FIRST LINE):
 ✓ Start with "Hi ${firstName || 'there'},"
@@ -2829,107 +2389,74 @@ GREETING (MANDATORY - MUST BE FIRST LINE):
 ✓ Greeting must be on its own line with blank line after
 
 CRITICAL QUALITY RULES:
-- AUTHENTIC OPENING: ${toneOpener ? `MUST start with ` + JSON.stringify(toneOpener) : 'Use authentic, conversational opener'} + ${selectedAngle ? selectedAngle.openingTemplate : 'direct question about their energy situation'}
-  - FORBIDDEN OPENING PATTERNS (NEVER USE THESE):
-    ✗ "I noticed..." (sounds like research, not authentic)
-    ✗ "I'm Lewis, an Energy Strategist..." (corporate bio intro)
-    ✗ "I am..." or "My name is..." (introductions)
-    ✗ "As [Role] of [Company]..." (corporate role intro)
-    ✗ "As [Role], you understand..." (corporate role assumption)
-    ✗ "I wanted to reach out..." (corporate speak)
-    ✗ "Hope this email finds you well..." (generic greeting)
-    ✗ "Out of curiosity—" or "Quick one—" (AI patterns)
-  - REQUIRED: ${toneOpener ? `MUST start with ` + JSON.stringify(toneOpener) + ` or similar natural variation (e.g., "Been wondering—", "Here's what I'm seeing—", "Question for you—", "Let me ask you something—")` : `Use authentic, conversational opener like "Been wondering—", "Here's what I'm seeing—", "Question for you—", "Let me ask you something—"`}
-  - CRITICAL RULE FOR QUESTION OPENERS: If you use "Let me ask you something—", "Question for you—", "Been wondering—", or any similar question opener, you MUST IMMEDIATELY follow with an actual question. NEVER use these phrases without asking a question in the same sentence or immediately after. Example: "Let me ask you something—are you locking in early or waiting closer to expiration?" (GOOD) vs "Let me ask you something—[company] operates in [location]..." (BAD - no question)
-  - DO NOT use generic market statistics like "rates rising 15-25%" or "15-25% rate increases" (NEVER mention these percentages)
+- OBSERVATION-BASED OPENING: MUST start with SPECIFIC observation about ${company || 'their company'}, NOT generic market facts
+  ${marketContext?.enabled ? `
+  - Market context is ENABLED - you may reference general market trends if relevant
+  - BUT: Still lead with specific observation about ${company} first` : `
+  - Market context is DISABLED - DO NOT use generic market statistics like "rates rising 15-25%"
   - DO NOT mention "data center demand" or generic rate increases
   - Focus ONLY on ${company}'s specific situation, industry challenges they face, or operational details
-  - INDUSTRY ADAPTATION: ${industry ? `The recipient is in ${industry} industry. ` : ''}Adapt your messaging to this specific industry's challenges. If the industry is unfamiliar, use your knowledge of that industry or focus on universal business concerns: cost control, budget predictability, operational efficiency.
+  - Use phrases like "I noticed ${company} operates..." or "With ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'your facilities'}..."`}
 - SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
-- NUMBER PLACEMENT: LEAD WITH NUMBERS at start of sentence (e.g., "12-20% consumption reductions happen..." NOT "Through optimization, companies reduce by 12-20%")
-- MEASURABLE CLAIMS: "save 10-20%" or "$X annually" NOT "significant savings"
-- VALUE PROP TONE: Use OBSERVATION-BASED patterns ("Most [role] I talk to see [specific #] when they [action]") NOT explanatory ("That's why...", "We help...", "This approach...")
+- MEASURABLE CLAIMS: "save ${marketContext?.typicalClientSavings || '10-20%'}" or "$X annually" NOT "significant savings"
 - COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
 - QUALIFYING CTAs: Prefer questions over meeting requests for cold emails
 - SOCIAL PROOF: Use real outcomes when mentioning similar companies
-- USE ACCOUNT DESCRIPTION FOR CONTEXT (NOT AS BIO): ${accountDescription ? 'You researched: ' + accountDescription + '. Use this ONLY to understand their operations and generate relevant questions. DO NOT copy-paste this description or use it like a Wikipedia bio. Instead, use it to: (1) understand their operational context, (2) generate specific questions about their situation, (3) reference their operations naturally (e.g., "With your production facilities..." or "Managing energy for a facility like yours..."). NEVER state what they do like a factoid or bio entry.' : 'Reference their specific business based on industry'}
+- USE ACCOUNT DESCRIPTION: ${accountDescription ? 'Must naturally reference: "' + accountDescription + '"' : 'Reference their specific business'}
 - NATURAL LANGUAGE: Write like a real person researching their company
-- COMPANY NAME: Use "${company}" naturally (use the SHORT form, not full legal names like "Corporation" or "Inc." unless that's how they're commonly known). Reference them specifically, never mention other companies by name.
-- NO SIZE ASSUMPTIONS: NEVER use "small company", "small business", "as a small company", "as a small business", "limited resources" - these can insult business owners. Use role/industry focus instead: Reference their role naturally (e.g., "For CFOs like you...") or "As a ${industry} company", "companies in ${industry}". NEVER use "As [Role] of [Company]..." - that's corporate speak. Only use "large" if you have clear evidence it's a large enterprise.
+- COMPANY SPECIFICITY: ALWAYS reference ${company} specifically. NEVER mention other companies by name in this email.
+- NO SIZE ASSUMPTIONS: NEVER use "small company", "small business", "as a small company", "as a small business", "limited resources" - these can insult business owners. Use role/industry focus instead: "As CEO", "As a ${industry} company", "companies in ${industry}". Only use "large" if you have clear evidence it's a large enterprise.
 - COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
 - SINGLE CTA: Generate exactly ONE call to action per email
-  - CRITICAL: Only ONE question mark (?) in the entire email - the CTA question
-  - DO NOT ask multiple questions like "When does your contract expire, and are rising costs affecting your budget?"
-  - DO NOT combine questions with "and" or "or" - pick ONE question only
-  - Examples of SINGLE CTAs:
-    ✓ "When does your current electricity contract expire?"
-    ✓ "Are you locking in early or waiting closer to expiration?"
-    ✗ "When does your contract expire, and how do you handle renewals?" (TWO questions)
-    ✗ "When does your contract expire? Are rising costs affecting your budget?" (TWO questions)
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
 
 HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
-- Write like a 29-year-old business professional - conversational, direct, authentic
-- ${toneOpener ? `MUST start with ` + JSON.stringify(toneOpener) : `Use authentic, conversational opener`}
-- Focus on THEIR specific situation only
-- ${selectedAngle ? `Focus on: ${selectedAngle.primaryMessage}` : 'Focus on their energy situation'}
-- Use natural, conversational language: ${toneOpener ? JSON.stringify(toneOpener) : `"Let me ask you something—"`} followed by ${selectedAngle ? selectedAngle.openingTemplate : 'a direct question'}
-- Reference context naturally WITHOUT saying "I noticed" or "I saw":
-  * ${accountDescription ? 'CONTEXT (use for question generation, NOT as bio): ' + accountDescription.substring(0, 80) + '... Use this ONLY to understand their operations and generate relevant questions. DO NOT copy-paste or use like Wikipedia bio. Show understanding through questions about their situation, not by stating what they do' : 'Reference their business type naturally'}
-  * ${recentActivityContext ? 'Mention: ' + recentActivityContext.substring(0, 60) + '... naturally' : 'Reference industry trends naturally'}
-  * ${contractEndLabel ? 'Use: "With your contract ending ' + contractEndLabel + '..." naturally' : 'Reference their energy situation naturally'}
-- Use natural transitions: "Here's the thing...", "Given that...", "Most teams I talk to...", "Here's what typically happens..."
-- FORBIDDEN TRANSITIONS: NEVER use "That's why..." (too academic), "The reality is..." (statement-based, weak)
+- Write like a knowledgeable energy expert who researched ${company || 'their company'} deeply
+- ${marketContext?.enabled ? 'Market context is ENABLED, but still lead with specific observation' : 'Market context is DISABLED - focus on THEIR specific situation only'}
+- Show you did homework: When you have specific data, use phrases like:
+  * "I noticed ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail about their company]'}" ${accountDescription ? '(you have account description - USE THIS)' : ''}
+  * "I saw ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}" ${recentActivityContext ? '(you have recent activity - USE THIS)' : ''}
+  * "On your website, I noticed..." ${websiteContext ? '(you have website context - USE THIS)' : ''}
+  * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." ${city && marketContext?.enabled ? '(you have location)' : '(skip if market context disabled)'}
+  ${!marketContext?.enabled ? '* "With ' + (contractEndLabel ? 'your contract ending ' + contractEndLabel : 'your current energy setup') + '..." (use contract timing if available)' : ''}
+- Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : '[specific situation]'}..."
+- Include micro-observations: Reference their website, recent posts, industry trends they'd recognize
 - Vary sentence length: Mix short punchy statements with longer explanatory ones
-- Use conversational connectors: "Here's what I'm seeing...", "Most teams I talk to...", "From what I'm hearing...", "Here's what typically happens..."
-- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", "I noticed...", "I've been tracking..." or other template phrases
-- DO NOT mention generic market statistics - focus on their specific situation
-- Sound like a peer who knows their industry, not a researcher
+- Use conversational connectors: "Here's the thing...", "The reality is...", "What I've found..."
+- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", "I've been tracking how companies..." or other template phrases
+${marketContext?.enabled ? '- You may reference general market trends, but lead with specific observation first' : '- DO NOT mention generic market statistics - focus on their specific situation'}
+- Show expertise subtly: "In my experience with ${industry || '[industry]'} companies", "I've noticed [specific trend about their company]"
 ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\'ve likely seen..." (tenure available)' : ''}
 
-EVIDENCE OF RESEARCH (Show You Know Their Business - Reference Naturally, NOT "I noticed"):
-${accountDescription ? '✓ CONTEXT (use for question generation, NOT as bio): From research: ' + accountDescription.substring(0, 100) + '... Use this ONLY to: (1) understand their operations, (2) generate relevant questions about their situation, (3) reference operations naturally. DO NOT copy-paste or use like Wikipedia bio. Show understanding through operational references and questions, not by stating what they do' : ''}
-${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements naturally' : ''}
-${websiteContext ? '✓ Use website info: Reference naturally WITHOUT saying "I noticed" or "I saw"' : ''}
-${recentActivityContext ? '✓ Use recent activity: Reference ' + recentActivityContext.substring(0, 60) + '... naturally' : ''}
-${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..." naturally' : ''}
-${squareFootage ? '✓ CONTEXT: Facility is ' + squareFootage.toLocaleString() + ' sq ft. DO NOT mention exact square footage. Instead reference scale naturally (e.g., "With your production space..." or "Managing a facility like yours...")' : ''}
-${employees ? '✓ CONTEXT: ' + employees + ' employees. DO NOT mention exact employee counts. Instead reference operational scale naturally' : ''}
-CRITICAL: Use this research for CONTEXT to understand their business. DO NOT copy-paste descriptions. DO NOT say "I noticed" or "I saw". Show understanding through operational references (e.g., "With your production schedule..." not "Company X is a manufacturer founded in...")
+EVIDENCE OF RESEARCH (Show You Know Their Business):
+${accountDescription ? '✓ Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally' : ''}
+${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements' : ''}
+${websiteContext ? '✓ Use website info: "On your website, I noticed..." to show you visited' : ''}
+${recentActivityContext ? '✓ Use recent activity: "I saw ${company} recently..." + ' + recentActivityContext.substring(0, 60) + '...' : ''}
+${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
+${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
+${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant' : ''}
 
 CONVERSATIONAL FLOW PATTERNS:
-${toneOpener ? `✓ GOOD: ` + JSON.stringify(toneOpener) + `${selectedAngle ? ' ' + selectedAngle.openingTemplate : ' [direct question about their energy situation]'}` : `✓ GOOD: "Let me ask you something—[direct question about their energy situation]"`}
-✓ CRITICAL: If using question opener ("Let me ask you something—", "Question for you—", "Been wondering—"), you MUST immediately follow with an actual question. Example: "Let me ask you something—are you locking in early or waiting closer to expiration?" (GOOD) vs "Let me ask you something—[company] operates in [location]..." (BAD - no question)
-✓ GOOD: "${toneOpener || 'Here\'s what I\'m seeing'}—${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
-✓ GOOD: "Given your role as ${job || '[role]'}, you're probably dealing with ${roleContext?.painPoints[0] || '[pain point]'}. ${selectedAngle ? selectedAngle.primaryMessage : 'Here\'s what I\'ve found...'}"
+✓ GOOD: "I noticed ${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
+✓ GOOD: "Given your role as ${job || '[role]'}, you're probably dealing with ${roleContext?.painPoints[0] || '[pain point]'}. Here's what I've found..."
 ✓ GOOD: "${industry || '[Industry]'} companies are facing [specific challenge]. ${company || '[Company]'} likely sees this in..."
 ✓ GOOD: "Companies in ${industry || '[industry]'}" (not "your industry")
-✗ BAD: "I noticed..." (sounds like research, not authentic)
-✗ BAD: "I wanted to reach out about..." (corporate speak)
-✗ BAD: "I hope this email finds you well..." (corporate speak)
-✗ BAD: "I'm reaching out because..." (corporate speak)
+✗ BAD: "I wanted to reach out about..."
+✗ BAD: "I hope this email finds you well..."
+✗ BAD: "I'm reaching out because..."
 
 PARAGRAPH STRUCTURE (CRITICAL):
-Paragraph 1 (Opening Hook - 1-2 sentences MAX):
-${toneOpener ? `- MUST start with: ` + JSON.stringify(toneOpener) : `- Use authentic, conversational opener`}
-${selectedAngle ? `- Focus on: ${selectedAngle.primaryMessage}` : '- Focus on their energy situation'}
-${selectedAngle ? `- Use opening template: ${selectedAngle.openingTemplate}` : '- Start with a direct question about their energy situation'}
+Paragraph 1 (Opening Hook - 1-2 sentences):
+- Industry-specific problem or market condition
 - Reference ${company} specifically
-- NO "I noticed..." or "I saw..." (sounds like research)
-- NO generic market statistics (rates rising 15-25%, data center demand)
-- NO corporate speak ("I wanted to reach out", "Hope this email finds you well")
-- REMOVE explanatory text before value prop - jump to value prop after opening question
-- Keep it conversational and human
+- Use qualitative language (rising, increasing, higher) NOT percentages
+- NO statistics in opening hook
 
 Paragraph 2 (Value Proposition - 2-3 sentences):
-- LEAD WITH NUMBERS: Put percentages/savings at START of sentence (e.g., "12-20% consumption reductions happen..." NOT "Through optimization, companies reduce by 12-20%")
-- OBSERVATION-BASED: "Most [role] I talk to see [specific #] when they [action]"
-- FORBIDDEN: "That's why...", "The reality is...", "We help...", "We work with...", "This approach..."
-- FORBIDDEN JARGON: "streamline", "optimize" (as verbs), "leverage", "demanding", "procurement", generic obvious statements
-- USE INSTEAD: "Most [role] I talk to...", "From what I'm seeing...", "Here's the thing..." (NOT "Here's what typically happens:" as sentence opener)
-- Use plain language: "simplify" not "streamline", "manage better" not "optimize", "improve" not "leverage"
-- ACTION-FOCUSED: What they'd experience, not what we deliver
-- SPECIFIC measurable value: "save 10-20%", "reduce costs by $X" (with numbers at START of sentence)
+- How Power Choosers helps
+- SPECIFIC measurable value: "save 10-20%", "reduce costs by $X"
+- Include both HOW we help AND WHAT results
 
 Paragraph 3 (CTA - 1 sentence):
 - Qualifying question or soft ask
@@ -2943,65 +2470,39 @@ FORMATTING REQUIREMENTS:
 - Ensure proper spacing for readability
 
 OPENING (1-2 sentences):
-${toneOpener ? `MUST START with: ` + JSON.stringify(toneOpener) : `Use authentic, natural opener (not "I wanted to reach out" or "Hope this email finds you well")`}
-${selectedAngle ? `Focus on: ${selectedAngle.primaryMessage}` : 'Focus on their energy situation'}
-${selectedAngle ? `Opening template: ${selectedAngle.openingTemplate}` : 'Start with a direct question about their energy situation'}
-${accountDescription ? `CONTEXT (use for question generation, NOT as bio): ${accountDescription.substring(0, 100)}... Use this ONLY to understand their operations and generate relevant questions. DO NOT copy-paste or use like Wikipedia bio. Reference their operations naturally to generate specific questions about their situation` : 'Reference their industry challenges'}
-CRITICAL: 
-- NO "I noticed..." bio openings (sounds like research, not authentic)
-- NO generic market statistics ("rates rising 15-25%", "data center demand")
-- NO corporate speak ("I wanted to reach out", "Hope this email finds you well")
-- Use ${toneOpener || 'authentic, conversational opener'} + ${selectedAngle ? selectedAngle.openingTemplate : 'direct question about their situation'}
-- Reference ${company} specifically, not other companies
-- Keep it conversational and human (like a 29-year-old business professional)
+Style: ${openingStyle.type}
+${openingStyle.prompt}
+${marketContext?.enabled ? `
+Lead with SPECIFIC OBSERVATION about ${company} FIRST, then optionally reference market context:
+- "I noticed ${company} operates in ${city || '[location]'}. With contracts renewing in 2025, you're likely seeing..."
+- "Given ${accountDescription ? accountDescription.substring(0, 60) + '...' : company + '\'s operations'}, energy costs are probably..."
+- "${industry || 'Your industry'} companies like ${company} are facing [specific challenge]. I've noticed..."` : `
+Lead with SPECIFIC OBSERVATION about ${company} - NO generic market statistics:
+- "I noticed ${company} operates ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'with facilities in ' + (city || '[location]')}..."
+- "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : 'your current energy setup'}, you're likely dealing with..."
+- "${company} likely sees energy as [specific to their situation] given [specific detail about their operations]"
+- "Companies with ${industryContent?.painPoints[0] || '[specific pain point]'} typically benefit from early planning"
+DO NOT mention: "rates rising 15-25%", "data center demand", generic market statistics`}
+IMPORTANT: Always reference ${company} specifically, not other companies.
 
 VALUE PROPOSITION (1-2 sentences MINIMUM):
-${selectedAngle ? `PRIMARY FOCUS: ${selectedAngle.primaryValue}` : 'Observation-based value prop with SPECIFIC MEASURABLE VALUE (e.g., "Most [role] see [specific #] when they [action]")'}
-${selectedAngle?.id === 'timing_strategy' && selectedAngle?.situationalContext ? `- TIMING CONTEXT: ${selectedAngle.situationalContext} (reference this when explaining value)` : ''}
-- MUST include: (1) Observation-based pattern, (2) Concrete numbers at START: "10-20% savings happen when...", "Most teams see $X", "12-20% reductions occur..."
-${selectedAngle ? `- Use angle value: ${selectedAngle.primaryValue}` : '- Reference their business type and industry challenges'}
-- Example (GOOD): ${selectedAngle?.id === 'timing_strategy' ? `"Most facilities teams I talk to either plan 6-12 months ahead or scramble the last 30 days. The ones that plan usually lock in 8-15% better terms."` : (selectedAngle?.id === 'demand_efficiency' ? `"12-20% consumption reductions happen from efficiency alone, before they talk to a new supplier. Here's why that matters: you renew from strength instead of scrambling."` : (selectedAngle ? `"Most [role] I talk to see ${selectedAngle.primaryValue} when they [action]."` : '"Most companies here see 10-20% savings when they lock in rates early, before contracts expire."'))}
-- Example (BAD): "That's why most companies we work with typically reduce consumption by 12-20% through targeted efficiency measures."
-- Example (BAD): "We help companies secure better rates and manage procurement." (jargon: procurement)
+- Explain how Power Choosers helps with SPECIFIC MEASURABLE VALUE
+- MUST include: (1) What we do, (2) Concrete numbers: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X", "clients typically see Y"
+- Reference: ${accountDescription ? '"' + accountDescription + '"' : 'their business type'}
+- Add social proof if relevant: "helped similar companies achieve [specific result]"
+- Example: "We help ${industry || 'businesses'} secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs."
 - NEVER end with incomplete phrases or "within [company name]"
 - ALWAYS include a complete value proposition - never skip this field
 - THIS FIELD IS MANDATORY - NEVER LEAVE BLANK
 
 CTA (ASSERTIVE, NOT PERMISSION-BASED):
-${(() => {
-  const bestCTA = getBestCTA(selectedAngle, recipient?.job || recipient?.title || recipient?.role || job || 'operations', industry, ctaPattern);
-  const angleCTA = selectedAngle ? getAngleSpecificCTA(selectedAngle) : null;
-  const roleCTA = getRoleSpecificCTA(recipient?.job || recipient?.title || recipient?.role || job || 'operations', industry);
-  
-  if (angleCTA && angleCTA === bestCTA) {
-    return `ANGLE-SPECIFIC CTA (HIGHEST PRIORITY - USE THIS): "${bestCTA}" - This CTA directly relates to ${selectedAngle.primaryMessage}`;
-  } else if (roleCTA && roleCTA === bestCTA) {
-    return `ROLE-SPECIFIC CTA (USE THIS): "${bestCTA}"`;
-  } else if (selectedAngle) {
-    return `ANGLE-RELATED CTA: "${bestCTA}" - This CTA relates to ${selectedAngle.primaryMessage}`;
-  } else {
-    return `CTA: "${bestCTA}"`;
-  }
-})()}
-- CRITICAL: Generate EXACTLY ONE question. The CTA MUST relate to the email body and selected angle.
-${(() => {
-  const bestCTA = getBestCTA(selectedAngle, recipient?.job || recipient?.title || recipient?.role || job || 'operations', industry, ctaPattern);
-  const angleCTA = selectedAngle ? getAngleSpecificCTA(selectedAngle) : null;
-  
-  if (angleCTA && angleCTA === bestCTA) {
-    return `- PRIMARY CTA: "${bestCTA}" (matches ${selectedAngle.primaryMessage} angle)`;
-  } else if (selectedAngle) {
-    return `- ANGLE-SPECIFIC OPTIONS (relate to ${selectedAngle.primaryMessage}): ${selectedAngle.openingTemplate} or adapt this as your CTA question`;
-  } else {
-    return `- PRIMARY CTA: "${bestCTA}"`;
-  }
-})()}
-- ASSERTIVE PATTERNS (pick ONE only - use role-specific CTA above if available):
-  * "When does your current contract renew?"
-  * "Are you locking in early or waiting close to expiration?"
-  * "When you renew, do you shop around or just renew what you had?"
-  * "What's your renewal timeline?"
-  * "Does energy cost predictability matter for your budget planning?" (for finance roles)
+${ctaPattern ? 'Use assertive question pattern: "' + ctaPattern.template + '"' : 'Create an assertive qualifying question'}
+- ASSERTIVE PATTERNS (use these - they assume conversation is happening):
+  * "When does your current contract renew? And how often do you typically review your rates?"
+  * "Quick question—are you locking in 6 months early or waiting closer to renewal?"
+  * "Out of curiosity—when you renew your contract, do you shop around or just renew what you had?"
+  * "Question for you—what's your renewal timeline? That timing difference is usually worth 15-20%."
+  * "Real question—does energy cost predictability matter for your budget planning?" (for finance roles)
 - FORBIDDEN PERMISSION-BASED PATTERNS (DO NOT USE):
   * "Would you be open to a conversation?" (asking permission, weak)
   * "Are you interested in learning more?" (permission-based)
@@ -3009,7 +2510,7 @@ ${(() => {
   * "Open to discussing your energy setup?" (permission-based)
 - MUST: Assume the conversation is happening - don't ask for permission to talk
 - YES: Ask specific question about their contract, timing, or process
-- Role-specific CTAs (choose ONE):
+- Role-specific CTAs:
   * Finance roles (CFO, Controller): Focus on predictability, budget cycles, timing
   * Operations roles: Focus on renewal timing, early lock-in, facility operations
   * Executive roles: Focus on contract timing, strategic planning
@@ -3017,7 +2518,7 @@ ${(() => {
 - Complete sentence with proper punctuation (? or .)
 - MUST be complete sentence with proper ending punctuation
 - NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .)
-- Generate ONLY ONE CTA - no second questions, no follow-up questions
+- Generate ONLY ONE CTA
 
 EMAIL GENERATION MODE: ${generationMode.toUpperCase()}
 ${modeInstructions ? `
@@ -3028,15 +2529,15 @@ ${generationMode === 'consultative' ? `
 * Use discovery questions: "I'm curious..." "How do you typically..." "What matters more to you..."
 * Lower pressure approach - understand their situation first` : ''}
 ${generationMode === 'direct' ? `
-* Lead with specific insights: "Here's what I found..." "Most teams I talk to..." "Let me ask you something—"
+* Lead with specific insights: "Here's what I found..." "The reality is..." "Quick question—"
 * Assertive but respectful - present facts and ask direct questions` : ''}
 ${generationMode === 'balanced' ? `
-* Combine observation + value: Reference their situation naturally, then "Here's what I'm seeing..."
+* Combine observation + value: "I noticed..." followed by "Here's what I've found..."
 * Professional but conversational - show expertise without being pushy` : ''}
 ` : ''}
 
 SUBJECT LINE (MUST BE SPECIFIC, NOT VAGUE):
-${suggestedSubject ? `SUGGESTED SUBJECT: ` + JSON.stringify(suggestedSubject) + ` (use this pattern or similar)` : ''}
+${suggestedSubject ? `SUGGESTED SUBJECT: "${suggestedSubject}" (use this pattern or similar)` : ''}
 - Under 50 characters
 - MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
 - REQUIRED PATTERNS (use these):
@@ -3055,14 +2556,13 @@ TONE: Write like a 29-year-old Texas business pro - conversational, confident, d
 - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
 - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy"
 - Sound like: colleague who knows their industry and has talked to others like them
-- Use casual confidence: "Let me ask you something—" "Question for you—" "Been wondering—"
-- CRITICAL: If you use "Let me ask you something—" or similar question opener, you MUST immediately follow with an actual question. NEVER use these phrases without asking a question in the same sentence.
+- Use casual confidence: "Quick question—" "Real question—" "Out of curiosity—"
 `;
 
     return { 
       prompt: [identity, recipientContext, coldEmailRules, outputFormat].join('\n\n'),
       researchData: researchData,
-      openingStyle: selectedAngle?.id || null
+      openingStyle: openingStyle?.type || null
     };
   }
 
@@ -3122,9 +2622,8 @@ QUALITY REQUIREMENTS:
 ✓ Length: 90-130 words total
 ✓ Use "${firstName || 'there'}," in greeting ONCE (no duplicate names)
 ✓ Middle paragraph: 3-4 complete sentences
-✓ Reference company-specific observation or timing, NEVER generic rate statistics
-✓ NO generic market statistics — use accountDescription and company context only
-✓ CTA: Use EXACTLY ONE qualifying question (pick ONE: "When does your contract expire?" OR "Are rising costs affecting your budget?" — not both)
+✓ MUST mention "15-25%" rate increase
+✓ CTA: Use qualifying questions only (e.g., "When does your contract expire?", "Are rising costs affecting your budget?")
 ✓ Subject line: Under 50 chars, include ${firstName || 'recipient name'}
 ✓ Closing: "Best regards," on its own line, followed by sender name on next line
 ✓ DO NOT include citation markers like [1], [2], [3]
@@ -3133,7 +2632,7 @@ PARAGRAPH STRUCTURE (CRITICAL):
 ✓ Paragraph 1: Greeting line - "Hi ${firstName || 'there'},"
 ✓ Paragraph 2: Opening context (2-3 sentences) 
 ✓ Paragraph 3: Main message and value proposition (3-4 sentences)
-✓ Paragraph 4: Call to action (1 sentence only — EXACTLY ONE question, must end with ?)
+✓ Paragraph 4: Call to action (1-2 sentences)
 ✓ Use DOUBLE LINE BREAKS between paragraphs
 ✓ Each paragraph must be separated by blank line
 
@@ -3177,9 +2676,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, selectedAngle = null, toneOpener = null } = req.body || {};
-    
-    console.log('[Perplexity] Received angle:', selectedAngle?.id, '| Tone:', toneOpener);
+    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext, meetingPreferences, industrySegmentation } = req.body || {};
     
     // Detect template type for both HTML and standard modes
     const templateType = getTemplateType(prompt);
@@ -3195,7 +2692,7 @@ export default async function handler(req, res) {
       day: 'numeric' 
     });
     
-    const meetingTimes = getSuggestedMeetingTimes(null);
+    const meetingTimes = getSuggestedMeetingTimes(meetingPreferences);
     
     // Only suggest meeting times for follow-up emails, not cold emails
     const dateContext = templateType === 'cold_email' ? `TODAY'S DATE: ${todayLabel}
@@ -3218,7 +2715,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, selectedAngle, toneOpener });
+    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation });
     const fullSystemPrompt = dateContext + systemPrompt;
     
     // Call Perplexity API
@@ -3250,7 +2747,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         const fallbackBody = {
           model: 'sonar',
           messages: [
-            { role: 'system', content: dateContext + (await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, selectedAngle, toneOpener })).prompt },
+            { role: 'system', content: dateContext + (await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation })).prompt },
             { role: 'user', content: prompt || 'Draft a professional email' }
           ],
           max_tokens: 600
@@ -3290,7 +2787,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
             console.warn('[Validation] Incomplete value prop detected, fixing...');
             jsonData.value_proposition = jsonData.value_proposition.replace(
               /\b(within|like|such as|including)\s+[A-Z][^.!?]*$/i,
-              `secure better energy rates before contracts expire. Most teams see 10-20% savings on annual costs.`
+              `secure better energy rates before contracts expire. Clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual costs.`
             );
           }
         }
@@ -3300,7 +2797,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           const incompleteCTA = /would you be open to a quick$/i.test(jsonData.cta_text);
           if (incompleteCTA) {
             console.warn('[Validation] Incomplete CTA detected, fixing...');
-            jsonData.cta_text = 'When does your current electricity contract expire?';
+            jsonData.cta_text = 'Would you be open to discussing your current energy setup?';
           }
         }
         
@@ -3308,7 +2805,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         if (templateType === 'cold_email' && (!jsonData.value_proposition || jsonData.value_proposition.trim() === '')) {
           console.warn('[Validation] Missing value proposition detected, adding default...');
           const industry = recipient?.industry || 'businesses';
-          jsonData.value_proposition = `Most ${industry} companies see 10-20% savings when they lock in rates early, before contracts expire.`;
+          jsonData.value_proposition = `We help ${industry} companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs.`;
         }
         
         // Validate missing opening_hook for cold emails
@@ -3366,58 +2863,9 @@ CRITICAL: Use these EXACT meeting times in your CTA.
             console.warn(`[Validation] Email too short (${wordCount} words), expanding value proposition...`);
             // Only expand if value prop is very short
             if (jsonData.value_proposition && jsonData.value_proposition.length < 40) {
-              jsonData.value_proposition = `${jsonData.value_proposition} Most teams see 10-20% savings on annual energy costs.`;
+              jsonData.value_proposition = `${jsonData.value_proposition} Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs.`;
             }
           }
-        }
-        
-        // Enforce single CTA for cold emails (remove extra questions)
-        function enforceSingleCTA(text) {
-          if (!text) return text;
-          // Find all sentences ending with ?
-          const questions = text.match(/[^.!?]*\?/g) || [];
-          
-          // If more than one question, keep only the last one (the CTA)
-          if (questions.length > 1) {
-            console.warn('[CTA Cleanup] Multiple questions detected, keeping only last one');
-            // Remove all but the last question
-            for (let i = 0; i < questions.length - 1; i++) {
-              text = text.replace(questions[i], '');
-            }
-          }
-          
-          return text.trim();
-        }
-        
-        // Remove forbidden phrases from any text
-        function removeForbiddenPhrases(text) {
-          if (!text) return text;
-          let cleaned = text;
-          
-          // Remove "I noticed" patterns
-          cleaned = cleaned.replace(/\bI noticed\b/gi, '');
-          cleaned = cleaned.replace(/\bI saw\b/gi, '');
-          
-          // Remove corporate bio intros
-          cleaned = cleaned.replace(/\bI'm Lewis,?\s+an?\s+Energy Strategist\b/gi, '');
-          cleaned = cleaned.replace(/\bI am Lewis,?\s+an?\s+Energy Strategist\b/gi, '');
-          cleaned = cleaned.replace(/\bMy name is Lewis\b/gi, '');
-          
-          // Remove corporate role intros
-          cleaned = cleaned.replace(/\bAs\s+(?:CFO|President|CEO|Controller|Manager|Director)\s+of\s+[^,]+,\s*/gi, '');
-          cleaned = cleaned.replace(/\bAs\s+(?:CFO|President|CEO|Controller|Manager|Director),\s*you\s+understand\b/gi, 'You understand');
-          
-          // Remove "I wanted to reach out"
-          cleaned = cleaned.replace(/\bI wanted to reach out\b/gi, '');
-          
-          // Remove "Hope this email finds you well"
-          cleaned = cleaned.replace(/\bHope this email finds you well\b/gi, '');
-          
-          // Clean up double spaces and punctuation
-          cleaned = cleaned.replace(/\s+/g, ' ').trim();
-          cleaned = cleaned.replace(/\s+([,.!?])/g, '$1');
-          
-          return cleaned;
         }
         
         // Final language polishing: de-salesify and personalize industry/size
@@ -3429,16 +2877,10 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           job: recipient?.title || recipient?.job || recipient?.role || null
         };
         if (jsonData.greeting) jsonData.greeting = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.greeting, personalizeCtx)));
-        if (jsonData.opening_hook) {
-          jsonData.opening_hook = enforceSingleCTA(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx))));
-          jsonData.opening_hook = removeForbiddenPhrases(jsonData.opening_hook);
-        }
-        if (jsonData.value_proposition) {
-          jsonData.value_proposition = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.value_proposition, personalizeCtx)));
-          jsonData.value_proposition = removeForbiddenPhrases(jsonData.value_proposition);
-        }
+        if (jsonData.opening_hook) jsonData.opening_hook = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx)));
+        if (jsonData.value_proposition) jsonData.value_proposition = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.value_proposition, personalizeCtx)));
         if (jsonData.social_proof_optional) jsonData.social_proof_optional = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.social_proof_optional, personalizeCtx)));
-        if (jsonData.cta_text) jsonData.cta_text = enforceSingleCTA(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.cta_text, personalizeCtx))));
+        if (jsonData.cta_text) jsonData.cta_text = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.cta_text, personalizeCtx)));
         
         // Clean all other string fields in jsonData to remove citations
         Object.keys(jsonData).forEach(key => {
