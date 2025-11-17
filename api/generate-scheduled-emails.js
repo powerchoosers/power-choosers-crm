@@ -600,7 +600,9 @@ export default async function handler(req, res) {
         }
         
         // Generate email content using /api/perplexity-email endpoint (which has full angle system)
-        const baseUrl = process.env.PUBLIC_BASE_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+        // Cloud Run deployment: always use PUBLIC_BASE_URL, fall back to localhost for local testing
+        const baseUrl = (process.env.PUBLIC_BASE_URL && process.env.PUBLIC_BASE_URL.replace(/\/$/, '')) 
+          || 'http://localhost:3000';
         const perplexityResponse = await fetch(`${baseUrl}/api/perplexity-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
