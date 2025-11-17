@@ -1199,7 +1199,7 @@ function getTemplateType(prompt) {
 // CTA Pattern System (Hybrid Approach with Role-Specific CTAs)
 function getCTAPattern(recipient, meetingPreferences = null, templateType = null) {
   // For cold emails, NEVER use meeting requests - always use qualifying questions
-  if (templateType === 'cold_email') {
+  if (templateType === 'coldemail') {
     // Role-specific CTA patterns (higher conversion rates)
     const jobTitle = (recipient?.job || '').toLowerCase();
     
@@ -2208,6 +2208,22 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
     }
   }
 
+  // For cold emails, gate research-heavy context to prevent Wikipedia-style intros
+  const isColdEmail = templateType === 'coldemail';
+  if (isColdEmail) {
+    // For true cold emails, keep research minimal - no full company bios
+    linkedinContext = null;
+    websiteContext = null;
+    // Optionally keep 1 short recent activity line, but not full paragraphs
+    if (recentActivityContext) {
+      recentActivityContext = recentActivityContext.slice(0, 140);
+    }
+    // Keep location context minimal (just city/state, not full descriptions)
+    if (locationContextData && locationContextData.length > 100) {
+      locationContextData = locationContextData.slice(0, 100);
+    }
+  }
+
   // For prompt brevity, summarize to ~220 chars without destroying saved description
   if (accountDescription) {
     const trimmed = accountDescription.replace(/\s+/g, ' ').trim();
@@ -2220,10 +2236,10 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   }
   
   // Select angle based on industry (for cold emails only)
-  const selectedAngle = templateType === 'cold_email' ? selectRandomizedAngle(industry, null, r.account || {}) : null;
+  const selectedAngle = templateType === 'coldemail' ? selectRandomizedAngle(industry, null, r.account || {}) : null;
   
   // Select tone opener (for cold emails only)
-  const toneOpener = templateType === 'cold_email' ? selectRandomToneOpener(selectedAngle?.id) : null;
+  const toneOpener = templateType === 'coldemail' ? selectRandomToneOpener(selectedAngle?.id) : null;
   
   console.log(`[Perplexity] Industry: "${industry}", Selected Angle: "${selectedAngle?.id}", Tone: "${toneOpener}"`);
   
@@ -2241,8 +2257,8 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const contractEndLabel = toMonthYear(energy.contractEnd || '');
   
   // Get dynamic patterns for cold emails (needed for both HTML and standard modes)
-  const ctaPattern = templateType === 'cold_email' ? getCTAPattern(recipient, meetingPreferences, templateType) : null;
-  const openingStyle = templateType === 'cold_email' ? getOpeningStyle(recipient) : null;
+  const ctaPattern = templateType === 'coldemail' ? getCTAPattern(recipient, meetingPreferences, templateType) : null;
+  const openingStyle = templateType === 'coldemail' ? getOpeningStyle(recipient) : null;
   
   // Get role-specific context
   const roleContext = job ? getRoleSpecificLanguage(job) : null;
@@ -2259,7 +2275,7 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const modeInstructions = EMAIL_GENERATION_MODES[generationMode];
   
   // Get subject line variant (for suggestions in prompt)
-  const suggestedSubject = templateType === 'cold_email' ? 
+  const suggestedSubject = templateType === 'coldemail' ? 
     getRandomSubjectLine('cold-email', roleCategory, firstName, company) : null;
   
   // Get industry-specific content (prefer settings if provided)
@@ -2481,6 +2497,15 @@ ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\
 ${contactLinkedinContext ? '- Reference contact profile: Use insights from their LinkedIn profile naturally' : ''}
 
 EVIDENCE OF RESEARCH (Show You Know Their Business):
+${isColdEmail ? `
+- EVIDENCE OF RESEARCH (COLD EMAIL - MINIMAL):
+  Use ONE short, relevant observation about their operations or role.
+  Example: "Given you're expanding manufacturing capacity in Houston..."
+  DO NOT list employee counts, leadership bios, facility square footage, or full company history.
+  DO NOT use multi-sentence company descriptions or Wikipedia-style intros.
+  Base opening on sanitized accountDescription only: ${accountDescription ? '"' + accountDescription.substring(0, 100) + '..."' : 'their business type'}
+  ${recentActivityContext ? 'Optionally reference recent activity briefly: "' + recentActivityContext.substring(0, 60) + '..."' : ''}
+` : `
 ${accountDescription ? '✓ Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally in opening hook' : ''}
 ${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements' : ''}
 ${websiteContext ? '✓ Use website info: "On your website, I noticed..." to show you visited' : ''}
@@ -2488,6 +2513,7 @@ ${recentActivityContext ? '✓ Use recent activity: "I saw ${company} recently..
 ${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
 ${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
 ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant for context' : ''}
+`}
 
 CONVERSATIONAL FLOW PATTERNS:
 ✓ GOOD: "I noticed ${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
@@ -2832,6 +2858,15 @@ ${marketContext?.enabled ? '- You may reference general market trends, but lead 
 ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\'ve likely seen..." (tenure available)' : ''}
 
 EVIDENCE OF RESEARCH (Show You Know Their Business):
+${isColdEmail ? `
+- EVIDENCE OF RESEARCH (COLD EMAIL - MINIMAL):
+  Use ONE short, relevant observation about their operations or role.
+  Example: "Given you're expanding manufacturing capacity in Houston..."
+  DO NOT list employee counts, leadership bios, facility square footage, or full company history.
+  DO NOT use multi-sentence company descriptions or Wikipedia-style intros.
+  Base opening on sanitized accountDescription only: ${accountDescription ? '"' + accountDescription.substring(0, 100) + '..."' : 'their business type'}
+  ${recentActivityContext ? 'Optionally reference recent activity briefly: "' + recentActivityContext.substring(0, 60) + '..."' : ''}
+` : `
 ${accountDescription ? '✓ Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally' : ''}
 ${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements' : ''}
 ${websiteContext ? '✓ Use website info: "On your website, I noticed..." to show you visited' : ''}
@@ -2839,6 +2874,7 @@ ${recentActivityContext ? '✓ Use recent activity: "I saw ${company} recently..
 ${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
 ${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
 ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant' : ''}
+`}
 
 CONVERSATIONAL FLOW PATTERNS:
 ✓ GOOD: "I noticed ${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
@@ -3083,7 +3119,13 @@ export default async function handler(req, res) {
     const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext, meetingPreferences, industrySegmentation } = req.body || {};
     
     // Detect template type for both HTML and standard modes
-    const templateType = getTemplateType(prompt);
+    let templateType = getTemplateType(prompt);
+    
+    // Normalize cold email key so the rest of the code sees the same value
+    // getTemplateType returns 'cold_email' but schemas/HTML builders use 'coldemail'
+    if (templateType === 'cold_email') {
+      templateType = 'coldemail';
+    }
     
     console.log('[Perplexity] Template type:', templateType, 'for prompt:', prompt);
     
@@ -3099,7 +3141,7 @@ export default async function handler(req, res) {
     const meetingTimes = getSuggestedMeetingTimes(meetingPreferences);
     
     // Only suggest meeting times for follow-up emails, not cold emails
-    const dateContext = templateType === 'cold_email' ? `TODAY'S DATE: ${todayLabel}
+    const dateContext = templateType === 'coldemail' ? `TODAY'S DATE: ${todayLabel}
 
 COLD EMAIL RULES:
 - Use qualifying questions only (NO meeting requests)
@@ -3185,7 +3227,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         console.log('[Perplexity] Parsed JSON for template:', templateType);
         
         // Validate value proposition completeness for cold emails
-        if (templateType === 'cold_email' && jsonData.value_proposition) {
+        if (templateType === 'coldemail' && jsonData.value_proposition) {
           const incomplete = /\b(within|like|such as|including)\s+[A-Z][^.!?]*$/i.test(jsonData.value_proposition);
           if (incomplete) {
             console.warn('[Validation] Incomplete value prop detected, fixing...');
@@ -3197,7 +3239,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         }
         
         // Validate CTA completeness for cold emails
-        if (templateType === 'cold_email' && jsonData.cta_text) {
+        if (templateType === 'coldemail' && jsonData.cta_text) {
           const incompleteCTA = /would you be open to a quick$/i.test(jsonData.cta_text);
           if (incompleteCTA) {
             console.warn('[Validation] Incomplete CTA detected, fixing...');
@@ -3206,21 +3248,21 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         }
         
         // Validate missing value propositions for cold emails
-        if (templateType === 'cold_email' && (!jsonData.value_proposition || jsonData.value_proposition.trim() === '')) {
+        if (templateType === 'coldemail' && (!jsonData.value_proposition || jsonData.value_proposition.trim() === '')) {
           console.warn('[Validation] Missing value proposition detected, adding default...');
           const industry = recipient?.industry || 'businesses';
           jsonData.value_proposition = `We help ${industry} companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs.`;
         }
         
         // Validate missing opening_hook for cold emails
-        if (templateType === 'cold_email' && (!jsonData.opening_hook || jsonData.opening_hook.trim() === '')) {
+        if (templateType === 'coldemail' && (!jsonData.opening_hook || jsonData.opening_hook.trim() === '')) {
           console.warn('[Validation] Missing opening_hook detected, adding default...');
           const company = recipient?.company || 'Companies';
           jsonData.opening_hook = `${company} are likely facing rising electricity costs with contracts renewing in 2025.`;
         }
         
         // Validate for duplicate CTAs in cold emails
-        if (templateType === 'cold_email' && jsonData.cta_text) {
+        if (templateType === 'coldemail' && jsonData.cta_text) {
           // Check if the CTA contains multiple questions or meeting requests
           const hasMultipleQuestions = (jsonData.cta_text.match(/\?/g) || []).length > 1;
           const hasMeetingRequest = /does.*work.*call|tuesday|thursday|monday|wednesday|friday|15-minute|brief.*call|quick.*call|meeting|schedule|calendar/i.test(jsonData.cta_text);
@@ -3233,7 +3275,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         }
         
         // Validate no statistics in opening_hook for cold emails
-        if (templateType === 'cold_email' && jsonData.opening_hook) {
+        if (templateType === 'coldemail' && jsonData.opening_hook) {
           const hasStatistics = /\d+[-–]\d+%|\d+%|save \$\d+|reduce costs by|15-25%|20-30%|10-20%|data center.*\d+%|rates up \d+%/i.test(jsonData.opening_hook);
           if (hasStatistics) {
             console.warn('[Validation] Statistics detected in opening_hook:', jsonData.opening_hook);
@@ -3253,7 +3295,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         }
         
         // Validate email length for cold emails (90-130 words optimal)
-        if (templateType === 'cold_email') {
+        if (templateType === 'coldemail') {
           const fullEmail = `${jsonData.greeting || ''} ${jsonData.opening_hook || ''} ${jsonData.value_proposition || ''} ${jsonData.cta_text || ''}`.trim();
           const wordCount = fullEmail.split(/\s+/).length;
           
@@ -3281,6 +3323,14 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           job: recipient?.title || recipient?.job || recipient?.role || null
         };
         if (jsonData.greeting) jsonData.greeting = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.greeting, personalizeCtx)));
+        
+        // Enforce greeting normalization for cold emails
+        if (templateType === 'coldemail' && jsonData.greeting) {
+          const first = firstName || 'there';
+          // Force consistent greeting - always "Hi [firstName],"
+          jsonData.greeting = `Hi ${first},`;
+        }
+        
         if (jsonData.opening_hook) jsonData.opening_hook = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx)));
         if (jsonData.value_proposition) jsonData.value_proposition = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.value_proposition, personalizeCtx)));
         if (jsonData.social_proof_optional) jsonData.social_proof_optional = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.social_proof_optional, personalizeCtx)));
@@ -3307,7 +3357,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           metadata: {
             subject_style: jsonData.subject_style || null,
             cta_type: jsonData.cta_type || null,
-            opening_style: templateType === 'cold_email' ? (openingStyleUsed || null) : null,
+            opening_style: templateType === 'coldemail' ? (openingStyleUsed || null) : null,
             generated_at: new Date().toISOString()
           }
         }));
