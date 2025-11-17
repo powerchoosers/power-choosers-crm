@@ -599,17 +599,25 @@ export default async function handler(req, res) {
           console.log(`[GenerateScheduledEmails] Selected angle: ${selectedAngle?.id}, tone: ${toneOpener}, industry: ${recipientIndustry}`);
         }
         
+        // Decide AI mode for this email based on sequence configuration.
+        // Default to "standard" so the body matches NEPQ-style plain emails
+        // unless the step explicitly requested HTML generation.
+        const aiMode = (emailData.aiMode || '').toLowerCase() === 'html' ? 'html' : 'standard';
+
         // Generate email content using /api/perplexity-email endpoint (which has full angle system)
         // Cloud Run deployment: always use PUBLIC_BASE_URL, fall back to localhost for local testing
         const baseUrl = (process.env.PUBLIC_BASE_URL && process.env.PUBLIC_BASE_URL.replace(/\/$/, '')) 
           || 'http://localhost:3000';
+
         const perplexityResponse = await fetch(`${baseUrl}/api/perplexity-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             prompt: emailData.aiPrompt || 'Write a professional follow-up email',
-            mode: 'html',
-            templateType: 'cold_email',
+            mode: aiMode,
+            // For HTML mode, use the cold email template. For standard mode we let
+            // the backend handle template detection based on the prompt.
+            ...(aiMode === 'html' ? { templateType: 'cold_email' } : {}),
             recipient: recipient,
             selectedAngle: selectedAngle,
             toneOpener: toneOpener,
@@ -627,14 +635,67 @@ export default async function handler(req, res) {
           throw new Error(`Perplexity email API failed: ${perplexityResult.error || 'Unknown error'}`);
         }
         
-        // Build HTML template from structured JSON data (same as sequence-builder.js preview)
-        const outputData = perplexityResult.output || {};
-        const htmlContent = buildColdEmailHtmlTemplate(outputData, recipient);
-        const textContent = buildTextVersionFromHtml(htmlContent);
+        let htmlContent = '';
+        let textContent = '';
+
+        if (aiMode === 'html') {
+          // HTML mode: use the same cold email HTML template as Cloud Run / preview
+          const outputData = perplexityResult.output || {};
+          htmlContent = buildColdEmailHtmlTemplate(outputData, recipient);
+          textContent = buildTextVersionFromHtml(htmlContent);
+        } else {
+          // Standard mode: parse JSON-style output and build a simple NEPQ email body
+          const raw = String(perplexityResult.output || '').trim();
+          let jsonData = null;
+          try {
+            const match = raw.match(/\{[\s\S]*\}/);
+            if (match) {
+              jsonData = JSON.parse(match[0]);
+            }
+          } catch (e) {
+            // Fallback to treating output as plain text
+            jsonData = null;
+          }
+
+          let subject = emailData.subject || 'Energy update';
+          let bodyText = raw;
+
+          if (jsonData && typeof jsonData === 'object') {
+            if (jsonData.subject) subject = jsonData.subject;
+            const parts = [];
+            if (jsonData.greeting) parts.push(jsonData.greeting);
+            if (jsonData.paragraph1) parts.push(jsonData.paragraph1);
+            if (jsonData.paragraph2) parts.push(jsonData.paragraph2);
+            if (jsonData.paragraph3) parts.push(jsonData.paragraph3);
+            if (jsonData.closing) parts.push(jsonData.closing);
+            bodyText = parts.join('\n\n') || raw;
+          }
+
+          const escapeHtml = (str) => String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+
+          const paragraphs = bodyText
+            .split(/\n\n+/)
+            .map(p => p.trim())
+            .filter(Boolean);
+
+          htmlContent = paragraphs
+            .map(p => `<p style="margin:0 0 16px 0; color:#222;">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
+            .join('');
+
+          textContent = bodyText;
+
+          // Replace subject in generatedContent below
+          emailData.generatedSubject = subject;
+        }
         
         // Format the result to match expected structure
         const generatedContent = {
-          subject: outputData.subject || 'Follow-up Email',
+          subject: emailData.generatedSubject || (perplexityResult.output?.subject) || 'Follow-up Email',
           html: htmlContent,
           text: textContent,
           angle_used: selectedAngle?.id || null,
