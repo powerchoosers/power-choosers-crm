@@ -128,7 +128,7 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.20,
         primaryMessage: 'multi-plant consolidation',
         openingTemplate: 'How many facilities are you managing energy for, and are they on different contracts?',
-        primaryValue: '15-25% savings by consolidating all locations'
+        primaryValue: '10-20% savings by consolidating all locations'
       }
     ]
   },
@@ -165,7 +165,7 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.40,
         primaryMessage: 'multi-location consolidation',
         openingTemplate: 'How many locations are you managing energy for?',
-        primaryValue: '15-25% savings by consolidating all locations'
+        primaryValue: '10-20% savings by consolidating all locations'
       },
       {
         id: 'timing_strategy',
@@ -198,7 +198,7 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.40,
         primaryMessage: 'multi-facility consolidation',
         openingTemplate: 'How many facilities are you managing energy for, and are they all renewing on different schedules?',
-        primaryValue: '15-25% savings by consolidating all facilities'
+        primaryValue: '10-20% savings by consolidating all facilities'
       },
       {
         id: 'operational_continuity',
@@ -241,7 +241,7 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.45,
         primaryMessage: 'multi-location volume leverage',
         openingTemplate: 'How many locations are you managing energy for?',
-        primaryValue: '15-25% savings by consolidating all locations'
+        primaryValue: '10-20% savings by consolidating all locations'
       },
       {
         id: 'timing_strategy',
@@ -266,7 +266,7 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.40,
         primaryMessage: 'multi-property consolidation',
         openingTemplate: 'How many properties are you managing energy for, and are they all on different renewal schedules?',
-        primaryValue: '15-25% savings by consolidating all properties'
+        primaryValue: '10-20% savings by consolidating all properties'
       },
       {
         id: 'timing_strategy',
