@@ -57,44 +57,44 @@ function inferIndustryFromDescription(description) {
   
   const desc = String(description).toLowerCase();
   
-  // Hospitality
+  // Nonprofit (check FIRST so food-focused nonprofits like food banks are not misclassified)
+  if (/\b(nonprofit|non-profit|charity|foundation|mission|donation|volunteer|food bank)\b/i.test(desc)) {
+    return 'Nonprofit';
+  }
+  
+  // Hospitality - narrowed to true hospitality / restaurant signals (avoid generic "food" only)
   if (/\b(hotel|inn|motel|resort|lodge|accommodation|hospitality|guest|room|booking|stay)\b/i.test(desc)) {
     return 'Hospitality';
   }
   
-  // Restaurant/Food
-  if (/\b(restaurant|cafe|dining|food|beverage|menu|cuisine|chef)\b/i.test(desc)) {
+  // Restaurant/Food service (avoid matching every mention of \"food\" by itself)
+  if (/\b(restaurant|cafe|dining|bistro|bar\s+and\s+grill|steakhouse|brewpub|catering)\b/i.test(desc)) {
     return 'Hospitality';
   }
   
   // Manufacturing
-  if (/\b(manufacturing|production|factory|plant|industrial|assembly|fabrication)\b/i.test(desc)) {
+  if (/\b(manufacturing|manufacturer|production|factory|plant|industrial|assembly|fabrication)\b/i.test(desc)) {
     return 'Manufacturing';
   }
   
   // Healthcare
-  if (/\b(hospital|clinic|medical|healthcare|patient|treatment|diagnosis|surgery)\b/i.test(desc)) {
+  if (/\b(hospital|clinic|medical|healthcare|health\s*care|patient|treatment|diagnosis|surgery)\b/i.test(desc)) {
     return 'Healthcare';
   }
   
   // Retail
-  if (/\b(retail|store|merchandise|shopping|customer|product|sale)\b/i.test(desc)) {
+  if (/\b(retail|store|merchandise|shopping|customer|boutique|supermarket|grocery)\b/i.test(desc)) {
     return 'Retail';
   }
   
   // Logistics
-  if (/\b(logistics|warehouse|shipping|distribution|freight|transportation|delivery)\b/i.test(desc)) {
+  if (/\b(logistics|shipping|distribution|freight|transportation|delivery)\b/i.test(desc)) {
     return 'Logistics';
   }
   
   // Data Center
-  if (/\b(data\s*center|server|hosting|cloud|infrastructure|computing)\b/i.test(desc)) {
+  if (/\b(data\s*center|datacenter|server\s+farm|hosting|cloud (infrastructure|services)?|colocation)\b/i.test(desc)) {
     return 'DataCenter';
-  }
-  
-  // Nonprofit
-  if (/\b(nonprofit|charity|foundation|mission|donation|volunteer)\b/i.test(desc)) {
-    return 'Nonprofit';
   }
   
   return '';
@@ -132,7 +132,7 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.20,
         primaryMessage: 'multi-plant consolidation',
         openingTemplate: 'How many facilities are you managing energy for, and are they on different contracts?',
-        primaryValue: '15-25% savings by consolidating all locations'
+        primaryValue: '10-20% savings by consolidating all locations'
       }
     ]
   },
@@ -169,7 +169,7 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.40,
         primaryMessage: 'multi-location consolidation',
         openingTemplate: 'How many locations are you managing energy for?',
-        primaryValue: '15-25% savings by consolidating all locations'
+        primaryValue: '10-20% savings by consolidating all locations'
       },
       {
         id: 'timing_strategy',
@@ -202,7 +202,7 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.40,
         primaryMessage: 'multi-facility consolidation',
         openingTemplate: 'How many facilities are you managing energy for, and are they all renewing on different schedules?',
-        primaryValue: '15-25% savings by consolidating all facilities'
+        primaryValue: '10-20% savings by consolidating all facilities'
       },
       {
         id: 'operational_continuity',
@@ -245,7 +245,7 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.45,
         primaryMessage: 'multi-location volume leverage',
         openingTemplate: 'How many locations are you managing energy for?',
-        primaryValue: '15-25% savings by consolidating all locations'
+        primaryValue: '10-20% savings by consolidating all locations'
       },
       {
         id: 'timing_strategy',
@@ -270,7 +270,7 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         weight: 0.40,
         primaryMessage: 'multi-property consolidation',
         openingTemplate: 'How many properties are you managing energy for, and are they all on different renewal schedules?',
-        primaryValue: '15-25% savings by consolidating all properties'
+        primaryValue: '10-20% savings by consolidating all properties'
       },
       {
         id: 'timing_strategy',
@@ -833,15 +833,47 @@ async function researchLocationContext(city, state, industry) {
   }
 }
 
-// Lightweight sanitizer to remove brand-first phrasing and prefer first-person voice
+// Lightweight sanitizer to remove brand-first phrasing and prefer observation-based, non-salesy voice
 function deSalesify(text) {
   if (!text) return text;
-  return String(text)
+  let out = String(text);
+
+  // Remove brand-first framing
+  out = out
     .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
     .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
-    .replace(/\bPower Choosers helps\b/gi, 'We help')
-    .replace(/\bPower Choosers can help\b/gi, 'We can help')
-    .replace(/\bPower Choosers\b/gi, 'We');
+    .replace(/\bPower Choosers\b/gi, 'we');
+
+  // Soften \"we help\" style sales language into observation-based language
+  out = out
+    .replace(/\bWe help\b/gi, 'Most teams I talk to')
+    .replace(/\bWe can help\b/gi, 'Most teams I work with')
+    .replace(/\bour clients typically save\b/gi, 'Most teams typically see');
+
+  // Normalize any lingering double spaces
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+// Additional sanitizer for forbidden or overused patterns in cold emails
+function sanitizeColdEmailText(text) {
+  if (!text) return text;
+  let out = String(text);
+
+  // Remove \"I noticed\" / \"I saw\" style intros
+  out = out
+    .replace(/\bI noticed\b/gi, '')
+    .replace(/\bI saw\b/gi, '')
+    .replace(/On your website, I noticed/gi, 'On your website');
+
+  // Normalize legacy 15-25% language to 10-20%
+  out = out.replace(/15-25%/gi, '10-20%');
+
+  // De-salesify remaining \"we help\" patterns if any slipped through
+  out = out
+    .replace(/\bWe help\b/gi, 'Most teams I talk to')
+    .replace(/\bour clients typically save\b/gi, 'Most teams typically see');
+
+  return out.replace(/\s+/g, ' ').trim();
 }
 
 // Remove citation brackets from text (e.g., [1], [2], [3])
@@ -1812,7 +1844,7 @@ function getIndustrySpecificContent(industry) {
   const industryMap = {
     manufacturing: {
       painPoints: ['production downtime', 'energy-intensive operations', 'equipment reliability'],
-      avgSavings: '15-25%',
+      avgSavings: '10-20%',
       keyBenefit: 'operational continuity',
       urgencyDrivers: ['production schedules', 'equipment uptime'],
       language: 'operational efficiency and production continuity'
@@ -2825,7 +2857,7 @@ CRITICAL QUALITY RULES:
   - Market context is DISABLED - DO NOT use generic market statistics like "rates rising 15-25%"
   - DO NOT mention "data center demand" or generic rate increases
   - Focus ONLY on ${company}'s specific situation, industry challenges they face, or operational details
-  - Use phrases like "I noticed ${company} operates..." or "With ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'your facilities'}..."`}
+  - Use natural observation-based language (e.g., "With your facilities in ${city || '[location]'}...", "For an organization like ${company} serving your community...") WITHOUT saying "I noticed" or "I saw"`}
 - SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
 - MEASURABLE CLAIMS: "save ${marketContext?.typicalClientSavings || '10-20%'}" or "$X annually" NOT "significant savings"
 - COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
@@ -3062,7 +3094,7 @@ QUALITY REQUIREMENTS:
 ✓ Length: 90-130 words total
 ✓ Use "${firstName || 'there'}," in greeting ONCE (no duplicate names)
 ✓ Middle paragraph: 3-4 complete sentences
-✓ MUST mention "15-25%" rate increase
+✓ DO NOT mention specific \"15-25%\" rate increase statistics - focus on timing, predictability, and real-world impact instead
 ✓ CTA: Use qualifying questions only (e.g., "When does your contract expire?", "Are rising costs affecting your budget?")
 ✓ Subject line: Under 50 chars, include ${firstName || 'recipient name'}
 ✓ Closing: "Best regards," on its own line, followed by sender name on next line
@@ -3322,7 +3354,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           sizeCategory,
           job: recipient?.title || recipient?.job || recipient?.role || null
         };
-        if (jsonData.greeting) jsonData.greeting = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.greeting, personalizeCtx)));
+        if (jsonData.greeting) jsonData.greeting = removeCitationBrackets(sanitizeColdEmailText(deSalesify(personalizeIndustryAndSize(jsonData.greeting, personalizeCtx))));
         
         // Enforce greeting normalization for cold emails
         if (templateType === 'coldemail' && jsonData.greeting) {
@@ -3331,10 +3363,10 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           jsonData.greeting = `Hi ${first},`;
         }
         
-        if (jsonData.opening_hook) jsonData.opening_hook = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx)));
-        if (jsonData.value_proposition) jsonData.value_proposition = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.value_proposition, personalizeCtx)));
-        if (jsonData.social_proof_optional) jsonData.social_proof_optional = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.social_proof_optional, personalizeCtx)));
-        if (jsonData.cta_text) jsonData.cta_text = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.cta_text, personalizeCtx)));
+        if (jsonData.opening_hook) jsonData.opening_hook = removeCitationBrackets(sanitizeColdEmailText(deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx))));
+        if (jsonData.value_proposition) jsonData.value_proposition = removeCitationBrackets(sanitizeColdEmailText(deSalesify(personalizeIndustryAndSize(jsonData.value_proposition, personalizeCtx))));
+        if (jsonData.social_proof_optional) jsonData.social_proof_optional = removeCitationBrackets(sanitizeColdEmailText(deSalesify(personalizeIndustryAndSize(jsonData.social_proof_optional, personalizeCtx))));
+        if (jsonData.cta_text) jsonData.cta_text = removeCitationBrackets(sanitizeColdEmailText(deSalesify(personalizeIndustryAndSize(jsonData.cta_text, personalizeCtx))));
         
         // Clean all other string fields in jsonData to remove citations
         Object.keys(jsonData).forEach(key => {
@@ -3384,7 +3416,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
       sizeCategory: sizeCategoryStd,
       job: recipient?.title || recipient?.job || recipient?.role || null
     };
-    const polished = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(content, personalizeCtxStd)));
+    const polished = removeCitationBrackets(sanitizeColdEmailText(deSalesify(personalizeIndustryAndSize(content, personalizeCtxStd))));
     return res.end(JSON.stringify({ 
       ok: true, 
       output: polished,
