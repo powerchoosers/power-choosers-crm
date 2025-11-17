@@ -3248,22 +3248,17 @@ class FreeSequenceAutomation {
     },
     {
       id: 'timing-insight',
-      text: 'Quick question—are you locking in 6 months early or waiting closer to renewal?',
-      role: 'all'
-    },
-    {
-      id: 'permission-context',
-      text: 'If you ever want a second opinion on your setup, I can spend 10 minutes looking at your situation.',
+      text: 'Are you locking in 6 months early or waiting closer to renewal?',
       role: 'all'
     },
     {
       id: 'timeline-risk',
-      text: 'Question for you—what\'s your renewal timeline? That timing difference is usually worth 10-20%.',
+      text: 'What\'s your renewal timeline? That timing difference is usually worth 10-20%.',
       role: 'finance'
     },
     {
       id: 'problem-validation',
-      text: 'Question for you—does energy cost predictability matter for your budget planning?',
+      text: 'Does energy cost predictability matter for your budget planning?',
       role: 'finance'
     }
   ];
@@ -3384,12 +3379,13 @@ class FreeSequenceAutomation {
 2. OPEN WITH OBSERVATION (CRITICAL - MUST USE RESEARCH)
    - YOU MUST reference something SPECIFIC about [contact_company] that proves you researched them
    - REQUIRED: Include at least ONE of these research elements (reference naturally WITHOUT saying "I noticed" or "I saw"):
-     * Location/facility details: "[contact_company] operates in [city], [state]..." or "With operations in [city]..."
+     * Location/facility details: "[contact_company] operates in [city], [state]..." or "With operations in [city]..." or "With [X] facilities in [state]..."
      * Recent activity from LinkedIn: Reference naturally, e.g., "[contact_company] recently..." (if [contact_linkedin_recent_activity] available)
      * Website insight: Reference naturally, e.g., "On your website..." or "Your website mentions..." (if [company_website] available)
      * Industry pattern with peer context: "I've been talking to [role]s across [state], and..."
-   - NEVER: "I noticed...", "I saw...", "I hope you're well", "I wanted to reach out", or "I hope this email finds you well"
+   - NEVER: "I noticed...", "I saw...", "I hope you're well", "I wanted to reach out", "I hope this email finds you well", "Let me ask you something—" (unless you actually ask a question immediately after)
    - MUST: Prove you researched - include specific details (location, facility size, operations type, operational model) - but weave it in naturally
+   - CRITICAL: If you use "Let me ask you something—" or similar openers, you MUST immediately follow with an actual question. Never use these phrases without asking a question.
 
 3. ACKNOWLEDGE THEIR SITUATION (ROLE-SPECIFIC)
    - For [contact_job_title]: Show you understand what they actually deal with daily
@@ -3404,6 +3400,7 @@ class FreeSequenceAutomation {
    - YES: "With 4 facilities in Texas, timing is critical - locking in 6 months out vs 90 days is usually 10-20% difference"
    - Include timing context: early renewal (6 months) vs late (90 days) = money difference
    - CRITICAL: Mention the 10-20% savings figure ONLY ONCE in the entire email - do not repeat it multiple times
+   - Use "10-20%" NOT "15-20%" or "15-25%" - be consistent with the 10-20% range
 
 5. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
    - Write like a peer, not a salesperson (conversational, confident, direct)
@@ -3412,15 +3409,18 @@ class FreeSequenceAutomation {
    - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "procurement," "unleash," "synergy," "dive into," "solution," "at Power Choosers"
    - Sound like: colleague who knows their industry and has talked to others like them
    - Use casual confidence: "Been wondering—" "Question for you—" "Here's what I'm seeing—"
+   - NEVER: "Quick question—", "Real question—", "Out of curiosity—", "Let me ask you something—" (unless immediately followed by an actual question)
    - NO: "Would you be open to..." (permission-based, weak)
    - YES: Ask specific questions that assume conversation is happening
+   - CRITICAL: If you use any question opener like "Let me ask you something—", you MUST immediately follow with an actual question. Never use these phrases without asking a question.
 
 6. CALL TO ACTION (ASSERTIVE, NOT PERMISSION-BASED)
    - Use THIS specific CTA (don't change it, use exactly as written):
    "${cta}"
    - MUST: Assume the conversation is happening - don't ask for permission to talk
-   - NO: "Would you be open to a conversation?" or "Let's schedule a call"
+   - NO: "Would you be open to a conversation?", "Let's schedule a call", "If you ever want a second opinion on your setup, I can spend 10 minutes looking at your situation."
    - YES: Ask specific question about their contract, timing, or process
+   - The CTA MUST be a direct question that relates to the email body and angle used
 
 7. SUBJECT LINE (SPECIFIC, NOT VAGUE)
    - MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)

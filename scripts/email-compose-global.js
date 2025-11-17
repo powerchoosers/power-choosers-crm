@@ -3128,51 +3128,90 @@
     const toneOpener = selectRandomToneOpener(selectedAngle?.id);
     
     const prompt = `
-You are drafting a cold email to an energy procurement decision-maker.
+Write a cold introduction email that MUST:
 
-SENDER PROFILE:
-- Name: Lewis
-- Age: 29
-- Background: African American business professional
-- Tone: Conversational, direct, authentic (not corporate-speak, not British formalisms)
-- Personality: Human, relatable, genuine
+1. GREETING (RANDOMIZE FOR VARIETY)
+   - RANDOMLY choose ONE of these greetings:
+     * "Hi ${contact?.firstName || '[contact_first_name]'},"
+     * "Hey ${contact?.firstName || '[contact_first_name]'},"
+     * "Hello ${contact?.firstName || '[contact_first_name]'},"
+   - DO NOT use "Hi [contact_first_name] there," or add extra words
 
-RECIPIENT:
-- Name: ${contact?.firstName || 'there'}
-- Role: ${contact?.role || ''}
-- Company: ${account?.name || ''}
-- Industry: ${account?.industry || ''}
+2. OPEN WITH OBSERVATION (CRITICAL - MUST USE RESEARCH)
+   - YOU MUST reference something SPECIFIC about ${account?.name || '[contact_company]'} that proves you researched them
+   - REQUIRED: Include at least ONE of these research elements (reference naturally WITHOUT saying "I noticed" or "I saw"):
+     * Location/facility details: "${account?.name || '[contact_company]'} operates in ${account?.city || '[city]'}, ${account?.state || '[state]'}..." or "With operations in ${account?.city || '[city]'}..." or "With [X] facilities in ${account?.state || '[state]'}..."
+     * Recent activity from LinkedIn: Reference naturally, e.g., "${account?.name || '[contact_company]'} recently..." (if available)
+     * Website insight: Reference naturally, e.g., "On your website..." or "Your website mentions..." (if available)
+     * Industry pattern with peer context: "I've been talking to ${contact?.role || '[role]'}s across ${account?.state || '[state]'}, and..."
+   - NEVER: "I noticed...", "I saw...", "I hope you're well", "I wanted to reach out", "I hope this email finds you well", "Let me ask you something—" (unless you actually ask a question immediately after)
+   - MUST: Prove you researched - include specific details (location, facility size, operations type, operational model) - but weave it in naturally
+   - CRITICAL: If you use "Let me ask you something—" or similar openers, you MUST immediately follow with an actual question. Never use these phrases without asking a question.
 
-SELECTED ANGLE (use this as primary focus):
-- Angle ID: ${selectedAngle?.id || 'timing_strategy'}
-- Primary Message: ${selectedAngle?.primaryMessage || 'strategic contract timing'}
-- Value Prop: ${selectedAngle?.primaryValue || '8-15% savings from early renewal'}
-- Opening Template: ${selectedAngle?.openingTemplate || 'When does your contract renew?'}
+3. ACKNOWLEDGE THEIR SITUATION (ROLE-SPECIFIC)
+   - For ${contact?.role || contact?.title || '[contact_job_title]'}: Show you understand what they actually deal with daily
+   - For ${account?.industry || '[company_industry]'}: Reference industry-specific pain points naturally (not generic)
+   - Use their role language (CFOs care about predictability/budgets, Operations care about uptime/reliability)
+   - Make it about THEM, not about us (don't lead with "We help...")
 
-TONE & VOICE:
-- Opening tone: "${toneOpener}"
-- Style: Conversational, direct, no corporate jargon
-- Examples of YOUR tone:
-  ✅ "Let me ask you something—are you currently claiming exemptions?"
-  ✅ "Looking at your situation, here's what I'm noticing..."
-  ✅ "Been wondering—how are you handling this?"
-  ❌ DON'T: "Quick one—", "Out of curiosity—", corporate formal phrases
+4. ONE INSIGHT (SPECIFIC, NOT GENERIC)
+   - Provide ONE concrete observation about why this matters to them NOW
+   - Use SPECIFIC numbers and timing: "6 months early = 10-20% savings" NOT "thousands annually"
+   - NOT: "Companies save 10-20%" (too generic)
+   - YES: "With 4 facilities in Texas, timing is critical - locking in 6 months out vs 90 days is usually 10-20% difference"
+   - Include timing context: early renewal (6 months) vs late (90 days) = money difference
+   - CRITICAL: Mention the 10-20% savings figure ONLY ONCE in the entire email - do not repeat it multiple times
+   - Use "10-20%" NOT "15-20%" or "15-25%" - be consistent with the 10-20% range
+   - SELECTED ANGLE: ${selectedAngle?.primaryMessage || 'strategic contract timing'}
+   - ANGLE VALUE: ${selectedAngle?.primaryValue || '10-20% savings from early renewal'}
 
-EMAIL STRUCTURE:
-1. Authentic opening question (using "${toneOpener}" style)
-2. Situational relevance (1-2 sentences, ${selectedAngle?.primaryMessage || 'their energy situation'})
-3. Specific value prop (use "${selectedAngle?.primaryValue || 'observation-based value with specific numbers'}")
-4. ONE yes/no CTA (conversational, not formal)
+5. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
+   - Write like a peer, not a salesperson (conversational, confident, direct)
+   - Use contractions: "we're," "don't," "it's," "you're," "I'm"
+   - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
+   - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "procurement," "unleash," "synergy," "dive into," "solution," "at Power Choosers"
+   - Sound like: colleague who knows their industry and has talked to others like them
+   - Use casual confidence: "Been wondering—" "Question for you—" "Here's what I'm seeing—"
+   - NEVER: "Quick question—", "Real question—", "Out of curiosity—", "Let me ask you something—" (unless immediately followed by an actual question)
+   - NO: "Would you be open to..." (permission-based, weak)
+   - YES: Ask specific questions that assume conversation is happening
+   - CRITICAL: If you use any question opener like "Let me ask you something—", you MUST immediately follow with an actual question. Never use these phrases without asking a question.
+   - Opening tone suggestion: "${toneOpener}" (use naturally, not forced)
 
-${newsHooks ? buildNewsContext(newsHooks, selectedAngle) : ''}
+6. CALL TO ACTION (ASSERTIVE, NOT PERMISSION-BASED)
+   - MUST: Assume the conversation is happening - don't ask for permission to talk
+   - NO: "Would you be open to a conversation?", "Let's schedule a call", "If you ever want a second opinion on your setup, I can spend 10 minutes looking at your situation."
+   - YES: Ask specific question about their contract, timing, or process
+   - The CTA MUST be a direct question that relates to the email body and selected angle
+   - Use angle opening template as inspiration: "${selectedAngle?.openingTemplate || 'When does your current electricity contract expire?'}"
+   - Exactly ONE question mark (?) in the entire email
 
-IMPORTANT RULES:
-- 75-130 words total
-- Exactly ONE question in CTA
-- NO bio opening ("I noticed...")
-- NO generic "save 10-20%"
-- Sound like Lewis (29, direct, authentic)
-- If user selected this angle, commit to it (don't second-guess)
+7. SUBJECT LINE (SPECIFIC, NOT VAGUE)
+   - MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
+   - Examples: "${contact?.firstName || '[FirstName]'}, contract timing question" or "${contact?.firstName || '[FirstName]'}, rate lock timing question"
+   - NOT generic: "thoughts on energy planning" or "insight to ease costs" or "thoughts on energy strategy"
+   - Focus on: contract renewal, rate lock timing, budget cycle, facility renewal
+   - Role-specific: For Controllers/CFO: "budget question about energy renewal timing"
+   - For Operations/Facilities: "facility renewal timing question"
+
+8. FORMAT
+   - 100-130 words max (scannable, not overwhelming)
+   - 2-3 short paragraphs (break up visually)
+   - Scannable on mobile (short lines, clear breaks)
+   - One CTA at end (a direct question related to the angle)
+
+9. PERSONALIZATION
+   - Include ${contact?.firstName || '[contact_first_name]'} naturally in randomized greeting
+   - Reference ${account?.name || '[company_name]'} specifically (not "your company")
+   - For ${account?.industry || '[company_industry]'}, use industry-specific language naturally
+   - Reference location if available (${account?.city || '[city]'}, ${account?.state || '[state]'}) for regional context
+
+10. PROOF OF RESEARCH
+   - Include at least ONE specific detail that proves you researched (not just role description)
+   - Examples: "4 locations across Texas," "24/7 operations," "both electricity and natural gas"
+   - This makes you stand out from generic templates
+
+ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should sound like their peer—a 29-year-old Texas business pro who knows the industry and has talked to others in their situation. Be conversational, confident, and direct.
 
 Generate ONLY email body (no signature, no HTML).
     `.trim();
@@ -3188,44 +3227,95 @@ Generate ONLY email body (no signature, no HTML).
     // Check if manual input mentions a specific angle or instruction
     const manualAngle = detectAngleFromInput(manualInput);
     const finalAngle = manualAngle ? findAngleById(manualAngle, account?.industry) : selectedAngle;
+    const toneOpener = selectRandomToneOpener(finalAngle?.id);
     
     const prompt = `
-You are drafting a cold email to an energy procurement decision-maker.
+Write a cold introduction email that MUST:
 
-SENDER PROFILE:
-- Name: Lewis
-- Tone: Conversational, direct, authentic
+1. GREETING (RANDOMIZE FOR VARIETY)
+   - RANDOMLY choose ONE of these greetings:
+     * "Hi ${contact?.firstName || '[contact_first_name]'},"
+     * "Hey ${contact?.firstName || '[contact_first_name]'},"
+     * "Hello ${contact?.firstName || '[contact_first_name]'},"
+   - DO NOT use "Hi [contact_first_name] there," or add extra words
 
-RECIPIENT:
-- Name: ${contact?.firstName || 'there'}
-- Role: ${contact?.role || ''}
-- Company: ${account?.name || ''}
+2. OPEN WITH OBSERVATION (CRITICAL - MUST USE RESEARCH)
+   - YOU MUST reference something SPECIFIC about ${account?.name || '[contact_company]'} that proves you researched them
+   - REQUIRED: Include at least ONE of these research elements (reference naturally WITHOUT saying "I noticed" or "I saw"):
+     * Location/facility details: "${account?.name || '[contact_company]'} operates in ${account?.city || '[city]'}, ${account?.state || '[state]'}..." or "With operations in ${account?.city || '[city]'}..."
+     * Recent activity from LinkedIn: Reference naturally, e.g., "${account?.name || '[contact_company]'} recently..." (if available)
+     * Website insight: Reference naturally, e.g., "On your website..." or "Your website mentions..." (if available)
+     * Industry pattern with peer context: "I've been talking to ${contact?.role || '[role]'}s across ${account?.state || '[state]'}, and..."
+   - NEVER: "I noticed...", "I saw...", "I hope you're well", "I wanted to reach out", "I hope this email finds you well", "Let me ask you something—" (unless you actually ask a question immediately after)
+   - MUST: Prove you researched - include specific details (location, facility size, operations type, operational model) - but weave it in naturally
+   - CRITICAL: If you use "Let me ask you something—" or similar openers, you MUST immediately follow with an actual question. Never use these phrases without asking a question.
 
-CONTEXT FROM USER:
+3. ACKNOWLEDGE THEIR SITUATION (ROLE-SPECIFIC)
+   - For ${contact?.role || contact?.title || '[contact_job_title]'}: Show you understand what they actually deal with daily
+   - For ${account?.industry || '[company_industry]'}: Reference industry-specific pain points naturally (not generic)
+   - Use their role language (CFOs care about predictability/budgets, Operations care about uptime/reliability)
+   - Make it about THEM, not about us (don't lead with "We help...")
+
+4. ONE INSIGHT (SPECIFIC, NOT GENERIC)
+   - Provide ONE concrete observation about why this matters to them NOW
+   - Use SPECIFIC numbers and timing: "6 months early = 10-20% savings" NOT "thousands annually"
+   - NOT: "Companies save 10-20%" (too generic)
+   - YES: "With 4 facilities in Texas, timing is critical - locking in 6 months out vs 90 days is usually 10-20% difference"
+   - Include timing context: early renewal (6 months) vs late (90 days) = money difference
+   - CRITICAL: Mention the 10-20% savings figure ONLY ONCE in the entire email - do not repeat it multiple times
+   - Use "10-20%" NOT "15-20%" or "15-25%" - be consistent with the 10-20% range
+   - PRIMARY ANGLE (use if relevant): ${finalAngle?.primaryMessage || 'their energy situation'}
+   - ANGLE VALUE: ${finalAngle?.primaryValue || 'observation-based value with specific numbers'}
+
+5. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
+   - Write like a peer, not a salesperson (conversational, confident, direct)
+   - Use contractions: "we're," "don't," "it's," "you're," "I'm"
+   - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
+   - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "procurement," "unleash," "synergy," "dive into," "solution," "at Power Choosers"
+   - Sound like: colleague who knows their industry and has talked to others like them
+   - Use casual confidence: "Been wondering—" "Question for you—" "Here's what I'm seeing—"
+   - NEVER: "Quick question—", "Real question—", "Out of curiosity—", "Let me ask you something—" (unless immediately followed by an actual question)
+   - NO: "Would you be open to..." (permission-based, weak)
+   - YES: Ask specific questions that assume conversation is happening
+   - CRITICAL: If you use any question opener like "Let me ask you something—", you MUST immediately follow with an actual question. Never use these phrases without asking a question.
+   - Opening tone suggestion: "${toneOpener}" (use naturally, not forced)
+
+6. CALL TO ACTION (ASSERTIVE, NOT PERMISSION-BASED)
+   - MUST: Assume the conversation is happening - don't ask for permission to talk
+   - NO: "Would you be open to a conversation?", "Let's schedule a call", "If you ever want a second opinion on your setup, I can spend 10 minutes looking at your situation."
+   - YES: Ask specific question about their contract, timing, or process
+   - The CTA MUST be a direct question that relates to the email body and selected angle
+   - Exactly ONE question mark (?) in the entire email
+
+7. SUBJECT LINE (SPECIFIC, NOT VAGUE)
+   - MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
+   - Examples: "${contact?.firstName || '[FirstName]'}, contract timing question" or "${contact?.firstName || '[FirstName]'}, rate lock timing question"
+   - NOT generic: "thoughts on energy planning" or "insight to ease costs" or "thoughts on energy strategy"
+   - Focus on: contract renewal, rate lock timing, budget cycle, facility renewal
+
+8. FORMAT
+   - 100-130 words max (scannable, not overwhelming)
+   - 2-3 short paragraphs (break up visually)
+   - Scannable on mobile (short lines, clear breaks)
+   - One CTA at end (a direct question related to the angle)
+
+9. PERSONALIZATION
+   - Include ${contact?.firstName || '[contact_first_name]'} naturally in randomized greeting
+   - Reference ${account?.name || '[company_name]'} specifically (not "your company")
+   - For ${account?.industry || '[company_industry]'}, use industry-specific language naturally
+   - Reference location if available (${account?.city || '[city]'}, ${account?.state || '[state]'}) for regional context
+
+10. PROOF OF RESEARCH
+   - Include at least ONE specific detail that proves you researched (not just role description)
+   - Examples: "4 locations across Texas," "24/7 operations," "both electricity and natural gas"
+   - This makes you stand out from generic templates
+
+USER CONTEXT (RESPECT THIS INTENT):
 ${manualInput}
 
-PRIMARY ANGLE (use if relevant):
-- ${finalAngle?.primaryMessage || 'their energy situation'}
-- Value: ${finalAngle?.primaryValue || 'observation-based value with specific numbers'}
+ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should sound like their peer—a 29-year-old Texas business pro who knows the industry and has talked to others in their situation. Be conversational, confident, and direct. Respect the user's intent from manual context while following all the rules above.
 
-TONE:
-- Sound authentic, not corporate
-- Use conversational openers like "Let me ask you something—", "Been wondering—", "Question for you—"
-
-EMAIL STRUCTURE:
-1. Natural opening question
-2. Situational relevance
-3. Specific value prop
-4. ONE yes/no CTA
-
-IMPORTANT:
-- 75-130 words
-- NO bio opening
-- NO generic claims
-- Sound like Lewis (29, African American professional)
-- Respect the user's intent from manual context
-
-Generate ONLY email body.
+Generate ONLY email body (no signature, no HTML).
     `.trim();
     
     return prompt;
@@ -3309,12 +3399,32 @@ Generate ONLY email body.
       console.log('[AI] Selected angle:', selectedAngle?.id, 'for industry:', recipientIndustry);
       console.log('[AI] Using tone opener:', toneOpener);
 
+      // Build comprehensive prompt using the prompt builders (enhances user's input with all rules)
+      const contact = {
+        firstName: recipient?.firstName || recipient?.name?.split(' ')[0] || '',
+        role: recipient?.title || recipient?.job || recipient?.role || '',
+        title: recipient?.title || recipient?.job || recipient?.role || ''
+      };
+      const account = recipient?.account || {
+        name: recipient?.company || '',
+        industry: recipient?.industry || recipient?.account?.industry || '',
+        city: recipient?.account?.city || '',
+        state: recipient?.account?.state || ''
+      };
+      
+      // Use buildDynamicPrompt or buildManualPrompt to enhance the user's prompt
+      const enhancedPrompt = prompt.trim().length > 0
+        ? buildManualPrompt(contact, account, selectedAngle, prompt)
+        : buildDynamicPrompt(contact, account, selectedAngle, null, null);
+
+      console.log('[AI] Using enhanced prompt with comprehensive rules');
+
       // Call the API
       const response = await fetch(genUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: prompt,
+          prompt: enhancedPrompt,
           recipient: recipient,
           mode: mode,
           senderName: senderName,
