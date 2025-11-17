@@ -47,7 +47,54 @@ export default async function handler(req, res) {
     // Build Apollo search request
     const searchBody = {
       page: page + 1, // Apollo uses 1-based pagination
-      per_page: Math.min(size, 100) // Apollo max is 100
+      per_page: Math.min(size, 100), // Apollo max is 100
+      
+      // Job title filtering - prioritize decision-makers in facilities, finance, and operations
+      person_titles: [
+        // Facilities & Energy
+        'Facilities Director',
+        'Facilities Manager',
+        'Energy Manager',
+        'Plant Operations',
+        'Real Estate Manager',
+        
+        // Finance & Accounting
+        'Controller',
+        'CFO',
+        'Chief Financial Officer',
+        'VP of Finance',
+        'Director of Finance',
+        'Corporate Controller',
+        'Accounting Manager',
+        
+        // Executive Leadership
+        'CEO',
+        'Chief Executive Officer',
+        'President',
+        'COO',
+        'Chief Operating Officer',
+        'Executive Director',
+        'General Manager',
+        'GM',
+        
+        // Operations & Business
+        'Business Office Manager',
+        'Office Manager',
+        'Business Administrator',
+        'Sourcing',
+        'Director of Supply Chain',
+        'Manager of Supply Chain',
+        'Cost Reduction Expert',
+        
+        // IT & Compliance
+        'IT Director',
+        'IT Manager',
+        'Chief Compliance Officer',
+        'Compliance Manager'
+      ],
+      
+      // Include similar titles (e.g., "Senior Facilities Manager", "VP Finance", etc.)
+      include_similar_titles: true
     };
     
     // COMBINED FILTERING STRATEGY:
