@@ -1490,6 +1490,10 @@
         companyName: accountName || companyName, // Use account name if available
         title: contact.title || contact.jobTitle || '',
         location: contact.location || contact.city || '',
+        city: contact.city || '',
+        state: contact.state || '',
+        industry: contact.industry || '',
+        seniority: contact.seniority || '',
         linkedin: contact.linkedin || contact.linkedinUrl || '',
         // map phone numbers to workDirectPhone/mobile/otherPhone
         workDirectPhone: selectPhone(contact, 'direct') || selectPhone(contact, 'work') || '',
@@ -1602,26 +1606,30 @@
       }
       if (existingId) {
         console.log('[Apollo Widget] Enriching account with payload:', payload);
+        // This uses PCSaves.updateAccount which already:
+        // - Updates in-memory cache optimistically
+        // - Dispatches a single pc:account-updated event
+        // - Persists to Firestore
         await window.PCSaves.updateAccount(existingId, payload);
         window.crm?.showToast && window.crm.showToast('Enriched existing account');
-        
-        // Dispatch account-updated event - account-detail.js will listen and refresh
+
+        // If we're currently on this account's detail page, refresh it once
         try {
-          const ev = new CustomEvent('pc:account-updated', { 
-            detail: { 
-              id: existingId, 
-              changes: { 
-                ...payload,
-                updatedAt: new Date()
-              } 
-            } 
-          });
-          document.dispatchEvent(ev);
-          console.log('[Apollo Widget] Dispatched pc:account-updated event for account:', existingId);
-        } catch (err) { 
-          console.error('[Apollo Widget] Failed to dispatch account-updated event:', err);
+          if (window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
+            const current = window.AccountDetail.state.currentAccount;
+            const currentId = current.id || current.accountId || current._id;
+            if (currentId && String(currentId) === String(existingId)) {
+              // Merge enriched fields into current state so UI updates immediately
+              window.AccountDetail.state.currentAccount = Object.assign({}, current, payload);
+              if (typeof window.AccountDetail.renderAccountDetail === 'function') {
+                window.AccountDetail.renderAccountDetail();
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('[Apollo Widget] Failed to refresh Account Detail after enrichment:', err);
         }
-        
+
       } else {
         const ref = await db.collection('accounts').add(payload);
         window.crm?.showToast && window.crm.showToast('Account added to CRM');
@@ -1698,7 +1706,11 @@
           emails: contact.emails || [],
           phones: contact.phones || [],
           linkedin: contact.linkedin || '',
-          location: contact.location || ''
+          location: contact.location || '',
+          city: contact.city || '',
+          state: contact.state || '',
+          industry: contact.industry || '',
+          seniority: contact.seniority || ''
         };
         
         // Show success toast
@@ -1852,6 +1864,25 @@
       // Add job title if available
       if (enriched.jobTitle) {
         updatePayload.jobTitle = enriched.jobTitle;
+      }
+      
+      // Add location fields if available
+      if (enriched.city) {
+        updatePayload.city = enriched.city;
+      }
+      if (enriched.state) {
+        updatePayload.state = enriched.state;
+      }
+      if (enriched.location) {
+        updatePayload.location = enriched.location;
+      }
+      
+      // Add industry and seniority if available
+      if (enriched.industry) {
+        updatePayload.industry = enriched.industry;
+      }
+      if (enriched.seniority) {
+        updatePayload.seniority = enriched.seniority;
       }
       
       console.log('[Lusha Enrich] Update payload:', updatePayload);
@@ -2056,9 +2087,18 @@
       } else if (which === 'phones') {
         const wrap = container.querySelector('[data-phones-list]');
         if (wrap) {
+          // First check if contact already has phones from initial search (sometimes Apollo includes them)
+          const existingPhones = Array.isArray(contact.phones) ? contact.phones.map(p => p.number || p).filter(Boolean) : [];
+          if (existingPhones.length > 0) {
+            lushaLog('Using phones from original contact data (no reveal needed)');
+            const newContent = existingPhones.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('');
+            animateRevealContent(wrap, newContent);
+            return; // Already have phones, no need to reveal
+          }
+          
+          // Check if enrich call returned phones immediately
           const phones = Array.isArray(enriched.phones) ? enriched.phones.map(p => p.number).filter(Boolean) : [];
           
-          // Check if we got phone numbers immediately (unlikely for reveals)
           if (phones.length > 0) {
             const newContent = phones.map(v => `<div class="lusha-value-item">${formatPhoneLink(v)}</div>`).join('');
             animateRevealContent(wrap, newContent);
@@ -3251,8 +3291,8 @@ function animateRevealContent(container, newContent) {
 
 // Helper function to poll for phone numbers delivered asynchronously via webhook
 async function pollForPhoneNumbers(personId, contact, wrap, container) {
-  const maxAttempts = 30; // Poll for up to 5 minutes (30 attempts * 10 seconds)
-  const pollInterval = 10000; // 10 seconds between polls
+  const maxAttempts = 30; // Poll for up to 2.5 minutes (30 attempts * 5 seconds)
+  const pollInterval = 5000; // 5 seconds between polls (reduced from 10s for faster response)
   let attempts = 0;
   
   let base = (window.API_BASE_URL || '').replace(/\/$/, '');
@@ -3317,7 +3357,7 @@ async function pollForPhoneNumbers(personId, contact, wrap, container) {
       
       // Not ready yet, continue polling
       if (attempts < maxAttempts) {
-        lushaLog('Phone numbers not ready yet, polling again in 10s...');
+        lushaLog(`Phone numbers not ready yet, polling again in ${pollInterval/1000}s...`);
         setTimeout(poll, pollInterval);
       } else {
         // Timeout - show error
@@ -3348,7 +3388,7 @@ async function pollForPhoneNumbers(personId, contact, wrap, container) {
   };
   
   // Start polling after a short delay
-  setTimeout(poll, 2000); // Initial 2-second delay before first poll
+  setTimeout(poll, 1000); // Initial 1-second delay before first poll (reduced for faster response)
 }
 
 // Helper function to set credit total (can be called manually if needed)

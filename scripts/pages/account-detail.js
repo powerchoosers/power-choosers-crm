@@ -2922,7 +2922,10 @@ var console = {
       }
     });
 
-    // Listen for account creation/update events (from CSV import, etc.)
+    // Listen for account creation events (from CSV import, etc.)
+    // NOTE: We intentionally do NOT listen for generic `pc:account-updated` here
+    // to avoid full-page re-renders on every inline field save. Inline edits
+    // update the DOM directly; Apollo enrich now refreshes Account Detail itself.
     document.addEventListener('pc:account-created', (e) => {
       if (state.currentAccount && e.detail) {
         const { id, doc } = e.detail;
@@ -2936,38 +2939,6 @@ var console = {
           
           // Re-render the account detail to show updated fields
           renderAccountDetail();
-        }
-      }
-    });
-
-    // Listen for account update events (from Apollo widget enrich, etc.)
-    document.addEventListener('pc:account-updated', async (e) => {
-      if (state.currentAccount && e.detail) {
-        const { id, changes } = e.detail;
-        
-        // Only update if this is the current account being viewed
-        if (id === state.currentAccount.id) {
-          console.log('[AccountDetail] Account updated via pc:account-updated, refreshing display', changes);
-          
-          // Immediately merge changes into current state
-          state.currentAccount = { ...state.currentAccount, ...changes };
-          
-          // Re-render immediately to show changes
-          renderAccountDetail();
-          
-          // Also refresh from database after a short delay to ensure consistency
-          setTimeout(async () => {
-            try {
-              const refreshedAccount = await findAccountById(id);
-              if (refreshedAccount) {
-                state.currentAccount = refreshedAccount;
-                renderAccountDetail();
-                console.log('[AccountDetail] Refreshed from database after enrich');
-              }
-            } catch (err) {
-              console.warn('[AccountDetail] Failed to refresh from database:', err);
-            }
-          }, 300);
         }
       }
     });
