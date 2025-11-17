@@ -370,6 +370,23 @@
         // CRITICAL FIX: Load BOTH people and accounts lists from cache on initial load
         // This ensures both are ready when user toggles, and initial render is correct
         
+        // Helper: merge new lists into existing ones without losing previously seen items
+        const mergeListsById = (existing, incoming) => {
+          const map = new Map();
+          (existing || []).forEach(list => {
+            if (list && list.id) map.set(list.id, list);
+          });
+          (incoming || []).forEach(list => {
+            if (list && list.id) map.set(list.id, list);
+          });
+          // Keep most recently updated lists first
+          return Array.from(map.values()).sort((a, b) => {
+            const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+            const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+            return bTime - aTime;
+          });
+        };
+        
         // Filter people lists
         const peopleLists = allLists.filter(list => {
           const listKind = (list.kind || list.type || list.listType || '').toLowerCase();
@@ -382,10 +399,11 @@
           return listKind === 'accounts' || listKind === 'account' || listKind === 'companies' || listKind === 'company';
         });
         
-        // Update state with both filtered lists (zero cost)
-        state.peopleLists = peopleLists;
+        // Update state with both filtered lists, MERGING with any existing lists
+        // This prevents newly created lists from "disappearing" if a later cache reload is incomplete
+        state.peopleLists = mergeListsById(state.peopleLists, peopleLists);
         state.loadedPeople = true;
-        state.accountLists = accountLists;
+        state.accountLists = mergeListsById(state.accountLists, accountLists);
         state.loadedAccounts = true;
         
         console.log('[ListsOverview] ✓ Loaded', peopleLists.length, 'people lists and', accountLists.length, 'account lists from BackgroundListsLoader cache (zero cost)');
