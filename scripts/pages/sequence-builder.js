@@ -6323,6 +6323,128 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     });
 
   // Helper functions for AI email formatting
+
+  // Mirror the Cloud Run cold email HTML used by generate-scheduled-emails.js
+  // so sequence previews look identical to the final scheduled emails.
+  function buildColdEmailHtmlTemplateForPreview(data, recipient) {
+    const company = recipient?.company || recipient?.accountName || 'Your Company';
+    const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const industry = recipient?.industry || recipient?.account?.industry || '';
+
+    // Sender profile comes from Settings / compose-global logic where possible.
+    const senderName = 'Lewis Patterson';
+    const senderTitle = 'Energy Strategist';
+    const senderCompany = 'Power Choosers';
+
+    // Clean data fields (remove citations)
+    const cleanField = (field) => {
+      if (!field) return '';
+      return String(field).replace(/\[\d+\]/g, '').trim();
+    };
+
+    const greeting = cleanField(data.greeting) || `Hi ${firstName},`;
+    const openingHook = cleanField(data.opening_hook) ||
+      `I tried reaching you earlier but couldn't connect. I wanted to share some important information about energy cost trends that could significantly impact ${company}.`;
+    const valueProposition = cleanField(data.value_proposition) ||
+      (industry
+        ? `Most ${industry} companies like ${company} see 10-20% savings through competitive procurement. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>`
+        : 'Most businesses see 10-20% savings through competitive procurement and efficiency solutions. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>');
+    const socialProof = cleanField(data.social_proof_optional) || '';
+    const ctaText = cleanField(data.cta_text) || 'Explore Your Savings Potential';
+
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 2px 24px; font-size:14px; color:#dc2626;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#fee2e2; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .solution-box { background:linear-gradient(135deg,#f0fdfa 0%,#ccfbf1 100%);
+      border:1px solid #99f6e4; padding:18px 20px; margin:0 24px 18px 24px;
+      border-radius:8px; box-shadow:0 2px 8px rgba(20,184,166,0.06);
+    }
+    .solution-box h3 { margin:0 0 10px 0; color:#0f766e; font-size:16px; }
+    .solution-box p { margin:0; color:#1f2937; font-size:15px; line-height:1.5; }
+    .social-proof { background:linear-gradient(135deg,#dbeafe 0%,#bfdbfe 100%);
+      padding:14px 18px; margin:0 24px 18px 24px; border-radius:8px;
+    }
+    .social-proof p { margin:0; color:#1e40af; font-size:14px; font-style:italic; line-height:1.5; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#fee2e2; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(239,68,68,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#ef4444; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(239,68,68,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#dc2626;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">⚠️ Energy Costs Rising Fast</div>
+    <div class="intro">
+      <p>${greeting}</p>
+      <p>${openingHook}</p>
+    </div>
+    <div class="solution-box">
+      <h3>✓ How Power Choosers Helps</h3>
+      <p>${valueProposition}</p>
+    </div>
+    ${socialProof ? `<div class="social-proof"><p>${socialProof}</p></div>` : ''}
+    <div class="cta-container">
+      <a href="https://powerchoosers.com/schedule" class="cta-btn">${ctaText}</a>
+      <div style="margin-top:8px;font-size:14px;color:#dc2626;opacity:0.83;">
+        Quick 15-minute call to discuss your options—no obligation.
+      </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${senderName}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${senderTitle}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+        <div style="margin: 2px 0 0 0; line-height: 1.3;">${senderCompany}</div>
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
+    `;
+  }
+
   function formatTemplatedEmail(result, recipient, templateType) {
     try {
       // Clean all string fields in result to remove citations
@@ -6331,15 +6453,24 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           if (typeof result[key] === 'string') {
             result[key] = result[key].replace(/\[\d+\]/g, '').trim();
           } else if (Array.isArray(result[key])) {
-            result[key] = result[key].map(item => 
+            result[key] = result[key].map(item =>
               typeof item === 'string' ? item.replace(/\[\d+\]/g, '').trim() : item
             );
           }
         });
       }
-      
+
       const subject = (result.subject || 'Energy Solutions');
-      const html = result.output || result.html || '<p>Email content</p>';
+      let html;
+
+      // For cold email templates, mirror the same HTML structure used in
+      // generate-scheduled-emails so preview = final.
+      if (templateType === 'coldemail') {
+        html = buildColdEmailHtmlTemplateForPreview(result, recipient);
+      } else {
+        html = result.output || result.html || '<p>Email content</p>';
+      }
+
       // Light de-salesify on subject only (avoid mutating structured HTML templates)
       const cleanSubject = String(subject)
         .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
@@ -6347,7 +6478,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         .replace(/\bPower Choosers helps\b/gi, 'We help')
         .replace(/\bPower Choosers can help\b/gi, 'We can help')
         .replace(/\bPower Choosers\b/gi, 'We');
-      // HTML content is already cleaned above
+
       const cleanHtml = String(html);
       return { subject: cleanSubject, html: cleanHtml };
     } catch (error) {
@@ -6741,7 +6872,10 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               // Update AI lifecycle state only – do not overwrite manual subject/body until saved
               if (step) {
                 if (!step.data) step.data = {};
+                // Persist latest AI output and the mode used so scheduled emails
+                // can respect Standard vs HTML generation preference.
                 step.data.aiOutput = { subject, html };
+                step.data.aiMode = mode || 'standard';
                 step.data.aiStatus = 'generated';
                 try { scheduleStepSave(step.id); } catch (_) {}
               }

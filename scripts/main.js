@@ -3611,6 +3611,38 @@ class PowerChoosersCRM {
                         recordCount: increment,
                         updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
                     });
+                    
+                    // Update BackgroundListsLoader cache immediately (cost-effective: no Firestore read)
+                    if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
+                        // Get current count from cache, then add new records
+                        const currentList = window.BackgroundListsLoader.getListsData().find(l => l.id === listId);
+                        const currentCount = currentList?.recordCount || currentList?.count || 0;
+                        const newCount = currentCount + newRecordIds.length;
+                        window.BackgroundListsLoader.updateListCountLocally(listId, newCount);
+                    }
+                    
+                    // Update CacheManager cache (cost-effective: IndexedDB write only)
+                    if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+                        const currentList = window.BackgroundListsLoader?.getListsData()?.find(l => l.id === listId);
+                        const currentCount = currentList?.recordCount || currentList?.count || 0;
+                        const newCount = currentCount + newRecordIds.length;
+                        window.CacheManager.updateRecord('lists', listId, {
+                            recordCount: newCount,
+                            count: newCount,
+                            updatedAt: new Date()
+                        }).catch(err => console.warn('[Main] CacheManager update failed:', err));
+                    }
+                    
+                    // Dispatch event for lists page to refresh
+                    try {
+                        document.dispatchEvent(new CustomEvent('pc:list-updated', {
+                            detail: {
+                                id: listId,
+                                recordCount: newRecordIds.length,
+                                targetType: targetType
+                            }
+                        }));
+                    } catch (_) {}
                 }
                 
                 console.log(`✓ Batch assigned ${newRecordIds.length} ${targetType} to list ${listId} (${recordIds.length - newRecordIds.length} already existed)`);
