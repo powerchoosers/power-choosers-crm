@@ -92,6 +92,8 @@ import apolloContactsHandler from './api/apollo/contacts.js';
 import apolloEnrichHandler from './api/apollo/enrich.js';
 import apolloUsageHandler from './api/apollo/usage.js';
 import apolloHealthHandler from './api/apollo/health.js';
+import apolloPhoneWebhookHandler from './api/apollo/phone-webhook.js';
+import apolloPhoneRetrieveHandler from './api/apollo/phone-retrieve.js';
 import uploadHostGoogleAvatarHandler from './api/upload/host-google-avatar.js';
 import uploadSignatureImageHandler from './api/upload/signature-image.js';
 import algoliaReindexHandler from './api/algolia/reindex.js';
@@ -696,6 +698,8 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/apollo/enrich' ||
     pathname === '/api/apollo/usage' ||
     pathname === '/api/apollo/health' ||
+    pathname === '/api/apollo/phone-webhook' ||
+    pathname === '/api/apollo/phone-retrieve' ||
     pathname === '/api/upload/host-google-avatar' ||
     pathname === '/api/upload/signature-image' ||
     pathname === '/api/algolia/reindex' ||
@@ -864,6 +868,12 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/apollo/health') {
     return handleApiApolloHealth(req, res, parsedUrl);
+  }
+  if (pathname === '/api/apollo/phone-webhook') {
+    return handleApiApolloPhoneWebhook(req, res, parsedUrl);
+  }
+  if (pathname === '/api/apollo/phone-retrieve') {
+    return handleApiApolloPhoneRetrieve(req, res, parsedUrl);
   }
   if (pathname === '/api/upload/host-google-avatar') {
     return handleApiUploadHostGoogleAvatar(req, res);
@@ -1072,6 +1082,16 @@ async function handleApiApolloUsage(req, res, parsedUrl) {
 async function handleApiApolloHealth(req, res, parsedUrl) {
   req.query = { ...parsedUrl.query };
   return await apolloHealthHandler(req, res);
+}
+
+async function handleApiApolloPhoneWebhook(req, res, parsedUrl) {
+  req.query = { ...parsedUrl.query };
+  return await apolloPhoneWebhookHandler(req, res);
+}
+
+async function handleApiApolloPhoneRetrieve(req, res, parsedUrl) {
+  req.query = { ...parsedUrl.query };
+  return await apolloPhoneRetrieveHandler(req, res);
 }
 
 // Upload handlers
