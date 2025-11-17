@@ -2215,14 +2215,16 @@
     
     console.log('[AI] Rendering AI bar...');
     
-    // Hardcoded prompt suggestions (no settings dependency)
+    // Get custom prompts from settings (Phase 1 integration)
+    const aiTemplates = getAITemplatesFromSettings();
+    
     const suggestions = [
-      { text: 'Warm intro after a call', prompt: 'warm intro email after our call', template: 'warm_intro' },
-      { text: 'Follow-up with value', prompt: 'follow-up email with value proposition', template: 'follow_up' },
-      { text: 'Energy Health Check', prompt: 'energy health check email', template: 'energy_health' },
-      { text: 'Proposal delivery', prompt: 'proposal delivery email', template: 'proposal' },
-      { text: 'Cold email outreach', prompt: 'cold email outreach', template: 'cold_email' },
-      { text: 'Invoice request', prompt: 'invoice request email', template: 'invoice' }
+      { text: 'Warm intro after a call', prompt: aiTemplates.warm_intro, template: 'warm_intro' },
+      { text: 'Follow-up with value props', prompt: aiTemplates.follow_up, template: 'follow_up' },
+      { text: 'Energy Health Check', prompt: aiTemplates.energy_health, template: 'energy_health' },
+      { text: 'Proposal delivery', prompt: aiTemplates.proposal, template: 'proposal' },
+      { text: 'Cold email outreach', prompt: aiTemplates.cold_email, template: 'cold_email' },
+      { text: 'Invoice request', prompt: aiTemplates.invoice, template: 'invoice' }
     ];
     
     aiBar.innerHTML = `
@@ -2287,6 +2289,68 @@
     });
   }
 
+  // Helper function to get AI templates from settings
+  function getAITemplatesFromSettings() {
+    try {
+      const settings = window.SettingsPage?.getSettings?.() || {};
+      const aiTemplates = settings?.aiTemplates || {};
+      
+      return {
+        warm_intro: aiTemplates.warm_intro || 'Warm intro after a call',
+        follow_up: aiTemplates.follow_up || 'Follow-up with tailored value props',
+        energy_health: aiTemplates.energy_health || 'Schedule an Energy Health Check',
+        proposal: aiTemplates.proposal || 'Proposal delivery with next steps',
+        cold_email: aiTemplates.cold_email || 'Cold email outreach to energy procurement decision maker',
+        invoice: aiTemplates.invoice || 'Standard Invoice Request',
+        who_we_are: aiTemplates.who_we_are || 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates. Write in first person ("we"/"I"). Avoid brand-first openers like "At Power Choosers," — use "We help" or "I help".',
+        // NEW: Market Context
+        marketContext: aiTemplates.marketContext || {
+          enabled: true,
+          rateIncrease: '15-25%',
+          renewalYears: '2025-2026',
+          earlyRenewalSavings: '20-30%',
+          typicalClientSavings: '10-20%',
+          marketInsights: 'due to data center demand'
+        },
+        // NEW: Meeting Preferences
+        meetingPreferences: aiTemplates.meetingPreferences || {
+          enabled: true,
+          useHardcodedTimes: true,
+          slot1Time: '2-3pm',
+          slot2Time: '10-11am',
+          callDuration: '15-minute',
+          timeZone: 'EST'
+        }
+      };
+    } catch (error) {
+      console.warn('[AI] Error getting templates from settings:', error);
+      return {
+        warm_intro: 'Warm intro after a call',
+        follow_up: 'Follow-up with tailored value props',
+        energy_health: 'Schedule an Energy Health Check',
+        proposal: 'Proposal delivery with next steps',
+        cold_email: 'Cold email outreach to energy procurement decision maker',
+        invoice: 'Standard Invoice Request',
+        who_we_are: 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates. Write in first person ("we"/"I"). Avoid brand-first openers like "At Power Choosers," — use "We help" or "I help".',
+        marketContext: {
+          enabled: true,
+          rateIncrease: '15-25%',
+          renewalYears: '2025-2026',
+          earlyRenewalSavings: '20-30%',
+          typicalClientSavings: '10-20%',
+          marketInsights: 'due to data center demand'
+        },
+        meetingPreferences: {
+          enabled: true,
+          useHardcodedTimes: true,
+          slot1Time: '2-3pm',
+          slot2Time: '10-11am',
+          callDuration: '15-minute',
+          timeZone: 'EST'
+        }
+      };
+    }
+  }
 
   // Helper function to escape HTML
   function escapeHtml(text) {
@@ -2524,807 +2588,6 @@
 
   // ========== AI GENERATION CORE ==========
   
-  /**
-   * AUTHENTIC TONE OPENERS - Matching Lewis's voice (29-year-old professional)
-   */
-  window.AUTHENTIC_TONE_OPENERS = {
-    disarming: [
-      "Genuine question—",
-      "Let me ask you something—",
-      "Been wondering—",
-      "You ever considered—",
-      "So here's the thing—",
-      "This might sound random, but—",
-      "Honestly—",
-      "Looking at your situation—",
-      "Question for you—",
-    ],
-    observation: [
-      "Here's what I'm seeing—",
-      "Most people I talk to—",
-      "From what I'm hearing—",
-      "I've found that teams like yours—",
-    ],
-  };
-
-  /**
-   * RANDOMIZED ANGLES BY INDUSTRY
-   * Each industry gets multiple angles with weighted probability
-   */
-  window.RANDOMIZED_ANGLES_BY_INDUSTRY = {
-    Manufacturing: {
-      angles: [
-        {
-          id: 'exemption_recovery',
-          weight: 0.30,
-          primaryMessage: 'electricity sales tax exemption recovery',
-          openingTemplate: 'Are you currently claiming electricity exemptions on your production facilities, or haven\'t filed yet?',
-          primaryValue: '$75K–$500K 4-year refund potential',
-          condition: '!accountData || !accountData.industry || accountData.industry.toLowerCase().includes("manufacturing") || accountData.industry.toLowerCase().includes("manufacturer") || accountData.industry.toLowerCase().includes("industrial") || accountData.taxExemptStatus === "Manufacturing"',
-          newsHooks: [],
-        },
-        {
-          id: 'demand_efficiency',
-          weight: 0.25,
-          primaryMessage: 'demand-side efficiency optimization',
-          openingTemplate: 'When you look at energy spend, are you focusing on rates, or have you already optimized consumption?',
-          primaryValue: '12–20% reduction before rate negotiation',
-          newsHooks: [],
-        },
-        {
-          id: 'timing_strategy',
-          weight: 0.25,
-          primaryMessage: 'early renewal timing strategy',
-          openingTemplate: 'How do you typically handle contract renewals—locking in early, or timing closer to expiration?',
-          primaryValue: '8-15% protection from market spikes',
-          situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
-          newsHooks: ['rate_spike_national', 'rate_spike_regional'],
-        },
-        {
-          id: 'consolidation',
-          weight: 0.20,
-          primaryMessage: 'multi-plant contract consolidation',
-          openingTemplate: 'Do you manage energy renewals centrally across your plants, or does each location handle its own?',
-          primaryValue: '2-4% overpay prevention + operational simplicity',
-          newsHooks: [],
-        },
-      ],
-    },
-    Nonprofit: {
-      angles: [
-        {
-          id: 'exemption_recovery',
-          weight: 0.40,
-          primaryMessage: 'tax exemption + refund recovery',
-          openingTemplate: 'Is your nonprofit currently filing electricity exemption certificates with your utility?',
-          primaryValue: '$40K–$200K+ in 4-year refund recovery',
-          newsHooks: [],
-        },
-        {
-          id: 'mission_funding',
-          weight: 0.35,
-          primaryMessage: 'mission-focused budget optimization',
-          openingTemplate: 'How are you currently managing energy costs so more funding goes to your mission?',
-          primaryValue: 'Redirect savings from operations to program impact',
-          newsHooks: [],
-        },
-        {
-          id: 'budget_stability',
-          weight: 0.25,
-          primaryMessage: 'budget predictability for board reporting',
-          openingTemplate: 'When budgeting for energy, are you locking in costs, or dealing with volatility year to year?',
-          primaryValue: '12–18% cost stability improvement',
-          newsHooks: [],
-        },
-      ],
-    },
-    Retail: {
-      angles: [
-        {
-          id: 'consolidation',
-          weight: 0.40,
-          primaryMessage: 'multi-location contract consolidation',
-          openingTemplate: 'How many locations do you have, and are they all renewing on different schedules?',
-          primaryValue: '2–4% overpay prevention + one renewal calendar',
-          newsHooks: [],
-        },
-        {
-          id: 'timing_strategy',
-          weight: 0.35,
-          primaryMessage: 'early renewal timing strategy',
-          openingTemplate: 'When your locations renew, are you coordinating timing or letting each one handle it independently?',
-          primaryValue: '8–15% savings from coordinated renewal timing',
-          situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
-          newsHooks: ['rate_spike_national', 'rate_spike_regional'],
-        },
-        {
-          id: 'operational_simplicity',
-          weight: 0.25,
-          primaryMessage: 'centralized energy operations',
-          openingTemplate: 'Right now, how much time are you spending managing energy renewals across your network?',
-          primaryValue: 'Centralized management reduces vendor complexity',
-          newsHooks: [],
-        },
-      ],
-    },
-    Healthcare: {
-      angles: [
-        {
-          id: 'exemption_recovery',
-          weight: 0.35,
-          primaryMessage: 'tax exemption + mission-aligned savings',
-          openingTemplate: 'Is your healthcare organization currently claiming electricity exemptions?',
-          primaryValue: '$100K–$300K+ in refund + ongoing savings',
-          condition: 'accountData?.taxExemptStatus === "Nonprofit"',
-          newsHooks: [],
-        },
-        {
-          id: 'consolidation',
-          weight: 0.40,
-          primaryMessage: 'multi-facility consolidation + compliance',
-          openingTemplate: 'How many facilities are you managing energy for, and are they on different contracts?',
-          primaryValue: '$100K–$500K network-wide optimization',
-          newsHooks: [],
-        },
-        {
-          id: 'operational_continuity',
-          weight: 0.25,
-          primaryMessage: 'uptime guarantee + budget certainty',
-          openingTemplate: 'For healthcare operations, what\'s more critical—energy savings or guaranteed uptime?',
-          primaryValue: 'Predictable costs + operational continuity',
-          newsHooks: [],
-        },
-      ],
-    },
-    DataCenter: {
-      angles: [
-        {
-          id: 'demand_efficiency',
-          weight: 0.45,
-          primaryMessage: 'demand-side efficiency + uptime resilience',
-          openingTemplate: 'For a data center like yours, what matters more—cutting energy spend or guaranteeing uptime?',
-          primaryValue: '12–20% consumption reduction + reliability',
-          newsHooks: [],
-        },
-        {
-          id: 'timing_strategy',
-          weight: 0.35,
-          primaryMessage: 'contract timing strategy (AI-driven demand)',
-          openingTemplate: 'With AI driving energy demand up, are you thinking about locking rates early?',
-          primaryValue: '8–15% protection from demand-driven spikes',
-          situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
-          newsHooks: ['datacenter_demand_spike'],
-        },
-        {
-          id: 'data_governance',
-          weight: 0.20,
-          primaryMessage: 'unified metering data + predictive planning',
-          openingTemplate: 'When you plan for energy, do you have unified metering across your data center?',
-          primaryValue: 'Better forecasting + uptime prediction',
-          newsHooks: [],
-        },
-      ],
-    },
-    Logistics: {
-      angles: [
-        {
-          id: 'consolidation',
-          weight: 0.45,
-          primaryMessage: 'multi-location volume leverage',
-          openingTemplate: 'With operations across multiple states, how are you coordinating energy contracts?',
-          primaryValue: '3–6% collective savings from volume negotiation',
-          newsHooks: [],
-        },
-        {
-          id: 'timing_strategy',
-          weight: 0.35,
-          primaryMessage: 'strategic renewal timing (avoid scramble)',
-          openingTemplate: 'Are you renewing energy contracts strategically, or waiting until the last minute?',
-          primaryValue: '8–15% vs. emergency renewals',
-          situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
-          newsHooks: ['rate_spike_national', 'rate_spike_regional'],
-        },
-        {
-          id: 'operational_efficiency',
-          weight: 0.20,
-          primaryMessage: 'warehouse efficiency optimization',
-          openingTemplate: 'For your warehouses, what drives energy costs more—facility size or operations model?',
-          primaryValue: 'Identify efficiency opportunities + rate savings',
-          newsHooks: [],
-        },
-      ],
-    },
-    Hospitality: {
-      angles: [
-        {
-          id: 'consolidation',
-          weight: 0.40,
-          primaryMessage: 'multi-property contract consolidation',
-          openingTemplate: 'How many properties are you managing energy for, and are they all on different renewal schedules?',
-          primaryValue: '2–4% overpay prevention + unified renewal calendar',
-          newsHooks: [],
-        },
-        {
-          id: 'timing_strategy',
-          weight: 0.35,
-          primaryMessage: 'seasonal planning + early renewal timing',
-          openingTemplate: 'When do you typically renew energy contracts—before peak season or waiting until the last minute?',
-          primaryValue: '8–15% savings from strategic timing',
-          situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
-          newsHooks: ['rate_spike_national', 'rate_spike_regional'],
-        },
-        {
-          id: 'operational_efficiency',
-          weight: 0.25,
-          primaryMessage: 'guest comfort + cost control balance',
-          openingTemplate: 'For your properties, what drives energy costs more—guest comfort requirements or operational efficiency?',
-          primaryValue: 'Optimize consumption without impacting guest experience',
-          newsHooks: [],
-        },
-      ],
-    },
-    Default: {
-      angles: [
-        {
-          id: 'timing_strategy',
-          weight: 0.40,
-          primaryMessage: 'strategic contract renewal timing',
-          openingTemplate: 'When does your current electricity contract renew?',
-          primaryValue: '8–15% savings from early renewal',
-          situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
-          newsHooks: ['rate_spike_national', 'rate_spike_regional'],
-        },
-        {
-          id: 'cost_control',
-          weight: 0.35,
-          primaryMessage: 'energy cost predictability and budget control',
-          openingTemplate: 'Are you locking in energy costs ahead of time, or dealing with rate volatility?',
-          primaryValue: 'Predictable costs + 10–20% savings opportunity',
-          newsHooks: [],
-        },
-        {
-          id: 'operational_simplicity',
-          weight: 0.25,
-          primaryMessage: 'simplified energy procurement management',
-          openingTemplate: 'How much time are you spending managing energy procurement versus focusing on your core business?',
-          primaryValue: 'Streamlined process + better rates',
-          newsHooks: [],
-        },
-      ],
-    },
-  };
-
-  /**
-   * Helper: Randomize selection based on weights
-   */
-  function randomizeByWeight(angles) {
-    const totalWeight = angles.reduce((sum, angle) => sum + angle.weight, 0);
-    let random = Math.random() * totalWeight;
-    
-    for (let angle of angles) {
-      random -= angle.weight;
-      if (random <= 0) {
-        return angle;
-      }
-    }
-    
-    return angles[0]; // Fallback
-  }
-
-  /**
-   * Helper: Infer industry from company name
-   */
-  function inferIndustryFromCompanyName(companyName) {
-    if (!companyName) return '';
-    
-    const name = String(companyName).toLowerCase();
-    
-    // Hospitality keywords
-    if (/\b(inn|hotel|motel|resort|lodge|suites|hospitality|accommodation|bed\s*and\s*breakfast|b&b|b\s*&\s*b)\b/i.test(name)) {
-      return 'Hospitality';
-    }
-    
-    // Restaurant/Food Service
-    if (/\b(restaurant|cafe|diner|bistro|grill|bar\s*&?\s*grill|tavern|pub|eatery|food\s*service)\b/i.test(name)) {
-      return 'Hospitality';
-    }
-    
-    // Manufacturing
-    if (/\b(manufacturing|manufacturer|industrial|factory|plant|production|fabrication)\b/i.test(name)) {
-      return 'Manufacturing';
-    }
-    
-    // Healthcare
-    if (/\b(hospital|clinic|medical|healthcare|health\s*care|physician|doctor|dental|pharmacy)\b/i.test(name)) {
-      return 'Healthcare';
-    }
-    
-    // Retail
-    if (/\b(retail|store|shop|market|outlet|merchandise|boutique)\b/i.test(name)) {
-      return 'Retail';
-    }
-    
-    // Logistics/Transportation
-    if (/\b(logistics|transportation|warehouse|shipping|freight|delivery|distribution|trucking)\b/i.test(name)) {
-      return 'Logistics';
-    }
-    
-    // Data Center
-    if (/\b(data\s*center|datacenter|server|hosting|cloud|colo)\b/i.test(name)) {
-      return 'DataCenter';
-    }
-    
-    // Nonprofit
-    if (/\b(nonprofit|non-profit|charity|foundation|501c3|501\(c\)\(3\))\b/i.test(name)) {
-      return 'Nonprofit';
-    }
-    
-    return '';
-  }
-
-  /**
-   * Helper: Infer industry from account description
-   */
-  function inferIndustryFromDescription(description) {
-    if (!description) return '';
-    
-    const desc = String(description).toLowerCase();
-    
-    // Hospitality
-    if (/\b(hotel|inn|motel|resort|lodge|accommodation|hospitality|guest|room|booking|stay)\b/i.test(desc)) {
-      return 'Hospitality';
-    }
-    
-    // Restaurant/Food
-    if (/\b(restaurant|cafe|dining|food|beverage|menu|cuisine|chef)\b/i.test(desc)) {
-      return 'Hospitality';
-    }
-    
-    // Manufacturing
-    if (/\b(manufacturing|production|factory|plant|industrial|assembly|fabrication)\b/i.test(desc)) {
-      return 'Manufacturing';
-    }
-    
-    // Healthcare
-    if (/\b(hospital|clinic|medical|healthcare|patient|treatment|diagnosis|surgery)\b/i.test(desc)) {
-      return 'Healthcare';
-    }
-    
-    // Retail
-    if (/\b(retail|store|merchandise|shopping|customer|product|sale)\b/i.test(desc)) {
-      return 'Retail';
-    }
-    
-    // Logistics
-    if (/\b(logistics|warehouse|shipping|distribution|freight|transportation|delivery)\b/i.test(desc)) {
-      return 'Logistics';
-    }
-    
-    // Data Center
-    if (/\b(data\s*center|server|hosting|cloud|infrastructure|computing)\b/i.test(desc)) {
-      return 'DataCenter';
-    }
-    
-    // Nonprofit
-    if (/\b(nonprofit|charity|foundation|mission|donation|volunteer)\b/i.test(desc)) {
-      return 'Nonprofit';
-    }
-    
-    return '';
-  }
-
-  /**
-   * Normalize industry name to match RANDOMIZED_ANGLES_BY_INDUSTRY keys
-   */
-  function normalizeIndustry(industry) {
-    if (!industry) return 'Default';
-    
-    const normalized = String(industry).trim();
-    
-    // Industry mapping for common variations
-    const industryMap = {
-      'Transportation and Warehousing': 'Logistics',
-      'Transportation': 'Logistics',
-      'Warehousing': 'Logistics',
-      'Logistics and Supply Chain': 'Logistics',
-      'Supply Chain': 'Logistics',
-      'Manufacturing': 'Manufacturing',
-      'Manufacturer': 'Manufacturing',
-      'Industrial': 'Manufacturing',
-      'Nonprofit': 'Nonprofit',
-      'Non-Profit': 'Nonprofit',
-      'Charity': 'Nonprofit',
-      'Foundation': 'Nonprofit',
-      '501(c)(3)': 'Nonprofit',
-      'Healthcare': 'Healthcare',
-      'Hospital': 'Healthcare',
-      'Medical': 'Healthcare',
-      'Data Center': 'DataCenter',
-      'DataCentre': 'DataCenter',
-      'Retail': 'Retail',
-      'Retail Trade': 'Retail',
-      'Hospitality': 'Hospitality',
-      'Hotel': 'Hospitality',
-      'Hotels': 'Hospitality',
-      'Restaurant': 'Hospitality',
-      'Restaurants': 'Hospitality',
-      'Food Service': 'Hospitality',
-      'Food & Beverage': 'Hospitality',
-      'Food and Beverage': 'Hospitality',
-      'Accommodation': 'Hospitality',
-      'Lodging': 'Hospitality',
-      'Resort': 'Hospitality',
-      'Resorts': 'Hospitality',
-    };
-    
-    // Check exact match first
-    if (industryMap[normalized]) {
-      return industryMap[normalized];
-    }
-    
-    // Check partial match (case-insensitive)
-    const normalizedLower = normalized.toLowerCase();
-    for (const [key, value] of Object.entries(industryMap)) {
-      if (normalizedLower.includes(key.toLowerCase()) || key.toLowerCase().includes(normalizedLower)) {
-        return value;
-      }
-    }
-    
-    // Check if it matches any key in RANDOMIZED_ANGLES_BY_INDUSTRY directly
-    if (window.RANDOMIZED_ANGLES_BY_INDUSTRY[normalized]) {
-      return normalized;
-    }
-    
-    // Default fallback - use generic angles that work for any industry
-    return 'Default';
-  }
-
-  /**
-   * Select randomized angle based on industry weights
-   */
-  function selectRandomizedAngle(industry, manualAngleOverride, accountData) {
-    // STEP 1: If user manually specified an angle, ALWAYS use it (respect user intent)
-    if (manualAngleOverride) {
-      return findAngleById(manualAngleOverride, industry);
-    }
-    
-    // STEP 1.5: Normalize industry name
-    const normalizedIndustry = normalizeIndustry(industry);
-    
-    // STEP 2: Get angles for this industry
-    const industryAngles = window.RANDOMIZED_ANGLES_BY_INDUSTRY[normalizedIndustry];
-    if (!industryAngles || !industryAngles.angles.length) {
-      // Fallback to generic angles
-      return {
-        id: 'timing_strategy',
-        primaryMessage: 'strategic contract timing',
-        openingTemplate: 'When does your contract renew?',
-        primaryValue: '8-15% savings from early renewal',
-        newsHooks: [],
-      };
-    }
-    
-    // STEP 3: Filter angles (check conditions)
-    let validAngles = industryAngles.angles.filter(angle => {
-      if (angle.condition) {
-        // Check if condition passes (e.g., "taxExemptStatus === 'Nonprofit'")
-        try {
-          // Replace accountData references in condition string
-          const conditionCode = angle.condition.replace(/accountData\?\./g, 'accountData?.');
-          // Create safe evaluation context - accountData might be recipient object
-          const accountDataSafe = accountData || {};
-          // If accountData is recipient object, extract account info for easier condition checking
-          if (accountDataSafe.account) {
-            accountDataSafe.industry = accountDataSafe.industry || accountDataSafe.account.industry || '';
-            accountDataSafe.taxExemptStatus = accountDataSafe.taxExemptStatus || accountDataSafe.account.taxExemptStatus || '';
-          }
-          return eval(conditionCode);
-        } catch (e) {
-          console.warn('[Angle Selection] Condition evaluation failed:', e);
-          return false;
-        }
-      }
-      return true;
-    });
-    
-    // STEP 4: Randomize based on weights
-    if (validAngles.length === 0) {
-      // If no valid angles after filtering, fall back to timing_strategy only
-      console.warn('[Angle Selection] No valid angles after filtering, using timing_strategy fallback');
-      return {
-        id: 'timing_strategy',
-        primaryMessage: 'strategic contract timing',
-        openingTemplate: 'When does your contract renew?',
-        primaryValue: '8-15% savings from early renewal',
-        situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
-        newsHooks: [],
-      };
-    }
-    
-    return randomizeByWeight(validAngles);
-  }
-
-  /**
-   * Find angle by ID
-   */
-  function findAngleById(angleId, industry) {
-    const normalizedIndustry = normalizeIndustry(industry);
-    const industryAngles = window.RANDOMIZED_ANGLES_BY_INDUSTRY[normalizedIndustry];
-    if (!industryAngles) return null;
-    return industryAngles.angles.find(a => a.id === angleId) || null;
-  }
-
-  /**
-   * Select random authentic tone opener
-   */
-  function selectRandomToneOpener(angleId = null) {
-    // Combine both disarming and observation openers for more variety
-    const allOpeners = [
-      ...window.AUTHENTIC_TONE_OPENERS.disarming,
-      ...window.AUTHENTIC_TONE_OPENERS.observation
-    ];
-    return allOpeners[Math.floor(Math.random() * allOpeners.length)];
-  }
-
-  /**
-   * Helper: Detect if user's manual input specifies a different angle
-   */
-  function detectAngleFromInput(manualInput) {
-    if (!manualInput) return null;
-    const input = manualInput.toLowerCase();
-    
-    // Pattern matching for user intent
-    if (input.includes('exemption') || input.includes('tax recovery')) {
-      return 'exemption_recovery';
-    }
-    if (input.includes('demand') || input.includes('efficiency') || input.includes('consumption')) {
-      return 'demand_efficiency';
-    }
-    if (input.includes('timing') || input.includes('early renewal') || input.includes('renewal')) {
-      return 'timing_strategy';
-    }
-    if (input.includes('consolidat') || input.includes('multiple') || input.includes('multi-site')) {
-      return 'consolidation';
-    }
-    if (input.includes('mission') || input.includes('nonprofit')) {
-      return 'mission_funding';
-    }
-    
-    return null; // No specific angle detected
-  }
-
-  /**
-   * Helper: Build news context (if applicable)
-   */
-  function buildNewsContext(newsHooks, selectedAngle) {
-    if (!newsHooks || newsHooks.length === 0) return '';
-    
-    // Note: This would integrate with a MARKET_CONTEXT object if available
-    // For now, return empty string as news hooks are optional
-    return '';
-  }
-
-  /**
-   * Dynamic prompt builder that respects:
-   * 1. Manual angle override (if user types specific angle)
-   * 2. Authentic tone (matches your personality)
-   * 3. Account data (news, industry triggers)
-   * 4. News context (integrated naturally, not forced)
-   */
-  function buildDynamicPrompt(
-    contact,
-    account,
-    selectedAngle,
-    manualPromptOverride = null,
-    newsHooks = null
-  ) {
-    // STEP 1: If user provided manual prompt override, use it as context (don't force angle)
-    if (manualPromptOverride && manualPromptOverride.trim().length > 0) {
-      return buildManualPrompt(
-        contact,
-        account,
-        selectedAngle,
-        manualPromptOverride
-      );
-    }
-    
-    // STEP 2: Otherwise, build dynamic prompt based on selected angle
-    const toneOpener = selectRandomToneOpener(selectedAngle?.id);
-    
-    const prompt = `
-Write a cold introduction email that MUST:
-
-1. GREETING (RANDOMIZE FOR VARIETY)
-   - RANDOMLY choose ONE of these greetings:
-     * "Hi ${contact?.firstName || '[contact_first_name]'},"
-     * "Hey ${contact?.firstName || '[contact_first_name]'},"
-     * "Hello ${contact?.firstName || '[contact_first_name]'},"
-   - DO NOT use "Hi [contact_first_name] there," or add extra words
-
-2. OPEN WITH OBSERVATION (CRITICAL - MUST USE RESEARCH)
-   - YOU MUST reference something SPECIFIC about ${account?.name || '[contact_company]'} that proves you researched them
-   - REQUIRED: Include at least ONE of these research elements (reference naturally WITHOUT saying "I noticed" or "I saw"):
-     * Location/facility details: "${account?.name || '[contact_company]'} operates in ${account?.city || '[city]'}, ${account?.state || '[state]'}..." or "With operations in ${account?.city || '[city]'}..." or "With [X] facilities in ${account?.state || '[state]'}..."
-     * Recent activity from LinkedIn: Reference naturally, e.g., "${account?.name || '[contact_company]'} recently..." (if available)
-     * Website insight: Reference naturally, e.g., "On your website..." or "Your website mentions..." (if available)
-     * Industry pattern with peer context: "I've been talking to ${contact?.role || '[role]'}s across ${account?.state || '[state]'}, and..."
-   - NEVER: "I noticed...", "I saw...", "I hope you're well", "I wanted to reach out", "I hope this email finds you well", "Let me ask you something—" (unless you actually ask a question immediately after)
-   - MUST: Prove you researched - include specific details (location, facility size, operations type, operational model) - but weave it in naturally
-   - CRITICAL: If you use "Let me ask you something—" or similar openers, you MUST immediately follow with an actual question. Never use these phrases without asking a question.
-
-3. ACKNOWLEDGE THEIR SITUATION (ROLE-SPECIFIC)
-   - For ${contact?.role || contact?.title || '[contact_job_title]'}: Show you understand what they actually deal with daily
-   - For ${account?.industry || '[company_industry]'}: Reference industry-specific pain points naturally (not generic)
-   - Use their role language (CFOs care about predictability/budgets, Operations care about uptime/reliability)
-   - Make it about THEM, not about us (don't lead with "We help...")
-
-4. ONE INSIGHT (SPECIFIC, NOT GENERIC)
-   - Provide ONE concrete observation about why this matters to them NOW
-   - Use SPECIFIC numbers and timing: "6 months early = 10-20% savings" NOT "thousands annually"
-   - NOT: "Companies save 10-20%" (too generic)
-   - YES: "With 4 facilities in Texas, timing is critical - locking in 6 months out vs 90 days is usually 10-20% difference"
-   - Include timing context: early renewal (6 months) vs late (90 days) = money difference
-   - CRITICAL: Mention the 10-20% savings figure ONLY ONCE in the entire email - do not repeat it multiple times
-   - Use "10-20%" NOT "15-20%" or "15-25%" - be consistent with the 10-20% range
-   - SELECTED ANGLE: ${selectedAngle?.primaryMessage || 'strategic contract timing'}
-   - ANGLE VALUE: ${selectedAngle?.primaryValue || '10-20% savings from early renewal'}
-
-5. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
-   - Write like a peer, not a salesperson (conversational, confident, direct)
-   - Use contractions: "we're," "don't," "it's," "you're," "I'm"
-   - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
-   - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "procurement," "unleash," "synergy," "dive into," "solution," "at Power Choosers"
-   - Sound like: colleague who knows their industry and has talked to others like them
-   - Use casual confidence: "Been wondering—" "Question for you—" "Here's what I'm seeing—"
-   - NEVER: "Quick question—", "Real question—", "Out of curiosity—", "Let me ask you something—" (unless immediately followed by an actual question)
-   - NO: "Would you be open to..." (permission-based, weak)
-   - YES: Ask specific questions that assume conversation is happening
-   - CRITICAL: If you use any question opener like "Let me ask you something—", you MUST immediately follow with an actual question. Never use these phrases without asking a question.
-   - Opening tone suggestion: "${toneOpener}" (use naturally, not forced)
-
-6. CALL TO ACTION (ASSERTIVE, NOT PERMISSION-BASED)
-   - MUST: Assume the conversation is happening - don't ask for permission to talk
-   - NO: "Would you be open to a conversation?", "Let's schedule a call", "If you ever want a second opinion on your setup, I can spend 10 minutes looking at your situation."
-   - YES: Ask specific question about their contract, timing, or process
-   - The CTA MUST be a direct question that relates to the email body and selected angle
-   - Use angle opening template as inspiration: "${selectedAngle?.openingTemplate || 'When does your current electricity contract expire?'}"
-   - Exactly ONE question mark (?) in the entire email
-
-7. SUBJECT LINE (SPECIFIC, NOT VAGUE)
-   - MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
-   - Examples: "${contact?.firstName || '[FirstName]'}, contract timing question" or "${contact?.firstName || '[FirstName]'}, rate lock timing question"
-   - NOT generic: "thoughts on energy planning" or "insight to ease costs" or "thoughts on energy strategy"
-   - Focus on: contract renewal, rate lock timing, budget cycle, facility renewal
-   - Role-specific: For Controllers/CFO: "budget question about energy renewal timing"
-   - For Operations/Facilities: "facility renewal timing question"
-
-8. FORMAT
-   - 100-130 words max (scannable, not overwhelming)
-   - 2-3 short paragraphs (break up visually)
-   - Scannable on mobile (short lines, clear breaks)
-   - One CTA at end (a direct question related to the angle)
-
-9. PERSONALIZATION
-   - Include ${contact?.firstName || '[contact_first_name]'} naturally in randomized greeting
-   - Reference ${account?.name || '[company_name]'} specifically (not "your company")
-   - For ${account?.industry || '[company_industry]'}, use industry-specific language naturally
-   - Reference location if available (${account?.city || '[city]'}, ${account?.state || '[state]'}) for regional context
-
-10. PROOF OF RESEARCH
-   - Include at least ONE specific detail that proves you researched (not just role description)
-   - Examples: "4 locations across Texas," "24/7 operations," "both electricity and natural gas"
-   - This makes you stand out from generic templates
-
-ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should sound like their peer—a 29-year-old Texas business pro who knows the industry and has talked to others in their situation. Be conversational, confident, and direct.
-
-Generate ONLY email body (no signature, no HTML).
-    `.trim();
-    
-    return prompt;
-  }
-
-  /**
-   * Handle manual prompt overrides (user typed specific context)
-   * This respects the user's intent while using the selected angle
-   */
-  function buildManualPrompt(contact, account, selectedAngle, manualInput) {
-    // Check if manual input mentions a specific angle or instruction
-    const manualAngle = detectAngleFromInput(manualInput);
-    const finalAngle = manualAngle ? findAngleById(manualAngle, account?.industry) : selectedAngle;
-    const toneOpener = selectRandomToneOpener(finalAngle?.id);
-    
-    const prompt = `
-Write a cold introduction email that MUST:
-
-1. GREETING (RANDOMIZE FOR VARIETY)
-   - RANDOMLY choose ONE of these greetings:
-     * "Hi ${contact?.firstName || '[contact_first_name]'},"
-     * "Hey ${contact?.firstName || '[contact_first_name]'},"
-     * "Hello ${contact?.firstName || '[contact_first_name]'},"
-   - DO NOT use "Hi [contact_first_name] there," or add extra words
-
-2. OPEN WITH OBSERVATION (CRITICAL - MUST USE RESEARCH)
-   - YOU MUST reference something SPECIFIC about ${account?.name || '[contact_company]'} that proves you researched them
-   - REQUIRED: Include at least ONE of these research elements (reference naturally WITHOUT saying "I noticed" or "I saw"):
-     * Location/facility details: "${account?.name || '[contact_company]'} operates in ${account?.city || '[city]'}, ${account?.state || '[state]'}..." or "With operations in ${account?.city || '[city]'}..."
-     * Recent activity from LinkedIn: Reference naturally, e.g., "${account?.name || '[contact_company]'} recently..." (if available)
-     * Website insight: Reference naturally, e.g., "On your website..." or "Your website mentions..." (if available)
-     * Industry pattern with peer context: "I've been talking to ${contact?.role || '[role]'}s across ${account?.state || '[state]'}, and..."
-   - NEVER: "I noticed...", "I saw...", "I hope you're well", "I wanted to reach out", "I hope this email finds you well", "Let me ask you something—" (unless you actually ask a question immediately after)
-   - MUST: Prove you researched - include specific details (location, facility size, operations type, operational model) - but weave it in naturally
-   - CRITICAL: If you use "Let me ask you something—" or similar openers, you MUST immediately follow with an actual question. Never use these phrases without asking a question.
-
-3. ACKNOWLEDGE THEIR SITUATION (ROLE-SPECIFIC)
-   - For ${contact?.role || contact?.title || '[contact_job_title]'}: Show you understand what they actually deal with daily
-   - For ${account?.industry || '[company_industry]'}: Reference industry-specific pain points naturally (not generic)
-   - Use their role language (CFOs care about predictability/budgets, Operations care about uptime/reliability)
-   - Make it about THEM, not about us (don't lead with "We help...")
-
-4. ONE INSIGHT (SPECIFIC, NOT GENERIC)
-   - Provide ONE concrete observation about why this matters to them NOW
-   - Use SPECIFIC numbers and timing: "6 months early = 10-20% savings" NOT "thousands annually"
-   - NOT: "Companies save 10-20%" (too generic)
-   - YES: "With 4 facilities in Texas, timing is critical - locking in 6 months out vs 90 days is usually 10-20% difference"
-   - Include timing context: early renewal (6 months) vs late (90 days) = money difference
-   - CRITICAL: Mention the 10-20% savings figure ONLY ONCE in the entire email - do not repeat it multiple times
-   - Use "10-20%" NOT "15-20%" or "15-25%" - be consistent with the 10-20% range
-   - PRIMARY ANGLE (use if relevant): ${finalAngle?.primaryMessage || 'their energy situation'}
-   - ANGLE VALUE: ${finalAngle?.primaryValue || 'observation-based value with specific numbers'}
-
-5. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
-   - Write like a peer, not a salesperson (conversational, confident, direct)
-   - Use contractions: "we're," "don't," "it's," "you're," "I'm"
-   - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
-   - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "procurement," "unleash," "synergy," "dive into," "solution," "at Power Choosers"
-   - Sound like: colleague who knows their industry and has talked to others like them
-   - Use casual confidence: "Been wondering—" "Question for you—" "Here's what I'm seeing—"
-   - NEVER: "Quick question—", "Real question—", "Out of curiosity—", "Let me ask you something—" (unless immediately followed by an actual question)
-   - NO: "Would you be open to..." (permission-based, weak)
-   - YES: Ask specific questions that assume conversation is happening
-   - CRITICAL: If you use any question opener like "Let me ask you something—", you MUST immediately follow with an actual question. Never use these phrases without asking a question.
-   - Opening tone suggestion: "${toneOpener}" (use naturally, not forced)
-
-6. CALL TO ACTION (ASSERTIVE, NOT PERMISSION-BASED)
-   - MUST: Assume the conversation is happening - don't ask for permission to talk
-   - NO: "Would you be open to a conversation?", "Let's schedule a call", "If you ever want a second opinion on your setup, I can spend 10 minutes looking at your situation."
-   - YES: Ask specific question about their contract, timing, or process
-   - The CTA MUST be a direct question that relates to the email body and selected angle
-   - Exactly ONE question mark (?) in the entire email
-
-7. SUBJECT LINE (SPECIFIC, NOT VAGUE)
-   - MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
-   - Examples: "${contact?.firstName || '[FirstName]'}, contract timing question" or "${contact?.firstName || '[FirstName]'}, rate lock timing question"
-   - NOT generic: "thoughts on energy planning" or "insight to ease costs" or "thoughts on energy strategy"
-   - Focus on: contract renewal, rate lock timing, budget cycle, facility renewal
-
-8. FORMAT
-   - 100-130 words max (scannable, not overwhelming)
-   - 2-3 short paragraphs (break up visually)
-   - Scannable on mobile (short lines, clear breaks)
-   - One CTA at end (a direct question related to the angle)
-
-9. PERSONALIZATION
-   - Include ${contact?.firstName || '[contact_first_name]'} naturally in randomized greeting
-   - Reference ${account?.name || '[company_name]'} specifically (not "your company")
-   - For ${account?.industry || '[company_industry]'}, use industry-specific language naturally
-   - Reference location if available (${account?.city || '[city]'}, ${account?.state || '[state]'}) for regional context
-
-10. PROOF OF RESEARCH
-   - Include at least ONE specific detail that proves you researched (not just role description)
-   - Examples: "4 locations across Texas," "24/7 operations," "both electricity and natural gas"
-   - This makes you stand out from generic templates
-
-USER CONTEXT (RESPECT THIS INTENT):
-${manualInput}
-
-ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should sound like their peer—a 29-year-old Texas business pro who knows the industry and has talked to others in their situation. Be conversational, confident, and direct. Respect the user's intent from manual context while following all the rules above.
-
-Generate ONLY email body (no signature, no HTML).
-    `.trim();
-    
-    return prompt;
-  }
-
   async function generateWithAI(aiBar, mode = 'standard') {
     const compose = document.getElementById('compose-window');
     const editor = compose?.querySelector('.body-input');
@@ -3364,78 +2627,36 @@ Generate ONLY email body (no signature, no HTML).
         console.warn('[AI] Failed to lookup recipient:', error);
       }
 
-      // Get sender name from settings (only thing we need from settings)
+      // Get settings once
       const settings = (window.SettingsPage?.getSettings?.()) || {};
       const g = settings?.general || {};
       const senderName = (g.firstName && g.lastName) 
         ? `${g.firstName} ${g.lastName}`.trim()
-        : 'Lewis Patterson';
+        : (g.agentName || 'Power Choosers Team');
 
-      // Hardcoded identity - focus on electricity only
-      const whoWeAre = 'You are an Energy Strategist at Power Choosers. You help businesses secure better electricity rates and manage energy procurement more effectively.';
+      // Get "who we are" information from settings
+      const aiTemplates = getAITemplatesFromSettings();
+      const whoWeAre = aiTemplates.who_we_are || 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.';
 
-      // Select randomized angle based on recipient industry (with inference fallbacks)
-      let recipientIndustry = recipient?.industry || recipient?.account?.industry || '';
-      
-      // If no industry field, infer from company name
-      if (!recipientIndustry && recipient?.company) {
-        recipientIndustry = inferIndustryFromCompanyName(recipient.company);
-      }
-      
-      // If still no industry, try to infer from account description
-      if (!recipientIndustry && recipient?.account) {
-        const accountDesc = recipient.account?.shortDescription || recipient.account?.short_desc || 
-                           recipient.account?.descriptionShort || recipient.account?.description || 
-                           recipient.account?.companyDescription || recipient.account?.accountDescription || '';
-        if (accountDesc) {
-          recipientIndustry = inferIndustryFromDescription(accountDesc);
-        }
-      }
-      
-      // Fallback to Default if still no industry detected
-      if (!recipientIndustry) {
-        recipientIndustry = 'Default';
-      }
-      
-      const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient);
-      const toneOpener = selectRandomToneOpener();
-
-      console.log('[AI] Selected angle:', selectedAngle?.id, 'for industry:', recipientIndustry);
-      console.log('[AI] Using tone opener:', toneOpener);
-
-      // Build comprehensive prompt using the prompt builders (enhances user's input with all rules)
-      const contact = {
-        firstName: recipient?.firstName || recipient?.name?.split(' ')[0] || '',
-        role: recipient?.title || recipient?.job || recipient?.role || '',
-        title: recipient?.title || recipient?.job || recipient?.role || ''
-      };
-      const account = recipient?.account || {
-        name: recipient?.company || '',
-        industry: recipient?.industry || recipient?.account?.industry || '',
-        city: recipient?.account?.city || '',
-        state: recipient?.account?.state || ''
-      };
-      
-      // Use buildDynamicPrompt or buildManualPrompt to enhance the user's prompt
-      const enhancedPrompt = prompt.trim().length > 0
-        ? buildManualPrompt(contact, account, selectedAngle, prompt)
-        : buildDynamicPrompt(contact, account, selectedAngle, null, null);
-
-      console.log('[AI] Using enhanced prompt with comprehensive rules');
+      // Get industry segmentation from settings
+      const industrySegmentation = settings?.industrySegmentation || null;
 
       // Call the API
       const response = await fetch(genUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: enhancedPrompt,
+          prompt: prompt,
           recipient: recipient,
           mode: mode,
           senderName: senderName,
           whoWeAre: whoWeAre,
-          // Pass selected angle and tone
-          selectedAngle: selectedAngle,
-          toneOpener: toneOpener
+          // NEW: Pass market context
+          marketContext: aiTemplates.marketContext,
+          // NEW: Pass meeting preferences
+          meetingPreferences: aiTemplates.meetingPreferences,
+          // NEW: Pass industry segmentation
+          industrySegmentation: industrySegmentation
         })
       });
 
@@ -4374,7 +3595,7 @@ Generate ONLY email body (no signature, no HTML).
     </div>
     <div class="solution-box">
       <h3>✓ How Power Choosers Helps</h3>
-      <p>${data.value_proposition || (industry ? `Most ${industry} companies like ${company} see 10-20% savings through competitive procurement. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>` : 'Most businesses see 10-20% savings through competitive procurement and efficiency solutions. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>')}</p>
+      <p>${data.value_proposition || (industry ? `We help ${industry} companies like ${company} reduce energy costs through competitive procurement. Our team handles the entire process—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>` : 'We help businesses like yours reduce energy costs through competitive procurement and efficiency solutions. Our team handles the entire process—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>')}</p>
       ${valueProps.length > 0 ? `
       <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #d1fae5;">
         <ul style="margin: 0; padding-left: 20px; list-style: none;">
@@ -4579,8 +3800,8 @@ Generate ONLY email body (no signature, no HTML).
     const displaySubject = simplifySubject(data.subject);
     
     const sections = data.sections || [
-      'Most facilities see 10-20% savings when securing rates early, before typical renewal windows',
-      'Supplier negotiations and contract reviews handled at no cost to you',
+      'We\'ve secured exclusive rates for facilities that are 15-25% below typical renewal offers',
+      'Our team handles all supplier negotiations and contract reviews at no cost to you',
       'You maintain complete control and transparency throughout the entire process',
       'Early action now protects you from anticipated rate increases'
     ];
@@ -4645,7 +3866,7 @@ Generate ONLY email body (no signature, no HTML).
     <div class="subject-blurb">${displaySubject}</div>
     <div class="intro">
       <p>${data.greeting || `Hi ${firstName},`}</p>
-      <p>${data.opening_paragraph || `Been wondering—when does ${company}'s energy contract renew?`}</p>
+      <p>${data.opening_paragraph || `I wanted to reach out about an interesting opportunity for ${company}.`}</p>
     </div>
     <div class="info-list">
       <strong>${data.list_header || 'How We Can Help:'}</strong>
