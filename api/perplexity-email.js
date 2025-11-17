@@ -1330,7 +1330,7 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
       return operationsPatterns[Math.floor(Math.random() * operationsPatterns.length)];
     }
     
-    // Generic qualifying patterns (fallback)
+    // Generic qualifying patterns (fallback) - REDUCED WEIGHT for contract expire to increase variety
     const patterns = [
       {
         type: 'contract_timing',
@@ -1358,14 +1358,24 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
         guidance: 'Timing and urgency qualification'
       },
       {
+        type: 'renewal_process',
+        template: 'When you renew, do you shop around or just renew what you had?',
+        guidance: 'Renewal process question'
+      },
+      {
+        type: 'early_lock_in',
+        template: 'Are you locking in early or waiting closer to expiration?',
+        guidance: 'Early lock-in strategy question'
+      },
+      {
         type: 'industry_specific',
         template: `How is ${recipient?.company || 'your company'} approaching energy cost management for 2025?`,
         guidance: 'Company-specific strategic question'
       }
     ];
     
-    // Updated weights for new qualifying-focused patterns
-    const weights = [0.25, 0.20, 0.15, 0.15, 0.15, 0.10];
+    // Updated weights - REDUCED contract_timing weight from 0.25 to 0.10 to increase variety
+    const weights = [0.10, 0.15, 0.15, 0.15, 0.15, 0.15, 0.10, 0.05];
     const random = Math.random();
     let cumulative = 0;
     
@@ -1497,7 +1507,7 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
     return operationsPatterns[Math.floor(Math.random() * operationsPatterns.length)];
   }
   
-  // Generic qualifying patterns (fallback)
+  // Generic qualifying patterns (fallback) - REDUCED WEIGHT for contract expire to increase variety
   const patterns = [
     {
       type: 'contract_timing',
@@ -1525,14 +1535,24 @@ function getCTAPattern(recipient, meetingPreferences = null, templateType = null
       guidance: 'Timing and urgency qualification'
     },
     {
+      type: 'renewal_process',
+      template: 'When you renew, do you shop around or just renew what you had?',
+      guidance: 'Renewal process question'
+    },
+    {
+      type: 'early_lock_in',
+      template: 'Are you locking in early or waiting closer to expiration?',
+      guidance: 'Early lock-in strategy question'
+    },
+    {
       type: 'industry_specific',
       template: `How is ${recipient?.company || 'your company'} approaching energy cost management for 2025?`,
       guidance: 'Company-specific strategic question'
     }
   ];
   
-  // Updated weights for new qualifying-focused patterns
-  const weights = [0.25, 0.20, 0.15, 0.15, 0.15, 0.10];
+  // Updated weights - REDUCED contract_timing weight from 0.25 to 0.10 to increase variety
+  const weights = [0.10, 0.15, 0.15, 0.15, 0.15, 0.15, 0.10, 0.05];
   const random = Math.random();
   let cumulative = 0;
   
@@ -2578,7 +2598,7 @@ ${toneOpener ? `- REQUIRED OPENER: MUST use ` + JSON.stringify(toneOpener) + ` o
 - AVOID CORPORATE JARGON: NO "streamline", "optimize" (as verbs), "leverage", "stabilize expenses", "demanding", "procurement", "unleash", "synergy". Use plain language instead: "simplify", "improve", "manage better". Say "energy renewals" or "energy contracts" not "energy procurement"
 - NO GENERIC STATEMENTS: Never say obvious things like "energy costs are likely a significant expense" or "with facilities demanding steady energy"
 - Be specific but not creepy: Reference industry patterns, not exact employee counts or sq ft
-${accountDescription ? '- CONTEXT (DO NOT COPY): You researched and learned: ' + accountDescription.substring(0, 80) + '... Use this to understand their business, but reference their operations naturally, not as a factoid. Example: Instead of stating what they do, reference their operational reality (e.g., "With production running 24/7..." or "Managing multiple locations...")' : ''}
+${accountDescription ? '- CONTEXT (use for question generation, NOT as bio): You researched: ' + accountDescription.substring(0, 80) + '... Use this ONLY to: (1) understand their operations, (2) generate relevant questions about their situation, (3) reference operations naturally. DO NOT copy-paste or use like Wikipedia bio. Example: Instead of stating what they do, use it to generate questions (e.g., "With production running 24/7, how do you manage energy costs?" or "Managing multiple locations, are they all on different renewal schedules?")' : ''}
 ${company ? '- Reference ' + company + ' by name naturally' : ''}
 
 EMAIL RULES:
@@ -2820,6 +2840,7 @@ CRITICAL QUALITY RULES:
     ✗ "Hope this email finds you well..." (generic greeting)
     ✗ "Out of curiosity—" or "Quick one—" (AI patterns)
   - REQUIRED: ${toneOpener ? `MUST start with ` + JSON.stringify(toneOpener) + ` or similar natural variation (e.g., "Been wondering—", "Here's what I'm seeing—", "Question for you—", "Let me ask you something—")` : `Use authentic, conversational opener like "Been wondering—", "Here's what I'm seeing—", "Question for you—", "Let me ask you something—"`}
+  - CRITICAL RULE FOR QUESTION OPENERS: If you use "Let me ask you something—", "Question for you—", "Been wondering—", or any similar question opener, you MUST IMMEDIATELY follow with an actual question. NEVER use these phrases without asking a question in the same sentence or immediately after. Example: "Let me ask you something—are you locking in early or waiting closer to expiration?" (GOOD) vs "Let me ask you something—[company] operates in [location]..." (BAD - no question)
   - DO NOT use generic market statistics like "rates rising 15-25%" or "15-25% rate increases" (NEVER mention these percentages)
   - DO NOT mention "data center demand" or generic rate increases
   - Focus ONLY on ${company}'s specific situation, industry challenges they face, or operational details
@@ -2831,7 +2852,7 @@ CRITICAL QUALITY RULES:
 - COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
 - QUALIFYING CTAs: Prefer questions over meeting requests for cold emails
 - SOCIAL PROOF: Use real outcomes when mentioning similar companies
-- USE ACCOUNT DESCRIPTION FOR CONTEXT: ${accountDescription ? 'You know from research that: ' + accountDescription + '. Use this CONTEXT to understand their business, but DO NOT copy-paste this description. Instead, show you understand their operations naturally (e.g., "With your production facilities..." or "Managing energy for a facility like yours...")' : 'Reference their specific business based on industry'}
+- USE ACCOUNT DESCRIPTION FOR CONTEXT (NOT AS BIO): ${accountDescription ? 'You researched: ' + accountDescription + '. Use this ONLY to understand their operations and generate relevant questions. DO NOT copy-paste this description or use it like a Wikipedia bio. Instead, use it to: (1) understand their operational context, (2) generate specific questions about their situation, (3) reference their operations naturally (e.g., "With your production facilities..." or "Managing energy for a facility like yours..."). NEVER state what they do like a factoid or bio entry.' : 'Reference their specific business based on industry'}
 - NATURAL LANGUAGE: Write like a real person researching their company
 - COMPANY NAME: Use "${company}" naturally (use the SHORT form, not full legal names like "Corporation" or "Inc." unless that's how they're commonly known). Reference them specifically, never mention other companies by name.
 - NO SIZE ASSUMPTIONS: NEVER use "small company", "small business", "as a small company", "as a small business", "limited resources" - these can insult business owners. Use role/industry focus instead: Reference their role naturally (e.g., "For CFOs like you...") or "As a ${industry} company", "companies in ${industry}". NEVER use "As [Role] of [Company]..." - that's corporate speak. Only use "large" if you have clear evidence it's a large enterprise.
@@ -2854,7 +2875,7 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - ${selectedAngle ? `Focus on: ${selectedAngle.primaryMessage}` : 'Focus on their energy situation'}
 - Use natural, conversational language: ${toneOpener ? JSON.stringify(toneOpener) : `"Let me ask you something—"`} followed by ${selectedAngle ? selectedAngle.openingTemplate : 'a direct question'}
 - Reference context naturally WITHOUT saying "I noticed" or "I saw":
-  * ${accountDescription ? 'CONTEXT (use for understanding, not quoting): ' + accountDescription.substring(0, 80) + '... Show you understand their operations without stating what they do like a Wikipedia entry' : 'Reference their business type naturally'}
+  * ${accountDescription ? 'CONTEXT (use for question generation, NOT as bio): ' + accountDescription.substring(0, 80) + '... Use this ONLY to understand their operations and generate relevant questions. DO NOT copy-paste or use like Wikipedia bio. Show understanding through questions about their situation, not by stating what they do' : 'Reference their business type naturally'}
   * ${recentActivityContext ? 'Mention: ' + recentActivityContext.substring(0, 60) + '... naturally' : 'Reference industry trends naturally'}
   * ${contractEndLabel ? 'Use: "With your contract ending ' + contractEndLabel + '..." naturally' : 'Reference their energy situation naturally'}
 - Use natural transitions: "Here's the thing...", "Given that...", "Most teams I talk to...", "Here's what typically happens..."
@@ -2867,7 +2888,7 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\'ve likely seen..." (tenure available)' : ''}
 
 EVIDENCE OF RESEARCH (Show You Know Their Business - Reference Naturally, NOT "I noticed"):
-${accountDescription ? '✓ CONTEXT (do not copy-paste): From research you know: ' + accountDescription.substring(0, 100) + '... Use this to understand their business. Show understanding through operational references, not by stating what they do' : ''}
+${accountDescription ? '✓ CONTEXT (use for question generation, NOT as bio): From research: ' + accountDescription.substring(0, 100) + '... Use this ONLY to: (1) understand their operations, (2) generate relevant questions about their situation, (3) reference operations naturally. DO NOT copy-paste or use like Wikipedia bio. Show understanding through operational references and questions, not by stating what they do' : ''}
 ${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements naturally' : ''}
 ${websiteContext ? '✓ Use website info: Reference naturally WITHOUT saying "I noticed" or "I saw"' : ''}
 ${recentActivityContext ? '✓ Use recent activity: Reference ' + recentActivityContext.substring(0, 60) + '... naturally' : ''}
@@ -2878,6 +2899,7 @@ CRITICAL: Use this research for CONTEXT to understand their business. DO NOT cop
 
 CONVERSATIONAL FLOW PATTERNS:
 ${toneOpener ? `✓ GOOD: ` + JSON.stringify(toneOpener) + `${selectedAngle ? ' ' + selectedAngle.openingTemplate : ' [direct question about their energy situation]'}` : `✓ GOOD: "Let me ask you something—[direct question about their energy situation]"`}
+✓ CRITICAL: If using question opener ("Let me ask you something—", "Question for you—", "Been wondering—"), you MUST immediately follow with an actual question. Example: "Let me ask you something—are you locking in early or waiting closer to expiration?" (GOOD) vs "Let me ask you something—[company] operates in [location]..." (BAD - no question)
 ✓ GOOD: "${toneOpener || 'Here\'s what I\'m seeing'}—${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
 ✓ GOOD: "Given your role as ${job || '[role]'}, you're probably dealing with ${roleContext?.painPoints[0] || '[pain point]'}. ${selectedAngle ? selectedAngle.primaryMessage : 'Here\'s what I\'ve found...'}"
 ✓ GOOD: "${industry || '[Industry]'} companies are facing [specific challenge]. ${company || '[Company]'} likely sees this in..."
@@ -2924,7 +2946,7 @@ OPENING (1-2 sentences):
 ${toneOpener ? `MUST START with: ` + JSON.stringify(toneOpener) : `Use authentic, natural opener (not "I wanted to reach out" or "Hope this email finds you well")`}
 ${selectedAngle ? `Focus on: ${selectedAngle.primaryMessage}` : 'Focus on their energy situation'}
 ${selectedAngle ? `Opening template: ${selectedAngle.openingTemplate}` : 'Start with a direct question about their energy situation'}
-${accountDescription ? `CONTEXT (for understanding only, do not insert): ${accountDescription.substring(0, 100)}... Use this context to understand their business, but reference their operations naturally without copying this description` : 'Reference their industry challenges'}
+${accountDescription ? `CONTEXT (use for question generation, NOT as bio): ${accountDescription.substring(0, 100)}... Use this ONLY to understand their operations and generate relevant questions. DO NOT copy-paste or use like Wikipedia bio. Reference their operations naturally to generate specific questions about their situation` : 'Reference their industry challenges'}
 CRITICAL: 
 - NO "I noticed..." bio openings (sounds like research, not authentic)
 - NO generic market statistics ("rates rising 15-25%", "data center demand")
@@ -3034,6 +3056,7 @@ TONE: Write like a 29-year-old Texas business pro - conversational, confident, d
 - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy"
 - Sound like: colleague who knows their industry and has talked to others like them
 - Use casual confidence: "Let me ask you something—" "Question for you—" "Been wondering—"
+- CRITICAL: If you use "Let me ask you something—" or similar question opener, you MUST immediately follow with an actual question. NEVER use these phrases without asking a question in the same sentence.
 `;
 
     return { 
