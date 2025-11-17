@@ -176,20 +176,84 @@ export default async function handler(req, res) {
           }
         }
         
-        // Generate email content using Perplexity API
-        const generatedContent = await generateEmailContent({
-          prompt: emailData.aiPrompt || 'Write a professional follow-up email',
-          contactName: contactData.firstName || contactData.name || emailData.contactName || 'there',
-          contactCompany: contactData.company || accountData.companyName || accountData.name || emailData.contactCompany || '',
-          contactRole: contactData.role || contactData.title || contactData.job || '',
-          accountIndustry: accountData.industry || contactData.industry || '',
-          accountData: accountData,
-          sequenceContext: {
-            stepNumber: (emailData.stepIndex || 0) + 1,
-            totalSteps: emailData.totalSteps || 1,
-            previousInteractions: previousEmails
+        // Detect industry and select angle (same logic as sequence-builder.js)
+        let recipientIndustry = accountData.industry || contactData.industry || '';
+        
+        // Infer industry from company name if not set
+        if (!recipientIndustry && emailData.contactCompany) {
+          recipientIndustry = inferIndustryFromCompanyName(emailData.contactCompany);
+        }
+        
+        // Infer from account description if still not set
+        if (!recipientIndustry && accountData) {
+          const accountDesc = accountData.shortDescription || accountData.short_desc || 
+                             accountData.descriptionShort || accountData.description || 
+                             accountData.companyDescription || accountData.accountDescription || '';
+          if (accountDesc) {
+            recipientIndustry = inferIndustryFromDescription(accountDesc);
           }
+        }
+        
+        // Default to 'Default' if no industry detected
+        if (!recipientIndustry) {
+          recipientIndustry = 'Default';
+        }
+        
+        // Select angle based on industry/role/exemption status
+        const recipient = {
+          firstName: contactData.firstName || contactData.name || emailData.contactName || 'there',
+          company: contactData.company || accountData.companyName || accountData.name || emailData.contactCompany || '',
+          title: contactData.role || contactData.title || contactData.job || '',
+          industry: recipientIndustry,
+          account: accountData
+        };
+        
+        const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient);
+        const toneOpener = selectRandomToneOpener(selectedAngle?.id);
+        
+        if (!isProduction) {
+          console.log(`[GenerateScheduledEmails] Selected angle: ${selectedAngle?.id}, tone: ${toneOpener}, industry: ${recipientIndustry}`);
+        }
+        
+        // Generate email content using /api/perplexity-email endpoint (which has full angle system)
+        const baseUrl = process.env.PUBLIC_BASE_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000';
+        const perplexityResponse = await fetch(`${baseUrl}/api/perplexity-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: emailData.aiPrompt || 'Write a professional follow-up email',
+            mode: 'html',
+            templateType: 'cold_email',
+            recipient: recipient,
+            selectedAngle: selectedAngle,
+            toneOpener: toneOpener,
+            senderName: 'Lewis Patterson'
+          })
         });
+        
+        if (!perplexityResponse.ok) {
+          throw new Error(`Perplexity email API error: ${perplexityResponse.status}`);
+        }
+        
+        const perplexityResult = await perplexityResponse.json();
+        
+        if (!perplexityResult.ok) {
+          throw new Error(`Perplexity email API failed: ${perplexityResult.error || 'Unknown error'}`);
+        }
+        
+        // Build HTML template from structured JSON data (same as sequence-builder.js preview)
+        const outputData = perplexityResult.output || {};
+        const htmlContent = buildColdEmailHtmlTemplate(outputData, recipient);
+        const textContent = buildTextVersionFromHtml(htmlContent);
+        
+        // Format the result to match expected structure
+        const generatedContent = {
+          subject: outputData.subject || 'Follow-up Email',
+          html: htmlContent,
+          text: textContent,
+          angle_used: selectedAngle?.id || null,
+          exemption_type: accountData?.taxExemptStatus || null
+        };
         
         // Update email with generated content
         // Ensure ownership fields are preserved/set
@@ -268,310 +332,143 @@ export default async function handler(req, res) {
   }
   }
 
-// Generate email content using Perplexity API
-async function generateEmailContent({ prompt, contactName, contactCompany, contactRole, accountIndustry, accountData, sequenceContext }) {
-  try {
-    // NEPQ ENHANCEMENT: Detect exemption status from industry
-    let exemptionStatus = null;
-    let exemptionDetails = null;
-    
-    if (accountIndustry) {
-      // Industry to exemption mapping (same as email-compose-global.js)
-      const industryExemptionMap = {
-        'Manufacturing': 'Manufacturing',
-        'Manufacturer': 'Manufacturing',
-        'Industrial': 'Manufacturing',
-        'Nonprofit': 'Nonprofit',
-        'Non-Profit': 'Nonprofit',
-        'Charity': 'Nonprofit',
-        'Foundation': 'Nonprofit',
-        '501(c)(3)': 'Nonprofit',
-        'Government': 'Government',
-        'Municipality': 'Government',
-        'Public Sector': 'Government',
-        'Healthcare': 'Nonprofit',
-        'Hospital': 'Nonprofit',
-        'RV Park': 'RVPark',
-        'Mobile Home Park': 'RVPark',
-        'Hospitality': 'RVPark',
-        'Campground': 'RVPark'
-      };
-      
-      const normalizedIndustry = String(accountIndustry).trim();
-      exemptionStatus = industryExemptionMap[normalizedIndustry] || null;
-      
-      if (exemptionStatus) {
-        // Exemption details (same as email-compose-global.js)
-        const exemptionDetailsMap = {
-          'Manufacturing': { typical_amount: '$75K–$200K', description: 'manufacturing facility electricity exemption' },
-          'Nonprofit': { typical_amount: '$40K–$100K', description: '501(c)(3) tax-exempt organization electricity exemption' },
-          'Government': { typical_amount: '$50K–$150K', description: 'government entity electricity exemption' },
-          'RVPark': { typical_amount: '$75K–$300K', description: 'predominant use exemption (residential)' }
-        };
-        exemptionDetails = exemptionDetailsMap[exemptionStatus] || null;
-        
-        console.log('[NEPQ] Exemption detected for sequence email:', exemptionStatus, exemptionDetails?.typical_amount);
-      }
+// Build cold email HTML template (matches sequence-builder.js preview)
+function buildColdEmailHtmlTemplate(data, recipient) {
+  const company = recipient?.company || recipient?.accountName || 'Your Company';
+  const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+  const industry = recipient?.industry || recipient?.account?.industry || '';
+  
+  // Default sender profile
+  const senderName = 'Lewis Patterson';
+  const senderTitle = 'Energy Strategist';
+  const senderCompany = 'Power Choosers';
+  
+  // Clean data fields (remove citations)
+  const cleanField = (field) => {
+    if (!field) return '';
+    return String(field).replace(/\[\d+\]/g, '').trim();
+  };
+  
+  const greeting = cleanField(data.greeting) || `Hi ${firstName},`;
+  const openingHook = cleanField(data.opening_hook) || `I tried reaching you earlier but couldn't connect. I wanted to share some important information about energy cost trends that could significantly impact ${company}.`;
+  const valueProposition = cleanField(data.value_proposition) || (industry ? `Most ${industry} companies like ${company} see 10-20% savings through competitive procurement. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>` : 'Most businesses see 10-20% savings through competitive procurement and efficiency solutions. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>');
+  const socialProof = cleanField(data.social_proof_optional) || '';
+  const ctaText = cleanField(data.cta_text) || 'Explore Your Savings Potential';
+  
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
     }
-    
-    // Build enhanced prompt with context
-    let enhancedPrompt = prompt;
-    
-    if (contactName && contactName !== 'there') {
-      enhancedPrompt = `Contact Name: ${contactName}\n` + enhancedPrompt;
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
     }
-    
-    if (contactCompany) {
-      enhancedPrompt = `Company: ${contactCompany}\n` + enhancedPrompt;
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 2px 24px; font-size:14px; color:#dc2626;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#fee2e2; padding:6px 13px; border-radius:6px; display:inline-block;
     }
-    
-    if (contactRole) {
-      enhancedPrompt = `Contact Role: ${contactRole}\n` + enhancedPrompt;
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .main-paragraph {margin:0 24px 18px 24px; padding:18px; background:#fff; border-radius:7px; line-height:1.6;}
+    .solution-box { background:linear-gradient(135deg,#f0fdfa 0%,#ccfbf1 100%);
+      border:1px solid #99f6e4; padding:18px 20px; margin:0 24px 18px 24px;
+      border-radius:8px; box-shadow:0 2px 8px rgba(20,184,166,0.06);
     }
-    
-    if (accountIndustry) {
-      enhancedPrompt = `Industry: ${accountIndustry}\n` + enhancedPrompt;
+    .solution-box h3 { margin:0 0 10px 0; color:#0f766e; font-size:16px; }
+    .solution-box p { margin:0; color:#1f2937; font-size:15px; line-height:1.5; }
+    .social-proof { background:linear-gradient(135deg,#dbeafe 0%,#bfdbfe 100%);
+      padding:14px 18px; margin:0 24px 18px 24px; border-radius:8px;
     }
-    
-    if (sequenceContext.stepNumber > 1) {
-      enhancedPrompt = `This is step ${sequenceContext.stepNumber} of ${sequenceContext.totalSteps} in our email sequence.\n` + enhancedPrompt;
+    .social-proof p { margin:0; color:#1e40af; font-size:14px; font-style:italic; line-height:1.5; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#fee2e2; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(239,68,68,0.05);
     }
-    
-    if (sequenceContext.previousInteractions.length > 0) {
-      enhancedPrompt += `\n\nPrevious email interactions with this contact:\n`;
-      sequenceContext.previousInteractions.forEach((email, index) => {
-        enhancedPrompt += `${index + 1}. Subject: ${email.subject}\n`;
-        if (email.content) {
-          const preview = email.content.substring(0, 200) + '...';
-          enhancedPrompt += `   Content: ${preview}\n`;
-        }
-      });
+    .cta-btn { display:inline-block; padding:13px 36px; background:#ef4444; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(239,68,68,0.13); transition:background 0.18s;
     }
-    
-    // Call Perplexity API with retry logic for rate limits
-    let perplexityResponse;
-    let retryCount = 0;
-    const MAX_RETRIES = 3;
-    const RETRY_DELAY = 5000; // 5 seconds
-    
-    while (retryCount <= MAX_RETRIES) {
-      try {
-        perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-            model: 'sonar',
-        messages: [
-          {
-            role: 'system',
-                content: `You are an expert email writer for Power Choosers, an energy brokerage helping businesses secure lower electricity and natural gas rates. Follow ALL instructions in the prompt exactly.
-
-${exemptionStatus && exemptionDetails ? `
-🎯 NEPQ EXEMPTION-FIRST STRATEGY ACTIVE:
-This is a ${exemptionStatus} organization - PRIORITIZE TAX EXEMPTION RECOVERY
-- Exemption Type: ${exemptionDetails.description}
-- Typical Refund Value: ${exemptionDetails.typical_amount} over 4 years
-- Strategy: Lead with disarming question about exemption filing (not generic "10-20% savings")
-- Example Hook: "Has your ${accountIndustry} facility filed for electricity sales tax exemption, or are you still paying sales tax on power?"
-- Value Emphasis: "${exemptionDetails.typical_amount} in refunds + ongoing tax elimination" (2-5x more valuable than rate savings)
-- CTA Format: Use yes/no questions (mobile-friendly, low friction)
-- Position: Strategic tax consultant, not commodity broker
-- AVOID: Repetitive "10-20% savings" messaging - exemption recovery is the priority
-` : ''}
-
-When writing emails:
-1. ALWAYS use actual contact names and company information provided - NEVER use bracketed placeholders like {{name}} or [contact_first_name] in the final output
-2. OUTPUT FORMAT: Write ONLY the email body and subject line - no metadata, no version labels, no markdown formatting, no statistics
-3. Subject line should appear first as "Subject: [your subject]" followed by the email body${exemptionStatus ? ' (for exemption emails: "[FirstName], electricity tax exemption question")' : ''}
-4. Use proper paragraph spacing (double line breaks between paragraphs)
-5. End with "Best regards," followed by sender name
-6. Do NOT include: **bold markdown**, # headers, \`\`\`code blocks\`\`\`, "HTML Version" labels, "Email Stats", "Word Count", or any metadata sections
-7. Research proof: If the prompt asks you to research the company, do so and incorporate specific details naturally
-8. NEPQ Principles: Use disarming questions (curious, not defensive), yes/no CTAs, angle variation (not repetitive messaging)${exemptionStatus ? '\n9. EXEMPTION PRIORITY: Start with exemption question, emphasize refund value, position as tax consultant' : ''}`
-          },
-          {
-            role: 'user',
-            content: enhancedPrompt
-          }
-        ],
-        max_tokens: 1000,
-        temperature: 0.7
-      })
-    });
-    
-        // Check for rate limiting (429)
-        if (perplexityResponse.status === 429) {
-          retryCount++;
-          if (retryCount <= MAX_RETRIES) {
-            const waitTime = RETRY_DELAY * retryCount; // Exponential backoff
-            console.warn(`[GenerateScheduledEmails] Rate limited (429), retrying in ${waitTime/1000}s... (attempt ${retryCount}/${MAX_RETRIES})`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-            continue;
-          }
-          throw new Error(`Perplexity API rate limit exceeded after ${MAX_RETRIES} retries`);
-        }
-        
-        // Check for other errors
-    if (!perplexityResponse.ok) {
-          const errorText = await perplexityResponse.text();
-          throw new Error(`Perplexity API error ${perplexityResponse.status}: ${errorText}`);
-        }
-        
-        // Success - break out of retry loop
-        break;
-        
-      } catch (error) {
-        if (retryCount >= MAX_RETRIES) {
-          throw error;
-        }
-        retryCount++;
-        const waitTime = RETRY_DELAY * retryCount;
-        console.warn(`[GenerateScheduledEmails] API call failed, retrying in ${waitTime/1000}s... (attempt ${retryCount}/${MAX_RETRIES})`, error.message);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-      }
+    .cta-btn:hover { background:#dc2626;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
     }
-    
-    const perplexityData = await perplexityResponse.json();
-    const generatedText = perplexityData.choices[0].message.content;
-    
-    // Extract subject line (look for various patterns)
-    let subject = 'Follow-up Email';
-    const subjectPatterns = [
-      /Subject[:\s]+(.+?)(?:\n|$)/i,
-      /Subject Line[:\s]+(.+?)(?:\n|$)/i,
-      /^#\s+(.+?)(?:\n|$)/m,
-      /^\*\*Subject[:\s]*\*\*\s*(.+?)(?:\n|$)/i
-    ];
-    
-    for (const pattern of subjectPatterns) {
-      const match = generatedText.match(pattern);
-      if (match && match[1]) {
-        subject = match[1].trim()
-          .replace(/^\*\*|\*\*$/g, '') // Remove markdown bold
-          .replace(/^#+\s*/, '') // Remove markdown headers
-          .trim();
-        if (subject) break;
-      }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
     }
-    
-    // Extract clean email body - remove all metadata and formatting artifacts
-    let bodyContent = generatedText;
-    
-    // Remove subject line and all its variations
-    bodyContent = bodyContent.replace(/Subject[:\s]+.+?(?:\n|$)/gi, '');
-    bodyContent = bodyContent.replace(/Subject Line[:\s]+.+?(?:\n|$)/gi, '');
-    bodyContent = bodyContent.replace(/^\*\*Subject[:\s]*\*\*\s*.+?(?:\n|$)/gim, '');
-    
-    // Remove version markers (HTML Version, Plain Text Version, etc.)
-    bodyContent = bodyContent.replace(/---[\s\S]*?---/g, '');
-    bodyContent = bodyContent.replace(/HTML Version[:\s]*/gi, '');
-    bodyContent = bodyContent.replace(/Plain Text Version[:\s]*/gi, '');
-    bodyContent = bodyContent.replace(/```html[\s\S]*?```/gi, '');
-    bodyContent = bodyContent.replace(/```[\s\S]*?```/g, '');
-    
-    // Remove markdown headers and formatting
-    bodyContent = bodyContent.replace(/^#+\s+.+?(?:\n|$)/gm, '');
-    bodyContent = bodyContent.replace(/\*\*(.+?)\*\*/g, '$1'); // Remove bold markdown
-    bodyContent = bodyContent.replace(/\*(.+?)\*/g, '$1'); // Remove italic markdown
-    bodyContent = bodyContent.replace(/\[(.+?)\]\(.+?\)/g, '$1'); // Remove links, keep text
-    
-    // Remove email metadata sections
-    bodyContent = bodyContent.replace(/Email Sequence[:\s]+.+?(?:\n|$)/gi, '');
-    bodyContent = bodyContent.replace(/Step \d+ of \d+/gi, '');
-    bodyContent = bodyContent.replace(/Email Breakdown[:\s]*/gi, '');
-    bodyContent = bodyContent.replace(/Email Stats[:\s]*/gi, '');
-    bodyContent = bodyContent.replace(/Email Specifications[:\s]*/gi, '');
-    bodyContent = bodyContent.replace(/Research Proof[:\s]*/gi, '');
-    bodyContent = bodyContent.replace(/Tone[:\s]*/gi, '');
-    bodyContent = bodyContent.replace(/Word Count[:\s]*/gi, '');
-    bodyContent = bodyContent.replace(/Paragraphs[:\s]*/gi, '');
-    bodyContent = bodyContent.replace(/CTA[:\s]*/gi, '');
-    bodyContent = bodyContent.replace(/Personalization[:\s]*/gi, '');
-    
-    // Remove "Hi [Name]," if it appears multiple times (from examples)
-    const lines = bodyContent.split('\n');
-    let foundGreeting = false;
-    bodyContent = lines.filter(line => {
-      const trimmed = line.trim();
-      if (/^Hi\s+\w+,?$/i.test(trimmed) || /^Hey\s+\w+,?$/i.test(trimmed)) {
-        if (foundGreeting) return false; // Skip duplicate greetings
-        foundGreeting = true;
-      }
-      return true;
-    }).join('\n');
-    
-    // Clean up excessive whitespace
-    bodyContent = bodyContent
-      .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
-      .replace(/^\s+|\s+$/gm, '') // Trim each line
-      .replace(/^\s+|\s+$/g, '') // Trim entire content
-      .replace(/\n\s*\n\s*\n/g, '\n\n'); // Clean up paragraph breaks
-    
-    // Remove any remaining HTML tags that shouldn't be there
-    bodyContent = bodyContent.replace(/<[^>]+>/g, '');
-    
-    // Find the actual email content (usually starts with greeting)
-    const greetingMatch = bodyContent.match(/(?:^|\n)(Hi|Hey|Hello|Dear)\s+\w+[,\n]/i);
-    if (greetingMatch) {
-      const startIndex = bodyContent.indexOf(greetingMatch[0]);
-      bodyContent = bodyContent.substring(startIndex).trim();
-    }
-    
-    // Remove signature placeholders and add proper signature
-    bodyContent = bodyContent.replace(/—\s*\[Your Name\]/g, '');
-    bodyContent = bodyContent.replace(/Thanks?,\s*\[Your Name\]/gi, '');
-    bodyContent = bodyContent.replace(/\[Your Name\]/g, '');
-    bodyContent = bodyContent.replace(/—\s*$/gm, '');
-    
-    // Add proper signature if not present
-    const hasSignature = /(Best regards|Regards|Thanks|Thank you|Sincerely)/i.test(bodyContent);
-    if (!hasSignature && bodyContent.trim()) {
-      // Get sender name from settings or use default
-      const senderName = 'Power Choosers Team'; // You can enhance this to get from settings
-      bodyContent = bodyContent.trim() + '\n\nBest regards,\n' + senderName;
-    }
-    
-    // Ensure proper paragraph spacing (double line breaks between paragraphs)
-    bodyContent = bodyContent
-      .replace(/\n\n\n+/g, '\n\n') // Max 2 newlines
-      .trim();
-    
-    // Create HTML version with proper paragraph tags
-    const htmlContent = bodyContent
-      .split(/\n\n+/) // Split by double newlines (paragraphs)
-      .map(para => para.trim().replace(/\n/g, '<br>')) // Convert single newlines to <br>
-      .filter(para => para.length > 0) // Remove empty paragraphs
-      .map(para => `<p>${para}</p>`) // Wrap in <p> tags
-      .join('\n');
-    
-    // Create plain text version (clean, with proper spacing)
-    const textContent = bodyContent
-      .replace(/\n{3,}/g, '\n\n') // Max 2 newlines
-      .trim();
-    
-    return {
-      subject: subject.trim() || 'Follow-up Email',
-      html: htmlContent || `<p>${bodyContent.replace(/\n/g, '<br>')}</p>`,
-      text: textContent || bodyContent,
-      // Metadata for tracking angle effectiveness
-      angle_used: exemptionStatus ? 'exemption_recovery' : 'timing_risk', // Default if not specified
-      exemption_type: exemptionStatus || null,
-      exemption_details: exemptionDetails || null
-    };
-    
-  } catch (error) {
-    console.error('[GenerateScheduledEmails] Perplexity API error:', error);
-    console.error('[GenerateScheduledEmails] Error details:', {
-      message: error.message,
-      status: error.status,
-      response: error.response
-    });
-    
-    // Re-throw the error instead of silently failing with fallback content
-    // This ensures the email stays in 'not_generated' status so we can retry
-    throw new Error(`Perplexity API failed: ${error.message}`);
-  }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">⚠️ Energy Costs Rising Fast</div>
+    <div class="intro">
+      <p>${greeting}</p>
+      <p>${openingHook}</p>
+    </div>
+    <div class="solution-box">
+      <h3>✓ How Power Choosers Helps</h3>
+      <p>${valueProposition}</p>
+    </div>
+    ${socialProof ? `<div class="social-proof"><p>${socialProof}</p></div>` : ''}
+    <div class="cta-container">
+      <a href="https://powerchoosers.com/schedule" class="cta-btn">${ctaText}</a>
+      <div style="margin-top:8px;font-size:14px;color:#dc2626;opacity:0.83;">
+        Quick 15-minute call to discuss your options—no obligation.
+      </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${senderName}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${senderTitle}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+        <div style="margin: 2px 0 0 0; line-height: 1.3;">${senderCompany}</div>
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
+  `;
 }
+
+// Build plain text version from HTML
+function buildTextVersionFromHtml(html) {
+  // Remove HTML tags and decode entities
+  let text = html
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  // Extract main content (between intro and signature)
+  const lines = text.split(/\s+/).filter(Boolean);
+  return lines.join(' ').substring(0, 1000); // Limit length
+}
+
+// NOTE: Old generateEmailContent function removed - now using /api/perplexity-email endpoint directly
+// This ensures consistent angle selection and HTML template formatting across all email generation paths
