@@ -2657,19 +2657,44 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       };
     }
     
-    // Get settings for AI generation
-    const settings = (window.SettingsPage?.getSettings?.()) || {};
-    const g = settings?.general || {};
-    const senderName = (g.firstName && g.lastName) 
-      ? `${g.firstName} ${g.lastName}`.trim()
-      : (g.agentName || 'Power Choosers Team');
+    // Get sender name (hardcoded to match other files)
+    const senderName = 'Lewis Patterson';
     
-    const aiTemplates = settings?.aiTemplates || {};
-    const whoWeAre = aiTemplates.who_we_are || 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.';
-    const industrySegmentation = settings?.industrySegmentation || null;
+    // Hardcoded identity (matches email-compose-global.js)
+    const whoWeAre = 'You are an Energy Strategist at Power Choosers. You help businesses secure better electricity rates and manage energy procurement more effectively.';
     
-    // Call Perplexity API (same as email-compose-global.js)
-      const baseUrl = window.API_BASE_URL || window.location.origin || '';
+    // Detect industry and select angle (same logic as sequence-builder.js)
+    let recipientIndustry = recipient?.industry || recipient?.account?.industry || '';
+    
+    // Infer from company name if not set
+    if (!recipientIndustry && recipient?.company) {
+      // Simple industry inference (can be enhanced if needed)
+      const companyName = String(recipient.company).toLowerCase();
+      if (/\b(inn|hotel|motel|resort|lodge|hospitality)\b/i.test(companyName)) {
+        recipientIndustry = 'Hospitality';
+      } else if (/\b(manufacturing|manufacturer|industrial|factory|plant)\b/i.test(companyName)) {
+        recipientIndustry = 'Manufacturing';
+      } else if (/\b(hospital|clinic|medical|healthcare)\b/i.test(companyName)) {
+        recipientIndustry = 'Healthcare';
+      } else if (/\b(retail|store|shop|market)\b/i.test(companyName)) {
+        recipientIndustry = 'Retail';
+      } else if (/\b(logistics|warehouse|shipping|transportation)\b/i.test(companyName)) {
+        recipientIndustry = 'Logistics';
+      } else if (/\b(nonprofit|non-profit|charity|foundation)\b/i.test(companyName)) {
+        recipientIndustry = 'Nonprofit';
+      }
+    }
+    
+    if (!recipientIndustry) {
+      recipientIndustry = 'Default';
+    }
+    
+    // Select angle (would need to import functions, but for now use null to let API handle it)
+    const selectedAngle = null; // API will handle angle selection
+    const toneOpener = null; // API will handle tone selection
+    
+    // Call Perplexity API (same as sequence-builder.js and generate-scheduled-emails.js)
+    const baseUrl = window.API_BASE_URL || window.location.origin || '';
     const genUrl = `${baseUrl}/api/perplexity-email`;
     
     const response = await fetch(genUrl, {
@@ -2677,13 +2702,12 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: emailData.aiPrompt || 'Write a professional follow-up email',
-        recipient: recipient,
-        mode: 'standard', // Use standard mode for scheduled emails
-        senderName: senderName,
-        whoWeAre: whoWeAre,
-        marketContext: aiTemplates.marketContext,
-        meetingPreferences: aiTemplates.meetingPreferences,
-        industrySegmentation: industrySegmentation
+          recipient: recipient,
+          mode: 'html', // Use HTML mode with template building
+          templateType: 'cold_email',
+          senderName: senderName,
+          selectedAngle: selectedAngle,
+          toneOpener: toneOpener
         })
       });
 
@@ -2694,24 +2718,32 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
 
         const result = await response.json();
         
-    // Format the output (similar to email-compose-global.js formatGeneratedEmail)
-    let subject = '';
-    let html = '';
-    let text = '';
+    // Build HTML template from structured JSON data (same as sequence-builder.js and generate-scheduled-emails.js)
+    let htmlContent = '';
+    let textContent = '';
+    let subject = 'Follow-up Email';
     
-    if (result.templateType) {
-      // HTML template mode
-      const formatted = formatTemplatedEmailForScheduled(result.output, recipient, result.templateType);
-      subject = formatted.subject;
-      html = formatted.html;
-      text = stripHtml(html);
+    if (result.templateType === 'cold_email' && result.output) {
+      // Build HTML template from structured data
+      const outputData = result.output;
+      htmlContent = buildColdEmailHtmlTemplateForScheduled(outputData, recipient);
+      textContent = buildTextVersionFromHtmlForScheduled(htmlContent);
+      subject = outputData.subject || 'Follow-up Email';
+    } else if (result.html) {
+      // Fallback: use pre-built HTML if available
+      htmlContent = result.html;
+      textContent = result.text || buildTextVersionFromHtmlForScheduled(htmlContent);
+      subject = result.subject || 'Follow-up Email';
     } else {
-      // Standard mode
-      const formatted = formatStandardEmailForScheduled(result.output, recipient);
-      subject = formatted.subject;
-      html = formatted.html;
-      text = formatted.text || stripHtml(html);
+      // Last resort: use output as plain text
+      const outputText = result.output || 'Email content';
+      htmlContent = `<p style="color:#222;">${String(outputText).replace(/\n/g, '<br>')}</p>`;
+      textContent = String(outputText);
+      subject = result.subject || 'Follow-up Email';
     }
+    
+    const html = htmlContent;
+    const text = textContent;
     
     // Update email with generated content
         await db.collection('emails').doc(emailId).update({
@@ -2725,15 +2757,143 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         });
   }
 
-  // Helper: Format templated email for scheduled emails
-  function formatTemplatedEmailForScheduled(result, recipient, templateType) {
-    // Use the same logic as email-compose-global.js formatTemplatedEmail
-    // For now, use a simplified version
-    const subject = result.subject || 'Energy Solutions';
-    const html = result.html || result.output || '<p>Email content</p>';
+  // Build cold email HTML template (matches sequence-builder.js and generate-scheduled-emails.js)
+  function buildColdEmailHtmlTemplateForScheduled(data, recipient) {
+    const company = recipient?.company || recipient?.accountName || 'Your Company';
+    const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const industry = recipient?.industry || recipient?.account?.industry || '';
     
-    return { subject, html };
-        }
+    // Default sender profile
+    const senderName = 'Lewis Patterson';
+    const senderTitle = 'Energy Strategist';
+    const senderCompany = 'Power Choosers';
+    
+    // Clean data fields (remove citations)
+    const cleanField = (field) => {
+      if (!field) return '';
+      return String(field).replace(/\[\d+\]/g, '').trim();
+    };
+    
+    const greeting = cleanField(data.greeting) || `Hi ${firstName},`;
+    const openingHook = cleanField(data.opening_hook) || `I tried reaching you earlier but couldn't connect. I wanted to share some important information about energy cost trends that could significantly impact ${company}.`;
+    const valueProposition = cleanField(data.value_proposition) || (industry ? `Most ${industry} companies like ${company} see 10-20% savings through competitive procurement. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>` : 'Most businesses see 10-20% savings through competitive procurement and efficiency solutions. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>');
+    const socialProof = cleanField(data.social_proof_optional) || '';
+    const ctaText = cleanField(data.cta_text) || 'Explore Your Savings Potential';
+    
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 2px 24px; font-size:14px; color:#dc2626;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#fee2e2; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .main-paragraph {margin:0 24px 18px 24px; padding:18px; background:#fff; border-radius:7px; line-height:1.6;}
+    .solution-box { background:linear-gradient(135deg,#f0fdfa 0%,#ccfbf1 100%);
+      border:1px solid #99f6e4; padding:18px 20px; margin:0 24px 18px 24px;
+      border-radius:8px; box-shadow:0 2px 8px rgba(20,184,166,0.06);
+    }
+    .solution-box h3 { margin:0 0 10px 0; color:#0f766e; font-size:16px; }
+    .solution-box p { margin:0; color:#1f2937; font-size:15px; line-height:1.5; }
+    .social-proof { background:linear-gradient(135deg,#dbeafe 0%,#bfdbfe 100%);
+      padding:14px 18px; margin:0 24px 18px 24px; border-radius:8px;
+    }
+    .social-proof p { margin:0; color:#1e40af; font-size:14px; font-style:italic; line-height:1.5; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#fee2e2; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(239,68,68,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#ef4444; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(239,68,68,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#dc2626;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">⚠️ Energy Costs Rising Fast</div>
+    <div class="intro">
+      <p>${greeting}</p>
+      <p>${openingHook}</p>
+    </div>
+    <div class="solution-box">
+      <h3>✓ How Power Choosers Helps</h3>
+      <p>${valueProposition}</p>
+    </div>
+    ${socialProof ? `<div class="social-proof"><p>${socialProof}</p></div>` : ''}
+    <div class="cta-container">
+      <a href="https://powerchoosers.com/schedule" class="cta-btn">${ctaText}</a>
+      <div style="margin-top:8px;font-size:14px;color:#dc2626;opacity:0.83;">
+        Quick 15-minute call to discuss your options—no obligation.
+      </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${senderName}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${senderTitle}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+        <div style="margin: 2px 0 0 0; line-height: 1.3;">${senderCompany}</div>
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
+    `;
+  }
+
+  // Build plain text version from HTML
+  function buildTextVersionFromHtmlForScheduled(html) {
+    // Remove HTML tags and decode entities
+    let text = html
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // Extract main content (between intro and signature)
+    const lines = text.split(/\s+/).filter(Boolean);
+    return lines.join(' ').substring(0, 1000); // Limit length
+  }
 
   // Helper: Format standard email for scheduled emails
   function formatStandardEmailForScheduled(output, recipient) {

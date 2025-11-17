@@ -1,5 +1,290 @@
 'use strict';
 
+// ========== AUTHENTIC TONE OPENERS ==========
+const AUTHENTIC_TONE_OPENERS = [
+  'Been wondering—',
+  'Question for you—',
+  'Here\'s what I\'m seeing—',
+  'Let me ask you something—',
+  'From what I\'m hearing—'
+];
+
+// ========== RANDOMIZED ANGLES BY INDUSTRY ==========
+const RANDOMIZED_ANGLES_BY_INDUSTRY = {
+  Manufacturing: [
+    {
+      id: 'exemption_recovery',
+      weight: 0.35,
+      primaryMessage: 'electricity tax exemption recovery',
+      openingTemplate: 'Are you currently claiming electricity exemptions on your production facilities?',
+      primaryValue: '$75K-$500K in unclaimed exemptions over 4 years',
+      condition: '!accountData || !accountData.industry || accountData.industry.toLowerCase().includes("manufacturing") || accountData.industry.toLowerCase().includes("manufacturer") || accountData.industry.toLowerCase().includes("industrial") || accountData.taxExemptStatus === "Manufacturing"',
+      newsHooks: []
+    },
+    {
+      id: 'timing_strategy',
+      weight: 0.30,
+      primaryMessage: 'early contract renewal timing',
+      openingTemplate: 'When does your current electricity contract expire?',
+      primaryValue: '10-20% better rates when locking in 6 months early',
+      situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
+      newsHooks: ['rate_spike_national']
+    },
+    {
+      id: 'demand_efficiency',
+      weight: 0.20,
+      primaryMessage: 'consumption efficiency before renewal',
+      openingTemplate: 'Are you optimizing consumption before you renew your contract?',
+      primaryValue: '12-20% consumption reduction before rate shopping',
+      newsHooks: []
+    },
+    {
+      id: 'operational_continuity',
+      weight: 0.15,
+      primaryMessage: 'uptime and reliability',
+      openingTemplate: 'What\'s more critical—energy savings or guaranteed uptime?',
+      primaryValue: 'Predictable costs without operational disruption',
+      newsHooks: []
+    }
+  ],
+
+  Nonprofit: [
+    {
+      id: 'exemption_recovery',
+      weight: 0.40,
+      primaryMessage: 'nonprofit electricity exemption recovery',
+      openingTemplate: 'Is your organization filing electricity exemption certificates?',
+      primaryValue: '$50K-$300K redirected to programs annually',
+      condition: 'accountData?.taxExemptStatus === "Nonprofit"',
+      newsHooks: []
+    },
+    {
+      id: 'mission_funding',
+      weight: 0.35,
+      primaryMessage: 'redirect savings to mission',
+      openingTemplate: 'How are you making sure more funding goes to your mission, not vendors?',
+      primaryValue: '10-20% savings redirected to programs',
+      newsHooks: []
+    },
+    {
+      id: 'budget_stability',
+      weight: 0.25,
+      primaryMessage: 'budget predictability',
+      openingTemplate: 'When budgeting for energy, are you locking in costs or dealing with volatility?',
+      primaryValue: 'Fixed costs for better program planning',
+      newsHooks: ['rate_spike_national']
+    }
+  ],
+
+  Retail: [
+    {
+      id: 'consolidation',
+      weight: 0.35,
+      primaryMessage: 'multi-location consolidation',
+      openingTemplate: 'How many locations are you managing energy for?',
+      primaryValue: '15-25% savings by consolidating all locations',
+      newsHooks: []
+    },
+    {
+      id: 'timing_strategy',
+      weight: 0.30,
+      primaryMessage: 'early contract renewal timing',
+      openingTemplate: 'When does your current electricity contract expire?',
+      primaryValue: '10-20% better rates when locking in 6 months early',
+      situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
+      newsHooks: ['rate_spike_national']
+    },
+    {
+      id: 'operational_simplicity',
+      weight: 0.20,
+      primaryMessage: 'simplify management across locations',
+      openingTemplate: 'Are you managing multiple energy suppliers or contracts?',
+      primaryValue: 'Single vendor, unified billing',
+      newsHooks: []
+    },
+    {
+      id: 'cost_control',
+      weight: 0.15,
+      primaryMessage: 'budget predictability',
+      openingTemplate: 'Does energy cost predictability matter for your budget planning?',
+      primaryValue: 'Fixed costs for better financial planning',
+      newsHooks: []
+    }
+  ],
+
+  Healthcare: [
+    {
+      id: 'exemption_recovery',
+      weight: 0.30,
+      primaryMessage: 'healthcare electricity exemption recovery',
+      openingTemplate: 'Is your healthcare facility claiming electricity exemptions?',
+      primaryValue: '$50K-$400K in unclaimed exemptions',
+      condition: 'accountData?.taxExemptStatus === "Nonprofit"',
+      newsHooks: []
+    },
+    {
+      id: 'operational_continuity',
+      weight: 0.30,
+      primaryMessage: 'uptime and patient care continuity',
+      openingTemplate: 'What\'s more critical—energy savings or guaranteed uptime?',
+      primaryValue: 'Predictable costs without disrupting patient care',
+      newsHooks: []
+    },
+    {
+      id: 'timing_strategy',
+      weight: 0.25,
+      primaryMessage: 'early contract renewal timing',
+      openingTemplate: 'When does your current electricity contract expire?',
+      primaryValue: '10-20% better rates when locking in 6 months early',
+      situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
+      newsHooks: ['rate_spike_national']
+    },
+    {
+      id: 'budget_stability',
+      weight: 0.15,
+      primaryMessage: 'budget predictability for healthcare',
+      openingTemplate: 'Does energy cost predictability matter for your budget planning?',
+      primaryValue: 'Fixed costs for better financial planning',
+      newsHooks: []
+    }
+  ],
+
+  DataCenter: [
+    {
+      id: 'demand_efficiency',
+      weight: 0.35,
+      primaryMessage: 'consumption efficiency for data centers',
+      openingTemplate: 'Are you optimizing consumption before you renew your contract?',
+      primaryValue: '15-25% consumption reduction before rate shopping',
+      newsHooks: ['datacenter_demand_spike']
+    },
+    {
+      id: 'timing_strategy',
+      weight: 0.30,
+      primaryMessage: 'early contract renewal timing',
+      openingTemplate: 'When does your current electricity contract expire?',
+      primaryValue: '10-20% better rates when locking in 6 months early',
+      situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
+      newsHooks: ['datacenter_demand_spike']
+    },
+    {
+      id: 'operational_continuity',
+      weight: 0.20,
+      primaryMessage: 'uptime and reliability',
+      openingTemplate: 'What\'s more critical—energy savings or guaranteed uptime?',
+      primaryValue: 'Predictable costs without operational disruption',
+      newsHooks: []
+    },
+    {
+      id: 'data_governance',
+      weight: 0.15,
+      primaryMessage: 'unified metering and visibility',
+      openingTemplate: 'Do you have visibility into energy usage across your facilities?',
+      primaryValue: 'Centralized metering and reporting',
+      newsHooks: []
+    }
+  ],
+
+  Logistics: [
+    {
+      id: 'consolidation',
+      weight: 0.35,
+      primaryMessage: 'multi-location warehouse consolidation',
+      openingTemplate: 'How many warehouse locations are you managing energy for?',
+      primaryValue: '15-25% savings by consolidating all locations',
+      newsHooks: []
+    },
+    {
+      id: 'timing_strategy',
+      weight: 0.30,
+      primaryMessage: 'early contract renewal timing',
+      openingTemplate: 'When does your current electricity contract expire?',
+      primaryValue: '10-20% better rates when locking in 6 months early',
+      situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
+      newsHooks: []
+    },
+    {
+      id: 'operational_efficiency',
+      weight: 0.20,
+      primaryMessage: 'operational efficiency',
+      openingTemplate: 'Are energy costs impacting your operational efficiency?',
+      primaryValue: '10-18% cost reduction',
+      newsHooks: []
+    },
+    {
+      id: 'operational_simplicity',
+      weight: 0.15,
+      primaryMessage: 'simplify management',
+      openingTemplate: 'How much time are you spending managing energy renewals?',
+      primaryValue: 'Single vendor, unified billing',
+      newsHooks: []
+    }
+  ],
+
+  Hospitality: [
+    {
+      id: 'consolidation',
+      weight: 0.30,
+      primaryMessage: 'multi-property consolidation',
+      openingTemplate: 'How many properties are you managing energy for?',
+      primaryValue: '12-22% savings by consolidating all properties',
+      newsHooks: []
+    },
+    {
+      id: 'timing_strategy',
+      weight: 0.30,
+      primaryMessage: 'early contract renewal timing',
+      openingTemplate: 'When does your current electricity contract expire?',
+      primaryValue: '10-20% better rates when locking in 6 months early',
+      situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.',
+      newsHooks: []
+    },
+    {
+      id: 'operational_efficiency',
+      weight: 0.25,
+      primaryMessage: 'guest comfort and operational costs',
+      openingTemplate: 'Are energy costs impacting your guest experience budget?',
+      primaryValue: '12-18% cost reduction without sacrificing comfort',
+      newsHooks: []
+    },
+    {
+      id: 'budget_stability',
+      weight: 0.15,
+      primaryMessage: 'budget predictability',
+      openingTemplate: 'Does energy cost predictability matter for your budget planning?',
+      primaryValue: 'Fixed costs for better financial planning',
+      newsHooks: []
+    }
+  ],
+
+  Default: [
+    {
+      id: 'timing_strategy',
+      weight: 0.40,
+      primaryMessage: 'early contract renewal timing',
+      openingTemplate: 'When does your current electricity contract expire?',
+      primaryValue: '10-20% better rates when locking in 6 months early',
+      newsHooks: ['rate_spike_national']
+    },
+    {
+      id: 'cost_control',
+      weight: 0.35,
+      primaryMessage: 'cost control and predictability',
+      openingTemplate: 'Are you locking in energy costs ahead of time, or dealing with rate volatility?',
+      primaryValue: '10-20% savings with predictable costs',
+      newsHooks: []
+    },
+    {
+      id: 'operational_simplicity',
+      weight: 0.25,
+      primaryMessage: 'simplify energy management',
+      openingTemplate: 'How much time are you spending managing energy renewals?',
+      primaryValue: 'Single vendor, simplified management',
+      newsHooks: []
+    }
+  ]
+};
+
 // Free Sequence Automation Class - Zero Cost Email Automation
 class FreeSequenceAutomation {
   constructor() {
@@ -221,23 +506,107 @@ class FreeSequenceAutomation {
         }
       }
       
-      // Call Perplexity email API endpoint (using existing endpoint)
+      // Get full contact/account data for angle selection
+      let recipient = null;
+      try {
+        if (email.contactId) {
+          const contactDoc = await db.collection('people').doc(email.contactId).get();
+          if (contactDoc.exists) {
+            recipient = { id: contactDoc.id, ...contactDoc.data() };
+            
+            // Get account data if available
+            const accountId = recipient.accountId || recipient.account_id;
+            if (accountId) {
+              const accountDoc = await db.collection('accounts').doc(accountId).get();
+              if (accountDoc.exists) {
+                recipient.account = { id: accountDoc.id, ...accountDoc.data() };
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('[FreeSequence] Could not fetch contact/account data:', error);
+      }
+      
+      // Detect industry and select angle
+      let recipientIndustry = recipient?.industry || recipient?.account?.industry || '';
+      
+      // Infer industry from company name if not set
+      if (!recipientIndustry && email.contactCompany) {
+        recipientIndustry = inferIndustryFromCompanyName(email.contactCompany);
+      }
+      
+      // Infer from account description if still not set
+      if (!recipientIndustry && recipient?.account) {
+        const accountDesc = recipient.account?.shortDescription || recipient.account?.short_desc || 
+                           recipient.account?.descriptionShort || recipient.account?.description || 
+                           recipient.account?.companyDescription || recipient.account?.accountDescription || '';
+        if (accountDesc) {
+          recipientIndustry = inferIndustryFromDescription(accountDesc);
+        }
+      }
+      
+      // Default to 'Default' if no industry detected
+      if (!recipientIndustry) {
+        recipientIndustry = 'Default';
+      }
+      
+      // Select angle based on industry/role/exemption status
+      const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient);
+      const toneOpener = selectRandomToneOpener(selectedAngle?.id);
+      
+      console.log(`[FreeSequence] Selected angle: ${selectedAngle?.id}, tone: ${toneOpener}, industry: ${recipientIndustry}`);
+      
+      // Call Perplexity email API endpoint with angle and recipient data
       const baseUrl = window.API_BASE_URL || window.location.origin || '';
       const response = await fetch(`${baseUrl}/api/perplexity-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: email.aiPrompt,
-          contactName: email.contactName,
-          contactCompany: email.contactCompany
+          mode: 'html',
+          templateType: 'cold_email',
+          recipient: recipient || {
+            firstName: email.contactName?.split(' ')[0] || '',
+            company: email.contactCompany || '',
+            industry: recipientIndustry
+          },
+          selectedAngle: selectedAngle,
+          toneOpener: toneOpener,
+          senderName: 'Lewis Patterson'
         })
       });
       
       if (response.ok) {
         const result = await response.json();
-        email.html = result.html;
-        email.text = result.text;
-        email.subject = result.subject;
+        
+        // Build HTML template from structured JSON data (same as preview)
+        let htmlContent = '';
+        let textContent = '';
+        let subject = 'Follow-up Email';
+        
+        if (result.templateType === 'cold_email' && result.output) {
+          // Build HTML template from structured data
+          const outputData = result.output;
+          htmlContent = buildColdEmailHtmlTemplate(outputData, recipient);
+          textContent = buildTextVersionFromHtml(htmlContent);
+          subject = outputData.subject || 'Follow-up Email';
+        } else if (result.html) {
+          // Fallback: use pre-built HTML if available
+          htmlContent = result.html;
+          textContent = result.text || buildTextVersionFromHtml(htmlContent);
+          subject = result.subject || 'Follow-up Email';
+        } else {
+          // Last resort: use output as plain text
+          const outputText = result.output || 'Email content';
+          htmlContent = `<p style="color:#222;">${String(outputText).replace(/\n/g, '<br>')}</p>`;
+          textContent = String(outputText);
+          subject = result.subject || 'Follow-up Email';
+        }
+        
+        email.html = htmlContent;
+        email.text = textContent;
+        email.subject = subject;
         email.status = 'pending_approval';
         email.generatedAt = Date.now();
         
@@ -245,9 +614,9 @@ class FreeSequenceAutomation {
         if (db) {
           try {
             await db.collection('emails').doc(email.id).update({
-              subject: result.subject,
-              html: result.html,
-              text: result.text,
+              subject: subject,
+              html: htmlContent,
+              text: textContent,
               status: 'pending_approval',
               generatedAt: email.generatedAt,
               updatedAt: new Date().toISOString()
@@ -2527,6 +2896,234 @@ class FreeSequenceAutomation {
       </div>`;
   }
 
+  // ========== ANGLE SELECTION HELPER FUNCTIONS ==========
+  
+  function inferIndustryFromCompanyName(companyName) {
+    if (!companyName) return '';
+    
+    const name = String(companyName).toLowerCase();
+    
+    // Hospitality keywords
+    if (/\b(inn|hotel|motel|resort|lodge|suites|hospitality|accommodation|bed\s*and\s*breakfast|b&b|b\s*&\s*b)\b/i.test(name)) {
+      return 'Hospitality';
+    }
+    
+    // Restaurant/Food Service
+    if (/\b(restaurant|cafe|diner|bistro|grill|bar\s*&?\s*grill|tavern|pub|eatery|food\s*service)\b/i.test(name)) {
+      return 'Hospitality';
+    }
+    
+    // Manufacturing
+    if (/\b(manufacturing|manufacturer|industrial|factory|plant|production|fabrication)\b/i.test(name)) {
+      return 'Manufacturing';
+    }
+    
+    // Healthcare
+    if (/\b(hospital|clinic|medical|healthcare|health\s*care|physician|doctor|dental|pharmacy)\b/i.test(name)) {
+      return 'Healthcare';
+    }
+    
+    // Retail
+    if (/\b(retail|store|shop|market|outlet|merchandise|boutique)\b/i.test(name)) {
+      return 'Retail';
+    }
+    
+    // Logistics/Transportation
+    if (/\b(logistics|transportation|warehouse|shipping|freight|delivery|distribution|trucking)\b/i.test(name)) {
+      return 'Logistics';
+    }
+    
+    // Data Center
+    if (/\b(data\s*center|datacenter|server|hosting|cloud|colo)\b/i.test(name)) {
+      return 'DataCenter';
+    }
+    
+    // Nonprofit
+    if (/\b(nonprofit|non-profit|charity|foundation|501c3|501\(c\)\(3\))\b/i.test(name)) {
+      return 'Nonprofit';
+    }
+    
+    return '';
+  }
+  
+  function inferIndustryFromDescription(description) {
+    if (!description) return '';
+    
+    const desc = String(description).toLowerCase();
+    
+    // Hospitality
+    if (/\b(hotel|inn|motel|resort|lodge|accommodation|hospitality|guest|room|booking|stay)\b/i.test(desc)) {
+      return 'Hospitality';
+    }
+    
+    // Restaurant/Food
+    if (/\b(restaurant|cafe|dining|food|beverage|menu|cuisine|chef)\b/i.test(desc)) {
+      return 'Hospitality';
+    }
+    
+    // Manufacturing
+    if (/\b(manufacturing|production|factory|plant|industrial|assembly|fabrication)\b/i.test(desc)) {
+      return 'Manufacturing';
+    }
+    
+    // Healthcare
+    if (/\b(hospital|clinic|medical|healthcare|patient|treatment|diagnosis|surgery)\b/i.test(desc)) {
+      return 'Healthcare';
+    }
+    
+    // Retail
+    if (/\b(retail|store|merchandise|shopping|customer|product|sale)\b/i.test(desc)) {
+      return 'Retail';
+    }
+    
+    // Logistics
+    if (/\b(logistics|warehouse|shipping|distribution|freight|transportation|delivery)\b/i.test(desc)) {
+      return 'Logistics';
+    }
+    
+    // Data Center
+    if (/\b(data\s*center|server|hosting|cloud|infrastructure|computing)\b/i.test(desc)) {
+      return 'DataCenter';
+    }
+    
+    // Nonprofit
+    if (/\b(nonprofit|charity|foundation|mission|donation|volunteer)\b/i.test(desc)) {
+      return 'Nonprofit';
+    }
+    
+    return '';
+  }
+  
+  function normalizeIndustry(industry) {
+    if (!industry) return 'Default';
+    
+    const normalized = String(industry).toLowerCase().trim();
+    
+    // Map variations to defined industry keys
+    const industryMap = {
+      'manufacturing': 'Manufacturing',
+      'manufacturer': 'Manufacturing',
+      'industrial': 'Manufacturing',
+      'nonprofit': 'Nonprofit',
+      'non-profit': 'Nonprofit',
+      'retail': 'Retail',
+      'healthcare': 'Healthcare',
+      'health care': 'Healthcare',
+      'hospitality': 'Hospitality',
+      'hotel': 'Hospitality',
+      'restaurant': 'Hospitality',
+      'data center': 'DataCenter',
+      'datacenter': 'DataCenter',
+      'logistics': 'Logistics',
+      'transportation': 'Logistics',
+      'warehousing': 'Logistics',
+      'transportation and warehousing': 'Logistics'
+    };
+    
+    // Check for exact matches first
+    if (industryMap[normalized]) {
+      return industryMap[normalized];
+    }
+    
+    // Check for partial matches
+    for (const [key, value] of Object.entries(industryMap)) {
+      if (normalized.includes(key) || key.includes(normalized)) {
+        return value;
+      }
+    }
+    
+    return 'Default';
+  }
+  
+  function randomizeByWeight(angles) {
+    const totalWeight = angles.reduce((sum, angle) => sum + angle.weight, 0);
+    let random = Math.random() * totalWeight;
+    
+    for (const angle of angles) {
+      random -= angle.weight;
+      if (random <= 0) {
+        return angle;
+      }
+    }
+    
+    return angles[angles.length - 1];
+  }
+  
+  function selectRandomizedAngle(industry, manualAngleOverride, accountData) {
+    // If manual override, find and return that angle
+    if (manualAngleOverride) {
+      const angle = findAngleById(manualAngleOverride, industry);
+      if (angle) return angle;
+    }
+    
+    // Normalize industry
+    const normalizedIndustry = normalizeIndustry(industry);
+    
+    // Get angles for this industry
+    let industryAngles = RANDOMIZED_ANGLES_BY_INDUSTRY[normalizedIndustry];
+    
+    // Fallback to Default if industry not found
+    if (!industryAngles || industryAngles.length === 0) {
+      industryAngles = RANDOMIZED_ANGLES_BY_INDUSTRY['Default'];
+    }
+    
+    // Filter angles based on conditions
+    const eligibleAngles = industryAngles.filter(angle => {
+      if (!angle.condition) return true;
+      
+      try {
+        // Simple condition evaluation for exemption status
+        if (angle.condition.includes('taxExemptStatus')) {
+          if (!accountData) return false;
+          
+          const taxExemptStatus = accountData.taxExemptStatus || accountData.tax_exempt_status;
+          
+          if (angle.condition.includes('=== "Manufacturing"')) {
+            return taxExemptStatus === 'Manufacturing';
+          }
+          if (angle.condition.includes('=== "Nonprofit"')) {
+            return taxExemptStatus === 'Nonprofit';
+          }
+        }
+        
+        // For industry-specific conditions
+        if (angle.condition.includes('industry.toLowerCase()')) {
+          if (!accountData || !accountData.industry) return false;
+          
+          const industryLower = String(accountData.industry).toLowerCase();
+          
+          if (angle.condition.includes('includes("manufacturing")')) {
+            return industryLower.includes('manufacturing') || 
+                   industryLower.includes('manufacturer') || 
+                   industryLower.includes('industrial');
+          }
+        }
+        
+        return true;
+      } catch (e) {
+        console.warn('[Angle Selection] Condition evaluation failed:', e);
+        return true;
+      }
+    });
+    
+    // If no eligible angles after filtering, use all angles
+    const anglesPool = eligibleAngles.length > 0 ? eligibleAngles : industryAngles;
+    
+    // Select by weighted randomization
+    return randomizeByWeight(anglesPool);
+  }
+  
+  function findAngleById(angleId, industry) {
+    const normalizedIndustry = normalizeIndustry(industry);
+    const angles = RANDOMIZED_ANGLES_BY_INDUSTRY[normalizedIndustry] || RANDOMIZED_ANGLES_BY_INDUSTRY['Default'];
+    return angles.find(a => a.id === angleId) || null;
+  }
+  
+  function selectRandomToneOpener(angleId = null) {
+    // Simple random selection from authentic tone openers
+    return AUTHENTIC_TONE_OPENERS[Math.floor(Math.random() * AUTHENTIC_TONE_OPENERS.length)];
+  }
+  
   function formatDelay(minutes, channel) {
     const n = Number(minutes) || 0;
     if (n < 60) return `${channel === 'email' ? 'Send email' : 'Do step'} in ${n} minute${n === 1 ? '' : 's'}`;
@@ -2661,12 +3258,12 @@ class FreeSequenceAutomation {
     },
     {
       id: 'timeline-risk',
-      text: 'Question for you—what\'s your renewal timeline? That timing difference is usually worth 15-20%.',
+      text: 'Question for you—what\'s your renewal timeline? That timing difference is usually worth 10-20%.',
       role: 'finance'
     },
     {
       id: 'problem-validation',
-      text: 'Real question—does energy cost predictability matter for your budget planning?',
+      text: 'Question for you—does energy cost predictability matter for your budget planning?',
       role: 'finance'
     }
   ];
@@ -2692,7 +3289,7 @@ class FreeSequenceAutomation {
     },
     {
       id: 'problem-frustration',
-      text: 'What\'s been the most frustrating part about energy procurement?',
+      text: 'What\'s been the most frustrating part about managing energy renewals?',
       role: 'all'
     },
     {
@@ -2802,19 +3399,19 @@ class FreeSequenceAutomation {
 
 4. ONE INSIGHT (SPECIFIC, NOT GENERIC)
    - Provide ONE concrete observation about why this matters to them NOW
-   - Use SPECIFIC numbers and timing: "6 months early = 15-20% savings" NOT "thousands annually"
+   - Use SPECIFIC numbers and timing: "6 months early = 10-20% savings" NOT "thousands annually"
    - NOT: "Companies save 10-20%" (too generic)
-   - YES: "With 4 facilities in Texas, timing is critical - locking in 6 months out vs 90 days is usually 15-20% difference"
+   - YES: "With 4 facilities in Texas, timing is critical - locking in 6 months out vs 90 days is usually 10-20% difference"
    - Include timing context: early renewal (6 months) vs late (90 days) = money difference
-   - CRITICAL: Mention the 15-20% savings figure ONLY ONCE in the entire email - do not repeat it multiple times
+   - CRITICAL: Mention the 10-20% savings figure ONLY ONCE in the entire email - do not repeat it multiple times
 
 5. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
    - Write like a peer, not a salesperson (conversational, confident, direct)
    - Use contractions: "we're," "don't," "it's," "you're," "I'm"
    - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
-   - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy," "dive into," "solution," "at Power Choosers"
+   - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "procurement," "unleash," "synergy," "dive into," "solution," "at Power Choosers"
    - Sound like: colleague who knows their industry and has talked to others like them
-   - Use casual confidence: "Quick question—" "Real question—" "Been wondering—" "Here's what I'm seeing—"
+   - Use casual confidence: "Been wondering—" "Question for you—" "Here's what I'm seeing—"
    - NO: "Would you be open to..." (permission-based, weak)
    - YES: Ask specific questions that assume conversation is happening
 
@@ -2909,7 +3506,7 @@ FRAMEWORK (2025 Best Practice - Day 5 Follow-Up):
    - Lead with a common challenge or mistake companies make
    - Examples:
      * "A lot of companies wait until the last minute—here's why early review matters..."
-     * "Most [role]s I talk to don't realize timing costs them 15-20%..."
+     * "Most [role]s I talk to don't realize timing costs them 10-20%..."
      * "The biggest mistake I see in [company_industry] is..."
    - Make it educational, not salesy
 
@@ -3073,7 +3670,7 @@ AVOID (Weak CTAs):
 - "Feel free to reach out if you have questions"
 - "We should probably talk next week"
 VALUE REMINDER:
-- 15-20% savings based on current market
+- 10-20% savings based on current market
 - Locked-in rates = budget certainty
 - Simplified process vs. current supplier
 - Better terms because shopping early
@@ -3123,7 +3720,7 @@ QUESTION EXAMPLES:
 - "Have you run a competitive analysis recently?"
 
 INSIGHT EXAMPLES:
-- "Most companies I talk to don't realize renewal timing costs them 15-20%"
+- "Most companies I talk to don't realize renewal timing costs them 10-20%"
 - "Lock-in timing is when you actually save money—not just best price"
 - "Your supplier probably doesn't tell you when rate changes are coming"
 
@@ -3152,7 +3749,7 @@ STRUCTURE:
 
 ANSWER EXAMPLES:
 If they ask "How much could we save?"
-→ "Based on companies similar to yours in [industry], typically 15-20% on renewal. I'd need to see your current bill to give you exact numbers."
+→ "Based on companies similar to yours in [industry], typically 10-20% on renewal. I'd need to see your current bill to give you exact numbers."
 
 If they ask "How does this work?"
 → "Simply put: [step 1], [step 2], [step 3]. Takes 30 days from analysis to locked-in rates."
@@ -6323,6 +6920,144 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     });
 
   // Helper functions for AI email formatting
+  // Build cold email HTML template (matches email-compose-global.js and generate-scheduled-emails.js)
+  function buildColdEmailHtmlTemplate(data, recipient) {
+    const company = recipient?.company || recipient?.accountName || 'Your Company';
+    const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
+    const industry = recipient?.industry || recipient?.account?.industry || '';
+    
+    // Default sender profile
+    const senderName = 'Lewis Patterson';
+    const senderTitle = 'Energy Strategist';
+    const senderCompany = 'Power Choosers';
+    
+    // Clean data fields (remove citations)
+    const cleanField = (field) => {
+      if (!field) return '';
+      return String(field).replace(/\[\d+\]/g, '').trim();
+    };
+    
+    const greeting = cleanField(data.greeting) || `Hi ${firstName},`;
+    const openingHook = cleanField(data.opening_hook) || `I tried reaching you earlier but couldn't connect. I wanted to share some important information about energy cost trends that could significantly impact ${company}.`;
+    const valueProposition = cleanField(data.value_proposition) || (industry ? `Most ${industry} companies like ${company} see 10-20% savings through competitive procurement. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>` : 'Most businesses see 10-20% savings through competitive procurement and efficiency solutions. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>');
+    const socialProof = cleanField(data.social_proof_optional) || '';
+    const ctaText = cleanField(data.cta_text) || 'Explore Your Savings Potential';
+    
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { margin:0; padding:0; background:#f1f5fa; font-family:'Segoe UI',Arial,sans-serif; color:#1e3a8a;}
+    .container { max-width:600px; margin:30px auto; background:#fff; border-radius:14px;
+      box-shadow:0 6px 28px rgba(30,64,175,0.11),0 1.5px 4px rgba(30,64,175,0.03); overflow:hidden;
+    }
+    .header { padding:32px 24px 18px 24px; background:linear-gradient(135deg,#1e3a8a 0%,#1e40af 100%);
+      color:#fff; text-align:center;
+    }
+    .header img { max-width:190px; margin:0 auto 10px; display:block;}
+    .brandline { font-size:16px; font-weight:600; letter-spacing:0.08em; opacity:0.92;}
+    .subject-blurb { margin:20px 24px 2px 24px; font-size:14px; color:#dc2626;
+      font-weight:600; letter-spacing:0.02em; opacity:0.93;
+      background:#fee2e2; padding:6px 13px; border-radius:6px; display:inline-block;
+    }
+    .intro { margin:0 24px 10px 24px; padding:18px 0 2px 0; }
+    .intro p { margin:0 0 3px 0; font-size:16px; color:#1e3a8a; }
+    .main-paragraph {margin:0 24px 18px 24px; padding:18px; background:#fff; border-radius:7px; line-height:1.6;}
+    .solution-box { background:linear-gradient(135deg,#f0fdfa 0%,#ccfbf1 100%);
+      border:1px solid #99f6e4; padding:18px 20px; margin:0 24px 18px 24px;
+      border-radius:8px; box-shadow:0 2px 8px rgba(20,184,166,0.06);
+    }
+    .solution-box h3 { margin:0 0 10px 0; color:#0f766e; font-size:16px; }
+    .solution-box p { margin:0; color:#1f2937; font-size:15px; line-height:1.5; }
+    .social-proof { background:linear-gradient(135deg,#dbeafe 0%,#bfdbfe 100%);
+      padding:14px 18px; margin:0 24px 18px 24px; border-radius:8px;
+    }
+    .social-proof p { margin:0; color:#1e40af; font-size:14px; font-style:italic; line-height:1.5; }
+    .cta-container { text-align:center; padding:22px 24px;
+      background:#fee2e2; border-radius:8px; margin:0 24px 18px 24px;
+      box-shadow:0 2px 6px rgba(239,68,68,0.05);
+    }
+    .cta-btn { display:inline-block; padding:13px 36px; background:#ef4444; color:#fff;
+      border-radius:7px; font-weight:700; font-size:16px; text-decoration:none;
+      box-shadow:0 2px 8px rgba(239,68,68,0.13); transition:background 0.18s;
+    }
+    .cta-btn:hover { background:#dc2626;}
+    .signature { margin:15px 24px 22px 24px; font-size:15.3px; color:#1e40af;
+      font-weight:500; padding:14px 0 0 0; border-top:1px solid #e9ebf3;
+    }
+    .footer { padding:22px 24px; color:#aaa; text-align:center; font-size:13px;
+      background: #f1f5fa; border-bottom-left-radius:14px; border-bottom-right-radius:14px;
+      letter-spacing:0.08em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/687d6d9c6ea5d6db744563ee_clear%20logo.png" alt="Power Choosers">
+      <div class="brandline">Your Energy Partner</div>
+    </div>
+    <div class="subject-blurb">⚠️ Energy Costs Rising Fast</div>
+    <div class="intro">
+      <p>${greeting}</p>
+      <p>${openingHook}</p>
+    </div>
+    <div class="solution-box">
+      <h3>✓ How Power Choosers Helps</h3>
+      <p>${valueProposition}</p>
+    </div>
+    ${socialProof ? `<div class="social-proof"><p>${socialProof}</p></div>` : ''}
+    <div class="cta-container">
+      <a href="https://powerchoosers.com/schedule" class="cta-btn">${ctaText}</a>
+      <div style="margin-top:8px;font-size:14px;color:#dc2626;opacity:0.83;">
+        Quick 15-minute call to discuss your options—no obligation.
+      </div>
+    </div>
+    <div class="signature">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <div>
+          <div style="font-weight: 600; font-size: 15px; color: #1e3a8a;">${senderName}</div>
+          <div style="font-size: 13px; color: #1e40af; opacity: 0.9;">${senderTitle}</div>
+        </div>
+      </div>
+      <div style="font-size: 14px; color: #1e40af; margin: 4px 0 0 0; line-height: 1.4;">
+        <div style="margin: 2px 0 0 0; line-height: 1.3;">${senderCompany}</div>
+      </div>
+    </div>
+    <div class="footer">
+      Power Choosers &bull; Your Energy Partner<br>
+      &copy; 2025 PowerChoosers.com. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>
+    `;
+  }
+
+  // Build plain text version from HTML
+  function buildTextVersionFromHtml(html) {
+    // Remove HTML tags and decode entities
+    let text = html
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    // Extract main content (between intro and signature)
+    const lines = text.split(/\s+/).filter(Boolean);
+    return lines.join(' ').substring(0, 1000); // Limit length
+  }
+
   function formatTemplatedEmail(result, recipient, templateType) {
     try {
       // Clean all string fields in result to remove citations
@@ -6339,7 +7074,15 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       }
       
       const subject = (result.subject || 'Energy Solutions');
-      const html = result.output || result.html || '<p>Email content</p>';
+      
+      // Build HTML template from structured data if templateType is cold_email
+      let html = '';
+      if (templateType === 'cold_email' && result.greeting) {
+        html = buildColdEmailHtmlTemplate(result, recipient);
+      } else {
+        html = result.output || result.html || '<p>Email content</p>';
+      }
+      
       // Light de-salesify on subject only (avoid mutating structured HTML templates)
       const cleanSubject = String(subject)
         .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
@@ -6615,83 +7358,118 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               ? substituteBracketTokensInPrompt(prompt, selectedContact)
               : prompt;
             
+            // Build enriched recipient object with account data (same as actual email generation)
+            const recipient = (() => {
+              const recipient = {
+                name: selectedContact.full_name || selectedContact.name || '',
+                firstName: selectedContact.first_name || selectedContact.firstName || (selectedContact.name?.split(' ')[0] || ''),
+                lastName: selectedContact.last_name || selectedContact.lastName || (selectedContact.name?.split(' ').slice(1).join(' ') || ''),
+                company: selectedContact.company || selectedContact.accountName || '',
+                email: selectedContact.email || '',
+                title: selectedContact.title || selectedContact.job || selectedContact.role || '',
+                linkedin: selectedContact.linkedin || selectedContact.linkedinUrl || '',
+                linkedinUrl: selectedContact.linkedin || selectedContact.linkedinUrl || '',
+                seniority: selectedContact.seniority || '',
+                department: selectedContact.department || '',
+                industry: selectedContact.industry || selectedContact.account?.industry || ''
+              };
+              
+              // Add account data if available
+              if (selectedContact.account || selectedContact.account_id) {
+                const accountId = selectedContact.account?.id || selectedContact.account_id;
+                // Try to get account from cache
+                let account = null;
+                if (window.BackgroundAccountsLoader) {
+                  const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+                  account = accounts.find(a => a.id === accountId) || null;
+                }
+                
+                if (account) {
+                  recipient.account = {
+                    id: account.id,
+                    name: account.accountName || account.name || '',
+                    industry: account.industry || '',
+                    domain: account.domain || account.website || '',
+                    city: account.city || account.billingCity || account.locationCity || '',
+                    state: account.state || account.billingState || account.region || '',
+                    shortDescription: account.shortDescription || account.short_desc || account.descriptionShort || account.description || '',
+                    linkedin: account.linkedin || account.linkedinUrl || account.companyLinkedin || '',
+                    linkedinUrl: account.linkedin || account.linkedinUrl || account.companyLinkedin || '',
+                    employees: account.employees || account.companyEmployees || null,
+                    squareFootage: account.squareFootage || account.square_footage || account.companySquareFootage || null,
+                    occupancyPct: account.occupancyPct || account.occupancy_pct || account.companyOccupancyPct || null,
+                    annualUsage: account.annualUsage || account.annualKilowattUsage || account.annual_usage || '',
+                    electricitySupplier: account.electricitySupplier || '',
+                    currentRate: account.currentRate || '',
+                    contractEndDate: account.contractEndDate || account.contractEnd || account.contract_end_date || ''
+                  };
+                  
+                  recipient.energy = {
+                    supplier: account.electricitySupplier || '',
+                    currentRate: account.currentRate || '',
+                    usage: account.annualUsage || '',
+                    contractEnd: account.contractEndDate || account.contractEnd || ''
+                  };
+                  
+                  // Set industry from account if not already set
+                  if (!recipient.industry && account.industry) {
+                    recipient.industry = account.industry;
+                  }
+                }
+              }
+              
+              // Also include account data directly from contact if present
+              if (selectedContact.account) {
+                recipient.account = { ...selectedContact.account };
+                if (selectedContact.account.industry && !recipient.industry) {
+                  recipient.industry = selectedContact.account.industry;
+                }
+              }
+              
+              return recipient;
+            })();
+            
+            // Detect industry and select angle (same logic as actual email generation)
+            let recipientIndustry = recipient?.industry || recipient?.account?.industry || '';
+            
+            // Infer from company name if not set
+            if (!recipientIndustry && recipient?.company) {
+              recipientIndustry = inferIndustryFromCompanyName(recipient.company);
+            }
+            
+            // Infer from account description if still not set
+            if (!recipientIndustry && recipient?.account) {
+              const accountDesc = recipient.account?.shortDescription || recipient.account?.short_desc || 
+                                 recipient.account?.descriptionShort || recipient.account?.description || 
+                                 recipient.account?.companyDescription || recipient.account?.accountDescription || '';
+              if (accountDesc) {
+                recipientIndustry = inferIndustryFromDescription(accountDesc);
+              }
+            }
+            
+            // Default to 'Default' if no industry detected
+            if (!recipientIndustry) {
+              recipientIndustry = 'Default';
+            }
+            
+            // Select angle based on industry/role/exemption status (same as actual email generation)
+            const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient);
+            const toneOpener = selectRandomToneOpener(selectedAngle?.id);
+            
+            // Determine templateType based on mode
+            const templateType = mode === 'html' ? 'cold_email' : null;
+            
             const response = await fetch(`${base}/api/perplexity-email`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 prompt: substitutedPrompt,
                 mode: mode,
-                recipient: (() => {
-                  // Build enriched recipient object with account data
-                  const recipient = {
-                    name: selectedContact.full_name || selectedContact.name || '',
-                    firstName: selectedContact.first_name || selectedContact.firstName || (selectedContact.name?.split(' ')[0] || ''),
-                    lastName: selectedContact.last_name || selectedContact.lastName || (selectedContact.name?.split(' ').slice(1).join(' ') || ''),
-                    company: selectedContact.company || selectedContact.accountName || '',
-                    email: selectedContact.email || '',
-                    title: selectedContact.title || selectedContact.job || selectedContact.role || '',
-                    linkedin: selectedContact.linkedin || selectedContact.linkedinUrl || '',
-                    linkedinUrl: selectedContact.linkedin || selectedContact.linkedinUrl || '',
-                    seniority: selectedContact.seniority || '',
-                    department: selectedContact.department || '',
-                    industry: selectedContact.industry || selectedContact.account?.industry || ''
-                  };
-                  
-                  // Add account data if available
-                  if (selectedContact.account || selectedContact.account_id) {
-                    const accountId = selectedContact.account?.id || selectedContact.account_id;
-                    // Try to get account from cache
-                    let account = null;
-                    if (window.BackgroundAccountsLoader) {
-                      const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
-                      account = accounts.find(a => a.id === accountId) || null;
-                    }
-                    
-                    if (account) {
-                      recipient.account = {
-                        id: account.id,
-                        name: account.accountName || account.name || '',
-                        industry: account.industry || '',
-                        domain: account.domain || account.website || '',
-                        city: account.city || account.billingCity || account.locationCity || '',
-                        state: account.state || account.billingState || account.region || '',
-                        shortDescription: account.shortDescription || account.short_desc || account.descriptionShort || account.description || '',
-                        linkedin: account.linkedin || account.linkedinUrl || account.companyLinkedin || '',
-                        linkedinUrl: account.linkedin || account.linkedinUrl || account.companyLinkedin || '',
-                        employees: account.employees || account.companyEmployees || null,
-                        squareFootage: account.squareFootage || account.square_footage || account.companySquareFootage || null,
-                        occupancyPct: account.occupancyPct || account.occupancy_pct || account.companyOccupancyPct || null,
-                        annualUsage: account.annualUsage || account.annualKilowattUsage || account.annual_usage || '',
-                        electricitySupplier: account.electricitySupplier || '',
-                        currentRate: account.currentRate || '',
-                        contractEndDate: account.contractEndDate || account.contractEnd || account.contract_end_date || ''
-                      };
-                      
-                      recipient.energy = {
-                        supplier: account.electricitySupplier || '',
-                        currentRate: account.currentRate || '',
-                        usage: account.annualUsage || '',
-                        contractEnd: account.contractEndDate || account.contractEnd || ''
-                      };
-                      
-                      // Set industry from account if not already set
-                      if (!recipient.industry && account.industry) {
-                        recipient.industry = account.industry;
-                      }
-                    }
-                  }
-                  
-                  // Also include account data directly from contact if present
-                  if (selectedContact.account) {
-                    recipient.account = { ...selectedContact.account };
-                    if (selectedContact.account.industry && !recipient.industry) {
-                      recipient.industry = selectedContact.account.industry;
-                    }
-                  }
-                  
-                  return recipient;
-                })(),
-                senderName: senderFirst || ' '
+                templateType: templateType,
+                recipient: recipient,
+                selectedAngle: selectedAngle,
+                toneOpener: toneOpener,
+                senderName: senderFirst || 'Lewis Patterson'
               })
             });
             
