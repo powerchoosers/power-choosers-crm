@@ -17,6 +17,10 @@
   let _cacheWritePending = false;
   let lastLoadedDoc = null; // For pagination
   let hasMoreData = true; // For pagination
+  
+  // In-memory cache for folder counts (30 second expiry)
+  const folderCountCache = new Map();
+  const FOLDER_COUNT_EXPIRY = 30 * 1000; // 30 seconds
   const tsToIso = (v) => {
     try {
       if (!v) return null;
@@ -43,6 +47,90 @@
     try { if (window.DataManager && typeof window.DataManager.getCurrentUserEmail==='function') return window.DataManager.getCurrentUserEmail(); return (window.currentUserEmail||'').toLowerCase(); } catch(_) { return (window.currentUserEmail||'').toLowerCase(); }
   };
   
+  // Helper to normalize a Firestore email document into our standard shape
+  function normalizeEmailDoc(id, data) {
+    const createdAt = tsToIso(data.createdAt);
+    const updatedAt = tsToIso(data.updatedAt);
+    const sentAt = tsToIso(data.sentAt);
+    const receivedAt = tsToIso(data.receivedAt);
+    const scheduledSendTime = tsToMs(data.scheduledSendTime); // Keep as milliseconds for numeric comparison
+    const generatedAt = tsToIso(data.generatedAt);
+    const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
+    return {
+      id,
+      ...data,
+      createdAt,
+      updatedAt,
+      sentAt,
+      receivedAt,
+      scheduledSendTime,
+      generatedAt,
+      timestamp,
+      emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
+    };
+  }
+
+  // Ensure all scheduled emails (up to ~200) are loaded into memory so the Scheduled tab
+  // is always complete and responsive, regardless of how many other emails exist.
+  async function ensureAllScheduledEmailsLoaded() {
+    if (_scheduledLoadedOnce) return;
+    if (!window.firebaseDB) return;
+    
+    try {
+      const db = window.firebaseDB;
+      const userEmail = (window.currentUserEmail || '').toLowerCase();
+      const isEmployee = window.currentUserRole !== 'admin' && !!userEmail;
+      
+      const map = new Map(emailsData.map(e => [e.id, e]));
+      
+      if (isEmployee) {
+        const e = String(userEmail).toLowerCase();
+        const [ownedSnap, assignedSnap] = await Promise.all([
+          db.collection('emails')
+            .where('ownerId', '==', e)
+            .where('type', '==', 'scheduled')
+            .limit(200)
+            .get(),
+          db.collection('emails')
+            .where('assignedTo', '==', e)
+            .where('type', '==', 'scheduled')
+            .limit(200)
+            .get()
+        ]);
+        
+        const applySnap = (snap) => {
+          snap.forEach(doc => {
+            const data = doc.data();
+            map.set(doc.id, normalizeEmailDoc(doc.id, data));
+          });
+        };
+        
+        applySnap(ownedSnap);
+        applySnap(assignedSnap);
+      } else {
+        // Admin: load up to 200 scheduled emails across the system
+        const scheduledSnap = await db.collection('emails')
+          .where('type', '==', 'scheduled')
+          .orderBy('createdAt', 'desc')
+          .limit(200)
+          .get();
+        
+        scheduledSnap.forEach(doc => {
+          const data = doc.data();
+          map.set(doc.id, normalizeEmailDoc(doc.id, data));
+        });
+      }
+      
+      emailsData = Array.from(map.values())
+        .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+      
+      _scheduledLoadedOnce = true;
+      console.log('[BackgroundEmailsLoader] ✓ Ensured all scheduled emails loaded into memory (up to 200)');
+    } catch (e) {
+      console.warn('[BackgroundEmailsLoader] Failed to ensure all scheduled emails are loaded:', e);
+    }
+  }
+
   async function loadFromFirestore() {
     if (!window.firebaseDB) {
       console.warn('[BackgroundEmailsLoader] firebaseDB not available');
@@ -74,16 +162,7 @@
           assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
           raw = Array.from(map.values());
         }
-        emailsData = raw.map((data) => {
-          const createdAt = tsToIso(data.createdAt);
-          const updatedAt = tsToIso(data.updatedAt);
-          const sentAt = tsToIso(data.sentAt);
-          const receivedAt = tsToIso(data.receivedAt);
-          const scheduledSendTime = tsToMs(data.scheduledSendTime); // Keep as milliseconds for numeric comparison
-          const generatedAt = tsToIso(data.generatedAt);
-          const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
-          return { ...data, createdAt, updatedAt, sentAt, receivedAt, scheduledSendTime, generatedAt, timestamp, emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent') };
-        });
+        emailsData = raw.map((data) => normalizeEmailDoc(data.id || data.id, data));
         // Sort newest first
         emailsData.sort((a,b)=> new Date(b.timestamp||0) - new Date(a.timestamp||0));
       } else {
@@ -93,29 +172,7 @@
           .limit(200)
           .get();
         
-        emailsData = snapshot.docs.map(doc => {
-          const data = doc.data();
-          const createdAt = tsToIso(data.createdAt);
-          const updatedAt = tsToIso(data.updatedAt);
-          const sentAt = tsToIso(data.sentAt);
-          const receivedAt = tsToIso(data.receivedAt);
-          const scheduledSendTime = tsToMs(data.scheduledSendTime); // Keep as milliseconds for numeric comparison
-          const generatedAt = tsToIso(data.generatedAt);
-          // Prioritize actual sent/received dates over creation date for display
-          const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
-          return {
-            id: doc.id,
-            ...data,
-            createdAt,
-            updatedAt,
-            sentAt,
-            receivedAt,
-            scheduledSendTime,
-            generatedAt,
-            timestamp,
-            emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
-          };
-        });
+        emailsData = snapshot.docs.map(doc => normalizeEmailDoc(doc.id, doc.data()));
         
         // Sort by timestamp (actual sent/received date) instead of createdAt for better date continuity
         emailsData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -131,6 +188,9 @@
         console.log('[BackgroundEmailsLoader] Admin loaded, date range:', 
                     emailsData.length > 0 ? `${emailsData[emailsData.length-1].timestamp} to ${emailsData[0].timestamp}` : 'none');
       }
+      
+      // Ensure ALL scheduled emails (up to 200) are present in memory so the Scheduled tab is complete
+      await ensureAllScheduledEmailsLoaded();
       
       console.log('[BackgroundEmailsLoader] ✓ Loaded', emailsData.length, 'emails from Firestore');
       
@@ -266,89 +326,116 @@
     }
   }
 
-  // Get total count for a specific folder without loading all records
+  // Fast in-memory filter for folder counts (mirrors emails-redesigned.js filters)
+  function getInMemoryCountByFolder(folder) {
+    const isEmployee = window.currentUserRole !== 'admin';
+    const userEmail = (window.currentUserEmail || '').toLowerCase();
+    
+    let filtered = emailsData;
+    
+    // Apply ownership filter for employees
+    if (isEmployee && userEmail) {
+      filtered = filtered.filter(email => {
+        const ownerId = (email.ownerId || '').toLowerCase();
+        const assignedTo = (email.assignedTo || '').toLowerCase();
+        return ownerId === userEmail || assignedTo === userEmail;
+      });
+    }
+    
+    // Apply folder-specific filters (exact same logic as emails-redesigned.js)
+    switch (folder) {
+      case 'inbox':
+        filtered = filtered.filter(email => {
+          return (email.type === 'received' || 
+                  email.emailType === 'received' || 
+                  email.provider === 'sendgrid_inbound' ||
+                  (!email.type && !email.emailType && !email.isSentEmail)) && 
+                 !email.deleted;
+        });
+        break;
+      case 'sent':
+        filtered = filtered.filter(email => {
+          const isSent = (
+            email.type === 'sent' ||
+            email.emailType === 'sent' ||
+            email.isSentEmail === true ||
+            email.status === 'sent' ||
+            email.provider === 'sendgrid'
+          );
+          return isSent && !email.deleted;
+        });
+        break;
+      case 'scheduled':
+        // OPTIMIZATION: Pre-compute time once, use early returns, match emails-redesigned.js logic
+        {
+          const oneMinuteAgo = Date.now() - 60000;
+          filtered = filtered.filter(email => {
+            // Fast path: early returns for common cases
+            if (email.type !== 'scheduled' || email.deleted) return false;
+            
+            const status = email.status;
+            // Fast path: exclude already sent emails
+            if (status === 'sent' || status === 'delivered') return false;
+            
+            // Show if pending or generating (most common cases)
+            if (status === 'not_generated' || status === 'pending_approval' || status === 'generating') {
+              return true;
+            }
+            
+            // Show approved emails with valid future send time
+            if (status === 'approved') {
+              const sendTime = email.scheduledSendTime;
+              return sendTime && typeof sendTime === 'number' && sendTime >= oneMinuteAgo;
+            }
+            
+            return false;
+          });
+        }
+        break;
+      case 'starred':
+        filtered = filtered.filter(email => email.starred && !email.deleted);
+        break;
+      case 'trash':
+        filtered = filtered.filter(email => email.deleted);
+        break;
+      default:
+        return emailsData.length;
+    }
+    
+    return filtered.length;
+  }
+  
+  // Get total count for a specific folder without loading all records.
+  // IMPORTANT: This must mirror the same filters used in emails-redesigned.js/applyFilters()
+  // so the footer count always matches what the user can actually see.
   // folder: 'inbox' | 'sent' | 'scheduled' | 'starred' | 'trash'
   async function getTotalCountByFolder(folder) {
-    if (!window.firebaseDB) return 0;
-    const db = window.firebaseDB.collection('emails');
-    const isEmployee = window.currentUserRole !== 'admin';
-    const user = (window.currentUserEmail || '').toLowerCase();
-    const idSet = new Set();
-    
-    const runQuery = async (builder) => {
-      try {
-        const snap = await builder.get();
-        snap.forEach(d => idSet.add(d.id));
-      } catch (e) {
-        console.warn('[BackgroundEmailsLoader] Count query failed for folder', folder, e);
-      }
-    };
-    
-    try {
-      switch (folder) {
-        case 'inbox': {
-          // Union of: type == 'received' OR provider == 'sendgrid_inbound'
-          if (isEmployee && user) {
-            await runQuery(db.where('ownerId','==',user).where('type','==','received'));
-            await runQuery(db.where('assignedTo','==',user).where('type','==','received'));
-            await runQuery(db.where('ownerId','==',user).where('provider','==','sendgrid_inbound'));
-            await runQuery(db.where('assignedTo','==',user).where('provider','==','sendgrid_inbound'));
-          } else {
-            await runQuery(db.where('type','==','received'));
-            await runQuery(db.where('provider','==','sendgrid_inbound'));
-          }
-          break;
-        }
-        case 'sent': {
-          // Union of: type == 'sent' OR provider == 'sendgrid'
-          if (isEmployee && user) {
-            await runQuery(db.where('ownerId','==',user).where('type','==','sent'));
-            await runQuery(db.where('assignedTo','==',user).where('type','==','sent'));
-            await runQuery(db.where('ownerId','==',user).where('provider','==','sendgrid'));
-            await runQuery(db.where('assignedTo','==',user).where('provider','==','sendgrid'));
-          } else {
-            await runQuery(db.where('type','==','sent'));
-            await runQuery(db.where('provider','==','sendgrid'));
-          }
-          break;
-        }
-        case 'scheduled': {
-          if (isEmployee && user) {
-            await runQuery(db.where('ownerId','==',user).where('type','==','scheduled'));
-            await runQuery(db.where('assignedTo','==',user).where('type','==','scheduled'));
-          } else {
-            await runQuery(db.where('type','==','scheduled'));
-          }
-          break;
-        }
-        case 'starred': {
-          if (isEmployee && user) {
-            await runQuery(db.where('ownerId','==',user).where('starred','==',true));
-            await runQuery(db.where('assignedTo','==',user).where('starred','==',true));
-          } else {
-            await runQuery(db.where('starred','==',true));
-          }
-          break;
-        }
-        case 'trash': {
-          if (isEmployee && user) {
-            await runQuery(db.where('ownerId','==',user).where('deleted','==',true));
-            await runQuery(db.where('assignedTo','==',user).where('deleted','==',true));
-          } else {
-            await runQuery(db.where('deleted','==',true));
-          }
-          break;
-        }
-        default: {
-          // Fallback to total
-          return await getTotalCount();
-        }
-      }
-      return idSet.size;
-    } catch (error) {
-      console.error('[BackgroundEmailsLoader] Failed to get folder count:', folder, error);
-      return 0;
+    // OPTIMIZATION: Check in-memory cache first (30 second expiry)
+    const cacheKey = `${folder}-${window.currentUserEmail || 'admin'}`;
+    const cached = folderCountCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < FOLDER_COUNT_EXPIRY) {
+      console.log(`[BackgroundEmailsLoader] Folder count cache HIT for ${folder}: ${cached.count}`);
+      return cached.count;
     }
+    
+    // OPTIMIZATION: Use in-memory filtering first (instant, no Firestore cost)
+    // This works well when we have data already loaded in memory
+    const inMemoryCount = getInMemoryCountByFolder(folder);
+    console.log(`[BackgroundEmailsLoader] In-memory count for ${folder}: ${inMemoryCount}`);
+    
+    // Cache the in-memory count
+    folderCountCache.set(cacheKey, { count: inMemoryCount, timestamp: Date.now() });
+    
+    // Return the in-memory count immediately (fast path)
+    // We could optionally fetch accurate count from Firestore in background for next time,
+    // but for most cases, in-memory filtering is sufficient and accurate
+    return inMemoryCount;
+  }
+  
+  // Invalidate folder count cache (call when emails are updated)
+  function invalidateFolderCountCache() {
+    folderCountCache.clear();
+    console.log('[BackgroundEmailsLoader] Folder count cache cleared');
   }
 
   // Start a real-time listener for emails collection
@@ -386,8 +473,19 @@
             });
           });
 
-          emailsData = updated;
+          // IMPORTANT: Do NOT overwrite emailsData here, or we will drop
+          // older pages that were loaded via pagination. Instead, merge the
+          // 100 most recent documents into the existing array by id, and keep
+          // everything else intact. This prevents the Scheduled/Inbox lists
+          // from "shrinking" after a realtime update.
+          const map = new Map(emailsData.map(e => [e.id, e]));
+          updated.forEach(e => map.set(e.id, e));
+          emailsData = Array.from(map.values())
+            .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
 
+          // Invalidate folder count cache when emails are updated
+          invalidateFolderCountCache();
+          
           // Throttle cache writes to avoid excessive IndexedDB operations
           if (!_cacheWritePending && window.CacheManager && typeof window.CacheManager.set === 'function') {
             _cacheWritePending = true;
@@ -446,6 +544,10 @@
         const map = new Map(emailsData.map(e=>[e.id,e]));
         updated.forEach(e=>map.set(e.id,e));
         emailsData = Array.from(map.values()).sort((a,b)=> new Date(b.timestamp||0) - new Date(a.timestamp||0));
+        
+        // Invalidate folder count cache when emails are updated
+        invalidateFolderCountCache();
+        
         if (!_cacheWritePending && window.CacheManager && typeof window.CacheManager.set === 'function') {
           _cacheWritePending = true;
           setTimeout(async () => {
@@ -729,7 +831,9 @@
     getCount: () => emailsData.length,
     hasMore: () => hasMoreData,
     getTotalCount: getTotalCount,
-    getTotalCountByFolder: getTotalCountByFolder
+    getTotalCountByFolder: getTotalCountByFolder,
+    invalidateFolderCountCache: invalidateFolderCountCache,
+    getInMemoryCountByFolder: getInMemoryCountByFolder
   };
   
   console.log('[BackgroundEmailsLoader] Module initialized');

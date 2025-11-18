@@ -2334,9 +2334,9 @@
         who_we_are: 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates. Write in first person ("we"/"I"). Avoid brand-first openers like "At Power Choosers," — use "We help" or "I help".',
         marketContext: {
           enabled: true,
-          rateIncrease: '15-25%',
+          rateIncrease: '10-20%',
           renewalYears: '2025-2026',
-          earlyRenewalSavings: '20-30%',
+          earlyRenewalSavings: '15-25%',
           typicalClientSavings: '10-20%',
           marketInsights: 'due to data center demand'
         },
@@ -3336,7 +3336,7 @@
       <p>I wanted to share an opportunity for ${company} to get a comprehensive energy assessment at no cost. Our team will analyze your current energy profile and identify potential savings opportunities.</p>
     </div>
     <div class="main-paragraph">
-      <p>${data.benefits || 'Our assessment typically uncovers <strong style="color:#14b8a6;">15-30% in cost reduction potential</strong> for facilities. We\'ll review your current rate structure, contract terms, and usage patterns to identify hidden charges and optimization opportunities.'}</p>
+      <p>${data.benefits || 'Most teams typically see <strong style="color:#14b8a6;">10-20% in cost reduction potential</strong>. We\'ll review your current rate structure, contract terms, and usage patterns to identify hidden charges and optimization opportunities.'}</p>
     </div>
     <div class="info-list">
       <h3>📋 What We'll Review</h3>
@@ -3800,7 +3800,7 @@
     const displaySubject = simplifySubject(data.subject);
     
     const sections = data.sections || [
-      'We\'ve secured exclusive rates for facilities that are 15-25% below typical renewal offers',
+      'We\'ve secured exclusive rates for facilities that are 10-20% below typical renewal offers',
       'Our team handles all supplier negotiations and contract reviews at no cost to you',
       'You maintain complete control and transparency throughout the entire process',
       'Early action now protects you from anticipated rate increases'

@@ -4,6 +4,8 @@
     currentEmail: null
   };
   const els = {};
+  let senderNameClickHandler = null;
+  let senderNameKeyHandler = null;
 
   // Initialize DOM references
   function initDomRefs() {
@@ -19,7 +21,8 @@
     els.replyBtn = document.getElementById('reply-btn');
     els.forwardBtn = document.getElementById('forward-btn');
     els.deleteBtn = document.getElementById('delete-email-btn');
-    els.actionBar = els.page ? els.page.querySelector('.action-buttons') : null;
+    els.regenerateBtn = document.getElementById('regenerate-email-btn');
+    els.actionBar = els.page ? els.page.querySelector('.page-actions') : null;
     
     // Reply container elements
     els.replyContainer = document.getElementById('email-reply-container');
@@ -111,6 +114,8 @@
       // Add action buttons for scheduled emails (all statuses)
       if (state.currentEmail.type === 'scheduled') {
         addScheduledEmailActions();
+      } else {
+        resetScheduledEmailActions();
       }
       
       // Mark as read
@@ -161,6 +166,9 @@
     }
 
     // Set sender/recipient info
+    const contactId = email.contactId || email.contact_id || null;
+    const knownContactName = email.contactName || email.contact?.name || '';
+    
     if (els.senderName) {
       if (isSentEmail) {
         // For sent/scheduled emails, show recipient name
@@ -171,10 +179,24 @@
         } else {
           recipientEmail = email.to || '';
         }
-        els.senderName.textContent = extractName(recipientEmail) || 'Unknown Recipient';
+        const displayName = knownContactName || extractName(recipientEmail) || 'Unknown Recipient';
+        els.senderName.textContent = displayName;
+        if (contactId) {
+          enableContactNameLink(contactId);
+        } else {
+          disableContactNameLink();
+        }
       } else {
-      els.senderName.textContent = extractName(email.from) || 'Unknown';
+        const displayName = knownContactName || extractName(email.from) || 'Unknown';
+        els.senderName.textContent = displayName;
+        if (contactId) {
+          enableContactNameLink(contactId);
+        } else {
+          disableContactNameLink();
+        }
       }
+    } else {
+      disableContactNameLink();
     }
 
     if (els.senderEmail) {
@@ -195,7 +217,7 @@
 
     // Set date
     if (els.emailDate) {
-      els.emailDate.textContent = formatDate(email.date);
+      els.emailDate.textContent = getEmailDateLabel(email);
     }
 
     // Set sender/recipient avatar
@@ -2331,6 +2353,13 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
   async function deleteEmail() {
     if (!state.currentEmail) return;
 
+    // For scheduled emails, this acts as reject and moves to next stage
+    if (state.currentEmail.type === 'scheduled') {
+      await rejectAndAdvanceScheduledEmail(state.currentEmail.id);
+      return;
+    }
+
+    // For other emails, normal delete
     if (!confirm('Are you sure you want to delete this email?')) {
       return;
     }
@@ -2349,62 +2378,368 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     }
   }
 
+  // Reject scheduled email and advance contact to next stage
+  async function rejectAndAdvanceScheduledEmail(emailId) {
+    if (!confirm('Are you sure you want to reject this scheduled email? The contact will be moved to the next stage in the sequence.')) {
+      return;
+    }
+
+    try {
+      const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+      if (!db) {
+        throw new Error('Firebase not available');
+      }
+
+      // Get email data
+      const emailDoc = await db.collection('emails').doc(emailId).get();
+      if (!emailDoc.exists) {
+        throw new Error('Email not found');
+      }
+
+      const emailData = emailDoc.data();
+      const sequenceId = emailData.sequenceId;
+      const contactId = emailData.contactId;
+      const stepIndex = emailData.stepIndex || 0;
+
+      // Mark email as rejected
+      await db.collection('emails').doc(emailId).update({
+        status: 'rejected',
+        rejectedAt: Date.now(),
+        updatedAt: new Date().toISOString()
+      });
+
+      // Get sequence to find next step
+      if (sequenceId && contactId) {
+        const sequenceDoc = await db.collection('sequences').doc(sequenceId).get();
+        if (sequenceDoc.exists) {
+          const sequence = sequenceDoc.data();
+          const steps = sequence.steps || [];
+
+          // Find next auto-email step
+          let nextAutoEmailStep = null;
+          let nextStepIndex = null;
+
+          for (let i = stepIndex + 1; i < steps.length; i++) {
+            const step = steps[i];
+            if (step.type === 'auto-email' || step.type === 'email') {
+              nextAutoEmailStep = step;
+              nextStepIndex = i;
+              break;
+            }
+          }
+
+          // If there's a next step, create the email for it
+          if (nextAutoEmailStep) {
+            const delayMs = (nextAutoEmailStep.delayMinutes || 0) * 60 * 1000;
+            const nextScheduledSendTime = Date.now() + delayMs;
+
+            const nextEmailId = `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+            // Get contact data for next email
+            let contactName = emailData.contactName || '';
+            let contactCompany = emailData.contactCompany || '';
+            let toEmail = emailData.to || '';
+
+            try {
+              const contactDoc = await db.collection('people').doc(contactId).get();
+              if (contactDoc.exists) {
+                const contact = contactDoc.data();
+                contactName = contact.name || contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || contactName;
+                contactCompany = contact.company || contactCompany;
+                toEmail = contact.email || toEmail;
+              }
+            } catch (error) {
+              console.warn('[EmailDetail] Failed to load contact data for next step:', error);
+            }
+
+            await db.collection('emails').doc(nextEmailId).set({
+              type: 'scheduled',
+              status: 'not_generated',
+              scheduledSendTime: nextScheduledSendTime,
+              contactId: contactId,
+              contactName: contactName,
+              contactCompany: contactCompany,
+              to: toEmail,
+              sequenceId: sequenceId,
+              sequenceName: emailData.sequenceName || sequence.name || '',
+              stepIndex: nextStepIndex,
+              totalSteps: steps.length,
+              activationId: emailData.activationId,
+              aiPrompt: nextAutoEmailStep.emailSettings?.aiPrompt || nextAutoEmailStep.data?.aiPrompt || nextAutoEmailStep.aiPrompt || nextAutoEmailStep.content || 'Write a professional email',
+              ownerId: emailData.ownerId,
+              assignedTo: emailData.assignedTo,
+              createdBy: emailData.createdBy,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp ? firebase.firestore.FieldValue.serverTimestamp() : new Date().toISOString()
+            });
+
+            console.log(`[EmailDetail] Created next step email (step ${nextStepIndex}) for contact ${contactId}`);
+          }
+        }
+      }
+
+      // Show success message
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Email rejected. Contact moved to next stage.');
+      }
+
+      // Go back to emails page
+      goBack();
+    } catch (error) {
+      console.error('[EmailDetail] Failed to reject and advance email:', error);
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Failed to reject email: ' + error.message);
+      }
+    }
+  }
+
+  function configureRegenerateButton(options = {}) {
+    if (!els.regenerateBtn) {
+      return;
+    }
+    
+    const { visible, text, disabled, onClick } = options;
+    
+    if (!visible) {
+      els.regenerateBtn.style.display = 'none';
+      els.regenerateBtn.disabled = false;
+      els.regenerateBtn.textContent = 'Regenerate Email';
+      els.regenerateBtn.onclick = null;
+      return;
+    }
+    
+    // Show the button (use inline-block to match other buttons in the header)
+    els.regenerateBtn.style.display = 'inline-block';
+    els.regenerateBtn.disabled = !!disabled;
+    els.regenerateBtn.textContent = text || 'Regenerate Email';
+    if (typeof onClick === 'function') {
+      els.regenerateBtn.onclick = onClick;
+    } else {
+      els.regenerateBtn.onclick = null;
+    }
+  }
+
+  function setQuickActionButtonsForSchedule(isScheduled) {
+    // Hide/show reply and forward buttons based on email type
+    if (els.replyBtn) {
+      els.replyBtn.style.display = isScheduled ? 'none' : '';
+    }
+    if (els.forwardBtn) {
+      els.forwardBtn.style.display = isScheduled ? 'none' : '';
+    }
+    
+    // Show regenerate button for scheduled emails, hide for others
+    if (isScheduled) {
+      // The regenerate button will be configured by addScheduledEmailActions()
+      // This function just ensures the visibility state is correct
+      // The actual configuration (text, onClick) happens in addScheduledEmailActions()
+    } else {
+      // Hide regenerate button for non-scheduled emails
+      configureRegenerateButton({ visible: false });
+    }
+  }
+
+  function resetScheduledEmailActions() {
+    if (!els.actionBar) return;
+    const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .generate-btn, .regenerate-btn');
+    existingBtns.forEach(btn => btn.remove());
+    setQuickActionButtonsForSchedule(false);
+  }
+
+  function enableContactNameLink(contactId) {
+    if (!els.senderName || !contactId) {
+      disableContactNameLink();
+      return;
+    }
+    
+    disableContactNameLink();
+    els.senderName.classList.add('email-detail-contact-link');
+    els.senderName.setAttribute('role', 'link');
+    els.senderName.setAttribute('tabindex', '0');
+    
+    senderNameClickHandler = (event) => {
+      if (event) event.preventDefault();
+      openContactDetailFromEmail(contactId);
+    };
+    senderNameKeyHandler = (event) => {
+      if (!event) return;
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openContactDetailFromEmail(contactId);
+      }
+    };
+    
+    els.senderName.addEventListener('click', senderNameClickHandler);
+    els.senderName.addEventListener('keydown', senderNameKeyHandler);
+  }
+
+  function disableContactNameLink() {
+    if (!els.senderName) return;
+    
+    if (senderNameClickHandler) {
+      els.senderName.removeEventListener('click', senderNameClickHandler);
+      senderNameClickHandler = null;
+    }
+    if (senderNameKeyHandler) {
+      els.senderName.removeEventListener('keydown', senderNameKeyHandler);
+      senderNameKeyHandler = null;
+    }
+    
+    els.senderName.classList.remove('email-detail-contact-link');
+    els.senderName.removeAttribute('role');
+    els.senderName.removeAttribute('tabindex');
+  }
+
+  function openContactDetailFromEmail(contactId) {
+    if (!contactId) return;
+    
+    // Store navigation context for back button
+    const emailId = state.currentEmail?.id || null;
+    window._contactNavigationSource = 'email-detail';
+    window._emailDetailReturn = { emailId };
+    
+    // Try to prefetch full contact data with company context
+    try {
+      // First try to get full contact from people data cache
+      let fullContact = null;
+      if (window.getPeopleData && typeof window.getPeopleData === 'function') {
+        const peopleData = window.getPeopleData();
+        fullContact = peopleData.find(p => p.id === contactId);
+      }
+      
+      // If we found the full contact in cache, use it
+      if (fullContact) {
+        window._prefetchedContactForDetail = fullContact;
+      } else {
+        // Fallback: Build contact object from email data with company context
+        const isSentEmail = state.currentEmail.isSentEmail || state.currentEmail.type === 'sent' || state.currentEmail.type === 'scheduled';
+        let contactEmail = '';
+        
+        if (isSentEmail) {
+          // For sent/scheduled emails, recipient is the contact
+          if (Array.isArray(state.currentEmail.to)) {
+            contactEmail = state.currentEmail.to[0] || '';
+          } else {
+            contactEmail = state.currentEmail.to || '';
+          }
+        } else {
+          // For received emails, sender is the contact
+          contactEmail = state.currentEmail.from || '';
+        }
+        
+        // Extract domain to help find account
+        const emailDomain = contactEmail ? extractDomain(contactEmail) : '';
+        
+        // Try to find linked account by domain
+        let linkedAccountId = null;
+        let linkedAccountName = state.currentEmail.companyName || state.currentEmail.company || '';
+        
+        if (emailDomain && window.getAccountsData && typeof window.getAccountsData === 'function') {
+          const accounts = window.getAccountsData();
+          const linkedAccount = accounts.find(a => {
+            const accountDomain = (a.domain || '').toLowerCase().replace(/^www\./, '');
+            const accountWebsite = (a.website || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+            const domainLower = emailDomain.toLowerCase();
+            return accountDomain === domainLower || accountWebsite === domainLower;
+          });
+          
+          if (linkedAccount) {
+            linkedAccountId = linkedAccount.id;
+            linkedAccountName = linkedAccount.name || linkedAccount.accountName || linkedAccountName;
+          }
+        }
+        
+        // Build enriched contact object
+        window._prefetchedContactForDetail = {
+          id: contactId,
+          name: state.currentEmail.contactName || extractName(contactEmail) || 'Unknown',
+          email: contactEmail,
+          company: linkedAccountName,
+          accountId: linkedAccountId,
+          account_id: linkedAccountId // Also set legacy field
+        };
+      }
+    } catch (error) {
+      console.warn('[EmailDetail] Error prefetching contact data:', error);
+      // Minimal fallback
+      window._prefetchedContactForDetail = {
+        id: contactId,
+        name: state.currentEmail?.contactName || 'Unknown'
+      };
+    }
+    
+    // Navigate to people page (where contact detail is shown)
+    if (window.crm && typeof window.crm.navigateToPage === 'function') {
+      window.crm.navigateToPage('people');
+      
+      // Use retry pattern to ensure ContactDetail module is ready
+      requestAnimationFrame(() => {
+        let attempts = 0;
+        const maxAttempts = 25;
+        const retryInterval = 80;
+        const retry = () => {
+          attempts++;
+          if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+            window.ContactDetail.show(contactId);
+          } else if (attempts < maxAttempts) {
+            setTimeout(retry, retryInterval);
+          }
+        };
+        retry();
+      });
+    }
+  }
+
   // Add action buttons for scheduled emails (all statuses)
   function addScheduledEmailActions() {
-    if (!els.actionBar || !state.currentEmail) return;
+    if (!els.actionBar || !state.currentEmail) {
+      return;
+    }
 
-    const status = state.currentEmail.status || 'not_generated';
+    const status = (state.currentEmail.status || 'not_generated').toLowerCase();
+    
+    setQuickActionButtonsForSchedule(true);
 
     // Remove any existing scheduled email buttons
-    const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .regenerate-btn, .generate-btn');
+    const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .generate-btn, .regenerate-btn');
     existingBtns.forEach(btn => btn.remove());
 
-    // Show different buttons based on status
+    const emailId = state.currentEmail.id;
+    const regenerateAction = () => regenerateScheduledEmail(emailId);
+    const generateAction = () => generateScheduledEmail(emailId);
+
     if (status === 'not_generated') {
-      // For not_generated: Show Generate button
-      const generateBtn = document.createElement('button');
-      generateBtn.className = 'btn-primary generate-btn';
-      generateBtn.textContent = 'Generate Email';
-      generateBtn.addEventListener('click', () => generateScheduledEmail(state.currentEmail.id));
-      els.actionBar.insertBefore(generateBtn, els.deleteBtn);
-    } else if (status === 'pending_approval') {
-      // For pending_approval: Show Approve, Reject, and Regenerate buttons
+      configureRegenerateButton({
+        visible: true,
+        text: 'Generate Email',
+        disabled: false,
+        onClick: generateAction
+      });
+    } else if (status === 'generating') {
+      configureRegenerateButton({
+        visible: true,
+        text: 'Generating…',
+        disabled: true
+      });
+    } else {
+      configureRegenerateButton({
+        visible: true,
+        text: 'Regenerate Email',
+        disabled: false,
+        onClick: regenerateAction
+      });
+    }
+
+    // Show different buttons based on status
+    if (status === 'pending_approval') {
+      // For pending_approval: Show only Approve button
+      // Delete button (trash icon) will serve as reject button
+      // Regenerate Email button is already shown via configureRegenerateButton()
     const approveBtn = document.createElement('button');
     approveBtn.className = 'btn-primary approve-btn';
     approveBtn.textContent = 'Approve';
     approveBtn.addEventListener('click', () => approveScheduledEmail(state.currentEmail.id));
     els.actionBar.insertBefore(approveBtn, els.deleteBtn);
-
-    const rejectBtn = document.createElement('button');
-    rejectBtn.className = 'btn-secondary reject-btn';
-    rejectBtn.textContent = 'Reject';
-    rejectBtn.addEventListener('click', () => rejectScheduledEmail(state.currentEmail.id));
-    els.actionBar.insertBefore(rejectBtn, els.deleteBtn);
-
-    const regenerateBtn = document.createElement('button');
-    regenerateBtn.className = 'btn-secondary regenerate-btn';
-    regenerateBtn.textContent = 'Regenerate';
-    regenerateBtn.addEventListener('click', () => regenerateScheduledEmail(state.currentEmail.id));
-    els.actionBar.insertBefore(regenerateBtn, els.deleteBtn);
-    } else if (status === 'approved') {
-      // For approved: Show Regenerate button (can regenerate before sending)
-      const regenerateBtn = document.createElement('button');
-      regenerateBtn.className = 'btn-secondary regenerate-btn';
-      regenerateBtn.textContent = 'Regenerate';
-      regenerateBtn.addEventListener('click', () => regenerateScheduledEmail(state.currentEmail.id));
-      els.actionBar.insertBefore(regenerateBtn, els.deleteBtn);
-    } else if (status === 'rejected') {
-      // For rejected: Show Regenerate button (can regenerate after rejection)
-      const regenerateBtn = document.createElement('button');
-      regenerateBtn.className = 'btn-primary regenerate-btn';
-      regenerateBtn.textContent = 'Regenerate';
-      regenerateBtn.addEventListener('click', () => regenerateScheduledEmail(state.currentEmail.id));
-      els.actionBar.insertBefore(regenerateBtn, els.deleteBtn);
     }
-
-    // Hide reply/forward buttons for scheduled emails
-    if (els.replyBtn) els.replyBtn.style.display = 'none';
-    if (els.forwardBtn) els.forwardBtn.style.display = 'none';
   }
 
   // Approve scheduled email
@@ -2864,7 +3199,41 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         return '<p>No content available</p>';
       }
 
-      return decodedHtml;
+      // Wrap content with CSS to match signature color and be dynamic for email clients
+      // Use CSS variables for dark mode CRM, but allow email clients to override with their own styles
+      const wrappedHtml = `
+        <div class="email-content-wrapper" style="
+          color: var(--text-primary, #ffffff);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+          line-height: 1.6;
+          font-size: 15px;
+        ">
+          ${decodedHtml}
+        </div>
+        <style>
+          /* Ensure text is visible in dark mode CRM */
+          .email-content-wrapper {
+            color: var(--text-primary, #ffffff) !important;
+          }
+          /* For email clients with light backgrounds, use dark text */
+          /* Email clients will apply their own styles, but we provide fallback */
+          .email-content-wrapper p,
+          .email-content-wrapper div,
+          .email-content-wrapper span,
+          .email-content-wrapper td {
+            color: inherit !important;
+          }
+          /* Override any inline styles that force dark text in dark mode */
+          @media (prefers-color-scheme: dark) {
+            .email-content-wrapper,
+            .email-content-wrapper * {
+              color: var(--text-primary, #ffffff) !important;
+            }
+          }
+        </style>
+      `;
+
+      return wrappedHtml;
     } catch (error) {
       console.error('Failed to sanitize email HTML:', error);
       return '<p>Error loading email content</p>';
@@ -3088,9 +3457,33 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     return email; // Final fallback to full string
   }
 
+  function getEmailDateLabel(email) {
+    if (!email) return '';
+    const scheduled = email.type === 'scheduled';
+    if (scheduled) {
+      if (email.scheduledSendTime) {
+        const formatted = formatDate(email.scheduledSendTime);
+        if (formatted) return `Scheduled • ${formatted}`;
+      }
+      const statusLabel = formatStatusLabel(email.status);
+      return statusLabel ? `Scheduled Email • ${statusLabel}` : 'Scheduled Email';
+    }
+    return formatDate(email.date);
+  }
+
+  function formatStatusLabel(status) {
+    if (!status) return '';
+    return String(status)
+      .split('_')
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
+
   function formatDate(date) {
     if (!date) return '';
     const d = new Date(date);
+    if (Number.isNaN(d.getTime())) return '';
     return d.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
