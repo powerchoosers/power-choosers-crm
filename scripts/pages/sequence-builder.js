@@ -6157,9 +6157,9 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     });
 
     // Drag and drop for step reordering
-    // TEMPORARILY DISABLED: caused unexpected step jumps when interacting with previews.
-    // We keep step order stable based purely on creation order and explicit saves.
-    // attachDragAndDropEvents(container);
+    // Enabled, but constrained to the step header so it never conflicts with
+    // preview/contact selection or editor interactions.
+    attachDragAndDropEvents(container);
 
     // Attachment remove (immediate save)
     container.querySelectorAll('.step-card .attachments .remove-attach').forEach(btn => {
@@ -7407,12 +7407,16 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     };
     const preventTextSelection = (ev) => ev.preventDefault();
 
+    // Only allow dragging from the step header area (not the whole card) so
+    // clicks inside the body, preview picker, editor, etc. can never start a drag.
     container.querySelectorAll('.step-card').forEach(stepCard => {
+      const headerEl = stepCard.querySelector('.step-header');
+      if (!headerEl) return;
       let holdTimer = null;
       let startPos = { x: 0, y: 0 };
 
       // Mouse down - start hold timer
-      stepCard.addEventListener('mousedown', (e) => {
+      headerEl.addEventListener('mousedown', (e) => {
         // Don't drag if clicking on interactive elements or editable areas
         if (
           e.target.closest('button, input, textarea, select, .toolbar-btn, .toggle-switch, .editor-toolbar, .link-bar, .attachments, .preview-contact-picker') ||
@@ -7428,7 +7432,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       });
 
       // Mouse move - cancel hold if moved too much
-      stepCard.addEventListener('mousemove', (e) => {
+      headerEl.addEventListener('mousemove', (e) => {
         if (holdTimer && !dragState.isDragging) {
           const dx = Math.abs(e.clientX - startPos.x);
           const dy = Math.abs(e.clientY - startPos.y);
@@ -7440,7 +7444,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       });
 
       // Mouse up - cancel hold timer
-      stepCard.addEventListener('mouseup', () => {
+      headerEl.addEventListener('mouseup', () => {
         if (holdTimer) {
           clearTimeout(holdTimer);
           holdTimer = null;
@@ -7448,7 +7452,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       });
 
       // Mouse leave - cancel hold timer
-      stepCard.addEventListener('mouseleave', () => {
+      headerEl.addEventListener('mouseleave', () => {
         if (holdTimer) {
           clearTimeout(holdTimer);
           holdTimer = null;
