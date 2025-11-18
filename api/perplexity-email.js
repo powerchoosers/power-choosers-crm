@@ -3,6 +3,7 @@
 // Expects POST { prompt, mode: 'standard'|'html', recipient, to, senderName, fromEmail }
 
 import { cors } from './_cors.js';
+import * as IndustryDetection from './_industry-detection.js';
 
 // ========== SUBJECT LINE VARIANTS ==========
 // Multiple subject line options that randomly select to reduce template-like appearance
@@ -1437,35 +1438,66 @@ function getIndustrySpecificContent(industry) {
   
   const industryMap = {
     manufacturing: {
-      painPoints: ['production downtime', 'energy-intensive operations', 'equipment reliability'],
+      painPoints: [
+        'production downtime',
+        'energy-intensive operations',
+        'equipment reliability',
+        'energy spend doubling on renewal for large facilities',
+        'confusing riders and line items on bills that hide negotiable costs',
+        'being on the wrong contract structure leading to high delivery charges'
+      ],
       avgSavings: '15-25%',
       keyBenefit: 'operational continuity',
       urgencyDrivers: ['production schedules', 'equipment uptime'],
       language: 'operational efficiency and production continuity'
     },
     healthcare: {
-      painPoints: ['budget constraints', 'regulatory compliance', 'patient care continuity'],
+      painPoints: [
+        'budget constraints',
+        'regulatory compliance',
+        'patient care continuity',
+        'unpredictable utility bills impacting care budgets',
+        'multiple meters and contracts renewing at different times causing chaos'
+      ],
       avgSavings: '10-18%',
       keyBenefit: 'cost predictability',
       urgencyDrivers: ['budget cycles', 'compliance deadlines'],
       language: 'budget optimization and regulatory compliance'
     },
     retail: {
-      painPoints: ['multiple locations', 'unpredictable costs', 'seasonal demand'],
+      painPoints: [
+        'multiple locations',
+        'unpredictable costs',
+        'seasonal demand',
+        'fragmented contracts across locations renewing at different times',
+        'bills with hard-to-explain riders and fees that can be removed'
+      ],
       avgSavings: '12-20%',
       keyBenefit: 'centralized management',
       urgencyDrivers: ['lease renewals', 'expansion plans'],
       language: 'cost control and centralized management'
     },
     hospitality: {
-      painPoints: ['seasonal demand', 'guest comfort', 'operational costs'],
+      painPoints: [
+        'seasonal demand',
+        'guest comfort',
+        'operational costs',
+        'multi-property contracts renewing at different times creating chaos',
+        'wrong contract type causing high delivery charges during peak seasons'
+      ],
       avgSavings: '12-18%',
       keyBenefit: 'cost stability',
       urgencyDrivers: ['seasonal planning', 'guest satisfaction'],
       language: 'cost stability and guest experience'
     },
     education: {
-      painPoints: ['budget constraints', 'facility maintenance', 'student safety'],
+      painPoints: [
+        'budget constraints',
+        'facility maintenance',
+        'student safety',
+        'energy spend jumping significantly on renewal impacting academic budgets',
+        'confusing line items on bills that hide negotiable costs'
+      ],
       avgSavings: '10-15%',
       keyBenefit: 'budget optimization',
       urgencyDrivers: ['academic year cycles', 'facility upgrades'],
@@ -1725,7 +1757,8 @@ async function buildSystemPrompt({
   const firstName = r.firstName || r.first_name || (name ? String(name).split(' ')[0] : '');
   const company = r.company || r.accountName || '';
   const job = r.title || r.job || r.role || '';
-  const industry = r.industry || '';
+  // Normalize industry using shared detection helpers when missing
+  let industry = r.industry || '';
   const energy = r.energy || {};
   const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 1000);
   const notes = [r.notes, r.account?.notes].filter(Boolean).join('\n').slice(0, 500);
@@ -1762,6 +1795,18 @@ async function buildSystemPrompt({
 
   // Always run research in parallel for comprehensive personalization
   const researchPromises = [];
+
+  // If industry not provided but we have company or description, infer it here
+  try {
+    if (!industry && company) {
+      industry = IndustryDetection.inferIndustryFromCompanyName(company) || industry;
+    }
+    if (!industry && accountDescription) {
+      industry = IndustryDetection.inferIndustryFromDescription(accountDescription) || industry;
+    }
+  } catch (_) {
+    // Best-effort only; fall back to whatever was passed in
+  }
   
   // Company research (only if no description exists)
   if (!accountDescription && company) {
