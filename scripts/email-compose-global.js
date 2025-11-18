@@ -2370,6 +2370,98 @@
 
   // ========== AI HELPER FUNCTIONS ==========
   
+  // Browser-compatible industry detection (matches api/_industry-detection.js)
+  function inferIndustryFromCompanyName(companyName) {
+    if (!companyName) return '';
+
+    const name = String(companyName).toLowerCase();
+
+    // Manufacturing (including building materials, machinery, chemicals)
+    if (/\b(manufacturing|manufacturer|industrial|factory|plant|fabrication|production|assembly|machinery|machine|equipment|chemical|chemicals|petrochemical|building\s+materials?|building\s+products?|lumber|millwork|concrete|ready\s+mix|asphalt|steel)\b/i.test(name)) {
+      return 'Manufacturing';
+    }
+
+    // Hospitality / Restaurant
+    if (/\b(hotel|inn|motel|resort|lodge|restaurant|cafe|dining|hospitality)\b/i.test(name)) {
+      return 'Hospitality';
+    }
+
+    // Healthcare (including dental / dentist offices)
+    if (/\b(hospital|clinic|medical|healthcare|health\s*care|physician|doctor|dental|dentist|orthodontic|pharmacy)\b/i.test(name)) {
+      return 'Healthcare';
+    }
+
+    // Retail
+    if (/\b(retail|store|shop|market|outlet|merchandise|boutique)\b/i.test(name)) {
+      return 'Retail';
+    }
+
+    // Logistics / Transportation / Warehousing
+    if (/\b(logistics|transportation|warehouse|shipping|freight|delivery|distribution|trucking)\b/i.test(name)) {
+      return 'Logistics';
+    }
+
+    // Data Center / Hosting / Cloud
+    if (/\b(data\s*center|datacenter|server|hosting|cloud|colo)\b/i.test(name)) {
+      return 'DataCenter';
+    }
+
+    // Nonprofit
+    if (/\b(nonprofit|non-profit|charity|foundation|501c3|501\(c\)\(3\))\b/i.test(name)) {
+      return 'Nonprofit';
+    }
+
+    return '';
+  }
+
+  function inferIndustryFromDescription(description) {
+    if (!description) return '';
+
+    const desc = String(description).toLowerCase();
+
+    // Hospitality
+    if (/\b(hotel|inn|motel|resort|lodge|accommodation|hospitality|guest|room|booking|stay)\b/i.test(desc)) {
+      return 'Hospitality';
+    }
+
+    // Restaurant / Food
+    if (/\b(restaurant|cafe|dining|food|beverage|menu|cuisine|chef)\b/i.test(desc)) {
+      return 'Hospitality';
+    }
+
+    // Manufacturing (including building materials, machinery, chemicals)
+    if (/\b(manufacturing|production|factory|plant|industrial|assembly|fabrication|machinery|machine|equipment|chemical|chemicals|petrochemical|building\s+materials?|building\s+products?|lumber|millwork|concrete|ready\s+mix|asphalt|steel)\b/i.test(desc)) {
+      return 'Manufacturing';
+    }
+
+    // Healthcare (including dental / dentist offices)
+    if (/\b(hospital|clinic|medical|healthcare|patient|treatment|diagnosis|surgery|dental|dentist|orthodontic)\b/i.test(desc)) {
+      return 'Healthcare';
+    }
+
+    // Retail
+    if (/\b(retail|store|merchandise|shopping|customer|product|sale)\b/i.test(desc)) {
+      return 'Retail';
+    }
+
+    // Logistics
+    if (/\b(logistics|warehouse|shipping|distribution|freight|transportation|delivery)\b/i.test(desc)) {
+      return 'Logistics';
+    }
+
+    // Data Center
+    if (/\b(data\s*center|server|hosting|cloud|infrastructure|computing)\b/i.test(desc)) {
+      return 'DataCenter';
+    }
+
+    // Nonprofit
+    if (/\b(nonprofit|charity|foundation|mission|donation|volunteer)\b/i.test(desc)) {
+      return 'Nonprofit';
+    }
+
+    return '';
+  }
+  
   async function lookupPersonByEmail(email) {
     try {
       const e = String(email || '').trim().toLowerCase();
@@ -2427,21 +2519,42 @@
             linkedinUrl: person.linkedin || person.linkedinUrl || '',
             seniority: person.seniority || '',
             department: person.department || '',
-            account: account ? {
-              id: account.id,
-              name: account.accountName || account.name || '',
-              industry: account.industry || '',
-              domain: account.domain || account.website || '',
-              city: account.city || account.billingCity || account.locationCity || '',
-              state: account.state || account.billingState || account.region || '',
-              shortDescription: account.shortDescription || account.short_desc || account.descriptionShort || account.description || '',
-              logoUrl: account.logoUrl || '',
-              phone: account.phone || account.companyPhone || '',
-              annualUsage: account.annualUsage || '',
-              electricitySupplier: account.electricitySupplier || '',
-              currentRate: account.currentRate || '',
-              contractEndDate: account.contractEndDate || ''
-            } : null
+            account: account ? (() => {
+              // Infer industry if missing (using shared detection logic)
+              let detectedIndustry = account.industry || '';
+              if (!detectedIndustry) {
+                // Try company name first
+                const companyName = account.accountName || account.name || person.company || '';
+                if (companyName) {
+                  detectedIndustry = inferIndustryFromCompanyName(companyName);
+                }
+                
+                // Try description if still not found
+                if (!detectedIndustry) {
+                  const accountDesc = account.shortDescription || account.short_desc || 
+                                     account.descriptionShort || account.description || '';
+                  if (accountDesc) {
+                    detectedIndustry = inferIndustryFromDescription(accountDesc);
+                  }
+                }
+              }
+              
+              return {
+                id: account.id,
+                name: account.accountName || account.name || '',
+                industry: detectedIndustry, // Use detected industry (from account or inferred)
+                domain: account.domain || account.website || '',
+                city: account.city || account.billingCity || account.locationCity || '',
+                state: account.state || account.billingState || account.region || '',
+                shortDescription: account.shortDescription || account.short_desc || account.descriptionShort || account.description || '',
+                logoUrl: account.logoUrl || '',
+                phone: account.phone || account.companyPhone || '',
+                annualUsage: account.annualUsage || '',
+                electricitySupplier: account.electricitySupplier || '',
+                currentRate: account.currentRate || '',
+                contractEndDate: account.contractEndDate || ''
+              };
+            })() : null
           };
         }
       }
@@ -2547,6 +2660,25 @@
           recipient.company = acct.accountName || acct.name || '';
         }
         
+        // Infer industry if missing (using shared detection logic)
+        let detectedIndustry = acct.industry || '';
+        if (!detectedIndustry) {
+          // Try company name first
+          const companyName = acct.accountName || acct.name || recipient.company || '';
+          if (companyName) {
+            detectedIndustry = inferIndustryFromCompanyName(companyName);
+          }
+          
+          // Try description if still not found
+          if (!detectedIndustry) {
+            const accountDesc = acct.shortDescription || acct.short_desc || 
+                               acct.descriptionShort || acct.description || '';
+            if (accountDesc) {
+              detectedIndustry = inferIndustryFromDescription(accountDesc);
+            }
+          }
+        }
+        
         const acctEnergy = {
           supplier: acct.electricitySupplier || '',
           currentRate: acct.currentRate || '',
@@ -2557,7 +2689,7 @@
         recipient.account = {
           id: acct.id,
           name: acct.accountName || acct.name || '',
-          industry: acct.industry || '',
+          industry: detectedIndustry, // Use detected industry (from account or inferred)
           domain: acct.domain || acct.website || '',
           city: acct.city || acct.billingCity || acct.locationCity || '',
           state: acct.state || acct.billingState || acct.region || '',
@@ -2574,6 +2706,11 @@
           squareFootage: acct.squareFootage || acct.square_footage || acct.companySquareFootage || null,
           occupancyPct: acct.occupancyPct || acct.occupancy_pct || acct.companyOccupancyPct || null
         };
+        
+        // Also set recipient.industry if missing
+        if (!recipient.industry && detectedIndustry) {
+          recipient.industry = detectedIndustry;
+        }
         
         let rate = String(acctEnergy.currentRate || '').trim();
         if (/^\.\d+$/.test(rate)) rate = '0' + rate;

@@ -4994,9 +4994,12 @@ class PowerChoosersCRM {
                         if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
                             // Use DataManager helper if available
                             const firebaseTasks = await window.DataManager.queryWithOwnership('tasks');
+
+                            // CRITICAL FIX: Always prefer Firebase as the source of truth
+                            // Firebase tasks override any stale local copies with the same ID
                             const mergedTasksMap = new Map();
-                            localTasks.forEach(t => { if (t && t.id) mergedTasksMap.set(t.id, t); });
-                            firebaseTasks.forEach(t => { if (t && t.id && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t); });
+                            firebaseTasks.forEach(t => { if (t && t.id) mergedTasksMap.set(t.id, t); });
+                            localTasks.forEach(t => { if (t && t.id && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t); });
                             const mergedTasks = Array.from(mergedTasksMap.values());
                             try {
                                 localStorage.setItem('userTasks', JSON.stringify(mergedTasks));
@@ -5026,9 +5029,11 @@ class PowerChoosersCRM {
                                 }
                             });
                             const firebaseTasks = Array.from(tasksMap.values());
+
+                            // CRITICAL FIX: Always prefer Firebase as the source of truth
                             const mergedTasksMap = new Map();
-                            localTasks.forEach(t => { if (t && t.id) mergedTasksMap.set(t.id, t); });
-                            firebaseTasks.forEach(t => { if (t && t.id && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t); });
+                            firebaseTasks.forEach(t => { if (t && t.id) mergedTasksMap.set(t.id, t); });
+                            localTasks.forEach(t => { if (t && t.id && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t); });
                             const mergedTasks = Array.from(mergedTasksMap.values());
                             try {
                                 localStorage.setItem('userTasks', JSON.stringify(mergedTasks));
@@ -5052,10 +5057,11 @@ class PowerChoosersCRM {
                         return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
                     });
                     
-                    // Merge with localStorage (local takes precedence for duplicates)
+                    // CRITICAL FIX: Always prefer Firebase as the source of truth
+                    // Firebase tasks override any stale local copies with the same ID
                     const allTasksMap = new Map();
-                    localTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
-                    firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+                    firebaseTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+                    localTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
                     const mergedTasks = Array.from(allTasksMap.values());
                     
                     // Save merged data back to localStorage cache for next refresh
