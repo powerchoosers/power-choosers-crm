@@ -5895,7 +5895,16 @@
 function closeContactSequencesPanel() {
   const panel = document.getElementById('contact-sequences-panel');
   const cleanup = () => {
-    if (panel && panel.parentElement) panel.parentElement.removeChild(panel);
+    if (panel && panel.parentElement) {
+      // Remove click handler before removing panel
+      if (panel._sequenceClickHandler) {
+        try {
+          panel.removeEventListener('click', panel._sequenceClickHandler);
+          panel._sequenceClickHandler = null;
+        } catch(_) {}
+      }
+      panel.parentElement.removeChild(panel);
+    }
     try { 
       if (_onContactSequencesOutside) {
         document.removeEventListener('mousedown', _onContactSequencesOutside, true);
@@ -6001,12 +6010,15 @@ function openContactSequencesPanel() {
   try { window.addEventListener('resize', _positionContactSequencesPanel, true); } catch (_) {}
   try { window.addEventListener('scroll', _positionContactSequencesPanel, true); } catch (_) {}
 
-  // Interactions
-  panel.addEventListener('click', (e) => {
+  // Interactions - use event delegation on panel to ensure it works after content updates
+  // Store handler reference so we can remove it later if needed
+  panel._sequenceClickHandler = (e) => {
     const item = e.target.closest?.('.list-item');
     if (!item || item.getAttribute('aria-disabled') === 'true') return;
+    console.log('[ContactDetail] Sequence item clicked:', item.getAttribute('data-name'));
     handleSequenceChoose(item);
-  });
+  };
+  panel.addEventListener('click', panel._sequenceClickHandler);
 
   // Define keyboard handler before registering
   _onContactSequencesKeydown = (e) => {
@@ -6181,12 +6193,22 @@ async function addCurrentContactToSequence(sequenceId, sequenceName) {
 
     const message = `Added to "${sequenceName}"${!hasEmail ? ' (email steps will be skipped)' : ''}`;
     window.crm?.showToast && window.crm.showToast(message, 'success');
+    
+    // Update the sequence item to show checkmark (keep panel open for multiple additions)
+    const panel = document.getElementById('contact-sequences-panel');
+    if (panel) {
+      const sequenceItem = panel.querySelector(`[data-id="${sequenceId}"]`);
+      if (sequenceItem) {
+        sequenceItem.setAttribute('data-member-id', 'pending');
+        const checkEl = sequenceItem.querySelector('.list-check');
+        if (checkEl) checkEl.textContent = '✓';
+      }
+    }
   } catch (err) {
     console.warn('Add to sequence failed', err);
     window.crm?.showToast && window.crm.showToast('Failed to add to sequence', 'error');
-  } finally {
-    closeContactSequencesPanel();
   }
+  // Don't close panel automatically - let user add multiple contacts or close manually
 }
 
 async function removeCurrentContactFromSequence(memberDocId, sequenceName) {
@@ -6765,7 +6787,14 @@ async function createContactSequenceThenAdd(name) {
         console.log('[ContactDetail] Closest list-item:', listItem);
         if (listItem && !listItem.hasAttribute('aria-disabled')) {
           console.log('[ContactDetail] Calling handleListChoose for:', listItem.getAttribute('data-name'));
-          handleListChoose(listItem);
+          try {
+            handleListChoose(listItem);
+          } catch (err) {
+            console.error('[ContactDetail] Error in handleListChoose:', err);
+            if (window.crm?.showToast) {
+              window.crm.showToast('Error adding to list. Please try again.', 'error');
+            }
+          }
         } else {
           console.log('[ContactDetail] List item click ignored:', {
             hasListItem: !!listItem,
@@ -6774,8 +6803,8 @@ async function createContactSequenceThenAdd(name) {
         }
       };
       
-      // Attach the listener
-      container.addEventListener('click', container._listItemClickHandler);
+      // Attach the listener with capture phase to ensure it fires
+      container.addEventListener('click', container._listItemClickHandler, true);
       console.log('[ContactDetail] List item click handler attached to container:', container.id);
     } catch (err) {
       console.warn('Failed to load lists', err);
