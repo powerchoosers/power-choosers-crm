@@ -42,13 +42,16 @@ export default async function handler(req, res) {
     
     const now = Date.now();
     
-    // Query for approved emails that are ready to send
+    // Query for emails that are ready to send.
+    // IMPORTANT: We now treat both 'approved' and 'pending_approval' as sendable
+    // once their scheduledSendTime has passed. This allows sequences to continue
+    // even if the user doesn't manually approve every email.
     // Note: This runs server-side with Firebase Admin SDK, which bypasses Firestore rules
     // The ownership fields were added during email creation to ensure client-side queries work
     // Limit to 50 emails per run to stay well under SendGrid's 100/sec rate limit
     const readyToSendQuery = db.collection('emails')
       .where('type', '==', 'scheduled')
-      .where('status', '==', 'approved')
+      .where('status', 'in', ['approved', 'pending_approval'])
       .where('scheduledSendTime', '<=', now)
       .limit(50);
     
@@ -89,8 +92,8 @@ export default async function handler(req, res) {
           
           const currentStatus = freshDoc.data().status;
           
-          // Only proceed if status is still 'approved'
-          if (currentStatus === 'approved') {
+          // Only proceed if status is still 'approved' or 'pending_approval'
+          if (currentStatus === 'approved' || currentStatus === 'pending_approval') {
             transaction.update(emailDoc.ref, {
               status: 'sending',
               sendingStartedAt: admin.firestore.FieldValue.serverTimestamp()

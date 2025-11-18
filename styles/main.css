@@ -7359,6 +7359,22 @@ html, body {
     gap: 10px;
 }
 
+/* Email detail contact link */
+.email-detail-contact-link {
+    cursor: pointer;
+    color: var(--grey-400);
+    font-weight: 400;
+    text-decoration: none;
+    outline: none;
+    transition: var(--transition-fast);
+}
+
+.email-detail-contact-link:hover,
+.email-detail-contact-link:focus-visible {
+    color: var(--text-inverse);
+    text-decoration: none;
+}
+
 #list-detail-table .name-cell .avatar-initials {
     width: 28px;
     height: 28px;
