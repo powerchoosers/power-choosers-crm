@@ -3538,6 +3538,20 @@
           return;
         }
         
+        if (window._contactNavigationSource === 'email-detail' && window._emailDetailReturn?.emailId) {
+          clearPhoneWidgetContext();
+          
+          const emailId = window._emailDetailReturn.emailId;
+          window._contactNavigationSource = null;
+          window._emailDetailReturn = null;
+          window._contactNavigationContactId = null;
+          
+          if (window.crm && typeof window.crm.navigateToPage === 'function') {
+            window.crm.navigateToPage('email-detail', { emailId });
+          }
+          return;
+        }
+        
         // Check if we came from calls page
         if (window._contactNavigationSource === 'calls') {
           // Clear phone widget context to prevent contact company info from leaking
