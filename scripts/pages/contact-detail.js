@@ -6135,19 +6135,26 @@ async function addCurrentContactToSequence(sequenceId, sequenceName) {
   try {
     const contactId = state.currentContact?.id;
     if (!contactId) { closeContactSequencesPanel(); return; }
-    
-    // ✅ NEW: Email validation
-    if (!state.currentContact.email || state.currentContact.email.trim() === '') {
-      const result = await showContactDetailEmailValidationModal(state.currentContact);
-      if (!result.proceed) {
+
+    const hasEmail = !!(state.currentContact.email && state.currentContact.email.trim() !== '');
+
+    // Gentle confirmation for contacts without email; do NOT block the whole CRM
+    if (!hasEmail) {
+      let proceed = true;
+      try {
+        proceed = window.confirm(
+          'This contact does not have an email address. They will still be added to the sequence, ' +
+          'but email steps will be skipped. Continue?'
+        );
+      } catch (_) {}
+      if (!proceed) {
         closeContactSequencesPanel();
-        return; // User cancelled
+        return;
       }
     }
-    
+
     const db = window.firebaseDB;
     if (db && typeof db.collection === 'function') {
-      const hasEmail = state.currentContact.email && state.currentContact.email.trim() !== '';
       const doc = { 
         sequenceId, 
         targetId: contactId, 
@@ -6171,8 +6178,7 @@ async function addCurrentContactToSequence(sequenceId, sequenceName) {
         });
       }
     }
-    
-    const hasEmail = state.currentContact.email && state.currentContact.email.trim() !== '';
+
     const message = `Added to "${sequenceName}"${!hasEmail ? ' (email steps will be skipped)' : ''}`;
     window.crm?.showToast && window.crm.showToast(message, 'success');
   } catch (err) {

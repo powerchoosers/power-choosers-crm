@@ -1494,6 +1494,8 @@
         state: contact.state || '',
         industry: contact.industry || '',
         seniority: contact.seniority || '',
+        // Department/functional area (best-effort mapping)
+        department: contact.department || contact.departmentName || '',
         linkedin: contact.linkedin || contact.linkedinUrl || '',
         // map phone numbers to workDirectPhone/mobile/otherPhone
         workDirectPhone: selectPhone(contact, 'direct') || selectPhone(contact, 'work') || '',
@@ -1710,7 +1712,9 @@
           city: contact.city || '',
           state: contact.state || '',
           industry: contact.industry || '',
-          seniority: contact.seniority || ''
+          seniority: contact.seniority || '',
+          // Department/functional area if already on the contact
+          department: contact.department || contact.departmentName || ''
         };
         
         // Show success toast
@@ -1877,12 +1881,15 @@
         updatePayload.location = enriched.location;
       }
       
-      // Add industry and seniority if available
+      // Add industry, seniority, and department if available
       if (enriched.industry) {
         updatePayload.industry = enriched.industry;
       }
       if (enriched.seniority) {
         updatePayload.seniority = enriched.seniority;
+      }
+      if (enriched.department) {
+        updatePayload.department = enriched.department;
       }
       
       console.log('[Lusha Enrich] Update payload:', updatePayload);
