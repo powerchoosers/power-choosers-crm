@@ -4,390 +4,6 @@
 
 import { cors } from './_cors.js';
 
-// ========== INDUSTRY DETECTION & ANGLE SELECTION ==========
-// (Matches email-compose-global.js system)
-
-// Infer industry from company name
-function inferIndustryFromCompanyName(companyName) {
-  if (!companyName) return '';
-  
-  const name = String(companyName).toLowerCase();
-  
-  // Manufacturing
-  if (/\b(manufacturing|manufacturer|industrial|factory|plant|fabrication|production|assembly)\b/i.test(name)) {
-    return 'Manufacturing';
-  }
-  
-  // Hospitality
-  if (/\b(hotel|inn|motel|resort|lodge|restaurant|cafe|dining|hospitality)\b/i.test(name)) {
-    return 'Hospitality';
-  }
-  
-  // Healthcare
-  if (/\b(hospital|clinic|medical|healthcare|health\s*care|physician|doctor|dental|pharmacy)\b/i.test(name)) {
-    return 'Healthcare';
-  }
-  
-  // Retail
-  if (/\b(retail|store|shop|market|outlet|merchandise|boutique)\b/i.test(name)) {
-    return 'Retail';
-  }
-  
-  // Logistics/Transportation
-  if (/\b(logistics|transportation|warehouse|shipping|freight|delivery|distribution|trucking)\b/i.test(name)) {
-    return 'Logistics';
-  }
-  
-  // Data Center
-  if (/\b(data\s*center|datacenter|server|hosting|cloud|colo)\b/i.test(name)) {
-    return 'DataCenter';
-  }
-  
-  // Nonprofit
-  if (/\b(nonprofit|non-profit|charity|foundation|501c3|501\(c\)\(3\))\b/i.test(name)) {
-    return 'Nonprofit';
-  }
-  
-  return '';
-}
-
-// Infer industry from account description
-function inferIndustryFromDescription(description) {
-  if (!description) return '';
-  
-  const desc = String(description).toLowerCase();
-  
-  // Nonprofit (check FIRST so food-focused nonprofits like food banks are not misclassified)
-  if (/\b(nonprofit|non-profit|charity|foundation|mission|donation|volunteer|food bank)\b/i.test(desc)) {
-    return 'Nonprofit';
-  }
-  
-  // Hospitality - narrowed to true hospitality / restaurant signals (avoid generic "food" only)
-  if (/\b(hotel|inn|motel|resort|lodge|accommodation|hospitality|guest|room|booking|stay)\b/i.test(desc)) {
-    return 'Hospitality';
-  }
-  
-  // Restaurant/Food service (avoid matching every mention of \"food\" by itself)
-  if (/\b(restaurant|cafe|dining|bistro|bar\s+and\s+grill|steakhouse|brewpub|catering)\b/i.test(desc)) {
-    return 'Hospitality';
-  }
-  
-  // Manufacturing
-  if (/\b(manufacturing|manufacturer|production|factory|plant|industrial|assembly|fabrication)\b/i.test(desc)) {
-    return 'Manufacturing';
-  }
-  
-  // Healthcare
-  if (/\b(hospital|clinic|medical|healthcare|health\s*care|patient|treatment|diagnosis|surgery)\b/i.test(desc)) {
-    return 'Healthcare';
-  }
-  
-  // Retail
-  if (/\b(retail|store|merchandise|shopping|customer|boutique|supermarket|grocery)\b/i.test(desc)) {
-    return 'Retail';
-  }
-  
-  // Logistics
-  if (/\b(logistics|shipping|distribution|freight|transportation|delivery)\b/i.test(desc)) {
-    return 'Logistics';
-  }
-  
-  // Data Center
-  if (/\b(data\s*center|datacenter|server\s+farm|hosting|cloud (infrastructure|services)?|colocation)\b/i.test(desc)) {
-    return 'DataCenter';
-  }
-  
-  return '';
-}
-
-// Simplified RANDOMIZED_ANGLES_BY_INDUSTRY (matches email-compose-global.js structure)
-const RANDOMIZED_ANGLES_BY_INDUSTRY = {
-  Manufacturing: {
-    angles: [
-      {
-        id: 'exemption_recovery',
-        weight: 0.30,
-        primaryMessage: 'electricity tax exemption recovery',
-        openingTemplate: 'Are you currently claiming electricity exemptions on your production facilities?',
-        primaryValue: '$75K-$500K in unclaimed exemptions over 4 years',
-        condition: (accountData) => accountData?.taxExemptStatus === 'Manufacturing'
-      },
-      {
-        id: 'demand_efficiency',
-        weight: 0.25,
-        primaryMessage: 'consumption efficiency before renewal',
-        openingTemplate: 'Are you optimizing consumption before you renew your contract?',
-        primaryValue: '12-20% consumption reduction before rate shopping'
-      },
-      {
-        id: 'timing_strategy',
-        weight: 0.25,
-        primaryMessage: 'early contract renewal timing',
-        openingTemplate: 'When does your current electricity contract expire?',
-        primaryValue: '10-20% better rates when locking in 6 months early',
-        situationalContext: 'Best practice is renewing 6 months to 1 year in advance, though most companies renew 30-60 days out or last minute if not careful.'
-      },
-      {
-        id: 'consolidation',
-        weight: 0.20,
-        primaryMessage: 'multi-plant consolidation',
-        openingTemplate: 'How many facilities are you managing energy for, and are they on different contracts?',
-        primaryValue: '10-20% savings by consolidating all locations'
-      }
-    ]
-  },
-  Nonprofit: {
-    angles: [
-      {
-        id: 'exemption_recovery',
-        weight: 0.40,
-        primaryMessage: 'tax exemption + refund recovery',
-        openingTemplate: 'Is your organization filing electricity exemption certificates?',
-        primaryValue: '$50K-$300K redirected to programs annually',
-        condition: (accountData) => accountData?.taxExemptStatus === 'Nonprofit'
-      },
-      {
-        id: 'mission_funding',
-        weight: 0.35,
-        primaryMessage: 'mission-focused budget optimization',
-        openingTemplate: 'How are you making sure more funding goes to your mission, not vendors?',
-        primaryValue: '10-20% savings redirected to programs'
-      },
-      {
-        id: 'budget_stability',
-        weight: 0.25,
-        primaryMessage: 'budget predictability',
-        openingTemplate: 'When budgeting for energy, are you locking in costs or dealing with volatility?',
-        primaryValue: 'Fixed costs for better program planning'
-      }
-    ]
-  },
-  Retail: {
-    angles: [
-      {
-        id: 'consolidation',
-        weight: 0.40,
-        primaryMessage: 'multi-location consolidation',
-        openingTemplate: 'How many locations are you managing energy for?',
-        primaryValue: '10-20% savings by consolidating all locations'
-      },
-      {
-        id: 'timing_strategy',
-        weight: 0.35,
-        primaryMessage: 'early renewal timing',
-        openingTemplate: 'When does your current electricity contract expire?',
-        primaryValue: '10-20% better rates when locking in 6 months early'
-      },
-      {
-        id: 'operational_simplicity',
-        weight: 0.25,
-        primaryMessage: 'centralized operations',
-        openingTemplate: 'How much time are you spending managing energy renewals across your network?',
-        primaryValue: 'Single vendor, simplified management'
-      }
-    ]
-  },
-  Healthcare: {
-    angles: [
-      {
-        id: 'exemption_recovery',
-        weight: 0.35,
-        primaryMessage: 'tax exemption',
-        openingTemplate: 'Is your healthcare facility claiming electricity exemptions?',
-        primaryValue: '$50K-$200K in unclaimed exemptions',
-        condition: (accountData) => accountData?.taxExemptStatus === 'Nonprofit'
-      },
-      {
-        id: 'consolidation',
-        weight: 0.40,
-        primaryMessage: 'multi-facility consolidation',
-        openingTemplate: 'How many facilities are you managing energy for, and are they all renewing on different schedules?',
-        primaryValue: '10-20% savings by consolidating all facilities'
-      },
-      {
-        id: 'operational_continuity',
-        weight: 0.25,
-        primaryMessage: 'uptime guarantee',
-        openingTemplate: 'What\'s more critical—energy savings or guaranteed uptime?',
-        primaryValue: 'Predictable costs without operational disruption'
-      }
-    ]
-  },
-  DataCenter: {
-    angles: [
-      {
-        id: 'demand_efficiency',
-        weight: 0.45,
-        primaryMessage: 'demand-side efficiency',
-        openingTemplate: 'Are you optimizing consumption before you renew your contract?',
-        primaryValue: '12-20% consumption reduction before rate shopping'
-      },
-      {
-        id: 'timing_strategy',
-        weight: 0.35,
-        primaryMessage: 'AI-driven demand timing',
-        openingTemplate: 'When does your current electricity contract expire?',
-        primaryValue: '10-20% better rates when locking in 6 months early'
-      },
-      {
-        id: 'data_governance',
-        weight: 0.20,
-        primaryMessage: 'unified metering',
-        openingTemplate: 'How are you managing energy across your data centers?',
-        primaryValue: 'Unified metering and reporting'
-      }
-    ]
-  },
-  Logistics: {
-    angles: [
-      {
-        id: 'consolidation',
-        weight: 0.45,
-        primaryMessage: 'multi-location volume leverage',
-        openingTemplate: 'How many locations are you managing energy for?',
-        primaryValue: '10-20% savings by consolidating all locations'
-      },
-      {
-        id: 'timing_strategy',
-        weight: 0.35,
-        primaryMessage: 'strategic renewal timing',
-        openingTemplate: 'When does your current electricity contract expire?',
-        primaryValue: '10-20% better rates when locking in 6 months early'
-      },
-      {
-        id: 'operational_efficiency',
-        weight: 0.20,
-        primaryMessage: 'warehouse efficiency',
-        openingTemplate: 'Are you optimizing consumption before you renew your contract?',
-        primaryValue: '12-20% consumption reduction'
-      }
-    ]
-  },
-  Hospitality: {
-    angles: [
-      {
-        id: 'consolidation',
-        weight: 0.40,
-        primaryMessage: 'multi-property consolidation',
-        openingTemplate: 'How many properties are you managing energy for, and are they all on different renewal schedules?',
-        primaryValue: '10-20% savings by consolidating all properties'
-      },
-      {
-        id: 'timing_strategy',
-        weight: 0.35,
-        primaryMessage: 'seasonal planning',
-        openingTemplate: 'When does your current electricity contract expire?',
-        primaryValue: '10-20% better rates when locking in 6 months early'
-      },
-      {
-        id: 'operational_efficiency',
-        weight: 0.25,
-        primaryMessage: 'guest comfort + cost control',
-        openingTemplate: 'Are you optimizing consumption before you renew your contract?',
-        primaryValue: '12-20% consumption reduction'
-      }
-    ]
-  },
-  Default: {
-    angles: [
-      {
-        id: 'timing_strategy',
-        weight: 0.40,
-        primaryMessage: 'strategic contract renewal',
-        openingTemplate: 'When does your current electricity contract expire?',
-        primaryValue: '10-20% better rates when locking in 6 months early'
-      },
-      {
-        id: 'cost_control',
-        weight: 0.35,
-        primaryMessage: 'cost predictability',
-        openingTemplate: 'Are rising electricity costs affecting your budget?',
-        primaryValue: 'Predictable costs for better planning'
-      },
-      {
-        id: 'operational_simplicity',
-        weight: 0.25,
-        primaryMessage: 'simplified procurement',
-        openingTemplate: 'How much time are you spending managing energy procurement versus focusing on your core business?',
-        primaryValue: 'Single vendor, simplified management'
-      }
-    ]
-  }
-};
-
-// Select randomized angle based on industry
-function selectRandomizedAngle(industry, manualAngleOverride, accountData) {
-  // Normalize industry
-  let normalizedIndustry = (industry || '').toString().trim();
-  if (!normalizedIndustry) {
-    normalizedIndustry = 'Default';
-  }
-  
-  // Get angles for this industry
-  const industryConfig = RANDOMIZED_ANGLES_BY_INDUSTRY[normalizedIndustry] || RANDOMIZED_ANGLES_BY_INDUSTRY.Default;
-  let availableAngles = industryConfig.angles || [];
-  
-  // Filter angles by conditions if accountData provided
-  if (accountData) {
-    availableAngles = availableAngles.filter(angle => {
-      if (angle.condition && typeof angle.condition === 'function') {
-        return angle.condition(accountData);
-      }
-      return true;
-    });
-  }
-  
-  // If no angles available after filtering, use all angles
-  if (availableAngles.length === 0) {
-    availableAngles = industryConfig.angles || [];
-  }
-  
-  // If still no angles, use Default
-  if (availableAngles.length === 0) {
-    availableAngles = RANDOMIZED_ANGLES_BY_INDUSTRY.Default.angles;
-  }
-  
-  // Manual override takes precedence
-  if (manualAngleOverride) {
-    const overrideAngle = availableAngles.find(a => a.id === manualAngleOverride);
-    if (overrideAngle) return overrideAngle;
-  }
-  
-  // Weighted random selection
-  const random = Math.random();
-  let cumulative = 0;
-  
-  for (const angle of availableAngles) {
-    cumulative += angle.weight || 0;
-    if (random <= cumulative) {
-      return angle;
-    }
-  }
-  
-  // Fallback to first angle
-  return availableAngles[0] || RANDOMIZED_ANGLES_BY_INDUSTRY.Default.angles[0];
-}
-
-// Select random tone opener (all 13 types combined)
-function selectRandomToneOpener(angleId = null) {
-  const openers = [
-    "Genuine question—",
-    "Let me ask you something—",
-    "Been wondering—",
-    "You ever considered—",
-    "So here's the thing—",
-    "This might sound random, but—",
-    "Honestly—",
-    "Looking at your situation—",
-    "Question for you—",
-    "Here's what I'm seeing—",
-    "Most people I talk to—",
-    "From what I'm hearing—",
-    "I've found that teams like yours—"
-  ];
-  return openers[Math.floor(Math.random() * openers.length)];
-}
-
 // ========== SUBJECT LINE VARIANTS ==========
 // Multiple subject line options that randomly select to reduce template-like appearance
 const SUBJECT_LINE_VARIANTS = {
@@ -833,47 +449,15 @@ async function researchLocationContext(city, state, industry) {
   }
 }
 
-// Lightweight sanitizer to remove brand-first phrasing and prefer observation-based, non-salesy voice
+// Lightweight sanitizer to remove brand-first phrasing and prefer first-person voice
 function deSalesify(text) {
   if (!text) return text;
-  let out = String(text);
-
-  // Remove brand-first framing
-  out = out
+  return String(text)
     .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
     .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
-    .replace(/\bPower Choosers\b/gi, 'we');
-
-  // Soften \"we help\" style sales language into observation-based language
-  out = out
-    .replace(/\bWe help\b/gi, 'Most teams I talk to')
-    .replace(/\bWe can help\b/gi, 'Most teams I work with')
-    .replace(/\bour clients typically save\b/gi, 'Most teams typically see');
-
-  // Normalize any lingering double spaces
-  return out.replace(/\s+/g, ' ').trim();
-}
-
-// Additional sanitizer for forbidden or overused patterns in cold emails
-function sanitizeColdEmailText(text) {
-  if (!text) return text;
-  let out = String(text);
-
-  // Remove \"I noticed\" / \"I saw\" style intros
-  out = out
-    .replace(/\bI noticed\b/gi, '')
-    .replace(/\bI saw\b/gi, '')
-    .replace(/On your website, I noticed/gi, 'On your website');
-
-  // Normalize legacy 15-25% language to 10-20%
-  out = out.replace(/15-25%/gi, '10-20%');
-
-  // De-salesify remaining \"we help\" patterns if any slipped through
-  out = out
-    .replace(/\bWe help\b/gi, 'Most teams I talk to')
-    .replace(/\bour clients typically save\b/gi, 'Most teams typically see');
-
-  return out.replace(/\s+/g, ' ').trim();
+    .replace(/\bPower Choosers helps\b/gi, 'We help')
+    .replace(/\bPower Choosers can help\b/gi, 'We can help')
+    .replace(/\bPower Choosers\b/gi, 'We');
 }
 
 // Remove citation brackets from text (e.g., [1], [2], [3])
@@ -890,18 +474,30 @@ function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory,
   if (!text) return text;
   let out = String(text);
 
+  // CRITICAL FIX: Replace "Default companies" or "Default" industry references
+  // This happens when industry is "Default" or empty - replace with neutral language
+  out = out
+    .replace(/\bDefault companies\b/gi, 'companies like yours')
+    .replace(/\bDefault company\b/gi, 'companies like yours')
+    .replace(/\bI help Default\b/gi, 'I help companies')
+    .replace(/\bhelp Default\b/gi, 'help companies')
+    .replace(/\bfor Default\b/gi, 'for companies')
+    .replace(/\bwith Default\b/gi, 'with companies');
+
   // Replace generic "your industry" with specific industry when available
-  if (industry && /your industry/i.test(out)) {
+  if (industry && industry !== 'Default' && /your industry/i.test(out)) {
     out = out.replace(/your industry/gi, industry);
   }
 
   // Remove ALL size assumptions - "small company/business" can be insulting to business owners
   // Use neutral, empowering language regardless of actual size
   const neutralGroup = industry ? `companies in ${industry}` : 'companies like yours';
+  
+  // Aggressive removal of "small" language - assume nothing about company size
+  // Replace with industry-based or role-based language
   const industryBased = industry ? `companies in ${industry}` : 'companies like yours';
   const roleBased = job ? `As ${job}` : (industry ? `As a ${industry} company` : 'As a company');
-
-  // Aggressive removal of "small" language and sloppy industry phrases
+  
   out = out
     // Catch "as a small" patterns first (most common)
     .replace(/\bAs a small (?:company|business|firm|organization|operation)\b/gi, industry ? `As a ${industry} company` : 'As a company')
@@ -937,16 +533,6 @@ function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory,
     // Additional catch-all patterns
     .replace(/\bsmall (?:company|business|firm|organization|operation)\b/gi, industry ? `${industry} company` : 'company')
     .replace(/\bsmaller (?:company|business|firm|organization|operation)\b/gi, industry ? `${industry} company` : 'company');
-
-  // If the CRM industry is NOT nonprofit, strip any accidental "nonprofit" labels
-  if (!/non[-\s]?profit/i.test(industry || '')) {
-    out = out
-      .replace(/\bnon[-\s]?profit(?:\s+company|companies)?\b/gi, 'organizations')
-      .replace(/\bnon[-\s]?profit\b/gi, 'organization');
-  } else {
-    // For true nonprofits, prefer "nonprofit organizations" over "nonprofit companies"
-    out = out.replace(/\bnon[-\s]?profit companies\b/gi, 'nonprofit organizations');
-  }
 
   return out;
 }
@@ -1239,7 +825,7 @@ function getTemplateType(prompt) {
 // CTA Pattern System (Hybrid Approach with Role-Specific CTAs)
 function getCTAPattern(recipient, meetingPreferences = null, templateType = null) {
   // For cold emails, NEVER use meeting requests - always use qualifying questions
-  if (templateType === 'coldemail') {
+  if (templateType === 'cold_email') {
     // Role-specific CTA patterns (higher conversion rates)
     const jobTitle = (recipient?.job || '').toLowerCase();
     
@@ -1852,7 +1438,7 @@ function getIndustrySpecificContent(industry) {
   const industryMap = {
     manufacturing: {
       painPoints: ['production downtime', 'energy-intensive operations', 'equipment reliability'],
-      avgSavings: '10-20%',
+      avgSavings: '15-25%',
       keyBenefit: 'operational continuity',
       urgencyDrivers: ['production schedules', 'equipment uptime'],
       language: 'operational efficiency and production continuity'
@@ -2116,7 +1702,20 @@ function getRoleSpecificLanguage(role) {
   };
 }
 
-async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Lewis Patterson', templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation }) {
+async function buildSystemPrompt({ 
+  mode, 
+  recipient, 
+  to, 
+  prompt, 
+  senderName = 'Lewis Patterson', 
+  templateType, 
+  whoWeAre, 
+  marketContext, 
+  meetingPreferences, 
+  industrySegmentation,
+  selectedAngle,
+  toneOpener
+}) {
   // Analyze manual prompt for enhanced context understanding
   const promptAnalysis = analyzeManualPrompt(prompt);
   
@@ -2126,16 +1725,10 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const firstName = r.firstName || r.first_name || (name ? String(name).split(' ')[0] : '');
   const company = r.company || r.accountName || '';
   const job = r.title || r.job || r.role || '';
-  let industry = r.industry || '';
+  const industry = r.industry || '';
   const energy = r.energy || {};
   const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 1000);
   const notes = [r.notes, r.account?.notes].filter(Boolean).join('\n').slice(0, 500);
-  
-  // Detect industry if not set
-  if (!industry && company) {
-    industry = inferIndustryFromCompanyName(company);
-  }
-  
   // Debug log to see what account data is available
   console.log('[Debug] Full account data for', company, ':', JSON.stringify(r.account, null, 2));
   
@@ -2248,40 +1841,11 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
     }
   }
 
-  // For cold emails, gate research-heavy context to prevent Wikipedia-style intros
-  const isColdEmail = templateType === 'coldemail';
-  if (isColdEmail) {
-    // For true cold emails, keep research minimal - no full company bios
-    linkedinContext = null;
-    websiteContext = null;
-    // Optionally keep 1 short recent activity line, but not full paragraphs
-    if (recentActivityContext) {
-      recentActivityContext = recentActivityContext.slice(0, 140);
-    }
-    // Keep location context minimal (just city/state, not full descriptions)
-    if (locationContextData && locationContextData.length > 100) {
-      locationContextData = locationContextData.slice(0, 100);
-    }
-  }
-
   // For prompt brevity, summarize to ~220 chars without destroying saved description
   if (accountDescription) {
     const trimmed = accountDescription.replace(/\s+/g, ' ').trim();
     accountDescription = trimmed.length > 220 ? trimmed.slice(0, 217) + '…' : trimmed;
   }
-  
-  // Infer industry from description if still not set
-  if (!industry && accountDescription) {
-    industry = inferIndustryFromDescription(accountDescription);
-  }
-  
-  // Select angle based on industry (for cold emails only)
-  const selectedAngle = templateType === 'coldemail' ? selectRandomizedAngle(industry, null, r.account || {}) : null;
-  
-  // Select tone opener (for cold emails only)
-  const toneOpener = templateType === 'coldemail' ? selectRandomToneOpener(selectedAngle?.id) : null;
-  
-  console.log(`[Perplexity] Industry: "${industry}", Selected Angle: "${selectedAngle?.id}", Tone: "${toneOpener}"`);
   
   // Format contract end date
   const toMonthYear = (val) => {
@@ -2297,8 +1861,8 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const contractEndLabel = toMonthYear(energy.contractEnd || '');
   
   // Get dynamic patterns for cold emails (needed for both HTML and standard modes)
-  const ctaPattern = templateType === 'coldemail' ? getCTAPattern(recipient, meetingPreferences, templateType) : null;
-  const openingStyle = templateType === 'coldemail' ? getOpeningStyle(recipient) : null;
+  const ctaPattern = templateType === 'cold_email' ? getCTAPattern(recipient, meetingPreferences, templateType) : null;
+  const openingStyle = templateType === 'cold_email' ? getOpeningStyle(recipient) : null;
   
   // Get role-specific context
   const roleContext = job ? getRoleSpecificLanguage(job) : null;
@@ -2315,7 +1879,7 @@ async function buildSystemPrompt({ mode, recipient, to, prompt, senderName = 'Le
   const modeInstructions = EMAIL_GENERATION_MODES[generationMode];
   
   // Get subject line variant (for suggestions in prompt)
-  const suggestedSubject = templateType === 'coldemail' ? 
+  const suggestedSubject = templateType === 'cold_email' ? 
     getRandomSubjectLine('cold-email', roleCategory, firstName, company) : null;
   
   // Get industry-specific content (prefer settings if provided)
@@ -2437,13 +2001,40 @@ ${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo')
 
   // For HTML mode, return text-only prompts based on template type
   if (mode === 'html') {
-    
     // Generate dynamic fields based on prompt analysis
     const dynamicFields = generateDynamicFields(templateType, promptAnalysis, recipient);
     
     // Build conditional rules based on prompt intent
     const conditionalRules = buildConditionalRules(promptAnalysis, templateType);
-    
+
+    // Build optional angle + tone opener context for cold emails
+    let angleContextBlock = '';
+    if (templateType === 'cold_email' && selectedAngle && typeof selectedAngle === 'object') {
+      const angleId = selectedAngle.id || 'primary_angle';
+      const angleFocus = selectedAngle.primaryMessage || selectedAngle.label || 'primary focus';
+      const angleOpening = selectedAngle.openingTemplate || '';
+      const angleValue = selectedAngle.primaryValue || '';
+      angleContextBlock = `
+
+PRIMARY ANGLE FOR THIS EMAIL (CRITICAL - USE THIS AS YOUR LENS):
+- Angle ID: ${angleId}
+- Focus: ${angleFocus}
+${angleOpening ? '- Example opening pattern: "' + angleOpening + '"' : ''}
+${angleValue ? '- Primary value proposition: "' + angleValue + '"' : ''}
+
+You MUST structure the entire email around this primary angle. Do NOT switch to a different generic angle (for example, generic contract timing) unless it clearly matches this focus. Keep the problem framing, examples, and value proposition aligned with this angle.`;
+    }
+
+    const toneOpenerRule = (templateType === 'cold_email' && toneOpener)
+      ? `
+
+TONE OPENER (FIRST LINE AFTER GREETING - CRITICAL):
+- The opening_hook MUST start with this exact phrase: "${toneOpener}"
+- Example: "${toneOpener} with ${company || '[company]'} running [operations], timing on your energy contracts really matters."
+- Do NOT put any text before this opener.
+- Use this opener ONLY ONCE at the very start of the body, then continue naturally.`
+      : '';
+
     const basePrompt = `${whoWeAre || 'You are generating TEXT CONTENT ONLY for Power Choosers email templates.'}
 
 SENDER: ${senderName}
@@ -2451,6 +2042,8 @@ IMPORTANT: Return PLAIN TEXT only in JSON fields. NO HTML tags, NO styling, NO f
 We handle all HTML/CSS styling on our end.
 
 ${recipientContext}
+
+${angleContextBlock}
 
 ${conditionalRules}
 
@@ -2497,14 +2090,19 @@ Generate text for these fields:
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: "Hello ${firstName},"
-- opening_hook: Start with SPECIFIC problem awareness or market condition (1-2 sentences). ${accountDescription ? 'MUST reference: "' + accountDescription + '"' : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
+- opening_hook: Start with SPECIFIC problem awareness or market condition (1-2 sentences). ${accountDescription ? 'Use the saved company description as INTERNAL CONTEXT ONLY (do NOT copy it word-for-word). You may reference ONE short detail from it in natural language, but do NOT open the email by restating their full marketing description or mission statement.' : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
   * Retail: Multiple locations, unpredictable costs, seasonal demand
   * Hospitality: Guest comfort, operational costs, seasonal planning
-  * Education: Facility maintenance, student safety, budget optimization
-  * Use company-specific data: current supplier, rate, contract timing, recent achievements
-IMPORTANT: Always reference ${company} specifically. Use qualitative language (rising, increasing, higher) NOT percentages (15-25%, 20-30%). Keep it natural and conversational. NEVER mention company size ("small company", "small business") - focus on role, industry, and operational challenges instead.
+   * Education: Facility maintenance, student safety, budget optimization
+   * Use company-specific data: current supplier, rate, contract timing, recent achievements
+IMPORTANT:
+- Always reference ${company} specifically.
+- Use qualitative language (rising, increasing, higher) NOT percentages (15-25%, 20-30%) in the opening hook.
+- Keep it natural and conversational.
+- NEVER mention company size ("small company", "small business") - focus on role, industry, and operational challenges instead.
+- NEVER start the email by restating their full "About us" description (for example, "Safety Vision is a leading provider of..."). Instead, summarize their situation in plain, conversational language tied to energy costs.
 - value_proposition: How we help (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X annually", "helped similar companies achieve Y". Include role-specific benefits:
   * CFOs: Budget predictability, cost reduction, risk mitigation
   * Facilities Managers: Operational efficiency, maintenance cost reduction
@@ -2537,15 +2135,6 @@ ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\
 ${contactLinkedinContext ? '- Reference contact profile: Use insights from their LinkedIn profile naturally' : ''}
 
 EVIDENCE OF RESEARCH (Show You Know Their Business):
-${isColdEmail ? `
-- EVIDENCE OF RESEARCH (COLD EMAIL - MINIMAL):
-  Use ONE short, relevant observation about their operations or role.
-  Example: "Given you're expanding manufacturing capacity in Houston..."
-  DO NOT list employee counts, leadership bios, facility square footage, or full company history.
-  DO NOT use multi-sentence company descriptions or Wikipedia-style intros.
-  Base opening on sanitized accountDescription only: ${accountDescription ? '"' + accountDescription.substring(0, 100) + '..."' : 'their business type'}
-  ${recentActivityContext ? 'Optionally reference recent activity briefly: "' + recentActivityContext.substring(0, 60) + '..."' : ''}
-` : `
 ${accountDescription ? '✓ Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally in opening hook' : ''}
 ${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements' : ''}
 ${websiteContext ? '✓ Use website info: "On your website, I noticed..." to show you visited' : ''}
@@ -2553,7 +2142,6 @@ ${recentActivityContext ? '✓ Use recent activity: "I saw ${company} recently..
 ${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
 ${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
 ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant for context' : ''}
-`}
 
 CONVERSATIONAL FLOW PATTERNS:
 ✓ GOOD: "I noticed ${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
@@ -2659,9 +2247,9 @@ ${generationMode === 'consultative' ? `
   * Example CTA: "How do you typically handle your energy renewals?"` : ''}
 ${generationMode === 'direct' ? `
   * Lead with specific insights and concrete value upfront
-  * Use confident language: "Here's what I found..." "The reality is..." "Quick question—"
+  * Use confident language: "Here's what I found..." "The reality is..."
   * Assertive but respectful: Present facts and ask direct questions
-  * Example CTA: "When does your contract renew? That timing difference is usually worth 15-20%."` : ''}
+  * Example CTA: "When does your contract renew? That timing difference is usually worth 10-20%."` : ''}
 ${generationMode === 'balanced' ? `
   * Combine observation with specific value proposition
   * Professional but conversational: "I noticed..." followed by "Here's what I've found..."
@@ -2865,7 +2453,7 @@ CRITICAL QUALITY RULES:
   - Market context is DISABLED - DO NOT use generic market statistics like "rates rising 15-25%"
   - DO NOT mention "data center demand" or generic rate increases
   - Focus ONLY on ${company}'s specific situation, industry challenges they face, or operational details
-  - Use natural observation-based language (e.g., "With your facilities in ${city || '[location]'}...", "For an organization like ${company} serving your community...") WITHOUT saying "I noticed" or "I saw"`}
+  - Use phrases like "I noticed ${company} operates..." or "With ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'your facilities'}..."`}
 - SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
 - MEASURABLE CLAIMS: "save ${marketContext?.typicalClientSavings || '10-20%'}" or "$X annually" NOT "significant savings"
 - COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
@@ -2898,15 +2486,6 @@ ${marketContext?.enabled ? '- You may reference general market trends, but lead 
 ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\'ve likely seen..." (tenure available)' : ''}
 
 EVIDENCE OF RESEARCH (Show You Know Their Business):
-${isColdEmail ? `
-- EVIDENCE OF RESEARCH (COLD EMAIL - MINIMAL):
-  Use ONE short, relevant observation about their operations or role.
-  Example: "Given you're expanding manufacturing capacity in Houston..."
-  DO NOT list employee counts, leadership bios, facility square footage, or full company history.
-  DO NOT use multi-sentence company descriptions or Wikipedia-style intros.
-  Base opening on sanitized accountDescription only: ${accountDescription ? '"' + accountDescription.substring(0, 100) + '..."' : 'their business type'}
-  ${recentActivityContext ? 'Optionally reference recent activity briefly: "' + recentActivityContext.substring(0, 60) + '..."' : ''}
-` : `
 ${accountDescription ? '✓ Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally' : ''}
 ${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements' : ''}
 ${websiteContext ? '✓ Use website info: "On your website, I noticed..." to show you visited' : ''}
@@ -2914,7 +2493,6 @@ ${recentActivityContext ? '✓ Use recent activity: "I saw ${company} recently..
 ${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
 ${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
 ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant' : ''}
-`}
 
 CONVERSATIONAL FLOW PATTERNS:
 ✓ GOOD: "I noticed ${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
@@ -2949,7 +2527,7 @@ FORMATTING REQUIREMENTS:
 - Ensure proper spacing for readability
 
 OPENING (1-2 sentences):
-${toneOpener ? 'REQUIRED TONE OPENER: Start with "' + toneOpener + '" followed immediately by your observation' : 'Style: ' + openingStyle.type}
+Style: ${openingStyle.type}
 ${openingStyle.prompt}
 ${marketContext?.enabled ? `
 Lead with SPECIFIC OBSERVATION about ${company} FIRST, then optionally reference market context:
@@ -2965,7 +2543,6 @@ DO NOT mention: "rates rising 15-25%", "data center demand", generic market stat
 IMPORTANT: Always reference ${company} specifically, not other companies.
 
 VALUE PROPOSITION (1-2 sentences MINIMUM):
-${selectedAngle ? '- REQUIRED VALUE: "' + selectedAngle.primaryValue + '" (angle: ' + selectedAngle.primaryMessage + ')' : ''}
 - Explain how Power Choosers helps with SPECIFIC MEASURABLE VALUE
 - MUST include: (1) What we do, (2) Concrete numbers: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X", "clients typically see Y"
 - Reference: ${accountDescription ? '"' + accountDescription + '"' : 'their business type'}
@@ -2976,12 +2553,12 @@ ${selectedAngle ? '- REQUIRED VALUE: "' + selectedAngle.primaryValue + '" (angle
 - THIS FIELD IS MANDATORY - NEVER LEAVE BLANK
 
 CTA (ASSERTIVE, NOT PERMISSION-BASED):
-${selectedAngle ? 'REQUIRED PATTERN: "' + selectedAngle.openingTemplate + '" (from angle: ' + selectedAngle.id + ')' : (ctaPattern ? 'Use assertive question pattern: "' + ctaPattern.template + '"' : 'Create an assertive qualifying question')}
+${ctaPattern ? 'Use assertive question pattern: "' + ctaPattern.template + '"' : 'Create an assertive qualifying question'}
 - ASSERTIVE PATTERNS (use these - they assume conversation is happening):
   * "When does your current contract renew? And how often do you typically review your rates?"
-  * "Quick question—are you locking in 6 months early or waiting closer to renewal?"
+  * "Question for you—are you locking in 6 months early or waiting closer to renewal?"
   * "Out of curiosity—when you renew your contract, do you shop around or just renew what you had?"
-  * "Question for you—what's your renewal timeline? That timing difference is usually worth 15-20%."
+  * "Question for you—what's your renewal timeline? That timing difference is usually worth 10-20%."
   * "Real question—does energy cost predictability matter for your budget planning?" (for finance roles)
 - FORBIDDEN PERMISSION-BASED PATTERNS (DO NOT USE):
   * "Would you be open to a conversation?" (asking permission, weak)
@@ -3009,7 +2586,7 @@ ${generationMode === 'consultative' ? `
 * Use discovery questions: "I'm curious..." "How do you typically..." "What matters more to you..."
 * Lower pressure approach - understand their situation first` : ''}
 ${generationMode === 'direct' ? `
-* Lead with specific insights: "Here's what I found..." "The reality is..." "Quick question—"
+* Lead with specific insights: "Here's what I found..." "The reality is..."
 * Assertive but respectful - present facts and ask direct questions` : ''}
 ${generationMode === 'balanced' ? `
 * Combine observation + value: "I noticed..." followed by "Here's what I've found..."
@@ -3036,7 +2613,7 @@ TONE: Write like a 29-year-old Texas business pro - conversational, confident, d
 - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
 - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy"
 - Sound like: colleague who knows their industry and has talked to others like them
-- Use casual confidence: "Quick question—" "Real question—" "Out of curiosity—"
+- Use casual confidence: "Real question—" "Out of curiosity—" "Question for you—"
 `;
 
     return { 
@@ -3102,7 +2679,7 @@ QUALITY REQUIREMENTS:
 ✓ Length: 90-130 words total
 ✓ Use "${firstName || 'there'}," in greeting ONCE (no duplicate names)
 ✓ Middle paragraph: 3-4 complete sentences
-✓ DO NOT mention specific \"15-25%\" rate increase statistics - focus on timing, predictability, and real-world impact instead
+✓ MUST mention "15-25%" rate increase
 ✓ CTA: Use qualifying questions only (e.g., "When does your contract expire?", "Are rising costs affecting your budget?")
 ✓ Subject line: Under 50 chars, include ${firstName || 'recipient name'}
 ✓ Closing: "Best regards," on its own line, followed by sender name on next line
@@ -3156,16 +2733,23 @@ export default async function handler(req, res) {
       return;
     }
 
-    const { prompt, mode = 'standard', recipient = null, to = '', fromEmail = '', senderName = 'Lewis Patterson', whoWeAre, marketContext, meetingPreferences, industrySegmentation } = req.body || {};
+    const { 
+      prompt, 
+      mode = 'standard', 
+      recipient = null, 
+      to = '', 
+      fromEmail = '', 
+      senderName = 'Lewis Patterson', 
+      whoWeAre, 
+      marketContext, 
+      meetingPreferences, 
+      industrySegmentation,
+      selectedAngle,
+      toneOpener
+    } = req.body || {};
     
     // Detect template type for both HTML and standard modes
-    let templateType = getTemplateType(prompt);
-    
-    // Normalize cold email key so the rest of the code sees the same value
-    // getTemplateType returns 'cold_email' but schemas/HTML builders use 'coldemail'
-    if (templateType === 'cold_email') {
-      templateType = 'coldemail';
-    }
+    const templateType = getTemplateType(prompt);
     
     console.log('[Perplexity] Template type:', templateType, 'for prompt:', prompt);
     
@@ -3181,7 +2765,7 @@ export default async function handler(req, res) {
     const meetingTimes = getSuggestedMeetingTimes(meetingPreferences);
     
     // Only suggest meeting times for follow-up emails, not cold emails
-    const dateContext = templateType === 'coldemail' ? `TODAY'S DATE: ${todayLabel}
+    const dateContext = templateType === 'cold_email' ? `TODAY'S DATE: ${todayLabel}
 
 COLD EMAIL RULES:
 - Use qualifying questions only (NO meeting requests)
@@ -3201,7 +2785,20 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields } = await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation });
+    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields } = await buildSystemPrompt({ 
+      mode, 
+      recipient, 
+      to, 
+      prompt, 
+      senderName, 
+      templateType, 
+      whoWeAre, 
+      marketContext, 
+      meetingPreferences, 
+      industrySegmentation,
+      selectedAngle,
+      toneOpener
+    });
     const fullSystemPrompt = dateContext + systemPrompt;
     
     // Call Perplexity API
@@ -3233,7 +2830,23 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         const fallbackBody = {
           model: 'sonar',
           messages: [
-            { role: 'system', content: dateContext + (await buildSystemPrompt({ mode, recipient, to, prompt, senderName, templateType, whoWeAre, marketContext, meetingPreferences, industrySegmentation })).prompt },
+            { 
+              role: 'system', 
+              content: dateContext + (await buildSystemPrompt({ 
+                mode, 
+                recipient, 
+                to, 
+                prompt, 
+                senderName, 
+                templateType, 
+                whoWeAre, 
+                marketContext, 
+                meetingPreferences, 
+                industrySegmentation,
+                selectedAngle,
+                toneOpener
+              })).prompt 
+            },
             { role: 'user', content: prompt || 'Draft a professional email' }
           ],
           max_tokens: 600
@@ -3267,7 +2880,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         console.log('[Perplexity] Parsed JSON for template:', templateType);
         
         // Validate value proposition completeness for cold emails
-        if (templateType === 'coldemail' && jsonData.value_proposition) {
+        if (templateType === 'cold_email' && jsonData.value_proposition) {
           const incomplete = /\b(within|like|such as|including)\s+[A-Z][^.!?]*$/i.test(jsonData.value_proposition);
           if (incomplete) {
             console.warn('[Validation] Incomplete value prop detected, fixing...');
@@ -3279,7 +2892,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         }
         
         // Validate CTA completeness for cold emails
-        if (templateType === 'coldemail' && jsonData.cta_text) {
+        if (templateType === 'cold_email' && jsonData.cta_text) {
           const incompleteCTA = /would you be open to a quick$/i.test(jsonData.cta_text);
           if (incompleteCTA) {
             console.warn('[Validation] Incomplete CTA detected, fixing...');
@@ -3288,21 +2901,21 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         }
         
         // Validate missing value propositions for cold emails
-        if (templateType === 'coldemail' && (!jsonData.value_proposition || jsonData.value_proposition.trim() === '')) {
+        if (templateType === 'cold_email' && (!jsonData.value_proposition || jsonData.value_proposition.trim() === '')) {
           console.warn('[Validation] Missing value proposition detected, adding default...');
           const industry = recipient?.industry || 'businesses';
           jsonData.value_proposition = `We help ${industry} companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs.`;
         }
         
         // Validate missing opening_hook for cold emails
-        if (templateType === 'coldemail' && (!jsonData.opening_hook || jsonData.opening_hook.trim() === '')) {
+        if (templateType === 'cold_email' && (!jsonData.opening_hook || jsonData.opening_hook.trim() === '')) {
           console.warn('[Validation] Missing opening_hook detected, adding default...');
           const company = recipient?.company || 'Companies';
           jsonData.opening_hook = `${company} are likely facing rising electricity costs with contracts renewing in 2025.`;
         }
         
         // Validate for duplicate CTAs in cold emails
-        if (templateType === 'coldemail' && jsonData.cta_text) {
+        if (templateType === 'cold_email' && jsonData.cta_text) {
           // Check if the CTA contains multiple questions or meeting requests
           const hasMultipleQuestions = (jsonData.cta_text.match(/\?/g) || []).length > 1;
           const hasMeetingRequest = /does.*work.*call|tuesday|thursday|monday|wednesday|friday|15-minute|brief.*call|quick.*call|meeting|schedule|calendar/i.test(jsonData.cta_text);
@@ -3315,7 +2928,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         }
         
         // Validate no statistics in opening_hook for cold emails
-        if (templateType === 'coldemail' && jsonData.opening_hook) {
+        if (templateType === 'cold_email' && jsonData.opening_hook) {
           const hasStatistics = /\d+[-–]\d+%|\d+%|save \$\d+|reduce costs by|15-25%|20-30%|10-20%|data center.*\d+%|rates up \d+%/i.test(jsonData.opening_hook);
           if (hasStatistics) {
             console.warn('[Validation] Statistics detected in opening_hook:', jsonData.opening_hook);
@@ -3335,7 +2948,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         }
         
         // Validate email length for cold emails (90-130 words optimal)
-        if (templateType === 'coldemail') {
+        if (templateType === 'cold_email') {
           const fullEmail = `${jsonData.greeting || ''} ${jsonData.opening_hook || ''} ${jsonData.value_proposition || ''} ${jsonData.cta_text || ''}`.trim();
           const wordCount = fullEmail.split(/\s+/).length;
           
@@ -3362,19 +2975,19 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           sizeCategory,
           job: recipient?.title || recipient?.job || recipient?.role || null
         };
-        if (jsonData.greeting) jsonData.greeting = removeCitationBrackets(sanitizeColdEmailText(deSalesify(personalizeIndustryAndSize(jsonData.greeting, personalizeCtx))));
+        // Helper function to sanitize percentages and fix "Default" references
+        const sanitizePercentages = (text) => {
+          if (!text) return text;
+          return String(text)
+            .replace(/15-20%/gi, '10-20%')
+            .replace(/15-25%/gi, '10-20%');
+        };
         
-        // Enforce greeting normalization for cold emails
-        if (templateType === 'coldemail' && jsonData.greeting) {
-          const first = firstName || 'there';
-          // Force consistent greeting - always "Hi [firstName],"
-          jsonData.greeting = `Hi ${first},`;
-        }
-        
-        if (jsonData.opening_hook) jsonData.opening_hook = removeCitationBrackets(sanitizeColdEmailText(deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx))));
-        if (jsonData.value_proposition) jsonData.value_proposition = removeCitationBrackets(sanitizeColdEmailText(deSalesify(personalizeIndustryAndSize(jsonData.value_proposition, personalizeCtx))));
-        if (jsonData.social_proof_optional) jsonData.social_proof_optional = removeCitationBrackets(sanitizeColdEmailText(deSalesify(personalizeIndustryAndSize(jsonData.social_proof_optional, personalizeCtx))));
-        if (jsonData.cta_text) jsonData.cta_text = removeCitationBrackets(sanitizeColdEmailText(deSalesify(personalizeIndustryAndSize(jsonData.cta_text, personalizeCtx))));
+        if (jsonData.greeting) jsonData.greeting = sanitizePercentages(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.greeting, personalizeCtx))));
+        if (jsonData.opening_hook) jsonData.opening_hook = sanitizePercentages(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx))));
+        if (jsonData.value_proposition) jsonData.value_proposition = sanitizePercentages(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.value_proposition, personalizeCtx))));
+        if (jsonData.social_proof_optional) jsonData.social_proof_optional = sanitizePercentages(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.social_proof_optional, personalizeCtx))));
+        if (jsonData.cta_text) jsonData.cta_text = sanitizePercentages(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.cta_text, personalizeCtx))));
         
         // Clean all other string fields in jsonData to remove citations
         Object.keys(jsonData).forEach(key => {
@@ -3397,7 +3010,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           metadata: {
             subject_style: jsonData.subject_style || null,
             cta_type: jsonData.cta_type || null,
-            opening_style: templateType === 'coldemail' ? (openingStyleUsed || null) : null,
+            opening_style: templateType === 'cold_email' ? (openingStyleUsed || null) : null,
             generated_at: new Date().toISOString()
           }
         }));
@@ -3424,7 +3037,11 @@ CRITICAL: Use these EXACT meeting times in your CTA.
       sizeCategory: sizeCategoryStd,
       job: recipient?.title || recipient?.job || recipient?.role || null
     };
-    const polished = removeCitationBrackets(sanitizeColdEmailText(deSalesify(personalizeIndustryAndSize(content, personalizeCtxStd))));
+    // Sanitize percentages and personalize
+    let polished = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(content, personalizeCtxStd)));
+    polished = polished
+      .replace(/15-20%/gi, '10-20%')
+      .replace(/15-25%/gi, '10-20%');
     return res.end(JSON.stringify({ 
       ok: true, 
       output: polished,
