@@ -1157,13 +1157,33 @@
         return;
       }
 
-      let gotAny = false;
+      // CRITICAL FIX: Check BOTH collections and merge results
+      // All new additions go to top-level 'listMembers', but legacy data might be in subcollection
+      // We need to check both to ensure we get ALL members
       
-      // COST-EFFECTIVE: Try subcollection first (single query), fallback only if empty
+      // Priority 1: Top-level listMembers collection (where all new additions go)
+      try {
+        const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).limit(5000).get();
+        if (lmSnap && lmSnap.docs && lmSnap.docs.length > 0) {
+          lmSnap.docs.forEach(d => {
+            const m = d.data() || {};
+            const t = (m.targetType || m.type || '').toLowerCase();
+            const id = m.targetId || m.id || d.id;
+            if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
+            else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
+          });
+          console.log(`[ListDetail] ✓ Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from top-level collection`);
+        }
+      } catch (lmErr) {
+        console.warn('[ListDetail] Top-level query failed:', lmErr);
+      }
+      
+      // Priority 2: Also check subcollection for any legacy data (merge with top-level results)
       try {
         const subSnap = await window.firebaseDB.collection('lists').doc(listId).collection('members').get();
         if (subSnap && subSnap.docs && subSnap.docs.length > 0) {
-          gotAny = true;
+          const beforePeople = state.membersPeople.size;
+          const beforeAccounts = state.membersAccounts.size;
           subSnap.docs.forEach(d => {
             const m = d.data() || {};
             const t = (m.targetType || m.type || '').toLowerCase();
@@ -1171,30 +1191,14 @@
             if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
             else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
           });
-          console.log(`[ListDetail] ✓ Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from subcollection`);
+          const addedPeople = state.membersPeople.size - beforePeople;
+          const addedAccounts = state.membersAccounts.size - beforeAccounts;
+          if (addedPeople > 0 || addedAccounts > 0) {
+            console.log(`[ListDetail] ✓ Merged ${addedPeople} people, ${addedAccounts} accounts from subcollection (legacy data)`);
+          }
         }
       } catch (subErr) {
-        console.warn('[ListDetail] Subcollection query failed, trying fallback:', subErr);
-      }
-
-      // COST-EFFECTIVE: Fallback to top-level listMembers collection (only if subcollection empty)
-      if (!gotAny) {
-        try {
-          const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).limit(5000).get();
-          if (lmSnap && lmSnap.docs && lmSnap.docs.length > 0) {
-            lmSnap.docs.forEach(d => {
-              const m = d.data() || {};
-              const t = (m.targetType || m.type || '').toLowerCase();
-              const id = m.targetId || m.id || d.id;
-              if (t === 'people' || t === 'contact' || t === 'contacts') state.membersPeople.add(id);
-              else if (t === 'accounts' || t === 'account') state.membersAccounts.add(id);
-            });
-            console.log(`[ListDetail] ✓ Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from top-level collection`);
-          }
-        } catch (lmErr) {
-          console.warn('[ListDetail] Top-level query failed:', lmErr);
-          // COST-EFFECTIVE: Preserve empty Sets on error (don't clear cache)
-        }
+        console.warn('[ListDetail] Subcollection query failed (non-critical):', subErr);
       }
       
       // 3) Cache the results for next time (COST-EFFECTIVE: IndexedDB write only)
@@ -2211,6 +2215,41 @@
       loadDataOnce(),
       fetchMembers(state.listId)
     ]);
+    
+    // CRITICAL FIX: If list recordCount doesn't match fetched members, invalidate cache and re-fetch
+    // This handles cases where cache is stale or incomplete (e.g., only showing 12 out of 174 contacts)
+    if (state.listId) {
+      try {
+        const listData = window.BackgroundListsLoader?.getListsData?.() || [];
+        const list = listData.find(l => l.id === state.listId);
+        const expectedCount = list?.recordCount || list?.count || 0;
+        const actualPeopleCount = state.membersPeople?.size || 0;
+        const actualAccountsCount = state.membersAccounts?.size || 0;
+        const actualTotal = actualPeopleCount + actualAccountsCount;
+        
+        // If there's a significant mismatch (more than 10% difference or more than 10 items), invalidate cache and re-fetch
+        if (expectedCount > 0 && actualTotal > 0 && Math.abs(expectedCount - actualTotal) > Math.max(10, expectedCount * 0.1)) {
+          console.warn(`[ListDetail] Count mismatch detected: expected ${expectedCount}, got ${actualTotal}. Invalidating cache and re-fetching...`);
+          
+          // Invalidate cache
+          if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
+            await window.CacheManager.invalidateListCache(state.listId);
+          }
+          
+          // Clear in-memory cache
+          if (window.listMembersCache && window.listMembersCache[state.listId]) {
+            delete window.listMembersCache[state.listId];
+          }
+          
+          // Re-fetch members
+          await fetchMembers(state.listId);
+          
+          console.log(`[ListDetail] ✓ Re-fetched after cache invalidation: ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts`);
+        }
+      } catch (countCheckErr) {
+        console.warn('[ListDetail] Error checking count mismatch:', countCheckErr);
+      }
+    }
     
     // CRITICAL: Ensure members are loaded before filtering (fixes race condition)
     // Verify members Sets are initialized (even if empty)
