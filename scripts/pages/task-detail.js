@@ -1502,6 +1502,12 @@
     
     if (!task) {
       console.error('Task not found:', taskId);
+
+      // CRITICAL FIX: Treat this as a stale/ghost task and clean it up locally
+      try {
+        cleanupStaleTask(taskId);
+      } catch (_) {}
+
       showTaskError('Task not found or you do not have access to this task.');
       state.loadingTask = false;
       return;
@@ -1577,6 +1583,57 @@
     } catch (e) {
       console.error('[TaskDetail] Failed to show error message:', e);
       alert(message); // Final fallback
+    }
+  }
+
+  // CRITICAL FIX: Clean up stale tasks that can no longer be loaded
+  function cleanupStaleTask(taskId) {
+    if (!taskId) return;
+    
+    try {
+      // Remove from namespaced localStorage key
+      try {
+        const key = getUserTasksKey();
+        const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
+        const filteredTasks = userTasks.filter(t => t && t.id !== taskId);
+        localStorage.setItem(key, JSON.stringify(filteredTasks));
+      } catch (e) {
+        console.warn('[TaskDetail] Failed to remove stale task from namespaced localStorage:', e);
+      }
+      
+      // Also clean up legacy key
+      try {
+        const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+        const filteredLegacy = legacyTasks.filter(t => t && t.id !== taskId);
+        localStorage.setItem('userTasks', JSON.stringify(filteredLegacy));
+      } catch (e) {
+        console.warn('[TaskDetail] Failed to remove stale task from legacy localStorage:', e);
+      }
+      
+      // Best-effort cache cleanup so BackgroundTasksLoader won't keep returning the ghost task
+      try {
+        if (window.CacheManager && typeof window.CacheManager.deleteRecord === 'function') {
+          window.CacheManager.deleteRecord('tasks', taskId);
+        } else if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+          // Fallback: invalidate entire tasks cache
+          window.CacheManager.invalidate('tasks');
+        }
+      } catch (e) {
+        console.warn('[TaskDetail] Failed to clean up stale task from cache:', e);
+      }
+      
+      // Notify other pages (Tasks page, dashboard widget) to refresh their task lists
+      try {
+        window.dispatchEvent(new CustomEvent('tasksUpdated', { 
+          detail: { source: 'staleCleanup', taskId }
+        }));
+      } catch (e) {
+        console.warn('[TaskDetail] Failed to dispatch tasksUpdated for stale task cleanup:', e);
+      }
+      
+      console.log('[TaskDetail] Cleaned up stale task locally:', taskId);
+    } catch (e) {
+      console.warn('[TaskDetail] Unexpected error during stale task cleanup:', e);
     }
   }
 

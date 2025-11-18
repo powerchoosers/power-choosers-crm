@@ -356,15 +356,12 @@
     // Debug logging
     console.log(`[Tasks] Loaded ${userTasks.length} tasks from localStorage, ${firebaseTasks.length} tasks from Firebase`);
     
-    // Merge all tasks, prioritizing localStorage over Firebase for duplicates
-    const allTasks = [...userTasks];
-    
-    // Add Firebase tasks that aren't already in localStorage
-    firebaseTasks.forEach(fbTask => {
-      if (!userTasks.some(ut => ut.id === fbTask.id)) {
-        allTasks.push(fbTask);
-      }
-    });
+    // Merge all tasks - CRITICAL FIX: Always prefer Firebase as the source of truth
+    // Firebase tasks override any stale local copies with the same ID
+    const allTasksMap = new Map();
+    firebaseTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+    userTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+    const allTasks = Array.from(allTasksMap.values());
     
     // Add LinkedIn tasks that aren't duplicates
     const nonDupLinkedIn = linkedInTasks.filter(li => !allTasks.some(t => t.id === li.id));

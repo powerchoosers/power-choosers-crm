@@ -2828,13 +2828,22 @@ class FreeSequenceAutomation {
    - Use their role language (CFOs care about predictability/budgets, Operations care about uptime/reliability)
    - Make it about THEM, not about us (don't lead with "We help...")
 
-4. ONE INSIGHT (SPECIFIC, NOT GENERIC)
+4. ONE INSIGHT (SPECIFIC, NOT GENERIC) + ONE REAL PAIN SCENARIO
    - Provide ONE concrete observation about why this matters to them NOW
    - Use SPECIFIC numbers and timing: "6 months early = 15-20% savings" NOT "thousands annually"
    - NOT: "Companies save 10-20%" (too generic)
    - YES: "With 4 facilities in Texas, timing is critical - locking in 6 months out vs 90 days is usually 15-20% difference"
    - Include timing context: early renewal (6 months) vs late (90 days) = money difference
    - CRITICAL: Mention the 15-20% savings figure ONLY ONCE in the entire email - do not repeat it multiple times
+   
+   - PAIN LANE (TIE TO TIMING): Use ONE real scenario such as:
+     * Bills doubling on renewal (e.g., going from $800k/year to $1.6M)
+     * Confusing line items/riders on bills that hide negotiable costs
+     * Wrong contract type causing high delivery charges
+   - Explain how locking in 6 months early can prevent bill shocks like a customer going from $800k to $1.6M on renewal
+   - Keep it factual and calm: "I'm seeing a lot of contracts renewing 2x higher than the last term, and teams are scrambling to figure out why" (GOOD)
+   - NOT: "If you don't fix this now, you'll get crushed" (BAD - too fear-based)
+   - Tie pain to timing: One sentence hinting at real pain + one sentence showing timing is how smart teams avoid that outcome
 
 5. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
    - Write like a peer, not a salesperson (conversational, confident, direct)
@@ -2878,7 +2887,14 @@ class FreeSequenceAutomation {
    - Examples: "4 locations across Texas," "24/7 operations," "both electricity and natural gas"
    - This makes you stand out from generic templates
 
-ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should sound like their peer—a 29-year-old Texas business pro who knows the industry and has talked to others in their situation. Be conversational, confident, and direct.`;
+ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should sound like their peer—a 29-year-old Texas business pro who knows the industry and has talked to others in their situation. Be conversational, confident, and direct.
+
+GUARDRAILS (AVOID FAKE FEAR):
+- Only mention scenarios that are typical and believable for companies like [contact_company]. No exaggerated worst-case fear.
+- Describe pains as things you're seeing in the market right now, not predictions or threats.
+- No language like "you'll get crushed" or "you're in trouble"; use calm, factual language about stress, budget pressure, and surprises on bills.
+- GOOD EXAMPLE: "I'm seeing a lot of contracts renewing 2x higher than the last term, and teams are scrambling to figure out why."
+- BAD EXAMPLE: "If you don't fix this now, you'll get crushed by your energy bills."`;
   }
 
   // ========== FOLLOW-UP PROMPT BUILDERS ==========
@@ -2893,13 +2909,20 @@ CONTEXT: This is 2 days after the intro email. They haven't responded. DON'T men
 FRAMEWORK (2025 Best Practice - Day 2 Follow-Up):
 1. GREETING (RANDOMIZE): Use "Hi [contact_first_name]," OR "Hey [contact_first_name]," OR "Hello [contact_first_name],"
 
-2. NEW VALUE/INSIGHT (NOT a repeat of intro):
+2. NEW VALUE/INSIGHT (NOT a repeat of intro) + PAIN EXAMPLE:
    - Share ONE new insight they'd find valuable (NOT generic)
    - Examples:
      * "Here's a rate trend your peers noticed this spring..."
      * "I just saw [company_industry] contracts in [state] locked in at..."
      * "Quick insight about [company_industry] renewal timing..."
    - Make it about THEM discovering something useful, not you selling
+   
+   - PAIN EXAMPLE (USE ONE, NOT ALL): Include ONE specific example of what happens when energy contracts are handled on autopilot:
+     * A company's electricity spend jumping from $800k to $1.6M on renewal
+     * Bills with hard-to-explain riders and fees that can be removed
+     * Being stuck on the wrong contract type causing high delivery charges
+   - Then contrast this with what happens when teams review 6-12 months ahead: fewer surprises, cleaner bills, and lower total cost
+   - Use a budget_pressure or problem_aware opening style
 
 3. SOFT, CURIOUS CTA: Use THIS specific CTA (don't change it):
    "${cta}"
@@ -2920,7 +2943,14 @@ AVOID:
 - Repeating intro content
 
 LENGTH: 50-80 words max
-PURPOSE: Provide new value to keep conversation alive`;
+PURPOSE: Provide new value to keep conversation alive
+
+GUARDRAILS (AVOID FAKE FEAR):
+- Only mention scenarios that are typical and believable for companies like [contact_company]. No exaggerated worst-case fear.
+- Describe pains as things you're seeing in the market right now, not predictions or threats.
+- No language like "you'll get crushed" or "you're in trouble"; use calm, factual language about stress, budget pressure, and surprises on bills.
+- GOOD EXAMPLE: "I'm seeing a lot of contracts renewing 2x higher than the last term, and teams are scrambling to figure out why."
+- BAD EXAMPLE: "If you don't fix this now, you'll get crushed by your energy bills."`;
   }
 
   function buildFollowUpCuriosityPrompt(ctaVariant = true, role = 'all') {
@@ -2933,13 +2963,22 @@ CONTEXT: This is 5 days after intro. Still no response. Address a common objecti
 FRAMEWORK (2025 Best Practice - Day 5 Follow-Up):
 1. GREETING (RANDOMIZE): Use "Hi [contact_first_name]," OR "Hey [contact_first_name]," OR "Hello [contact_first_name],"
 
-2. ADDRESS OBJECTION/FAQ:
+2. ADDRESS OBJECTION/FAQ + HIDDEN PAINS:
    - Lead with a common challenge or mistake companies make
    - Examples:
      * "A lot of companies wait until the last minute—here's why early review matters..."
      * "Most [role]s I talk to don't realize timing costs them 15-20%..."
      * "The biggest mistake I see in [company_industry] is..."
    - Make it educational, not salesy
+   
+   - HIDDEN PAINS (ADDRESS "WE'RE ALL SET / WE RE-SHOP" BELIEF):
+     * Address the common belief "we already re-shop our contracts" by pointing out one or two issues that still slip through:
+       - Wrong structure driving high delivery charges even with a good rate
+       - Riders and fees that never get reviewed
+       - Being on the right rate but wrong term length
+     * Make the pain feel like an invisible blind spot, not an accusation
+     * Use operational_efficiency or timing_urgency style and highlight a hidden pain
+     * Ask a disarming question: "Curious—when you say you re-shop, does that include the delivery structure and riders, or just headline rates?"
 
 3. CURIOSITY CTA: Use THIS specific CTA (don't change it):
    "${cta}"
@@ -2958,7 +2997,14 @@ AVOID:
 - Generic "checking in"
 
 LENGTH: 60-90 words max
-PURPOSE: Address why they haven't responded, educate on common mistake`;
+PURPOSE: Address why they haven't responded, educate on common mistake
+
+GUARDRAILS (AVOID FAKE FEAR):
+- Only mention scenarios that are typical and believable for companies like [contact_company]. No exaggerated worst-case fear.
+- Describe pains as things you're seeing in the market right now, not predictions or threats.
+- No language like "you'll get crushed" or "you're in trouble"; use calm, factual language about stress, budget pressure, and surprises on bills.
+- GOOD EXAMPLE: "I'm seeing a lot of contracts renewing 2x higher than the last term, and teams are scrambling to figure out why."
+- BAD EXAMPLE: "If you don't fix this now, you'll get crushed by your energy bills."`;
   }
 
   function buildNurtureValuePrompt() {
