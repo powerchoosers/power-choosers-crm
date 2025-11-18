@@ -182,17 +182,19 @@
     // NEW: Left navigation sidebar listeners (main.js)
     '_sidebarHoverBound',
     
-    // NEW: Contact lists panel listeners (contact-detail.js)
-    '_contactListsResizeBound',
-    '_contactListsScrollBound',
-    '_contactListsKeydownBound',
-    '_contactListsMousedownBound',
-    
-    // NEW: Contact sequences panel listeners (contact-detail.js)
-    '_contactSequencesResizeBound',
-    '_contactSequencesScrollBound',
-    '_contactSequencesKeydownBound',
-    '_contactSequencesMousedownBound',
+    // NEW: Contact lists / sequences panel listeners (contact-detail.js)
+    // NOTE: These panels manage their own attach/detach lifecycle and are opened/closed
+    // per-contact. We intentionally do NOT pre-mark their guards here because doing so
+    // prevents listeners from being attached on subsequent opens (breaking Add-to-List
+    // and Add-to-Sequence after the first use).
+    // '_contactListsResizeBound',
+    // '_contactListsScrollBound',
+    // '_contactListsKeydownBound',
+    // '_contactListsMousedownBound',
+    // '_contactSequencesResizeBound',
+    // '_contactSequencesScrollBound',
+    // '_contactSequencesKeydownBound',
+    // '_contactSequencesMousedownBound',
 
     // Sequence Builder page (new)
     '_sequenceContactsBtnBound',

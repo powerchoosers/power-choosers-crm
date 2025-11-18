@@ -65,7 +65,12 @@
           try { 
             // Only reload if we're on the emails page
             if (els.page && els.page.style.display !== 'none') {
-              loadData(); 
+              // IMPORTANT: use showImmediately=true so realtime updates actually
+              // re-render the table (scheduled → sent, new emails, etc.).
+              // Previously this called loadData() without the flag, which updated
+              // in-memory data but didn't call applyFilters()/render(), forcing
+              // a manual refresh or tab toggle for users to see changes.
+              loadData(true); 
             }
           } catch(_) {}
         }, 1000); // 1 second debounce

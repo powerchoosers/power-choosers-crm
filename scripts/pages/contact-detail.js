@@ -5995,16 +5995,11 @@ function openContactSequencesPanel() {
   };
   _positionContactSequencesPanel();
   setTimeout(() => panel.classList.add('--show'), 0);
-  
-  // Guard against duplicate resize/scroll listeners
-  if (!document._contactSequencesResizeBound) {
-    try { window.addEventListener('resize', _positionContactSequencesPanel, true); } catch (_) {}
-    document._contactSequencesResizeBound = true;
-  }
-  if (!document._contactSequencesScrollBound) {
-    try { window.addEventListener('scroll', _positionContactSequencesPanel, true); } catch (_) {}
-    document._contactSequencesScrollBound = true;
-  }
+
+  // Always attach resize/scroll listeners for this panel instance.
+  // closeContactSequencesPanel() will clean them up.
+  try { window.addEventListener('resize', _positionContactSequencesPanel, true); } catch (_) {}
+  try { window.addEventListener('scroll', _positionContactSequencesPanel, true); } catch (_) {}
 
   // Interactions
   panel.addEventListener('click', (e) => {
@@ -6022,11 +6017,8 @@ function openContactSequencesPanel() {
     }
   };
   
-  // Guard against duplicate keydown listeners
-  if (!document._contactSequencesKeydownBound) {
-    document.addEventListener('keydown', _onContactSequencesKeydown, true);
-    document._contactSequencesKeydownBound = true;
-  }
+  // Always attach keydown listener; closeContactSequencesPanel() removes it.
+  document.addEventListener('keydown', _onContactSequencesKeydown, true);
   
   _onContactSequencesOutside = (e) => {
     const inside = panel.contains(e.target);
@@ -6525,15 +6517,10 @@ async function createContactSequenceThenAdd(name) {
     };
     _positionContactListsPanel();
     
-    // Guard against duplicate resize/scroll listeners
-    if (!document._contactListsResizeBound) {
-      window.addEventListener('resize', _positionContactListsPanel, true);
-      document._contactListsResizeBound = true;
-    }
-    if (!document._contactListsScrollBound) {
-      window.addEventListener('scroll', _positionContactListsPanel, true);
-      document._contactListsScrollBound = true;
-    }
+    // Always attach resize/scroll listeners for this panel instance.
+    // closeContactListsPanel() will clean them up.
+    try { window.addEventListener('resize', _positionContactListsPanel, true); } catch (_) {}
+    try { window.addEventListener('scroll', _positionContactListsPanel, true); } catch (_) {}
 
     // Animate in
     requestAnimationFrame(() => { panel.classList.add('--show'); });
@@ -6558,11 +6545,8 @@ async function createContactSequenceThenAdd(name) {
       }
     };
     
-    // Guard against duplicate keydown listeners
-    if (!document._contactListsKeydownBound) {
-      document.addEventListener('keydown', _onContactListsKeydown, true);
-      document._contactListsKeydownBound = true;
-    }
+    // Always attach keydown listener; closeContactListsPanel() removes it.
+    document.addEventListener('keydown', _onContactListsKeydown, true);
 
     // Click-away handler - closes when clicking outside or on other buttons
     _onContactListsOutside = (e) => {
