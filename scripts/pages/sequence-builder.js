@@ -981,6 +981,84 @@ class FreeSequenceAutomation {
         // Non-fatal; sequences list will eventually refresh on next visit
       }
       
+      // ✅ NEW: If sequence is already active (has active members), automatically start sequence for this new contact
+      // Check if sequence has active members (stats.active > 0 or existing sequenceActivations)
+      try {
+        const sequenceDoc = await db.collection('sequences').doc(state.currentSequence.id).get();
+        const sequenceData = sequenceDoc.data();
+        const hasActiveMembers = (sequenceData?.stats?.active || 0) > 0;
+        
+        // Also check if there are any existing sequenceActivations for this sequence
+        let hasExistingActivations = false;
+        try {
+          const existingActivationsQuery = await db.collection('sequenceActivations')
+            .where('sequenceId', '==', state.currentSequence.id)
+            .where('status', 'in', ['pending', 'processing'])
+            .limit(1)
+            .get();
+          hasExistingActivations = !existingActivationsQuery.empty;
+        } catch (_) {
+          // Query might fail if index missing, but that's okay - we'll use stats.active as fallback
+        }
+        
+        // If sequence is active, automatically create sequenceActivation for this new contact
+        if (hasActiveMembers || hasExistingActivations) {
+          if (contact.email && !contact._skipEmailSteps) {
+            console.log('[SequenceBuilder] Sequence is active, auto-starting for new contact:', contact.name);
+            
+            // Create sequenceActivation for this single contact
+            const activationRef = db.collection('sequenceActivations').doc();
+            const activationId = activationRef.id;
+            
+            const sequenceActivationData = {
+              sequenceId: state.currentSequence.id,
+              contactIds: [contact.id],
+              status: 'pending',
+              processedContacts: 0,
+              totalContacts: 1,
+              ownerId: userEmail || 'unknown',
+              assignedTo: userEmail || 'unknown',
+              createdBy: userEmail || 'unknown',
+              createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || Date.now()
+            };
+            
+            await activationRef.set(sequenceActivationData);
+            console.log('[SequenceBuilder] Created auto-sequenceActivation:', activationId);
+            
+            // Trigger immediate processing
+            try {
+              const baseUrl = window.API_BASE_URL || window.location.origin || '';
+              const response = await fetch(`${baseUrl}/api/process-sequence-activations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  immediate: true,
+                  activationId: activationId
+                })
+              });
+              
+              if (response.ok) {
+                const result = await response.json();
+                console.log('[SequenceBuilder] Auto-started sequence for new contact:', result);
+                if (window.crm && typeof window.crm.showToast === 'function') {
+                  window.crm.showToast(`✓ ${contact.name} added and sequence started automatically!`, 'success');
+                }
+              } else {
+                console.warn('[SequenceBuilder] Auto-start failed, but contact was added. Will be picked up by next cron run.');
+              }
+            } catch (autoStartError) {
+              console.warn('[SequenceBuilder] Auto-start failed (non-fatal):', autoStartError);
+              // Contact is still added, cron will pick it up
+            }
+          } else {
+            console.log('[SequenceBuilder] Contact has no email, skipping auto-start');
+          }
+        }
+      } catch (autoStartError) {
+        console.warn('[SequenceBuilder] Failed to check/auto-start sequence (non-fatal):', autoStartError);
+        // Non-fatal - contact is still added, user can manually start if needed
+      }
+      
     } catch (error) {
       console.error('Error saving contact to sequence:', error);
       if (window.crm && typeof window.crm.showToast === 'function') {
