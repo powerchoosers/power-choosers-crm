@@ -1,4 +1,5 @@
 import { db } from './_firebase.js';
+import * as IndustryDetection from './_industry-detection.js';
 
 // ========== INDUSTRY DETECTION FUNCTIONS ==========
 
@@ -311,8 +312,79 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
   }
 };
 
-// Select randomized angle based on industry
-function selectRandomizedAngle(industry, manualAngleOverride, accountData) {
+// Optional news hooks that can temporarily boost specific angles
+const ACTIVE_NEWS_HOOKS = [
+  {
+    id: 'ratespike11pct',
+    headline: 'Electricity rates up 11% nationally in 2025',
+    angleAffinity: ['timing_strategy'],
+    weight: 1.5
+  },
+  {
+    id: 'datacenterdemand',
+    headline: 'AI demand driving 50% rate increases',
+    angleAffinity: ['demand_efficiency'],
+    weight: 1.3
+  }
+];
+
+// Subject line variants for cold intro steps (short, question-based, role-aware)
+const SUBJECT_LINE_VARIANTS = {
+  intro: {
+    operations: [
+      '{firstName}, facility renewal timing?',
+      '{firstName}, quick question on your energy contract',
+      '{firstName}, how early do you lock in rates?',
+      '{company} facility renewal timing',
+      'Contract timing at {company}?'
+    ],
+    finance: [
+      '{firstName}, budget question on energy renewal',
+      '{firstName}, rate lock timing question',
+      'Energy renewal timing at {company}',
+      '{firstName}, cost predictability question',
+      '{firstName}, 2025 energy budget timing?'
+    ],
+    executive: [
+      '{firstName}, contract timing question',
+      '{company} energy renewal timing',
+      '{firstName}, quick question on 2025 energy strategy',
+      '{company} rate lock timing?',
+      'Energy contract timing at {company}'
+    ],
+    default: [
+      '{firstName}, contract timing question',
+      '{firstName}, quick energy renewal question',
+      '{company} contract renewal timing',
+      '{firstName}, rate lock timing',
+      'Energy renewal timing at {company}'
+    ]
+  }
+};
+
+function getRoleCategoryForSubject(roleRaw = '') {
+  const role = String(roleRaw || '').toLowerCase();
+  if (/cfo|finance|controller|treasurer|accounting|vp finance/.test(role)) return 'finance';
+  if (/operations|facilities|plant|gm|general manager|maintenance|operations manager/.test(role)) return 'operations';
+  if (/ceo|president|owner|founder|executive|chief/.test(role)) return 'executive';
+  return 'default';
+}
+
+function getRandomIntroSubject(roleRaw, firstName, company) {
+  const roleCategory = getRoleCategoryForSubject(roleRaw);
+  const variants =
+    SUBJECT_LINE_VARIANTS.intro[roleCategory] ||
+    SUBJECT_LINE_VARIANTS.intro.default;
+  const chosen = variants[Math.floor(Math.random() * variants.length)];
+  const safeFirst = (firstName || '').trim() || 'there';
+  const safeCompany = (company || '').trim() || 'your company';
+  return chosen
+    .replace('{firstName}', safeFirst)
+    .replace('{company}', safeCompany);
+}
+
+// Select randomized angle based on industry, with optional memory of recently used angles
+function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedAngles = []) {
   // Normalize industry
   let normalizedIndustry = (industry || '').toString().trim();
   if (!normalizedIndustry) {
@@ -348,7 +420,33 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData) {
     const overrideAngle = availableAngles.find(a => a.id === manualAngleOverride);
     if (overrideAngle) return overrideAngle;
   }
-  
+
+  // Avoid repeating angles that were just used in this sequence for this contact
+  const recentAngles = Array.isArray(usedAngles) ? usedAngles.filter(Boolean) : [];
+  if (recentAngles.length > 0) {
+    const freshAngles = availableAngles.filter(a => !recentAngles.includes(a.id));
+    if (freshAngles.length > 0) {
+      availableAngles = freshAngles;
+    }
+  }
+
+  // Apply optional news hook boosts to angle weights
+  if (ACTIVE_NEWS_HOOKS.length > 0) {
+    const boosted = [];
+    for (const angle of availableAngles) {
+      const hook = ACTIVE_NEWS_HOOKS.find(h => Array.isArray(h.angleAffinity) && h.angleAffinity.includes(angle.id));
+      if (hook) {
+        boosted.push({
+          ...angle,
+          weight: (angle.weight || 0) * (hook.weight || 1)
+        });
+      } else {
+        boosted.push(angle);
+      }
+    }
+    availableAngles = boosted;
+  }
+
   // Weighted random selection
   const random = Math.random();
   let cumulative = 0;
@@ -364,24 +462,48 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData) {
   return availableAngles[0] || RANDOMIZED_ANGLES_BY_INDUSTRY.Default.angles[0];
 }
 
-// Select random tone opener
+// Select random tone opener (angle-aware)
 function selectRandomToneOpener(angleId = null) {
-  const openers = [
-    "Genuine question—",
+  // Universal openers (work for any angle)
+  const universal = [
     "Let me ask you something—",
-    "Been wondering—",
-    "You ever considered—",
     "So here's the thing—",
-    "This might sound random, but—",
     "Honestly—",
     "Looking at your situation—",
     "Question for you—",
     "Here's what I'm seeing—",
     "Most people I talk to—",
     "From what I'm hearing—",
-    "I've found that teams like yours—"
+    "I've found that teams like yours—",
+    "Curious—",
+    "Real talk—"
   ];
-  return openers[Math.floor(Math.random() * openers.length)];
+
+  // Angle-specific openers (for NEW concepts only)
+  const angleSpecific = {
+    exemption_recovery: [
+      "You ever considered—",
+      "Did you know—",
+      "Here's something most teams miss—"
+    ],
+    mission_funding: [
+      "You ever considered—",
+      "Ever think about—"
+    ],
+    consolidation: [
+      "Curious—",
+      "Quick question—"
+    ],
+    timing_strategy: [
+      "Quick question—",
+      "Real question—"
+    ]
+  };
+
+  let pool = angleSpecific[angleId] || [];
+  const finalPool = pool.length > 0 ? [...pool, ...universal] : universal;
+
+  return finalPool[Math.floor(Math.random() * finalPool.length)];
 }
 
 export default async function handler(req, res) {
@@ -550,11 +672,15 @@ export default async function handler(req, res) {
               .limit(3)
               .get();
             
-            previousEmails = previousEmailsQuery.docs.map(doc => ({
-              subject: doc.data().subject,
-              content: doc.data().text || doc.data().html,
-              sentAt: doc.data().sentAt || doc.data().createdAt
-            }));
+            previousEmails = previousEmailsQuery.docs.map(doc => {
+              const data = doc.data();
+              return {
+                subject: data.subject,
+                content: data.text || data.html,
+                sentAt: data.sentAt || data.createdAt,
+                angle_used: data.angle_used || data.angleUsed || null
+              };
+            });
           } catch (error) {
             console.warn('[GenerateScheduledEmails] Failed to get previous emails:', error);
           }
@@ -565,7 +691,7 @@ export default async function handler(req, res) {
         
         // Infer industry from company name if not set
         if (!recipientIndustry && emailData.contactCompany) {
-          recipientIndustry = inferIndustryFromCompanyName(emailData.contactCompany);
+          recipientIndustry = IndustryDetection.inferIndustryFromCompanyName(emailData.contactCompany);
         }
         
         // Infer from account description if still not set
@@ -574,7 +700,7 @@ export default async function handler(req, res) {
                              accountData.descriptionShort || accountData.description || 
                              accountData.companyDescription || accountData.accountDescription || '';
           if (accountDesc) {
-            recipientIndustry = inferIndustryFromDescription(accountDesc);
+            recipientIndustry = IndustryDetection.inferIndustryFromDescription(accountDesc);
           }
         }
         
@@ -583,7 +709,7 @@ export default async function handler(req, res) {
           recipientIndustry = 'Default';
         }
         
-        // Select angle based on industry/role/exemption status
+        // Build recipient object used for angle selection + prompt context
         const recipient = {
           firstName: contactData.firstName || contactData.name || emailData.contactName || 'there',
           company: contactData.company || accountData.companyName || accountData.name || emailData.contactCompany || '',
@@ -592,7 +718,29 @@ export default async function handler(req, res) {
           account: accountData
         };
         
-        const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient);
+        // Extract recently used angles for this contact within this sequence (avoid repeats)
+        const usedAngles = [];
+        if (Array.isArray(previousEmails)) {
+          previousEmails.forEach(prev => {
+            if (prev && prev.angle_used) {
+              usedAngles.push(prev.angle_used);
+            } else if (prev && prev.content) {
+              const content = String(prev.content).toLowerCase();
+              if (content.includes('6 months') || content.includes('renewal timing')) {
+                usedAngles.push('timing_strategy');
+              }
+              if (content.includes('exemption') || content.includes('tax')) {
+                usedAngles.push('exemption_recovery');
+              }
+              if (content.includes('consolidat') || content.includes('multiple')) {
+                usedAngles.push('consolidation');
+              }
+            }
+          });
+        }
+        
+        // Select angle based on industry/role/exemption status with memory + news boosts
+        const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient, usedAngles);
         const toneOpener = selectRandomToneOpener(selectedAngle?.id);
         
         if (!isProduction) {
@@ -603,6 +751,13 @@ export default async function handler(req, res) {
         // Default to "standard" so the body matches NEPQ-style plain emails
         // unless the step explicitly requested HTML generation.
         const aiMode = (emailData.aiMode || '').toLowerCase() === 'html' ? 'html' : 'standard';
+
+        // Determine if this step should use the strict cold-email template
+        const isColdStep = (
+          emailData.stepType === 'intro' ||
+          emailData.template === 'first-email-intro' ||
+          String(emailData.aiMode || '').toLowerCase() === 'cold-email'
+        );
 
         // Generate email content using /api/perplexity-email endpoint (which has full angle system)
         // Cloud Run deployment: always use PUBLIC_BASE_URL, fall back to localhost for local testing
@@ -615,9 +770,9 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             prompt: emailData.aiPrompt || 'Write a professional follow-up email',
             mode: aiMode,
-            // For HTML mode, use the cold email template. For standard mode we let
-            // the backend handle template detection based on the prompt.
-            ...(aiMode === 'html' ? { templateType: 'cold_email' } : {}),
+            // Force cold-email template type for intro-style steps so the backend
+            // can apply strict cold-email schema, subject variants, and CTA logic.
+            ...(isColdStep ? { templateType: 'cold_email' } : (aiMode === 'html' ? { templateType: 'cold_email' } : {})),
             recipient: recipient,
             selectedAngle: selectedAngle,
             toneOpener: toneOpener,
@@ -659,7 +814,7 @@ export default async function handler(req, res) {
 
           let subject = emailData.subject || 'Energy update';
           let bodyText = raw;
-
+          
           if (jsonData && typeof jsonData === 'object') {
             if (jsonData.subject) subject = jsonData.subject;
             const parts = [];
@@ -669,6 +824,15 @@ export default async function handler(req, res) {
             if (jsonData.paragraph3) parts.push(jsonData.paragraph3);
             if (jsonData.closing) parts.push(jsonData.closing);
             bodyText = parts.join('\n\n') || raw;
+          }
+
+          // For true cold intro steps, override subject with a short,
+          // role-aware variant so we get real variation and best-practice patterns.
+          if (isColdStep) {
+            const roleForSubject = recipient.title || '';
+            const firstNameForSubject = recipient.firstName || contactData.firstName || emailData.contactName || '';
+            const companyForSubject = recipient.company || emailData.contactCompany || '';
+            subject = getRandomIntroSubject(roleForSubject, firstNameForSubject, companyForSubject);
           }
 
           const escapeHtml = (str) => String(str)
@@ -688,7 +852,7 @@ export default async function handler(req, res) {
             .join('');
 
           textContent = bodyText;
-
+          
           // Replace subject in generatedContent below
           emailData.generatedSubject = subject;
         }
@@ -711,9 +875,14 @@ export default async function handler(req, res) {
           status: 'pending_approval',
           generatedAt: Date.now(),
           generatedBy: 'scheduled_job',
-          // Add angle metadata for tracking effectiveness
+          // Angle + context metadata for performance tracking
           angle_used: generatedContent.angle_used || null,
-          exemption_type: generatedContent.exemption_type || null
+          exemption_type: generatedContent.exemption_type || null,
+          angleUsed: generatedContent.angle_used || null,
+          toneOpenersUsed: toneOpener || null,
+          industryDetected: recipientIndustry || null,
+          roleDetected: recipient.title || null,
+          version: '2.0'
         };
         
         // Add ownership fields if not already present

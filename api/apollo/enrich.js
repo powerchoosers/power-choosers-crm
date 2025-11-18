@@ -217,6 +217,8 @@ function mapApolloContactToLushaFormat(apolloPerson) {
     country: apolloPerson.country || '',
     industry: apolloPerson.organization?.industry || (apolloPerson.organization?.industries && apolloPerson.organization.industries[0]) || '',
     seniority: apolloPerson.seniority || '',
+    // Department/functional area (if Apollo provides it)
+    department: apolloPerson.department || '',
     photoUrl: apolloPerson.photo_url || '',
     isSuccess: true
   };
