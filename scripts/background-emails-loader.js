@@ -17,6 +17,7 @@
   let _cacheWritePending = false;
   let lastLoadedDoc = null; // For pagination
   let hasMoreData = true; // For pagination
+  let _scheduledLoadedOnce = false; // Track if scheduled emails have been loaded
   
   // In-memory cache for folder counts (30 second expiry)
   const folderCountCache = new Map();
@@ -130,7 +131,7 @@
       console.warn('[BackgroundEmailsLoader] Failed to ensure all scheduled emails are loaded:', e);
     }
   }
-
+  
   async function loadFromFirestore() {
     if (!window.firebaseDB) {
       console.warn('[BackgroundEmailsLoader] firebaseDB not available');
@@ -368,14 +369,29 @@
       case 'scheduled':
         // OPTIMIZATION: Pre-compute time once, use early returns, match emails-redesigned.js logic
         {
-          const oneMinuteAgo = Date.now() - 60000;
+          const now = Date.now();
+          const oneMinuteAgo = now - 60000;
           filtered = filtered.filter(email => {
             // Fast path: early returns for common cases
-            if (email.type !== 'scheduled' || email.deleted) return false;
+            // Exclude if type is 'sent' (already sent, even if type wasn't updated properly)
+            if (email.type === 'sent' || email.deleted) return false;
             
-            const status = email.status;
-            // Fast path: exclude already sent emails
-            if (status === 'sent' || status === 'delivered') return false;
+            // Only show emails that are actually scheduled
+            if (email.type !== 'scheduled') return false;
+            
+            const status = email.status || '';
+            
+            // Fast path: exclude already sent emails (multiple status indicators)
+            if (status === 'sent' || status === 'delivered' || status === 'error') return false;
+            
+            // Exclude emails stuck in 'sending' state if send time has passed (likely already sent)
+            if (status === 'sending') {
+              const sendTime = email.scheduledSendTime;
+              // If send time was more than 5 minutes ago, assume it was sent
+              if (sendTime && typeof sendTime === 'number' && sendTime < (now - 5 * 60 * 1000)) {
+                return false;
+              }
+            }
             
             // Show if pending or generating (most common cases)
             if (status === 'not_generated' || status === 'pending_approval' || status === 'generating') {
@@ -386,6 +402,15 @@
             if (status === 'approved') {
               const sendTime = email.scheduledSendTime;
               return sendTime && typeof sendTime === 'number' && sendTime >= oneMinuteAgo;
+            }
+            
+            // Exclude emails with missing/null status and no scheduledSendTime (orphaned records)
+            if (!status && !email.scheduledSendTime) return false;
+            
+            // Exclude emails with past send times and no valid status (likely already sent)
+            const sendTime = email.scheduledSendTime;
+            if (sendTime && typeof sendTime === 'number' && sendTime < oneMinuteAgo && !status) {
+              return false;
             }
             
             return false;
@@ -485,7 +510,7 @@
 
           // Invalidate folder count cache when emails are updated
           invalidateFolderCountCache();
-          
+
           // Throttle cache writes to avoid excessive IndexedDB operations
           if (!_cacheWritePending && window.CacheManager && typeof window.CacheManager.set === 'function') {
             _cacheWritePending = true;

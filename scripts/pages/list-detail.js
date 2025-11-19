@@ -3782,6 +3782,88 @@ async function handleListDetailSequenceChoose(el, view) {
           'recordCount': actualCount  // CRITICAL: Set recordCount to actual count from sequenceMembers
         });
       }
+      
+      // ✅ AUTO-START: If sequence is active, automatically create sequenceActivations for new contacts
+      try {
+        const sequenceDoc = await db.collection('sequences').doc(sequenceId).get();
+        const sequenceData = sequenceDoc.data();
+        const hasActiveMembers = (sequenceData?.stats?.active || 0) > 0;
+        
+        // Also check if there are any existing sequenceActivations for this sequence
+        let hasExistingActivations = false;
+        try {
+          const existingActivationsQuery = await db.collection('sequenceActivations')
+            .where('sequenceId', '==', sequenceId)
+            .where('status', 'in', ['pending', 'processing'])
+            .limit(1)
+            .get();
+          hasExistingActivations = !existingActivationsQuery.empty;
+        } catch (_) {
+          // Query might fail if index missing, but that's okay
+        }
+        
+        // If sequence is active, automatically create sequenceActivations for new contacts with emails
+        if (hasActiveMembers || hasExistingActivations) {
+          const contactsWithEmail = newIds.filter(id => {
+            const contact = contactsData.find(c => c.id === id);
+            return contact && contact.email && contact.email.trim() !== '';
+          });
+          
+          if (contactsWithEmail.length > 0) {
+            console.log('[ListDetail] Sequence is active, auto-starting for ' + contactsWithEmail.length + ' new contacts');
+            
+            // Create sequenceActivations in batches (process-sequence-activations handles up to 25 contacts per activation)
+            const BATCH_SIZE = 25;
+            for (let i = 0; i < contactsWithEmail.length; i += BATCH_SIZE) {
+              const batchContacts = contactsWithEmail.slice(i, i + BATCH_SIZE);
+              
+              const activationRef = db.collection('sequenceActivations').doc();
+              const activationId = activationRef.id;
+              
+              const sequenceActivationData = {
+                sequenceId: sequenceId,
+                contactIds: batchContacts,
+                status: 'pending',
+                processedContacts: 0,
+                totalContacts: batchContacts.length,
+                ownerId: email,
+                assignedTo: email,
+                createdBy: email,
+                createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || Date.now()
+              };
+              
+              await activationRef.set(sequenceActivationData);
+              console.log('[ListDetail] Created auto-sequenceActivation:', activationId, 'for', batchContacts.length, 'contacts');
+              
+              // Trigger immediate processing
+              try {
+                const baseUrl = window.API_BASE_URL || window.location.origin || '';
+                const response = await fetch(`${baseUrl}/api/process-sequence-activations`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    immediate: true,
+                    activationId: activationId
+                  })
+                });
+                
+                if (response.ok) {
+                  const result = await response.json();
+                  console.log('[ListDetail] Auto-started sequence for batch:', result);
+                } else {
+                  console.warn('[ListDetail] Auto-start failed for batch, will be picked up by next cron run.');
+                }
+              } catch (autoStartError) {
+                console.warn('[ListDetail] Auto-start failed (non-fatal):', autoStartError);
+                // Contacts are still added, cron will pick them up
+              }
+            }
+          }
+        }
+      } catch (autoStartError) {
+        console.warn('[ListDetail] Failed to check/auto-start sequence (non-fatal):', autoStartError);
+        // Non-fatal - contacts are still added
+      }
     }
     
     // Update progress - Step 3 complete

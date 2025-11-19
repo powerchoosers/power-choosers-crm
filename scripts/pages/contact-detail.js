@@ -3601,6 +3601,75 @@
           return;
         }
         
+        // Check if we came from sequence builder
+        if (window._contactNavigationSource === 'sequence-builder' && window._sequenceBuilderReturn?.sequenceId) {
+          // Clear phone widget context to prevent contact company info from leaking
+          clearPhoneWidgetContext();
+          
+          // Navigate back to sequence builder
+          if (window.crm && typeof window.crm.navigateToPage === 'function') {
+            window.crm.navigateToPage('sequence-builder');
+            
+            // Reopen the sequence contacts modal after navigation
+            setTimeout(() => {
+              let attempts = 0;
+              const maxAttempts = 25;
+              const retryInterval = 80;
+              
+              const tryReopen = () => {
+                attempts++;
+                try {
+                  // Check if SequenceBuilder module is available
+                  if (window.SequenceBuilder && typeof window.SequenceBuilder.show === 'function') {
+                    const sequenceId = window._sequenceBuilderReturn.sequenceId;
+                    const sequenceName = window._sequenceBuilderReturn.sequenceName;
+                    
+                    // Show the sequence
+                    window.SequenceBuilder.show({ id: sequenceId, name: sequenceName });
+                    
+                    // Wait a bit for the sequence to load, then open the contacts panel
+                    setTimeout(() => {
+                      // Find the "Sequence Contacts" button by ID
+                      const contactsBtn = document.getElementById('contacts-btn');
+                      if (contactsBtn) {
+                        contactsBtn.click();
+                      } else {
+                        // Fallback: try to find it by aria-label or title
+                        const allButtons = document.querySelectorAll('button');
+                        for (const btn of allButtons) {
+                          if (btn.getAttribute('aria-label') === 'Sequence Contacts' || 
+                              btn.getAttribute('title') === 'Sequence Contacts') {
+                            btn.click();
+                            break;
+                          }
+                        }
+                      }
+                    }, 300);
+                    
+                    // Clear navigation variables
+                    window._contactNavigationSource = null;
+                    window._contactNavigationContactId = null;
+                    window._sequenceBuilderReturn = null;
+                    return;
+                  }
+                } catch (_) {}
+                
+                if (attempts < maxAttempts) {
+                  setTimeout(tryReopen, retryInterval);
+                } else {
+                  // Clear navigation variables even if we couldn't reopen
+                  window._contactNavigationSource = null;
+                  window._contactNavigationContactId = null;
+                  window._sequenceBuilderReturn = null;
+                }
+              };
+              
+              tryReopen();
+            }, 100);
+          }
+          return;
+        }
+        
         // Check if we came from people page
         if (window._contactNavigationSource === 'people') {
           // Clear phone widget context to prevent contact company info from leaking
@@ -6004,11 +6073,11 @@ function openContactSequencesPanel() {
   };
   _positionContactSequencesPanel();
   setTimeout(() => panel.classList.add('--show'), 0);
-
+  
   // Always attach resize/scroll listeners for this panel instance.
   // closeContactSequencesPanel() will clean them up.
-  try { window.addEventListener('resize', _positionContactSequencesPanel, true); } catch (_) {}
-  try { window.addEventListener('scroll', _positionContactSequencesPanel, true); } catch (_) {}
+    try { window.addEventListener('resize', _positionContactSequencesPanel, true); } catch (_) {}
+    try { window.addEventListener('scroll', _positionContactSequencesPanel, true); } catch (_) {}
 
   // Interactions - use event delegation on panel to ensure it works after content updates
   // Store handler reference so we can remove it later if needed
@@ -6030,7 +6099,7 @@ function openContactSequencesPanel() {
   };
   
   // Always attach keydown listener; closeContactSequencesPanel() removes it.
-  document.addEventListener('keydown', _onContactSequencesKeydown, true);
+    document.addEventListener('keydown', _onContactSequencesKeydown, true);
   
   _onContactSequencesOutside = (e) => {
     const inside = panel.contains(e.target);
@@ -6147,7 +6216,7 @@ async function addCurrentContactToSequence(sequenceId, sequenceName) {
   try {
     const contactId = state.currentContact?.id;
     if (!contactId) { closeContactSequencesPanel(); return; }
-
+    
     const hasEmail = !!(state.currentContact.email && state.currentContact.email.trim() !== '');
 
     // Gentle confirmation for contacts without email; do NOT block the whole CRM
@@ -6164,7 +6233,7 @@ async function addCurrentContactToSequence(sequenceId, sequenceName) {
         return;
       }
     }
-
+    
     const db = window.firebaseDB;
     if (db && typeof db.collection === 'function') {
       const doc = { 
@@ -6188,6 +6257,90 @@ async function addCurrentContactToSequence(sequenceId, sequenceName) {
         await db.collection('sequences').doc(sequenceId).update({
           "stats.active": window.firebase.firestore.FieldValue.increment(1)
         });
+      }
+      
+      // ✅ AUTO-START: If sequence is active, automatically create sequenceActivation for this new contact
+      if (hasEmail) {
+        try {
+          const sequenceDoc = await db.collection('sequences').doc(sequenceId).get();
+          const sequenceData = sequenceDoc.data();
+          const hasActiveMembers = (sequenceData?.stats?.active || 0) > 0;
+          
+          // Also check if there are any existing sequenceActivations for this sequence
+          let hasExistingActivations = false;
+          try {
+            const existingActivationsQuery = await db.collection('sequenceActivations')
+              .where('sequenceId', '==', sequenceId)
+              .where('status', 'in', ['pending', 'processing'])
+              .limit(1)
+              .get();
+            hasExistingActivations = !existingActivationsQuery.empty;
+          } catch (_) {
+            // Query might fail if index missing, but that's okay
+          }
+          
+          // If sequence is active, automatically create sequenceActivation for this new contact
+          if (hasActiveMembers || hasExistingActivations) {
+            console.log('[ContactDetail] Sequence is active, auto-starting for new contact:', state.currentContact.name);
+            
+            const getUserEmail = () => {
+              try {
+                if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                  return window.DataManager.getCurrentUserEmail().toLowerCase();
+                }
+                return (window.currentUserEmail || '').toLowerCase();
+              } catch (_) {
+                return (window.currentUserEmail || '').toLowerCase();
+              }
+            };
+            const userEmail = getUserEmail();
+            
+            // Create sequenceActivation for this single contact
+            const activationRef = db.collection('sequenceActivations').doc();
+            const activationId = activationRef.id;
+            
+            const sequenceActivationData = {
+              sequenceId: sequenceId,
+              contactIds: [contactId],
+              status: 'pending',
+              processedContacts: 0,
+              totalContacts: 1,
+              ownerId: userEmail || 'unknown',
+              assignedTo: userEmail || 'unknown',
+              createdBy: userEmail || 'unknown',
+              createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || Date.now()
+            };
+            
+            await activationRef.set(sequenceActivationData);
+            console.log('[ContactDetail] Created auto-sequenceActivation:', activationId);
+            
+            // Trigger immediate processing
+            try {
+              const baseUrl = window.API_BASE_URL || window.location.origin || '';
+              const response = await fetch(`${baseUrl}/api/process-sequence-activations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  immediate: true,
+                  activationId: activationId
+                })
+              });
+              
+              if (response.ok) {
+                const result = await response.json();
+                console.log('[ContactDetail] Auto-started sequence for new contact:', result);
+              } else {
+                console.warn('[ContactDetail] Auto-start failed, but contact was added. Will be picked up by next cron run.');
+              }
+            } catch (autoStartError) {
+              console.warn('[ContactDetail] Auto-start failed (non-fatal):', autoStartError);
+              // Contact is still added, cron will pick it up
+            }
+          }
+        } catch (autoStartError) {
+          console.warn('[ContactDetail] Failed to check/auto-start sequence (non-fatal):', autoStartError);
+          // Non-fatal - contact is still added
+        }
       }
     }
 
@@ -6574,7 +6727,7 @@ async function createContactSequenceThenAdd(name) {
     };
     
     // Always attach keydown listener; closeContactListsPanel() removes it.
-    document.addEventListener('keydown', _onContactListsKeydown, true);
+      document.addEventListener('keydown', _onContactListsKeydown, true);
 
     // Click-away handler - closes when clicking outside or on other buttons
     _onContactListsOutside = (e) => {
@@ -6788,7 +6941,7 @@ async function createContactSequenceThenAdd(name) {
         if (listItem && !listItem.hasAttribute('aria-disabled')) {
           console.log('[ContactDetail] Calling handleListChoose for:', listItem.getAttribute('data-name'));
           try {
-            handleListChoose(listItem);
+          handleListChoose(listItem);
           } catch (err) {
             console.error('[ContactDetail] Error in handleListChoose:', err);
             if (window.crm?.showToast) {

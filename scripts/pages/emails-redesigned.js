@@ -411,11 +411,25 @@
       // OPTIMIZATION: Simplified filter logic - fewer variable assignments
       filtered = filtered.filter(email => {
         // Fast path: early returns for common cases
-        if (email.type !== 'scheduled' || email.deleted) return false;
+        // Exclude if type is 'sent' (already sent, even if type wasn't updated properly)
+        if (email.type === 'sent' || email.deleted) return false;
         
-        const status = email.status;
-        // Fast path: exclude already sent emails
-        if (status === 'sent' || status === 'delivered') return false;
+        // Only show emails that are actually scheduled
+        if (email.type !== 'scheduled') return false;
+        
+        const status = email.status || '';
+        
+        // Fast path: exclude already sent emails (multiple status indicators)
+        if (status === 'sent' || status === 'delivered' || status === 'error') return false;
+        
+        // Exclude emails stuck in 'sending' state if send time has passed (likely already sent)
+        if (status === 'sending') {
+          const sendTime = email.scheduledSendTime;
+          // If send time was more than 5 minutes ago, assume it was sent
+          if (sendTime && typeof sendTime === 'number' && sendTime < (now - 5 * 60 * 1000)) {
+            return false;
+          }
+        }
         
         // Show if pending or generating (most common cases)
         if (status === 'not_generated' || status === 'pending_approval' || status === 'generating') {
@@ -426,6 +440,15 @@
         if (status === 'approved') {
           const sendTime = email.scheduledSendTime;
           return sendTime && typeof sendTime === 'number' && sendTime >= oneMinuteAgo;
+        }
+        
+        // Exclude emails with missing/null status and no scheduledSendTime (orphaned records)
+        if (!status && !email.scheduledSendTime) return false;
+        
+        // Exclude emails with past send times and no valid status (likely already sent)
+        const sendTime = email.scheduledSendTime;
+        if (sendTime && typeof sendTime === 'number' && sendTime < oneMinuteAgo && !status) {
+          return false;
         }
         
         return false;
@@ -611,16 +634,43 @@
         });
       } else if (state.currentFolder === 'scheduled') {
         // OPTIMIZATION: Match the optimized filter from applyFilters()
-        const oneMinuteAgo = Date.now() - 60000;
+        const now = Date.now();
+        const oneMinuteAgo = now - 60000;
         filtered = filtered.filter(email => {
-          if (email.type !== 'scheduled' || email.deleted) return false;
-          const status = email.status;
-          if (status === 'sent' || status === 'delivered') return false;
+          // Exclude if type is 'sent' (already sent, even if type wasn't updated properly)
+          if (email.type === 'sent' || email.deleted) return false;
+          
+          // Only show emails that are actually scheduled
+          if (email.type !== 'scheduled') return false;
+          
+          const status = email.status || '';
+          
+          // Exclude already sent emails (multiple status indicators)
+          if (status === 'sent' || status === 'delivered' || status === 'error') return false;
+          
+          // Exclude emails stuck in 'sending' state if send time has passed (likely already sent)
+          if (status === 'sending') {
+            const sendTime = email.scheduledSendTime;
+            if (sendTime && typeof sendTime === 'number' && sendTime < (now - 5 * 60 * 1000)) {
+              return false;
+            }
+          }
+          
           if (status === 'not_generated' || status === 'pending_approval' || status === 'generating') return true;
           if (status === 'approved') {
             const sendTime = email.scheduledSendTime;
             return sendTime && typeof sendTime === 'number' && sendTime >= oneMinuteAgo;
           }
+          
+          // Exclude emails with missing/null status and no scheduledSendTime (orphaned records)
+          if (!status && !email.scheduledSendTime) return false;
+          
+          // Exclude emails with past send times and no valid status (likely already sent)
+          const sendTime = email.scheduledSendTime;
+          if (sendTime && typeof sendTime === 'number' && sendTime < oneMinuteAgo && !status) {
+            return false;
+          }
+          
           return false;
         });
         // Lazy sort - will happen in getPageItems()
@@ -863,12 +913,12 @@
         </td>
         <td class="email-subject-cell">
           <div class="email-subject-content">
-            <span class="email-subject ${email.unread ? 'unread' : ''}">${escapeHtml(email.subject)}</span>
+            <span class="email-subject ${email.unread ? 'unread' : ''}">${escapeHtml(email.subject || (email.status === 'not_generated' ? '(Pending generation)' : email.status === 'generating' ? '(Generating...)' : '(No Subject)'))}</span>
             <div class="email-snippet">${escapeHtml(emailPreview)}</div>
           </div>
         </td>
         <td class="email-date-cell">
-          <span class="email-date">${formatDate(email.date)}</span>
+          <span class="email-date">${formatDate(email.date || email.scheduledSendTime || email.createdAt || email.sentAt || email.receivedAt)}</span>
         </td>
         <td class="qa-cell">
           <div class="qa-actions">
@@ -1655,16 +1705,23 @@
   }
 
   function formatDate(date) {
-    if (!date) return '';
-    const d = new Date(date);
-    return d.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!date) return 'No date';
+    try {
+      const d = new Date(date);
+      if (Number.isNaN(d.getTime())) {
+        return 'Invalid date';
+      }
+      return d.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return 'Invalid date';
+    }
   }
 
   function escapeHtml(text) {
