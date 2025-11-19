@@ -4726,117 +4726,17 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       #sequence-contacts-panel .list-header { 
         display: flex; 
         align-items: center; 
-        gap: 0;
+        justify-content: space-between; 
         padding: 14px 16px; 
         border-bottom: 1px solid var(--border-light); 
         font-weight: 700; 
         background: var(--bg-card);
         border-radius: var(--border-radius) var(--border-radius) 0 0;
-        position: relative;
       }
       #sequence-contacts-panel .list-title { 
         font-weight: 700; 
         color: var(--text-primary); 
         font-size: 1rem; 
-        flex: 1 1 auto;
-        min-width: 0;
-        order: 2;
-        margin-left: 8px;
-      }
-      /* Bulk actions bar in header */
-      #sequence-contacts-panel #sequence-contacts-bulk-actions {
-        flex: 0 0 auto;
-        order: 1;
-        opacity: 0;
-        transform: translateY(-8px);
-        width: 0;
-        min-width: 0;
-        max-width: 0;
-        padding: 0;
-        margin: 0;
-        margin-right: 0;
-        border: none;
-        box-shadow: none;
-        overflow: hidden;
-        background: var(--bg-card);
-        color: var(--text-primary);
-        border-radius: var(--border-radius-lg);
-        transition: opacity 400ms ease, transform 400ms ease, width 400ms ease, max-width 400ms ease, padding 400ms ease, border 400ms ease, box-shadow 400ms ease, margin-right 400ms ease;
-      }
-      #sequence-contacts-panel #sequence-contacts-bulk-actions.--show {
-        opacity: 1;
-        transform: translateY(0);
-        width: auto;
-        min-width: fit-content;
-        max-width: calc(100% - 200px);
-        padding: 8px 10px;
-        border: 1px solid var(--border-light);
-        box-shadow: var(--elevation-card);
-        margin: 0;
-        margin-right: 8px;
-      }
-      #sequence-contacts-panel .close-btn {
-        order: 3;
-      }
-      #sequence-contacts-panel #sequence-contacts-bulk-actions .bar {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 6px;
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        box-sizing: border-box;
-      }
-      #sequence-contacts-panel #sequence-contacts-bulk-actions .spacer {
-        display: none;
-      }
-      #sequence-contacts-panel #sequence-contacts-bulk-actions .action-btn-sm {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        padding: 6px 10px;
-        flex-shrink: 0;
-        line-height: 1;
-        cursor: pointer;
-        background: var(--bg-item);
-        color: var(--text-inverse);
-        border: 1px solid var(--border-light);
-        border-radius: var(--border-radius-sm);
-        font-size: 0.85rem;
-        width: 100%;
-        transition: var(--transition-fast);
-        margin: 0;
-      }
-      #sequence-contacts-panel #sequence-contacts-bulk-actions .action-btn-sm:hover {
-        background: var(--grey-700);
-      }
-      #sequence-contacts-panel #sequence-contacts-bulk-actions .action-btn-sm.danger {
-        background: var(--red-muted);
-        border-color: var(--red-subtle);
-        color: var(--text-inverse);
-      }
-      #sequence-contacts-panel #sequence-contacts-bulk-actions .action-btn-sm.danger:hover {
-        background: var(--red-primary);
-      }
-      #sequence-contacts-panel #sequence-contacts-bulk-actions .action-btn-sm svg {
-        display: block;
-      }
-      #sequence-contacts-panel #sequence-contacts-bulk-actions .action-btn-sm span {
-        display: inline-block;
-        white-space: nowrap;
-      }
-      /* Checkbox styles */
-      #sequence-contacts-panel .list-item .row-select {
-        width: 18px;
-        height: 18px;
-        cursor: pointer;
-        margin-right: 8px;
-        flex-shrink: 0;
-      }
-      #sequence-contacts-panel .list-item.row-selected {
-        background: var(--bg-hover);
       }
       #sequence-contacts-panel .close-btn {
         display: inline-flex; 
@@ -4997,18 +4897,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     }
   }
 
-  // SVG icon helper for sequence contacts panel
-  function svgIcon(name) {
-    switch (name) {
-      case 'clear':
-        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l14 14M19 5L5 19"/></svg>';
-      case 'delete':
-        return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
-      default:
-        return '';
-    }
-  }
-
   function openSequenceContactsPanel(anchorEl) {
     if (document.getElementById('sequence-contacts-panel')) return;
     
@@ -5022,9 +4910,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     const contacts = Array.isArray(state.contacts) ? state.contacts.slice() : [];
     const total = contacts.length;
     
-    // Selected contacts state
-    const selectedContacts = new Set();
-    
     // Sort by name
     contacts.sort((a, b) => {
       const an = (a.name || a.fullName || `${a.firstName || ''} ${a.lastName || ''}`).trim().toLowerCase();
@@ -5034,7 +4919,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     
     panel.innerHTML = `
       <div class="list-header">
-        <div id="sequence-contacts-bulk-actions" class="bulk-actions-modal"></div>
         <div class="list-title">Sequence Contacts (${total})</div>
         <button type="button" class="close-btn" id="sequence-contacts-close" aria-label="Close">×</button>
       </div>
@@ -5051,7 +4935,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               
               return `
                 <div class="list-item" tabindex="0" data-id="${cid}">
-                  <input type="checkbox" class="row-select" data-id="${cid}" aria-label="Select ${escapeHtml(nameRaw)}" style="margin-right: 8px;">
                   <div class="name-cell__wrap">
                     <span class="avatar-initials" aria-hidden="true">${initials}</span>
                     <div>
@@ -5135,9 +5018,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       document.addEventListener('mousedown', _onSequenceContactsOutside, true);
     }, 0);
     
-    // Get body reference
-    const body = panel.querySelector('#sequence-contacts-body');
-    
     // Keyboard navigation
     const onKey = (e) => {
       if (e.key === 'Escape') {
@@ -5148,264 +5028,14 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     };
     document.addEventListener('keydown', onKey, true);
     
-    // Remove selected contacts from sequence
-    const removeSelectedContactsFromSequence = async (contactIds) => {
-      if (!contactIds || contactIds.length === 0) return;
-      
-      const db = window.firebaseDB;
-      if (!db || !state.currentSequence?.id) {
-        window.crm?.showToast && window.crm.showToast('Cannot remove contacts', 'error');
-        return;
-      }
-      
-      // Show progress toast
-      const progressToast = window.crm?.showProgressToast ? 
-        window.crm.showProgressToast(`Removing ${contactIds.length} ${contactIds.length === 1 ? 'contact' : 'contacts'} from sequence...`, contactIds.length, 0) : null;
-      
-      let failed = 0;
-      let completed = 0;
-      let removedCount = 0;
-      
-      try {
-        // Process removals sequentially to show progress
-        for (const contactId of contactIds) {
-          try {
-            // Find and delete sequenceMembers documents
-            const membersQuery = await db.collection('sequenceMembers')
-              .where('sequenceId', '==', state.currentSequence.id)
-              .where('targetId', '==', contactId)
-              .where('targetType', '==', 'people')
-              .get();
-            
-            const deletePromises = [];
-            membersQuery.forEach(doc => {
-              deletePromises.push(doc.ref.delete());
-            });
-            await Promise.all(deletePromises);
-            
-            if (deletePromises.length > 0) {
-              removedCount++;
-            }
-            
-            completed++;
-            if (progressToast) {
-              progressToast.update(completed, contactIds.length);
-            }
-          } catch (e) {
-            failed++;
-            completed++;
-            console.warn('Remove failed for contact', contactId, e);
-            if (progressToast) {
-              progressToast.update(completed, contactIds.length);
-            }
-          }
-        }
-        
-        // Decrement sequence stats.active count
-        if (removedCount > 0 && window.firebase?.firestore?.FieldValue) {
-          await db.collection('sequences').doc(state.currentSequence.id).update({
-            "stats.active": window.firebase.firestore.FieldValue.increment(-removedCount)
-          });
-        }
-        
-        // Update state
-        contactIds.forEach(id => {
-          const idx = state.contacts.findIndex(c => c.id === id);
-          if (idx >= 0) state.contacts.splice(idx, 1);
-        });
-        
-        // Invalidate cache
-        if (window._sequenceMembersCache && state.currentSequence?.id) {
-          const cacheKey = `sequence-members-${state.currentSequence.id}`;
-          window._sequenceMembersCache.delete(cacheKey);
-        }
-      } catch (err) {
-        console.warn('Failed to remove contacts from sequence:', err);
-        if (progressToast) {
-          progressToast.error('Remove operation failed');
-        }
-      } finally {
-        const successCount = removedCount;
-        
-        if (progressToast) {
-          if (failed === 0) {
-            progressToast.complete(`Successfully removed ${successCount} ${successCount === 1 ? 'contact' : 'contacts'} from sequence`);
-          } else if (successCount > 0) {
-            progressToast.complete(`Removed ${successCount} of ${contactIds.length} ${contactIds.length === 1 ? 'contact' : 'contacts'} from sequence`);
-          } else {
-            progressToast.error(`Failed to remove all ${contactIds.length} ${contactIds.length === 1 ? 'contact' : 'contacts'} from sequence`);
-          }
-        } else {
-          // Fallback to regular toasts if progress toast not available
-          if (removedCount > 0) {
-            window.crm?.showToast && window.crm.showToast(`Removed ${removedCount} ${removedCount === 1 ? 'contact' : 'contacts'} from sequence`);
-          }
-          if (failed > 0) {
-            window.crm?.showToast && window.crm.showToast(`Failed to remove ${failed} ${failed === 1 ? 'contact' : 'contacts'} from sequence`);
-          }
-        }
-      }
-    };
-    
-    // Render contacts list
-    const renderContactsList = (contactsList) => {
-      if (!body) return;
-      
-      const sorted = contactsList.slice().sort((a, b) => {
-        const an = (a.name || a.fullName || `${a.firstName || ''} ${a.lastName || ''}`).trim().toLowerCase();
-        const bn = (b.name || b.fullName || `${b.firstName || ''} ${b.lastName || ''}`).trim().toLowerCase();
-        return an.localeCompare(bn);
-      });
-      
-      if (sorted.length === 0) {
-        body.innerHTML = '<div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">No contacts in this sequence</div><div class="list-meta">Add contacts using the search bar</div></div></div>';
-      } else {
-        body.innerHTML = sorted.map(c => {
-          const nameRaw = c.name || c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed Contact';
-          const name = escapeHtml(nameRaw);
-          const title = escapeHtml(c.title || c.jobTitle || '');
-          const company = escapeHtml(c.company || c.companyName || '');
-          const initials = escapeHtml(getInitials(nameRaw));
-          const cid = escapeHtml(c.id || '');
-          const isSelected = selectedContacts.has(cid);
-          
-          return `
-            <div class="list-item ${isSelected ? 'row-selected' : ''}" tabindex="0" data-id="${cid}">
-              <input type="checkbox" class="row-select" data-id="${cid}" aria-label="Select ${escapeHtml(nameRaw)}" ${isSelected ? 'checked' : ''} style="margin-right: 8px;">
-              <div class="name-cell__wrap">
-                <span class="avatar-initials" aria-hidden="true">${initials}</span>
-                <div>
-                  <div class="list-name">${name}</div>
-                  ${title || company ? `<div class="list-meta">${title ? `${title}${company ? ' at ' : ''}` : ''}${company || ''}</div>` : ''}
-                  ${company && !title ? `<div class="list-company">${company}</div>` : ''}
-                </div>
-              </div>
-            </div>`;
-        }).join('');
-      }
-      
-      // Update header count
-      const titleEl = panel.querySelector('.list-title');
-      if (titleEl) {
-        titleEl.textContent = `Sequence Contacts (${sorted.length})`;
-      }
-      
-      // Re-attach event listeners
-      attachContactEventListeners();
-    };
-    
-    // Update checkbox states
-    const updateCheckboxes = () => {
-      if (!body) return;
-      const checkboxes = body.querySelectorAll('.row-select');
-      checkboxes.forEach(cb => {
-        const id = cb.getAttribute('data-id');
-        cb.checked = selectedContacts.has(id);
-        const item = cb.closest('.list-item');
-        if (item) {
-          item.classList.toggle('row-selected', cb.checked);
-        }
-      });
-    };
-    
-    // Update bulk action bar
-    const updateBulkActionsBar = () => {
-      const bulkBar = panel.querySelector('#sequence-contacts-bulk-actions');
-      if (!bulkBar) return;
-      
-      const count = selectedContacts.size;
-      if (count === 0) {
-        bulkBar.classList.remove('--show');
-        return;
-      }
-      
-      bulkBar.classList.add('--show');
-      bulkBar.innerHTML = `
-        <div class="bar">
-          <button class="action-btn-sm" id="seq-contacts-clear">${svgIcon('clear')}<span>Clear ${count} selected</span></button>
-          <button class="action-btn-sm danger" id="seq-contacts-remove">${svgIcon('delete')}<span>Remove from sequence</span></button>
-        </div>
-      `;
-      
-      // Add animation class
-      setTimeout(() => {
-        bulkBar.classList.add('--show');
-      }, 10);
-      
-      // Wire clear button
-      const clearBtn = bulkBar.querySelector('#seq-contacts-clear');
-      if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-          selectedContacts.clear();
-          updateCheckboxes();
-          updateBulkActionsBar();
-        });
-      }
-      
-      // Wire remove button
-      const removeBtn = bulkBar.querySelector('#seq-contacts-remove');
-      if (removeBtn) {
-        removeBtn.addEventListener('click', async () => {
-          await removeSelectedContactsFromSequence(Array.from(selectedContacts));
-          selectedContacts.clear();
-          updateCheckboxes();
-          updateBulkActionsBar();
-          // Reload contacts and re-render
-          if (state.currentSequence?.id) {
-            await loadContactsFromSequenceMembers(state.currentSequence.id);
-            const freshContacts = Array.isArray(state.contacts) ? state.contacts.slice() : [];
-            renderContactsList(freshContacts);
-          }
-        });
-      }
-    };
-    
-    // Attach event listeners for contacts
-    const attachContactEventListeners = () => {
-      if (!body) return;
-      
-      // Checkbox change handler
-      body.addEventListener('change', (e) => {
-        const cb = e.target;
-        if (cb && cb.classList.contains('row-select')) {
-          const id = cb.getAttribute('data-id');
-          if (!id) return;
-          
-          if (cb.checked) {
-            selectedContacts.add(id);
-          } else {
-            selectedContacts.delete(id);
-          }
-          
-          const item = cb.closest('.list-item');
-          if (item) {
-            item.classList.toggle('row-selected', cb.checked);
-          }
-          
-          updateBulkActionsBar();
-        }
-      });
-      
-      // Contact click handler (navigate to contact detail, but not if clicking checkbox)
+    // Contact click handler
+    const body = panel.querySelector('#sequence-contacts-body');
+    if (body) {
       body.addEventListener('click', (e) => {
-        // Don't navigate if clicking checkbox
-        if (e.target.classList.contains('row-select') || e.target.closest('.row-select')) {
-          return;
-        }
-        
         const item = e.target.closest('.list-item[data-id]');
         if (item && !item.hasAttribute('aria-disabled')) {
           const contactId = item.getAttribute('data-id');
           if (contactId) {
-            // Store navigation source for back button
-            window._contactNavigationSource = 'sequence-builder';
-            window._contactNavigationContactId = contactId;
-            window._sequenceBuilderReturn = {
-              sequenceId: state.currentSequence?.id,
-              sequenceName: state.currentSequence?.name,
-              timestamp: Date.now()
-            };
-            
             // Navigate to contact detail
             try { 
               window.crm && window.crm.navigateToPage && window.crm.navigateToPage('people'); 
@@ -5426,11 +5056,6 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           }
         }
       });
-    };
-    
-    // Attach event listeners
-    if (body) {
-      attachContactEventListeners();
     }
     
     // Set aria-expanded
@@ -5443,7 +5068,38 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       loadContactsFromSequenceMembers(state.currentSequence.id).then(() => {
         const freshContacts = Array.isArray(state.contacts) ? state.contacts.slice() : [];
         if (freshContacts.length > 0 && body) {
-          renderContactsList(freshContacts);
+          freshContacts.sort((a, b) => {
+            const an = (a.name || a.fullName || `${a.firstName || ''} ${a.lastName || ''}`).trim().toLowerCase();
+            const bn = (b.name || b.fullName || `${b.firstName || ''} ${b.lastName || ''}`).trim().toLowerCase();
+            return an.localeCompare(bn);
+          });
+          
+          body.innerHTML = freshContacts.map(c => {
+            const nameRaw = c.name || c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed Contact';
+            const name = escapeHtml(nameRaw);
+            const title = escapeHtml(c.title || c.jobTitle || '');
+            const company = escapeHtml(c.company || c.companyName || '');
+            const initials = escapeHtml(getInitials(nameRaw));
+            const cid = escapeHtml(c.id || '');
+            
+            return `
+              <div class="list-item" tabindex="0" data-id="${cid}">
+                <div class="name-cell__wrap">
+                  <span class="avatar-initials" aria-hidden="true">${initials}</span>
+                  <div>
+                    <div class="list-name">${name}</div>
+                    ${title || company ? `<div class="list-meta">${title ? `${title}${company ? ' at ' : ''}` : ''}${company || ''}</div>` : ''}
+                    ${company && !title ? `<div class="list-company">${company}</div>` : ''}
+                  </div>
+                </div>
+              </div>`;
+          }).join('');
+          
+          // Update header count
+          const titleEl = panel.querySelector('.list-title');
+          if (titleEl) {
+            titleEl.textContent = `Sequence Contacts (${freshContacts.length})`;
+          }
         }
       }).catch(err => {
         console.warn('[SequenceBuilder] Failed to load contacts for panel:', err);
@@ -6346,14 +6002,14 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             picker.classList.add('hidden');
           }
         }
-        
+
         // Add/remove preview-active class for CSS targeting
         if (tabName === 'preview') {
           card.classList.add('preview-active');
         } else {
           card.classList.remove('preview-active');
         }
-        
+
         // Persist active tab without forcing a full rebuild
         try { scheduleStepSave(step.id); } catch (_) { /* noop */ }
       });

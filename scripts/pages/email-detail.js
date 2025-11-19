@@ -266,27 +266,7 @@
       
       let contentHtml = '';
       
-      // Check if this is an orphaned scheduled email (sent but not properly updated)
-      const isOrphanedScheduled = email.type === 'scheduled' && 
-                                   (email.status === 'sent' || 
-                                    (!email.subject && !htmlContent && !textContent && 
-                                     email.scheduledSendTime && 
-                                     email.scheduledSendTime < Date.now() - 60000));
-      
-      if (isOrphanedScheduled) {
-        // Show helpful message for orphaned emails
-        contentHtml = `
-          <div style="padding: 20px; background: var(--bg-secondary, #f5f5f5); border-radius: 8px; border-left: 4px solid var(--orange-primary, #f97316);">
-            <p style="margin: 0 0 12px 0; font-weight: 600; color: var(--text-primary, #333);">
-              This email was already sent
-            </p>
-            <p style="margin: 0; color: var(--text-secondary, #666); font-size: 14px; line-height: 1.5;">
-              This scheduled email appears to have been sent, but the record wasn't properly updated. 
-              You can find the sent version in the <strong>Sent</strong> folder.
-            </p>
-          </div>
-        `;
-      } else if (htmlContent && htmlContent.trim()) {
+      if (htmlContent && htmlContent.trim()) {
         // Use HTML content with sanitization
         contentHtml = sanitizeEmailHtml(htmlContent);
       } else if (textContent && textContent.trim()) {
