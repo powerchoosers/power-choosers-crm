@@ -81,6 +81,7 @@ import inboundEmailHandler from './api/email/inbound-email.js';
 import generateScheduledEmailsHandler from './api/generate-scheduled-emails.js';
 import sendScheduledEmailsHandler from './api/send-scheduled-emails.js';
 import processSequenceActivationsHandler from './api/process-sequence-activations.js';
+import createBookingHandler from './api/create-booking.js';
 
 // ADDITIONAL IMPORTS FOR REMAINING PROXY FUNCTIONS
 import emailBackfillThreadsHandler from './api/email/backfill-threads.js';
@@ -850,6 +851,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/track-email-performance') {
     return handleApiTrackEmailPerformance(req, res);
   }
+  if (pathname === '/api/create-booking') {
+    return handleApiCreateBooking(req, res);
+  }
   if (pathname === '/api/apollo/company') {
     return handleApiApolloCompany(req, res, parsedUrl);
   }
@@ -1040,6 +1044,21 @@ async function handleApiTrackEmailPerformance(req, res) {
     req.body = await parseRequestBody(req);
   }
   return await trackEmailPerformanceHandler(req, res);
+}
+
+// Create booking handler (for public website forms)
+async function handleApiCreateBooking(req, res) {
+  if (req.method === 'POST') {
+    try {
+      req.body = await parseRequestBody(req);
+    } catch (error) {
+      console.error('[Server] Create Booking - Body Parse Error:', error.message);
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid request body' }));
+      return;
+    }
+  }
+  return await createBookingHandler(req, res);
 }
 
 // Apollo API handlers

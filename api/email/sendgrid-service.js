@@ -25,15 +25,15 @@ export class SendGridService {
       if (!db) {
         return { suppressed: false };
       }
-      
+
       const suppressionDoc = await db.collection('suppressions').doc(email).get();
-      
+
       if (suppressionDoc.exists) {
         const data = suppressionDoc.data();
         console.log(`[SendGrid] Email suppressed: ${email} - ${data.reason}`);
         return { suppressed: true, reason: data.reason };
       }
-      
+
       return { suppressed: false };
     } catch (error) {
       console.error(`[SendGrid] Error checking suppression for ${email}:`, error);
@@ -74,16 +74,16 @@ export class SendGridService {
       if (snap && !snap.empty) {
         const doc = snap.docs[0];
         const contact = doc.data();
-        
+
         // Build full name from contact
         const firstName = contact.firstName || '';
         const lastName = contact.lastName || '';
         const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
-        
+
         if (fullName) {
           return fullName;
         }
-        
+
         // Fallback to contact name field
         if (contact.name) {
           return contact.name;
@@ -136,21 +136,21 @@ export class SendGridService {
   /**
    * Send a single email via SendGrid
    */
-          async sendEmail(emailData) {
+  async sendEmail(emailData) {
     try {
-              const { to, subject, content, from, fromName, trackingId, _deliverability, inReplyTo, references, threadId, isHtmlEmail } = emailData;
-      
+      const { to, subject, content, from, fromName, trackingId, _deliverability, inReplyTo, references, threadId, isHtmlEmail } = emailData;
+
       // Check if any recipients are suppressed
       const recipients = Array.isArray(to) ? to : [to];
       const suppressedEmails = [];
-      
+
       for (const email of recipients) {
         const suppression = await this.checkSuppression(email);
         if (suppression.suppressed) {
           suppressedEmails.push({ email, reason: suppression.reason });
         }
       }
-      
+
       // If all recipients are suppressed, don't send
       if (suppressedEmails.length === recipients.length) {
         console.log(`[SendGrid] All recipients suppressed, skipping send`);
@@ -160,12 +160,12 @@ export class SendGridService {
           suppressed: suppressedEmails
         };
       }
-      
+
       // Filter out suppressed emails
-      const allowedRecipients = recipients.filter(email => 
+      const allowedRecipients = recipients.filter(email =>
         !suppressedEmails.some(s => s.email === email)
       );
-      
+
       if (allowedRecipients.length === 0) {
         console.log(`[SendGrid] No valid recipients after filtering suppressed emails`);
         return {
@@ -174,7 +174,7 @@ export class SendGridService {
           suppressed: suppressedEmails
         };
       }
-      
+
       // Get deliverability settings
       const deliverabilitySettings = _deliverability || {
         enableTracking: true,
@@ -188,12 +188,12 @@ export class SendGridService {
 
       // STEP 1: Validate and sanitize HTML content (per Twilio recommendations)
       let htmlContent = content;
-      
+
       // Validate UTF-8 encoding
       if (typeof htmlContent !== 'string') {
         throw new Error('Content must be a valid UTF-8 string');
       }
-      
+
       // Check for UTF-8 validity
       try {
         // This will throw if content is not valid UTF-8
@@ -201,7 +201,7 @@ export class SendGridService {
       } catch (utf8Error) {
         throw new Error('Content must be valid UTF-8 encoded');
       }
-      
+
       // Sanitize and inline CSS for HTML emails (per Twilio recommendations)
       if (isHtmlEmail) {
         // Step 1: Remove dangerous tags (script, iframe, etc.)
@@ -210,7 +210,7 @@ export class SendGridService {
           .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
           .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
           .replace(/javascript:/gi, '');
-        
+
         // Step 2: Inline all CSS styles using juice
         try {
           htmlContent = juice(htmlContent, {
@@ -233,47 +233,47 @@ export class SendGridService {
           console.warn('[SendGrid] CSS inlining failed, removed <style> tags as fallback');
         }
       }
-      
+
       // STEP 2: Generate text version with robust error handling
       let textContent = '';
-      
+
       try {
-        textContent = isHtmlEmail ? 
-          this.generateTextFromHtml(htmlContent) : 
+        textContent = isHtmlEmail ?
+          this.generateTextFromHtml(htmlContent) :
           this.stripHtml(htmlContent);
       } catch (textGenError) {
         console.error('[SendGrid] Error generating text content:', textGenError);
         // Fallback to basic HTML stripping
         textContent = this.stripHtml(htmlContent) || 'HTML email content';
       }
-      
+
       // Ensure text content is always a valid non-empty string
       if (!textContent || typeof textContent !== 'string' || textContent.trim().length === 0) {
         console.warn('[SendGrid] Text content is empty, using fallback');
         textContent = 'HTML email content - please view in HTML format';
       }
-      
+
       // Validate both contents are valid strings before sending
       if (!htmlContent || typeof htmlContent !== 'string' || htmlContent.trim().length === 0) {
         throw new Error('HTML content cannot be empty after sanitization');
       }
-      
+
       if (!textContent || typeof textContent !== 'string' || textContent.trim().length === 0) {
         throw new Error('Text content cannot be empty');
       }
-      
+
       console.log('[SendGrid] Email type:', isHtmlEmail ? 'HTML' : 'Standard', 'Content length:', content.length);
       console.log('[SendGrid] Text content length:', textContent.length);
-      
-              // Log sender details for debugging
-              const finalFromEmail = from || this.fromEmail;
-              const finalFromName = fromName || this.fromName;
-              console.log('[SendGrid] Sending email with from:', {
-                email: finalFromEmail,
-                name: finalFromName
-              });
-      
-              const msg = {
+
+      // Log sender details for debugging
+      const finalFromEmail = from || this.fromEmail;
+      const finalFromName = fromName || this.fromName;
+      console.log('[SendGrid] Sending email with from:', {
+        email: finalFromEmail,
+        name: finalFromName
+      });
+
+      const msg = {
         to: allowedRecipients,
         from: {
           email: finalFromEmail,
@@ -283,8 +283,16 @@ export class SendGridService {
         html: htmlContent,
         text: textContent,
         trackingSettings: {
-          clickTracking: { enable: deliverabilitySettings.enableTracking },
-          openTracking: { enable: deliverabilitySettings.enableTracking }
+          clickTracking: {
+            enable: deliverabilitySettings.enableClickTracking !== undefined
+              ? deliverabilitySettings.enableClickTracking
+              : deliverabilitySettings.enableTracking
+          },
+          openTracking: {
+            enable: deliverabilitySettings.enableOpenTracking !== undefined
+              ? deliverabilitySettings.enableOpenTracking
+              : deliverabilitySettings.enableTracking
+          }
         },
         // Add personalizations with customArgs for webhook matching
         // Include recipient names if available
@@ -292,7 +300,7 @@ export class SendGridService {
           allowedRecipients.map(async (recipient) => {
             // Look up contact name from CRM
             let recipientName = await this.lookupContactName(recipient);
-            
+
             // If no contact found, format email username as name
             if (!recipientName) {
               const emailMatch = recipient.match(/^(.+)@/);
@@ -300,12 +308,12 @@ export class SendGridService {
                 recipientName = this.formatEmailAsName(emailMatch[1]);
               }
             }
-            
+
             // Build to array with name if available
-            const toArray = recipientName 
+            const toArray = recipientName
               ? [{ email: recipient, name: recipientName }]
               : [{ email: recipient }];
-            
+
             return {
               to: toArray,
               customArgs: {
@@ -316,12 +324,12 @@ export class SendGridService {
         )
       };
 
-              // Threading headers
-              if (inReplyTo) {
-                msg.headers = { ...(msg.headers || {}), 'In-Reply-To': inReplyTo };
-              }
-              if (references && references.length) {
-                msg.headers = { ...(msg.headers || {}), 'References': references.join(' ') };
+      // Threading headers
+      if (inReplyTo) {
+        msg.headers = { ...(msg.headers || {}), 'In-Reply-To': inReplyTo };
+      }
+      if (references && references.length) {
+        msg.headers = { ...(msg.headers || {}), 'References': references.join(' ') };
       }
 
       // Add custom headers based on deliverability settings
@@ -357,24 +365,24 @@ export class SendGridService {
       if (!msg.text || typeof msg.text !== 'string') {
         throw new Error('Invalid text content type');
       }
-      
+
       // Check content size limits (Twilio recommends <1MB for content, 30MB total payload)
       const MAX_CONTENT_SIZE = 1048576; // 1MB (per Twilio recommendation for practical limits)
       const MAX_TOTAL_SIZE = 31457280; // 30MB total payload limit
-      
+
       if (msg.html.length > MAX_CONTENT_SIZE) {
         throw new Error(`HTML content too large: ${msg.html.length} bytes (recommended max: ${MAX_CONTENT_SIZE} bytes / 1MB)`);
       }
-      
+
       if (msg.text.length > MAX_CONTENT_SIZE) {
         throw new Error(`Text content too large: ${msg.text.length} bytes (recommended max: ${MAX_CONTENT_SIZE} bytes / 1MB)`);
       }
-      
+
       const totalSize = msg.html.length + msg.text.length + (msg.subject?.length || 0);
       if (totalSize > MAX_TOTAL_SIZE) {
         throw new Error(`Total payload too large: ${totalSize} bytes (max: ${MAX_TOTAL_SIZE} bytes / 30MB)`);
       }
-      
+
       // Ensure all header values are strings (per Twilio recommendation)
       if (msg.headers) {
         for (const [key, value] of Object.entries(msg.headers)) {
@@ -384,7 +392,7 @@ export class SendGridService {
           }
         }
       }
-      
+
       // STEP 4: Send email via SendGrid with enhanced error logging
       let response;
       try {
@@ -396,7 +404,7 @@ export class SendGridService {
           code: sendError.code,
           stack: sendError.stack
         };
-        
+
         // Log SendGrid API error response details (per Twilio recommendation)
         if (sendError.response) {
           errorDetails.response = {
@@ -405,7 +413,7 @@ export class SendGridService {
             body: sendError.response.body,
             headers: sendError.response.headers
           };
-        
+
           // Extract detailed error messages from SendGrid response
           if (sendError.response.body && sendError.response.body.errors) {
             errorDetails.sendGridErrors = sendError.response.body.errors.map(err => ({
@@ -415,7 +423,7 @@ export class SendGridService {
             }));
             console.error('[SendGrid] SendGrid API Error Details:', errorDetails.sendGridErrors);
           }
-          
+
           // Log specific error codes
           if (sendError.response.statusCode === 413) {
             console.error('[SendGrid] Payload Too Large - content exceeds SendGrid limits');
@@ -423,7 +431,7 @@ export class SendGridService {
             console.error('[SendGrid] Bad Request - check payload structure and headers');
           }
         }
-        
+
         // Log payload information for debugging
         errorDetails.payloadInfo = {
           htmlLength: msg.html.length,
@@ -433,11 +441,11 @@ export class SendGridService {
           hasHeaders: !!msg.headers,
           headerCount: msg.headers ? Object.keys(msg.headers).length : 0
         };
-        
+
         console.error('[SendGrid] SendGrid API error (full details):', JSON.stringify(errorDetails, null, 2));
         throw sendError;
       }
-      
+
       console.log('[SendGrid] Email sent successfully:', {
         to: to,
         subject: subject,
@@ -462,7 +470,7 @@ export class SendGridService {
     } catch (error) {
       // Enhanced error logging as recommended by Twilio AI
       console.error('[SendGrid] Email send error:', error);
-      
+
       // Log detailed SendGrid API error information
       if (error.response && error.response.body && error.response.body.errors) {
         console.error('[SendGrid] API Error Details:', error.response.body.errors);
@@ -471,7 +479,7 @@ export class SendGridService {
       } else {
         console.error('[SendGrid] Full Error Object:', JSON.stringify(error, null, 2));
       }
-      
+
       // Log the email data that failed (without sensitive content)
       console.error('[SendGrid] Failed Email Data:', {
         to: emailData.to,
@@ -480,7 +488,7 @@ export class SendGridService {
         trackingId: emailData.trackingId,
         contentLength: emailData.content ? emailData.content.length : 0
       });
-      
+
       throw new Error(`Failed to send email: ${error.message}`);
     }
   }
@@ -491,16 +499,16 @@ export class SendGridService {
   async sendBulkEmails(emails) {
     try {
       const results = [];
-      
+
       for (const emailData of emails) {
         try {
           const result = await this.sendEmail(emailData);
           results.push({ success: true, ...result });
         } catch (error) {
-          results.push({ 
-            success: false, 
+          results.push({
+            success: false,
             error: error.message,
-            email: emailData.to 
+            email: emailData.to
           });
         }
       }
@@ -528,9 +536,9 @@ export class SendGridService {
         date: now,                  // Add date field for emails page sorting
         timestamp: now,             // Add timestamp field for emails page fallback
         messageId: messageId,
-                threadId: emailData.threadId || null,
-                inReplyTo: emailData.inReplyTo || null,
-                references: emailData.references || [],
+        threadId: emailData.threadId || null,
+        inReplyTo: emailData.inReplyTo || null,
+        references: emailData.references || [],
         opens: [],
         replies: [],
         clicks: [],
@@ -563,7 +571,7 @@ export class SendGridService {
     if (!html || typeof html !== 'string') {
       return '';
     }
-    
+
     try {
       // Use sanitize-html library to remove dangerous tags while preserving email structure
       const sanitized = sanitizeHtml(html, {
@@ -614,7 +622,7 @@ export class SendGridService {
           }
         }
       });
-      
+
       // Additional cleanup: Remove any remaining dangerous content (belt and suspenders)
       // This ensures we catch anything that sanitize-html might have missed
       let cleaned = sanitized
@@ -623,7 +631,7 @@ export class SendGridService {
         .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '') // Remove event handlers (onclick, onload, etc.)
         .replace(/javascript:/gi, '') // Remove javascript: URLs
         .replace(/data:text\/html/gi, ''); // Remove data:text/html URLs
-      
+
       return cleaned;
     } catch (error) {
       console.error('[SendGrid] HTML sanitization error:', error);
@@ -651,21 +659,21 @@ export class SendGridService {
       console.warn('[SendGrid] Invalid HTML input for text generation');
       return 'HTML email content';
     }
-    
+
     // Limit processing for very large HTML to prevent memory issues
     const MAX_HTML_LENGTH = 1000000; // 1MB limit
     if (html.length > MAX_HTML_LENGTH) {
       console.warn('[SendGrid] HTML content too large, using simplified text extraction');
       return this.stripHtml(html.substring(0, MAX_HTML_LENGTH)) || 'HTML email content';
     }
-    
+
     try {
       let text = String(html);
-      
+
       // Remove script and style tags completely (handle nested tags)
       text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
       text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-      
+
       // Convert common HTML elements to text equivalents
       text = text.replace(/<br\s*\/?>/gi, '\n');
       text = text.replace(/<\/p>/gi, '\n\n');
@@ -675,20 +683,20 @@ export class SendGridService {
       text = text.replace(/<\/li>/gi, '\n');
       text = text.replace(/<\/ul>/gi, '\n');
       text = text.replace(/<\/ol>/gi, '\n');
-      
+
       // Replace links with text and URL (handle multiline links)
       text = text.replace(/<a[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (match, url, linkText) => {
         const cleanText = linkText.replace(/<[^>]*>/g, '').trim();
         return cleanText ? `${cleanText} (${url})` : url;
       });
-      
+
       // Replace images with alt text
       text = text.replace(/<img[^>]*alt\s*=\s*["']([^"']+)["'][^>]*>/gi, '$1');
       text = text.replace(/<img[^>]*>/gi, '[Image]');
-      
+
       // Remove all remaining HTML tags
       text = text.replace(/<[^>]*>/g, '');
-      
+
       // Decode common HTML entities
       const entityMap = {
         '&nbsp;': ' ',
@@ -702,7 +710,7 @@ export class SendGridService {
       Object.entries(entityMap).forEach(([entity, char]) => {
         text = text.replace(new RegExp(entity, 'gi'), char);
       });
-      
+
       // Decode numeric entities
       text = text.replace(/&#(\d+);/g, (match, dec) => {
         try {
@@ -711,29 +719,29 @@ export class SendGridService {
           return match;
         }
       });
-      
+
       // Clean up whitespace
       text = text.replace(/\n\s*\n\s*\n+/g, '\n\n'); // Max 2 consecutive newlines
       text = text.replace(/[ \t]+/g, ' '); // Multiple spaces to single space
       text = text.replace(/\n /g, '\n'); // Remove leading spaces on new lines
       text = text.replace(/ \n/g, '\n'); // Remove trailing spaces before newlines
-      
+
       const result = text.trim();
-      
+
       // Ensure we always return non-empty content
       if (!result || result.length === 0) {
         console.warn('[SendGrid] Generated text is empty after processing, using basic strip');
         const basicStrip = this.stripHtml(html);
         return basicStrip && basicStrip.length > 0 ? basicStrip : 'HTML email content - please view in HTML format';
       }
-      
+
       // Limit text length to prevent SendGrid issues
       const MAX_TEXT_LENGTH = 100000;
       if (result.length > MAX_TEXT_LENGTH) {
         console.warn('[SendGrid] Text content too long, truncating');
         return result.substring(0, MAX_TEXT_LENGTH) + '... [content truncated]';
       }
-      
+
       return result;
     } catch (e) {
       console.error('[SendGrid] Failed to generate text from HTML:', e);
@@ -746,7 +754,7 @@ export class SendGridService {
       } catch (stripError) {
         console.error('[SendGrid] Even basic strip failed:', stripError);
       }
-      
+
       // Final fallback
       return 'HTML email content - please view in HTML format';
     }
@@ -766,7 +774,7 @@ export class SendGridService {
   async getEmailStats(trackingId) {
     try {
       if (!db) return null;
-      
+
       const emailDoc = await db.collection('emails').doc(trackingId).get();
       if (!emailDoc.exists) return null;
 

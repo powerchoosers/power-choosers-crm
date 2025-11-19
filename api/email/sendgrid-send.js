@@ -4,7 +4,7 @@ import SendGridService from './sendgrid-service.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
-  
+
   if (req.method !== 'POST') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
@@ -18,8 +18,8 @@ export default async function handler(req, res) {
     return;
   }
 
-          try {
-            const { to, subject, content, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail } = req.body;
+  try {
+    const { to, subject, content, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail, emailSettings } = req.body;
 
     if (!to || !subject || !content) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -33,38 +33,52 @@ export default async function handler(req, res) {
     // Explicit boolean conversion - ensure it's always a boolean, never undefined
     const isHtmlEmailBoolean = Boolean(isHtmlEmail);
 
+    // Merge emailSettings with _deliverability (emailSettings takes priority)
+    const deliverability = {
+      enableTracking: true,
+      includeBulkHeaders: false,
+      includeListUnsubscribe: false,
+      includePriorityHeaders: false,
+      forceGmailOnly: false,
+      useBrandedHtmlTemplate: false,
+      signatureImageEnabled: true,
+      // Override with _deliverability if provided
+      ...(_deliverability || {}),
+      // Override with emailSettings if provided (highest priority)
+      ...(emailSettings?.deliverability ? {
+        enableTracking: emailSettings.deliverability.openTracking !== undefined ? emailSettings.deliverability.openTracking : true,
+        enableClickTracking: emailSettings.deliverability.clickTracking !== undefined ? emailSettings.deliverability.clickTracking : true,
+        includeBulkHeaders: emailSettings.deliverability.bulkHeaders || false,
+        includeListUnsubscribe: emailSettings.deliverability.listUnsubscribe !== undefined ? emailSettings.deliverability.listUnsubscribe : true,
+        includePriorityHeaders: emailSettings.deliverability.priorityHeaders || false
+      } : {})
+    };
+
     // Prepare email data
-            const emailData = {
+    const emailData = {
       to,
       subject,
       content,
       from: from || process.env.SENDGRID_FROM_EMAIL || 'l.patterson@powerchoosers.com',
       fromName: fromName || process.env.SENDGRID_FROM_NAME || 'Lewis Patterson',
       trackingId,
-              threadId: threadId || undefined,
-              inReplyTo: inReplyTo || undefined,
-              references: Array.isArray(references) ? references : (references ? [references] : undefined),
-              isHtmlEmail: isHtmlEmailBoolean, // Use explicit boolean, not || false
+      threadId: threadId || undefined,
+      inReplyTo: inReplyTo || undefined,
+      references: Array.isArray(references) ? references : (references ? [references] : undefined),
+      isHtmlEmail: isHtmlEmailBoolean, // Use explicit boolean, not || false
       userEmail: userEmail || null,
-      _deliverability: _deliverability || {
-        enableTracking: true,
-        includeBulkHeaders: false,
-        includeListUnsubscribe: false,
-        includePriorityHeaders: false,
-        forceGmailOnly: false,
-        useBrandedHtmlTemplate: false,
-        signatureImageEnabled: true
-      }
+      _deliverability: deliverability,
+      emailSettings: emailSettings || null // Pass through for logging/debugging
     };
 
-    console.log('[SendGrid] Sending email:', { to, subject, trackingId });
+    console.log('[SendGrid] Sending email:', { to, subject, trackingId, deliverability });
 
     const sendGridService = new SendGridService();
     const result = await sendGridService.sendEmail(emailData);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      success: true, 
+    res.end(JSON.stringify({
+      success: true,
       trackingId: result.trackingId,
       messageId: result.messageId,
       message: 'Email sent successfully via SendGrid'
@@ -72,16 +86,16 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('[SendGrid] Send error:', error);
-    
+
     // Extract more detailed error information (per Twilio recommendations)
     let errorMessage = error.message || 'Failed to send email';
     let errorDetails = null;
     let statusCode = 500;
-    
+
     // If it's a SendGrid API error, extract details (per Twilio recommendation)
     if (error.response && error.response.body) {
       statusCode = error.response.statusCode || 500;
-      
+
       // Extract detailed error messages from SendGrid response
       if (error.response.body.errors && Array.isArray(error.response.body.errors)) {
         errorDetails = error.response.body.errors.map(e => ({
@@ -94,7 +108,7 @@ export default async function handler(req, res) {
       } else if (error.response.body.message) {
         errorMessage = error.response.body.message;
       }
-      
+
       // Provide specific guidance based on status code
       if (statusCode === 413) {
         errorMessage = 'Payload Too Large: Email content exceeds SendGrid size limits. ' + errorMessage;
@@ -106,10 +120,10 @@ export default async function handler(req, res) {
         errorMessage = 'Forbidden: API key does not have Mail Send permissions. ' + errorMessage;
       }
     }
-    
+
     res.writeHead(statusCode, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      error: 'Failed to send email', 
+    res.end(JSON.stringify({
+      error: 'Failed to send email',
       message: errorMessage,
       details: errorDetails || null,
       statusCode: statusCode
