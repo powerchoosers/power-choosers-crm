@@ -168,26 +168,131 @@
     return account.id || account.accountId || account.docId || null;
   }
 
-  // Load selected account IDs from localStorage
-  function loadSelectedAccounts() {
+  // Get current user email and ID
+  function getUserEmail() {
     try {
-      const saved = localStorage.getItem('client-management-selected-accounts');
-      if (saved) {
-        state.selectedAccountIds = JSON.parse(saved);
-        console.log('[ClientManagement] Loaded selected account IDs:', state.selectedAccountIds);
+      if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+        return window.DataManager.getCurrentUserEmail();
       }
-    } catch (e) {
-      console.warn('[ClientManagement] Failed to load selected accounts:', e);
-      state.selectedAccountIds = [];
+      return (window.currentUserEmail || state.userEmail || '').toLowerCase();
+    } catch(_) {
+      return (window.currentUserEmail || state.userEmail || '').toLowerCase();
     }
   }
 
-  // Save selected account IDs to localStorage
-  function saveSelectedAccounts() {
+  function getCurrentUserId() {
     try {
-      localStorage.setItem('client-management-selected-accounts', JSON.stringify(state.selectedAccountIds));
+      if (window.firebase && window.firebase.auth && window.firebase.auth().currentUser) {
+        return window.firebase.auth().currentUser.uid;
+      }
+    } catch(_) {}
+    return null;
+  }
+
+  // Load selected account IDs from Firestore (with localStorage fallback)
+  async function loadSelectedAccounts() {
+    try {
+      const userEmail = getUserEmail();
+      if (!userEmail || !window.firebaseDB) {
+        // Fallback to localStorage if no auth or Firebase
+        const saved = localStorage.getItem('client-management-selected-accounts');
+        if (saved) {
+          state.selectedAccountIds = JSON.parse(saved);
+          console.log('[ClientManagement] Loaded selected account IDs from localStorage:', state.selectedAccountIds);
+        }
+        return;
+      }
+
+      // Try to load from Firestore first
+      const docId = `client-management-${userEmail}`;
+      const docRef = window.firebaseDB.collection('settings').doc(docId);
+      const doc = await docRef.get();
+
+      if (doc.exists) {
+        const data = doc.data();
+        if (data.selectedAccountIds && Array.isArray(data.selectedAccountIds)) {
+          state.selectedAccountIds = data.selectedAccountIds;
+          console.log('[ClientManagement] Loaded selected account IDs from Firestore:', state.selectedAccountIds);
+          
+          // Also update localStorage as backup
+          localStorage.setItem('client-management-selected-accounts', JSON.stringify(state.selectedAccountIds));
+          return;
+        }
+      }
+
+      // Fallback to localStorage if Firestore doesn't have data
+      const saved = localStorage.getItem('client-management-selected-accounts');
+      if (saved) {
+        state.selectedAccountIds = JSON.parse(saved);
+        console.log('[ClientManagement] Loaded selected account IDs from localStorage (Firestore empty):', state.selectedAccountIds);
+        
+        // Migrate localStorage data to Firestore
+        await saveSelectedAccounts();
+      } else {
+        state.selectedAccountIds = [];
+      }
     } catch (e) {
-      console.warn('[ClientManagement] Failed to save selected accounts:', e);
+      console.warn('[ClientManagement] Failed to load selected accounts from Firestore, using localStorage:', e);
+      // Fallback to localStorage on error
+      try {
+        const saved = localStorage.getItem('client-management-selected-accounts');
+        if (saved) {
+          state.selectedAccountIds = JSON.parse(saved);
+        } else {
+          state.selectedAccountIds = [];
+        }
+      } catch (e2) {
+        console.warn('[ClientManagement] Failed to load from localStorage:', e2);
+        state.selectedAccountIds = [];
+      }
+    }
+  }
+
+  // Save selected account IDs to Firestore (and localStorage as backup)
+  async function saveSelectedAccounts() {
+    try {
+      // Always save to localStorage as backup
+      localStorage.setItem('client-management-selected-accounts', JSON.stringify(state.selectedAccountIds));
+      
+      const userEmail = getUserEmail();
+      const userId = getCurrentUserId();
+      
+      if (!userEmail || !window.firebaseDB) {
+        console.log('[ClientManagement] Saved to localStorage only (no auth/Firebase)');
+        return;
+      }
+
+      // Save to Firestore
+      const docId = `client-management-${userEmail}`;
+      const docRef = window.firebaseDB.collection('settings').doc(docId);
+      
+      const dataToSave = {
+        selectedAccountIds: state.selectedAccountIds,
+        ownerId: userEmail,
+        updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date().toISOString()
+      };
+      
+      if (userId) {
+        dataToSave.userId = userId;
+      }
+
+      // Check if document exists
+      const doc = await docRef.get();
+      if (doc.exists) {
+        // Update existing document
+        await docRef.update(dataToSave);
+        console.log('[ClientManagement] Updated selected accounts in Firestore:', state.selectedAccountIds);
+      } else {
+        // Create new document
+        await docRef.set({
+          ...dataToSave,
+          createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date().toISOString()
+        });
+        console.log('[ClientManagement] Created selected accounts document in Firestore:', state.selectedAccountIds);
+      }
+    } catch (e) {
+      console.warn('[ClientManagement] Failed to save selected accounts to Firestore:', e);
+      // localStorage save already happened above, so at least that's saved
     }
   }
 
@@ -206,8 +311,8 @@
     state.userEmail = window.currentUserEmail || '';
     state.isAdmin = window.currentUserRole === 'admin';
 
-    // Load selected accounts
-    loadSelectedAccounts();
+    // Load selected accounts (now async - loads from Firestore)
+    await loadSelectedAccounts();
 
     showLoading();
 
@@ -336,10 +441,14 @@
       state.data.accounts = accounts;
       
       if (state.loaded) {
+        const metrics = calculateMetrics();
         renderClientList();
-        renderOverviewStats(calculateMetrics());
-        renderContractRenewalDashboard(calculateMetrics());
-        renderClientSegmentation(calculateMetrics());
+        renderOverviewStats(metrics);
+        renderContractRenewalDashboard(metrics);
+        renderClientSegmentation(metrics);
+        renderTopIndustries();
+        renderEnergyPortfolio();
+        renderEnergyUsageInsights();
       }
     });
     
@@ -360,6 +469,9 @@
         const metrics = calculateMetrics();
         renderOverviewStats(metrics);
         renderTaskDashboard(metrics);
+        renderTopIndustries();
+        renderEnergyPortfolio();
+        renderEnergyUsageInsights();
         renderClientList(); // Refresh overdue task counts per client
       }
     });
@@ -450,6 +562,93 @@
         midmarket: midmarketClients,
         smb: smbClients
       }
+    };
+  }
+
+  // Calculate top industries from selected accounts
+  function calculateTopIndustries() {
+    const accounts = state.data.accounts.filter(acc => {
+      const accountId = getAccountId(acc);
+      return accountId && state.selectedAccountIds.includes(accountId);
+    });
+
+    const industryCounts = {};
+    accounts.forEach(acc => {
+      const industry = (acc.industry || 'Unknown').trim();
+      if (industry) {
+        industryCounts[industry] = (industryCounts[industry] || 0) + 1;
+      }
+    });
+
+    // Sort by count and get top 5
+    const sorted = Object.entries(industryCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    return sorted.map(([industry, count]) => ({ industry, count }));
+  }
+
+  // Calculate energy metrics from selected accounts
+  function calculateEnergyMetrics() {
+    const accounts = state.data.accounts.filter(acc => {
+      const accountId = getAccountId(acc);
+      return accountId && state.selectedAccountIds.includes(accountId);
+    });
+
+    // Get usage values (handle both field names)
+    const accountsWithUsage = accounts.filter(acc => {
+      const usage = acc.annualKilowattUsage || acc.annualUsage;
+      return usage && !isNaN(parseFloat(usage));
+    });
+
+    // Total kWh (remove commas if present, then parse)
+    const totalKwh = accountsWithUsage.reduce((sum, acc) => {
+      const usage = acc.annualKilowattUsage || acc.annualUsage;
+      const numValue = typeof usage === 'string' 
+        ? parseFloat(usage.replace(/,/g, '')) 
+        : parseFloat(usage);
+      return sum + (isNaN(numValue) ? 0 : numValue);
+    }, 0);
+
+    // Average per client
+    const avgKwh = accountsWithUsage.length > 0 ? totalKwh / accountsWithUsage.length : 0;
+
+    // Breakdown by client size
+    const enterpriseAccounts = accountsWithUsage.filter(acc => getClientSize(acc.employees) === 'enterprise');
+    const midmarketAccounts = accountsWithUsage.filter(acc => getClientSize(acc.employees) === 'midmarket');
+    const smbAccounts = accountsWithUsage.filter(acc => getClientSize(acc.employees) === 'smb');
+
+    const enterpriseKwh = enterpriseAccounts.reduce((sum, acc) => {
+      const usage = acc.annualKilowattUsage || acc.annualUsage;
+      const numValue = typeof usage === 'string' 
+        ? parseFloat(usage.replace(/,/g, '')) 
+        : parseFloat(usage);
+      return sum + (isNaN(numValue) ? 0 : numValue);
+    }, 0);
+
+    const midmarketKwh = midmarketAccounts.reduce((sum, acc) => {
+      const usage = acc.annualKilowattUsage || acc.annualUsage;
+      const numValue = typeof usage === 'string' 
+        ? parseFloat(usage.replace(/,/g, '')) 
+        : parseFloat(usage);
+      return sum + (isNaN(numValue) ? 0 : numValue);
+    }, 0);
+
+    const smbKwh = smbAccounts.reduce((sum, acc) => {
+      const usage = acc.annualKilowattUsage || acc.annualUsage;
+      const numValue = typeof usage === 'string' 
+        ? parseFloat(usage.replace(/,/g, '')) 
+        : parseFloat(usage);
+      return sum + (isNaN(numValue) ? 0 : numValue);
+    }, 0);
+
+    return {
+      totalKwh,
+      avgKwh,
+      clientsWithUsage: accountsWithUsage.length,
+      enterpriseKwh,
+      midmarketKwh,
+      smbKwh
     };
   }
 
@@ -925,6 +1124,84 @@
     }
   }
 
+  // Render top industries
+  function renderTopIndustries() {
+    if (!els.dashboard) return;
+    
+    const contentEl = document.getElementById('top-industries-content');
+    if (!contentEl) return;
+
+    const industries = calculateTopIndustries();
+    
+    if (industries.length === 0) {
+      contentEl.innerHTML = `
+        <div class="metric-row">
+          <span class="metric-label">No industry data available</span>
+          <span class="metric-value">-</span>
+        </div>
+      `;
+      return;
+    }
+
+    contentEl.innerHTML = industries.map((item, index) => `
+      <div class="metric-row">
+        <span class="metric-label">${index + 1}. ${escapeHtml(item.industry)}</span>
+        <span class="metric-value">${item.count} ${item.count === 1 ? 'client' : 'clients'}</span>
+      </div>
+    `).join('');
+  }
+
+  // Render energy portfolio
+  function renderEnergyPortfolio() {
+    if (!els.dashboard) return;
+    
+    const metrics = calculateEnergyMetrics();
+    
+    const totalKwEl = document.getElementById('total-kw-managed');
+    const avgKwEl = document.getElementById('avg-kw-per-client');
+    const clientsWithUsageEl = document.getElementById('clients-with-usage');
+    
+    if (totalKwEl) {
+      totalKwEl.textContent = formatNumber(Math.round(metrics.totalKwh)) + ' kWh';
+    }
+    
+    if (avgKwEl) {
+      avgKwEl.textContent = formatNumber(Math.round(metrics.avgKwh)) + ' kWh';
+    }
+    
+    if (clientsWithUsageEl) {
+      clientsWithUsageEl.textContent = metrics.clientsWithUsage;
+    }
+  }
+
+  // Render energy usage insights
+  function renderEnergyUsageInsights() {
+    if (!els.dashboard) return;
+    
+    const metrics = calculateEnergyMetrics();
+    
+    const totalKwhEl = document.getElementById('total-annual-kwh');
+    const enterpriseKwhEl = document.getElementById('enterprise-kwh');
+    const midmarketKwhEl = document.getElementById('midmarket-kwh');
+    const smbKwhEl = document.getElementById('smb-kwh');
+    
+    if (totalKwhEl) {
+      totalKwhEl.textContent = formatNumber(Math.round(metrics.totalKwh)) + ' kWh';
+    }
+    
+    if (enterpriseKwhEl) {
+      enterpriseKwhEl.textContent = formatNumber(Math.round(metrics.enterpriseKwh)) + ' kWh';
+    }
+    
+    if (midmarketKwhEl) {
+      midmarketKwhEl.textContent = formatNumber(Math.round(metrics.midmarketKwh)) + ' kWh';
+    }
+    
+    if (smbKwhEl) {
+      smbKwhEl.textContent = formatNumber(Math.round(metrics.smbKwh)) + ' kWh';
+    }
+  }
+
   // Main dashboard render function
   function renderDashboard() {
     if (!initDomRefs()) return;
@@ -936,6 +1213,9 @@
     renderContractRenewalDashboard(metrics);
     renderTaskDashboard(metrics);
     renderClientSegmentation(metrics);
+    renderTopIndustries();
+    renderEnergyPortfolio();
+    renderEnergyUsageInsights();
     renderClientList();
 
     state.loaded = true;
@@ -1190,7 +1470,7 @@
   }
 
   // Handle account selection
-  function handleAccountSelected(accountId) {
+  async function handleAccountSelected(accountId) {
     console.log('[ClientManagement] Account selected:', accountId);
     console.log('[ClientManagement] Current selected IDs:', state.selectedAccountIds);
     console.log('[ClientManagement] Available accounts:', state.data.accounts.map(a => ({
@@ -1206,7 +1486,7 @@
     // Add account to selected list if not already there
     if (!state.selectedAccountIds.includes(accountId)) {
       state.selectedAccountIds.push(accountId);
-      saveSelectedAccounts();
+      await saveSelectedAccounts(); // Now async - saves to Firestore
       console.log('[ClientManagement] Account added to client management:', accountId);
       console.log('[ClientManagement] Updated selected IDs:', state.selectedAccountIds);
     } else {

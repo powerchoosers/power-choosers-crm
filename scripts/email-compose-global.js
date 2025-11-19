@@ -2540,19 +2540,19 @@
               }
               
               return {
-                id: account.id,
-                name: account.accountName || account.name || '',
+              id: account.id,
+              name: account.accountName || account.name || '',
                 industry: detectedIndustry, // Use detected industry (from account or inferred)
-                domain: account.domain || account.website || '',
-                city: account.city || account.billingCity || account.locationCity || '',
-                state: account.state || account.billingState || account.region || '',
-                shortDescription: account.shortDescription || account.short_desc || account.descriptionShort || account.description || '',
-                logoUrl: account.logoUrl || '',
-                phone: account.phone || account.companyPhone || '',
-                annualUsage: account.annualUsage || '',
-                electricitySupplier: account.electricitySupplier || '',
-                currentRate: account.currentRate || '',
-                contractEndDate: account.contractEndDate || ''
+              domain: account.domain || account.website || '',
+              city: account.city || account.billingCity || account.locationCity || '',
+              state: account.state || account.billingState || account.region || '',
+              shortDescription: account.shortDescription || account.short_desc || account.descriptionShort || account.description || '',
+              logoUrl: account.logoUrl || '',
+              phone: account.phone || account.companyPhone || '',
+              annualUsage: account.annualUsage || '',
+              electricitySupplier: account.electricitySupplier || '',
+              currentRate: account.currentRate || '',
+              contractEndDate: account.contractEndDate || ''
               };
             })() : null
           };
