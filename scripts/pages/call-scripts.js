@@ -685,6 +685,17 @@
         { label: 'Still not interested', next: 'objection_not_interested' }
       ]
     },
+    opener_quick_check: {
+      stage: 'Opening',
+      text: "Real quick—did I catch you in the middle of something, or do you have 30 seconds?<br><br><span class=\"pause-indicator\"></span> Got it. <span class=\"pause-indicator\"></span> So I'm basically the glue between electricity suppliers and account holders like you here in Texas. <span class=\"pause-indicator\"></span> The writing's kind of on the wall for next year—energy expenses are trending up, and a lot of companies are addressing it now instead of waiting until it hits their budget.<br><br>Have you already extended your energy agreements past 2026, or is that still open?",
+      responses: [
+        { label: "We've extended / locked in past 2026", next: 'ack_just_renewed' },
+        { label: "Still open / contract expires before 2027", next: 'situation_discovery' },
+        { label: "Not sure / need to check", next: 'situation_contract_expiry' },
+        { label: "What's this about?", next: 'ack_defensive' },
+        { label: "Not interested", next: 'objection_not_interested' }
+      ]
+    },
     situation_discovery: {
       stage: 'Discovery - Situation',
       text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Got it. <span class=\"pause-indicator\"></span> So help me understand - roughly how much are you spending monthly on electricity?",
@@ -1521,6 +1532,11 @@
       key: 'opener_social_proof',
       label: 'Social Proof',
       state: 'opener_social_proof'
+    },
+    quick_check: {
+      key: 'opener_quick_check',
+      label: 'Quick Check',
+      state: 'opener_quick_check'
     }
   };
 
@@ -1528,7 +1544,8 @@
   let availableOpeners = [
     OPENER_CONFIGS.direct_question,
     OPENER_CONFIGS.transparent,
-    OPENER_CONFIGS.social_proof
+    OPENER_CONFIGS.social_proof,
+    OPENER_CONFIGS.quick_check
   ];
 
   // Expose opener state for phone widget to sync (will be set up later when module is fully initialized)
@@ -1696,7 +1713,8 @@
               OPENER_CONFIGS.default,
               OPENER_CONFIGS.direct_question,
               OPENER_CONFIGS.transparent,
-              OPENER_CONFIGS.social_proof
+              OPENER_CONFIGS.social_proof,
+              OPENER_CONFIGS.quick_check
             ];
             
             // Set current opener to saved one
@@ -1713,7 +1731,8 @@
           availableOpeners = [
             OPENER_CONFIGS.direct_question,
             OPENER_CONFIGS.transparent,
-            OPENER_CONFIGS.social_proof
+            OPENER_CONFIGS.social_proof,
+            OPENER_CONFIGS.quick_check
           ];
         }
       } else {
@@ -1722,7 +1741,8 @@
         availableOpeners = [
           OPENER_CONFIGS.direct_question,
           OPENER_CONFIGS.transparent,
-          OPENER_CONFIGS.social_proof
+          OPENER_CONFIGS.social_proof,
+          OPENER_CONFIGS.quick_check
         ];
       }
     } catch(err) {
@@ -1732,7 +1752,8 @@
       availableOpeners = [
         OPENER_CONFIGS.direct_question,
         OPENER_CONFIGS.transparent,
-        OPENER_CONFIGS.social_proof
+        OPENER_CONFIGS.social_proof,
+        OPENER_CONFIGS.quick_check
       ];
     }
   }
@@ -2067,7 +2088,8 @@
       availableOpeners = [
         OPENER_CONFIGS.direct_question,
         OPENER_CONFIGS.transparent,
-        OPENER_CONFIGS.social_proof
+        OPENER_CONFIGS.social_proof,
+        OPENER_CONFIGS.quick_check
       ];
     }
     render();

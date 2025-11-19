@@ -2414,6 +2414,11 @@
           key: 'opener_social_proof',
           label: 'Social Proof',
           state: 'opener_social_proof'
+        },
+        quick_check: {
+          key: 'opener_quick_check',
+          label: 'Quick Check',
+          state: 'opener_quick_check'
         }
       };
 
@@ -2421,7 +2426,8 @@
       let availableOpeners = [
         OPENER_CONFIGS.direct_question,
         OPENER_CONFIGS.transparent,
-        OPENER_CONFIGS.social_proof
+        OPENER_CONFIGS.social_proof,
+        OPENER_CONFIGS.quick_check
       ];
 
       // Firebase persistence for opener selection
