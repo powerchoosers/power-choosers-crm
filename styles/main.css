@@ -20037,3 +20037,60 @@ div[id="account-contacts-list"] .contact-item .contact-name {
 .step-card.preview-active .link-bar {
     display: none;
 }
+
+/* Tab toggle group styling */
+.tab-toggle-group {
+    display: inline-flex;
+    background: var(--grey-700); /* Darker background for the group container */
+    border-radius: 8px;
+    padding: 4px;
+    gap: 4px;
+    border: 1px solid var(--border-light);
+}
+
+.tab-toggle {
+    background: transparent;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tab-toggle:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-toggle.active {
+    background: var(--grey-600); /* Lighter grey than header/group for active state */
+    color: var(--text-inverse);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* Ensure table container has relative positioning for fixed headers */
+.table-container {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border: 1px solid var(--border-light);
+    border-radius: var(--border-radius);
+    background: var(--bg-card);
+}
+
+.table-scroll {
+    overflow-x: auto;
+    max-height: calc(100vh - 240px); /* Adjust based on header/footer height */
+}
+
+/* Fixed header styling */
+.crm-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-card); /* Match card background */
+    z-index: 10;
+    box-shadow: 0 1px 0 var(--border-light);
+}

@@ -310,23 +310,6 @@
       return formattedNumber;
     }
 
-    // Wait for Firebase to initialize
-    function waitForFirebase(callback, maxAttempts = 20) {
-      let attempts = 0;
-      const check = () => {
-        attempts++;
-        if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
-          callback();
-        } else if (attempts < maxAttempts) {
-          setTimeout(check, 100);
-        } else {
-          console.warn('[Schedule] Firebase not available after waiting');
-          callback(); // Continue anyway for fallback behavior
-        }
-      };
-      check();
-    }
-
     // Set minimum date to today
     const dateInput = document.getElementById('appointment-date');
     if (dateInput) {
@@ -397,194 +380,71 @@
       hideError();
       hideSuccess();
 
-      // Wait for Firebase to be ready
-      waitForFirebase(async () => {
-        try {
-          // Check if contact/account exists, create if not
-          await createOrUpdateContact(bookingData);
-          
-          // Create task for admin
-          await createAdminTask(bookingData);
-          
-          // Show success
-          showSuccess();
-          form.reset();
-          timeSlots.forEach(s => s.classList.remove('selected'));
-          selectedTime = '';
-          if (selectedTimeInput) selectedTimeInput.value = '';
-          
-        } catch (error) {
-          console.error('Booking error:', error);
-          showError('There was an error scheduling your consultation. Please try again or contact us directly.');
-        } finally {
-          showLoading(false);
+      // Call secure API endpoint (uses Firebase Admin SDK)
+      try {
+        const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? 'http://localhost:3000'
+          : 'https://power-choosers-crm-792458658491.us-south1.run.app';
+        
+        const response = await fetch(`${API_BASE_URL}/api/create-booking`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            ...bookingData,
+            source: 'schedule'
+          })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to create booking');
         }
-      });
+
+        // Show success
+        showSuccess();
+        form.reset();
+        timeSlots.forEach(s => s.classList.remove('selected'));
+        selectedTime = '';
+        if (selectedTimeInput) selectedTimeInput.value = '';
+
+        // Dispatch event for notification system on crm-dashboard
+        window.dispatchEvent(new CustomEvent('pc:booking-created', { 
+          detail: { 
+            contactName: bookingData.contactName,
+            companyName: bookingData.companyName,
+            appointmentDate: bookingData.appointmentDate,
+            selectedTime: bookingData.selectedTime,
+            source: 'schedule',
+            taskId: result.taskId || 'new'
+          } 
+        }));
+        
+        // Also add notification directly if Notifications system is available
+        if (window.Notifications && typeof window.Notifications.add === 'function') {
+          const message = `${bookingData.contactName} from ${bookingData.companyName} scheduled a consultation${bookingData.appointmentDate ? ` for ${bookingData.appointmentDate}` : ''}${bookingData.selectedTime ? ` at ${bookingData.selectedTime}` : ''}`;
+          window.Notifications.add('new-lead', 'New Consultation Scheduled', message, {
+            contactName: bookingData.contactName,
+            companyName: bookingData.companyName,
+            appointmentDate: bookingData.appointmentDate,
+            selectedTime: bookingData.selectedTime,
+            source: 'schedule'
+          });
+        }
+
+        // Dispatch event for tasks.js to refresh
+        window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'booking' } }));
+        
+      } catch (error) {
+        console.error('Booking error:', error);
+        showError('There was an error scheduling your consultation. Please try again or contact us directly.');
+      } finally {
+        showLoading(false);
+      }
     });
 
-    async function createOrUpdateContact(bookingData) {
-      const db = window.firebaseDB;
-      if (!db || typeof db.collection !== 'function') {
-        console.warn('Firestore not available, skipping contact creation');
-        return;
-      }
-
-      try {
-        const email = bookingData.email.toLowerCase().trim();
-        const companyName = bookingData.companyName.trim();
-        const contactName = bookingData.contactName.trim();
-        const phone = bookingData.phone.trim();
-        const serverTimestamp = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue ? window.firebase.firestore.FieldValue.serverTimestamp() : new Date();
-
-        // Check if contact exists by email (using 'people' collection)
-        const contactsSnapshot = await db.collection('people').where('email', '==', email).limit(1).get();
-        
-        let contactId = null;
-        if (!contactsSnapshot.empty) {
-          // Contact exists, update if needed
-          const contactDoc = contactsSnapshot.docs[0];
-          contactId = contactDoc.id;
-          const contactData = contactDoc.data();
-          
-          // Update contact with latest info
-          const updates = {};
-          if (!contactData.firstName && contactName) {
-            const nameParts = contactName.split(' ');
-            updates.firstName = nameParts[0] || contactName;
-            updates.lastName = nameParts.slice(1).join(' ') || '';
-          }
-          // Use workDirectPhone field (matching contact-detail.js)
-          if (!contactData.workDirectPhone && phone) updates.workDirectPhone = phone;
-          // Also update mobile if workDirectPhone is not set and mobile is empty
-          if (!contactData.mobile && !contactData.workDirectPhone && phone) updates.mobile = phone;
-          if (!contactData.company && companyName) updates.company = companyName;
-          
-          if (Object.keys(updates).length > 0) {
-            updates.updatedAt = serverTimestamp;
-            await db.collection('people').doc(contactId).update(updates);
-          }
-        } else {
-          // Create new contact (use workDirectPhone field matching contact-detail.js)
-          const nameParts = contactName.split(' ');
-          const newContact = {
-            firstName: nameParts[0] || contactName,
-            lastName: nameParts.slice(1).join(' ') || '',
-            email: email,
-            workDirectPhone: phone, // Use workDirectPhone field
-            company: companyName,
-            ownerId: 'l.patterson@powerchoosers.com', // Admin owner
-            createdAt: serverTimestamp,
-            timestamp: serverTimestamp
-          };
-          
-          const contactRef = await db.collection('people').add(newContact);
-          contactId = contactRef.id;
-        }
-
-        // Check if account exists by company name
-        const accountsSnapshot = await db.collection('accounts').where('name', '==', companyName).limit(1).get();
-        
-        if (accountsSnapshot.empty) {
-          // Create new account
-          const newAccount = {
-            name: companyName,
-            ownerId: 'l.patterson@powerchoosers.com', // Admin owner
-            createdAt: serverTimestamp,
-            timestamp: serverTimestamp
-          };
-          await db.collection('accounts').add(newAccount);
-        }
-
-        return contactId;
-      } catch (error) {
-        console.error('Error creating/updating contact:', error);
-        // Don't throw - continue with task creation even if contact creation fails
-      }
-    }
-
-    async function createAdminTask(bookingData) {
-      const db = window.firebaseDB;
-      const serverTimestamp = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue ? window.firebase.firestore.FieldValue.serverTimestamp() : new Date();
-      
-      const taskData = {
-        title: `Consultation: ${bookingData.contactName} - ${bookingData.companyName}`,
-        type: 'phone-call',
-        priority: 'high',
-        contact: bookingData.contactName,
-        account: bookingData.companyName,
-        dueDate: bookingData.appointmentDate,
-        dueTime: bookingData.selectedTime,
-        status: 'pending',
-        notes: `SCHEDULED CONSULTATION\n\nContact: ${bookingData.contactName}\nCompany: ${bookingData.companyName}\nEmail: ${bookingData.email}\nPhone: ${bookingData.phone}\nDate: ${bookingData.appointmentDate}\nTime: ${bookingData.selectedTime}\n\nAdditional Notes:\n${bookingData.additionalNotes || 'None provided'}`,
-        ownerId: 'l.patterson@powerchoosers.com', // Admin owner
-        createdAt: serverTimestamp,
-        timestamp: serverTimestamp
-      };
-
-      if (db && typeof db.collection === 'function') {
-        try {
-          // Create task in Firestore
-          await db.collection('tasks').add(taskData);
-          console.log('[Schedule] Task created in Firestore');
-        } catch (error) {
-          console.error('Error creating task in Firestore:', error);
-          // Fallback to localStorage/event method
-          taskData.createdAt = Date.now();
-        }
-      }
-
-      // Also save to localStorage for immediate access
-      try {
-        const existingTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-        existingTasks.unshift({ ...taskData, createdAt: Date.now(), id: 'task_' + Date.now() });
-        localStorage.setItem('userTasks', JSON.stringify(existingTasks));
-      } catch (e) {
-        console.warn('Could not save task to localStorage:', e);
-      }
-
-      // Try to use window.Tasks.createTask if available (for tasks.js integration)
-      if (window.Tasks && typeof window.Tasks.createTask === 'function') {
-        try {
-          await window.Tasks.createTask({ ...taskData, createdAt: Date.now() });
-        } catch (e) {
-          console.warn('Could not create task via Tasks.createTask:', e);
-        }
-      } else if (window.createTask && typeof window.createTask === 'function') {
-        try {
-          await window.createTask({ ...taskData, createdAt: Date.now() });
-        } catch (e) {
-          console.warn('Could not create task via createTask:', e);
-        }
-      }
-
-      // Dispatch event for tasks.js to pick up
-      window.dispatchEvent(new CustomEvent('pc:auto-task', { detail: { ...taskData, createdAt: Date.now() } }));
-      window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'booking' } }));
-      
-      // Dispatch event for notification system on crm-dashboard
-      window.dispatchEvent(new CustomEvent('pc:booking-created', { 
-        detail: { 
-          contactName: bookingData.contactName,
-          companyName: bookingData.companyName,
-          appointmentDate: bookingData.appointmentDate,
-          selectedTime: bookingData.selectedTime,
-          source: 'schedule',
-          taskId: taskData.id || 'new'
-        } 
-      }));
-      
-      // Also add notification directly if Notifications system is available
-      if (window.Notifications && typeof window.Notifications.add === 'function') {
-        const message = `${bookingData.contactName} from ${bookingData.companyName} scheduled a consultation${bookingData.appointmentDate ? ` for ${bookingData.appointmentDate}` : ''}${bookingData.selectedTime ? ` at ${bookingData.selectedTime}` : ''}`;
-        window.Notifications.add('new-lead', 'New Consultation Scheduled', message, {
-          contactName: bookingData.contactName,
-          companyName: bookingData.companyName,
-          appointmentDate: bookingData.appointmentDate,
-          selectedTime: bookingData.selectedTime,
-          source: 'schedule'
-        });
-      }
-    }
 
     function showLoading(show) {
       if (loadingOverlay) {
