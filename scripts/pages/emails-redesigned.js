@@ -913,7 +913,7 @@
         </td>
         <td class="email-subject-cell">
           <div class="email-subject-content">
-            <span class="email-subject ${email.unread ? 'unread' : ''}">${escapeHtml(email.subject || (email.status === 'not_generated' ? '(Pending generation)' : email.status === 'generating' ? '(Generating...)' : '(No Subject)'))}</span>
+            <span class="email-subject ${email.unread ? 'unread' : ''}">${escapeHtml(email.subject || (email.status === 'not_generated' ? '(Pending generation)' : email.status === 'generating' ? '(Generating...)' : email.type === 'sent' && !email.subject ? '(Sent - No Subject)' : '(No Subject)'))}</span>
             <div class="email-snippet">${escapeHtml(emailPreview)}</div>
           </div>
         </td>

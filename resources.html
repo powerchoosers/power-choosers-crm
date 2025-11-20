@@ -139,6 +139,77 @@
     </style>
     <!-- Apollo Tracking Script -->
     <script>function initApollo(){var n=Math.random().toString(36).substring(7),o=document.createElement("script");o.src="https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache="+n,o.async=!0,o.defer=!0,o.onload=function(){window.trackingFunctions.onLoad({appId:"67ec3b5820289a0021c5a43c"})},document.head.appendChild(o)}initApollo();</script>
+    
+    <!-- Firebase Storage Posts Loader -->
+    <script>
+      (function() {
+        // Firebase Storage bucket name (matches Cloud Run env var: _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET)
+        const storageBucket = 'power-choosers-crm.firebasestorage.app';
+        const postsListUrl = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/posts-list.json?alt=media`;
+        
+        async function loadPosts() {
+          const container = document.getElementById('posts-container');
+          if (!container) return;
+          
+          try {
+            // Fetch posts list from Firebase Storage
+            const response = await fetch(postsListUrl);
+            
+            if (!response.ok) {
+              throw new Error('Failed to load posts');
+            }
+            
+            const data = await response.json();
+            const posts = data.posts || [];
+            
+            if (posts.length === 0) {
+              container.innerHTML = '<div class="resource-card" style="text-align: center; padding: 48px;"><p style="color: var(--muted);">No posts available yet.</p></div>';
+              return;
+            }
+            
+            // Render posts
+            container.innerHTML = posts.map(post => {
+              const category = post.category || 'News';
+              const title = post.title || 'Untitled';
+              const description = post.metaDescription || '';
+              const featuredImage = post.featuredImage || '';
+              // Construct Firebase Storage URL for the post HTML file
+              const postPath = post.url || `posts/${post.slug || post.id}.html`;
+              const encodedPath = encodeURIComponent(postPath);
+              const postUrl = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodedPath}?alt=media`;
+              
+              return `
+                <div class="resource-card">
+                  ${featuredImage ? `<img src="${escapeHtml(featuredImage)}" alt="${escapeHtml(title)}" style="width: 100%; height: 200px; object-fit: cover; border-radius: var(--radius); margin-bottom: 16px; display: block;">` : ''}
+                  ${category ? `<span class="resource-category">${escapeHtml(category)}</span>` : ''}
+                  <h3>${escapeHtml(title)}</h3>
+                  <p>${escapeHtml(description)}</p>
+                  <a href="${escapeHtml(postUrl)}" class="resource-link" target="_blank" rel="noopener">Read More <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+                </div>
+              `;
+            }).join('');
+            
+          } catch (error) {
+            console.error('[Resources] Error loading posts:', error);
+            container.innerHTML = '<div class="resource-card" style="text-align: center; padding: 48px;"><p style="color: var(--muted);">Unable to load posts at this time. Please try again later.</p></div>';
+          }
+        }
+        
+        function escapeHtml(text) {
+          if (!text) return '';
+          const div = document.createElement('div');
+          div.textContent = text;
+          return div.innerHTML;
+        }
+        
+        // Load posts when page is ready
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', loadPosts);
+        } else {
+          loadPosts();
+        }
+      })();
+    </script>
 </head>
 <body>
   <header class="site-header">
@@ -167,47 +238,10 @@
   </div>
 
   <section class="resources-section">
-    <div class="resources-grid">
-      <div class="resource-card">
-        <span class="resource-category">Energy Market</span>
-        <h3>Understanding Texas Energy Markets</h3>
-        <p>Learn how ERCOT and deregulated markets work, what factors influence pricing, and how to time your procurement for optimal rates.</p>
-        <a href="#" class="resource-link">Read More <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
-      </div>
-      
-      <div class="resource-card">
-        <span class="resource-category">Cost Savings</span>
-        <h3>10 Ways to Reduce Your Energy Costs</h3>
-        <p>Practical strategies businesses can implement immediately to lower energy consumption and reduce monthly bills without major investments.</p>
-        <a href="#" class="resource-link">Read More <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
-      </div>
-      
-      <div class="resource-card">
-        <span class="resource-category">Contract Management</span>
-        <h3>Energy Contract Renewal Guide</h3>
-        <p>When and how to renew your energy contracts, what to look for in renewal terms, and how to avoid common pitfalls.</p>
-        <a href="#" class="resource-link">Read More <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
-      </div>
-      
-      <div class="resource-card">
-        <span class="resource-category">Sustainability</span>
-        <h3>Renewable Energy Options for Business</h3>
-        <p>Explore solar, wind, and other renewable energy options available to Texas businesses, including incentives and ROI calculations.</p>
-        <a href="#" class="resource-link">Read More <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
-      </div>
-      
-      <div class="resource-card">
-        <span class="resource-category">Efficiency</span>
-        <h3>Energy Efficiency Best Practices</h3>
-        <p>Comprehensive guide to improving energy efficiency in commercial buildings, from lighting upgrades to HVAC optimization.</p>
-        <a href="#" class="resource-link">Read More <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
-      </div>
-      
-      <div class="resource-card">
-        <span class="resource-category">Industry Trends</span>
-        <h3>2025 Energy Market Outlook</h3>
-        <p>Analysis of current market trends, pricing forecasts, and what businesses should expect in the coming year.</p>
-        <a href="#" class="resource-link">Read More <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+    <div class="resources-grid" id="posts-container">
+      <!-- Posts will be loaded dynamically from Firebase Storage -->
+      <div class="resource-card" style="text-align: center; padding: 48px;">
+        <p style="color: var(--muted);">Loading posts...</p>
       </div>
     </div>
   </section>

@@ -1709,6 +1709,15 @@ class PowerChoosersCRM {
             }
             return;
         }
+        if (modalType === 'create-post') {
+            // Handle via post-editor.js
+            if (window.PostEditor && typeof window.PostEditor.openCreate === 'function') {
+                window.PostEditor.openCreate();
+            } else {
+                this.showToast('Post editor is loading...', 'info');
+            }
+            return;
+        }
         // Fallback for other modal types not yet wired here
         this.showToast(`Opening ${modalType} modal...`);
     }

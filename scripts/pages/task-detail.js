@@ -1,7 +1,7 @@
 'use strict';
 
 // Task Detail Page - Individual task pages with widgets and navigation
-(function() {
+(function () {
   const state = {
     currentTask: null,
     taskType: null,
@@ -21,7 +21,7 @@
   // Helper functions
   function getPriorityBackground(priority) {
     const p = (priority || '').toLowerCase().trim();
-    switch(p) {
+    switch (p) {
       case 'low': return '#495057';
       case 'medium': return 'rgba(255, 193, 7, 0.15)';
       case 'high': return 'rgba(220, 53, 69, 0.15)';
@@ -31,7 +31,7 @@
 
   function getPriorityColor(priority) {
     const p = (priority || '').toLowerCase().trim();
-    switch(p) {
+    switch (p) {
       case 'low': return '#e9ecef';
       case 'medium': return '#ffc107';
       case 'high': return '#dc3545';
@@ -49,12 +49,12 @@
   // Helper functions for ownership filtering and localStorage key management
   function getUserTasksKey() {
     try {
-      const email = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') 
-        ? window.DataManager.getCurrentUserEmail() 
+      const email = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+        ? window.DataManager.getCurrentUserEmail()
         : (window.currentUserEmail || '').toLowerCase();
       return email ? `userTasks:${email}` : 'userTasks';
-    } catch(_) { 
-      return 'userTasks'; 
+    } catch (_) {
+      return 'userTasks';
     }
   }
 
@@ -64,7 +64,7 @@
         return window.DataManager.getCurrentUserEmail();
       }
       return (window.currentUserEmail || '').toLowerCase();
-    } catch(_) {
+    } catch (_) {
       return (window.currentUserEmail || '').toLowerCase();
     }
   }
@@ -75,7 +75,7 @@
         return window.DataManager.isCurrentUserAdmin();
       }
       return window.currentUserRole === 'admin';
-    } catch(_) {
+    } catch (_) {
       return window.currentUserRole === 'admin';
     }
   }
@@ -83,10 +83,10 @@
   function filterTasksByOwnership(tasks) {
     if (!tasks || !Array.isArray(tasks)) return [];
     if (isAdmin()) return tasks;
-    
+
     const email = getUserEmail();
     if (!email) return [];
-    
+
     return tasks.filter(t => {
       if (!t) return false;
       const ownerId = (t.ownerId || '').toLowerCase();
@@ -99,15 +99,15 @@
   // Get primary phone data with type information (same logic as contact-detail.js)
   function getPrimaryPhoneData(contact) {
     if (!contact) return { value: '', type: 'mobile', field: 'mobile' };
-    
+
     // Check if a preferred phone field is set on the contact (from contact-detail.js)
     try {
       const pref = (contact && contact.preferredPhoneField) ? String(contact.preferredPhoneField).trim() : '';
       if (pref === 'mobile' && contact.mobile) return { value: contact.mobile, type: 'mobile', field: 'mobile' };
       if (pref === 'workDirectPhone' && contact.workDirectPhone) return { value: contact.workDirectPhone, type: 'work direct', field: 'workDirectPhone' };
       if (pref === 'otherPhone' && contact.otherPhone) return { value: contact.otherPhone, type: 'other', field: 'otherPhone' };
-    } catch(_) {}
-    
+    } catch (_) { }
+
     // Priority fallback: Mobile > Work Direct > Other
     if (contact.mobile) {
       return { value: contact.mobile, type: 'mobile', field: 'mobile' };
@@ -145,20 +145,20 @@
     try {
       if (typeof window.getAccountsData !== 'function') return null;
       const accounts = window.getAccountsData() || [];
-      
+
       // Try by ID first
       if (accountId) {
         const found = accounts.find(a => a.id === accountId);
         if (found) return found;
       }
-      
+
       // Fallback to name matching
       if (accountName) {
         const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
         const key = norm(accountName);
         return accounts.find(a => norm(a.accountName || a.name || a.companyName) === key) || null;
       }
-      
+
       return null;
     } catch (_) { return null; }
   }
@@ -170,7 +170,7 @@
     return task.account && (!task.contact || task.contact.trim() === '');
   }
 
-  function injectTaskDetailStyles(){
+  function injectTaskDetailStyles() {
     const id = 'task-detail-inline-styles';
     if (document.getElementById(id)) return;
     const style = document.createElement('style');
@@ -609,7 +609,7 @@
     els.backBtn = document.getElementById('task-detail-back-btn');
     els.completeBtn = document.getElementById('task-complete-btn');
     els.rescheduleBtn = document.getElementById('task-reschedule-btn');
-    
+
     // Only require the elements we actually need for interaction
     return !!(els.page && els.content);
   }
@@ -618,23 +618,23 @@
     if (els.backBtn) {
       els.backBtn.addEventListener('click', (e) => { e.preventDefault(); handleBackNavigation(); });
     }
-    
+
     if (els.completeBtn) {
       els.completeBtn.addEventListener('click', handleTaskComplete);
     }
-    
+
     if (els.rescheduleBtn) {
       els.rescheduleBtn.addEventListener('click', handleTaskReschedule);
     }
-    
+
     // Task navigation buttons
     const prevBtn = document.getElementById('task-prev-btn');
     const nextBtn = document.getElementById('task-next-btn');
-    
+
     if (prevBtn) {
       prevBtn.addEventListener('click', (e) => { e.preventDefault(); navigateToAdjacentTask('prev'); });
     }
-    
+
     if (nextBtn) {
       nextBtn.addEventListener('click', (e) => { e.preventDefault(); navigateToAdjacentTask('next'); });
     }
@@ -652,7 +652,7 @@
         const restore = window.__accountDetailsRestoreData || {};
         nav('account-details');
         setTimeout(() => {
-          try { 
+          try {
             // Restore account details state if available
             if (restore.accountId && window.showAccountDetail && typeof window.showAccountDetail === 'function') {
               window.showAccountDetail(restore.accountId);
@@ -660,7 +660,7 @@
             // Dispatch account details restore event
             document.dispatchEvent(new CustomEvent('pc:account-details-restore', { detail: restore || {} }));
             console.log('[Task Detail] Restored account details state:', restore);
-          } catch(_) {}
+          } catch (_) { }
         }, 80);
         return;
       }
@@ -669,31 +669,31 @@
         const restore = window.__taskDetailRestoreData || {};
         nav('task-detail');
         setTimeout(() => {
-          try { 
+          try {
             // Restore task detail state if available
             if (restore.taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
               window.TaskDetail.open(restore.taskId, restore.source || 'dashboard');
             }
             console.log('[Task Detail] Restored task detail state:', restore);
-          } catch(_) {}
+          } catch (_) { }
         }, 80);
         return;
       }
       if (src === 'accounts') {
-        const restore = window._accountsReturn || window.__accountsRestoreData || (window.accountsModule && typeof window.accountsModule.getCurrentState==='function' ? window.accountsModule.getCurrentState() : null);
+        const restore = window._accountsReturn || window.__accountsRestoreData || (window.accountsModule && typeof window.accountsModule.getCurrentState === 'function' ? window.accountsModule.getCurrentState() : null);
         nav('accounts');
         setTimeout(() => {
-          try { window.accountsModule && typeof window.accountsModule.rebindDynamic==='function' && window.accountsModule.rebindDynamic(); } catch(_) {}
-          try { document.dispatchEvent(new CustomEvent('pc:accounts-restore', { detail: restore || {} })); } catch(_) {}
+          try { window.accountsModule && typeof window.accountsModule.rebindDynamic === 'function' && window.accountsModule.rebindDynamic(); } catch (_) { }
+          try { document.dispatchEvent(new CustomEvent('pc:accounts-restore', { detail: restore || {} })); } catch (_) { }
         }, 80);
         return;
       }
       if (src === 'people') {
-        const restore = window.__peopleRestoreData || (window.peopleModule && typeof window.peopleModule.getCurrentState==='function' ? window.peopleModule.getCurrentState() : null);
+        const restore = window.__peopleRestoreData || (window.peopleModule && typeof window.peopleModule.getCurrentState === 'function' ? window.peopleModule.getCurrentState() : null);
         nav('people');
         setTimeout(() => {
-          try { window.peopleModule && typeof window.peopleModule.rebindDynamic==='function' && window.peopleModule.rebindDynamic(); } catch(_) {}
-          try { document.dispatchEvent(new CustomEvent('pc:people-restore', { detail: restore || {} })); } catch(_) {}
+          try { window.peopleModule && typeof window.peopleModule.rebindDynamic === 'function' && window.peopleModule.rebindDynamic(); } catch (_) { }
+          try { document.dispatchEvent(new CustomEvent('pc:people-restore', { detail: restore || {} })); } catch (_) { }
         }, 80);
         return;
       }
@@ -701,7 +701,7 @@
         const restore = window.__tasksRestoreData || { scroll: window.__tasksScrollY || 0 };
         nav('tasks');
         setTimeout(() => {
-          try { document.dispatchEvent(new CustomEvent('pc:tasks-restore', { detail: restore || {} })); } catch(_) {}
+          try { document.dispatchEvent(new CustomEvent('pc:tasks-restore', { detail: restore || {} })); } catch (_) { }
         }, 80);
         return;
       }
@@ -710,7 +710,7 @@
         const restore = window._dashboardReturn || { scroll: 0 };
         nav('dashboard');
         setTimeout(() => {
-          try { 
+          try {
             // Restore dashboard scroll position
             if (restore.scroll && restore.scroll > 0) {
               window.scrollTo(0, restore.scroll);
@@ -727,7 +727,7 @@
             // Dispatch dashboard restore event
             document.dispatchEvent(new CustomEvent('pc:dashboard-restore', { detail: restore || {} }));
             console.log('[Task Detail] Restored dashboard state:', restore);
-          } catch(_) {}
+          } catch (_) { }
         }, 80);
         return;
       }
@@ -735,13 +735,13 @@
       // Fallback: go to tasks
       nav('tasks');
     } catch (e) {
-      try { window.crm && window.crm.navigateToPage && window.crm.navigateToPage('tasks'); } catch(_) {}
+      try { window.crm && window.crm.navigateToPage && window.crm.navigateToPage('tasks'); } catch (_) { }
     }
   }
 
   async function handleTaskComplete() {
     if (!state.currentTask) return;
-    
+
     // CRITICAL: Verify ownership before deletion
     if (!isAdmin()) {
       const email = getUserEmail();
@@ -749,7 +749,7 @@
       const ownerId = (task.ownerId || '').toLowerCase();
       const assignedTo = (task.assignedTo || '').toLowerCase();
       const createdBy = (task.createdBy || '').toLowerCase();
-      
+
       if (ownerId !== email && assignedTo !== email && createdBy !== email) {
         console.error('[TaskDetail] User does not have permission to complete this task');
         if (window.crm && typeof window.crm.showToast === 'function') {
@@ -758,12 +758,12 @@
         return;
       }
     }
-    
+
     // Get updated notes from the form
     const callNotesEl = document.getElementById('call-notes');
     const updatedNotes = callNotesEl ? callNotesEl.value.trim() : '';
     const finalNotes = updatedNotes || state.currentTask.notes || '';
-    
+
     // Save notes to recent activities if there are any
     if (finalNotes) {
       try {
@@ -772,14 +772,14 @@
         console.warn('Could not save notes to recent activity:', e);
       }
     }
-    
+
     // Remove from localStorage completely (use namespaced key)
     try {
       const key = getUserTasksKey();
       const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
       const filteredTasks = userTasks.filter(t => t.id !== state.currentTask.id);
       localStorage.setItem(key, JSON.stringify(filteredTasks));
-      
+
       // Also clean up legacy key
       const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
       const filteredLegacy = legacyTasks.filter(t => t.id !== state.currentTask.id);
@@ -787,7 +787,7 @@
     } catch (e) {
       console.warn('Could not remove task from localStorage:', e);
     }
-    
+
     // Delete from Firebase completely (with ownership check)
     try {
       if (window.firebaseDB) {
@@ -795,26 +795,26 @@
           .where('id', '==', state.currentTask.id)
           .limit(1)
           .get();
-        
+
         if (!snapshot.empty) {
           const doc = snapshot.docs[0];
           const data = doc.data();
-          
+
           // Verify ownership before deletion
           if (!isAdmin()) {
             const email = getUserEmail();
             const ownerId = (data.ownerId || '').toLowerCase();
             const assignedTo = (data.assignedTo || '').toLowerCase();
             const createdBy = (data.createdBy || '').toLowerCase();
-            
+
             if (ownerId !== email && assignedTo !== email && createdBy !== email) {
               console.error('[TaskDetail] User does not have permission to delete this task');
               return;
             }
           }
-          
+
           await doc.ref.delete();
-          
+
           // CRITICAL FIX: Invalidate cache after deletion to prevent stale data
           if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
             await window.CacheManager.invalidate('tasks');
@@ -825,12 +825,12 @@
     } catch (e) {
       console.warn('Could not delete task from Firebase:', e);
     }
-    
+
     // Show success message
     if (window.crm && typeof window.crm.showToast === 'function') {
       window.crm.showToast('Task completed successfully');
     }
-    
+
     // Refresh Today's Tasks widget
     try {
       if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
@@ -839,7 +839,7 @@
     } catch (e) {
       console.warn('Could not refresh Today\'s Tasks widget:', e);
     }
-    
+
     // CRITICAL FIX: Invalidate cache after task completion to prevent stale data
     try {
       if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
@@ -849,17 +849,17 @@
     } catch (cacheError) {
       console.warn('[TaskDetail] Failed to invalidate cache:', cacheError);
     }
-    
+
     // Trigger tasks updated event for other components
-    window.dispatchEvent(new CustomEvent('tasksUpdated', { 
-      detail: { source: 'taskCompletion' } 
+    window.dispatchEvent(new CustomEvent('tasksUpdated', {
+      detail: { source: 'taskCompletion' }
     }));
-    
+
     // Navigate to next task instead of going back
     try {
       // Clean up any existing avatars/icons before navigation
       cleanupExistingAvatarsAndIcons();
-      
+
       // Small delay to ensure task deletion has been processed
       await new Promise(resolve => setTimeout(resolve, 100));
       await navigateToAdjacentTask('next');
@@ -878,7 +878,7 @@
   // Save task notes to recent activities
   async function saveTaskNotesToRecentActivity(task, notes) {
     if (!notes || !window.firebaseDB) return;
-    
+
     try {
       const activityData = {
         type: 'task_completed',
@@ -893,13 +893,13 @@
         createdAt: new Date(),
         userId: window.currentUser?.uid || 'anonymous'
       };
-      
+
       // Save to Firebase activities collection
       await window.firebaseDB.collection('activities').add({
         ...activityData,
         timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
       });
-      
+
       console.log('Task notes saved to recent activities:', activityData);
     } catch (error) {
       console.error('Error saving task notes to recent activities:', error);
@@ -908,38 +908,38 @@
 
   async function navigateToAdjacentTask(direction) {
     if (!state.currentTask) return;
-    
+
     // Prevent multiple rapid clicks
     if (state.navigating) {
       console.log('Navigation already in progress, ignoring click');
       return;
     }
-    
+
     state.navigating = true;
-    
+
     try {
       // Get all tasks from the same source (localStorage + Firebase) with ownership filtering
       let allTasks = [];
-      
+
       // Load from localStorage (with ownership filtering)
       try {
         const key = getUserTasksKey();
         const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
         allTasks = filterTasksByOwnership(userTasks);
-        
+
         // Fallback to legacy key
         if (allTasks.length === 0) {
           const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
           allTasks = filterTasksByOwnership(legacyTasks);
         }
       } catch (_) { allTasks = []; }
-      
+
       // Load from BackgroundTasksLoader (cache-first, cost-efficient)
       if (window.BackgroundTasksLoader) {
         try {
           const cachedTasks = window.BackgroundTasksLoader.getTasksData() || [];
           const filteredCached = filterTasksByOwnership(cachedTasks);
-          
+
           // Merge with localStorage (local takes precedence for duplicates)
           const allTasksMap = new Map();
           allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
@@ -949,12 +949,12 @@
           console.warn('Could not load tasks from BackgroundTasksLoader:', e);
         }
       }
-      
+
       // Only query Firebase if BackgroundTasksLoader doesn't have enough data
       if (allTasks.length < 10 && window.firebaseDB) {
         try {
           let firebaseTasks = [];
-          
+
           if (!isAdmin()) {
             const email = getUserEmail();
             if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
@@ -974,7 +974,7 @@
                   .limit(100)
                   .get()
               ]);
-              
+
               const tasksMap = new Map();
               ownedSnap.docs.forEach(doc => {
                 const data = doc.data();
@@ -1010,7 +1010,7 @@
               return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
             });
           }
-          
+
           // Merge with existing tasks
           const allTasksMap = new Map();
           allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
@@ -1020,11 +1020,11 @@
           console.warn('Could not load tasks from Firebase for navigation:', e);
         }
       }
-      
+
       // Filter to today's and overdue pending tasks (same logic as Today's Tasks widget)
       const today = new Date();
       const localMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      
+
       const parseDateStrict = (dateStr) => {
         if (!dateStr) return null;
         try {
@@ -1040,14 +1040,14 @@
         } catch (_) { /* noop */ }
         return null;
       };
-      
+
       const todaysTasks = allTasks.filter(task => {
         if ((task.status || 'pending') !== 'pending') return false;
         const d = parseDateStrict(task.dueDate);
         if (!d) return false;
         return d.getTime() <= localMidnight.getTime();
       });
-      
+
       // Sort by due date/time (earliest to latest)
       todaysTasks.sort((a, b) => {
         const da = parseDateStrict(a.dueDate);
@@ -1060,7 +1060,7 @@
         } else if (!da && db) {
           return 1;
         }
-        
+
         const parseTimeToMinutes = (timeStr) => {
           if (!timeStr || typeof timeStr !== 'string') return NaN;
           const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -1072,7 +1072,7 @@
           if (ap === 'PM') h += 12;
           return h * 60 + mins;
         };
-        
+
         const ta = parseTimeToMinutes(a.dueTime);
         const tb = parseTimeToMinutes(b.dueTime);
         const taValid = !isNaN(ta), tbValid = !isNaN(tb);
@@ -1083,13 +1083,13 @@
         } else if (!taValid && tbValid) {
           return 1;
         }
-        
+
         return (a.createdAt || 0) - (b.createdAt || 0);
       });
-      
+
       // Find current task index
       const currentIndex = todaysTasks.findIndex(task => task.id === state.currentTask.id);
-      
+
       // If current task not found (e.g., just completed), find the appropriate next task
       let targetIndex;
       if (currentIndex === -1) {
@@ -1109,21 +1109,21 @@
           targetIndex = currentIndex - 1;
         }
       }
-      
+
       // Check bounds - don't navigate if at the end
       if (targetIndex < 0 || targetIndex >= todaysTasks.length) {
         console.log(`Navigation ${direction} blocked: targetIndex ${targetIndex}, total tasks ${todaysTasks.length}`);
         return;
       }
-      
+
       // Navigate to the target task
       const targetTask = todaysTasks[targetIndex];
       if (targetTask && targetTask.id) {
         console.log(`Navigating ${direction} from task ${currentIndex} to task ${targetIndex}: ${targetTask.title}`);
-        
+
         // Clean up any existing avatars/icons before loading new task
         cleanupExistingAvatarsAndIcons();
-        
+
         // CRITICAL FIX: Add error handling for navigation
         try {
           // Load the target task data directly instead of calling TaskDetail.open
@@ -1137,7 +1137,7 @@
           // Don't navigate away - stay on current task
         }
       }
-      
+
     } catch (error) {
       console.error('Error navigating to adjacent task:', error);
       // Show user-friendly error
@@ -1154,35 +1154,35 @@
 
   async function updateNavigationButtons() {
     if (!state.currentTask) return;
-    
+
     const prevBtn = document.getElementById('task-prev-btn');
     const nextBtn = document.getElementById('task-next-btn');
-    
+
     if (!prevBtn || !nextBtn) return;
-    
+
     try {
       // Get all tasks (same logic as navigation) with ownership filtering
       let allTasks = [];
-      
+
       // Load from localStorage (with ownership filtering)
       try {
         const key = getUserTasksKey();
         const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
         allTasks = filterTasksByOwnership(userTasks);
-        
+
         // Fallback to legacy key
         if (allTasks.length === 0) {
           const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
           allTasks = filterTasksByOwnership(legacyTasks);
         }
       } catch (_) { allTasks = []; }
-      
+
       // Load from BackgroundTasksLoader (cache-first, cost-efficient)
       if (window.BackgroundTasksLoader) {
         try {
           const cachedTasks = window.BackgroundTasksLoader.getTasksData() || [];
           const filteredCached = filterTasksByOwnership(cachedTasks);
-          
+
           // Merge with localStorage (local takes precedence for duplicates)
           const allTasksMap = new Map();
           allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
@@ -1192,12 +1192,12 @@
           console.warn('Could not load tasks from BackgroundTasksLoader:', e);
         }
       }
-      
+
       // Only query Firebase if BackgroundTasksLoader doesn't have enough data
       if (allTasks.length < 10 && window.firebaseDB) {
         try {
           let firebaseTasks = [];
-          
+
           if (!isAdmin()) {
             const email = getUserEmail();
             if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
@@ -1217,7 +1217,7 @@
                   .limit(100)
                   .get()
               ]);
-              
+
               const tasksMap = new Map();
               ownedSnap.docs.forEach(doc => {
                 const data = doc.data();
@@ -1253,7 +1253,7 @@
               return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
             });
           }
-          
+
           // Merge with existing tasks
           const allTasksMap = new Map();
           allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
@@ -1263,11 +1263,11 @@
           console.warn('Could not load tasks from Firebase for navigation buttons:', e);
         }
       }
-      
+
       // Filter to today's and overdue pending tasks
       const today = new Date();
       const localMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      
+
       const parseDateStrict = (dateStr) => {
         if (!dateStr) return null;
         try {
@@ -1283,14 +1283,14 @@
         } catch (_) { /* noop */ }
         return null;
       };
-      
+
       const todaysTasks = allTasks.filter(task => {
         if ((task.status || 'pending') !== 'pending') return false;
         const d = parseDateStrict(task.dueDate);
         if (!d) return false;
         return d.getTime() <= localMidnight.getTime();
       });
-      
+
       // Sort by due date/time (same logic as navigation)
       todaysTasks.sort((a, b) => {
         const da = parseDateStrict(a.dueDate);
@@ -1303,7 +1303,7 @@
         } else if (!da && db) {
           return 1;
         }
-        
+
         const parseTimeToMinutes = (timeStr) => {
           if (!timeStr || typeof timeStr !== 'string') return NaN;
           const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -1315,7 +1315,7 @@
           if (ap === 'PM') h += 12;
           return h * 60 + mins;
         };
-        
+
         const ta = parseTimeToMinutes(a.dueTime);
         const tb = parseTimeToMinutes(b.dueTime);
         const taValid = !isNaN(ta), tbValid = !isNaN(tb);
@@ -1326,13 +1326,13 @@
         } else if (!taValid && tbValid) {
           return 1;
         }
-        
+
         return (a.createdAt || 0) - (b.createdAt || 0);
       });
-      
+
       // Find current task index
       const currentIndex = todaysTasks.findIndex(task => task.id === state.currentTask.id);
-      
+
       // Update button states
       if (currentIndex === -1) {
         // Current task not found in filtered list
@@ -1343,7 +1343,7 @@
         prevBtn.disabled = currentIndex === 0;
         nextBtn.disabled = currentIndex === todaysTasks.length - 1;
       }
-      
+
     } catch (error) {
       console.error('Error updating navigation buttons:', error);
       // Disable both buttons on error
@@ -1358,22 +1358,22 @@
       console.warn('[TaskDetail] Task load already in progress, skipping duplicate call');
       return;
     }
-    
+
     if (!taskId) {
       console.error('[TaskDetail] No taskId provided to loadTaskData');
       showTaskError('No task ID provided');
       return;
     }
-    
+
     state.loadingTask = true;
-    
+
     try {
       // CRITICAL: Re-initialize DOM refs to ensure els.content exists
       if (!initDomRefs()) {
         console.warn('[TaskDetail] DOM not ready, retrying...');
         // CRITICAL FIX: Reset loading flag before retry to prevent deadlock
         state.loadingTask = false;
-        
+
         // Retry after a short delay (max 5 attempts)
         let retryCount = 0;
         const maxRetries = 5;
@@ -1395,164 +1395,164 @@
         retry();
         return;
       }
-      
+
       // Load task from localStorage and Firebase with ownership filtering
       let task = null;
-    
-    // Try localStorage first (with ownership filtering)
-    try {
-      const key = getUserTasksKey();
-      const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
-      const filteredTasks = filterTasksByOwnership(userTasks);
-      task = filteredTasks.find(t => t.id === taskId);
-      
-      // Fallback to legacy key if not found
-      if (!task) {
-        const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-        const filteredLegacy = filterTasksByOwnership(legacyTasks);
-        task = filteredLegacy.find(t => t.id === taskId);
-      }
-    } catch (e) {
-      console.warn('Could not load task from localStorage:', e);
-    }
-    
-    // If not found, try pre-loaded essential data (with ownership filtering)
-    if (!task && window._essentialTasksData) {
-      const filteredEssential = filterTasksByOwnership(window._essentialTasksData);
-      task = filteredEssential.find(t => t.id === taskId);
-      if (task) {
-        console.log('[TaskDetail] Using pre-loaded task data');
-      }
-    }
-    
-    // If not found, try BackgroundTasksLoader (cache-first, cost-efficient)
-    if (!task && window.BackgroundTasksLoader) {
+
+      // Try localStorage first (with ownership filtering)
       try {
-        const allTasks = window.BackgroundTasksLoader.getTasksData() || [];
-        const filteredTasks = filterTasksByOwnership(allTasks);
+        const key = getUserTasksKey();
+        const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
+        const filteredTasks = filterTasksByOwnership(userTasks);
         task = filteredTasks.find(t => t.id === taskId);
-        if (task) {
-          console.log('[TaskDetail] Using BackgroundTasksLoader cached data');
+
+        // Fallback to legacy key if not found
+        if (!task) {
+          const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+          const filteredLegacy = filterTasksByOwnership(legacyTasks);
+          task = filteredLegacy.find(t => t.id === taskId);
         }
       } catch (e) {
-        console.warn('Could not load task from BackgroundTasksLoader:', e);
+        console.warn('Could not load task from localStorage:', e);
       }
-    }
-    
-    // If not found, try Firebase (with ownership filtering)
-    if (!task && window.firebaseDB) {
-      try {
-        console.log('Loading task from Firebase:', taskId);
-        
-        // Use ownership-aware query for non-admin users
-        if (!isAdmin()) {
-          const email = getUserEmail();
-          if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
-            const allTasks = await window.DataManager.queryWithOwnership('tasks');
-            task = allTasks.find(t => t.id === taskId);
-          } else if (email) {
-            // Fallback: two separate queries
-            const [ownedSnap, assignedSnap] = await Promise.all([
-              window.firebaseDB.collection('tasks')
-                .where('id', '==', taskId)
-                .where('ownerId', '==', email)
-                .limit(1)
-                .get(),
-              window.firebaseDB.collection('tasks')
-                .where('id', '==', taskId)
-                .where('assignedTo', '==', email)
-                .limit(1)
-                .get()
-            ]);
-            
-            if (!ownedSnap.empty) {
-              const doc = ownedSnap.docs[0];
-              const data = doc.data();
-              task = { ...data, id: data.id || doc.id };
-            } else if (!assignedSnap.empty) {
-              const doc = assignedSnap.docs[0];
+
+      // If not found, try pre-loaded essential data (with ownership filtering)
+      if (!task && window._essentialTasksData) {
+        const filteredEssential = filterTasksByOwnership(window._essentialTasksData);
+        task = filteredEssential.find(t => t.id === taskId);
+        if (task) {
+          console.log('[TaskDetail] Using pre-loaded task data');
+        }
+      }
+
+      // If not found, try BackgroundTasksLoader (cache-first, cost-efficient)
+      if (!task && window.BackgroundTasksLoader) {
+        try {
+          const allTasks = window.BackgroundTasksLoader.getTasksData() || [];
+          const filteredTasks = filterTasksByOwnership(allTasks);
+          task = filteredTasks.find(t => t.id === taskId);
+          if (task) {
+            console.log('[TaskDetail] Using BackgroundTasksLoader cached data');
+          }
+        } catch (e) {
+          console.warn('Could not load task from BackgroundTasksLoader:', e);
+        }
+      }
+
+      // If not found, try Firebase (with ownership filtering)
+      if (!task && window.firebaseDB) {
+        try {
+          console.log('Loading task from Firebase:', taskId);
+
+          // Use ownership-aware query for non-admin users
+          if (!isAdmin()) {
+            const email = getUserEmail();
+            if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+              const allTasks = await window.DataManager.queryWithOwnership('tasks');
+              task = allTasks.find(t => t.id === taskId);
+            } else if (email) {
+              // Fallback: two separate queries
+              const [ownedSnap, assignedSnap] = await Promise.all([
+                window.firebaseDB.collection('tasks')
+                  .where('id', '==', taskId)
+                  .where('ownerId', '==', email)
+                  .limit(1)
+                  .get(),
+                window.firebaseDB.collection('tasks')
+                  .where('id', '==', taskId)
+                  .where('assignedTo', '==', email)
+                  .limit(1)
+                  .get()
+              ]);
+
+              if (!ownedSnap.empty) {
+                const doc = ownedSnap.docs[0];
+                const data = doc.data();
+                task = { ...data, id: data.id || doc.id };
+              } else if (!assignedSnap.empty) {
+                const doc = assignedSnap.docs[0];
+                const data = doc.data();
+                task = { ...data, id: data.id || doc.id };
+              }
+            }
+          } else {
+            // Admin: unrestricted query
+            const snapshot = await window.firebaseDB.collection('tasks')
+              .where('id', '==', taskId)
+              .limit(1)
+              .get();
+
+            if (!snapshot.empty) {
+              const doc = snapshot.docs[0];
               const data = doc.data();
               task = { ...data, id: data.id || doc.id };
             }
           }
-        } else {
-          // Admin: unrestricted query
-          const snapshot = await window.firebaseDB.collection('tasks')
-            .where('id', '==', taskId)
-            .limit(1)
-            .get();
-          
-          if (!snapshot.empty) {
-            const doc = snapshot.docs[0];
-            const data = doc.data();
-            task = { ...data, id: data.id || doc.id };
+
+          if (task) {
+            const createdAt = task.createdAt || (task.timestamp && typeof task.timestamp.toDate === 'function' ?
+              task.timestamp.toDate().getTime() : task.timestamp) || Date.now();
+            task.createdAt = createdAt;
+            task.status = task.status || 'pending';
           }
+        } catch (error) {
+          console.warn('Could not load task from Firebase:', error);
         }
-        
-        if (task) {
-          const createdAt = task.createdAt || (task.timestamp && typeof task.timestamp.toDate === 'function' ? 
-            task.timestamp.toDate().getTime() : task.timestamp) || Date.now();
-          task.createdAt = createdAt;
-          task.status = task.status || 'pending';
-        }
-      } catch (error) {
-        console.warn('Could not load task from Firebase:', error);
       }
-    }
-    
-    if (!task) {
-      console.error('Task not found:', taskId);
 
-      // CRITICAL FIX: Treat this as a stale/ghost task and clean it up locally
+      if (!task) {
+        console.error('Task not found:', taskId);
+
+        // CRITICAL FIX: Treat this as a stale/ghost task and clean it up locally
+        try {
+          cleanupStaleTask(taskId);
+        } catch (_) { }
+
+        showTaskError('Task not found or you do not have access to this task.');
+        state.loadingTask = false;
+        return;
+      }
+
+      // CRITICAL FIX: Validate task data before normalization
+      if (typeof task !== 'object' || !task.id) {
+        console.error('[TaskDetail] Invalid task data:', task);
+        showTaskError('Invalid task data. Please refresh the page.');
+        state.loadingTask = false;
+        return;
+      }
+
+      // Normalize legacy task shapes/titles/types
+      const normType = (t) => {
+        const s = String(t || '').toLowerCase().trim();
+        if (s === 'phone call' || s === 'phone' || s === 'call') return 'phone-call';
+        if (s === 'manual email' || s === 'email' || s === 'manual-email') return 'manual-email';
+        if (s === 'auto email' || s === 'automatic email' || s === 'auto-email') return 'auto-email';
+        if (s === 'follow up' || s === 'follow-up') return 'follow-up';
+        if (s === 'custom task' || s === 'custom-task' || s === 'task') return 'custom-task';
+        if (s === 'demo') return 'demo';
+        if (s === 'li-connect' || s === 'linkedin-connect' || s === 'linkedin - send connection request') return 'li-connect';
+        if (s === 'li-message' || s === 'linkedin-message' || s === 'linkedin - send message') return 'li-message';
+        if (s === 'li-view-profile' || s === 'linkedin-view' || s === 'linkedin - view profile') return 'li-view-profile';
+        if (s === 'li-interact-post' || s === 'linkedin-interact' || s === 'linkedin - interact with post') return 'li-interact-post';
+        return t || 'custom-task';
+      };
+      task.type = normType(task.type);
+      // Upgrade legacy title like "Task — Name" to descriptive form
       try {
-        cleanupStaleTask(taskId);
-      } catch (_) {}
+        const looksLegacy = /^task\s+[—-]\s+/i.test(String(task.title || ''));
+        if (looksLegacy && window.crm && typeof window.crm.buildTaskTitle === 'function') {
+          task.title = window.crm.buildTaskTitle(task.type, task.contact || '', task.account || '');
+        }
+      } catch (_) { }
 
-      showTaskError('Task not found or you do not have access to this task.');
-      state.loadingTask = false;
-      return;
-    }
-    
-    // CRITICAL FIX: Validate task data before normalization
-    if (typeof task !== 'object' || !task.id) {
-      console.error('[TaskDetail] Invalid task data:', task);
-      showTaskError('Invalid task data. Please refresh the page.');
-      state.loadingTask = false;
-      return;
-    }
-    
-    // Normalize legacy task shapes/titles/types
-    const normType = (t)=>{
-      const s = String(t||'').toLowerCase().trim();
-      if (s === 'phone call' || s === 'phone' || s === 'call') return 'phone-call';
-      if (s === 'manual email' || s === 'email' || s === 'manual-email') return 'manual-email';
-      if (s === 'auto email' || s === 'automatic email' || s === 'auto-email') return 'auto-email';
-      if (s === 'follow up' || s === 'follow-up') return 'follow-up';
-      if (s === 'custom task' || s === 'custom-task' || s === 'task') return 'custom-task';
-      if (s === 'demo') return 'demo';
-      if (s === 'li-connect' || s === 'linkedin-connect' || s === 'linkedin - send connection request') return 'li-connect';
-      if (s === 'li-message' || s === 'linkedin-message' || s === 'linkedin - send message') return 'li-message';
-      if (s === 'li-view-profile' || s === 'linkedin-view' || s === 'linkedin - view profile') return 'li-view-profile';
-      if (s === 'li-interact-post' || s === 'linkedin-interact' || s === 'linkedin - interact with post') return 'li-interact-post';
-      return t || 'custom-task';
-    };
-    task.type = normType(task.type);
-    // Upgrade legacy title like "Task — Name" to descriptive form
-    try {
-      const looksLegacy = /^task\s+[—-]\s+/i.test(String(task.title||''));
-      if (looksLegacy && window.crm && typeof window.crm.buildTaskTitle==='function') {
-        task.title = window.crm.buildTaskTitle(task.type, task.contact||'', task.account||'');
-      }
-    } catch(_) {}
+      state.currentTask = task;
+      state.taskType = task.type;
 
-    state.currentTask = task;
-    state.taskType = task.type;
-    
-    // Load contact/account data
-    loadContactAccountData(task);
-    
-    // Render the task page
-    renderTaskPage();
+      // Load contact/account data
+      loadContactAccountData(task);
+
+      // Render the task page
+      renderTaskPage();
     } catch (error) {
       console.error('[TaskDetail] Error loading task data:', error);
       showTaskError('Failed to load task. Please try again.');
@@ -1560,7 +1560,7 @@
       state.loadingTask = false;
     }
   }
-  
+
   // CRITICAL FIX: Helper function to show errors even if DOM isn't ready
   function showTaskError(message) {
     try {
@@ -1589,7 +1589,7 @@
   // CRITICAL FIX: Clean up stale tasks that can no longer be loaded
   function cleanupStaleTask(taskId) {
     if (!taskId) return;
-    
+
     try {
       // Remove from namespaced localStorage key
       try {
@@ -1600,7 +1600,7 @@
       } catch (e) {
         console.warn('[TaskDetail] Failed to remove stale task from namespaced localStorage:', e);
       }
-      
+
       // Also clean up legacy key
       try {
         const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
@@ -1609,7 +1609,7 @@
       } catch (e) {
         console.warn('[TaskDetail] Failed to remove stale task from legacy localStorage:', e);
       }
-      
+
       // Best-effort cache cleanup so BackgroundTasksLoader won't keep returning the ghost task
       try {
         if (window.CacheManager && typeof window.CacheManager.deleteRecord === 'function') {
@@ -1621,16 +1621,16 @@
       } catch (e) {
         console.warn('[TaskDetail] Failed to clean up stale task from cache:', e);
       }
-      
+
       // Notify other pages (Tasks page, dashboard widget) to refresh their task lists
       try {
-        window.dispatchEvent(new CustomEvent('tasksUpdated', { 
+        window.dispatchEvent(new CustomEvent('tasksUpdated', {
           detail: { source: 'staleCleanup', taskId }
         }));
       } catch (e) {
         console.warn('[TaskDetail] Failed to dispatch tasksUpdated for stale task cleanup:', e);
       }
-      
+
       console.log('[TaskDetail] Cleaned up stale task locally:', taskId);
     } catch (e) {
       console.warn('[TaskDetail] Unexpected error during stale task cleanup:', e);
@@ -1638,16 +1638,107 @@
   }
 
   function loadContactAccountData(task) {
+    if (!task) return;
+
     // Load contact data if available
-    if (task.contactId) {
-      // TODO: Load contact from people data
-      console.log('Loading contact:', task.contactId);
+    if (task.contactId || task.contact) {
+      try {
+        // Try to get contact from global data sources
+        let contact = null;
+
+        // Method 1: Try getPeopleData() if available
+        if (typeof window.getPeopleData === 'function') {
+          const people = window.getPeopleData() || [];
+
+          // Try to find by contactId first
+          if (task.contactId) {
+            contact = people.find(p => p.id === task.contactId);
+          }
+
+          // Fallback: try to find by name
+          if (!contact && task.contact) {
+            contact = people.find(p => {
+              const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+              return fullName && fullName.toLowerCase() === String(task.contact).toLowerCase();
+            });
+          }
+        }
+
+        // Method 2: Try BackgroundContactsLoader if available
+        if (!contact && window.BackgroundContactsLoader) {
+          const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+
+          if (task.contactId) {
+            contact = contacts.find(c => c.id === task.contactId);
+          }
+
+          if (!contact && task.contact) {
+            contact = contacts.find(c => {
+              const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || c.name || '';
+              return fullName && fullName.toLowerCase() === String(task.contact).toLowerCase();
+            });
+          }
+        }
+
+        if (contact) {
+          state.contact = contact;
+          console.log('[TaskDetail] Loaded contact data:', contact.id);
+        } else {
+          console.warn('[TaskDetail] Could not find contact:', task.contactId || task.contact);
+        }
+      } catch (e) {
+        console.warn('[TaskDetail] Error loading contact data:', e);
+      }
     }
-    
+
     // Load account data if available
-    if (task.accountId) {
-      // TODO: Load account from accounts data
-      console.log('Loading account:', task.accountId);
+    if (task.accountId || task.account) {
+      try {
+        let account = null;
+
+        // Method 1: Try getAccountsData() if available
+        if (typeof window.getAccountsData === 'function') {
+          const accounts = window.getAccountsData(true) || []; // forceFullData = true
+
+          // Try to find by accountId first
+          if (task.accountId) {
+            account = accounts.find(a => a.id === task.accountId);
+          }
+
+          // Fallback: try to find by name
+          if (!account && task.account) {
+            account = accounts.find(a => {
+              const accountName = a.name || a.companyName || '';
+              return accountName && accountName.toLowerCase() === String(task.account).toLowerCase();
+            });
+          }
+        }
+
+        // Method 2: Try BackgroundAccountsLoader if available
+        if (!account && window.BackgroundAccountsLoader) {
+          const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+
+          if (task.accountId) {
+            account = accounts.find(a => a.id === task.accountId);
+          }
+
+          if (!account && task.account) {
+            account = accounts.find(a => {
+              const accountName = a.name || a.companyName || '';
+              return accountName && accountName.toLowerCase() === String(task.account).toLowerCase();
+            });
+          }
+        }
+
+        if (account) {
+          state.account = account;
+          console.log('[TaskDetail] Loaded account data:', account.id);
+        } else {
+          console.warn('[TaskDetail] Could not find account:', task.accountId || task.account);
+        }
+      } catch (e) {
+        console.warn('[TaskDetail] Error loading account data:', e);
+      }
     }
   }
 
@@ -1655,7 +1746,7 @@
   function renderAvatarOrIcon(elementSelector, htmlContent, isAvatar = false) {
     const maxRetries = 10;
     let retries = 0;
-    
+
     const tryRender = () => {
       const titleSection = document.querySelector(elementSelector);
       if (titleSection) {
@@ -1666,25 +1757,25 @@
             el.remove();
           }
         });
-        
+
         // Also check for absolutely positioned elements
         const allChildren = titleSection.querySelectorAll('*');
         allChildren.forEach(child => {
-          if (child.style && child.style.position === 'absolute' && 
-              (child.classList.contains('avatar-absolute') || 
-               child.querySelector('.avatar-initials') || 
-               child.querySelector('.company-favicon-header'))) {
+          if (child.style && child.style.position === 'absolute' &&
+            (child.classList.contains('avatar-absolute') ||
+              child.querySelector('.avatar-initials') ||
+              child.querySelector('.company-favicon-header'))) {
             child.remove();
           }
         });
-        
+
         // Add the new element
-        const wrapper = isAvatar 
+        const wrapper = isAvatar
           ? `<span class="avatar-initials avatar-absolute" aria-hidden="true">${htmlContent}</span>`
           : `<div class="company-favicon-header avatar-absolute" aria-hidden="true">${htmlContent}</div>`;
-        
+
         titleSection.insertAdjacentHTML('beforeend', wrapper);
-        
+
         // Add icon-loaded class
         requestAnimationFrame(() => {
           const element = titleSection.querySelector(isAvatar ? '.avatar-initials' : '.company-favicon-header');
@@ -1693,7 +1784,7 @@
             console.log(`[TaskDetail] Successfully rendered ${isAvatar ? 'avatar' : 'icon'}`);
           }
         });
-        
+
         return true;
       } else if (retries < maxRetries) {
         retries++;
@@ -1704,7 +1795,7 @@
         return false;
       }
     };
-    
+
     // Start with a small delay, then retry
     setTimeout(() => {
       requestAnimationFrame(tryRender);
@@ -1715,18 +1806,18 @@
   function cleanupExistingAvatarsAndIcons() {
     const titleSection = document.querySelector('.contact-header-text');
     if (!titleSection) return;
-    
+
     // Remove all possible avatar/icon elements
     const selectors = [
       '.avatar-initials',
-      '.company-favicon-header', 
+      '.company-favicon-header',
       '.avatar-absolute',
       '[class*="avatar"]',
       '[class*="favicon"]',
       '[class*="company-logo"]',
       '[class*="company-icon"]'
     ];
-    
+
     selectors.forEach(selector => {
       const elements = titleSection.querySelectorAll(selector);
       elements.forEach(el => {
@@ -1735,27 +1826,27 @@
         }
       });
     });
-    
+
     // Also check for any absolutely positioned elements that might be avatars
     const allChildren = titleSection.querySelectorAll('*');
     allChildren.forEach(child => {
-      if (child.style && child.style.position === 'absolute' && 
-          (child.classList.contains('avatar-absolute') || 
-           child.querySelector('.avatar-initials') || 
-           child.querySelector('.company-favicon-header') ||
-           child.querySelector('[class*="avatar"]') ||
-           child.querySelector('[class*="favicon"]'))) {
+      if (child.style && child.style.position === 'absolute' &&
+        (child.classList.contains('avatar-absolute') ||
+          child.querySelector('.avatar-initials') ||
+          child.querySelector('.company-favicon-header') ||
+          child.querySelector('[class*="avatar"]') ||
+          child.querySelector('[class*="favicon"]'))) {
         child.remove();
       }
     });
-    
+
     // Force a reflow to ensure DOM is clean
     titleSection.offsetHeight;
   }
 
   function renderTaskPage() {
     if (!state.currentTask) return;
-    
+
     // CRITICAL: Ensure DOM refs are initialized
     if (!els.content) {
       if (!initDomRefs()) {
@@ -1764,12 +1855,12 @@
         return;
       }
     }
-    
+
     // Clean up any existing avatars/icons first
     cleanupExistingAvatarsAndIcons();
-    
+
     injectTaskDetailStyles();
-    
+
     // For phone tasks, add header info based on task type
     if (state.taskType === 'phone-call') {
       // Check if this is an account task or contact task
@@ -1778,7 +1869,7 @@
         const accountName = state.currentTask.account || '';
         const accountId = state.currentTask.accountId || '';
         const account = findAccountByIdOrName(accountId, accountName);
-        
+
         // Prepare company icon/favicon
         const deriveDomain = (input) => {
           try {
@@ -1787,9 +1878,9 @@
             if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
             if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
             return '';
-          } catch(_) { return ''; }
+          } catch (_) { return ''; }
         };
-        const domain = account?.domain ? String(account.domain).replace(/^https?:\/\//,'').replace(/\/$/,'').replace(/^www\./i,'') : deriveDomain(account?.website || '');
+        const domain = account?.domain ? String(account.domain).replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./i, '') : deriveDomain(account?.website || '');
         const logoUrl = account?.logoUrl || '';
         const companyIconSize = 40; // Larger icon for header
         let companyIconHTML = '';
@@ -1797,30 +1888,30 @@
           if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
             companyIconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: companyIconSize });
           }
-        } catch(_) { /* noop */ }
-        
+        } catch (_) { /* noop */ }
+
         // If no icon HTML generated, create a fallback with first letter
         if (!companyIconHTML) {
           const fallbackLetter = accountName ? accountName.charAt(0).toUpperCase() : 'C';
           companyIconHTML = `<div style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: var(--bg-item); border-radius: 6px; font-weight: 600; font-size: 18px; color: var(--text-secondary);">${fallbackLetter}</div>`;
         }
-        
+
         // Update title with company name link
         if (els.title && accountName) {
           const companyLinkHTML = `<a href="#account-details" class="company-link" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(accountName)}">${escapeHtml(accountName)}</a>`;
           els.title.innerHTML = `Call ${companyLinkHTML}`;
         }
-        
+
         // Add company icon/favicon to header using retry helper
         renderAvatarOrIcon('.contact-header-text', companyIconHTML, false);
-        
+
         // Update subtitle
         if (els.subtitle) {
           const dueDate = state.currentTask.dueDate;
           const dueTime = state.currentTask.dueTime;
           els.subtitle.textContent = `Due: ${dueDate} at ${dueTime}`;
         }
-        
+
         // Add location info under title
         let contactInfoEl = document.getElementById('task-contact-info');
         if (!contactInfoEl) {
@@ -1828,19 +1919,19 @@
           contactInfoEl.id = 'task-contact-info';
           contactInfoEl.className = 'task-contact-info';
           contactInfoEl.style.cssText = 'margin-top: 0px; color: var(--text-secondary); font-size: 14px;';
-          
+
           const titleSection = document.querySelector('.contact-header-text');
           const subtitle = document.getElementById('task-detail-subtitle');
           if (titleSection && subtitle) {
             subtitle.insertAdjacentElement('beforebegin', contactInfoEl);
           }
         }
-        
+
         const city = account?.city || account?.locationCity || '';
         const stateVal = account?.state || account?.locationState || '';
         const locationHTML = city && stateVal ? `${escapeHtml(city)}, ${escapeHtml(stateVal)}` : (city || stateVal || '');
         contactInfoEl.innerHTML = `<div class="contact-details-normal">${locationHTML}</div>`;
-        
+
       } else {
         // Contact task header (existing logic)
         const contactName = state.currentTask.contact || '';
@@ -1851,7 +1942,7 @@
         }) : null) || {};
         const title = person.title || '';
         const company = person.companyName || accountName;
-        
+
         // Compute initials for avatar (same logic as people.js)
         const initials = (() => {
           const parts = String(contactName || '').trim().split(/\s+/).filter(Boolean);
@@ -1861,9 +1952,9 @@
           const e = String(person.email || '').trim();
           return e ? e[0].toUpperCase() : '?';
         })();
-        
+
         console.log('Contact task - Contact name:', contactName, 'Initials:', initials);
-        
+
         // Update the main title to include clickable contact name
         if (els.title && contactName) {
           const contactId = person.id || '';
@@ -1871,7 +1962,7 @@
           const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(contactId)}" data-contact-name="${escapeHtml(contactName)}">${escapeHtml(contactName)}</a>`;
           els.title.innerHTML = `Call ${contactLinkHTML}`;
         }
-        
+
         // Create or update contact info element (no avatar here)
         let contactInfoEl = document.getElementById('task-contact-info');
         if (!contactInfoEl) {
@@ -1879,7 +1970,7 @@
           contactInfoEl.id = 'task-contact-info';
           contactInfoEl.className = 'task-contact-info';
           contactInfoEl.style.cssText = 'margin-top: 0px; color: var(--text-secondary); font-size: 14px;';
-          
+
           // Insert between title and subtitle
           const titleSection = document.querySelector('.contact-header-text');
           const subtitle = document.getElementById('task-detail-subtitle');
@@ -1888,10 +1979,10 @@
             subtitle.insertAdjacentElement('beforebegin', contactInfoEl);
           }
         }
-        
+
         // Create contact details content (no avatar here)
         let contactDetailsHTML = '';
-        
+
         if (title && company) {
           const linkedAccount = findAssociatedAccount(person);
           const accountId = linkedAccount?.id || '';
@@ -1905,10 +1996,10 @@
           const companyLink = `<a href="#account-details" class="company-link" id="task-header-company-link" title="View account details" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>`;
           contactDetailsHTML = companyLink;
         }
-        
+
         // Set the contact details content
         contactInfoEl.innerHTML = `<div class="contact-details-normal">${contactDetailsHTML}</div>`;
-        
+
         // Add absolutely positioned avatar to the main title container using retry helper
         // Ensure we have valid initials
         const finalInitials = initials && initials !== '?' ? initials : (contactName ? contactName.charAt(0).toUpperCase() : 'C');
@@ -1920,41 +2011,41 @@
       if (els.title) {
         els.title.textContent = state.currentTask.title;
       }
-      
+
       if (els.subtitle) {
         const dueDate = state.currentTask.dueDate;
         const dueTime = state.currentTask.dueTime;
         els.subtitle.textContent = `Due: ${dueDate} at ${dueTime}`;
       }
     }
-    
+
     // Render task-specific content (split layout similar to Apollo screenshot)
     renderTaskContent();
-    
+
     // Re-attach event handlers after content is rendered (with retry logic)
     const attachHandlers = () => {
       setupCompanyLinkHandlers();
       setupContactLinkHandlers();
-      
+
       // Verify handlers were attached
       const companyLinks = document.querySelectorAll('#task-detail-page .company-link');
       const contactLinks = document.querySelectorAll('#task-detail-page .contact-link');
-      
+
       if (companyLinks.length > 0 || contactLinks.length > 0) {
         console.log(`[TaskDetail] Attached handlers to ${companyLinks.length} company links and ${contactLinks.length} contact links`);
       }
     };
-    
+
     // Immediate attachment
     attachHandlers();
-    
+
     // Retry attachment after a short delay to catch dynamically added elements
     setTimeout(attachHandlers, 100);
     setTimeout(attachHandlers, 300);
-    
+
     // Load widgets
     loadTaskWidgets();
-    
+
     // Load recent activity data for phone tasks
     if (state.taskType === 'phone-call') {
       loadRecentActivityForTask();
@@ -1962,31 +2053,31 @@
 
     // If phone task, embed contact details on the right
     try {
-      if ((state.taskType||'') === 'phone-call') embedContactDetails();
-    } catch (_) {}
-    
+      if ((state.taskType || '') === 'phone-call') embedContactDetails();
+    } catch (_) { }
+
     // Update navigation button states
     updateNavigationButtons();
-    
+
     // Process click-to-call and click-to-email elements
     setTimeout(() => {
       processClickToCallAndEmail();
     }, 100);
-    
+
     // Add event listener for "Log call & complete task" button
     const logCompleteBtn = document.getElementById('log-complete-call');
     if (logCompleteBtn) {
       logCompleteBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        
+
         // Get notes from the form
         const callNotesEl = document.getElementById('call-notes');
         const callPurposeEl = document.getElementById('call-purpose');
-        
+
         if (callNotesEl) {
           const formNotes = callNotesEl.value.trim();
           const purpose = callPurposeEl ? callPurposeEl.value : 'Prospecting Call';
-          
+
           // Update task notes with form data
           if (formNotes) {
             state.currentTask.notes = `${purpose}: ${formNotes}`;
@@ -1994,7 +2085,7 @@
             state.currentTask.notes = `Call purpose: ${purpose}`;
           }
         }
-        
+
         // Complete the task
         await handleTaskComplete();
       });
@@ -2009,7 +2100,7 @@
         e.preventDefault();
         const accountId = link.getAttribute('data-account-id');
         const accountName = link.getAttribute('data-account-name');
-        
+
         // Capture task detail state for back navigation
         if (state.currentTask) {
           window.__taskDetailRestoreData = {
@@ -2020,7 +2111,7 @@
           // Set navigation source for account details
           window._accountNavigationSource = 'task-detail';
         }
-        
+
         if (accountId && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
           try {
             window.AccountDetail.show(accountId);
@@ -2051,12 +2142,12 @@
 
   function renderTaskContent() {
     if (!els.content) return;
-    
+
     const task = state.currentTask;
     const taskType = task.type;
-    
+
     let contentHtml = '';
-    
+
     // Check if this is an account task
     if (isAccountTask(task)) {
       contentHtml = renderAccountTaskContent(task);
@@ -2080,7 +2171,7 @@
           contentHtml = renderGenericTaskContent(task);
       }
     }
-    
+
     els.content.innerHTML = contentHtml;
   }
 
@@ -2088,14 +2179,14 @@
     // Get account information
     const accountName = task.account || '';
     const accountId = task.accountId || '';
-    
+
     // Load the account data
     const account = findAccountByIdOrName(accountId, accountName);
-    
+
     if (!account) {
       return `<div class="task-content"><div class="empty">Account not found: ${escapeHtml(accountName)}</div></div>`;
     }
-    
+
     // Get account fields
     const companyPhone = account.companyPhone || account.phone || account.primaryPhone || account.mainPhone || '';
     const industry = account.industry || '';
@@ -2104,13 +2195,13 @@
     const city = account.city || account.locationCity || '';
     const stateVal = account.state || account.locationState || '';
     const website = account.website || '';
-    
+
     // Energy & contract fields
     const electricitySupplier = account.electricitySupplier || '';
     const annualUsage = account.annualUsage || '';
     const currentRate = account.currentRate || '';
     const contractEndDate = account.contractEndDate || '';
-    
+
     // Prepare company icon using global favicon helper
     const deriveDomain = (input) => {
       try {
@@ -2119,24 +2210,24 @@
         if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
         if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
         return '';
-      } catch(_) { return ''; }
+      } catch (_) { return ''; }
     };
-    const domain = account.domain ? String(account.domain).replace(/^https?:\/\//,'').replace(/\/$/,'').replace(/^www\./i,'') : deriveDomain(website);
+    const domain = account.domain ? String(account.domain).replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./i, '') : deriveDomain(website);
     const logoUrl = account.logoUrl || '';
     let companyIconHTML = '';
     try {
       if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
         companyIconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
       }
-    } catch(_) { /* noop */ }
+    } catch (_) { /* noop */ }
     if (!companyIconHTML) {
       if (window.__pcAccountsIcon) companyIconHTML = window.__pcAccountsIcon();
       else companyIconHTML = `<div class="company-logo-fallback">${accountName ? accountName.charAt(0).toUpperCase() : 'C'}</div>`;
     }
-    
+
     // Render contacts list
     const contactsListHTML = renderAccountContacts(account);
-    
+
     return `
       <div class="main-content">
         <!-- Log Call Card (for phone tasks) -->
@@ -2266,11 +2357,11 @@
     // Get contact information
     const contactName = task.contact || '';
     const accountName = task.account || '';
-    const person = (typeof window.getPeopleData==='function' ? (window.getPeopleData()||[]).find(p=>{
-      const full = [p.firstName,p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+    const person = (typeof window.getPeopleData === 'function' ? (window.getPeopleData() || []).find(p => {
+      const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
       return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
     }) : null) || {};
-    
+
     // Get contact details for the sidebar
     const contactId = person.id || person.contactId || '';
     const email = person.email || '';
@@ -2280,15 +2371,15 @@
     const seniority = person.seniority || '';
     const department = person.department || '';
     const companyName = person.companyName || accountName;
-    
-  // Get account information if available
+
+    // Get account information if available
     const linkedAccount = findAssociatedAccount(person) || null;
-    
+
     // Get location data from both contact and account
     const finalCity = city || linkedAccount?.city || linkedAccount?.locationCity || '';
     const finalState = stateVal || linkedAccount?.state || linkedAccount?.locationState || '';
     const finalIndustry = industry || linkedAccount?.industry || '';
-    
+
     const electricitySupplier = linkedAccount?.electricitySupplier || '';
     const annualUsage = linkedAccount?.annualUsage || '';
     const currentRate = linkedAccount?.currentRate || '';
@@ -2304,16 +2395,16 @@
         if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
         if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
         return '';
-      } catch(_) { return ''; }
+      } catch (_) { return ''; }
     };
-    const domain = linkedAccount?.domain ? String(linkedAccount.domain).replace(/^https?:\/\//,'').replace(/\/$/,'').replace(/^www\./i,'') : deriveDomain(linkedAccount?.website || '');
+    const domain = linkedAccount?.domain ? String(linkedAccount.domain).replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./i, '') : deriveDomain(linkedAccount?.website || '');
     const logoUrl = linkedAccount?.logoUrl || '';
     let companyIconHTML = '';
     try {
       if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
         companyIconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
       }
-    } catch(_) { /* noop */ }
+    } catch (_) { /* noop */ }
     if (!companyIconHTML) {
       if (window.__pcAccountsIcon) companyIconHTML = window.__pcAccountsIcon();
       else companyIconHTML = `<div class="company-logo-fallback">${companyName ? companyName.charAt(0).toUpperCase() : 'C'}</div>`;
@@ -2327,7 +2418,7 @@
     const phoneData = getPrimaryPhoneData(person);
     const { value: primaryPhone, type: phoneType } = phoneData;
     const phones = [person.mobile, person.workDirectPhone, person.otherPhone].filter(Boolean);
-    const phoneList = phones.map(ph=>`<div class="call-row"><button class="btn-secondary" data-call="${ph}">Call</button><span class="call-number">${ph}</span></div>`).join('') || '<div class="empty">No phone numbers on file</div>';
+    const phoneList = phones.map(ph => `<div class="call-row"><button class="btn-secondary" data-call="${ph}">Call</button><span class="call-number">${ph}</span></div>`).join('') || '<div class="empty">No phone numbers on file</div>';
 
     return `
       <div class="main-content">
@@ -2486,7 +2577,7 @@
   function renderLinkedInTaskContent(task) {
     const taskType = task.type;
     let actionText = '';
-    
+
     switch (taskType) {
       case 'li-connect':
         actionText = 'Add on LinkedIn';
@@ -2501,7 +2592,7 @@
         actionText = 'Interact with LinkedIn Post';
         break;
     }
-    
+
     return `
       <div class="task-content">
         <div class="linkedin-task-section">
@@ -2565,12 +2656,12 @@
     if (state.account) {
       loadMapsWidget();
     }
-    
+
     // Load energy health check if account data is available
     if (state.account) {
       loadEnergyHealthCheck();
     }
-    
+
     // Load notes widget
     loadNotesWidget();
   }
@@ -2591,18 +2682,18 @@
   }
 
   // Embed contact detail below-header section into right pane for context
-  function embedContactDetails(){
+  function embedContactDetails() {
     const mount = document.getElementById('task-contact-embed');
     if (!mount) return;
     const contactName = state.currentTask?.contact || '';
-    const people = (typeof window.getPeopleData==='function') ? (window.getPeopleData()||[]) : [];
+    const people = (typeof window.getPeopleData === 'function') ? (window.getPeopleData() || []) : [];
     let contact = null;
     if (state.currentTask?.contactId) {
-      contact = people.find(p => String(p.id||'') === String(state.currentTask.contactId));
+      contact = people.find(p => String(p.id || '') === String(state.currentTask.contactId));
     }
     if (!contact && contactName) {
-      const norm = (s)=>String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
-      contact = people.find(p => norm([p.firstName,p.lastName].filter(Boolean).join(' ')||p.name||'') === norm(contactName));
+      const norm = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      contact = people.find(p => norm([p.firstName, p.lastName].filter(Boolean).join(' ') || p.name || '') === norm(contactName));
     }
     if (!contact) {
       mount.innerHTML = '<div class="empty">Contact not found in local data.</div>';
@@ -2625,29 +2716,29 @@
           <div class="contact-inline">
             <h3 class="section-title">Contact information</h3>
             <div class="info-grid">
-              <div class="info-row"><div class="info-label">EMAIL</div><div class="info-value">${email||'--'}</div></div>
+              <div class="info-row"><div class="info-label">EMAIL</div><div class="info-value">${email || '--'}</div></div>
               <div class="info-row"><div class="info-label">${phoneType.toUpperCase()}</div><div class="info-value">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' '))}" data-contact-id="${escapeHtml(contact.id || '')}" data-account-id="${escapeHtml(contact.accountId || contact.account_id || '')}" data-account-name="${escapeHtml(company)}" data-company-name="${escapeHtml(company)}" data-logo-url="${escapeHtml(contact.logoUrl || '')}" data-city="${escapeHtml(city)}" data-state="${escapeHtml(stateVal)}" data-domain="${escapeHtml(contact.domain || '')}" data-phone-type="${phoneType}">${escapeHtml(primaryPhone)}</span>` : '--'}</div></div>
-              <div class="info-row"><div class="info-label">COMPANY</div><div class="info-value">${company||'--'}</div></div>
-              <div class="info-row"><div class="info-label">CITY</div><div class="info-value">${city||'--'}</div></div>
-              <div class="info-row"><div class="info-label">STATE</div><div class="info-value">${stateVal||'--'}</div></div>
-              <div class="info-row"><div class="info-label">INDUSTRY</div><div class="info-value">${industry||'--'}</div></div>
+              <div class="info-row"><div class="info-label">COMPANY</div><div class="info-value">${company || '--'}</div></div>
+              <div class="info-row"><div class="info-label">CITY</div><div class="info-value">${city || '--'}</div></div>
+              <div class="info-row"><div class="info-label">STATE</div><div class="info-value">${stateVal || '--'}</div></div>
+              <div class="info-row"><div class="info-label">INDUSTRY</div><div class="info-value">${industry || '--'}</div></div>
             </div>
           </div>`;
       }
-    } catch(_) {}
+    } catch (_) { }
   }
 
   // Handle contact phone clicks with proper contact context (same as contact-detail.js)
   function handleContactPhoneClick(phoneElement, person) {
     try {
       console.log('[Task Detail] Contact phone clicked, setting contact context');
-      
+
       // Get the phone type from the data attribute
       const phoneType = phoneElement.getAttribute('data-phone-type') || 'mobile';
-      
+
       // Get the associated account to include logo and domain
       const linkedAccount = findAssociatedAccount(person);
-      
+
       // Get domain from account if available
       const deriveDomain = (input) => {
         try {
@@ -2656,10 +2747,10 @@
           if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
           if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
           return '';
-        } catch(_) { return ''; }
+        } catch (_) { return ''; }
       };
-      const domain = linkedAccount?.domain ? String(linkedAccount.domain).replace(/^https?:\/\//,'').replace(/\/$/,'').replace(/^www\./i,'') : deriveDomain(linkedAccount?.website || '');
-      
+      const domain = linkedAccount?.domain ? String(linkedAccount.domain).replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./i, '') : deriveDomain(linkedAccount?.website || '');
+
       // Build contact context for contact phone calls
       const contextPayload = {
         contactId: person.id || person.contactId || person._id || '',
@@ -2677,27 +2768,27 @@
         suggestedContactId: person.id || person.contactId || person._id || '',
         suggestedContactName: person.name || [person.firstName, person.lastName].filter(Boolean).join(' ') || ''
       };
-      
+
       console.log('[Task Detail] Setting contact phone context:', contextPayload);
-      
+
       // Set the context in the phone widget
       if (window.Widgets && typeof window.Widgets.setCallContext === 'function') {
         window.Widgets.setCallContext(contextPayload);
-        
+
         // Also trigger contact display to show the contact info
         if (window.Widgets && typeof window.Widgets.setContactDisplay === 'function') {
           try {
             window.Widgets.setContactDisplay(contextPayload, '');
-          } catch(_) {}
+          } catch (_) { }
         }
       }
-      
+
       // Mark that we've set a specific context to prevent generic click-to-call from overriding
       try {
         window._pcPhoneContextSetByPage = true;
         setTimeout(() => { window._pcPhoneContextSetByPage = false; }, 1000);
-      } catch(_) {}
-      
+      } catch (_) { }
+
     } catch (error) {
       console.error('[Task Detail] Error setting contact phone context:', error);
     }
@@ -2709,7 +2800,7 @@
     if (window.ClickToCall && typeof window.ClickToCall.processSpecificPhoneElements === 'function') {
       window.ClickToCall.processSpecificPhoneElements();
     }
-    
+
     // Process email addresses
     if (window.ClickToEmail && typeof window.ClickToEmail.processSpecificEmailElements === 'function') {
       window.ClickToEmail.processSpecificEmailElements();
@@ -2720,15 +2811,15 @@
   async function loadRecentActivityForTask() {
     const timelineEl = document.getElementById('task-activity-timeline');
     if (!timelineEl) return;
-    
+
     // Check if this is an account task or contact task
     const isAcctTask = isAccountTask(state.currentTask);
-    
+
     if (isAcctTask) {
       // ACCOUNT TASK - Load account activities
       const accountName = state.currentTask?.account || '';
       const accountId = state.currentTask?.accountId || '';
-      
+
       if (!accountName && !accountId) {
         timelineEl.innerHTML = `
           <div class="activity-placeholder">
@@ -2737,7 +2828,7 @@
         `;
         return;
       }
-      
+
       try {
         if (window.ActivityManager) {
           // Find the account ID
@@ -2746,7 +2837,7 @@
             const account = findAccountByIdOrName('', accountName);
             finalAccountId = account?.id || '';
           }
-          
+
           if (finalAccountId) {
             await window.ActivityManager.renderActivities('task-activity-timeline', 'account', finalAccountId);
             // Ensure activities know they're being clicked from task-detail
@@ -2787,7 +2878,7 @@
     } else {
       // CONTACT TASK - Load contact activities
       const contactName = state.currentTask?.contact || '';
-      
+
       if (!contactName) {
         timelineEl.innerHTML = `
           <div class="activity-placeholder">
@@ -2796,7 +2887,7 @@
         `;
         return;
       }
-      
+
       try {
         // Use ActivityManager to load real activities for the contact
         if (window.ActivityManager) {
@@ -2842,11 +2933,11 @@
       }
     }
   }
-  
+
   // Helper function to find contact ID by name
   function findContactIdByName(contactName) {
     if (!contactName || !window.getPeopleData) return null;
-    
+
     try {
       const contacts = window.getPeopleData() || [];
       const contact = contacts.find(c => {
@@ -2859,7 +2950,7 @@
       return null;
     }
   }
-  
+
   // Get SVG icon for activity type
   function getActivityIcon(type) {
     switch (type) {
@@ -2883,12 +2974,12 @@
     try {
       const allContacts = window.getPeopleData() || [];
       const accountName = account.accountName || account.name || account.companyName;
-      
+
       // Find contacts associated with this account
       const associatedContacts = allContacts.filter(contact => {
         // Check if contact has accountId matching this account
         if (contact.accountId === account.id) return true;
-        
+
         // Check if contact's company name matches this account name
         const contactCompany = contact.companyName || contact.accountName || '';
         return contactCompany.toLowerCase().trim() === accountName.toLowerCase().trim();
@@ -2903,13 +2994,13 @@
         const title = contact.title || '';
         const email = contact.email || '';
         const phone = contact.workDirectPhone || contact.mobile || contact.otherPhone || '';
-        
+
         // Compute initials for avatar
         const parts = fullName.trim().split(/\s+/);
-        const initials = parts.length >= 2 
+        const initials = parts.length >= 2
           ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
           : (parts[0] ? parts[0][0].toUpperCase() : '?');
-        
+
         return `
           <div class="contact-item contact-link" data-contact-id="${escapeHtml(contact.id)}" data-contact-name="${escapeHtml(fullName)}" style="cursor: pointer;">
             <div class="contact-avatar">
@@ -2959,7 +3050,7 @@
     document.addEventListener('mousedown', (e) => {
       const phoneElement = findContactPhoneTarget(e.target);
       if (!phoneElement) return;
-      try { window._pcPhoneContextSetByPage = true; } catch(_) {}
+      try { window._pcPhoneContextSetByPage = true; } catch (_) { }
       const person = resolvePerson();
       if (person && person.id) {
         // Set context early so ClickToCall sees the guard and skips its own context
@@ -2988,14 +3079,14 @@
     document.addEventListener('click', (e) => {
       const contactLink = e.target.closest('.contact-link');
       if (!contactLink) return;
-      
+
       e.preventDefault();
-      
+
       const contactId = contactLink.getAttribute('data-contact-id');
       const contactName = contactLink.getAttribute('data-contact-name');
-      
+
       console.log('[TaskDetail] Contact link clicked:', { contactId, contactName });
-      
+
       // If no contactId, try to find the contact by name
       if (!contactId && contactName) {
         console.log('[TaskDetail] No contactId, searching by name:', contactName);
@@ -3005,7 +3096,7 @@
             const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
             return fullName && contactName && fullName.toLowerCase() === contactName.toLowerCase();
           });
-          
+
           if (contact && contact.id) {
             console.log('[TaskDetail] Found contact by name:', contact.id);
             // Update the link with the found ID
@@ -3024,7 +3115,7 @@
           console.error('[TaskDetail] Error finding contact:', error);
         }
       }
-      
+
       if (contactId && window.ContactDetail) {
         // Capture task detail state for back navigation
         window.__taskDetailRestoreData = {
@@ -3035,20 +3126,20 @@
           scroll: window.scrollY || 0,
           timestamp: Date.now()
         };
-        
+
         // Set navigation source for back button
         window._contactNavigationSource = 'task-detail';
         window._contactNavigationContactId = contactId;
-        
+
         // Navigate to contact detail
         if (window.crm && typeof window.crm.navigateToPage === 'function') {
           window.crm.navigateToPage('people');
-          
+
           // CRITICAL FIX: Use retry pattern with timeout and error handling
           requestAnimationFrame(() => {
             let attempts = 0;
             const maxAttempts = 25; // 2 seconds at 80ms intervals (increased for reliability)
-            
+
             const tryShowContact = () => {
               if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
                 try {
@@ -3069,7 +3160,7 @@
                 }
               }
             };
-            
+
             tryShowContact();
           });
         }
@@ -3080,7 +3171,7 @@
     document.addEventListener('click', (e) => {
       const addContactBtn = e.target.closest('#add-contact-btn');
       if (!addContactBtn) return;
-      
+
       e.preventDefault();
       openAddContactModal();
     });
@@ -3096,23 +3187,23 @@
         // Get account information from the current task
         const accountName = state.currentTask.account || '';
         const accountId = state.currentTask.accountId || '';
-        
+
         // Find the account data to get industry
         const account = findAccountByIdOrName(accountId, accountName);
         const industry = account?.industry || '';
-        
+
         // Pre-fill company name
         const companyInput = modal.querySelector('input[name="companyName"]');
         if (companyInput && accountName) {
           companyInput.value = accountName;
         }
-        
+
         // Pre-fill industry
         const industryInput = modal.querySelector('input[name="industry"]');
         if (industryInput && industry) {
           industryInput.value = industry;
         }
-        
+
         // Set navigation context so after creating the contact we return here
         try {
           window._contactNavigationSource = 'task-detail';
@@ -3125,9 +3216,9 @@
             scroll: window.scrollY || 0,
             timestamp: Date.now()
           };
-        } catch (_) {}
+        } catch (_) { }
       }
-      
+
       // Open the modal using the proper function
       window.crm.createAddContactModal();
     } else {
@@ -3150,7 +3241,7 @@
           const accountName = state.currentTask.account || '';
           const accountId = state.currentTask.accountId || '';
           const account = findAccountByIdOrName(accountId, accountName);
-          
+
           if (account) {
             contactsList.innerHTML = renderAccountContacts(account);
           }
@@ -3164,7 +3255,7 @@
         // Re-render the task page to reflect updated contact information
         console.log('[Task Detail] Contact updated, refreshing task detail page');
         renderTaskPage();
-        
+
         // Re-process click-to-call to ensure context is updated
         setTimeout(() => {
           processClickToCallAndEmail();
@@ -3175,15 +3266,15 @@
 
   // Public API
   window.TaskDetail = {
-    open: async function(taskId, navigationSource = 'tasks') {
+    open: async function (taskId, navigationSource = 'tasks') {
       try {
         // CRITICAL: Capture navigation source BEFORE calling navigateToPage
         // Standardize navigation source detection to match account detail pattern
         const crmPage = (window.crm && window.crm.currentPage) ? String(window.crm.currentPage) : '';
         const active = document.querySelector('.page.active');
-        const domPage = active ? (active.getAttribute('data-page') || active.id || '').replace('-page','') : '';
+        const domPage = active ? (active.getAttribute('data-page') || active.id || '').replace('-page', '') : '';
         let src = navigationSource || crmPage || domPage || 'tasks';
-        
+
         // Normalize aliases
         const alias = {
           'account-detail': 'account-details',
@@ -3192,21 +3283,21 @@
           'contact-details': 'people'
         };
         if (alias[src]) src = alias[src];
-        
+
         // Use single, reliable navigation source pattern like account detail
         window._taskNavigationSource = src;
 
         // Capture comprehensive per-page restore data
-        if (src === 'accounts' && window.accountsModule && typeof window.accountsModule.getCurrentState==='function') {
+        if (src === 'accounts' && window.accountsModule && typeof window.accountsModule.getCurrentState === 'function') {
           // Add small delay to ensure DOM elements are ready
           setTimeout(() => {
             window.__accountsRestoreData = window.accountsModule.getCurrentState();
           }, 50);
-        } else if (src === 'people' && window.peopleModule && typeof window.peopleModule.getCurrentState==='function') {
+        } else if (src === 'people' && window.peopleModule && typeof window.peopleModule.getCurrentState === 'function') {
           window.__peopleRestoreData = window.peopleModule.getCurrentState();
         } else if (src === 'tasks') {
           // Enhanced restore data for Tasks page
-          window.__tasksRestoreData = { 
+          window.__tasksRestoreData = {
             scroll: window.scrollY || 0,
             timestamp: Date.now()
           };
@@ -3222,19 +3313,19 @@
             };
           }
         }
-        
+
       } catch (_) { /* noop */ }
-      
+
       // Navigate to task detail page AFTER capturing navigation source
       if (window.crm && typeof window.crm.navigateToPage === 'function') {
         window.crm.navigateToPage('task-detail');
       }
-      
+
       // Load task data
       await loadTaskData(taskId);
     },
-    
-    init: function() {
+
+    init: function () {
       if (!initDomRefs()) return;
       attachEvents();
       setupContactLinkHandlers();
@@ -3251,7 +3342,7 @@
   }
 
   // Process click-to-call and click-to-email when task detail page loads
-  document.addEventListener('pc:page-loaded', function(e) {
+  document.addEventListener('pc:page-loaded', function (e) {
     if (e.detail && e.detail.page === 'task-detail') {
       setTimeout(() => {
         processClickToCallAndEmail();
@@ -3263,12 +3354,12 @@
   document.addEventListener('pc:task-detail-restore', async (e) => {
     console.log('[TaskDetail] Restore event received:', e.detail);
     const restoreData = e.detail || {};
-    
+
     if (restoreData.taskId) {
       // Don't call TaskDetail.open() - just reload the task data directly
       // This preserves the navigation source that was already set
       await loadTaskData(restoreData.taskId);
-      
+
       // Restore scroll position if available
       if (restoreData.scroll) {
         setTimeout(() => {
