@@ -45,10 +45,12 @@ export default async function handler(req, res) {
       return;
     }
 
-    if (type !== 'signature') {
+    // Accept signature, post-image, or featured-image types
+    const validTypes = ['signature', 'post-image', 'featured-image'];
+    if (!validTypes.includes(type)) {
       console.log('[SignatureUpload] Invalid type:', type);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Invalid upload type' }));
+      res.end(JSON.stringify({ error: 'Invalid upload type. Must be one of: ' + validTypes.join(', ') }));
       return;
     }
 

@@ -41,10 +41,11 @@ export default async function handler(req, res) {
             return;
         }
 
-        const { dryRun } = req.body || {};
+        const { dryRun, forceCreate } = req.body || {};
         const isDryRun = dryRun === true;
+        const isForceCreate = forceCreate === true;
 
-        logAlways(`Starting backfill - Dry run: ${isDryRun}`);
+        logAlways(`Starting backfill - Dry run: ${isDryRun}, Force create: ${isForceCreate}`);
 
         // Get all sequences
         const sequencesSnapshot = await db.collection('sequences').get();
@@ -64,7 +65,7 @@ export default async function handler(req, res) {
 
         logAlways(`Found ${members.length} sequence members`);
 
-        // Get all emails to determine current progress
+        //Get all emails to determine current progress
         const emailsSnapshot = await db.collection('emails')
             .where('type', '==', 'scheduled')
             .get();
@@ -106,7 +107,7 @@ export default async function handler(req, res) {
         for (const member of members) {
             const sequence = sequences.find(s => s.id === member.sequenceId);
             if (!sequence || !sequence.steps || sequence.steps.length === 0) {
-                skipped.push({ memberId: member.id, reason: 'Sequence not found or has no steps' });
+                skipped.push({ memberId: member.id, contactId: member.targetId, sequenceId: member.sequenceId, reason: 'Sequence not found or has no steps' });
                 continue;
             }
 
@@ -118,25 +119,43 @@ export default async function handler(req, res) {
             let currentStepIndex = -1;
             const now = Date.now();
 
-            memberEmails.forEach(email => {
-                const stepIndex = email.stepIndex || 0;
-                const status = email.status || '';
-                const scheduledTime = email.scheduledSendTime || 0;
+            if (isForceCreate && memberEmails.length === 0) {
+                // FORCE MODE: Assume all leading email steps were sent
+                // Find the last email step before first task step
+                for (let i = 0; i < sequence.steps.length; i++) {
+                    const step = sequence.steps[i];
+                    if (step.paused) continue;
 
-                let scheduledTimeMs = scheduledTime;
-                if (scheduledTime && typeof scheduledTime.toDate === 'function') {
-                    scheduledTimeMs = scheduledTime.toDate().getTime();
-                } else if (typeof scheduledTime === 'object' && scheduledTime.seconds) {
-                    scheduledTimeMs = scheduledTime.seconds * 1000;
-                }
-
-                // Step is "reached" if email was sent or is due now
-                if (status === 'sent' || (scheduledTimeMs <= now && status !== 'rejected' && status !== 'cancelled')) {
-                    if (stepIndex > currentStepIndex) {
-                        currentStepIndex = stepIndex;
+                    const isTaskStep = ['phone-call', 'li-connect', 'li-message', 'li-view-profile', 'li-interact-post', 'task'].includes(step.type);
+                    if (isTaskStep) {
+                        // Found first task step - assume all emails before it were sent
+                        currentStepIndex = i - 1;
+                        break;
                     }
                 }
-            });
+                logAlways(`[FORCE] Contact ${member.targetId}: Assuming currentStepIndex = ${currentStepIndex}`);
+            } else {
+                // NORMAL MODE: Determine from email records
+                memberEmails.forEach(email => {
+                    const stepIndex = email.stepIndex || 0;
+                    const status = email.status || '';
+                    const scheduledTime = email.scheduledSendTime || 0;
+
+                    let scheduledTimeMs = scheduledTime;
+                    if (scheduledTime && typeof scheduledTime.toDate === 'function') {
+                        scheduledTimeMs = scheduledTime.toDate().getTime();
+                    } else if (typeof scheduledTime === 'object' && scheduledTime.seconds) {
+                        scheduledTimeMs = scheduledTime.seconds * 1000;
+                    }
+
+                    // Step is "reached" if email was sent or is due now
+                    if (status === 'sent' || (scheduledTimeMs <= now && status !== 'rejected' && status !== 'cancelled')) {
+                        if (stepIndex > currentStepIndex) {
+                            currentStepIndex = stepIndex;
+                        }
+                    }
+                });
+            }
 
             // Find the next step that should have a task
             let nextTaskStepIndex = -1;
