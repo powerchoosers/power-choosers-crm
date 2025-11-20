@@ -81,6 +81,7 @@ import inboundEmailHandler from './api/email/inbound-email.js';
 import generateScheduledEmailsHandler from './api/generate-scheduled-emails.js';
 import sendScheduledEmailsHandler from './api/send-scheduled-emails.js';
 import processSequenceActivationsHandler from './api/process-sequence-activations.js';
+import completeSequenceTaskHandler from './api/complete-sequence-task.js';
 import createBookingHandler from './api/create-booking.js';
 
 // ADDITIONAL IMPORTS FOR REMAINING PROXY FUNCTIONS
@@ -157,20 +158,20 @@ if (process.env.NODE_ENV !== 'production') {
 
 // MIME types for different file extensions
 const mimeTypes = {
-    '.html': 'text/html',
-    '.css': 'text/css',
-    '.js': 'application/javascript',
-    '.json': 'application/json',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.gif': 'image/gif',
-    '.svg': 'image/svg+xml',
-    '.ico': 'image/x-icon',
-    '.woff': 'font/woff',
-    '.woff2': 'font/woff2',
-    '.ttf': 'font/ttf',
-    '.eot': 'application/vnd.ms-fontobject'
+  '.html': 'text/html',
+  '.css': 'text/css',
+  '.js': 'application/javascript',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.eot': 'application/vnd.ms-fontobject'
 };
 
 // Configuration
@@ -182,7 +183,7 @@ const API_BASE_URL = process.env.API_BASE_URL || 'https://power-choosers-crm-792
 
 // Helper function to generate correlation IDs for request tracing
 function getCorrelationId(req) {
-  return req.headers['x-request-id'] || 
+  return req.headers['x-request-id'] ||
     req.headers['x-correlation-id'] ||
     `req-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
@@ -190,7 +191,7 @@ function getCorrelationId(req) {
 // ---------------- Perplexity API endpoint for localhost development ----------------
 
 async function handleApiPerplexityEmail(req, res) {
-  if (req.method === 'OPTIONS') { 
+  if (req.method === 'OPTIONS') {
     const origin = req.headers.origin;
     const allowedOrigins = [
       'http://localhost:3000',
@@ -199,26 +200,26 @@ async function handleApiPerplexityEmail(req, res) {
       'https://www.powerchoosers.com',
       'https://power-choosers-crm-792458658491.us-south1.run.app'
     ];
-    
+
     const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-    
+
     res.writeHead(204, {
       'Access-Control-Allow-Origin': allowedOrigin,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
       'Access-Control-Allow-Credentials': 'true',
       'Vary': 'Origin'
-    }); 
-    res.end(); 
-    return; 
+    });
+    res.end();
+    return;
   }
-  
+
   if (req.method !== 'POST') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
-  
+
   // Ensure body is parsed for POST requests so downstream handler receives req.body
   try {
     req.body = await parseRequestBody(req);
@@ -232,18 +233,18 @@ async function handleApiPerplexityEmail(req, res) {
   try {
     // Import the Vercel function logic
     const { default: perplexityHandler } = await import('./api/perplexity-email.js');
-    
+
     // Create a mock request/response that matches Vercel's format
     const mockReq = {
       method: req.method,
       headers: req.headers,
       body: req.body
     };
-    
+
     const mockRes = {
       writeHead: (code, headers = {}) => {
         // Mirror headers and status to the actual response
-        try { Object.entries(headers).forEach(([k,v]) => res.setHeader(k, v)); } catch(_) {}
+        try { Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v)); } catch (_) { }
         res.statusCode = code;
       },
       status: (code) => ({
@@ -256,10 +257,10 @@ async function handleApiPerplexityEmail(req, res) {
             'https://www.powerchoosers.com',
             'https://power-choosers-crm-792458658491.us-south1.run.app'
           ];
-          
+
           const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-          
-          res.writeHead(code, { 
+
+          res.writeHead(code, {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': allowedOrigin,
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -278,13 +279,13 @@ async function handleApiPerplexityEmail(req, res) {
         res.end(data);
       }
     };
-    
+
     // Call the Vercel function
     await perplexityHandler(mockReq, mockRes);
-    
+
   } catch (error) {
     console.error('[Server] Perplexity API error:', error);
-    res.writeHead(500, { 
+    res.writeHead(500, {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*'
     });
@@ -314,7 +315,7 @@ function readRawBody(req) {
 async function handleApiTwilioVoice(req, res, parsedUrl) {
   const correlationId = getCorrelationId(req);
   logger.debug('Processing Twilio Voice webhook', 'TwilioWebhook', { correlationId, url: req.url });
-  
+
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
@@ -335,7 +336,7 @@ async function handleApiTwilioVoice(req, res, parsedUrl) {
 
   // Add query parameters to req.query for handler
   req.query = { ...parsedUrl.query };
-  
+
   try {
     await twilioVoiceHandler(req, res);
   } catch (error) {
@@ -351,17 +352,17 @@ async function handleApiTwilioVoice(req, res, parsedUrl) {
 async function handleApiTwilioRecording(req, res) {
   const correlationId = getCorrelationId(req);
   logger.debug('Processing Twilio Recording webhook', 'TwilioWebhook', { correlationId, url: req.url });
-  
+
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
       console.error(`[${correlationId}] [Server] Twilio Recording webhook - Body Parse Error:`, error.message, error.stack);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Invalid request body format',
         details: error.message,
-        correlationId 
+        correlationId
       }));
       return;
     }
@@ -374,16 +375,16 @@ async function handleApiTwilioRecording(req, res) {
       }
     }
   }
-  
+
   try {
     await twilioRecordingHandler(req, res);
   } catch (error) {
     console.error(`[${correlationId}] [Server] Twilio Recording handler unhandled error:`, error.name, error.message, error.stack);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Internal server error',
-        correlationId 
+        correlationId
       }));
     }
   }
@@ -428,7 +429,7 @@ async function handleApiTwilioConversationalIntelligenceWebhook(req, res) {
 }
 
 async function handleApiTwilioLanguageWebhook(req, res) {
-    if (req.method === 'POST') {
+  if (req.method === 'POST') {
     req.body = await parseRequestBody(req);
   }
   const parsedUrl = url.parse(req.url, true);
@@ -466,18 +467,18 @@ function readJsonBody(req) {
       }
     });
     req.on('end', () => {
-      try { 
-        try { req.rawBody = data; } catch(_) {}
-        resolve(data ? JSON.parse(data) : {}); 
-      } catch (e) { 
-        logger.error('JSON parse error', 'Server', { 
-          error: e.message, 
-          url: req.url, 
+      try {
+        try { req.rawBody = data; } catch (_) { }
+        resolve(data ? JSON.parse(data) : {});
+      } catch (e) {
+        logger.error('JSON parse error', 'Server', {
+          error: e.message,
+          url: req.url,
           method: req.method,
           contentType: req.headers['content-type'],
           dataLength: data ? data.length : 0
         });
-        reject(e); 
+        reject(e);
       }
     });
     req.on('error', reject);
@@ -511,7 +512,7 @@ function validateTwilioForm(req) {
   if (!sig || !token) return true;
   const urlFull = getExternalUrl(req);
   const params = (req && req.body && typeof req.body === 'object') ? req.body : {};
-  try { return !!twilio.validateRequest(token, sig, urlFull, params); } catch(_) { return false; }
+  try { return !!twilio.validateRequest(token, sig, urlFull, params); } catch (_) { return false; }
 }
 
 function validateTwilioJson(req) {
@@ -520,7 +521,7 @@ function validateTwilioJson(req) {
   if (!sig || !token) return true;
   const urlFull = getExternalUrl(req);
   const raw = typeof req.rawBody === 'string' ? req.rawBody : '';
-  try { return !!twilio.validateRequestBody(token, sig, urlFull, raw); } catch(_) { return false; }
+  try { return !!twilio.validateRequestBody(token, sig, urlFull, raw); } catch (_) { return false; }
 }
 
 // Twilio API endpoints (proxy to Vercel for production APIs)
@@ -541,7 +542,7 @@ async function handleApiTwilioCall(req, res) {
       return;
     }
   }
-  
+
   // Call handler directly (no proxy)
   return await twilioCallHandler(req, res);
 }
@@ -572,11 +573,11 @@ async function handleApiCalls(req, res) {
       return;
     }
   }
-  
+
   // Add query parameters to req.query for handler
   const parsed = url.parse(req.url, true);
   req.query = { ...parsed.query };
-  
+
   // Call handler directly (no proxy)
   return await callsHandler(req, res);
 }
@@ -585,10 +586,10 @@ async function handleApiCallsAccount(req, res, parsedUrl) {
   // Extract accountId from URL path: /api/calls/account/[accountId]
   const pathParts = parsedUrl.pathname.split('/');
   const accountId = pathParts[pathParts.length - 1];
-  
+
   // Add accountId to req.query for handler
   req.query = { accountId, ...parsedUrl.query };
-  
+
   // Call handler directly (no proxy)
   return await accountCallsHandler(req, res);
 }
@@ -605,7 +606,7 @@ async function handleApiCallStatus(req, res, parsedUrl) {
       return;
     }
   }
-  
+
   // Call handler directly (no proxy)
   return await callStatusHandler(req, res);
 }
@@ -643,13 +644,13 @@ const server = http.createServer(async (req, res) => {
     'https://powerchoosers.com',
     'https://www.powerchoosers.com'
   ];
-  
+
   if (allowedOrigins.includes(origin) || LOCAL_DEV_MODE) {
     res.setHeader('Access-Control-Allow-Origin', origin || '*');
   } else {
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
-  
+
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -720,7 +721,7 @@ const server = http.createServer(async (req, res) => {
     res.end();
     return;
   }
-  
+
   // API routes (Twilio integration - proxy to Vercel)
   if (pathname === '/api/twilio/token') {
     return handleApiTwilioToken(req, res, parsedUrl);
@@ -786,7 +787,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/perplexity-email') {
     return handleApiPerplexityEmail(req, res);
   }
-  
+
   // Email tracking routes
   if (pathname === '/api/email/send') {
     return handleApiSendEmail(req, res);
@@ -844,6 +845,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/process-sequence-activations') {
     return handleApiProcessSequenceActivations(req, res);
+  }
+  if (pathname === '/api/complete-sequence-task') {
+    return handleApiCompleteSequenceTask(req, res);
   }
   if (pathname === '/api/process-call') {
     return handleApiProcessCall(req, res);
@@ -928,12 +932,12 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/') {
     pathname = '/crm-dashboard.html';
   }
-  
+
   // Construct file path using the robust __dirname equivalent
   const filePath = path.join(__dirname, pathname);
-  
+
   logger.debug('Attempting to serve static file', 'Server', { filePath });
-  
+
   // Check if file exists first
   if (!fs.existsSync(filePath)) {
     console.error(`[Server] File not found at constructed path: ${filePath}`);
@@ -965,7 +969,7 @@ const server = http.createServer(async (req, res) => {
     `);
     return;
   }
-  
+
   try {
     const data = await fs.promises.readFile(filePath);
     const contentType = getContentType(filePath);
@@ -1031,6 +1035,13 @@ async function handleApiProcessSequenceActivations(req, res) {
   return await processSequenceActivationsHandler(req, res);
 }
 
+async function handleApiCompleteSequenceTask(req, res) {
+  if (req.method === 'POST') {
+    req.body = await parseRequestBody(req);
+  }
+  return await completeSequenceTaskHandler(req, res);
+}
+
 // Process call and track email performance
 async function handleApiProcessCall(req, res) {
   if (req.method === 'POST') {
@@ -1070,7 +1081,7 @@ async function handleApiApolloCompany(req, res, parsedUrl) {
 async function handleApiApolloContacts(req, res, parsedUrl) {
   if (req.method === 'POST') {
     req.body = await parseRequestBody(req);
-}
+  }
   req.query = { ...parsedUrl.query };
   return await apolloContactsHandler(req, res);
 }
@@ -1103,9 +1114,9 @@ async function handleApiUploadHostGoogleAvatar(req, res) {
 
 async function handleApiUploadSignatureImage(req, res) {
   try {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
-  }
+    if (req.method === 'POST') {
+      req.body = await parseRequestBody(req);
+    }
     const result = await uploadSignatureImageHandler(req, res);
     return result;
   } catch (error) {
@@ -1145,10 +1156,10 @@ async function handleApiDebugFirestore(req, res) {
   try {
     // Test basic Firestore access
     const testDoc = await db.collection('debug').doc('test').get();
-    
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      success: true, 
+    res.end(JSON.stringify({
+      success: true,
       message: 'Firestore access working',
       timestamp: new Date().toISOString(),
       docExists: testDoc.exists
@@ -1156,8 +1167,8 @@ async function handleApiDebugFirestore(req, res) {
   } catch (error) {
     console.error('[Debug] Firestore error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      success: false, 
+    res.end(JSON.stringify({
+      success: false,
       error: error.message,
       stack: error.stack,
       timestamp: new Date().toISOString()
@@ -1170,10 +1181,10 @@ async function handleApiCallsContact(req, res, parsedUrl) {
   // Extract contactId from URL path: /api/calls/contact/[contactId]
   const pathParts = parsedUrl.pathname.split('/');
   const contactId = pathParts[pathParts.length - 1];
-  
+
   // Add contactId to req.query for handler
   req.query = { contactId, ...parsedUrl.query };
-  
+
   // Call handler directly (no proxy)
   return await contactCallsHandler(req, res);
 }
@@ -1182,17 +1193,17 @@ async function handleApiCallsContact(req, res, parsedUrl) {
 async function handleApiTwilioStatus(req, res) {
   const correlationId = getCorrelationId(req);
   logger.debug('Processing Twilio Status webhook', 'TwilioWebhook', { correlationId, url: req.url });
-  
+
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
       console.error(`[${correlationId}] [Server] Twilio Status webhook - Body Parse Error:`, error.message, error.stack);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Invalid request body format',
         details: error.message,
-        correlationId 
+        correlationId
       }));
       return;
     }
@@ -1205,16 +1216,16 @@ async function handleApiTwilioStatus(req, res) {
       }
     }
   }
-  
+
   try {
     await twilioStatusHandler(req, res);
   } catch (error) {
     console.error(`[${correlationId}] [Server] Twilio Status handler unhandled error:`, error.name, error.message, error.stack);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Internal server error',
-        correlationId 
+        correlationId
       }));
     }
   }
@@ -1223,17 +1234,17 @@ async function handleApiTwilioStatus(req, res) {
 async function handleApiTwilioDialStatus(req, res) {
   const correlationId = getCorrelationId(req);
   logger.debug('Processing Twilio Dial Status webhook', 'TwilioWebhook', { correlationId, url: req.url });
-  
+
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
       console.error(`[${correlationId}] [Server] Twilio Dial Status webhook - Body Parse Error:`, error.message, error.stack);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Invalid request body format',
         details: error.message,
-        correlationId 
+        correlationId
       }));
       return;
     }
@@ -1246,16 +1257,16 @@ async function handleApiTwilioDialStatus(req, res) {
       }
     }
   }
-  
+
   try {
     await twilioDialStatusHandler(req, res);
   } catch (error) {
     console.error(`[${correlationId}] [Server] Twilio Dial Status handler unhandled error:`, error.name, error.message, error.stack);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Internal server error',
-        correlationId 
+        correlationId
       }));
     }
   }
@@ -1264,17 +1275,17 @@ async function handleApiTwilioDialStatus(req, res) {
 async function handleApiTwilioHangup(req, res) {
   const correlationId = getCorrelationId(req);
   logger.debug('Processing Twilio Hangup webhook', 'TwilioWebhook', { correlationId, url: req.url });
-  
+
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
       console.error(`[${correlationId}] [Server] Twilio Hangup webhook - Body Parse Error:`, error.message, error.stack);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Invalid request body format',
         details: error.message,
-        correlationId 
+        correlationId
       }));
       return;
     }
@@ -1286,16 +1297,16 @@ async function handleApiTwilioHangup(req, res) {
       return;
     }
   }
-  
+
   try {
     await twilioHangupHandler(req, res);
   } catch (error) {
     console.error(`[${correlationId}] [Server] Twilio Hangup handler unhandled error:`, error.name, error.message, error.stack);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Internal server error',
-        correlationId 
+        correlationId
       }));
     }
   }
@@ -1304,17 +1315,17 @@ async function handleApiTwilioHangup(req, res) {
 async function handleApiTwilioCallerId(req, res) {
   const correlationId = getCorrelationId(req);
   logger.debug('Processing Twilio Caller ID webhook', 'TwilioWebhook', { correlationId, url: req.url });
-  
+
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
       console.error(`[${correlationId}] [Server] Twilio Caller ID webhook - Body Parse Error:`, error.message, error.stack);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Invalid request body format',
         details: error.message,
-        correlationId 
+        correlationId
       }));
       return;
     }
@@ -1326,16 +1337,16 @@ async function handleApiTwilioCallerId(req, res) {
       return;
     }
   }
-  
+
   try {
     await twilioCallerIdHandler(req, res);
   } catch (error) {
     console.error(`[${correlationId}] [Server] Twilio Caller ID handler unhandled error:`, error.name, error.message, error.stack);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Internal server error',
-        correlationId 
+        correlationId
       }));
     }
   }
@@ -1344,31 +1355,31 @@ async function handleApiTwilioCallerId(req, res) {
 async function handleApiTwilioCheckTranscriptStatus(req, res) {
   const correlationId = getCorrelationId(req);
   logger.debug('Processing Twilio Check Transcript Status', 'TwilioWebhook', { correlationId, url: req.url });
-  
+
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
       console.error(`[${correlationId}] [Server] Twilio Check Transcript Status - Body Parse Error:`, error.message, error.stack);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Invalid request body format',
         details: error.message,
-        correlationId 
+        correlationId
       }));
       return;
     }
   }
-  
+
   try {
     await twilioCheckTranscriptStatusHandler(req, res);
   } catch (error) {
     console.error(`[${correlationId}] [Server] Twilio Check Transcript Status handler unhandled error:`, error.name, error.message, error.stack);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Internal server error',
-        correlationId 
+        correlationId
       }));
     }
   }
@@ -1377,31 +1388,31 @@ async function handleApiTwilioCheckTranscriptStatus(req, res) {
 async function handleApiTwilioDialComplete(req, res) {
   const correlationId = getCorrelationId(req);
   logger.debug('Processing Twilio Dial Complete', 'TwilioWebhook', { correlationId, url: req.url });
-  
+
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
       console.error(`[${correlationId}] [Server] Twilio Dial Complete - Body Parse Error:`, error.message, error.stack);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Invalid request body format',
         details: error.message,
-        correlationId 
+        correlationId
       }));
       return;
     }
   }
-  
+
   try {
     await twilioDialCompleteHandler(req, res);
   } catch (error) {
     console.error(`[${correlationId}] [Server] Twilio Dial Complete handler unhandled error:`, error.name, error.message, error.stack);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Internal server error',
-        correlationId 
+        correlationId
       }));
     }
   }
@@ -1410,31 +1421,31 @@ async function handleApiTwilioDialComplete(req, res) {
 async function handleApiTwilioProcessExistingTranscripts(req, res) {
   const correlationId = getCorrelationId(req);
   logger.debug('Processing Twilio Process Existing Transcripts', 'TwilioWebhook', { correlationId, url: req.url });
-  
+
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
       console.error(`[${correlationId}] [Server] Twilio Process Existing Transcripts - Body Parse Error:`, error.message, error.stack);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Invalid request body format',
         details: error.message,
-        correlationId 
+        correlationId
       }));
       return;
     }
   }
-  
+
   try {
     await twilioProcessExistingTranscriptsHandler(req, res);
   } catch (error) {
     console.error(`[${correlationId}] [Server] Twilio Process Existing Transcripts handler unhandled error:`, error.name, error.message, error.stack);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Internal server error',
-        correlationId 
+        correlationId
       }));
     }
   }
@@ -1443,31 +1454,31 @@ async function handleApiTwilioProcessExistingTranscripts(req, res) {
 async function handleApiTwilioTranscribe(req, res) {
   const correlationId = getCorrelationId(req);
   logger.debug('Processing Twilio Transcribe', 'TwilioWebhook', { correlationId, url: req.url });
-  
+
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
       console.error(`[${correlationId}] [Server] Twilio Transcribe - Body Parse Error:`, error.message, error.stack);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Invalid request body format',
         details: error.message,
-        correlationId 
+        correlationId
       }));
       return;
     }
   }
-  
+
   try {
     await twilioTranscribeHandler(req, res);
   } catch (error) {
     console.error(`[${correlationId}] [Server] Twilio Transcribe handler unhandled error:`, error.name, error.message, error.stack);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Internal server error',
-        correlationId 
+        correlationId
       }));
     }
   }
@@ -1476,35 +1487,35 @@ async function handleApiTwilioTranscribe(req, res) {
 async function handleApiTwilioBridge(req, res) {
   const correlationId = getCorrelationId(req);
   logger.debug('Processing Twilio Bridge webhook', 'TwilioWebhook', { correlationId, url: req.url });
-  
+
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
       console.error(`[${correlationId}] [Server] Twilio Bridge - Body Parse Error:`, error.message, error.stack);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Invalid request body format',
         details: error.message,
-        correlationId 
+        correlationId
       }));
       return;
     }
   }
-  
+
   // Parse query parameters (req.query doesn't exist in raw Node.js HTTP)
   const parsed = url.parse(req.url, true);
   req.query = { ...parsed.query };
-  
+
   try {
     await twilioBridgeHandler(req, res);
   } catch (error) {
     console.error(`[${correlationId}] [Server] Twilio Bridge handler unhandled error:`, error.name, error.message, error.stack);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Internal server error',
-        correlationId 
+        correlationId
       }));
     }
   }
@@ -1513,31 +1524,31 @@ async function handleApiTwilioBridge(req, res) {
 async function handleApiTwilioOperatorWebhook(req, res) {
   const correlationId = getCorrelationId(req);
   logger.debug('Processing Twilio Operator Webhook', 'TwilioWebhook', { correlationId, url: req.url });
-  
+
   if (req.method === 'POST') {
     try {
       req.body = await parseRequestBody(req);
     } catch (error) {
       console.error(`[${correlationId}] [Server] Twilio Operator Webhook - Body Parse Error:`, error.message, error.stack);
       res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Invalid request body format',
         details: error.message,
-        correlationId 
+        correlationId
       }));
       return;
     }
   }
-  
+
   try {
     await twilioOperatorWebhookHandler(req, res);
   } catch (error) {
     console.error(`[${correlationId}] [Server] Twilio Operator Webhook handler unhandled error:`, error.name, error.message, error.stack);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Internal server error',
-        correlationId 
+        correlationId
       }));
     }
   }
@@ -1580,7 +1591,7 @@ process.on('uncaughtException', (error) => {
 async function handleApiSearch(req, res, parsedUrl) {
   // Add query parameters to req.query for handler
   req.query = { ...parsedUrl.query };
-  
+
   // Call handler directly (no proxy)
   return await searchHandler(req, res);
 }
@@ -1632,22 +1643,22 @@ async function handleApiEnergyNews(req, res) {
     try {
       const { GoogleGenerativeAI } = await import('@google/generative-ai');
       const apiKey = process.env.GEMINI_API_KEY;
-      
+
       if (apiKey) {
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-        
+
         // Process headlines in parallel for better performance
         const reformattedItems = await Promise.all(rawItems.map(async (item) => {
           try {
             const prompt = `Rewrite this energy news headline to be approximately 150-180 characters long (must fill exactly 3 lines in a widget display). Make it detailed and comprehensive while remaining clear and scannable. Include the key facts and context. Remove source attribution (like "- CBS News", "- The Hill", etc.) from the end. Return ONLY the rewritten headline with no quotes or extra text:
 
 "${item.title}"`;
-            
+
             const result = await model.generateContent(prompt);
             const response = await result.response;
             const reformattedTitle = response.text().trim().replace(/^["']|["']$/g, ''); // Remove quotes if any
-            
+
             return {
               ...item,
               title: reformattedTitle || item.title // Fallback to original if Gemini fails
@@ -1657,7 +1668,7 @@ async function handleApiEnergyNews(req, res) {
             return item; // Fallback to original headline
           }
         }));
-        
+
         items.push(...reformattedItems);
       } else {
         // No Gemini key - use original headlines
@@ -1703,11 +1714,11 @@ async function handleApiSendEmail(req, res) {
 
     // Generate unique tracking ID
     const trackingId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Create tracking pixel URL - always use Cloud Run URL
     const baseUrl = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
     const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
-    
+
     // Inject tracking pixel into email content
     const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
     const emailContent = content + trackingPixel;
@@ -1741,12 +1752,12 @@ async function handleApiSendEmail(req, res) {
 
     // Email sending is now handled by the frontend using Gmail API
     // This endpoint just stores the email record for tracking purposes
-    
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      success: true, 
+    res.end(JSON.stringify({
+      success: true,
       trackingId,
-      message: 'Email record stored for tracking (actual sending handled by Gmail API)' 
+      message: 'Email record stored for tracking (actual sending handled by Gmail API)'
     }));
 
   } catch (error) {
@@ -1802,7 +1813,7 @@ async function handleApiEmailUpdateTracking(req, res) {
     if (!global.emailTrackingEvents) {
       global.emailTrackingEvents = new Map();
     }
-    
+
     const eventKey = `${trackingId}_${type}`;
     global.emailTrackingEvents.set(eventKey, {
       trackingId,
@@ -1812,8 +1823,8 @@ async function handleApiEmailUpdateTracking(req, res) {
     });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      success: true, 
+    res.end(JSON.stringify({
+      success: true,
       message: 'Tracking update stored',
       trackingId,
       type
@@ -1835,15 +1846,15 @@ async function handleApiEmailTrackingEvents(req, res) {
 
   try {
     const events = global.emailTrackingEvents ? Array.from(global.emailTrackingEvents.values()) : [];
-    
+
     // Clear events after reading so they are not reprocessed next poll
     if (global.emailTrackingEvents) {
       global.emailTrackingEvents.clear();
     }
-    
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      success: true, 
+    res.end(JSON.stringify({
+      success: true,
       events,
       count: events.length
     }));
@@ -1901,7 +1912,7 @@ async function handleApiEmailStats(req, res, parsedUrl) {
 
   try {
     const trackingId = parsedUrl.query.trackingId;
-    
+
     if (!trackingId) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Missing trackingId parameter' }));
@@ -2006,8 +2017,8 @@ async function handleApiSendGridSend(req, res) {
     const result = await sendGridService.sendEmail(emailData);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      success: true, 
+    res.end(JSON.stringify({
+      success: true,
       trackingId: result.trackingId,
       messageId: result.messageId,
       message: 'Email sent successfully via SendGrid'
@@ -2016,9 +2027,9 @@ async function handleApiSendGridSend(req, res) {
   } catch (error) {
     console.error('[SendGrid] Send error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      error: 'Failed to send email', 
-      message: error.message 
+    res.end(JSON.stringify({
+      error: 'Failed to send email',
+      message: error.message
     }));
   }
 }
@@ -2057,8 +2068,8 @@ async function handleApiSendGridTest(req, res) {
     const result = await sendGridService.sendEmail(testEmailData);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      success: true, 
+    res.end(JSON.stringify({
+      success: true,
       message: 'Test email sent successfully',
       result: result
     }));
@@ -2066,9 +2077,9 @@ async function handleApiSendGridTest(req, res) {
   } catch (error) {
     console.error('[SendGrid] Test email error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
-      error: 'Test email failed', 
-      message: error.message 
+    res.end(JSON.stringify({
+      error: 'Test email failed',
+      message: error.message
     }));
   }
 }
@@ -2106,7 +2117,7 @@ async function handleApiRecording(req, res, parsedUrl) {
         u.searchParams.set('RequestedChannels', '2');
       }
       fetchUrl = u.toString();
-    } catch (_) {}
+    } catch (_) { }
 
     const authHeader = 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64');
     const upstream = await fetch(fetchUrl, { headers: { Authorization: authHeader } });

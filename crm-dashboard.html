@@ -1414,30 +1414,18 @@
 
                                             <div class="dashboard-card">
                                                 <div class="card-header">
-                                                    <h4 class="card-title">Client Satisfaction</h4>
+                                                    <h4 class="card-title">Top Industries</h4>
                                                     <div class="card-action">
                                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                             <polyline points="6,9 12,15 18,9"></polyline>
                                                         </svg>
                                                         </div>
                                                     </div>
-                                                <div class="card-content">
+                                                <div class="card-content" id="top-industries-content">
                                                     <div class="metric-row">
-                                                        <span class="metric-label">Satisfaction Score</span>
-                                                        <span class="metric-value">4.7/5</span>
+                                                        <span class="metric-label">Loading...</span>
+                                                        <span class="metric-value">-</span>
                                                 </div>
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Support tickets</span>
-                                                        <span class="metric-value">23</span>
-                                            </div>
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Avg response time</span>
-                                                        <span class="metric-value">2.3 hours</span>
-                                                    </div>
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Client feedback</span>
-                                                        <span class="metric-value">+12% this month</span>
-                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1501,29 +1489,25 @@
 
                                             <div class="dashboard-card">
                                                 <div class="card-header">
-                                                    <h4 class="card-title">Service Delivery</h4>
+                                                    <h4 class="card-title">Energy Portfolio</h4>
                                                     <div class="card-action">
                                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                             <polyline points="6,9 12,15 18,9"></polyline>
                                         </svg>
                                     </div>
                                 </div>
-                                                <div class="card-content">
+                                                <div class="card-content" id="energy-portfolio-content">
                                                     <div class="metric-row">
-                                                        <span class="metric-label">Active requests</span>
-                                                        <span class="metric-value">15</span>
+                                                        <span class="metric-label">Total kW Managed</span>
+                                                        <span class="metric-value" id="total-kw-managed">0 kWh</span>
                             </div>
                                                     <div class="metric-row">
-                                                        <span class="metric-label">SLA compliance</span>
-                                                        <span class="metric-value">98.5%</span>
+                                                        <span class="metric-label">Average per Client</span>
+                                                        <span class="metric-value" id="avg-kw-per-client">0 kWh</span>
                                     </div>
                                                     <div class="metric-row">
-                                                        <span class="metric-label">Avg resolution time</span>
-                                                        <span class="metric-value">4.2 days</span>
-                                                    </div>
-                                                    <div class="metric-row">
-                                                        <span class="metric-label">Escalation alerts</span>
-                                                        <span class="metric-value">2</span>
+                                                        <span class="metric-label">Clients with Usage Data</span>
+                                                        <span class="metric-value" id="clients-with-usage">0</span>
                                                     </div>
                                 </div>
                             </div>
@@ -1572,29 +1556,29 @@
                                     
                                             <div class="dashboard-card">
                                                 <div class="card-header">
-                                                    <h4 class="card-title">Growth Opportunities</h4>
+                                                    <h4 class="card-title">Energy Usage Insights</h4>
                                                     <div class="card-action">
                                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                             <polyline points="6,9 12,15 18,9"></polyline>
                                                         </svg>
                                 </div>
                             </div>
-                                                <div class="card-content">
+                                                <div class="card-content" id="energy-usage-content">
                                                     <div class="metric-row">
-                                                        <span class="metric-label">Upsell opportunities</span>
-                                                        <span class="metric-value">23</span>
+                                                        <span class="metric-label">Total Annual kWh</span>
+                                                        <span class="metric-value" id="total-annual-kwh">0 kWh</span>
                         </div>
                                                     <div class="metric-row">
-                                                        <span class="metric-label">Cross-sell potential</span>
-                                                        <span class="metric-value">$1.2M</span>
+                                                        <span class="metric-label">Enterprise Clients</span>
+                                                        <span class="metric-value" id="enterprise-kwh">0 kWh</span>
                     </div>
                                                     <div class="metric-row">
-                                                        <span class="metric-label">Referral opportunities</span>
-                                                        <span class="metric-value">8</span>
+                                                        <span class="metric-label">Mid-market Clients</span>
+                                                        <span class="metric-value" id="midmarket-kwh">0 kWh</span>
                                     </div>
                                                     <div class="metric-row">
-                                                        <span class="metric-label">Expansion potential</span>
-                                                        <span class="metric-value">High</span>
+                                                        <span class="metric-label">SMB Clients</span>
+                                                        <span class="metric-value" id="smb-kwh">0 kWh</span>
                                 </div>
                             </div>
                                 </div>
