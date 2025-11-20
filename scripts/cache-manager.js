@@ -6,7 +6,8 @@ class CacheManager {
     this.dbName = 'PowerChoosersCRM';
     this.dbVersion = 4; // Bumped for tasks, sequences, lists collections
     this.db = null;
-    this.cacheExpiry = 15 * 60 * 1000; // 15 minutes in milliseconds
+    this.cacheExpiry = 15 * 60 * 1000; // 15 minutes in milliseconds (default for most collections)
+    this.tasksCacheExpiry = 3 * 60 * 1000; // 3 minutes for tasks (high volatility - frequently created/completed/deleted)
     this.collections = ['contacts', 'accounts', 'calls', 'calls-raw', 'tasks', 'sequences', 'lists', 'deals', 'settings', 'badge-data', 'emails', 'agents', 'agent_activities'];
     this.listMembersExpiry = 10 * 60 * 1000; // 10 minutes for list members
     this.initPromise = null;
@@ -33,7 +34,7 @@ class CacheManager {
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
-        
+
         // Create object stores for each collection
         this.collections.forEach(collection => {
           if (!db.objectStoreNames.contains(collection)) {
@@ -62,15 +63,15 @@ class CacheManager {
       accounts: Array.from(accountIds || []),
       timestamp: Date.now()
     }];
-    
+
     try {
       await this.init();
       const tx = this.db.transaction(['lists'], 'readwrite');
       const store = tx.objectStore('lists');
-      
+
       // Store with special key format
       store.put({ id: cacheKey, ...data[0] });
-      
+
       await new Promise((resolve, reject) => {
         tx.oncomplete = () => {
           console.log(`[CacheManager] ✓ Cached list members for ${listId}: ${data[0].people.length} people, ${data[0].accounts.length} accounts`);
@@ -91,7 +92,7 @@ class CacheManager {
       const tx = this.db.transaction(['lists'], 'readonly');
       const store = tx.objectStore('lists');
       const request = store.get(cacheKey);
-      
+
       return new Promise((resolve) => {
         request.onsuccess = () => {
           const cached = request.result;
@@ -99,10 +100,10 @@ class CacheManager {
             resolve(null);
             return;
           }
-          
+
           const age = Date.now() - cached.timestamp;
           const fresh = age < this.listMembersExpiry;
-          
+
           if (fresh) {
             console.log(`[CacheManager] ✓ List members cache HIT for ${listId} (${Math.round(age / 1000)}s old)`);
             resolve({
@@ -114,7 +115,7 @@ class CacheManager {
             resolve(null);
           }
         };
-        
+
         request.onerror = () => resolve(null);
       });
     } catch (error) {
@@ -130,10 +131,10 @@ class CacheManager {
       const cacheKey = `list-members-${listId}`;
       const tx = this.db.transaction(['lists'], 'readwrite');
       const store = tx.objectStore('lists');
-      
+
       // Delete the cached data
       store.delete(cacheKey);
-      
+
       await new Promise((resolve, reject) => {
         tx.oncomplete = () => {
           console.log(`[CacheManager] ✓ Invalidated list members cache for ${listId}`);
@@ -150,13 +151,13 @@ class CacheManager {
   async isFresh(collection) {
     try {
       await this.init();
-      
+
       // Check if database is still open
       if (!this.db || this.db.version === 0) {
         console.warn(`[CacheManager] Database not available for freshness check on ${collection}`);
         return false;
       }
-      
+
       const tx = this.db.transaction(['_meta'], 'readonly');
       const store = tx.objectStore('_meta');
       const request = store.get(collection);
@@ -169,9 +170,11 @@ class CacheManager {
             return;
           }
 
+          // Use collection-specific expiry
+          const expiry = collection === 'tasks' ? this.tasksCacheExpiry : this.cacheExpiry;
           const age = Date.now() - meta.timestamp;
-          const fresh = age < this.cacheExpiry;
-          console.log(`[CacheManager] Cache for ${collection}: ${fresh ? 'FRESH' : 'EXPIRED'} (${Math.round(age / 1000)}s old)`);
+          const fresh = age < expiry;
+          console.log(`[CacheManager] Cache for ${collection}: ${fresh ? 'FRESH' : 'EXPIRED'} (${Math.round(age / 1000)}s old, expiry: ${Math.round(expiry / 1000)}s)`);
           resolve(fresh);
         };
 
@@ -209,10 +212,10 @@ class CacheManager {
       // Cache miss or expired - fetch from Firestore
       console.log(`[CacheManager] Cache miss for ${collection}, fetching from Firestore...`);
       const data = await this.fetchFromFirestore(collection);
-      
+
       // Store in cache
       await this.set(collection, data);
-      
+
       return data;
     } catch (error) {
       console.error(`[CacheManager] Error getting ${collection}:`, error);
@@ -235,10 +238,10 @@ class CacheManager {
           // Try per-user settings doc first (employees), then fallback to 'user-settings' (admin/legacy)
           const email = (window.currentUserEmail || '').toLowerCase();
           const isAdmin = window.currentUserRole === 'admin';
-          
+
           let doc = null;
           let docId = null;
-          
+
           if (!isAdmin && email) {
             docId = `user-settings-${email}`;
             try {
@@ -258,7 +261,7 @@ class CacheManager {
               return [];
             }
           }
-          
+
           // Only fallback to legacy 'user-settings' for admin users
           if (isAdmin) {
             docId = 'user-settings';
@@ -269,7 +272,7 @@ class CacheManager {
               return [];
             }
           }
-          
+
           if (doc.exists) {
             const data = doc.data();
             // Check ownership for non-admin users (only needed for legacy 'user-settings')
@@ -312,24 +315,24 @@ class CacheManager {
         if (window.currentUserRole !== 'admin' && email) {
           // Non-admin: use scoped queries - check multiple ownership fields
           const queries = [];
-          
+
           // Check ownerId field
-          queries.push(window.firebaseDB.collection(collection).where('ownerId','==',email).get());
+          queries.push(window.firebaseDB.collection(collection).where('ownerId', '==', email).get());
           // Check assignedTo field  
-          queries.push(window.firebaseDB.collection(collection).where('assignedTo','==',email).get());
-          
+          queries.push(window.firebaseDB.collection(collection).where('assignedTo', '==', email).get());
+
           // For lists, also check createdBy field (legacy field)
           if (collection === 'lists') {
-            queries.push(window.firebaseDB.collection(collection).where('createdBy','==',email).get());
+            queries.push(window.firebaseDB.collection(collection).where('createdBy', '==', email).get());
           }
-          
+
           const snapshots = await Promise.all(queries);
           const map = new Map();
-          
+
           snapshots.forEach(snap => {
             snap.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
           });
-          
+
           const data = Array.from(map.values());
           console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore (scoped)`);
           return data;
@@ -362,13 +365,13 @@ class CacheManager {
   async getFromCache(collection) {
     try {
       await this.init();
-      
+
       // Check if database is still open
       if (!this.db || this.db.version === 0) {
         console.warn(`[CacheManager] Database not available for reading ${collection}`);
         return [];
       }
-      
+
       const tx = this.db.transaction([collection], 'readonly');
       const store = tx.objectStore(collection);
       const request = store.getAll();
@@ -387,20 +390,20 @@ class CacheManager {
   async set(collection, data) {
     try {
       await this.init();
-      
+
       // Check if database is still open
       if (!this.db || this.db.version === 0) {
         console.warn(`[CacheManager] Database not available for ${collection}, skipping cache`);
         return;
       }
-      
+
       // Store data
       const dataTx = this.db.transaction([collection], 'readwrite');
       const dataStore = dataTx.objectStore(collection);
-      
+
       // Clear existing data first
       dataStore.clear();
-      
+
       // Add new data
       data.forEach(item => {
         if (item && item.id) {
@@ -437,14 +440,14 @@ class CacheManager {
       await this.init();
       const tx = this.db.transaction([collection], 'readwrite');
       const store = tx.objectStore(collection);
-      
+
       // Get existing record
       const getRequest = store.get(id);
-      
+
       getRequest.onsuccess = () => {
         const existing = getRequest.result || { id };
         const updated = { ...existing, ...changes, updatedAt: changes.updatedAt || new Date() };
-        
+
         // Update record
         store.put(updated);
         console.log(`[CacheManager] ✓ Updated ${collection}/${id} in cache`);
@@ -467,7 +470,7 @@ class CacheManager {
       const tx = this.db.transaction([collection], 'readwrite');
       const store = tx.objectStore(collection);
       store.delete(id);
-      
+
       await new Promise((resolve, reject) => {
         tx.oncomplete = () => {
           console.log(`[CacheManager] ✓ Deleted ${collection}/${id} from cache`);
@@ -484,7 +487,7 @@ class CacheManager {
   async invalidate(collection) {
     try {
       await this.init();
-      
+
       // Clear data
       const dataTx = this.db.transaction([collection], 'readwrite');
       const dataStore = dataTx.objectStore(collection);
@@ -573,13 +576,13 @@ class CacheManager {
       timestamp: Date.now(),
       expiry: Date.now() + (5 * 60 * 1000) // 5 minutes
     };
-    
+
     try {
       await this.init();
       const tx = this.db.transaction(['agents'], 'readwrite');
       const store = tx.objectStore('agents');
       store.put(data);
-      
+
       await new Promise((resolve, reject) => {
         tx.oncomplete = () => {
           console.log(`[CacheManager] ✓ Cached metrics for agent ${agentEmail}`);
@@ -600,7 +603,7 @@ class CacheManager {
       const tx = this.db.transaction(['agents'], 'readonly');
       const store = tx.objectStore('agents');
       const request = store.get(cacheKey);
-      
+
       return new Promise((resolve) => {
         request.onsuccess = () => {
           const cached = request.result;
@@ -608,11 +611,11 @@ class CacheManager {
             resolve(null);
             return;
           }
-          
+
           console.log(`[CacheManager] ✓ Agent metrics cache HIT for ${agentEmail}`);
           resolve(cached);
         };
-        
+
         request.onerror = () => resolve(null);
       });
     } catch (error) {
@@ -631,13 +634,13 @@ class CacheManager {
       timestamp: Date.now(),
       expiry: Date.now() + (2 * 60 * 1000) // 2 minutes (more frequent updates)
     };
-    
+
     try {
       await this.init();
       const tx = this.db.transaction(['agent_activities'], 'readwrite');
       const store = tx.objectStore('agent_activities');
       store.put(data);
-      
+
       await new Promise((resolve, reject) => {
         tx.oncomplete = () => {
           console.log(`[CacheManager] ✓ Cached ${activities.length} activities for agent ${agentEmail}`);
@@ -658,7 +661,7 @@ class CacheManager {
       const tx = this.db.transaction(['agent_activities'], 'readonly');
       const store = tx.objectStore('agent_activities');
       const request = store.get(cacheKey);
-      
+
       return new Promise((resolve) => {
         request.onsuccess = () => {
           const cached = request.result;
@@ -666,11 +669,11 @@ class CacheManager {
             resolve(null);
             return;
           }
-          
+
           console.log(`[CacheManager] ✓ Agent activities cache HIT for ${agentEmail}`);
           resolve(cached.activities || []);
         };
-        
+
         request.onerror = () => resolve(null);
       });
     } catch (error) {
@@ -687,13 +690,13 @@ class CacheManager {
       timestamp: Date.now(),
       expiry: Date.now() + (30 * 60 * 1000) // 30 minutes
     };
-    
+
     try {
       await this.init();
       const tx = this.db.transaction(['agents'], 'readwrite');
       const store = tx.objectStore('agents');
       store.put(data);
-      
+
       await new Promise((resolve, reject) => {
         tx.oncomplete = () => {
           console.log(`[CacheManager] ✓ Cached ${numbers.length} Twilio numbers`);
@@ -713,7 +716,7 @@ class CacheManager {
       const tx = this.db.transaction(['agents'], 'readonly');
       const store = tx.objectStore('agents');
       const request = store.get('twilio-numbers');
-      
+
       return new Promise((resolve) => {
         request.onsuccess = () => {
           const cached = request.result;
@@ -721,11 +724,11 @@ class CacheManager {
             resolve(null);
             return;
           }
-          
+
           console.log(`[CacheManager] ✓ Twilio numbers cache HIT`);
           resolve(cached.numbers || []);
         };
-        
+
         request.onerror = () => resolve(null);
       });
     } catch (error) {
@@ -742,13 +745,13 @@ class CacheManager {
       timestamp: Date.now(),
       expiry: Date.now() + (30 * 60 * 1000) // 30 minutes
     };
-    
+
     try {
       await this.init();
       const tx = this.db.transaction(['agents'], 'readwrite');
       const store = tx.objectStore('agents');
       store.put(data);
-      
+
       await new Promise((resolve, reject) => {
         tx.oncomplete = () => {
           console.log(`[CacheManager] ✓ Cached ${emails.length} SendGrid emails`);
@@ -768,7 +771,7 @@ class CacheManager {
       const tx = this.db.transaction(['agents'], 'readonly');
       const store = tx.objectStore('agents');
       const request = store.get('sendgrid-emails');
-      
+
       return new Promise((resolve) => {
         request.onsuccess = () => {
           const cached = request.result;
@@ -776,11 +779,11 @@ class CacheManager {
             resolve(null);
             return;
           }
-          
+
           console.log(`[CacheManager] ✓ SendGrid emails cache HIT`);
           resolve(cached.emails || []);
         };
-        
+
         request.onerror = () => resolve(null);
       });
     } catch (error) {
@@ -795,19 +798,19 @@ class CacheManager {
       await this.init();
       const tx = this.db.transaction(['agents'], 'readwrite');
       const store = tx.objectStore('agents');
-      
+
       // Get existing agent data
       const getRequest = store.get(agentEmail);
-      
+
       getRequest.onsuccess = () => {
         const existing = getRequest.result || { id: agentEmail };
-        const updated = { 
-          ...existing, 
-          status, 
+        const updated = {
+          ...existing,
+          status,
           lastActive: lastActive || new Date(),
           updatedAt: new Date()
         };
-        
+
         store.put(updated);
         console.log(`[CacheManager] ✓ Updated agent status for ${agentEmail}: ${status}`);
       };
@@ -826,14 +829,14 @@ class CacheManager {
       await this.init();
       const tx = this.db.transaction(['agent_activities'], 'readwrite');
       const store = tx.objectStore('agent_activities');
-      
+
       // Store individual activity
       store.put({
         id: activity.id || `activity-${Date.now()}-${Math.random()}`,
         ...activity,
         timestamp: activity.timestamp || new Date()
       });
-      
+
       console.log(`[CacheManager] ✓ Added agent activity: ${activity.type}`);
     } catch (error) {
       console.error(`[CacheManager] Error adding agent activity:`, error);

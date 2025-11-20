@@ -1457,26 +1457,61 @@ class FreeSequenceAutomation {
       if (latestEmail) {
         const stepIndex = latestEmail.stepIndex || 0;
         const status = latestEmail.status;
+        const emailType = latestEmail.type || 'scheduled';
 
         // Show current step status
-        if (status === 'sent') {
-          // Email was sent - show next step if it exists
-          const nextStepIndex = stepIndex + 1;
-          if (nextStepIndex < state.currentSequence.steps.length) {
-            const nextStep = state.currentSequence.steps[nextStepIndex];
-            nextStepStr = nextStep ? (nextStep.name || nextStep.label || `Step ${nextStepIndex + 1}`) : `Step ${nextStepIndex + 1}`;
+        if (status === 'sent' || emailType === 'sent') {
+          // Email was sent - find and show next step
+          let nextStepIndex = stepIndex + 1;
+          let foundNextStep = false;
 
-            // Check if there's an email for the next step
-            const nextEmail = emails.find(e => e.contactId === member.targetId && (e.stepIndex || 0) === nextStepIndex);
-            if (nextEmail && nextEmail.scheduledSendTime) {
-              try {
-                const date = nextEmail.scheduledSendTime.toDate ? nextEmail.scheduledSendTime.toDate() : new Date(nextEmail.scheduledSendTime);
-                scheduledStr = date.toLocaleString();
-              } catch (e) {
-                scheduledStr = '-';
+          // Find next non-paused step
+          while (nextStepIndex < state.currentSequence.steps.length) {
+            const nextStep = state.currentSequence.steps[nextStepIndex];
+            if (!nextStep.paused) {
+              foundNextStep = true;
+              
+              // Determine step label
+              const stepLabel = nextStep.name || nextStep.label || nextStep.type || `Step ${nextStepIndex + 1}`;
+              
+              // Format step type for display
+              let displayLabel = stepLabel;
+              if (nextStep.type === 'auto-email') {
+                displayLabel = 'Automatic email';
+              } else if (nextStep.type === 'phone-call') {
+                displayLabel = 'Phone call';
+              } else if (nextStep.type === 'li-connect') {
+                displayLabel = 'LinkedIn connect';
+              } else if (nextStep.type === 'li-message') {
+                displayLabel = 'LinkedIn message';
+              } else if (nextStep.type === 'li-view-profile') {
+                displayLabel = 'LinkedIn view profile';
+              } else if (nextStep.type === 'li-interact-post') {
+                displayLabel = 'LinkedIn interact';
               }
+
+              nextStepStr = displayLabel;
+
+              // Check if there's an email or task for the next step
+              const nextEmail = emails.find(e => e.contactId === member.targetId && (e.stepIndex || 0) === nextStepIndex);
+              if (nextEmail && nextEmail.scheduledSendTime) {
+                try {
+                  const date = nextEmail.scheduledSendTime.toDate ? nextEmail.scheduledSendTime.toDate() : new Date(nextEmail.scheduledSendTime);
+                  scheduledStr = date.toLocaleString();
+                } catch (e) {
+                  scheduledStr = '-';
+                }
+              } else if (nextStep.type !== 'auto-email') {
+                // For task steps, check if task exists (would need to query tasks collection)
+                // For now, just show the step without scheduled time
+                scheduledStr = 'Pending';
+              }
+              break;
             }
-          } else {
+            nextStepIndex++;
+          }
+
+          if (!foundNextStep) {
             nextStepStr = '<span class="badge badge-success" style="background:#d4edda; color:#155724; padding:2px 8px; border-radius:12px; font-size:0.8rem;">Completed</span>';
           }
         } else if (status === 'error' || status === 'failed') {
@@ -1485,7 +1520,15 @@ class FreeSequenceAutomation {
         } else {
           // Email is pending/approved/sending - show current step
           const currentStep = state.currentSequence.steps[stepIndex];
-          nextStepStr = currentStep ? (currentStep.name || currentStep.label || `Step ${stepIndex + 1}`) : `Step ${stepIndex + 1}`;
+          const stepLabel = currentStep ? (currentStep.name || currentStep.label || `Step ${stepIndex + 1}`) : `Step ${stepIndex + 1}`;
+          
+          // Format step type for display
+          let displayLabel = stepLabel;
+          if (currentStep && currentStep.type === 'auto-email') {
+            displayLabel = 'Automatic email';
+          }
+          
+          nextStepStr = displayLabel;
 
           // Show status badge
           const statusLabels = {
