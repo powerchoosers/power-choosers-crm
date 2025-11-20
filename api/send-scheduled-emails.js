@@ -297,18 +297,21 @@ export default async function handler(req, res) {
           console.log('[SendScheduledEmails] Email sent successfully:', emailDoc.id, sendResult[0].statusCode);
         }
 
-        // Update email record
+        // Update email record (preserve subject, html, text fields)
         await emailDoc.ref.update({
           type: 'sent',
           status: 'sent',
           sentAt: Date.now(),
           sendgridMessageId: sendResult[0].headers['x-message-id'],
           sentBy: 'scheduled_job'
+          // Note: subject, html, text are preserved automatically by Firestore update()
         });
 
         sentCount++;
 
-        // If this email is part of a sequence, create the next step's email
+        // If this email is part of a sequence, create the next step (email or task)
+        // IMPORTANT: This is PROGRESSIVE - only creates ONE step at a time, not all future steps
+        // This keeps the tasks/emails list clean, showing only what's due next
         if (emailData.sequenceId && typeof emailData.stepIndex === 'number') {
           try {
             // Get sequence details
@@ -316,52 +319,133 @@ export default async function handler(req, res) {
             if (sequenceDoc.exists) {
               const sequence = sequenceDoc.data();
 
-              // Find the next auto-email step after current step
-              let nextAutoEmailStep = null;
+              // Find the next non-paused step after current step
+              // PROGRESSIVE: Only finds and creates the IMMEDIATELY NEXT step, not all future steps
+              let nextStep = null;
               let nextStepIndex = -1;
 
+              // Find next non-paused step (only ONE step - progressive creation)
               for (let i = emailData.stepIndex + 1; i < (sequence.steps?.length || 0); i++) {
-                if (sequence.steps[i].type === 'auto-email') {
-                  nextAutoEmailStep = sequence.steps[i];
+                if (!sequence.steps[i].paused) {
+                  nextStep = sequence.steps[i];
                   nextStepIndex = i;
-                  break;
+                  break; // CRITICAL: Only create the NEXT step, not all future steps
                 }
               }
 
-              // If there's a next step, create the email for it
-              if (nextAutoEmailStep) {
-                const delayMs = (nextAutoEmailStep.delayMinutes || 0) * 60 * 1000;
-                const nextScheduledSendTime = Date.now() + delayMs;
+              if (nextStep) {
+                // Calculate delay from NOW (when email was sent), not from sequence start
+                const delayMs = (nextStep.delayMinutes || 0) * 60 * 1000;
+                const scheduledTime = Date.now() + delayMs;
 
-                const nextEmailId = `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                // If next step is an email, create email document
+                if (nextStep.type === 'auto-email') {
+                  const nextScheduledSendTime = scheduledTime;
 
-                await db.collection('emails').doc(nextEmailId).set({
-                  type: 'scheduled',
-                  status: 'not_generated',
-                  scheduledSendTime: nextScheduledSendTime,
-                  contactId: emailData.contactId,
-                  contactName: emailData.contactName,
-                  contactCompany: emailData.contactCompany,
-                  to: emailData.to,
-                  sequenceId: emailData.sequenceId,
-                  sequenceName: emailData.sequenceName,
-                  stepIndex: nextStepIndex,
-                  totalSteps: sequence.steps?.length || 1,
-                  activationId: emailData.activationId,
-                  aiPrompt: nextAutoEmailStep.emailSettings?.aiPrompt || nextAutoEmailStep.data?.aiPrompt || nextAutoEmailStep.aiPrompt || nextAutoEmailStep.content || 'Write a professional email',
-                  ownerId: emailData.ownerId,
-                  assignedTo: emailData.assignedTo,
-                  createdBy: emailData.createdBy,
-                  createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
+                  const nextEmailId = `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-                if (!isProduction) {
-                  console.log(`[SendScheduledEmails] Created next step email (step ${nextStepIndex}) for contact ${emailData.contactId}`);
+                  await db.collection('emails').doc(nextEmailId).set({
+                    type: 'scheduled',
+                    status: 'not_generated',
+                    scheduledSendTime: nextScheduledSendTime,
+                    contactId: emailData.contactId,
+                    contactName: emailData.contactName,
+                    contactCompany: emailData.contactCompany,
+                    to: emailData.to,
+                    sequenceId: emailData.sequenceId,
+                    sequenceName: emailData.sequenceName,
+                    stepIndex: nextStepIndex,
+                    totalSteps: sequence.steps?.length || 1,
+                    activationId: emailData.activationId,
+                    aiPrompt: nextStep.emailSettings?.aiPrompt || nextStep.data?.aiPrompt || nextStep.aiPrompt || nextStep.content || 'Write a professional email',
+                    aiMode: nextStep.data?.aiMode || nextStep.emailSettings?.aiMode || 'standard',
+                    ownerId: emailData.ownerId,
+                    assignedTo: emailData.assignedTo,
+                    createdBy: emailData.createdBy,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                  });
+
+                  if (!isProduction) {
+                    console.log(`[SendScheduledEmails] Created next step email (step ${nextStepIndex}) for contact ${emailData.contactId}`);
+                  }
+                } 
+                // If next step is a task, create task document
+                else if (['phone-call', 'li-connect', 'li-message', 'li-view-profile', 'li-interact-post', 'task'].includes(nextStep.type)) {
+                  // Load contact data to get name and company
+                  let contactName = emailData.contactName || '';
+                  let contactCompany = emailData.contactCompany || '';
+                  
+                  try {
+                    const contactDoc = await db.collection('people').doc(emailData.contactId).get();
+                    if (contactDoc.exists) {
+                      const contactData = contactDoc.data();
+                      contactName = contactName || (contactData.firstName ? `${contactData.firstName} ${contactData.lastName || ''}`.trim() : contactData.name || '');
+                      contactCompany = contactCompany || contactData.company || contactData.companyName || '';
+                    }
+                  } catch (contactError) {
+                    console.warn('[SendScheduledEmails] Failed to load contact data:', contactError);
+                  }
+
+                  const taskId = `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                  const dueDate = new Date(scheduledTime);
+
+                  // Determine task type and title
+                  let taskType = nextStep.type;
+                  let taskTitle = nextStep.data?.note || nextStep.name || nextStep.label || '';
+
+                  if (nextStep.type === 'phone-call') {
+                    taskType = 'phone-call';
+                    taskTitle = taskTitle || 'Call contact';
+                  } else if (nextStep.type === 'li-connect') {
+                    taskType = 'linkedin-connect';
+                    taskTitle = taskTitle || 'Connect on LinkedIn';
+                  } else if (nextStep.type === 'li-message') {
+                    taskType = 'linkedin-message';
+                    taskTitle = taskTitle || 'Send LinkedIn message';
+                  } else if (nextStep.type === 'li-view-profile') {
+                    taskType = 'linkedin-view';
+                    taskTitle = taskTitle || 'View LinkedIn profile';
+                  } else if (nextStep.type === 'li-interact-post') {
+                    taskType = 'linkedin-interact';
+                    taskTitle = taskTitle || 'Interact with LinkedIn post';
+                  } else {
+                    taskType = 'task';
+                    taskTitle = taskTitle || 'Complete task';
+                  }
+
+                  await db.collection('tasks').doc(taskId).set({
+                    id: taskId,
+                    title: taskTitle,
+                    contact: contactName,
+                    contactId: emailData.contactId,
+                    account: contactCompany,
+                    type: taskType,
+                    priority: nextStep.data?.priority || 'normal',
+                    dueDate: dueDate.toLocaleDateString(),
+                    dueTime: dueDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                    dueTimestamp: scheduledTime,
+                    status: 'pending',
+                    sequenceId: emailData.sequenceId,
+                    sequenceName: emailData.sequenceName,
+                    stepId: nextStep.id,
+                    stepIndex: nextStepIndex,
+                    isSequenceTask: true,
+                    notes: nextStep.data?.note || '',
+                    ownerId: emailData.ownerId,
+                    assignedTo: emailData.assignedTo || emailData.ownerId,
+                    createdBy: emailData.createdBy || emailData.ownerId,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                    timestamp: admin.firestore.FieldValue.serverTimestamp()
+                  });
+
+                  if (!isProduction) {
+                    console.log(`[SendScheduledEmails] Created next step task (step ${nextStepIndex}, type: ${taskType}) for contact ${emailData.contactId}`);
+                  }
                 }
               }
             }
           } catch (error) {
-            console.error('[SendScheduledEmails] Failed to create next step email:', error);
+            console.error('[SendScheduledEmails] Failed to create next step:', error);
             // Don't fail the whole process if next step creation fails
           }
         }
