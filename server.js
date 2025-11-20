@@ -82,6 +82,7 @@ import generateScheduledEmailsHandler from './api/generate-scheduled-emails.js';
 import sendScheduledEmailsHandler from './api/send-scheduled-emails.js';
 import processSequenceActivationsHandler from './api/process-sequence-activations.js';
 import completeSequenceTaskHandler from './api/complete-sequence-task.js';
+import backfillSequenceTasksHandler from './api/backfill-sequence-tasks.js';
 import createBookingHandler from './api/create-booking.js';
 
 // ADDITIONAL IMPORTS FOR REMAINING PROXY FUNCTIONS
@@ -849,6 +850,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/complete-sequence-task') {
     return handleApiCompleteSequenceTask(req, res);
   }
+  if (pathname === '/api/backfill-sequence-tasks') {
+    return handleApiBackfillSequenceTasks(req, res);
+  }
   if (pathname === '/api/process-call') {
     return handleApiProcessCall(req, res);
   }
@@ -1040,6 +1044,13 @@ async function handleApiCompleteSequenceTask(req, res) {
     req.body = await parseRequestBody(req);
   }
   return await completeSequenceTaskHandler(req, res);
+}
+
+async function handleApiBackfillSequenceTasks(req, res) {
+  if (req.method === 'POST') {
+    req.body = await parseRequestBody(req);
+  }
+  return await backfillSequenceTasksHandler(req, res);
 }
 
 // Process call and track email performance
