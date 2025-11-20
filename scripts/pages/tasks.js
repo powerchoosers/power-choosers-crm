@@ -1,5 +1,5 @@
 'use strict';
-(function(){
+(function () {
   const state = {
     data: [],
     filtered: [],
@@ -14,7 +14,7 @@
   // Priority color helper functions
   function getPriorityBackground(priority) {
     const p = (priority || '').toLowerCase().trim();
-    switch(p) {
+    switch (p) {
       case 'low': return '#495057';
       case 'medium': return 'rgba(255, 193, 7, 0.15)';
       case 'high': return 'rgba(220, 53, 69, 0.15)';
@@ -24,7 +24,7 @@
 
   function getPriorityColor(priority) {
     const p = (priority || '').toLowerCase().trim();
-    switch(p) {
+    switch (p) {
       case 'low': return '#e9ecef';
       case 'medium': return '#ffc107';
       case 'high': return '#dc3545';
@@ -44,7 +44,7 @@
         if (Array.isArray(d.selectedItems)) state.selected = new Set(d.selectedItems);
         render();
         if (typeof d.scroll === 'number') {
-          setTimeout(() => { try { window.scrollTo(0, d.scroll); } catch(_) {} }, 80);
+          setTimeout(() => { try { window.scrollTo(0, d.scroll); } catch (_) { } }, 80);
         }
       } catch (e) { console.warn('[Tasks] Restore failed', e); }
     });
@@ -52,8 +52,8 @@
   }
 
   // Minimal inline icons
-  function svgIcon(name){
-    switch(name){
+  function svgIcon(name) {
+    switch (name) {
       case 'clear': return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l14 14M19 5L5 19"/></svg>';
       case 'complete': return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20z"/></svg>';
       case 'assign': return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a8.38 8.38 0 0 1 13 0"/></svg>';
@@ -64,9 +64,9 @@
     }
   }
 
-  function injectTasksBulkStyles(){
-    const id='tasks-bulk-styles'; if(document.getElementById(id)) return;
-    const style=document.createElement('style'); style.id=id; style.type='text/css';
+  function injectTasksBulkStyles() {
+    const id = 'tasks-bulk-styles'; if (document.getElementById(id)) return;
+    const style = document.createElement('style'); style.id = id; style.type = 'text/css';
     style.textContent = `
       /* Ensure positioning context */
       #tasks-page .table-container { position: relative; overflow: visible; }
@@ -124,67 +124,67 @@
     document.head.appendChild(style);
   }
 
-  function escapeHtml(s){return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');}
+  function escapeHtml(s) { return String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;'); }
 
   // Parse a date string in MM/DD/YYYY or YYYY-MM-DD into a Date at local midnight
-  function parseDateStrict(dateStr){
-    if(!dateStr) return null;
-    try{
-      if(dateStr.includes('/')){
-        const parts = dateStr.split('/').map(n=>parseInt(n,10));
-        if(parts.length===3 && !parts.some(isNaN)) return new Date(parts[2], parts[0]-1, parts[1]);
-      } else if(dateStr.includes('-')){
-        const parts = dateStr.split('-').map(n=>parseInt(n,10));
-        if(parts.length===3 && !parts.some(isNaN)) return new Date(parts[0], parts[1]-1, parts[2]);
+  function parseDateStrict(dateStr) {
+    if (!dateStr) return null;
+    try {
+      if (dateStr.includes('/')) {
+        const parts = dateStr.split('/').map(n => parseInt(n, 10));
+        if (parts.length === 3 && !parts.some(isNaN)) return new Date(parts[2], parts[0] - 1, parts[1]);
+      } else if (dateStr.includes('-')) {
+        const parts = dateStr.split('-').map(n => parseInt(n, 10));
+        if (parts.length === 3 && !parts.some(isNaN)) return new Date(parts[0], parts[1] - 1, parts[2]);
       }
       const d = new Date(dateStr);
-      if(!isNaN(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    }catch(_){ /* noop */ }
+      if (!isNaN(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    } catch (_) { /* noop */ }
     return null;
   }
 
   // Parse a time like "10:30 AM" into minutes since midnight; NaN if invalid/missing
-  function parseTimeToMinutes(timeStr){
-    if(!timeStr || typeof timeStr!=='string') return NaN;
+  function parseTimeToMinutes(timeStr) {
+    if (!timeStr || typeof timeStr !== 'string') return NaN;
     const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-    if(!m) return NaN;
-    let hour = parseInt(m[1],10);
-    const min = parseInt(m[2],10);
+    if (!m) return NaN;
+    let hour = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
     const ap = m[3].toUpperCase();
-    if(hour===12) hour = 0; // 12AM -> 0, 12PM handled below
-    if(ap==='PM') hour += 12;
-    return hour*60 + min;
+    if (hour === 12) hour = 0; // 12AM -> 0, 12PM handled below
+    if (ap === 'PM') hour += 12;
+    return hour * 60 + min;
   }
 
   // Sort tasks chronologically by due date then due time
-  function sortTasksChronologically(arr){
-    return arr.slice().sort((a,b)=>{
+  function sortTasksChronologically(arr) {
+    return arr.slice().sort((a, b) => {
       const da = parseDateStrict(a.dueDate);
       const db = parseDateStrict(b.dueDate);
-      if(da && db){
+      if (da && db) {
         const dd = da - db;
-        if(dd!==0) return dd;
-      } else if(da && !db){
+        if (dd !== 0) return dd;
+      } else if (da && !db) {
         return -1;
-      } else if(!da && db){
+      } else if (!da && db) {
         return 1;
       }
       const ta = parseTimeToMinutes(a.dueTime);
       const tb = parseTimeToMinutes(b.dueTime);
       const taValid = !isNaN(ta), tbValid = !isNaN(tb);
-      if(taValid && tbValid){
-        const td = ta - tb; if(td!==0) return td;
-      } else if(taValid && !tbValid){
+      if (taValid && tbValid) {
+        const td = ta - tb; if (td !== 0) return td;
+      } else if (taValid && !tbValid) {
         return -1;
-      } else if(!taValid && tbValid){
+      } else if (!taValid && tbValid) {
         return 1;
       }
-      return (a.createdAt||0) - (b.createdAt||0);
+      return (a.createdAt || 0) - (b.createdAt || 0);
     });
   }
 
-  function initDomRefs(){
-    els.page = document.getElementById('tasks-page'); if(!els.page) return false;
+  function initDomRefs() {
+    els.page = document.getElementById('tasks-page'); if (!els.page) return false;
     els.table = document.getElementById('tasks-table');
     els.tbody = els.table ? els.table.querySelector('tbody') : null;
     els.container = els.page.querySelector('.table-container');
@@ -196,48 +196,48 @@
     return true;
   }
 
-  function attachEvents(){
-    if(els.selectAll){
-      els.selectAll.addEventListener('change',()=>{
-        if(els.selectAll.checked) openBulkSelectModal(); else { state.selected.clear(); render(); closeBulkSelectModal(); hideBulkBar(); }
+  function attachEvents() {
+    if (els.selectAll) {
+      els.selectAll.addEventListener('change', () => {
+        if (els.selectAll.checked) openBulkSelectModal(); else { state.selected.clear(); render(); closeBulkSelectModal(); hideBulkBar(); }
       });
     }
     // Handle Tasks filter tabs locally and silence global handler in main.js
-    els.filterTabs.forEach(tab=>{
-      tab.addEventListener('click', (e)=>{
+    els.filterTabs.forEach(tab => {
+      tab.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopImmediatePropagation();
-        els.filterTabs.forEach(t=>t.classList.remove('active'));
+        els.filterTabs.forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
-        const label = (tab.textContent||'').trim().toLowerCase();
+        const label = (tab.textContent || '').trim().toLowerCase();
         // New filter sections: All your tasks, Phone Tasks, Email Tasks, LinkedIn Tasks, Overdue Tasks
-        if(label.includes('phone')) state.filterMode='phone';
-        else if(label.includes('email')) state.filterMode='email';
-        else if(label.includes('linkedin')) state.filterMode='linkedin';
-        else if(label.includes('overdue')) state.filterMode='overdue';
-        else state.filterMode='all';
+        if (label.includes('phone')) state.filterMode = 'phone';
+        else if (label.includes('email')) state.filterMode = 'email';
+        else if (label.includes('linkedin')) state.filterMode = 'linkedin';
+        else if (label.includes('overdue')) state.filterMode = 'overdue';
+        else state.filterMode = 'all';
         applyFilters();
       });
     });
     // Create task button
-    if(els.createTaskBtn){
+    if (els.createTaskBtn) {
       els.createTaskBtn.addEventListener('click', openCreateTaskModal);
     }
   }
 
-  function getUserTasksKey(){
+  function getUserTasksKey() {
     try {
-      const email = (window.DataManager && typeof window.DataManager.getCurrentUserEmail==='function') ? window.DataManager.getCurrentUserEmail() : (window.currentUserEmail||'').toLowerCase();
+      const email = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') ? window.DataManager.getCurrentUserEmail() : (window.currentUserEmail || '').toLowerCase();
       return email ? `userTasks:${email}` : 'userTasks';
-    } catch(_) { return 'userTasks'; }
+    } catch (_) { return 'userTasks'; }
   }
 
-  async function loadData(){
+  async function loadData() {
     // Build from real sources: BackgroundTasksLoader + localStorage tasks + LinkedIn sequence tasks
     const linkedInTasks = await getLinkedInTasksFromSequences();
     let userTasks = [];
     let firebaseTasks = [];
-    
+
     // Helper to get user email and role
     const getUserEmail = () => {
       try {
@@ -245,7 +245,7 @@
           return window.DataManager.getCurrentUserEmail();
         }
         return (window.currentUserEmail || '').toLowerCase();
-      } catch(_) {
+      } catch (_) {
         return (window.currentUserEmail || '').toLowerCase();
       }
     };
@@ -255,11 +255,11 @@
           return window.DataManager.isCurrentUserAdmin();
         }
         return window.currentUserRole === 'admin';
-      } catch(_) {
+      } catch (_) {
         return window.currentUserRole === 'admin';
       }
     };
-    
+
     // Load from localStorage (namespaced by user email; fallback to legacy key)
     try {
       const key = getUserTasksKey();
@@ -271,7 +271,7 @@
         const legacy = localStorage.getItem('userTasks');
         userTasks = legacy ? JSON.parse(legacy) : [];
       }
-      
+
       // CRITICAL: Filter by ownership for non-admin users (localStorage bypasses Firestore rules)
       if (!isAdmin() && userTasks.length > 0) {
         const email = getUserEmail();
@@ -283,8 +283,8 @@
           return ownerId === email || assignedTo === email || createdBy === email;
         });
       }
-    } catch(_) { userTasks = []; }
-    
+    } catch (_) { userTasks = []; }
+
     // Load from BackgroundTasksLoader (cache-first)
     try {
       if (window.BackgroundTasksLoader) {
@@ -338,7 +338,7 @@
             firebaseTasks = snapshot.docs.map(doc => {
               const data = doc.data();
               return {
-                id: doc.id, 
+                id: doc.id,
                 ...data,
                 // Ensure we have the required fields with proper fallbacks
                 createdAt: data.createdAt || (data.timestamp && data.timestamp.toDate ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now(),
@@ -352,21 +352,21 @@
     } catch (error) {
       console.warn('Could not load tasks from BackgroundTasksLoader:', error);
     }
-    
+
     // Debug logging
     console.log(`[Tasks] Loaded ${userTasks.length} tasks from localStorage, ${firebaseTasks.length} tasks from Firebase`);
-    
+
     // Merge all tasks - CRITICAL FIX: Always prefer Firebase as the source of truth
     // Firebase tasks override any stale local copies with the same ID
     const allTasksMap = new Map();
     firebaseTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
     userTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
     const allTasks = Array.from(allTasksMap.values());
-    
+
     // Add LinkedIn tasks that aren't duplicates
     const nonDupLinkedIn = linkedInTasks.filter(li => !allTasks.some(t => t.id === li.id));
     const rows = [...allTasks, ...nonDupLinkedIn];
-    
+
     state.data = rows;
     state.filtered = sortTasksChronologically(rows);
     console.log(`[Tasks] Total tasks loaded: ${rows.length}`);
@@ -382,7 +382,7 @@
     try {
       console.log('[Tasks] Loading more tasks...');
       const result = await window.BackgroundTasksLoader.loadMore();
-      
+
       if (result.loaded > 0) {
         // Reload data to get updated tasks
         await loadData();
@@ -397,7 +397,7 @@
 
   async function getLinkedInTasksFromSequences() {
     const linkedInTasks = [];
-    
+
     // Get current user email for ownership
     const getUserEmail = () => {
       try {
@@ -410,7 +410,7 @@
       }
     };
     const userEmail = getUserEmail();
-    
+
     try {
       // Use cached sequences from BackgroundSequencesLoader (FAST - no Firestore query)
       let sequences = [];
@@ -423,24 +423,24 @@
         sequences = sequencesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         console.log('[Tasks] Loaded sequences from Firestore:', sequences.length);
       }
-      
+
       if (sequences.length === 0) {
         return linkedInTasks;
       }
-      
+
       // Get all sequenceMembers (single query for all sequences)
       if (!window.firebaseDB) {
         console.warn('[Tasks] Firebase not available for sequence members');
         return linkedInTasks;
       }
-      
+
       const membersQuery = window.firebaseDB.collection('sequenceMembers');
       const membersSnapshot = await membersQuery.get();
-      
+
       if (membersSnapshot.empty) {
         return linkedInTasks;
       }
-      
+
       // Group members by sequenceId and contactId
       const membersBySequence = new Map();
       membersSnapshot.forEach(doc => {
@@ -456,7 +456,7 @@
             return window.currentUserRole === 'admin';
           }
         };
-        
+
         if (!isAdmin()) {
           const ownerId = (data.ownerId || '').toLowerCase();
           const assignedTo = (data.assignedTo || '').toLowerCase();
@@ -465,28 +465,28 @@
             return; // Skip if user doesn't own this member
           }
         }
-        
+
         const key = `${data.sequenceId}_${data.targetId}`;
         if (!membersBySequence.has(key)) {
           membersBySequence.set(key, []);
         }
         membersBySequence.get(key).push(data);
       });
-      
+
       const now = Date.now();
-      
+
       // OPTIMIZATION: Query all emails once instead of per-contact
       // Get all sequence IDs for efficient querying
       const sequenceIds = sequences.map(s => s.id);
       const emailsBySequenceAndContact = new Map();
-      
+
       if (sequenceIds.length > 0) {
         try {
           // Query all emails for all sequences at once (much faster!)
           const allEmailsSnapshot = await window.firebaseDB.collection('emails')
             .where('type', '==', 'scheduled')
             .get();
-          
+
           // Group emails by sequenceId and contactId
           allEmailsSnapshot.forEach(doc => {
             const email = doc.data();
@@ -498,38 +498,38 @@
               emailsBySequenceAndContact.get(key).push(email);
             }
           });
-          
+
           console.log('[Tasks] Loaded all sequence emails:', allEmailsSnapshot.size);
         } catch (error) {
           console.warn('[Tasks] Failed to load sequence emails:', error);
         }
       }
-      
+
       // For each sequence/contact combination, determine current step and filter tasks
       for (const sequence of sequences) {
         if (!sequence.steps || !Array.isArray(sequence.steps)) continue;
-        
+
         // Find all contacts in this sequence
         const sequenceMembers = Array.from(membersBySequence.entries())
           .filter(([key]) => key.startsWith(`${sequence.id}_`))
           .map(([, members]) => members[0]);
-        
+
         for (const member of sequenceMembers) {
           const contactId = member.targetId;
-          
+
           // Determine current step for this contact by checking scheduled emails
           let currentStep = -1; // -1 means no steps completed yet
-          
+
           // Get emails for this specific sequence/contact from cached map
           const emailKey = `${sequence.id}_${contactId}`;
           const contactEmails = emailsBySequenceAndContact.get(emailKey) || [];
-          
+
           // Find the highest stepIndex where email has been sent OR is due now
           contactEmails.forEach(email => {
             const stepIndex = email.stepIndex || 0;
             const scheduledTime = email.scheduledSendTime || 0;
             const status = email.status || '';
-            
+
             // Convert Firestore timestamp to milliseconds if needed
             let scheduledTimeMs = scheduledTime;
             if (scheduledTime && typeof scheduledTime.toDate === 'function') {
@@ -537,7 +537,7 @@
             } else if (typeof scheduledTime === 'object' && scheduledTime.seconds) {
               scheduledTimeMs = scheduledTime.seconds * 1000;
             }
-            
+
             // Step is "reached" if:
             // 1. Email has been sent (status === 'sent')
             // 2. OR email is due now (scheduledTime <= now and status is not 'rejected')
@@ -547,24 +547,24 @@
               }
             }
           });
-          
+
           // Now process steps, but only show tasks that:
           // 1. Are at or before currentStep + 1 (allow next step)
           // 2. Have scheduledSendTime <= now (only show tasks that are due)
           for (let stepIndex = 0; stepIndex < sequence.steps.length; stepIndex++) {
             const step = sequence.steps[stepIndex];
-            
+
             // Only process LinkedIn steps that are active (not paused)
             if (step.paused || !(step.type === 'li-connect' || step.type === 'li-message' || step.type === 'li-view-profile' || step.type === 'li-interact-post')) {
               continue;
             }
-            
+
             // Check if this step should be shown:
             // 1. Step must be <= currentStep + 1 (we've reached this step or it's the next one)
             if (stepIndex > currentStep + 1) {
               continue; // Skip future steps
             }
-            
+
             // 2. Calculate when this step is due (based on cumulative delays)
             let cumulativeDelay = 0;
             for (let i = 0; i <= stepIndex; i++) {
@@ -572,7 +572,7 @@
                 cumulativeDelay += sequence.steps[i].delayMinutes;
               }
             }
-            
+
             // Get sequence start time from member creation or first email
             let sequenceStartTime = now;
             try {
@@ -589,36 +589,36 @@
             } catch (_) {
               // Fallback to now if we can't determine start time
             }
-            
+
             const stepDueTime = sequenceStartTime + (cumulativeDelay * 60 * 1000);
-            
+
             // Only show task if it's due now or in the past
             if (stepDueTime > now) {
               continue; // Skip tasks that aren't due yet
             }
-            
+
             // Task passes all filters - create it
             const typeLabels = {
               'li-connect': 'linkedin-connect',
-              'li-message': 'linkedin-message', 
+              'li-message': 'linkedin-message',
               'li-view-profile': 'linkedin-view',
               'li-interact-post': 'linkedin-interact'
             };
-            
+
             const taskTitles = {
               'li-connect': 'Add on LinkedIn',
               'li-message': 'Send a message on LinkedIn',
-              'li-view-profile': 'View LinkedIn profile', 
+              'li-view-profile': 'View LinkedIn profile',
               'li-interact-post': 'Interact with LinkedIn Post'
             };
-            
+
             const dueDate = new Date(stepDueTime);
-            
+
             // Resolve actual contact name and account from contactId
             let actualContactName = `Contact from ${sequence.name}`;
             let actualAccountName = `Account from ${sequence.name}`;
             let accountId = null;
-            
+
             try {
               if (window.getPeopleData && typeof window.getPeopleData === 'function') {
                 const contacts = window.getPeopleData() || [];
@@ -633,7 +633,7 @@
             } catch (error) {
               console.warn(`[Tasks] Could not resolve contact ${contactId} for task:`, error);
             }
-            
+
             const taskData = {
               id: `linkedin_${sequence.id}_${contactId}_${stepIndex}`,
               title: step.data?.note || taskTitles[step.type] || 'LinkedIn task',
@@ -657,9 +657,9 @@
               createdAt: Date.now(),
               timestamp: Date.now()
             };
-            
+
             linkedInTasks.push(taskData);
-            
+
             // Save to Firebase so it appears in Recent Activities
             try {
               const db = window.firebaseDB;
@@ -684,41 +684,42 @@
     } catch (error) {
       console.error('[Tasks] Error loading LinkedIn tasks from sequences:', error);
     }
-    
+
     return linkedInTasks;
   }
 
-  function applyFilters(){
+  function applyFilters() {
     let arr = state.data.slice();
     const today = new Date();
     const localMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    if(state.filterMode==='phone') {
-      arr = arr.filter(r => /phone|call/i.test(String(r.type||'')));
-    } else if(state.filterMode==='email') {
-      arr = arr.filter(r => /email/i.test(String(r.type||'')));
-    } else if(state.filterMode==='linkedin') {
-      arr = arr.filter(r => /linkedin|li-/i.test(String(r.type||'')));
-    } else if(state.filterMode==='overdue') {
+    if (state.filterMode === 'phone') {
+      arr = arr.filter(r => /phone|call/i.test(String(r.type || '')));
+    } else if (state.filterMode === 'email') {
+      arr = arr.filter(r => /email/i.test(String(r.type || '')));
+    } else if (state.filterMode === 'linkedin') {
+      arr = arr.filter(r => /linkedin|li-/i.test(String(r.type || '')));
+    } else if (state.filterMode === 'overdue') {
       arr = arr.filter(r => {
-        if((r.status||'pending') === 'completed') return false;
+        if ((r.status || 'pending') === 'completed') return false;
         const d = parseDateStrict(r.dueDate);
-        if(!d) return false;
+        if (!d) return false;
         return d.getTime() < localMidnight.getTime();
       });
     }
     state.filtered = sortTasksChronologically(arr);
-    state.currentPage=1; state.selected.clear();
+    state.currentPage = 1; state.selected.clear();
     render();
   }
 
-  function getPageItems(){ const s=(state.currentPage-1)*state.pageSize; return state.filtered.slice(s,s+state.pageSize); }
+  function getPageItems() { const s = (state.currentPage - 1) * state.pageSize; return state.filtered.slice(s, s + state.pageSize); }
 
-  function paginate(){ if(!els.pag) return; const total=state.filtered.length; const pages=Math.max(1,Math.ceil(total/state.pageSize)); state.currentPage=Math.min(state.currentPage,pages); if(els.summary){ const st=total===0?0:(state.currentPage-1)*state.pageSize+1; const en=Math.min(state.currentPage*state.pageSize,total); els.summary.textContent=`${st}-${en} of ${total}`; } let html=''; const btn=(l,d,p)=>`<button class="page-btn" ${d?'disabled':''} data-page="${p}">${l}</button>`; html+=btn('Prev',state.currentPage===1,state.currentPage-1); for(let p=1;p<=pages;p++){ html+=`<button class="page-btn ${p===state.currentPage?'active':''}" data-page="${p}">${p}</button>`;} html+=btn('Next',state.currentPage===pages,state.currentPage+1); els.pag.innerHTML=html; els.pag.querySelectorAll('.page-btn').forEach(b=>b.addEventListener('click',()=>{ const n=parseInt(b.getAttribute('data-page')||'1',10); if(!isNaN(n)&&n>=1&&n<=pages){ state.currentPage=n; render(); }})); }
+  function paginate() { if (!els.pag) return; const total = state.filtered.length; const pages = Math.max(1, Math.ceil(total / state.pageSize)); state.currentPage = Math.min(state.currentPage, pages); if (els.summary) { const st = total === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1; const en = Math.min(state.currentPage * state.pageSize, total); els.summary.textContent = `${st}-${en} of ${total}`; } let html = ''; const btn = (l, d, p) => `<button class="page-btn" ${d ? 'disabled' : ''} data-page="${p}">${l}</button>`; html += btn('Prev', state.currentPage === 1, state.currentPage - 1); for (let p = 1; p <= pages; p++) { html += `<button class="page-btn ${p === state.currentPage ? 'active' : ''}" data-page="${p}">${p}</button>`; } html += btn('Next', state.currentPage === pages, state.currentPage + 1); els.pag.innerHTML = html; els.pag.querySelectorAll('.page-btn').forEach(b => b.addEventListener('click', () => { const n = parseInt(b.getAttribute('data-page') || '1', 10); if (!isNaN(n) && n >= 1 && n <= pages) { state.currentPage = n; render(); } })); }
 
-  function render(){ if(!els.tbody) return; state.filtered = sortTasksChronologically(state.filtered); const rows=getPageItems(); els.tbody.innerHTML = rows.map(r=>rowHtml(r)).join('');
+  function render() {
+    if (!els.tbody) return; state.filtered = sortTasksChronologically(state.filtered); const rows = getPageItems(); els.tbody.innerHTML = rows.map(r => rowHtml(r)).join('');
     // Row events
-    els.tbody.querySelectorAll('input.row-select').forEach(cb=>cb.addEventListener('change',()=>{ const id=cb.getAttribute('data-id'); if(cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); }));
-    
+    els.tbody.querySelectorAll('input.row-select').forEach(cb => cb.addEventListener('change', () => { const id = cb.getAttribute('data-id'); if (cb.checked) state.selected.add(id); else state.selected.delete(id); updateBulkBar(); }));
+
     // Task link events - open individual task detail pages
     els.tbody.querySelectorAll('.task-link').forEach(link => {
       link.addEventListener('click', (e) => {
@@ -733,47 +734,82 @@
               selectedItems: Array.from(state.selected || []),
               scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0
             };
-          } catch(_) {}
+          } catch (_) { }
           window.TaskDetail.open(taskId, 'tasks');
         }
       });
     });
-    
-    els.tbody.querySelectorAll('button.btn-success').forEach(btn=>btn.addEventListener('click',async ()=>{ const id = btn.getAttribute('data-id'); const recIdx = state.data.findIndex(x=>x.id===id); if(recIdx!==-1){
-      // Remove from state immediately
-      const [removed] = state.data.splice(recIdx,1);
-      state.filtered = state.data.slice();
-      // Remove from localStorage immediately (namespaced)
-      try {
-        const key = getUserTasksKey();
-        const current = JSON.parse(localStorage.getItem(key) || '[]');
-        const filtered = current.filter(t => t.id !== id);
-        localStorage.setItem(key, JSON.stringify(filtered));
-      } catch (e) { console.warn('Could not remove task from localStorage:', e); }
-      // Remove from Firebase (best-effort)
-      try {
-        const db = window.firebaseDB;
-        if (db) {
-          // Many tasks store their own id inside the doc; delete by where('id','==',id)
-          const snap = await db.collection('tasks').where('id','==',id).limit(5).get();
-          const batch = db.batch();
-          snap.forEach(doc => batch.delete(doc.ref));
-          if (!snap.empty) await batch.commit();
+
+    els.tbody.querySelectorAll('button.btn-success').forEach(btn => btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id'); const recIdx = state.data.findIndex(x => x.id === id); if (recIdx !== -1) {
+        // Get the task before removing it (for sequence processing)
+        const task = state.data[recIdx];
+
+        // Remove from state immediately
+        const [removed] = state.data.splice(recIdx, 1);
+        state.filtered = state.data.slice();
+        // Remove from localStorage immediately (namespaced)
+        try {
+          const key = getUserTasksKey();
+          const current = JSON.parse(localStorage.getItem(key) || '[]');
+          const filtered = current.filter(t => t.id !== id);
+          localStorage.setItem(key, JSON.stringify(filtered));
+        } catch (e) { console.warn('Could not remove task from localStorage:', e); }
+        // Remove from Firebase (best-effort)
+        try {
+          const db = window.firebaseDB;
+          if (db) {
+            // Many tasks store their own id inside the doc; delete by where('id','==',id)
+            const snap = await db.collection('tasks').where('id', '==', id).limit(5).get();
+            const batch = db.batch();
+            snap.forEach(doc => batch.delete(doc.ref));
+            if (!snap.empty) await batch.commit();
+          }
+        } catch (e) { console.warn('Could not remove task from Firebase:', e); }
+
+        // If this is a sequence task, trigger next step creation
+        if (task && task.isSequenceTask) {
+          try {
+            console.log('[Tasks] Completed sequence task, creating next step...', task.id);
+            const baseUrl = window.API_BASE_URL || window.location.origin;
+            const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ taskId: task.id })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+              console.log('[Tasks] Next step created:', result.nextStepType);
+              // If next step is a task, reload tasks to show it
+              if (result.nextStepType === 'task') {
+                await loadData(); // Reload to show new task
+              }
+              // If next step is an email, user can see it in Emails page
+            } else {
+              console.warn('[Tasks] Failed to create next step:', result.message || result.error);
+            }
+          } catch (error) {
+            console.error('[Tasks] Error creating next sequence step:', error);
+            // Don't block - task was already completed
+          }
         }
-      } catch (e) { console.warn('Could not remove task from Firebase:', e); }
-      // Update Today's Tasks widget and table
-      updateTodaysTasksWidget();
-    }
-    btn.textContent='Completed'; btn.disabled=true; btn.style.opacity='0.6'; render(); }));
+
+        // Update Today's Tasks widget and table
+        updateTodaysTasksWidget();
+      }
+      btn.textContent = 'Completed'; btn.disabled = true; btn.style.opacity = '0.6'; render();
+    }));
     // Header select state
-    if(els.selectAll){ const pageIds=new Set(rows.map(r=>r.id)); const allSelected=[...pageIds].every(id=>state.selected.has(id)); els.selectAll.checked = allSelected && rows.length>0; }
-    paginate(); updateBulkBar(); }
+    if (els.selectAll) { const pageIds = new Set(rows.map(r => r.id)); const allSelected = [...pageIds].every(id => state.selected.has(id)); els.selectAll.checked = allSelected && rows.length > 0; }
+    paginate(); updateBulkBar();
+  }
 
   // Update task titles to descriptive format
   function updateTaskTitle(task) {
     // Normalize task type first
     const normalizedType = normalizeTaskType(task.type);
-    
+
     // Always update titles to use proper action-oriented format based on task type
     if (normalizedType && (task.contact || task.account)) {
       // Use the shared buildTaskTitle function if available
@@ -817,7 +853,7 @@
     return type || 'custom-task';
   }
 
-  function rowHtml(r){
+  function rowHtml(r) {
     const id = escapeHtml(r.id);
     const title = escapeHtml(updateTaskTitle(r));
     const name = escapeHtml(r.contact || '');
@@ -829,7 +865,7 @@
     const status = escapeHtml(r.status || '');
     return `
       <tr>
-        <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id)?'checked':''}></td>
+        <td class="col-select"><input type="checkbox" class="row-select" data-id="${id}" ${state.selected.has(r.id) ? 'checked' : ''}></td>
         <td>
           <div class="task-info">
             <div class="task-title">
@@ -843,25 +879,25 @@
         <td>${due}</td>
         <td>${time}</td>
         <td><span class="status-badge ${status}">${status}</span></td>
-        <td><div class="action-buttons"><button class="btn-success" data-id="${id}">${status==='completed'?'Completed':'Complete'}</button><button class="btn-text">Edit</button></div></td>
+        <td><div class="action-buttons"><button class="btn-success" data-id="${id}">${status === 'completed' ? 'Completed' : 'Complete'}</button><button class="btn-text">Edit</button></div></td>
       </tr>`;
   }
 
   // Bulk selection modal (using pc-modal style)
-  function openBulkSelectModal(){
-    if(!els.container) return;
+  function openBulkSelectModal() {
+    if (!els.container) return;
     closeBulkSelectModal();
-    
+
     const total = state.filtered.length;
     const page = getPageItems().length;
-    
+
     const modal = document.createElement('div');
     modal.id = 'tasks-bulk-select-modal';
     modal.className = 'pc-modal';
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-labelledby', 'tasks-bulk-modal-title');
-    
+
     modal.innerHTML = `
       <div class="pc-modal__backdrop"></div>
       <div class="pc-modal__dialog">
@@ -880,7 +916,7 @@
                 <input type="radio" name="bulk-mode" value="custom" checked style="accent-color: var(--orange-subtle);">
                 <span>Select</span>
               </label>
-              <input type="number" id="bulk-custom-count" min="1" max="${total}" value="${Math.min(50,total)}" style="width: 120px; height: 40px; padding: 0 14px; background: var(--bg-item); color: var(--text-primary); border: 2px solid var(--border-light); border-radius: 8px; transition: all 0.3s ease;">
+              <input type="number" id="bulk-custom-count" min="1" max="${total}" value="${Math.min(50, total)}" style="width: 120px; height: 40px; padding: 0 14px; background: var(--bg-item); color: var(--text-primary); border: 2px solid var(--border-light); border-radius: 8px; transition: all 0.3s ease;">
               <span class="hint" style="color: var(--text-secondary); font-size: 0.85rem;">items from current filters</span>
             </div>
             <div class="option" style="display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: var(--spacing-md);">
@@ -905,14 +941,14 @@
         </div>
       </div>
     `;
-    
+
     document.body.appendChild(modal);
-    
+
     // Show modal with animation
     requestAnimationFrame(() => {
       modal.classList.add('show');
     });
-    
+
     // Enable/disable custom count input
     const customInput = modal.querySelector('#bulk-custom-count');
     const radios = Array.from(modal.querySelectorAll('input[name="bulk-mode"]'));
@@ -929,7 +965,7 @@
       if (r.value === 'custom' && customInput && !customInput.disabled) customInput.focus();
     }));
     updateCustomEnabled();
-    
+
     // Event handlers
     const close = () => {
       modal.classList.remove('show');
@@ -938,14 +974,14 @@
       }, 300);
       if (els.selectAll) els.selectAll.checked = state.selected.size > 0;
     };
-    
+
     modal.querySelector('.pc-modal__backdrop').addEventListener('click', close);
     modal.querySelector('.pc-modal__close').addEventListener('click', close);
     modal.querySelector('#bulk-cancel').addEventListener('click', () => {
       if (els.selectAll) els.selectAll.checked = false;
       close();
     });
-    
+
     modal.querySelector('#bulk-apply').addEventListener('click', () => {
       const mode = (modal.querySelector('input[name="bulk-mode"]:checked') || {}).value;
       let selectedIds = [];
@@ -963,7 +999,7 @@
       updateBulkBar();
       showBulkBar();
     });
-    
+
     // Keyboard support
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
@@ -973,7 +1009,7 @@
     };
     document.addEventListener('keydown', handleKeyDown);
     modal._keydownHandler = handleKeyDown;
-    
+
     // Focus first input
     setTimeout(() => {
       const firstInput = customInput || modal.querySelector('input, button');
@@ -981,7 +1017,7 @@
     }, 100);
   }
 
-  function closeBulkSelectModal(){
+  function closeBulkSelectModal() {
     const modal = document.getElementById('tasks-bulk-select-modal');
     if (modal) {
       if (modal._keydownHandler) {
@@ -994,7 +1030,7 @@
       }, 300);
     }
   }
-  function selectIds(ids){ state.selected = new Set(ids); }
+  function selectIds(ids) { state.selected = new Set(ids); }
 
   // Check if user is admin
   function isAdmin() {
@@ -1009,13 +1045,13 @@
   }
 
   // Bulk actions bar
-  function showBulkBar(){ 
-    updateBulkBar(true); 
+  function showBulkBar() {
+    updateBulkBar(true);
   }
-  
-  function hideBulkBar(){ 
-    const bar = els.page ? els.page.querySelector('#tasks-bulk-actions') : document.getElementById('tasks-bulk-actions'); 
-    if(bar && bar.parentNode) {
+
+  function hideBulkBar() {
+    const bar = els.page ? els.page.querySelector('#tasks-bulk-actions') : document.getElementById('tasks-bulk-actions');
+    if (bar && bar.parentNode) {
       bar.classList.remove('--show');
       setTimeout(() => {
         if (bar.parentNode) bar.parentNode.removeChild(bar);
@@ -1026,19 +1062,19 @@
   async function deleteSelectedTasks() {
     const ids = Array.from(state.selected || []);
     if (!ids.length) return;
-    
+
     if (!confirm(`Are you sure you want to delete ${ids.length} task(s)?`)) return;
-    
+
     // Store current page before deletion to preserve pagination
     const currentPageBeforeDeletion = state.currentPage;
-    
+
     // Show progress toast
-    const progressToast = window.crm?.showProgressToast ? 
+    const progressToast = window.crm?.showProgressToast ?
       window.crm.showProgressToast(`Deleting ${ids.length} ${ids.length === 1 ? 'task' : 'tasks'}...`, ids.length, 0) : null;
-    
+
     let failed = 0;
     let completed = 0;
-    
+
     try {
       // Process deletions sequentially to show progress
       for (const id of ids) {
@@ -1049,10 +1085,10 @@
             const current = JSON.parse(localStorage.getItem(key) || '[]');
             const filtered = current.filter(t => t.id !== id);
             localStorage.setItem(key, JSON.stringify(filtered));
-          } catch (e) { 
-            console.warn('Could not remove task from localStorage:', e); 
+          } catch (e) {
+            console.warn('Could not remove task from localStorage:', e);
           }
-          
+
           // Remove from Firebase
           if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
             const db = window.firebaseDB;
@@ -1063,13 +1099,13 @@
               await batch.commit();
             }
           }
-          
+
           // Remove from local state
           const recIdx = state.data.findIndex(x => x.id === id);
           if (recIdx !== -1) {
             state.data.splice(recIdx, 1);
           }
-          
+
           completed++;
           if (progressToast && typeof progressToast.update === 'function') {
             progressToast.update(completed, ids.length);
@@ -1082,7 +1118,7 @@
             progressToast.update(completed, ids.length);
           }
         }
-        
+
         // Small delay to prevent UI blocking
         await new Promise(resolve => setTimeout(resolve, 10));
       }
@@ -1095,26 +1131,26 @@
       // Update filtered data
       const idSet = new Set(ids);
       state.filtered = Array.isArray(state.filtered) ? state.filtered.filter(t => !idSet.has(t.id)) : [];
-      
+
       // Calculate new total pages after deletion
       const newTotalPages = Math.max(1, Math.ceil(state.filtered.length / state.pageSize));
-      
+
       // Only adjust page if current page is beyond the new total
       if (currentPageBeforeDeletion > newTotalPages) {
         state.currentPage = newTotalPages;
       }
-      
+
       state.selected.clear();
       applyFilters();
       updateTodaysTasksWidget();
       hideBulkBar();
-      if (els.selectAll) { 
-        els.selectAll.checked = false; 
-        els.selectAll.indeterminate = false; 
+      if (els.selectAll) {
+        els.selectAll.checked = false;
+        els.selectAll.indeterminate = false;
       }
-      
+
       const successCount = Math.max(0, ids.length - failed);
-      
+
       if (progressToast) {
         if (failed === 0) {
           progressToast.complete(`Successfully deleted ${successCount} ${successCount === 1 ? 'task' : 'tasks'}`);
@@ -1134,22 +1170,22 @@
       }
     }
   }
-  
-  function updateBulkBar(force=false){ 
-    if(!els.container) return; 
-    const count = state.selected.size; 
-    const shouldShow = force || count > 0; 
-    let container = els.page ? els.page.querySelector('#tasks-bulk-actions') : null; 
-    if(!shouldShow){ 
-      if(container) {
+
+  function updateBulkBar(force = false) {
+    if (!els.container) return;
+    const count = state.selected.size;
+    const shouldShow = force || count > 0;
+    let container = els.page ? els.page.querySelector('#tasks-bulk-actions') : null;
+    if (!shouldShow) {
+      if (container) {
         container.classList.remove('--show');
         setTimeout(() => {
           if (container.parentNode) container.parentNode.removeChild(container);
         }, 200);
       }
-      return; 
+      return;
     }
-    
+
     const adminOnly = isAdmin();
     const html = `
       <div class="bar">
@@ -1160,32 +1196,32 @@
         <button class="action-btn-sm" id="bulk-export">${svgIcon('export')}<span>Export</span></button>
         <button class="action-btn-sm danger" id="bulk-delete">${svgIcon('delete')}<span>Delete</span></button>
       </div>`;
-    
-    if(!container){ 
-      container = document.createElement('div'); 
-      container.id = 'tasks-bulk-actions'; 
-      container.className = 'bulk-actions-modal'; 
-      els.container.appendChild(container); 
+
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'tasks-bulk-actions';
+      container.className = 'bulk-actions-modal';
+      els.container.appendChild(container);
     }
     container.innerHTML = html;
-    
+
     // Show with animation
     requestAnimationFrame(() => {
       container.classList.add('--show');
     });
-    
+
     // Event handlers
-    container.querySelector('#bulk-clear').addEventListener('click', () => { 
-      state.selected.clear(); 
-      render(); 
-      hideBulkBar(); 
-      if(els.selectAll){ 
-        els.selectAll.checked = false; 
-        els.selectAll.indeterminate = false; 
-      } 
+    container.querySelector('#bulk-clear').addEventListener('click', () => {
+      state.selected.clear();
+      render();
+      hideBulkBar();
+      if (els.selectAll) {
+        els.selectAll.checked = false;
+        els.selectAll.indeterminate = false;
+      }
     });
-    
-    container.querySelector('#bulk-complete').addEventListener('click', async () => { 
+
+    container.querySelector('#bulk-complete').addEventListener('click', async () => {
       const selectedIds = Array.from(state.selected);
       for (const id of selectedIds) {
         const task = state.data.find(r => r.id === id);
@@ -1217,18 +1253,18 @@
       applyFilters();
       updateTodaysTasksWidget();
     });
-    
+
     if (adminOnly) {
       container.querySelector('#bulk-assign').addEventListener('click', () => {
         console.log('Bulk assign', Array.from(state.selected));
         // TODO: Implement bulk assign functionality
       });
     }
-    
+
     container.querySelector('#bulk-export').addEventListener('click', () => {
       const selectedIds = Array.from(state.selected);
       const selectedTasks = state.data.filter(r => selectedIds.includes(r.id));
-      
+
       // Convert to CSV
       const headers = ['Title', 'Contact', 'Account', 'Type', 'Priority', 'Due Date', 'Due Time', 'Status'];
       const rows = selectedTasks.map(t => [
@@ -1241,12 +1277,12 @@
         escapeHtml(t.dueTime || ''),
         escapeHtml(t.status || '')
       ]);
-      
+
       const csv = [
         headers.join(','),
         ...rows.map(r => r.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
       ].join('\n');
-      
+
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1257,7 +1293,7 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     });
-    
+
     container.querySelector('#bulk-delete').addEventListener('click', async () => {
       await deleteSelectedTasks();
     });
@@ -1344,20 +1380,20 @@
       </div>`;
 
     const close = () => { if (overlay.parentElement) overlay.parentElement.removeChild(overlay); };
-    
+
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay || (e.target.classList && e.target.classList.contains('close-btn'))) close();
     });
-    
+
     overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-    
+
     // Set default due date to today
     const dueDateInput = overlay.querySelector('#task-due-date');
     if (dueDateInput) {
       const today = new Date().toISOString().split('T')[0];
       dueDateInput.value = today;
     }
-    
+
     // Add auto-formatting to time input
     const timeInput = overlay.querySelector('#task-due-time');
     if (timeInput) {
@@ -1367,50 +1403,50 @@
           e.target.value = '';
         }
       });
-      
+
       timeInput.addEventListener('input', (e) => {
         let value = e.target.value;
         let cursorPos = e.target.selectionStart;
         const originalLength = value.length;
-        
+
         // Only allow digits, colon, A, P, M, and spaces
         value = value.replace(/[^\d:APMapm\s]/g, '');
-        
+
         // Don't auto-format if user is backspacing or deleting
         if (value.length < originalLength) {
           e.target.value = value;
           return;
         }
-        
+
         // Auto-insert colon after 2 digits if no colon exists
         if (/^\d{2}$/.test(value) && !value.includes(':')) {
           value = value + ':';
           cursorPos = 3; // Position cursor after the colon
         }
-        
+
         // Auto-insert colon after 1 digit if user types 3rd digit and no colon
         if (/^\d{3}$/.test(value) && !value.includes(':')) {
           value = value.slice(0, 1) + ':' + value.slice(1);
           cursorPos = 4; // Position cursor after the colon
         }
-        
+
         // Handle 4 digits without colon (e.g., "1030")
         if (/^\d{4}$/.test(value)) {
           value = value.slice(0, 2) + ':' + value.slice(2);
           cursorPos = 5; // Position cursor after the colon
         }
-        
+
         // Clean up AM/PM formatting
         value = value.replace(/\s+/g, ' ').trim();
-        
+
         // If user types AM or PM, ensure proper spacing
         if (/AM|PM/i.test(value)) {
           value = value.replace(/(\d{1,2}:\d{0,2})\s*(AM|PM)/i, '$1 $2');
           value = value.replace(/(\d{1,2}:\d{2})\s*(AM|PM)/i, '$1 $2');
         }
-        
+
         e.target.value = value;
-        
+
         // Restore cursor position
         if (cursorPos !== undefined) {
           setTimeout(() => {
@@ -1418,7 +1454,7 @@
           }, 0);
         }
       });
-      
+
       // Handle paste events
       timeInput.addEventListener('paste', (e) => {
         setTimeout(() => {
@@ -1426,26 +1462,26 @@
         }, 0);
       });
     }
-    
+
     // Event listeners
     overlay.querySelector('#cancel-create-task').addEventListener('click', close);
     overlay.querySelector('#save-create-task').addEventListener('click', async () => {
       const form = overlay.querySelector('#create-task-form');
       const formData = new FormData(form);
       const taskData = Object.fromEntries(formData.entries());
-      
+
       // Validate required fields
       if (!taskData.title || !taskData.type || !taskData.priority || !taskData.dueDate || !taskData.dueTime) {
         alert('Please fill in all required fields');
         return;
       }
-      
+
       await createTask(taskData);
       close();
     });
-    
+
     document.body.appendChild(overlay);
-    
+
     // Focus first input
     setTimeout(() => {
       const firstInput = overlay.querySelector('#task-title');
@@ -1478,7 +1514,7 @@
         title = `${action} ${name}`;
       }
     }
-    
+
     const newTask = {
       id: 'task_' + Date.now(),
       title: title || 'Task',
@@ -1492,11 +1528,11 @@
       notes: taskData.notes || '',
       createdAt: Date.now()
     };
-    
+
     // Add to state
     state.data.unshift(newTask);
     state.filtered = state.data.slice();
-    
+
     // Save to localStorage for persistence
     try {
       const existingTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
@@ -1505,7 +1541,7 @@
     } catch (e) {
       console.warn('Could not save task to localStorage:', e);
     }
-    
+
     // Save to Firebase
     try {
       const db = window.firebaseDB;
@@ -1514,7 +1550,7 @@
           ...newTask,
           timestamp: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
         });
-        
+
         // CRITICAL FIX: Invalidate cache after task creation to prevent stale data
         if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
           await window.CacheManager.invalidate('tasks');
@@ -1524,15 +1560,15 @@
     } catch (err) {
       console.warn('Failed to save task to Firebase:', err);
     }
-    
+
     // Refresh display
     applyFilters();
-    
+
     // Show success message
     if (window.crm && typeof window.crm.showToast === 'function') {
       window.crm.showToast('Task created successfully');
     }
-    
+
     // Update Today's Tasks widget
     updateTodaysTasksWidget();
   }
@@ -1542,28 +1578,28 @@
     if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
       window.crm.loadTodaysTasks();
     }
-    
+
     // Also trigger a custom event for other components that might need to know about task updates
-    window.dispatchEvent(new CustomEvent('tasksUpdated', { 
-      detail: { source: 'taskCreation' } 
+    window.dispatchEvent(new CustomEvent('tasksUpdated', {
+      detail: { source: 'taskCreation' }
     }));
   }
 
-  async function init(){ if(!initDomRefs()) return; attachEvents(); injectTasksBulkStyles(); await loadData(); bindUpdates(); }
+  async function init() { if (!initDomRefs()) return; attachEvents(); injectTasksBulkStyles(); await loadData(); bindUpdates(); }
 
   // Listen for cross-page task updates and refresh immediately
-  function bindUpdates(){
+  function bindUpdates() {
     window.addEventListener('tasksUpdated', async () => {
       // Rebuild from localStorage + Firebase + LinkedIn tasks
       await loadData();
     });
-    
+
     // Listen for background tasks loader events
     document.addEventListener('pc:tasks-loaded', async () => {
       console.log('[Tasks] Background tasks loaded, refreshing data...');
       await loadData();
     });
-    
+
     // Listen for auto-task events from other pages
     window.addEventListener('pc:auto-task', async (event) => {
       const { title, type, contact, account, dueDate, dueTime, notes } = event.detail;
@@ -1581,9 +1617,9 @@
       try {
         const payload = (e && e.detail) || {};
         await createTask(payload);
-      } catch(_) {}
+      } catch (_) { }
     });
-  } catch(_) {}
+  } catch (_) { }
 
   // Initialize immediately if DOM already loaded, otherwise wait
   if (document.readyState === 'loading') {

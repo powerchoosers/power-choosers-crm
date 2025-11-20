@@ -6,7 +6,7 @@
   if (window.ContactDetail && window.ContactDetail._cleanup) {
     try {
       window.ContactDetail._cleanup();
-    } catch(e) {
+    } catch (e) {
       console.warn('[ContactDetail] Cleanup error:', e);
     }
   }
@@ -22,7 +22,7 @@
   };
 
   const els = {};
-  
+
   // Track event listeners for cleanup
   const eventListeners = [];
 
@@ -37,15 +37,15 @@
   function setupEventDelegation() {
     // Only set up once
     if (document._pcContactDetailDelegated) return;
-    
-    
+
+
     const delegatedClickHandler = (e) => {
       // Check if click is on "Add to list" button
       const addToListBtn = e.target.closest('#add-contact-to-list');
       if (addToListBtn) {
         e.preventDefault();
         e.stopPropagation();
-        
+
         // Toggle behavior: close if already open
         if (document.getElementById('contact-lists-panel')) {
           closeContactListsPanel();
@@ -54,13 +54,13 @@
         }
         return;
       }
-      
+
       // Check if click is on "Add to sequences" button
       const addToSequencesBtn = e.target.closest('#add-contact-to-sequences');
       if (addToSequencesBtn) {
         e.preventDefault();
         e.stopPropagation();
-        
+
         // Toggle behavior: close if already open
         if (document.getElementById('contact-sequences-panel')) {
           closeContactSequencesPanel();
@@ -69,7 +69,7 @@
         }
         return;
       }
-      
+
       // Company link click delegation (fix inconsistent behavior)
       if (e.target.closest('#contact-company-link')) {
         e.preventDefault();
@@ -81,7 +81,7 @@
         }
         return;
       }
-      
+
       // Website button click delegation (contact detail specific)
       const websiteBtn = e.target.closest('.website-header-btn');
       if (websiteBtn && document.getElementById('contact-detail-header')) {
@@ -90,7 +90,7 @@
         handleQuickAction('website');
         return;
       }
-      
+
       // LinkedIn button click delegation (contact detail specific)
       const linkedInBtn = e.target.closest('.linkedin-header-btn');
       if (linkedInBtn && document.getElementById('contact-detail-header')) {
@@ -99,7 +99,7 @@
         handleQuickAction('linkedin');
         return;
       }
-      
+
       // Edit button click delegation (contact detail specific)
       const editBtn = e.target.closest('.title-edit');
       if (editBtn && document.getElementById('contact-detail-header') && !document.getElementById('account-details-page')) {
@@ -109,21 +109,21 @@
         return;
       }
     };
-    
+
     // Attach to document with capture phase to catch events early
     document.addEventListener('click', delegatedClickHandler, true);
     eventListeners.push({ type: 'click', handler: delegatedClickHandler, target: document });
-    
+
     document._pcContactDetailDelegated = true;
   }
-  
+
   // Initialize event delegation immediately
   setupEventDelegation();
 
   // Listen for accounts data becoming available (ONCE)
   if (!document._contactDetailAccountsListenerBound) {
     document.addEventListener('pc:accounts-loaded', async (e) => {
-      
+
       // Only re-render if we're showing a contact and don't have account data yet
       if (state.currentContact && !state._linkedAccountId) {
         try {
@@ -140,26 +140,26 @@
   async function saveField(field, value) {
     const db = window.firebaseDB;
     const contactId = state.currentContact?.id;
-    
+
     if (!contactId || !db) {
       console.warn('[Contact Detail] Missing contactId or db:', { contactId, db: !!db });
       return;
     }
-    
+
     try {
       const payload = {
         [field]: value,
         updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
       };
-      
+
       await db.collection('contacts').doc(contactId).update(payload);
-      
+
       // Update local state
-      try { if (state.currentContact) state.currentContact[field] = value; } catch(_) {}
-      try { window.crm?.showToast && window.crm.showToast('Saved'); } catch(_) {}
+      try { if (state.currentContact) state.currentContact[field] = value; } catch (_) { }
+      try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) { }
     } catch (e) {
       console.error('[Contact Detail] Failed to save contact field', field, e);
-      try { window.crm?.showToast && window.crm.showToast('Save failed'); } catch(_) {}
+      try { window.crm?.showToast && window.crm.showToast('Save failed'); } catch (_) { }
     }
   }
 
@@ -167,31 +167,31 @@
   async function saveAccountField(field, value) {
     const db = window.firebaseDB;
     const accountId = state._linkedAccountId;
-    
+
     if (!accountId) {
       return;
     }
-    
+
     const payload = { [field]: value, updatedAt: Date.now() };
-    
+
     // Update local cache if we have it
     try {
       if (typeof window.getAccountsData === 'function') {
         const accounts = window.getAccountsData() || [];
         const idx = accounts.findIndex(a => a.id === accountId);
         if (idx !== -1) {
-          try { accounts[idx][field] = value; } catch(_) {}
+          try { accounts[idx][field] = value; } catch (_) { }
         }
       }
-    } catch(_) {}
-    
-    if (!db) { 
-      try { document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: accountId, field, value } })); } catch(_) {} 
-      return; 
+    } catch (_) { }
+
+    if (!db) {
+      try { document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: accountId, field, value } })); } catch (_) { }
+      return;
     }
-    
-    try { 
-      await db.collection('accounts').doc(accountId).update(payload); 
+
+    try {
+      await db.collection('accounts').doc(accountId).update(payload);
       window.crm?.showToast && window.crm.showToast('Saved');
       // Opportunistically update Health widget inputs immediately for better UX
       try {
@@ -211,15 +211,15 @@
           const endEl = document.querySelector('#health-contract-end');
           if (endEl) endEl.value = String(value || '').trim();
         }
-      } catch (_) {}
-      try { 
+      } catch (_) { }
+      try {
         const event = new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: accountId, field, value } });
         document.dispatchEvent(event);
-      } catch(e) { 
+      } catch (e) {
       }
-    } catch (e) { 
-      console.warn('[Contact Detail] Failed to save account field', field, e); 
-      window.crm?.showToast && window.crm.showToast('Save failed'); 
+    } catch (e) {
+      console.warn('[Contact Detail] Failed to save account field', field, e);
+      window.crm?.showToast && window.crm.showToast('Save failed');
     }
   }
 
@@ -229,57 +229,57 @@
     const db = window.firebaseDB;
     const accountId = state._linkedAccountId;
     console.log('[Contact Detail] Linked account ID:', accountId);
-    
+
     if (!accountId) {
       console.log('[Contact Detail] No linked account ID found');
       return;
     }
-    
+
     const payload = { serviceAddresses: addresses, updatedAt: Date.now() };
     console.log('[Contact Detail] Payload to save:', payload);
-    
+
     // Update local cache if we have it
     try {
       if (typeof window.getAccountsData === 'function') {
         const accounts = window.getAccountsData() || [];
         const idx = accounts.findIndex(a => a.id === accountId);
         if (idx !== -1) {
-          try { 
+          try {
             accounts[idx].serviceAddresses = addresses;
             accounts[idx].updatedAt = new Date();
-          } catch(_) {}
+          } catch (_) { }
           console.log('[Contact Detail] Updated local cache for account service addresses:', accountId);
         }
       }
-    } catch(_) {}
-    
-    if (!db) { 
+    } catch (_) { }
+
+    if (!db) {
       console.log('[Contact Detail] No database, dispatching service-addresses-updated event');
-      try { document.dispatchEvent(new CustomEvent('pc:service-addresses-updated', { detail: { entity: 'account', id: accountId, addresses } })); } catch(_) {} 
-      return; 
+      try { document.dispatchEvent(new CustomEvent('pc:service-addresses-updated', { detail: { entity: 'account', id: accountId, addresses } })); } catch (_) { }
+      return;
     }
-    
-    try { 
-      await db.collection('accounts').doc(accountId).update(payload); 
+
+    try {
+      await db.collection('accounts').doc(accountId).update(payload);
       window.crm?.showToast && window.crm.showToast('Saved');
       console.log('[Contact Detail] Dispatching service-addresses-updated event:', { entity: 'account', id: accountId, addresses });
-      try { 
+      try {
         const event = new CustomEvent('pc:service-addresses-updated', { detail: { entity: 'account', id: accountId, addresses } });
         document.dispatchEvent(event);
-      } catch(e) { 
+      } catch (e) {
       }
-    } catch (e) { 
-      console.warn('[Contact Detail] Failed to save service addresses', e); 
-      window.crm?.showToast && window.crm.showToast('Save failed'); 
+    } catch (e) {
+      console.warn('[Contact Detail] Failed to save service addresses', e);
+      window.crm?.showToast && window.crm.showToast('Save failed');
     }
   }
 
   // Recent Calls (Contact) keyed patching & styles
-  function injectRecentCallsStyles(){
+  function injectRecentCallsStyles() {
     if (document.getElementById('contact-recent-calls-styles')) return;
-    const style=document.createElement('style');
-    style.id='contact-recent-calls-styles';
-    style.textContent=`
+    const style = document.createElement('style');
+    style.id = 'contact-recent-calls-styles';
+    style.textContent = `
       /* Base list + rows */
       #contact-recent-calls .rc-list { 
         position: relative; 
@@ -364,7 +364,7 @@
     document.head.appendChild(style);
   }
 
-  function injectTaskPopoverStyles(){
+  function injectTaskPopoverStyles() {
     const id = 'contact-task-popover-styles';
     if (document.getElementById(id)) return;
     const style = document.createElement('style');
@@ -524,10 +524,10 @@
   function openEditContactModal() {
     const overlay = createEditContactModal();
     document.body.appendChild(overlay);
-    
+
     // Open modal with animation (same as add modals)
     overlay.removeAttribute('hidden');
-    
+
     // Double requestAnimationFrame ensures browser is ready for smooth animation
     // This prevents choppy first render by giving browser time to create compositor layers
     requestAnimationFrame(() => {
@@ -535,7 +535,7 @@
         overlay.classList.add('show');
       });
     });
-    
+
     // Focus first input
     setTimeout(() => {
       const first = overlay.querySelector('input, select, textarea, button');
@@ -604,7 +604,7 @@
     const backdrop = overlay.querySelector('.pc-modal__backdrop');
     const form = overlay.querySelector('#form-edit-contact');
 
-    const close = () => { 
+    const close = () => {
       // Close with animation
       overlay.classList.remove('show');
       setTimeout(() => {
@@ -684,11 +684,11 @@
       if (db && id) {
         try { await db.collection('contacts').doc(id).update(updates); } catch (err) { console.warn('Failed to save contact', err); }
       }
-      
+
       // If LinkedIn URL provided and contact is linked to an account, update account's LinkedIn
       if (updates.linkedin) {
         let accountId = state.currentContact?.accountId;
-        
+
         // If no accountId but has companyName, try to find account by name
         if (!accountId && updates.companyName) {
           try {
@@ -699,9 +699,9 @@
             if (!accountQuery.empty) {
               accountId = accountQuery.docs[0].id;
             }
-          } catch (_) {}
+          } catch (_) { }
         }
-        
+
         if (accountId) {
           try {
             await db.collection('accounts').doc(accountId).update({
@@ -714,10 +714,10 @@
           }
         }
       }
-      
+
       // Update local state
-      try { Object.assign(state.currentContact, updates); } catch (_) {}
-      
+      try { Object.assign(state.currentContact, updates); } catch (_) { }
+
       // IMMEDIATELY update essential data
       if (window._essentialContactsData) {
         const idx = window._essentialContactsData.findIndex(c => c.id === id);
@@ -729,7 +729,7 @@
           console.log('[ContactDetail] Updated essential data');
         }
       }
-      
+
       // IMMEDIATELY update cache
       if (window.CacheManager && typeof window.CacheManager.get === 'function') {
         window.CacheManager.get('contacts').then(contacts => {
@@ -741,23 +741,23 @@
               console.log('[ContactDetail] Updated cache');
             }
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
-      
+
       // Notify other pages
       try {
-        const ev = new CustomEvent('pc:contact-updated', { 
-          detail: { 
-            id, 
+        const ev = new CustomEvent('pc:contact-updated', {
+          detail: {
+            id,
             changes: { ...updates },
             contact: state.currentContact  // Full updated contact
-          } 
+          }
         });
         document.dispatchEvent(ev);
       } catch (_) { /* noop */ }
       // Feedback and refresh UI
-      try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) {}
-      try { renderContactDetail(); } catch (_) {}
+      try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) { }
+      try { renderContactDetail(); } catch (_) { }
       close();
     });
 
@@ -780,7 +780,7 @@
           } catch (_) { /* noop */ }
         }
         console.log('Widget: Notes for contact', contactId);
-        try { window.crm?.showToast && window.crm.showToast('Open Notes'); } catch (_) {}
+        try { window.crm?.showToast && window.crm.showToast('Open Notes'); } catch (_) { }
         break;
       }
       case 'health': {
@@ -796,7 +796,7 @@
           } catch (_) { /* noop */ }
         }
         console.log('Widget: Energy Health Check for contact', contactId);
-        try { window.crm?.showToast && window.crm.showToast('Open Energy Health Check'); } catch (_) {}
+        try { window.crm?.showToast && window.crm.showToast('Open Energy Health Check'); } catch (_) { }
         break;
       }
       case 'deal': {
@@ -812,7 +812,7 @@
           } catch (_) { /* noop */ }
         }
         console.log('Widget: Deal Calculator for contact', contactId);
-        try { window.crm?.showToast && window.crm.showToast('Open Deal Calculator'); } catch (_) {}
+        try { window.crm?.showToast && window.crm.showToast('Open Deal Calculator'); } catch (_) { }
         break;
       }
       case 'lusha': {
@@ -828,7 +828,7 @@
           } catch (_) { /* noop */ }
         }
         console.log('Widget: Prospect for contact', contactId);
-        try { window.crm?.showToast && window.crm.showToast('Open Prospect'); } catch (_) {}
+        try { window.crm?.showToast && window.crm.showToast('Open Prospect'); } catch (_) { }
         break;
       }
       case 'maps': {
@@ -844,7 +844,7 @@
           } catch (_) { /* noop */ }
         }
         console.log('Widget: Google Maps for contact', contactId);
-        try { window.crm?.showToast && window.crm.showToast('Open Google Maps'); } catch (_) {}
+        try { window.crm?.showToast && window.crm.showToast('Open Google Maps'); } catch (_) { }
         break;
       }
       default:
@@ -1007,7 +1007,7 @@
     const form = pop.querySelector('#contact-task-form');
     const closeBtn = pop.querySelector('#tp-close');
     const timeInput = pop.querySelector('input[name="dueTime"]');
-    
+
     // Auto-format time input
     if (timeInput) {
       // Clear placeholder on focus
@@ -1016,34 +1016,34 @@
           e.target.value = '';
         }
       });
-      
+
       // Track last pressed key to refine formatting behavior (e.g., don't auto-expand on delete)
       let _timeLastKey = null;
-      
+
       timeInput.addEventListener('input', (e) => {
         const rawBefore = e.target.value;
         let value = rawBefore;
         let cursorPos = e.target.selectionStart;
-        
+
         // Only allow digits, colon, A, P, M, and spaces
         let sanitized = value.replace(/[^\d:APMapm\s]/g, '');
-        
+
         // Handle common time formats more intelligently
         let formattedValue = formatTimeInput(sanitized, _timeLastKey);
-        
+
         // If the formatted value ended up with extra characters after AM/PM, strip them
         formattedValue = formattedValue.replace(/^(\d{1,2}:\d{2}\s+(?:AM|PM)).*$/i, '$1');
-        
+
         // Calculate cursor position adjustment
         let cursorAdjustment = formattedValue.length - sanitized.length;
         let newCursorPos = Math.max(0, (cursorPos ?? formattedValue.length) + cursorAdjustment);
-        
+
         // Debugging
-        try { console.log('[TimeInput] input', { raw: rawBefore, sanitized, formatted: formattedValue, lastKey: _timeLastKey, cursorBefore: cursorPos, cursorAfter: newCursorPos }); } catch (_) {}
-        
+        try { console.log('[TimeInput] input', { raw: rawBefore, sanitized, formatted: formattedValue, lastKey: _timeLastKey, cursorBefore: cursorPos, cursorAfter: newCursorPos }); } catch (_) { }
+
         // Set the formatted value
         e.target.value = formattedValue;
-        
+
         // Set cursor position properly
         setTimeout(() => {
           if (e.target === document.activeElement) {
@@ -1053,53 +1053,53 @@
           _timeLastKey = null;
         }, 0);
       });
-      
+
       // Check if user is typing beyond a complete time format
       timeInput.addEventListener('keydown', (e) => {
         _timeLastKey = e.key;
         // Always allow backspace, delete, navigation keys, and space
         const alwaysAllowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter', 'Escape', ' ', 'Space', 'Spacebar'];
         if (alwaysAllowed.includes(e.key) || e.ctrlKey || e.metaKey) {
-          try { console.log('[TimeInput] keydown allow', { key: e.key, reason: 'alwaysAllowed' }); } catch (_) {}
+          try { console.log('[TimeInput] keydown allow', { key: e.key, reason: 'alwaysAllowed' }); } catch (_) { }
           return; // Allow the event to proceed
         }
-        
+
         const value = e.target.value;
         const cursorPos = e.target.selectionStart ?? value.length;
         const complete = isCompleteTimeFormat(value);
-        
+
         // If the current value is a complete time format and user is trying to add characters at the end
         if (complete && cursorPos >= value.length) {
-          try { console.log('[TimeInput] keydown block', { key: e.key, value, cursorPos, complete }); } catch (_) {}
+          try { console.log('[TimeInput] keydown block', { key: e.key, value, cursorPos, complete }); } catch (_) { }
           e.preventDefault();
           return false;
         }
-        try { console.log('[TimeInput] keydown pass', { key: e.key, value, cursorPos, complete }); } catch (_) {}
+        try { console.log('[TimeInput] keydown pass', { key: e.key, value, cursorPos, complete }); } catch (_) { }
       });
-      
+
       // Helper function to check if time format is complete
       function isCompleteTimeFormat(value) {
         // Check if it matches "H:MM AM" or "HH:MM AM" or "H:MM PM" or "HH:MM PM"
         return /^\d{1,2}:\d{2}\s+(AM|PM)$/.test(value);
       }
-      
+
       // Helper function to format time input
       function formatTimeInput(input, lastKey) {
         if (input == null) return '';
-        
+
         // Detect if user intentionally typed a trailing space and no AM/PM yet
         const hadTrailingSpace = /\s$/.test(input);
-        
+
         // Normalize spaces (but do not trim end yet)
         let value = String(input).replace(/\s+/g, ' ');
         // Trim leading spaces only
         value = value.replace(/^\s+/, '');
-        
+
         // Extract digits and letters
         const digits = (value.match(/\d+/g) || []).join('');
         const colonExplicit = /:\s*$/.test(value) || /:\s*[ap]?m?$/i.test(value); // user typed colon at end
         let ampmRaw = (value.match(/([ap]m?)$/i) || [null, ''])[1] || '';
-        
+
         // Build time from digits
         let hours = '';
         let minutes = '';
@@ -1114,10 +1114,10 @@
         } else if (digits.length === 1) {
           hours = digits;
         }
-        
+
         // Clamp minutes to two digits; ignore extras
         if (minutes.length > 2) minutes = minutes.slice(0, 2);
-        
+
         // Compose base time string
         let out = '';
         if (hours) {
@@ -1125,9 +1125,9 @@
           else if (colonExplicit) out = `${hours}:`;
           else out = hours;
         }
-        
+
         // Handle various input patterns
-        
+
         // Apply AM/PM logic
         if (ampmRaw) {
           // If deleting, don't auto-expand 'A' -> 'AM'
@@ -1141,29 +1141,29 @@
           }
           out = out ? `${out} ${ampmRaw}` : ampmRaw;
         }
-        
+
         // Auto-add space before AM/PM if missing (e.g., 10:30p -> 10:30 p)
         out = out.replace(/(\d)([AP]M?)$/g, '$1 $2');
-        
+
         // Capitalize AM/PM
         value = value.replace(/\b(am|pm|a|p)\b/gi, (match) => {
           if (match.toLowerCase() === 'a') return 'AM';
           if (match.toLowerCase() === 'p') return 'PM';
           return match.toUpperCase();
         });
-        
+
         // Preserve a single trailing space if user typed it and AM/PM not present
         if (hadTrailingSpace && !/(AM|PM)/i.test(out)) {
-          out = out.replace(/\s+$/,'') + ' ';
+          out = out.replace(/\s+$/, '') + ' ';
           return out;
         }
-        
+
         // Clean up spaces (trim both ends when no trailing space preservation)
         out = out.replace(/\s+/g, ' ').trim();
-        
+
         return out;
       }
-      
+
       // Handle paste events
       timeInput.addEventListener('paste', (e) => {
         setTimeout(() => {
@@ -1171,9 +1171,9 @@
         }, 0);
       });
     }
-    
+
     closeBtn?.addEventListener('click', closeContactTaskPopover);
-    
+
     // Calendar functionality
     const calendarToggle = pop.querySelector('#calendar-toggle');
     const calendarToolbar = pop.querySelector('#calendar-toolbar');
@@ -1182,7 +1182,7 @@
     const calendarPrev = pop.querySelector('#calendar-prev');
     const calendarNext = pop.querySelector('#calendar-next');
     const dueDateInput = pop.querySelector('input[name="dueDate"]');
-    
+
     // Dropdown functionality
     const typeToggle = pop.querySelector('#type-toggle');
     const typeToolbar = pop.querySelector('#type-toolbar');
@@ -1190,61 +1190,61 @@
     const priorityToggle = pop.querySelector('#priority-toggle');
     const priorityToolbar = pop.querySelector('#priority-toolbar');
     const priorityInput = pop.querySelector('input[name="priority"]');
-    
+
     // Parse the ISO date string and create local date objects to avoid timezone issues
     const [year, month, day] = nextBiz.split('-').map(Number);
     let currentDate = new Date(year, month - 1, day);
     let selectedDate = new Date(year, month - 1, day);
-    
+
     // Format date for display
     function formatDateForDisplay(dateString) {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        weekday: 'short', 
-        month: 'short', 
+      return date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
         day: 'numeric',
         year: 'numeric'
       });
     }
-    
+
     // Generate calendar days
     function generateCalendar() {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
-      
+
       // Update month/year display
-      calendarMonthYear.textContent = currentDate.toLocaleDateString('en-US', { 
-        month: 'long', 
-        year: 'numeric' 
+      calendarMonthYear.textContent = currentDate.toLocaleDateString('en-US', {
+        month: 'long',
+        year: 'numeric'
       });
-      
+
       // Clear existing days
       calendarDays.innerHTML = '';
-      
+
       // Get first day of month and number of days
       const firstDay = new Date(year, month, 1);
       const lastDay = new Date(year, month + 1, 0);
       const daysInMonth = lastDay.getDate();
       const startingDayOfWeek = firstDay.getDay();
-      
+
       // Add empty cells for days before the first day of the month
       for (let i = 0; i < startingDayOfWeek; i++) {
         const emptyDay = document.createElement('div');
         emptyDay.className = 'calendar-day calendar-day-empty';
         calendarDays.appendChild(emptyDay);
       }
-      
+
       // Add days of the month
       for (let day = 1; day <= daysInMonth; day++) {
         const dayElement = document.createElement('button');
         dayElement.className = 'calendar-day';
         dayElement.textContent = day;
         dayElement.type = 'button';
-        
+
         const dayDate = new Date(year, month, day);
         const isSelected = dayDate.toDateString() === selectedDate.toDateString();
         const isToday = dayDate.toDateString() === new Date().toDateString();
-        
+
         if (isSelected) {
           dayElement.classList.add('calendar-day-selected');
         }
@@ -1252,18 +1252,18 @@
           dayElement.classList.add('calendar-day-today');
           dayElement.style.borderColor = 'var(--orange-primary)';
         }
-        
+
         dayElement.addEventListener('click', () => {
           selectedDate = dayDate;
           dueDateInput.value = `${(dayDate.getMonth() + 1).toString().padStart(2, '0')}/${dayDate.getDate().toString().padStart(2, '0')}/${dayDate.getFullYear()}`;
           generateCalendar();
           closeCalendar();
         });
-        
+
         calendarDays.appendChild(dayElement);
       }
     }
-    
+
     // Ensure the time/due date row is at the top of the scroll container
     function scrollTimeDueRowIntoView() {
       try {
@@ -1286,7 +1286,7 @@
         closeCalendar();
       }
     }
-    
+
     function openCalendar() {
       generateCalendar();
       calendarToolbar.style.display = 'block';
@@ -1295,61 +1295,61 @@
       calendarToolbar.classList.add('calendar-slide-in');
       // Add animation class to task popover to make it flexible
       pop.classList.add('calendar-expanded');
-      
+
       // Scroll to the time/date form row when calendar opens
       setTimeout(() => {
         console.log('Attempting to scroll to form row...');
         const tpBody = pop.querySelector('.tp-body');
-        
+
         // Find the Time/Due date form row by looking for the Time label
         const timeLabel = pop.querySelector('label:has(input[name="dueTime"])');
         const formRow = timeLabel ? timeLabel.closest('.form-row') : null;
-        
+
         console.log('tpBody found:', !!tpBody);
         console.log('timeLabel found:', !!timeLabel);
         console.log('formRow found:', !!formRow);
-        
+
         if (tpBody && formRow) {
           console.log('Both elements found, attempting scroll...');
           console.log('tpBody scrollTop before:', tpBody.scrollTop);
           console.log('formRow offsetTop:', formRow.offsetTop);
-          
+
           // Scroll to align the actual Time label top with the container top
           const anchorEl = timeLabel || formRow; // prefer the Time label; fallback to row
-          
+
           if (anchorEl) {
             const containerRect = tpBody.getBoundingClientRect();
             const anchorRect = anchorEl.getBoundingClientRect();
             const deltaTop = anchorRect.top - containerRect.top; // pixels from visible top
             const targetScrollTop = Math.max(0, tpBody.scrollTop + deltaTop - 0); // no padding
-            
+
             console.log('containerRect.top:', containerRect.top);
             console.log('anchorRect.top:', anchorRect.top);
             console.log('deltaTop:', deltaTop);
             console.log('targetScrollTop:', targetScrollTop);
-            
+
             tpBody.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
           } else {
             console.log('Anchor label not found, scrolling to top');
             tpBody.scrollTo({ top: 0, behavior: 'smooth' });
           }
-          
+
           console.log('tpBody.scrollTo called');
         } else {
           console.log('Missing elements - tpBody:', !!tpBody, 'formRow:', !!formRow);
         }
       }, 300); // Increased delay to ensure calendar is fully rendered
     }
-    
+
     function closeCalendar() {
       if (!calendarToolbar) return;
-      
+
       // Start smooth scroll back to top when closing
       const tpBody = pop.querySelector('.tp-body');
       if (tpBody) {
         tpBody.scrollTo({ top: 0, behavior: 'smooth' });
       }
-      
+
       // Start toolbar collapse animation
       calendarToolbar.classList.remove('calendar-slide-in');
       calendarToolbar.classList.add('calendar-slide-out');
@@ -1372,12 +1372,12 @@
 
       // Fallback cleanup in case transitionend doesn't fire
       setTimeout(() => {
-        try { calendarToolbar.removeEventListener('transitionend', handleEnd); } catch (_) {}
+        try { calendarToolbar.removeEventListener('transitionend', handleEnd); } catch (_) { }
         calendarToolbar.style.display = 'none';
         calendarToolbar.classList.remove('calendar-slide-out');
       }, 600);
     }
-    
+
     // Dropdown toggle functions
     function toggleTypeDropdown() {
       if (typeToolbar.style.display === 'none') {
@@ -1386,19 +1386,19 @@
         closeTypeDropdown();
       }
     }
-    
+
     function openTypeDropdown() {
       typeToolbar.style.display = 'block';
       typeToolbar.offsetHeight; // Force reflow
       typeToolbar.classList.add('dropdown-slide-in');
     }
-    
+
     function closeTypeDropdown() {
       if (!typeToolbar) return;
       typeToolbar.classList.remove('dropdown-slide-in');
       typeToolbar.classList.add('dropdown-slide-out');
       typeToolbar.style.display = 'block';
-      
+
       const handleEnd = (ev) => {
         if (ev.target !== typeToolbar) return;
         typeToolbar.removeEventListener('transitionend', handleEnd);
@@ -1406,14 +1406,14 @@
         typeToolbar.classList.remove('dropdown-slide-out');
       };
       typeToolbar.addEventListener('transitionend', handleEnd);
-      
+
       setTimeout(() => {
-        try { typeToolbar.removeEventListener('transitionend', handleEnd); } catch (_) {}
+        try { typeToolbar.removeEventListener('transitionend', handleEnd); } catch (_) { }
         typeToolbar.style.display = 'none';
         typeToolbar.classList.remove('dropdown-slide-out');
       }, 600);
     }
-    
+
     function togglePriorityDropdown() {
       if (priorityToolbar.style.display === 'none') {
         openPriorityDropdown();
@@ -1421,19 +1421,19 @@
         closePriorityDropdown();
       }
     }
-    
+
     function openPriorityDropdown() {
       priorityToolbar.style.display = 'block';
       priorityToolbar.offsetHeight; // Force reflow
       priorityToolbar.classList.add('dropdown-slide-in');
     }
-    
+
     function closePriorityDropdown() {
       if (!priorityToolbar) return;
       priorityToolbar.classList.remove('dropdown-slide-in');
       priorityToolbar.classList.add('dropdown-slide-out');
       priorityToolbar.style.display = 'block';
-      
+
       const handleEnd = (ev) => {
         if (ev.target !== priorityToolbar) return;
         priorityToolbar.removeEventListener('transitionend', handleEnd);
@@ -1441,14 +1441,14 @@
         priorityToolbar.classList.remove('dropdown-slide-out');
       };
       priorityToolbar.addEventListener('transitionend', handleEnd);
-      
+
       setTimeout(() => {
-        try { priorityToolbar.removeEventListener('transitionend', handleEnd); } catch (_) {}
+        try { priorityToolbar.removeEventListener('transitionend', handleEnd); } catch (_) { }
         priorityToolbar.style.display = 'none';
         priorityToolbar.classList.remove('dropdown-slide-out');
       }, 600);
     }
-    
+
     // Event listeners
     // Prevent outside-click from firing when interacting with calendar UI
     calendarToolbar?.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -1463,19 +1463,19 @@
       currentDate.setMonth(currentDate.getMonth() + 1);
       generateCalendar();
     });
-    
+
     // Dropdown event listeners
     typeToggle?.addEventListener('mousedown', (e) => e.stopPropagation());
     typeToggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleTypeDropdown(); });
     priorityToggle?.addEventListener('mousedown', (e) => e.stopPropagation());
     priorityToggle?.addEventListener('click', (e) => { e.stopPropagation(); togglePriorityDropdown(); });
-    
+
     // Prevent outside-click from firing when interacting with dropdown UI
     typeToolbar?.addEventListener('mousedown', (e) => e.stopPropagation());
     typeToolbar?.addEventListener('click', (e) => e.stopPropagation());
     priorityToolbar?.addEventListener('mousedown', (e) => e.stopPropagation());
     priorityToolbar?.addEventListener('click', (e) => e.stopPropagation());
-    
+
     // Type option selection
     typeToolbar?.addEventListener('click', (e) => {
       const option = e.target.closest('.dropdown-option');
@@ -1483,15 +1483,15 @@
         const value = option.dataset.value;
         const text = option.textContent;
         typeInput.value = text;
-        
+
         // Update selected state
         typeToolbar.querySelectorAll('.dropdown-option').forEach(btn => btn.classList.remove('selected'));
         option.classList.add('selected');
-        
+
         closeTypeDropdown();
       }
     });
-    
+
     // Priority option selection
     priorityToolbar?.addEventListener('click', (e) => {
       const option = e.target.closest('.dropdown-option');
@@ -1499,21 +1499,21 @@
         const value = option.dataset.value;
         const text = option.textContent;
         priorityInput.value = text;
-        
+
         // Update selected state
         priorityToolbar.querySelectorAll('.dropdown-option').forEach(btn => btn.classList.remove('selected'));
         option.classList.add('selected');
-        
+
         closePriorityDropdown();
       }
     });
-    
+
     // Set initial selected states
     const phoneCallOption = typeToolbar?.querySelector('[data-value="phone-call"]');
     const mediumOption = priorityToolbar?.querySelector('[data-value="medium"]');
     if (phoneCallOption) phoneCallOption.classList.add('selected');
     if (mediumOption) mediumOption.classList.add('selected');
-    
+
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
@@ -1558,7 +1558,7 @@
         console.warn('Failed to save task to Firebase:', err);
       }
 
-      try { window.crm?.showToast && window.crm.showToast('Task created'); } catch (_) {}
+      try { window.crm?.showToast && window.crm.showToast('Task created'); } catch (_) { }
       // Notify other components
       try {
         // Update Today's Tasks widget immediately
@@ -1567,7 +1567,7 @@
         }
         // Notify Tasks page (and any listeners) to refresh its list from localStorage
         window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'contact-detail', task: newTask } }));
-      } catch (_) {}
+      } catch (_) { }
       closeContactTaskPopover();
     });
 
@@ -1584,14 +1584,14 @@
       document.addEventListener('mousedown', outside);
       document.addEventListener('keydown', onEsc);
     }, 0);
-    function cleanup(){
+    function cleanup() {
       document.removeEventListener('mousedown', outside);
       document.removeEventListener('keydown', onEsc);
       closeContactTaskPopover();
     }
   }
 
-  function closeContactTaskPopover(){
+  function closeContactTaskPopover() {
     const ex = document.querySelector('.task-popover');
     if (ex) {
       // Remove show class for dropdown animation
@@ -1602,7 +1602,7 @@
     }
   }
 
-  function buildTaskTitle(type, name){
+  function buildTaskTitle(type, name) {
     const map = {
       'phone-call': 'Call',
       'manual-email': 'Email',
@@ -1615,12 +1615,12 @@
     return `${label} — ${name}`;
   }
 
-  function getNextBusinessDayISO(){
+  function getNextBusinessDayISO() {
     const d = new Date();
     const dayOfWeek = d.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-    
+
     console.log('Current date:', d.toDateString(), 'Day of week:', dayOfWeek);
-    
+
     // If today is Friday (5), next business day is Monday (+3 days)
     if (dayOfWeek === 5) {
       d.setDate(d.getDate() + 3);
@@ -1637,12 +1637,12 @@
     else {
       d.setDate(d.getDate() + 1);
     }
-    
+
     console.log('Next business day:', d.toDateString());
     return d.toISOString().split('T')[0];
   }
 
-  function renderExistingTasksForContact(contactId, fullName){
+  function renderExistingTasksForContact(contactId, fullName) {
     let tasks = [];
     try {
       const all = JSON.parse(localStorage.getItem('userTasks') || '[]');
@@ -1669,20 +1669,20 @@
   function normalizePhone(input) {
     const raw = (input || '').toString().trim();
     if (!raw) return '';
-    
+
     // Parse phone number and extension
     const parsed = parsePhoneWithExtension(raw);
     if (!parsed.number) return '';
-    
+
     // Format the number part
     let formattedNumber = '';
     const cleaned = parsed.number.replace(/[^\d]/g, '');
-    
+
     // Always display US numbers with +1 prefix and formatting
     if (cleaned.length === 11 && cleaned.startsWith('1')) {
-      formattedNumber = `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+      formattedNumber = `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
     } else if (cleaned.length === 10) {
-      formattedNumber = `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+      formattedNumber = `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
     } else if (/^\+/.test(String(parsed.number))) {
       // International number - keep as-is
       formattedNumber = parsed.number;
@@ -1693,12 +1693,12 @@
       // Fallback: return original if we can't format
       return raw;
     }
-    
+
     // Add extension if present (use consistent format with period)
     if (parsed.extension) {
       return `${formattedNumber} ext. ${parsed.extension}`;
     }
-    
+
     return formattedNumber;
   }
 
@@ -1706,7 +1706,7 @@
   function parsePhoneWithExtension(input) {
     const raw = (input || '').toString().trim();
     if (!raw) return { number: '', extension: '' };
-    
+
     // Common extension patterns
     const extensionPatterns = [
       /ext\.?\s*(\d+)/i,
@@ -1715,10 +1715,10 @@
       /#\s*(\d+)/i,
       /\s+(\d{3,6})\s*$/  // 3-6 digits at the end (common extension length)
     ];
-    
+
     let number = raw;
     let extension = '';
-    
+
     // Try to find extension using various patterns
     for (const pattern of extensionPatterns) {
       const match = number.match(pattern);
@@ -1728,7 +1728,7 @@
         break;
       }
     }
-    
+
     return { number, extension };
   }
 
@@ -1736,7 +1736,7 @@
   function isTypingExtension(value, cursorPos) {
     const text = (value || '').toLowerCase();
     const cursor = cursorPos || 0;
-    
+
     // Check if cursor is after common extension keywords
     const extensionKeywords = ['ext', 'extension', 'x', '#'];
     for (const keyword of extensionKeywords) {
@@ -1745,7 +1745,7 @@
         return true;
       }
     }
-    
+
     // Check if we're at the end and typing digits after a space (common extension pattern)
     const trimmed = value.trim();
     const lastSpace = trimmed.lastIndexOf(' ');
@@ -1756,39 +1756,39 @@
         return true;
       }
     }
-    
+
     // Check if we have a complete phone number and user is adding more digits
     const digits = value.replace(/\D/g, '');
     if (digits.length >= 10) {
       // If we have 10+ digits and user is still typing, might be extension
       const phonePart = value.substring(0, value.lastIndexOf(digits[digits.length - 1]) + 1);
       const remaining = value.substring(phonePart.length).trim();
-      
+
       // If there's remaining text that looks like an extension
       if (remaining && /^[\s]*[\d]+$/.test(remaining)) {
         return true;
       }
     }
-    
+
     return false;
   }
 
   // Format phone number for input (less aggressive than display formatting)
   function formatPhoneNumberForInput(value) {
     if (!value) return '';
-    
+
     // Parse to separate number and extension
     const parsed = parsePhoneWithExtension(value);
     if (!parsed.number) return value;
-    
+
     // Format only the main number part
     const cleaned = parsed.number.replace(/\D/g, '');
     let formattedNumber = '';
-    
+
     if (cleaned.length === 11 && cleaned.startsWith('1')) {
-      formattedNumber = `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+      formattedNumber = `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
     } else if (cleaned.length === 10) {
-      formattedNumber = `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+      formattedNumber = `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
     } else if (cleaned.length >= 8) {
       // For international numbers, just clean up formatting
       formattedNumber = parsed.number;
@@ -1796,32 +1796,32 @@
       // Too short, return as-is
       return value;
     }
-    
+
     // Add extension back if present
     if (parsed.extension) {
       return `${formattedNumber} ext. ${parsed.extension}`;
     }
-    
+
     return formattedNumber;
   }
 
   // Format phone numbers for display with extension support
   function formatPhoneForDisplay(phone) {
     if (!phone) return '';
-    
+
     // Parse phone number and extension
     const parsed = parsePhoneWithExtension(phone);
     if (!parsed.number) return phone;
-    
+
     // Format the main number
     let formattedNumber = '';
     const cleaned = parsed.number.replace(/\D/g, '');
-    
+
     // Always display US numbers with +1 prefix
     if (cleaned.length === 11 && cleaned.startsWith('1')) {
-      formattedNumber = `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+      formattedNumber = `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
     } else if (cleaned.length === 10) {
-      formattedNumber = `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+      formattedNumber = `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
     } else if (/^\+/.test(String(parsed.number))) {
       // International number - keep as-is but clean up formatting
       const digits = parsed.number.replace(/\D/g, '');
@@ -1834,29 +1834,29 @@
       // Fallback: return original if we can't format
       formattedNumber = parsed.number;
     }
-    
+
     // Add extension if present
     if (parsed.extension) {
       return `${formattedNumber} ext. ${parsed.extension}`;
     }
-    
+
     return formattedNumber;
   }
 
   async function showContactDetail(contactId, tempContact) {
     if (!initDomRefs()) return;
-    
+
     // Clear previous contact's linked account state to prevent data leakage
     state._linkedAccountId = null;
     state._preloadedAccount = null;
     state._preloadedCompanyPhone = null;
     state._accountCache = null;
-    
+
     // Clear AccountDetail global state to prevent other modules from using stale account data
     if (window.AccountDetail && window.AccountDetail.state) {
       window.AccountDetail.state.currentAccount = null;
     }
-    
+
     // Find contact in people data, or use provided temporary contact
     let contact = null;
     if (tempContact && typeof tempContact === 'object') {
@@ -1864,12 +1864,12 @@
     } else {
       contact = await findContactById(contactId);
     }
-    
+
     // Ensure contact has an ID
     if (contact && !contact.id && contactId) {
       contact.id = contactId;
     }
-    
+
     if (!contact) {
       console.error('Contact not found:', contactId);
       return;
@@ -1877,29 +1877,29 @@
 
     // Ensure the new contact has a stable id immediately for downstream actions (lists, notes)
     if (!contact.id && contactId) contact.id = contactId;
-    
+
     // PRE-LOAD: Start account data fetch in parallel
     const accountDataPromise = findAssociatedAccount(contact);
     const companyPhonePromise = accountDataPromise.then(linkedAccount => getCompanyPhone(contact, linkedAccount));
-    
+
     // Store contact immediately
     state.currentContact = contact;
-    
+
     // Wait for account data to load
     const [linkedAccount, companyPhone] = await Promise.all([
-      accountDataPromise, 
+      accountDataPromise,
       companyPhonePromise
     ]);
-    
+
     // Store pre-loaded data for render
     state._preloadedAccount = linkedAccount;
     state._preloadedCompanyPhone = companyPhone;
     state._linkedAccountId = linkedAccount?.id || null;
     state.currentContact = contact;
-    
+
     // Broadcast that contact detail is loaded so dependent widgets can rebind
-    try { document.dispatchEvent(new CustomEvent('pc:contact-loaded', { detail: { id: contact.id } })); } catch(_) {}
-    
+    try { document.dispatchEvent(new CustomEvent('pc:contact-loaded', { detail: { id: contact.id } })); } catch (_) { }
+
     // Enable the "Add to list" button now that contact is fully loaded
     // Using requestAnimationFrame for smoother UI update (runs on next paint)
     requestAnimationFrame(() => {
@@ -1910,11 +1910,11 @@
         addToListBtn.title = 'Add to list';
       }
     });
-    
+
     // Clear phone widget context completely when opening contact detail page
     // This prevents any previous contact/company info from leaking into future calls
     clearPhoneWidgetContext();
-    
+
     // Add event listener for company phone clicks with strict company-mode flow
     // This implements the AI-suggested approach for Contact Detail company phone calls
     try {
@@ -1923,7 +1923,7 @@
         // Reset flag to allow reattachment after module reload
         contactDetailView._companyPhoneHandlerAdded = false;
         contactDetailView._contactPhoneHandlerAdded = false;
-        
+
         if (!contactDetailView._companyPhoneHandlerAdded) {
           contactDetailView._companyPhoneHandlerAdded = true;
           const companyPhoneHandler = (e) => {
@@ -1936,7 +1936,7 @@
           contactDetailView.addEventListener('click', companyPhoneHandler);
           eventListeners.push({ type: 'click', handler: companyPhoneHandler, target: contactDetailView });
         }
-        
+
         if (!contactDetailView._contactPhoneHandlerAdded) {
           contactDetailView._contactPhoneHandlerAdded = true;
           const contactPhoneHandler = (e) => {
@@ -1950,12 +1950,12 @@
           eventListeners.push({ type: 'click', handler: contactPhoneHandler, target: contactDetailView });
         }
       }
-    } catch(_) {}
-    
+    } catch (_) { }
+
     // Ensure per-contact event handlers are rebound on each view
     // This avoids stale guards after navigating to other pages (e.g., account details)
     state._contactDetailEventsAttached = false;
-    
+
     // Attach contact detail events after DOM is ready
     // Using requestAnimationFrame ensures DOM is painted before attaching events
     requestAnimationFrame(() => {
@@ -1977,21 +1977,21 @@
     // Enable scrollable content area while in contact detail
     if (els.page) { els.page.classList.add('contact-detail-mode'); }
     // Seed preferred phone selection from persisted value so the primary phone row reflects it immediately
-    try { state.preferredPhoneField = String(contact.preferredPhoneField || '').trim(); } catch(_) { state.preferredPhoneField = ''; }
+    try { state.preferredPhoneField = String(contact.preferredPhoneField || '').trim(); } catch (_) { state.preferredPhoneField = ''; }
     await renderContactDetail();
-    
+
     // Setup energy update listener for real-time sync with Health Widget
     try {
       if (window.ContactDetail && window.ContactDetail.setupEnergyUpdateListener) {
         window.ContactDetail.setupEnergyUpdateListener();
       }
-    } catch (_) {}
-    
+    } catch (_) { }
+
     // Setup contact created listener for cases where new contacts are created from Account Details
     try {
       setupContactCreatedListener();
-    } catch (_) {}
-    
+    } catch (_) { }
+
     // Setup contact updated listener to re-attach event handlers after editing
     if (!document._contactDetailUpdatedBound) {
       document._contactDetailUpdatedBound = true;
@@ -2004,9 +2004,9 @@
             }
           }, 100);
         });
-      } catch (_) {}
+      } catch (_) { }
     }
-    
+
     // Listen for new calls to this contact
     if (!document._contactDetailCallLoggedBound) {
       document._contactDetailCallLoggedBound = true;
@@ -2014,15 +2014,15 @@
         document.addEventListener('pc:call-logged', (event) => {
           const callData = event.detail;
           const currentContactId = state.currentContact?.id;
-          
-          if (currentContactId && (callData.contactId === currentContactId || 
-                                   callData.call?.contactId === currentContactId)) {
-            
+
+          if (currentContactId && (callData.contactId === currentContactId ||
+            callData.call?.contactId === currentContactId)) {
+
             // Immediately refresh recent calls section
             if (window.ActivityManager && typeof window.ActivityManager.renderActivities === 'function') {
               window.ActivityManager.renderActivities(
-                'contact-activity-timeline', 
-                'contact', 
+                'contact-activity-timeline',
+                'contact',
                 currentContactId,
                 true // force refresh
               );
@@ -2031,7 +2031,7 @@
         });
       } catch (_) { /* noop */ }
     }
-    
+
     // Setup contact loaded listener to ensure event handlers are attached
     if (!document._contactDetailLoadedBound) {
       document._contactDetailLoadedBound = true;
@@ -2044,9 +2044,9 @@
             }
           }, 100);
         });
-      } catch (_) {}
+      } catch (_) { }
     }
-    
+
     // Add click handler to persist default phone when star button is clicked
     const starButton = document.querySelector('.star-button');
     if (starButton) {
@@ -2078,7 +2078,7 @@
   }
 
   async function findContactById(contactId) {
-    
+
     // Use prefetched contact if provided by navigation source (avoids extra hops)
     try {
       if (window._prefetchedContactForDetail && window._prefetchedContactForDetail.id === contactId) {
@@ -2090,7 +2090,7 @@
     } catch (error) {
       console.error('[ContactDetail] Error with prefetched contact:', error);
     }
-    
+
     // Check BackgroundContactsLoader first (cache-first)
     if (window.BackgroundContactsLoader) {
       const contactsData = window.BackgroundContactsLoader.getContactsData() || [];
@@ -2100,7 +2100,7 @@
         return found;
       }
     }
-    
+
     // Access people.js data if available (legacy cache)
     if (window.getPeopleData) {
       const peopleData = window.getPeopleData();
@@ -2109,7 +2109,7 @@
         return found;
       }
     }
-    
+
     // If not found in people data cache, try to find in calls data
     // This handles cases where contacts are accessed from calls page
     if (window.callsModule && window.callsModule.getCallContactById) {
@@ -2118,14 +2118,14 @@
         return callContact;
       }
     }
-    
+
     // Fallback: try to find by name in people data (for generated contact IDs)
     if (contactId && contactId.startsWith('call_contact_') && window.getPeopleData) {
       const peopleData = window.getPeopleData();
       // Extract contact name from the call data if possible
       // This is a best-effort fallback for generated contact IDs
     }
-    
+
     // Final fallback: try to load from Firestore if available
     if (window.firebaseDB && contactId && !contactId.startsWith('call_contact_')) {
       try {
@@ -2138,7 +2138,7 @@
         console.error('[ContactDetail] Error loading from Firestore:', error);
       }
     }
-    
+
     return null;
   }
 
@@ -2164,17 +2164,17 @@
 
   function getCompanyPhone(contact, linkedAccount = null) {
     if (!contact) return '';
-    
+
     // Priority 1: Use the pre-loaded linked account (most reliable)
     if (linkedAccount && (linkedAccount.companyPhone || linkedAccount.phone)) {
       return linkedAccount.companyPhone || linkedAccount.phone;
     }
-    
+
     // Priority 2: Try to get from contact's account data if available
     if (contact.account && (contact.account.companyPhone || contact.account.phone)) {
       return contact.account.companyPhone || contact.account.phone;
     }
-    
+
     // Priority 3: Fallback to lookup by company name (least reliable)
     if (contact.companyName && typeof window.getAccountsData === 'function') {
       try {
@@ -2191,7 +2191,7 @@
         return '';
       }
     }
-    
+
     return '';
   }
 
@@ -2199,7 +2199,7 @@
   // Helper to safely get accounts data - now simplified with background loader
   async function getAccountsDataSafe() {
     const log = window.console.log.bind(window.console); // Bypass log silencing
-    
+
     // Priority 1: Background loader (most reliable data)
     if (window.BackgroundAccountsLoader) {
       const data = window.BackgroundAccountsLoader.getAccountsData();
@@ -2208,7 +2208,7 @@
         return data;
       }
     }
-    
+
     // Priority 2: window.getAccountsData (fallback)
     if (typeof window.getAccountsData === 'function') {
       const data = window.getAccountsData() || [];
@@ -2217,7 +2217,7 @@
         return data;
       }
     }
-    
+
     // Priority 3: Fallback to CacheManager (shouldn't happen with background loader)
     if (window.CacheManager && typeof window.CacheManager.get === 'function') {
       try {
@@ -2230,7 +2230,7 @@
         window.console.warn('[ContactDetail] Cache read failed:', err);
       }
     }
-    
+
     window.console.warn('[ContactDetail] No accounts data available');
     return [];
   }
@@ -2238,22 +2238,22 @@
   // Find the associated account for this contact (by id or normalized company name)
   async function findAssociatedAccount(contact, maxRetries = 3) {
     try {
-      
+
       if (!contact) {
         console.warn('[ContactDetail] No contact provided');
         return null;
       }
-      
+
       // Check cache first
       const cacheKey = contact.accountId || contact.companyName;
       if (cacheKey && state._accountCache && state._accountCache[cacheKey]) {
         return state._accountCache[cacheKey];
       }
-      
+
       // OPTIMIZED: Check BackgroundAccountsLoader first, then Firestore fallback
       const accountId = contact.accountId || contact.account_id || '';
       const companyName = contact.companyName || contact.accountName || '';
-      
+
       // Check BackgroundAccountsLoader first (cache-first)
       if (window.BackgroundAccountsLoader && accountId) {
         const accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
@@ -2268,14 +2268,14 @@
           return found;
         }
       }
-      
+
       // Try direct Firestore query as fallback
       if (window.firebaseDB) {
         try {
           // Method 1: Query by accountId (most reliable)
-      if (accountId) {
+          if (accountId) {
             const doc = await window.firebaseDB.collection('accounts').doc(accountId).get();
-            
+
             if (doc.exists) {
               const account = { id: doc.id, ...doc.data() };
               // Cache the result
@@ -2287,14 +2287,14 @@
             } else {
             }
           }
-          
+
           // Method 2: Query by company name (fallback) - try exact match first
           if (companyName) {
             let snapshot = await window.firebaseDB.collection('accounts')
               .where('accountName', '==', companyName)
               .limit(1)
               .get();
-            
+
             // If exact match fails, try BackgroundAccountsLoader with normalized matching (cost-effective: zero Firestore reads)
             if (snapshot.empty && window.BackgroundAccountsLoader) {
               const accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
@@ -2313,7 +2313,7 @@
                 return found;
               }
             }
-            
+
             if (!snapshot.empty) {
               const account = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
               // Cache the result
@@ -2324,35 +2324,35 @@
               return account;
             }
           }
-          
+
         } catch (error) {
           console.error('[ContactDetail] Error querying Firestore for account:', error);
         }
       }
-      
+
       // FALLBACK: Try cached accounts if Firestore query fails
       let accounts = [];
-      
+
       // Try getting accounts with retry logic
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         accounts = await getAccountsDataSafe();
-        
+
         if (accounts.length > 0) {
           break;
         }
-        
+
         // Wait before retrying (100ms, 200ms, 400ms, 800ms, 1600ms... exponential backoff)
         if (attempt < maxRetries - 1) {
           const delay = 100 * Math.pow(2, attempt);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
-      
+
       if (accounts.length === 0) {
         console.warn('[ContactDetail] No cached accounts available');
         return null;
       }
-      
+
       // Search cached accounts by ID
       if (accountId) {
         const m = accounts.find(a => a.id === accountId);
@@ -2360,7 +2360,7 @@
           return m;
         }
       }
-      
+
       // Fallback to company name with normalized exact match first (cost-effective)
       if (companyName) {
         const normalizedCompany = String(companyName).trim().toLowerCase();
@@ -2372,12 +2372,12 @@
           return exactMatch;
         }
       }
-      
+
       // Fallback to company name with safer fuzzy matching (token/Jaccard)
       const STOP = new Set([
-        'inc','llc','ltd','corp','corporation','company','co','incorporated',
-        'group','international','services','solutions','systems','industries',
-        'manufacturing','electric','electrical','the','and','of','usa','us'
+        'inc', 'llc', 'ltd', 'corp', 'corporation', 'company', 'co', 'incorporated',
+        'group', 'international', 'services', 'solutions', 'systems', 'industries',
+        'manufacturing', 'electric', 'electrical', 'the', 'and', 'of', 'usa', 'us'
       ]);
       const norm = (s) => String(s || '').toLowerCase()
         .replace(/\(usa\)|\(u\.s\.a\.\)|\(us\)/g, '')
@@ -2387,21 +2387,21 @@
       const toTokens = (s) => Array.from(new Set(
         norm(s).split(' ').filter(w => w.length >= 3 && !STOP.has(w))
       ));
-      
+
       const contactName = contact.companyName || contact.accountName || '';
       const key = norm(contactName);
-      
+
       if (!key) {
         return null;
       }
-      
-      
+
+
       // Try exact match first
       let match = accounts.find(a => {
         const accountName = norm(a.accountName || a.name || a.companyName || '');
         return accountName === key;
       });
-      
+
       // If no exact match, try token/Jaccard fallback
       if (!match) {
         const cTok = toTokens(contactName);
@@ -2416,7 +2416,7 @@
         }
       } else {
       }
-      
+
       if (!match) {
         console.warn('[ContactDetail] No account match for company:', contactName);
         // Try one more fuzzy search - look for ANY words in common
@@ -2431,19 +2431,19 @@
           if (match) {
           }
         }
-        
+
         if (!match) {
         }
       }
-      
+
       const result = match || null;
-      
+
       // Cache the result
       if (result && cacheKey) {
         if (!state._accountCache) state._accountCache = {};
         state._accountCache[cacheKey] = result;
       }
-      
+
       return result;
     } catch (err) {
       console.error('[ContactDetail] Error finding account:', err);
@@ -2451,12 +2451,12 @@
     }
   }
 
-  function promotePageContent(){
+  function promotePageContent() {
     // Apply performance CSS to contact page-content
     if (document.getElementById('contact-page-perf-styles')) return;
-    const style=document.createElement('style');
-    style.id='contact-page-perf-styles';
-    style.textContent=`
+    const style = document.createElement('style');
+    style.id = 'contact-page-perf-styles';
+    style.textContent = `
       #people-page .page-content {
         will-change: transform;
         transform: translateZ(0);
@@ -2476,7 +2476,7 @@
     const company = contact.companyName || '';
     const title = contact.title || '';
     const email = contact.email || '';
-    const phone = (function(){ try { const d = getPrimaryPhoneData(contact); return d && d.value ? d.value : ''; } catch(_) { return contact.workDirectPhone || contact.mobile || contact.otherPhone || ''; } })();
+    const phone = (function () { try { const d = getPrimaryPhoneData(contact); return d && d.value ? d.value : ''; } catch (_) { return contact.workDirectPhone || contact.mobile || contact.otherPhone || ''; } })();
     const city = contact.city || contact.locationCity || '';
     const stateVal = contact.state || contact.locationState || '';
     const industry = contact.industry || contact.companyIndustry || '';
@@ -2741,7 +2741,7 @@
           if (!btn) return;
           e.preventDefault(); e.stopPropagation();
           const id = btn.getAttribute('data-id');
-          const call = (state._rcCalls || []).find(x => String(x.id||x.twilioSid||x.callSid||'') === String(id));
+          const call = (state._rcCalls || []).find(x => String(x.id || x.twilioSid || x.callSid || '') === String(id));
           if (!call) return;
           if (btn.classList.contains('not-processed')) {
             const callSid = call.id || call.twilioSid || call.callSid;
@@ -2753,9 +2753,9 @@
         });
         rcList._delegated = '1';
       }
-    } catch(_) {}
+    } catch (_) { }
     startRecentCallsLiveHooks();
-    
+
     // Add periodic refresh to ensure eye icons update when recordings are ready
     let refreshInterval = null;
     let lastRefreshTime = 0;
@@ -2766,17 +2766,17 @@
         const hasOpenInsights = state._rcOpenIds && state._rcOpenIds.size > 0;
         const now = Date.now();
         const timeSinceLastRefresh = now - lastRefreshTime;
-        
+
         if (!state._rcReloadInFlight && !state._rcIsScrolling && !hasOpenInsights && timeSinceLastRefresh >= 60000) {
           lastRefreshTime = now;
           loadRecentCallsForContact();
         }
       }, 60000); // Check every 60 seconds
     };
-    
+
     // Start periodic refresh
     startPeriodicRefresh();
-    
+
     // Cleanup interval when page is unloaded
     window.addEventListener('beforeunload', () => {
       if (refreshInterval) {
@@ -2784,22 +2784,22 @@
         refreshInterval = null;
       }
     });
-    
+
     // Process click-to-call for phone numbers with a slight delay to ensure DOM is ready
     setTimeout(() => {
-      try { 
+      try {
         console.debug('[Contact Detail] Processing click-to-call for phone numbers');
-        window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); 
-      } catch (e) { 
+        window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements();
+      } catch (e) {
         console.warn('[Contact Detail] Click-to-call processing failed:', e);
       }
     }, 100);
-    
+
     // Load activities
     loadContactActivities();
     // Load recent calls
-        try { loadRecentCallsForContact(); } catch (_) { /* noop */ }
-        try { promotePageContent(); } catch(_) {}
+    try { loadRecentCallsForContact(); } catch (_) { /* noop */ }
+    try { promotePageContent(); } catch (_) { }
   }
 
   function svgPencil() {
@@ -2808,67 +2808,67 @@
 
   function loadContactActivities() {
     if (!window.ActivityManager || !state.currentContact) return;
-    
+
     const contactId = state.currentContact.id;
     window.ActivityManager.renderActivities('contact-activity-timeline', 'contact', contactId);
-    
+
     // Setup pagination
     setupContactActivityPagination(contactId);
   }
 
   // ===== Recent Calls (Contact) =====
   let _rcRetryTimer = null;
-  function startRecentCallsLiveHooks(){
-    try{
+  function startRecentCallsLiveHooks() {
+    try {
       if (document._rcLiveHooksBound) return;
-      
+
       // Only listen for call completion - no more frequent refreshes during live calls
       document.addEventListener('callEnded', onAnyContactCallActivity, false);
-      
+
       // Listen for new calls (only when call is actually logged/completed)
       document.addEventListener('pc:call-logged', (event) => {
         const callData = event.detail;
         if (callData && callData.contactId === state.currentContact?.id) {
           console.log('[ContactDetail] Call logged for this contact, refreshing activities');
-          
+
           // Immediately refresh recent calls section
           if (window.ActivityManager && typeof window.ActivityManager.renderActivities === 'function') {
             window.ActivityManager.renderActivities(
-              'contact-activity-timeline', 
-              'contact', 
+              'contact-activity-timeline',
+              'contact',
               state.currentContact.id,
               true // force refresh
             );
           }
-          
+
           // Also use debounced refresh as backup
           onAnyContactCallActivity();
         }
       });
-      
+
       // Track scroll state to defer refresh
-      try{
-        if (els.mainContent && !els.mainContent._rcScrollBound){
+      try {
+        if (els.mainContent && !els.mainContent._rcScrollBound) {
           const sc = els.mainContent;
           let scrollRafId = null;
-          sc.addEventListener('scroll', ()=>{
+          sc.addEventListener('scroll', () => {
             state._rcIsScrolling = true;
             if (scrollRafId) cancelAnimationFrame(scrollRafId);
             scrollRafId = requestAnimationFrame(() => {
               clearTimeout(state._rcScrollTimer);
-              state._rcScrollTimer = setTimeout(()=>{
+              state._rcScrollTimer = setTimeout(() => {
                 state._rcIsScrolling = false;
-                if (state._rcPendingRefresh){ state._rcPendingRefresh = false; safeReloadContactRecentCallsWithRetries(); }
+                if (state._rcPendingRefresh) { state._rcPendingRefresh = false; safeReloadContactRecentCallsWithRetries(); }
               }, 180);
             });
-          }, { passive:true });
+          }, { passive: true });
           els.mainContent._rcScrollBound = '1';
         }
-      }catch(_){ }
+      } catch (_) { }
       document._rcLiveHooksBound = true;
-    }catch(_){ }
+    } catch (_) { }
   }
-  function onAnyContactCallActivity(){
+  function onAnyContactCallActivity() {
     // Optimized cleanup: only clean up if we have many entries to reduce overhead
     try {
       if (state._liveCallDurations && state._liveCallDurations.size > 10) {
@@ -2882,25 +2882,25 @@
         // Batch delete to reduce Map operations
         toDelete.forEach(sid => state._liveCallDurations.delete(sid));
       }
-    } catch(_) {}
-    
+    } catch (_) { }
+
     // [OPTIMIZATION] Debounce refresh to prevent freeze on hangup
     // Cancel any pending refresh and schedule a new one
     if (state._rcRefreshDebounceTimer) {
       clearTimeout(state._rcRefreshDebounceTimer);
     }
-    
+
     // [OPTIMIZATION] Only refresh if this page is visible
     const contactPage = document.getElementById('contact-detail-page');
     const isVisible = contactPage && contactPage.style.display !== 'none' && !contactPage.hidden;
-    
+
     if (!isVisible) {
       console.debug('[Contact Detail] Page not visible, skipping refresh to prevent freeze');
       return;
     }
-    
-    try{ const list = document.getElementById('contact-recent-calls-list'); const hasOpen = (state._rcOpenIds && state._rcOpenIds.size>0); if(list && !hasOpen) { /* could show spinner */ } }catch(_){ }
-    
+
+    try { const list = document.getElementById('contact-recent-calls-list'); const hasOpen = (state._rcOpenIds && state._rcOpenIds.size > 0); if (list && !hasOpen) { /* could show spinner */ } } catch (_) { }
+
     // Debounce refresh by 1.5 seconds to allow:
     // 1. User to continue working without UI freeze
     // 2. Webhooks to update call data
@@ -2910,22 +2910,22 @@
       state._rcRefreshDebounceTimer = null;
     }, 1500); // 1.5 second debounce (increased from 1s to prevent freeze)
   }
-  
+
   // onLiveCallDurationUpdate function removed - live duration updates no longer needed
-  function safeReloadContactRecentCallsWithRetries(){
-    try{ if (_rcRetryTimer){ clearTimeout(_rcRetryTimer); _rcRetryTimer=null; } }catch(_){ }
+  function safeReloadContactRecentCallsWithRetries() {
+    try { if (_rcRetryTimer) { clearTimeout(_rcRetryTimer); _rcRetryTimer = null; } } catch (_) { }
     // Skip auto-reload while insights are open to prevent UI thrash/shrink
     if (state._rcOpenIds && state._rcOpenIds.size > 0) return;
     if (state._rcReloadInFlight) return;
     state._rcReloadInFlight = true;
-    let attempts=0;
-    const run=()=>{
+    let attempts = 0;
+    const run = () => {
       // If user opened insights mid-sequence, stop further retries
-      if (state._rcOpenIds && state._rcOpenIds.size > 0) { state._rcReloadInFlight=false; return; }
+      if (state._rcOpenIds && state._rcOpenIds.size > 0) { state._rcReloadInFlight = false; return; }
       attempts++;
-      try{ loadRecentCallsForContact(); }catch(_){ }
-      if (attempts<3) { _rcRetryTimer = setTimeout(run, 1500); } // Reduced from 10 to 3 attempts, increased interval
-      else { state._rcReloadInFlight=false; }
+      try { loadRecentCallsForContact(); } catch (_) { }
+      if (attempts < 3) { _rcRetryTimer = setTimeout(run, 1500); } // Reduced from 10 to 3 attempts, increased interval
+      else { state._rcReloadInFlight = false; }
     };
     run();
   }
@@ -2933,28 +2933,28 @@
 
   function setupContactActivityPagination(contactId) {
     const paginationEl = document.getElementById('contact-activity-pagination');
-    
+
     if (!paginationEl) return;
-    
+
     // Show pagination if there are more than 4 activities
     const updatePagination = async () => {
       if (!window.ActivityManager) return;
-      
+
       const activities = await window.ActivityManager.getActivities('contact', contactId);
       const totalPages = Math.ceil(activities.length / window.ActivityManager.maxActivitiesPerPage);
-      
+
       if (totalPages > 1) {
         paginationEl.style.display = 'flex';
-        
+
         // Use unified pagination component
         if (window.crm && window.crm.createPagination) {
           window.crm.createPagination(
-            window.ActivityManager.currentPage + 1, 
-            totalPages, 
+            window.ActivityManager.currentPage + 1,
+            totalPages,
             (page) => {
               window.ActivityManager.goToPage(page - 1, 'contact-activity-timeline', 'contact', contactId);
               updatePagination();
-            }, 
+            },
             paginationEl.id
           );
         }
@@ -2962,7 +2962,7 @@
         paginationEl.style.display = 'none';
       }
     };
-    
+
     updatePagination();
   }
   function svgTrash() {
@@ -2984,13 +2984,13 @@
     const { value, type, field } = phoneData;
     const text = value ? escapeHtml(formatPhoneForDisplay(value)) : '--';
     const hasValue = !!value;
-    
+
     // Get contact and account IDs for context
     const contactId = contact.id || contact.contactId || contact._id;
     const accountId = contact.accountId || contact.account_id;
     const contactName = contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ') || '';
     const companyName = contact.companyName || contact.company || contact.account || '';
-    
+
     return `
       <div class="info-row" data-field="phone" data-phone-type="${type}">
         <div class="info-label">${escapeHtml(type.toUpperCase())}</div>
@@ -3026,7 +3026,7 @@
       if (pref === 'mobile' && contact.mobile) return { value: contact.mobile, type: 'mobile', field: 'mobile' };
       if (pref === 'workDirectPhone' && contact.workDirectPhone) return { value: contact.workDirectPhone, type: 'work direct', field: 'workDirectPhone' };
       if (pref === 'otherPhone' && contact.otherPhone) return { value: contact.otherPhone, type: 'other', field: 'otherPhone' };
-    } catch(_) {}
+    } catch (_) { }
     // Priority: Mobile > Work Direct > Other
     if (contact.mobile) {
       return { value: contact.mobile, type: 'mobile', field: 'mobile' };
@@ -3044,41 +3044,41 @@
   function handleCompanyPhoneClick(phoneElement, contact) {
     try {
       console.log('[Contact Detail] Company phone clicked, setting strict company-mode context');
-      
+
       // Build account context from contact's associated account (AI-suggested approach)
       const accountId = contact.accountId || contact.account_id;
       const accountName = contact.companyName || contact.company || contact.account || '';
-      
+
       // Resolve account context with fallback chain (AI suggestion)
       let resolvedAccount = null;
       let resolvedDomain = '';
-      
+
       // Primary: Contact's associated account data - try multiple methods
       if (accountId) {
         // Method 1: Try window.Accounts.getAccountById
         if (window.Accounts && window.Accounts.getAccountById) {
           try {
             resolvedAccount = window.Accounts.getAccountById(accountId);
-          } catch(_) {}
+          } catch (_) { }
         }
-        
+
         // Method 2: Try window.getAccountsData if available
         if (!resolvedAccount && typeof window.getAccountsData === 'function') {
           try {
             const accounts = window.getAccountsData() || [];
             resolvedAccount = accounts.find(acc => acc.id === accountId || acc.accountId === accountId);
-          } catch(_) {}
+          } catch (_) { }
         }
-        
+
         // Method 3: Try window.Accounts.accounts cache
         if (!resolvedAccount && window.Accounts && window.Accounts.accounts) {
           try {
             const accounts = window.Accounts.accounts || [];
             resolvedAccount = accounts.find(acc => acc.id === accountId || acc.accountId === accountId);
-          } catch(_) {}
+          } catch (_) { }
         }
       }
-      
+
       // Fallback: DOM elements (header/company field)
       if (!resolvedAccount) {
         const companyFromDOM = document.querySelector('#contact-detail-view .info-row[data-field="companyName"] .info-value-text')?.textContent?.trim();
@@ -3086,18 +3086,18 @@
           resolvedAccount = { name: companyFromDOM, accountName: companyFromDOM };
         }
       }
-      
+
       // Final fallback: Accounts cache by name match
       if (!resolvedAccount && accountName && window.Accounts && window.Accounts.accounts) {
         try {
           const accounts = window.Accounts.accounts || [];
-          resolvedAccount = accounts.find(acc => 
+          resolvedAccount = accounts.find(acc =>
             (acc.name && acc.name.toLowerCase() === accountName.toLowerCase()) ||
             (acc.accountName && acc.accountName.toLowerCase() === accountName.toLowerCase())
           );
-        } catch(_) {}
+        } catch (_) { }
       }
-      
+
       // Extract domain from account data
       if (resolvedAccount) {
         resolvedDomain = resolvedAccount.domain || resolvedAccount.website || '';
@@ -3108,39 +3108,39 @@
           try {
             const url = new URL(resolvedDomain);
             resolvedDomain = url.hostname.replace(/^www\./, '');
-          } catch(_) {
+          } catch (_) {
             resolvedDomain = resolvedDomain.replace(/^https?:\/\//, '').replace(/^www\./, '');
           }
         }
       }
-      
+
       // Set strict company-mode context (AI-suggested payload)
       const contextPayload = {
         // Account context
         accountId: accountId || (resolvedAccount && resolvedAccount.id) || null,
         accountName: (resolvedAccount && resolvedAccount.name) || (resolvedAccount && resolvedAccount.accountName) || accountName || null,
         company: (resolvedAccount && resolvedAccount.name) || (resolvedAccount && resolvedAccount.accountName) || accountName || null,
-        
+
         // Branding/location - ensure these are properly set for phone widget
         // Priority: resolvedAccount data > contact account fields > contact location fields
-        city: (resolvedAccount && (resolvedAccount.city || resolvedAccount.locationCity)) || 
-              contact.accountCity || contact.accountLocationCity || 
-              contact.city || contact.locationCity || '',
-        state: (resolvedAccount && (resolvedAccount.state || resolvedAccount.locationState)) || 
-               contact.accountState || contact.accountLocationState || 
-               contact.state || contact.locationState || '',
+        city: (resolvedAccount && (resolvedAccount.city || resolvedAccount.locationCity)) ||
+          contact.accountCity || contact.accountLocationCity ||
+          contact.city || contact.locationCity || '',
+        state: (resolvedAccount && (resolvedAccount.state || resolvedAccount.locationState)) ||
+          contact.accountState || contact.accountLocationState ||
+          contact.state || contact.locationState || '',
         domain: resolvedDomain || contact.accountDomain || contact.accountWebsite || '',
         logoUrl: (resolvedAccount && resolvedAccount.logoUrl) || contact.accountLogoUrl || '',
-        
+
         // Force company mode
         isCompanyPhone: true,
-        
+
         // Explicitly clear contact attribution
         contactId: null,
         contactName: '',
         name: (resolvedAccount && resolvedAccount.name) || (resolvedAccount && resolvedAccount.accountName) || accountName || ''
       };
-      
+
       // Debug logging to see what context is being set
       console.log('[Contact Detail] Resolved account data:', {
         accountId: accountId,
@@ -3155,7 +3155,7 @@
         },
         finalContext: contextPayload
       });
-      
+
       // Additional debug: log all available account fields if we found an account
       if (resolvedAccount) {
         console.log('[Contact Detail] Account fields available:', {
@@ -3173,17 +3173,17 @@
           allFields: Object.keys(resolvedAccount)
         });
       }
-      
+
       console.log('[Contact Detail] Setting company phone context:', contextPayload);
       window.Widgets.setCallContext(contextPayload);
-      
+
       // Mark that we've set a specific context to prevent generic click-to-call from overriding
       try {
         window._pcPhoneContextSetByPage = true;
         // Clear the flag after a short delay to allow the click event to use it
         setTimeout(() => { window._pcPhoneContextSetByPage = false; }, 100);
-      } catch(_) {}
-      
+      } catch (_) { }
+
     } catch (error) {
       console.error('[Contact Detail] Error setting company phone context:', error);
     }
@@ -3193,10 +3193,10 @@
   function handleContactPhoneClick(phoneElement, contact) {
     try {
       console.log('[Contact Detail] Contact phone clicked, setting contact context');
-      
+
       // Get the phone type from the data attribute
       const phoneType = phoneElement.closest('.info-row')?.getAttribute('data-phone-type') || 'mobile';
-      
+
       // Build contact context for contact phone calls
       const contextPayload = {
         contactId: contact.id || contact.contactId || contact._id || '',
@@ -3214,25 +3214,25 @@
         suggestedContactId: contact.id || contact.contactId || contact._id || '',
         suggestedContactName: contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ') || ''
       };
-      
+
       // Set the context in the phone widget
       if (window.Widgets && typeof window.Widgets.setCallContext === 'function') {
         window.Widgets.setCallContext(contextPayload);
-        
+
         // Also trigger contact display to show the contact info
         if (window.Widgets && typeof window.Widgets.setContactDisplay === 'function') {
           try {
             window.Widgets.setContactDisplay(contextPayload, '');
-          } catch(_) {}
+          } catch (_) { }
         }
       }
-      
+
       // Mark that we've set a specific context to prevent generic click-to-call from overriding
       try {
         window._pcPhoneContextSetByPage = true;
         setTimeout(() => { window._pcPhoneContextSetByPage = false; }, 1000);
-      } catch(_) {}
-      
+      } catch (_) { }
+
     } catch (error) {
       console.error('[Contact Detail] Error setting contact phone context:', error);
     }
@@ -3242,7 +3242,7 @@
     const text = value ? escapeHtml(String(value)) : '--';
     const hasValue = !!value;
     const isVerified = emailStatus === 'verified' || emailStatus === true;
-    
+
     return `
       <div class="info-row" data-field="${escapeHtml(field)}">
         <div class="info-label">
@@ -3264,14 +3264,14 @@
 
   function renderInfoRow(label, field, value) {
     let text = value ? escapeHtml(String(value)) : '--';
-    
+
     // Format phone numbers for display
     if (field === 'companyPhone' && value && String(value).trim()) {
       text = escapeHtml(formatPhoneForDisplay(value));
     }
-    
+
     const hasValue = !!value;
-    
+
     // Add context data attributes for company phone
     let dataAttributes = '';
     if (field === 'companyPhone' && state.currentContact) {
@@ -3279,7 +3279,7 @@
       const contactId = contact.id || contact.contactId || contact._id;
       const accountId = contact.accountId || contact.account_id;
       const contactName = contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ') || '';
-      
+
       // Get company name with fallback to DOM
       let companyName = contact.companyName || contact.company || contact.account || '';
       if (!companyName) {
@@ -3289,28 +3289,28 @@
           companyName = companyFromDOM;
         }
       }
-      
+
       // Resolve the associated account to get additional context
       const linkedAccount = findAssociatedAccount(contact);
       let city = '';
       let stateValue = '';
       let domain = '';
       let logoUrl = '';
-      
+
       if (linkedAccount) {
         city = linkedAccount.city || linkedAccount.locationCity || '';
         stateValue = linkedAccount.state || linkedAccount.locationState || '';
         logoUrl = linkedAccount.logoUrl || '';
-        
+
         // Extract domain from account
         const domainRaw = linkedAccount.domain || linkedAccount.website || linkedAccount.site || '';
         if (domainRaw) {
           try {
             domain = String(domainRaw).replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').trim();
-          } catch(_) {}
+          } catch (_) { }
         }
       }
-      
+
       // Fallback to contact's account fields if no linked account found
       if (!city) city = contact.accountCity || contact.accountLocationCity || contact.city || contact.locationCity || '';
       if (!stateValue) stateValue = contact.accountState || contact.accountLocationState || contact.state || contact.locationState || '';
@@ -3320,10 +3320,10 @@
         if (domainRaw) {
           try {
             domain = String(domainRaw).replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').trim();
-          } catch(_) {}
+          } catch (_) { }
         }
       }
-      
+
       dataAttributes = `data-contact-id="${contactId || ''}" 
                        data-account-id="${accountId || ''}" 
                        data-contact-name="${escapeHtml(contactName)}" 
@@ -3333,7 +3333,7 @@
                        data-domain="${escapeHtml(domain)}"
                        data-logo-url="${escapeHtml(logoUrl)}"`;
     }
-    
+
     return `
       <div class="info-row" data-field="${escapeHtml(field)}">
         <div class="info-label">${escapeHtml(label)}</div>
@@ -3353,13 +3353,13 @@
   function attachContactDetailEvents() {
     // Reset flag to allow reattachment after module reload
     state._contactDetailEventsAttached = false;
-    
+
     // Ensure we have a valid contact before attaching events
     if (!state.currentContact?.id) {
       console.warn('[ContactDetail] Cannot attach events: no contact ID available');
       return;
     }
-    
+
     state._contactDetailEventsAttached = true;
 
     // Listen for activity refresh events
@@ -3392,12 +3392,12 @@
           }
           return;
         }
-        
+
         // Check if we came from account details page
         if (window._contactNavigationSource === 'account-details' && window._contactNavigationAccountId) {
           // Clear phone widget context to prevent contact company info from leaking
           clearPhoneWidgetContext();
-          
+
           // Navigate back to account details page
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             window.crm.navigateToPage('account-details');
@@ -3405,27 +3405,27 @@
             requestAnimationFrame(() => {
               const accountId = window._contactNavigationAccountId;
               const accountObj = window._contactNavigationAccount;
-              
+
               // Prefetch FIRST, before any retry attempts
               if (accountObj) {
-                try { 
+                try {
                   window._prefetchedAccountForDetail = accountObj;
                   console.log('[ContactDetail] Prefetched account for return navigation:', accountObj.name || accountObj.accountName);
-                } catch (_) {}
+                } catch (_) { }
               }
-              
+
               // Now do the retry
               let attempts = 0;
               const maxAttempts = 25;
               const retryInterval = 80;
-              
+
               const retry = () => {
                 attempts++;
                 if (window.showAccountDetail && typeof window.showAccountDetail === 'function') {
                   window.showAccountDetail(accountId);
                   // Clear navigation variables AFTER the call
-          window._contactNavigationSource = null;
-          window._contactNavigationAccountId = null;
+                  window._contactNavigationSource = null;
+                  window._contactNavigationAccountId = null;
                   window._contactNavigationAccount = null;
                 } else if (attempts < maxAttempts) {
                   setTimeout(retry, retryInterval);
@@ -3436,16 +3436,16 @@
           }
           return;
         }
-        
+
         // Check if we came from task detail page
         if (window._contactNavigationSource === 'task-detail') {
           // Clear phone widget context to prevent contact company info from leaking
           clearPhoneWidgetContext();
-          
+
           // Navigate back to task detail page
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             window.crm.navigateToPage('task-detail');
-            
+
             // Dispatch restore event instead of calling TaskDetail.open()
             setTimeout(() => {
               try {
@@ -3456,7 +3456,7 @@
                   console.log('[ContactDetail] Dispatched task-detail restore event');
                   window.__taskDetailRestoreData = null;
                 }
-              } catch (_) {}
+              } catch (_) { }
             }, 100);
           }
           // Clear the navigation source
@@ -3464,12 +3464,12 @@
           window._contactNavigationContactId = null;
           return;
         }
-        
+
         // Check if we came from list detail page
         if (window._contactNavigationSource === 'list-detail' && window._contactNavigationListId) {
           // Clear phone widget context to prevent contact company info from leaking
           clearPhoneWidgetContext();
-          
+
           // Navigate back to list detail page with state restoration
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             // Provide context up-front so navigateToPage's internal init uses it immediately
@@ -3479,29 +3479,29 @@
                 listName: window._contactNavigationListName || 'List',
                 listKind: 'people'
               };
-            } catch (_) {}
-            
+            } catch (_) { }
+
             // Set restoration flag BEFORE navigation
             try {
               window.__restoringListDetail = true;
               window.__restoringListDetailUntil = Date.now() + 10000; // 10 seconds
-            } catch (_) {}
-            
+            } catch (_) { }
+
             window.crm.navigateToPage('list-detail');
-            
+
             // Dispatch restore event with retry mechanism
             setTimeout(() => {
               const restore = window._listDetailReturn || {};
               const deadline = Date.now() + 8000; // 8 second timeout
               let attempts = 0;
-              
+
               const tryRestore = () => {
                 attempts++;
                 if (Date.now() > deadline) {
                   console.warn('[ContactDetail] List detail page not ready after 8 seconds');
                   return;
                 }
-                
+
                 try {
                   const page = document.getElementById('list-detail-page');
                   const listDetailModule = window.ListDetail;
@@ -3521,42 +3521,42 @@
                     console.log('[ContactDetail] Dispatched pc:list-detail-restore event (ready) after', attempts, 'attempts');
                     return;
                   }
-                } catch (_) {}
-                
+                } catch (_) { }
+
                 // Retry after 80ms
                 setTimeout(tryRestore, 80);
               };
-              
+
               tryRestore();
             }, 60);
           }
-          
+
           // Clear the navigation source
           window._contactNavigationSource = null;
           window._contactNavigationListId = null;
           window._contactNavigationListName = null;
           return;
         }
-        
+
         if (window._contactNavigationSource === 'email-detail' && window._emailDetailReturn?.emailId) {
           clearPhoneWidgetContext();
-          
+
           const emailId = window._emailDetailReturn.emailId;
           window._contactNavigationSource = null;
           window._emailDetailReturn = null;
           window._contactNavigationContactId = null;
-          
+
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             window.crm.navigateToPage('email-detail', { emailId });
           }
           return;
         }
-        
+
         // Check if we came from calls page
         if (window._contactNavigationSource === 'calls') {
           // Clear phone widget context to prevent contact company info from leaking
           clearPhoneWidgetContext();
-          
+
           // Navigate back to calls page
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             window.crm.navigateToPage('calls');
@@ -3566,16 +3566,16 @@
           window._contactNavigationContactId = null;
           return;
         }
-        
+
         // Check if we came from dashboard activities
         if (window._dashboardNavigationSource === 'activities') {
           // Clear phone widget context to prevent contact company info from leaking
           clearPhoneWidgetContext();
-          
+
           // Navigate back to dashboard and restore pagination state
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             window.crm.navigateToPage('dashboard');
-            
+
             // Restore dashboard pagination state
             setTimeout(() => {
               try {
@@ -3583,13 +3583,13 @@
                 if (window.ActivityManager && restore.page !== undefined) {
                   // Restore the specific page
                   window.ActivityManager.goToPage('home-activity-timeline', 'global', restore.page);
-                  
+
                   // Restore scroll position
                   if (restore.scroll !== undefined) {
                     window.scrollTo(0, restore.scroll);
                   }
                 }
-                
+
                 // Clear navigation markers AFTER successful navigation and restore
                 window._dashboardNavigationSource = null;
                 window._dashboardReturn = null;
@@ -3600,22 +3600,22 @@
           }
           return;
         }
-        
+
         // Check if we came from sequence builder
         if (window._contactNavigationSource === 'sequence-builder' && window._sequenceBuilderReturn?.sequenceId) {
           // Clear phone widget context to prevent contact company info from leaking
           clearPhoneWidgetContext();
-          
+
           // Navigate back to sequence builder
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             window.crm.navigateToPage('sequence-builder');
-            
+
             // Reopen the sequence contacts modal after navigation
             setTimeout(() => {
               let attempts = 0;
               const maxAttempts = 25;
               const retryInterval = 80;
-              
+
               const tryReopen = () => {
                 attempts++;
                 try {
@@ -3623,10 +3623,10 @@
                   if (window.SequenceBuilder && typeof window.SequenceBuilder.show === 'function') {
                     const sequenceId = window._sequenceBuilderReturn.sequenceId;
                     const sequenceName = window._sequenceBuilderReturn.sequenceName;
-                    
+
                     // Show the sequence
                     window.SequenceBuilder.show({ id: sequenceId, name: sequenceName });
-                    
+
                     // Wait a bit for the sequence to load, then open the contacts panel
                     setTimeout(() => {
                       // Find the "Sequence Contacts" button by ID
@@ -3637,23 +3637,23 @@
                         // Fallback: try to find it by aria-label or title
                         const allButtons = document.querySelectorAll('button');
                         for (const btn of allButtons) {
-                          if (btn.getAttribute('aria-label') === 'Sequence Contacts' || 
-                              btn.getAttribute('title') === 'Sequence Contacts') {
+                          if (btn.getAttribute('aria-label') === 'Sequence Contacts' ||
+                            btn.getAttribute('title') === 'Sequence Contacts') {
                             btn.click();
                             break;
                           }
                         }
                       }
                     }, 300);
-                    
+
                     // Clear navigation variables
                     window._contactNavigationSource = null;
                     window._contactNavigationContactId = null;
                     window._sequenceBuilderReturn = null;
                     return;
                   }
-                } catch (_) {}
-                
+                } catch (_) { }
+
                 if (attempts < maxAttempts) {
                   setTimeout(tryReopen, retryInterval);
                 } else {
@@ -3663,18 +3663,18 @@
                   window._sequenceBuilderReturn = null;
                 }
               };
-              
+
               tryReopen();
             }, 100);
           }
           return;
         }
-        
+
         // Check if we came from people page
         if (window._contactNavigationSource === 'people') {
           // Clear phone widget context to prevent contact company info from leaking
           clearPhoneWidgetContext();
-          
+
           try {
             const restore = window._peopleReturn || {};
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
@@ -3682,20 +3682,23 @@
               try {
                 window.__restoringPeople = true;
                 window.__restoringPeopleUntil = Date.now() + 15000; // 15 seconds
-              } catch (_) {}
-              
+              } catch (_) { }
+
               window.crm.navigateToPage('people');
               // Dispatch an event for People page to restore UI state
               setTimeout(() => {
                 try {
-                  const ev = new CustomEvent('pc:people-restore', { detail: {
-                    page: restore.page, scroll: restore.scroll, filters: restore.filters, searchTerm: restore.searchTerm, sortColumn: restore.sortColumn, sortDirection: restore.sortDirection, currentPage: restore.currentPage || restore.page } });
+                  const ev = new CustomEvent('pc:people-restore', {
+                    detail: {
+                      page: restore.page, scroll: restore.scroll, filters: restore.filters, searchTerm: restore.searchTerm, sortColumn: restore.sortColumn, sortDirection: restore.sortDirection, currentPage: restore.currentPage || restore.page
+                    }
+                  });
                   document.dispatchEvent(ev);
-                  
+
                   // Clear navigation markers AFTER successful navigation and restore
                   window._contactNavigationSource = null;
                   window._peopleReturn = null;
-                } catch(_) {}
+                } catch (_) { }
               }, 60);
             }
             // Also cleanup the contact detail overlay and restore people view immediately (overlay mode)
@@ -3722,17 +3725,17 @@
                   loaded: peopleState.loaded,
                   dataLength: peopleState.data?.length || 0
                 });
-                
+
                 // Check if data is actually loaded (not just the flag)
                 if (!peopleState.data || peopleState.data.length === 0) {
                   console.log('[ContactDetail] People data empty, forcing reload');
-                  
+
                   // Reset loaded flag if data is empty
                   if (peopleState.loaded) {
                     console.log('[ContactDetail] Resetting loaded flag');
                     peopleState.loaded = false;
                   }
-                  
+
                   if (typeof window.peopleModule.loadDataOnce === 'function') {
                     window.peopleModule.loadDataOnce().then(() => {
                       console.log('[ContactDetail] People data reloaded');
@@ -3740,7 +3743,7 @@
                         window.peopleModule.applyFilters();
                       }
                       if (typeof window.peopleModule.rebindDynamic === 'function') {
-                try { window.peopleModule.rebindDynamic(); } catch (e) { /* noop */ }
+                        try { window.peopleModule.rebindDynamic(); } catch (e) { /* noop */ }
                       }
                     }).catch((error) => {
                       console.error('[ContactDetail] Failed to reload people data:', error);
@@ -3749,10 +3752,10 @@
                 } else {
                   // Data exists, just filter and rebind
                   if (typeof window.peopleModule.applyFilters === 'function') {
-                    try { 
+                    try {
                       console.log('[ContactDetail] Forcing people table re-render');
-                      window.peopleModule.applyFilters(); 
-                    } catch (e) { 
+                      window.peopleModule.applyFilters();
+                    } catch (e) {
                       console.error('[ContactDetail] Failed to re-render people table:', e);
                     }
                   }
@@ -3766,9 +3769,9 @@
           } catch (_) { /* noop */ }
           return;
         }
-        
+
         // Default behavior: return to people page
-        
+
         // Show the People toolbar/header again
         showToolbar();
         // Disable contact detail scroll mode
@@ -3803,17 +3806,17 @@
             loaded: peopleState.loaded,
             dataLength: peopleState.data?.length || 0
           });
-          
+
           // Check if data is actually loaded (not just the flag)
           if (!peopleState.data || peopleState.data.length === 0) {
             console.log('[ContactDetail] People data empty, forcing reload');
-            
+
             // Reset loaded flag if data is empty
             if (peopleState.loaded) {
               console.log('[ContactDetail] Resetting loaded flag');
               peopleState.loaded = false;
             }
-            
+
             if (typeof window.peopleModule.loadDataOnce === 'function') {
               window.peopleModule.loadDataOnce().then(() => {
                 console.log('[ContactDetail] People data reloaded');
@@ -3821,7 +3824,7 @@
                   window.peopleModule.applyFilters();
                 }
                 if (typeof window.peopleModule.rebindDynamic === 'function') {
-          try { window.peopleModule.rebindDynamic(); } catch (e) { /* noop */ }
+                  try { window.peopleModule.rebindDynamic(); } catch (e) { /* noop */ }
                 }
               }).catch((error) => {
                 console.error('[ContactDetail] Failed to reload people data:', error);
@@ -3830,10 +3833,10 @@
           } else {
             // Data exists, just filter and rebind
             if (typeof window.peopleModule.applyFilters === 'function') {
-              try { 
+              try {
                 console.log('[ContactDetail] Forcing people table re-render');
-                window.peopleModule.applyFilters(); 
-              } catch (e) { 
+                window.peopleModule.applyFilters();
+              } catch (e) {
                 console.error('[ContactDetail] Failed to re-render people table:', e);
               }
             }
@@ -3952,8 +3955,8 @@
         const copyBtn = e.target.closest?.('.title-copy');
         if (copyBtn) {
           const txt = (nameEl?.textContent || '').trim();
-          try { await navigator.clipboard?.writeText(txt); } catch (_) {}
-          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) {}
+          try { await navigator.clipboard?.writeText(txt); } catch (_) { }
+          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) { }
           return;
         }
 
@@ -3984,8 +3987,8 @@
         const copyBtn = e.target.closest('.info-copy');
         if (copyBtn) {
           const txt = wrap.querySelector('.info-value-text')?.textContent?.trim() || '';
-          try { await navigator.clipboard?.writeText(txt); } catch (_) {}
-          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) {}
+          try { await navigator.clipboard?.writeText(txt); } catch (_) { }
+          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) { }
           return;
         }
         // Delete button
@@ -4019,8 +4022,8 @@
         const copyBtn = e.target.closest('.info-copy');
         if (copyBtn) {
           const txt = wrap.querySelector('.info-value-text')?.textContent?.trim() || '';
-          try { await navigator.clipboard?.writeText(txt); } catch (_) {}
-          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) {}
+          try { await navigator.clipboard?.writeText(txt); } catch (_) { }
+          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) { }
           return;
         }
         // Delete button
@@ -4054,27 +4057,27 @@
     if (contactAddServiceAddressBtn && !contactAddServiceAddressBtn._bound) {
       contactAddServiceAddressBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        
+
         // Get linked account
         const linkedAccount = findAssociatedAccount(state.currentContact);
         if (!linkedAccount) {
           window.crm?.showToast && window.crm.showToast('No linked account found');
           return;
         }
-        
+
         // Get current service addresses
         const currentAddresses = (linkedAccount.serviceAddresses && Array.isArray(linkedAccount.serviceAddresses)) ? linkedAccount.serviceAddresses : [];
-        
+
         // Add a new empty address
         const newAddress = { address: '', isPrimary: currentAddresses.length === 0 };
         const updatedAddresses = [...currentAddresses, newAddress];
-        
+
         // Save to Firestore
         await saveAccountServiceAddresses(updatedAddresses);
-        
+
         // Re-render the contact detail to show the new address
         renderContactDetail();
-        
+
         // Find the newly added address field and start editing it
         setTimeout(() => {
           const newIndex = updatedAddresses.length - 1;
@@ -4123,7 +4126,7 @@
             const currentField = getPrimaryPhoneData(contact).field;
             const idx = Math.max(0, available.indexOf(currentField));
             const next = available[(idx + 1) % available.length];
-            try { await setPreferredPhoneType(next); } catch(_) {}
+            try { await setPreferredPhoneType(next); } catch (_) { }
             // Update label immediately
             const labelEl = wrap.closest('.info-row')?.querySelector('.info-label');
             if (labelEl) {
@@ -4138,12 +4141,12 @@
               tempDiv.innerHTML = newPhoneRow;
               const newRow = tempDiv.firstElementChild;
               phoneRow.parentElement.replaceChild(newRow, phoneRow);
-              
+
               // Process click-to-call for the new phone row
               setTimeout(() => {
-                try { 
-                  window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); 
-                } catch (_) {}
+                try {
+                  window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements();
+                } catch (_) { }
               }, 50);
             }
           } finally {
@@ -4156,8 +4159,8 @@
         const copyBtn = e.target.closest('.info-copy');
         if (copyBtn) {
           const txt = wrap.querySelector('.info-value-text')?.textContent?.trim() || '';
-          try { await navigator.clipboard?.writeText(txt); } catch (_) {}
-          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) {}
+          try { await navigator.clipboard?.writeText(txt); } catch (_) { }
+          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) { }
           return;
         }
         // Delete button
@@ -4177,7 +4180,7 @@
             openDeleteConfirmPopover(delBtn, async () => {
               await saveField(clearField, '');
               // Update local contact and re-render the phone row
-              try { if (state.currentContact) state.currentContact[clearField] = ''; } catch(_) {}
+              try { if (state.currentContact) state.currentContact[clearField] = ''; } catch (_) { }
               const phoneRow = infoRow;
               if (phoneRow) {
                 const newPhoneRow = renderPhoneRow(state.currentContact || {});
@@ -4185,12 +4188,12 @@
                 temp.innerHTML = newPhoneRow;
                 const newEl = temp.firstElementChild;
                 phoneRow.parentElement.replaceChild(newEl, phoneRow);
-                
+
                 // Process click-to-call for the new phone row
                 setTimeout(() => {
-                  try { 
-                    window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); 
-                  } catch (_) {}
+                  try {
+                    window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements();
+                  } catch (_) { }
                 }, 50);
               }
             });
@@ -4210,13 +4213,13 @@
 
   function beginEditField(wrap, field) {
     if (!wrap) return;
-    
+
     // Special handling for phone field
     if (field === 'phone') {
       beginEditPhoneField(wrap);
       return;
     }
-    
+
     const current = wrap.querySelector('.info-value-text')?.textContent || '';
     wrap.classList.add('editing');
     const input = document.createElement('input');
@@ -4224,7 +4227,7 @@
     input.className = 'input-dark info-edit-input';
     input.value = current === '--' ? '' : current;
     input.placeholder = 'Enter ' + field;
-    
+
     // Add supplier suggestions for electricity supplier field
     if (field === 'electricitySupplier') {
       console.log('[Contact Detail] Adding supplier suggestions for field:', field);
@@ -4276,24 +4279,24 @@
     let input;
     // Local date helpers
     const parseDateFlexible = (s) => {
-      if (!s) return null; const str=String(s).trim();
-      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) { 
+      if (!s) return null; const str = String(s).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
         // For ISO dates, parse components to avoid timezone issues
         const parts = str.split('-');
         const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
         return isNaN(d.getTime()) ? null : d;
       }
-      const m = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/); 
-      if (m){ 
+      const m = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
+      if (m) {
         // Parse MM/DD/YYYY format directly to avoid timezone issues
-        const d = new Date(parseInt(m[3],10), parseInt(m[1],10)-1, parseInt(m[2],10)); 
+        const d = new Date(parseInt(m[3], 10), parseInt(m[1], 10) - 1, parseInt(m[2], 10));
         return isNaN(d.getTime()) ? null : d;
       }
       const d = new Date(str); return isNaN(d.getTime()) ? null : d;
     };
-    const toISODate = (v) => { const d=parseDateFlexible(v); if(!d) return ''; const yyyy=d.getFullYear(); const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${yyyy}-${mm}-${dd}`; };
-    const toMDY = (v) => { const d=parseDateFlexible(v); if(!d) return v?String(v):''; const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); const yyyy=d.getFullYear(); return `${mm}/${dd}/${yyyy}`; };
-    const formatDateInputAsMDY = (raw) => { const digits=String(raw||'').replace(/[^0-9]/g,'').slice(0,8); let out=''; if(digits.length>=1) out=digits.slice(0,2); if(digits.length>=3) out=digits.slice(0,2)+'/'+digits.slice(2,4); if(digits.length>=5) out=digits.slice(0,2)+'/'+digits.slice(2,4)+'/'+digits.slice(4,8); return out; };
+    const toISODate = (v) => { const d = parseDateFlexible(v); if (!d) return ''; const yyyy = d.getFullYear(); const mm = String(d.getMonth() + 1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0'); return `${yyyy}-${mm}-${dd}`; };
+    const toMDY = (v) => { const d = parseDateFlexible(v); if (!d) return v ? String(v) : ''; const mm = String(d.getMonth() + 1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0'); const yyyy = d.getFullYear(); return `${mm}/${dd}/${yyyy}`; };
+    const formatDateInputAsMDY = (raw) => { const digits = String(raw || '').replace(/[^0-9]/g, '').slice(0, 8); let out = ''; if (digits.length >= 1) out = digits.slice(0, 2); if (digits.length >= 3) out = digits.slice(0, 2) + '/' + digits.slice(2, 4); if (digits.length >= 5) out = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4, 8); return out; };
 
     input = document.createElement('input');
     input.className = 'input-dark info-edit-input';
@@ -4305,26 +4308,26 @@
       input.value = current === '--' ? '' : current;
       input.placeholder = 'Enter ' + field;
     }
-    
+
     // Add comma formatting for annual usage field
     if (field === 'annualUsage') {
       // Remove commas from current value for editing
       const cleanValue = (current === '--' ? '' : current).replace(/,/g, '');
       input.value = cleanValue;
-      
+
       // Add input event listener for comma formatting
       input.addEventListener('input', (e) => {
         const cursorPos = e.target.selectionStart;
         const value = e.target.value.replace(/[^0-9]/g, ''); // Remove non-digits
         const formatted = value.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         e.target.value = formatted;
-        
+
         // Restore cursor position after formatting
         const newCursorPos = cursorPos + (formatted.length - e.target.value.length);
         e.target.setSelectionRange(newCursorPos, newCursorPos);
       });
     }
-    
+
     // Add supplier suggestions for electricity supplier field
     if (field === 'electricitySupplier') {
       console.log('[Contact Detail] Adding supplier suggestions for account field:', field);
@@ -4337,7 +4340,7 @@
         console.warn('[Contact Detail] window.addSupplierSuggestions not available for account field');
       }
     }
-    
+
 
     const actions = wrap.querySelector('.info-actions');
     const saveBtn = document.createElement('button');
@@ -4378,17 +4381,17 @@
       }
       await saveAccountField(field, val);
       // For annual usage, show formatted value with commas
-      const displayValue = field === 'annualUsage' && val ? 
-        String(val).replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',') : 
+      const displayValue = field === 'annualUsage' && val ?
+        String(val).replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',') :
         val || '';
       updateFieldText(wrap, displayValue);
       // Notify other components (Health widget) to sync
-      try { 
+      try {
         const eventDetail = { entity: 'account', id: state._linkedAccountId, field, value: val };
         console.log('[Contact Detail] Dispatching energy-updated event from commit:', eventDetail);
         console.log('[Contact Detail] Event detail for supplier field:', { field, value: val, entity: 'account', id: state._linkedAccountId });
-        document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: eventDetail })); 
-      } catch(e) { 
+        document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: eventDetail }));
+      } catch (e) {
         console.error('[Contact Detail] Error dispatching energy-updated event:', e);
       }
     };
@@ -4440,32 +4443,32 @@
 
     const commit = async () => {
       const val = input.value.trim();
-      
+
       // Get address index from field name
       const addressIndex = parseInt(wrap.getAttribute('data-address-index'), 10);
       if (isNaN(addressIndex)) {
         console.error('[Contact Detail] Invalid address index');
         return;
       }
-      
+
       // Get linked account
       const linkedAccount = findAssociatedAccount(state.currentContact);
       if (!linkedAccount) {
         console.error('[Contact Detail] No linked account found');
         return;
       }
-      
+
       // Update the address in the array
       const currentAddresses = (linkedAccount.serviceAddresses && Array.isArray(linkedAccount.serviceAddresses)) ? linkedAccount.serviceAddresses : [];
       const updatedAddresses = [...currentAddresses];
-      
+
       if (addressIndex < updatedAddresses.length) {
         updatedAddresses[addressIndex] = { ...updatedAddresses[addressIndex], address: val };
       }
-      
+
       // Save to account
       await saveAccountServiceAddresses(updatedAddresses);
-      
+
       // Update display
       updateFieldText(wrap, val || '--');
     };
@@ -4481,18 +4484,18 @@
 
   function beginEditPhoneField(wrap) {
     if (!wrap) return;
-    
+
     const contact = state.currentContact;
     if (!contact) return;
-    
+
     // Preserve original UI so Cancel can restore without persisting
     const originalValue = wrap.querySelector('.info-value-text')?.textContent || '';
     const labelEl = wrap.closest('.info-row')?.querySelector('.info-label');
     const originalLabel = labelEl ? labelEl.textContent : '';
-    
+
     // Get all available phone numbers and add missing options
     const phoneOptions = [];
-    
+
     // Add existing phone numbers
     if (contact.mobile) {
       phoneOptions.push({ type: 'mobile', value: contact.mobile, field: 'mobile' });
@@ -4503,7 +4506,7 @@
     if (contact.otherPhone) {
       phoneOptions.push({ type: 'other', value: contact.otherPhone, field: 'otherPhone' });
     }
-    
+
     // Add missing phone type options
     if (!contact.mobile) {
       phoneOptions.push({ type: 'add mobile', value: '', field: 'mobile', isAdd: true });
@@ -4514,16 +4517,16 @@
     if (!contact.otherPhone) {
       phoneOptions.push({ type: 'add other', value: '', field: 'otherPhone', isAdd: true });
     }
-    
+
     // If no phone numbers exist at all, default to mobile
     if (phoneOptions.length === 0) {
       phoneOptions.push({ type: 'mobile', value: '', field: 'mobile' });
     }
-    
+
     console.log('[Contact Detail] Phone options created:', phoneOptions);
-    
+
     wrap.classList.add('editing');
-    
+
     // Create dropdown
     const dropdown = document.createElement('div');
     dropdown.className = 'phone-dropdown';
@@ -4543,12 +4546,12 @@
     dropdown.style.maxHeight = '200px';
     dropdown.style.overflowY = 'auto';
     console.log('[Contact Detail] Created phone dropdown with', phoneOptions.length, 'options');
-    
+
     phoneOptions.forEach((option, index) => {
       const item = document.createElement('div');
       item.className = 'phone-dropdown-item';
       if (index === 0) item.classList.add('selected');
-      
+
       // Add inline styles to ensure proper styling
       item.style.display = 'flex';
       item.style.alignItems = 'center';
@@ -4558,37 +4561,37 @@
       item.style.borderBottom = '1px solid var(--border-light)';
       item.style.transition = 'background-color 0.2s ease';
       item.style.color = 'var(--text-primary)';
-      
+
       if (index === 0) {
         item.style.background = 'var(--primary-700)';
         item.style.color = 'white';
       }
-      
+
       const displayText = option.isAdd ? 'Click to add' : (option.value ? formatPhoneForDisplay(option.value) : 'Click to add');
       const typeText = option.isAdd ? option.type.toUpperCase() : option.type.toUpperCase();
-      
+
       item.innerHTML = `
         <span class="phone-type" style="font-weight: 600; font-size: 0.85rem; text-transform: uppercase;">${escapeHtml(typeText)}</span>
         <span class="phone-number" style="font-size: 0.9rem; color: ${index === 0 ? 'rgba(255, 255, 255, 0.9)' : 'var(--text-secondary)'};">${escapeHtml(displayText)}</span>
       `;
-      
+
       console.log('[Contact Detail] Created dropdown item:', option.type, option.value);
-      
+
       item.addEventListener('click', () => {
         console.log('[Contact Detail] Phone dropdown item clicked:', option);
-        
+
         // Remove selected class from all items
         dropdown.querySelectorAll('.phone-dropdown-item').forEach(el => {
           el.classList.remove('selected');
           el.style.background = '';
           el.style.color = 'var(--text-primary)';
         });
-        
+
         // Add selected class to clicked item
         item.classList.add('selected');
         item.style.background = 'var(--primary-700)';
         item.style.color = 'white';
-        
+
         // Update the input value
         const input = wrap.querySelector('.info-edit-input');
         if (input) {
@@ -4601,7 +4604,7 @@
             selectedField: input.dataset.selectedField
           });
         }
-        
+
         // Update the field label to show visual confirmation
         const fieldLabel = wrap.closest('.info-row')?.querySelector('.info-label');
         if (fieldLabel) {
@@ -4618,10 +4621,10 @@
           console.log('[Contact Detail] Field label updated to:', newLabel);
         }
       });
-      
+
       dropdown.appendChild(item);
     });
-    
+
     // Create input
     const input = document.createElement('input');
     input.type = 'tel';
@@ -4630,17 +4633,17 @@
     input.dataset.selectedType = phoneOptions[0].type;
     input.dataset.selectedField = phoneOptions[0].field;
     input.placeholder = 'Enter phone number (e.g., 337-233-0464 ext 10117)';
-    
+
     // Add smart real-time formatting that allows extension typing
     input.addEventListener('input', (e) => {
       const cursorPos = e.target.selectionStart;
       const rawValue = e.target.value;
-      
+
       // Don't format if user is typing an extension
       if (isTypingExtension(rawValue, cursorPos)) {
         return; // Allow free typing for extensions
       }
-      
+
       // Only format the main phone number part
       const formatted = formatPhoneNumberForInput(rawValue);
       if (formatted !== rawValue) {
@@ -4650,12 +4653,12 @@
         setTimeout(() => { e.target.setSelectionRange(newPos, newPos); }, 0);
       }
     });
-    
+
     // Create input wrapper
     const inputWrap = document.createElement('div');
     inputWrap.className = 'phone-input-wrap';
     inputWrap.style.position = 'relative'; // Ensure relative positioning for dropdown
-    
+
     // Add helper text for extension input
     const helperText = document.createElement('div');
     helperText.className = 'phone-input-helper';
@@ -4667,7 +4670,7 @@
     inputWrap.appendChild(helperText);
     inputWrap.appendChild(dropdown);
     console.log('[Contact Detail] Created input wrapper and appended dropdown');
-    
+
     // Create actions
     const actions = wrap.querySelector('.info-actions');
     const saveBtn = document.createElement('button');
@@ -4678,47 +4681,47 @@
     cancelBtn.className = 'icon-btn-sm info-cancel';
     cancelBtn.textContent = '×';
     cancelBtn.title = 'Cancel';
-    
+
     // Replace content
     const textEl = wrap.querySelector('.info-value-text');
     if (textEl && textEl.parentElement) textEl.parentElement.replaceChild(inputWrap, textEl);
-    
+
     if (actions) {
       actions.innerHTML = '';
       actions.appendChild(saveBtn);
       actions.appendChild(cancelBtn);
     }
-    
+
     setTimeout(() => input.focus(), 0);
-    
+
     // Event handlers
     const onKey = async (ev) => {
-      if (ev.key === 'Enter') { 
-        ev.preventDefault(); 
-        await commitPhoneEdit(wrap, input.value, input.dataset.selectedField, input.dataset.selectedType); 
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        await commitPhoneEdit(wrap, input.value, input.dataset.selectedField, input.dataset.selectedType);
       }
-      else if (ev.key === 'Escape') { 
-        ev.preventDefault(); 
-        cancelEdit(wrap, 'phone', wrap.querySelector('.info-value-text')?.textContent || ''); 
+      else if (ev.key === 'Escape') {
+        ev.preventDefault();
+        cancelEdit(wrap, 'phone', wrap.querySelector('.info-value-text')?.textContent || '');
       }
     };
-    
+
     input.addEventListener('keydown', onKey);
-    saveBtn.addEventListener('click', async () => { 
+    saveBtn.addEventListener('click', async () => {
       console.log('[Contact Detail] Save button clicked with:', {
         value: input.value,
         selectedField: input.dataset.selectedField,
         selectedType: input.dataset.selectedType
       });
-      await commitPhoneEdit(wrap, input.value, input.dataset.selectedField, input.dataset.selectedType); 
+      await commitPhoneEdit(wrap, input.value, input.dataset.selectedField, input.dataset.selectedType);
     });
-    cancelBtn.addEventListener('click', () => { 
+    cancelBtn.addEventListener('click', () => {
       // Restore original label and value; do not save
       if (labelEl && originalLabel) labelEl.textContent = originalLabel;
       state.preferredPhoneField = '';
-      cancelEdit(wrap, 'phone', originalValue); 
+      cancelEdit(wrap, 'phone', originalValue);
     });
-    
+
     // Close dropdown when clicking outside
     const closeDropdown = (e) => {
       if (!wrap.contains(e.target)) {
@@ -4726,7 +4729,7 @@
         document.removeEventListener('click', closeDropdown);
       }
     };
-    
+
     setTimeout(() => {
       document.addEventListener('click', closeDropdown);
     }, 100);
@@ -4735,11 +4738,11 @@
   async function commitPhoneEdit(wrap, value, field, type) {
     const normalizedValue = normalizePhone(value);
     console.log('[Contact Detail] commitPhoneEdit called with:', { value, field, type, normalizedValue });
-    
+
     console.log('[Contact Detail] Calling saveField with:', { field, normalizedValue });
     // Prevent accidental clearing when selecting an "Add <type>" option without entering a value
     if (!normalizedValue || !String(normalizedValue).trim()) {
-      try { window.crm?.showToast && window.crm.showToast('Enter a phone number or press Escape to cancel'); } catch(_) {}
+      try { window.crm?.showToast && window.crm.showToast('Enter a phone number or press Escape to cancel'); } catch (_) { }
       // Restore previous UI without saving
       cancelEdit(wrap, 'phone', wrap.querySelector('.info-value-text')?.textContent || '');
       return;
@@ -4748,14 +4751,14 @@
     // Remember the chosen field so the primary row reflects it on re-render
     state.preferredPhoneField = field;
     // Persist preferred type so it remains default on next load
-    try { await setPreferredPhoneType(field); } catch(_) {}
-    
+    try { await setPreferredPhoneType(field); } catch (_) { }
+
     // Update the contact data
     if (state.currentContact) {
       state.currentContact[field] = normalizedValue;
       console.log('[Contact Detail] Updated contact data:', state.currentContact[field]);
     }
-    
+
     // Update the field display to show the new field name and value
     const fieldLabel = wrap.closest('.info-row')?.querySelector('.info-label');
     if (fieldLabel) {
@@ -4768,12 +4771,12 @@
       fieldLabel.textContent = typeLabels[field] || 'PHONE';
       console.log('[Contact Detail] Updated field label to:', fieldLabel.textContent);
     }
-    
+
     // Update the field value display with formatted version
     const formattedDisplay = formatPhoneForDisplay(normalizedValue);
     updateFieldText(wrap, formattedDisplay);
     console.log('[Contact Detail] Updated field text to:', normalizedValue);
-    
+
     // Re-render the phone row with new primary phone
     const phoneRow = wrap.closest('.info-row');
     if (phoneRow) {
@@ -4783,12 +4786,12 @@
       tempDiv.innerHTML = newPhoneRow;
       const newRow = tempDiv.firstElementChild;
       phoneRow.parentElement.replaceChild(newRow, phoneRow);
-      
+
       // Process click-to-call for the new phone row
       setTimeout(() => {
-        try { 
-          window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); 
-        } catch (_) {}
+        try {
+          window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements();
+        } catch (_) { }
       }, 50);
     }
     // Clear preferred override after re-render so subsequent loads use normal priority
@@ -4897,7 +4900,7 @@
     // Update avatar initial
     const avatar = document.querySelector('#contact-detail-header .avatar-circle-small');
     if (avatar) { avatar.textContent = (newName.charAt(0) || 'C').toUpperCase(); }
-    try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) {}
+    try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) { }
   }
 
   function cancelEditName() {
@@ -4919,44 +4922,44 @@
   // ===== Recent Calls (Contact) =====
 
   // Avatar + helper utilities for transcript rendering
-  function cd_getAgentAvatar(){ return `<div class="transcript-avatar-circle agent-avatar" aria-hidden="true">Y</div>`; }
-  function cd_getContactAvatar(contactName, call){
+  function cd_getAgentAvatar() { return `<div class="transcript-avatar-circle agent-avatar" aria-hidden="true">Y</div>`; }
+  function cd_getContactAvatar(contactName, call) {
     const c = (window.getPeopleData && call && call.contactId) ? (getContactById(call.contactId) || null) : null;
-    if (c && c.firstName){
+    if (c && c.firstName) {
       const initials = (c.firstName.charAt(0) + (c.lastName ? c.lastName.charAt(0) : '')).toUpperCase();
       return `<div class="transcript-avatar-circle contact-avatar" aria-hidden="true">${initials}</div>`;
     }
     const domain = cd_extractDomainFromAccount(call && (call.accountName || ''));
-    if (domain){
+    if (domain) {
       const fb = (typeof window.__pcAccountsIcon === 'function') ? window.__pcAccountsIcon() : '<span class="company-favicon" aria-hidden="true" style="display:inline-block;width:16px;height:16px;"></span>';
       return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true">${window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 64) : fb}</div>`;
     }
-    const initial = (String(contactName||'C').charAt(0) || 'C').toUpperCase();
+    const initial = (String(contactName || 'C').charAt(0) || 'C').toUpperCase();
     return `<div class="transcript-avatar-circle contact-avatar" aria-hidden="true">${initial}</div>`;
   }
-  function cd_extractDomainFromAccount(name){
+  function cd_extractDomainFromAccount(name) {
     if (!name) return '';
     const key = String(name).trim().toLowerCase();
-    try{
-      if (typeof window.getAccountsData === 'function'){
+    try {
+      if (typeof window.getAccountsData === 'function') {
         const accounts = window.getAccountsData() || [];
-        const hit = accounts.find(a => String(a.name||a.accountName||'').trim().toLowerCase() === key);
+        const hit = accounts.find(a => String(a.name || a.accountName || '').trim().toLowerCase() === key);
         const dom = hit && (hit.domain || hit.website || '').toString();
-        if (dom) return dom.replace(/^https?:\/\//,'').replace(/\/$/,'');
+        if (dom) return dom.replace(/^https?:\/\//, '').replace(/\/$/, '');
       }
-    }catch(_){}
+    } catch (_) { }
     return '';
   }
-  function cd_normalizeSupplierTokens(s){ try{ if(!s) return ''; let out=String(s); out=out.replace(/\bT\s*X\s*U\b/gi,'TXU'); out=out.replace(/\bN\s*R\s*G\b/gi,'NRG'); out=out.replace(/\breliant\b/gi,'Reliant'); return out; }catch(_){ return s||''; } }
+  function cd_normalizeSupplierTokens(s) { try { if (!s) return ''; let out = String(s); out = out.replace(/\bT\s*X\s*U\b/gi, 'TXU'); out = out.replace(/\bN\s*R\s*G\b/gi, 'NRG'); out = out.replace(/\breliant\b/gi, 'Reliant'); return out; } catch (_) { return s || ''; } }
 
-  async function loadRecentCallsForContact(){
+  async function loadRecentCallsForContact() {
     const list = document.getElementById('contact-recent-calls-list');
     if (!list || !state.currentContact) return;
     const contactId = state.currentContact.id;
     const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-    
+
     // Loading recent calls for contact
-    
+
     try {
       // Use new targeted API endpoint for much better performance
       const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser)
@@ -4965,17 +4968,17 @@
       const r = await fetch(`${base}/api/calls/contact/${contactId}?limit=50`, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
-      const j = await r.json().catch(()=>({}));
+      const j = await r.json().catch(() => ({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
-      
+
       console.log(`[Contact Detail] Loaded ${calls.length} targeted calls for contact ${contactId}`);
-      
+
       // Calls are already filtered and sorted by the API
       const filtered = calls;
-      
+
       // Save to state and initialize pagination
-      try { state._rcCalls = filtered; } catch(_) {}
-      try { if (typeof state._rcPage !== 'number' || !state._rcPage) state._rcPage = 1; } catch(_) {}
+      try { state._rcCalls = filtered; } catch (_) { }
+      try { if (typeof state._rcPage !== 'number' || !state._rcPage) state._rcPage = 1; } catch (_) { }
       // DEBUG: show mapping coverage
       try {
         console.log('[Contact Detail][Recent Calls] Contact:', {
@@ -4983,21 +4986,21 @@
           name: [state.currentContact?.firstName, state.currentContact?.lastName].filter(Boolean).join(' ') || state.currentContact?.name,
           phones: nums
         });
-        console.log('[Contact Detail][Recent Calls] Filtered calls:', filtered.map(c=>({ id:c.id, to:c.to, from:c.from, contactName:c.contactName, accountName:c.accountName })));
-      } catch(_) {}
+        console.log('[Contact Detail][Recent Calls] Filtered calls:', filtered.map(c => ({ id: c.id, to: c.to, from: c.from, contactName: c.contactName, accountName: c.accountName })));
+      } catch (_) { }
       // Enrich each call with direction and pretty counterparty number like the Calls page
-      const bizList = Array.isArray(window.CRM_BUSINESS_NUMBERS) ? window.CRM_BUSINESS_NUMBERS.map(n=>String(n||'').replace(/\D/g,'').slice(-10)).filter(Boolean) : [];
-      const isBiz = (p)=> bizList.includes(p);
-      const norm = (s)=> String(s||'').replace(/\D/g,'').slice(-10);
+      const bizList = Array.isArray(window.CRM_BUSINESS_NUMBERS) ? window.CRM_BUSINESS_NUMBERS.map(n => String(n || '').replace(/\D/g, '').slice(-10)).filter(Boolean) : [];
+      const isBiz = (p) => bizList.includes(p);
+      const norm = (s) => String(s || '').replace(/\D/g, '').slice(-10);
       filtered.forEach(c => {
-        if (!c.id) c.id = c.twilioSid || c.callSid || c.sid || `${c.to||''}_${c.from||''}_${c.timestamp||c.callTime||''}`;
+        if (!c.id) c.id = c.twilioSid || c.callSid || c.sid || `${c.to || ''}_${c.from || ''}_${c.timestamp || c.callTime || ''}`;
         const to10 = norm(c.to);
         const from10 = norm(c.from);
         let direction = 'unknown';
-        if (String(c.from||'').startsWith('client:') || isBiz(from10)) direction = 'outbound';
-        else if (String(c.to||'').startsWith('client:') || isBiz(to10)) direction = 'inbound';
+        if (String(c.from || '').startsWith('client:') || isBiz(from10)) direction = 'outbound';
+        else if (String(c.to || '').startsWith('client:') || isBiz(to10)) direction = 'inbound';
         const counter10 = direction === 'outbound' ? to10 : (direction === 'inbound' ? from10 : (to10 || from10));
-        const pretty = counter10 ? `+1 (${counter10.slice(0,3)}) ${counter10.slice(3,6)}-${counter10.slice(6)}` : '';
+        const pretty = counter10 ? `+1 (${counter10.slice(0, 3)}) ${counter10.slice(3, 6)}-${counter10.slice(6)}` : '';
         c.direction = c.direction || direction;
         c.counterpartyPretty = c.counterpartyPretty || pretty;
         c.contactPhone = c.contactPhone || pretty;
@@ -5012,14 +5015,14 @@
             const acctName = state.currentContact?.companyName || state.currentContact?.accountName || '';
             if (acctName) c.accountName = acctName;
           }
-        } catch(_) {}
-        try { if (window.CRM_DEBUG_CALLS) console.log('[Contact Detail][enrich]', { id:c.id, direction:c.direction, number:c.counterpartyPretty, contactName:c.contactName, accountName:c.accountName }); } catch(_) {}
+        } catch (_) { }
+        try { if (window.CRM_DEBUG_CALLS) console.log('[Contact Detail][enrich]', { id: c.id, direction: c.direction, number: c.counterpartyPretty, contactName: c.contactName, accountName: c.accountName }); } catch (_) { }
       });
       renderRecentCallsPage();
       bindRecentCallsPager();
-      try { window.ClickToCall?.processSpecificPhoneElements?.(); } catch(_) {}
+      try { window.ClickToCall?.processSpecificPhoneElements?.(); } catch (_) { }
       // Clear the reload flag after successful load
-      try { state._rcReloadInFlight = false; } catch(_) {}
+      try { state._rcReloadInFlight = false; } catch (_) { }
     } catch (e) {
       console.warn('[RecentCalls][Contact] load failed', e);
       list.innerHTML = '<div class="rc-empty">Failed to load recent calls</div>';
@@ -5027,42 +5030,42 @@
   }
 
   const RC_PAGE_SIZE = 5;
-  function getRecentCallsPageSlice(){
+  function getRecentCallsPageSlice() {
     const calls = Array.isArray(state._rcCalls) ? state._rcCalls : [];
-    const page = Math.max(1, parseInt(state._rcPage||1, 10));
+    const page = Math.max(1, parseInt(state._rcPage || 1, 10));
     const start = (page - 1) * RC_PAGE_SIZE;
     return calls.slice(start, start + RC_PAGE_SIZE);
   }
 
-  function renderRecentCallsPage(){
+  function renderRecentCallsPage() {
     const list = document.getElementById('contact-recent-calls-list');
     if (!list) return;
     const total = Array.isArray(state._rcCalls) ? state._rcCalls.length : 0;
-    if (!total) { rcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); updateRecentCallsPager(0,0); return; }
+    if (!total) { rcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); updateRecentCallsPager(0, 0); return; }
     const slice = getRecentCallsPageSlice();
     rcUpdateListAnimated(list, slice.map(call => rcItemHtml(call)).join(''));
-      // delegate click to handle dynamic rerenders
-      list.querySelectorAll('.rc-insights').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.preventDefault(); e.stopPropagation();
-          const id = btn.getAttribute('data-id');
-          const call = (state._rcCalls||[]).find(x=>String(x.id)===String(id));
-          if (!call) return;
-          if (btn.classList.contains('not-processed')) {
-            const callSid = call.id || call.twilioSid || call.callSid;
-            const recordingSid = call.recordingSid || call.recording_id;
-            triggerContactCI(callSid, recordingSid, btn);
-            return;
-          }
-          toggleRcDetails(btn, call);
-        });
+    // delegate click to handle dynamic rerenders
+    list.querySelectorAll('.rc-insights').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const id = btn.getAttribute('data-id');
+        const call = (state._rcCalls || []).find(x => String(x.id) === String(id));
+        if (!call) return;
+        if (btn.classList.contains('not-processed')) {
+          const callSid = call.id || call.twilioSid || call.callSid;
+          const recordingSid = call.recordingSid || call.recording_id;
+          triggerContactCI(callSid, recordingSid, btn);
+          return;
+        }
+        toggleRcDetails(btn, call);
       });
+    });
     const totalPages = Math.max(1, Math.ceil(total / RC_PAGE_SIZE));
-    updateRecentCallsPager(state._rcPage||1, totalPages);
+    updateRecentCallsPager(state._rcPage || 1, totalPages);
   }
 
-  function rcSpinnerHtml(){ return '<div class="rc-loading"><div class="rc-spinner" aria-hidden="true"></div></div>'; }
-  function rcSetLoading(list){
+  function rcSpinnerHtml() { return '<div class="rc-loading"><div class="rc-spinner" aria-hidden="true"></div></div>'; }
+  function rcSetLoading(list) {
     try {
       // Overlay spinner without clearing existing rows to prevent flicker
       let ov = list.querySelector('.rc-loading-overlay');
@@ -5079,9 +5082,9 @@
         list.appendChild(ov);
       }
       ov.style.display = 'flex';
-    } catch(_) {}
+    } catch (_) { }
   }
-  function rcUpdateListAnimated(list, html){
+  function rcUpdateListAnimated(list, html) {
     try {
       // Preserve expanded insights dropdowns before refresh
       const expandedInsights = [];
@@ -5107,8 +5110,8 @@
       requestAnimationFrame(() => {
         list.innerHTML = html;
         // Remove any lingering overlay after content update
-        try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch(_) {}
-        
+        try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch (_) { }
+
         // Restore expanded insights dropdowns (avoid nesting rc-details-inner repeatedly)
         expandedInsights.forEach(expanded => {
           const insightsBtn = list.querySelector(`.rc-insights[data-id="${expanded.callId}"]`);
@@ -5126,7 +5129,7 @@
             }
           }
         });
-        
+
         const targetH = list.scrollHeight;
         list.style.transition = 'height 220ms ease, opacity 220ms ease';
         list.style.opacity = '1';
@@ -5137,20 +5140,20 @@
           list.style.overflow = '';
         }, 260);
       });
-    } catch(_) { list.innerHTML = html; }
+    } catch (_) { list.innerHTML = html; }
   }
 
-  function bindRecentCallsPager(){
+  function bindRecentCallsPager() {
     const pager = document.getElementById('contact-rc-pager');
     const prev = document.getElementById('rc-prev');
     const next = document.getElementById('rc-next');
     if (!pager || pager._bound) return;
-    prev?.addEventListener('click', (e)=>{ e.preventDefault(); const total = Math.ceil((state._rcCalls||[]).length/RC_PAGE_SIZE)||1; state._rcPage = Math.max(1, (state._rcPage||1) - 1); renderRecentCallsPage(); updateRecentCallsPager(state._rcPage, total); });
-    next?.addEventListener('click', (e)=>{ e.preventDefault(); const total = Math.ceil((state._rcCalls||[]).length/RC_PAGE_SIZE)||1; state._rcPage = Math.min(total, (state._rcPage||1) + 1); renderRecentCallsPage(); updateRecentCallsPager(state._rcPage, total); });
+    prev?.addEventListener('click', (e) => { e.preventDefault(); const total = Math.ceil((state._rcCalls || []).length / RC_PAGE_SIZE) || 1; state._rcPage = Math.max(1, (state._rcPage || 1) - 1); renderRecentCallsPage(); updateRecentCallsPager(state._rcPage, total); });
+    next?.addEventListener('click', (e) => { e.preventDefault(); const total = Math.ceil((state._rcCalls || []).length / RC_PAGE_SIZE) || 1; state._rcPage = Math.min(total, (state._rcPage || 1) + 1); renderRecentCallsPage(); updateRecentCallsPager(state._rcPage, total); });
     pager._bound = '1';
   }
 
-  function updateRecentCallsPager(current, total){
+  function updateRecentCallsPager(current, total) {
     const pager = document.getElementById('contact-rc-pager');
     const info = document.getElementById('rc-info');
     const prev = document.getElementById('rc-prev');
@@ -5158,17 +5161,17 @@
     if (!pager || !info || !prev || !next) return;
     const show = total > 1;
     pager.style.display = show ? 'flex' : 'none';
-    info.textContent = `${Math.max(1, parseInt(current||1,10))} of ${Math.max(1, parseInt(total||1,10))}`;
+    info.textContent = `${Math.max(1, parseInt(current || 1, 10))} of ${Math.max(1, parseInt(total || 1, 10))}`;
     prev.disabled = (current <= 1);
     next.disabled = (current >= total);
   }
 
-  function safeReloadRecentCallsWithRetries(){
-    try { if (_rcRetryTimer) { clearTimeout(_rcRetryTimer); _rcRetryTimer = null; } } catch(_) {}
+  function safeReloadRecentCallsWithRetries() {
+    try { if (_rcRetryTimer) { clearTimeout(_rcRetryTimer); _rcRetryTimer = null; } } catch (_) { }
     let attempts = 0;
     const run = () => {
       attempts++;
-      try { loadRecentCallsForContact(); } catch(_) {}
+      try { loadRecentCallsForContact(); } catch (_) { }
       if (attempts < 10) { // ~8–10s coverage with 900ms spacing
         _rcRetryTimer = setTimeout(run, 900);
       }
@@ -5176,13 +5179,13 @@
     run();
   }
 
-  function collectContactPhones(c){
+  function collectContactPhones(c) {
     const arr = [c.mobile, c.workDirectPhone, c.otherPhone];
-    try { const company = getCompanyPhone(c); if (company) arr.push(company); } catch(_){}
+    try { const company = getCompanyPhone(c); if (company) arr.push(company); } catch (_) { }
     return arr.filter(Boolean);
   }
 
-  function rcItemHtml(c){
+  function rcItemHtml(c) {
     // Prefer contact name; if absent (company call), show company once
     const hasContact = !!(c.contactId && c.contactName);
     const rawCompany = String(c.accountName || c.company || '');
@@ -5192,8 +5195,8 @@
     const outcome = escapeHtml(c.outcome || c.status || '');
     const ts = c.callTime || c.timestamp || new Date().toISOString();
     const when = new Date(ts).toLocaleString();
-    const idAttr = escapeHtml(String(c.id||c.twilioSid||c.callSid||''));
-    
+    const idAttr = escapeHtml(String(c.id || c.twilioSid || c.callSid || ''));
+
     // Check for live duration first, fallback to database duration
     let durStr = '';
     if (state._liveCallDurations && state._liveCallDurations.has(idAttr)) {
@@ -5203,13 +5206,13 @@
         durStr = liveData.durationFormatted;
       }
     }
-    
+
     // Fallback to database duration if no live duration
     if (!durStr) {
-      const dur = Math.max(0, parseInt(c.durationSec||c.duration||0,10));
-      durStr = `${Math.floor(dur/60)}m ${dur%60}s`;
+      const dur = Math.max(0, parseInt(c.durationSec || c.duration || 0, 10));
+      durStr = `${Math.floor(dur / 60)}m ${dur % 60}s`;
     }
-    
+
     // Prefer the real dialed/peer number: use targetPhone/to/from; fallback to counterpartyPretty
     const phone = escapeHtml(String(c.targetPhone || c.to || c.from || c.contactPhone || c.counterpartyPretty || ''));
     const direction = escapeHtml((c.direction || '').charAt(0).toUpperCase() + (c.direction || '').slice(1));
@@ -5224,11 +5227,11 @@
                                  data-contact-id="${c.contactId || state.currentContact?.id || ''}" 
                                  data-account-id="${c.accountId || state.currentContact?.accountId || ''}" 
                                  data-contact-name="${escapeHtml(name)}" 
-                                 data-company-name="${escapeHtml(company)}">${phone}</span>${direction?` • ${direction}`:''}</div>
+                                 data-company-name="${escapeHtml(company)}">${phone}</span>${direction ? ` • ${direction}` : ''}</div>
         </div>
         <div class="rc-actions">
           <span class="rc-outcome">${outcome}</span>
-          <button type="button" class="rc-icon-btn rc-insights ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'not-processed' : ''}" data-id="${escapeHtml(String(c.id||''))}" aria-label="View insights" title="${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'Process Call' : 'View AI insights'}">${svgEye()}</button>
+          <button type="button" class="rc-icon-btn rc-insights ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'not-processed' : ''}" data-id="${escapeHtml(String(c.id || ''))}" aria-label="View insights" title="${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'Process Call' : 'View AI insights'}">${svgEye()}</button>
         </div>
       </div>`;
   }
@@ -5239,14 +5242,14 @@
       console.warn('[ContactDetail] Missing callSid for CI processing:', { callSid, recordingSid });
       return;
     }
-    
+
     // Use shared CI processor for consistent functionality
     if (window.SharedCIProcessor) {
       const success = await window.SharedCIProcessor.processCall(callSid, recordingSid, btn, {
         context: 'contact-detail',
         onSuccess: (call) => {
           console.log('[ContactDetail] CI processing completed:', call);
-          
+
           // Update state cache so future renders show full insights
           try {
             if (Array.isArray(state._rcCalls)) {
@@ -5254,49 +5257,49 @@
               state._rcCalls = state._rcCalls.map(x => {
                 const xid = String(x.id || x.twilioSid || x.callSid || '');
                 if (xid === idMatch) {
-                  return { 
-                    ...x, 
-                    transcript: call.transcript || x.transcript, 
-                    formattedTranscript: call.formattedTranscript || x.formattedTranscript, 
-                    aiInsights: call.aiInsights || x.aiInsights, 
-                    conversationalIntelligence: call.conversationalIntelligence || x.conversationalIntelligence 
+                  return {
+                    ...x,
+                    transcript: call.transcript || x.transcript,
+                    formattedTranscript: call.formattedTranscript || x.formattedTranscript,
+                    aiInsights: call.aiInsights || x.aiInsights,
+                    conversationalIntelligence: call.conversationalIntelligence || x.conversationalIntelligence
                   };
                 }
                 return x;
               });
             }
-          } catch(_) {}
+          } catch (_) { }
         },
         onError: (error) => {
           console.error('[ContactDetail] CI processing failed:', error);
         }
       });
-      
+
       return;
     }
-    
+
     // If no recordingSid provided, the API will look it up by callSid
     if (!recordingSid) {
-      try { console.log('[ContactDetail] No recordingSid provided, API will look up recording for callSid:', callSid); } catch(_) {}
+      try { console.log('[ContactDetail] No recordingSid provided, API will look up recording for callSid:', callSid); } catch (_) { }
     }
     try {
       // Show loading spinner on the button (scoped, consistent across pages)
-      try { 
-        btn.innerHTML = '<span class="ci-btn-spinner" aria-hidden="true"></span>'; 
-        btn.classList.add('processing'); 
-        btn.disabled = true; 
-      } catch(_) {}
+      try {
+        btn.innerHTML = '<span class="ci-btn-spinner" aria-hidden="true"></span>';
+        btn.classList.add('processing');
+        btn.disabled = true;
+      } catch (_) { }
       // Toast
-      try { 
-        if (window.ToastManager) { 
+      try {
+        if (window.ToastManager) {
           window.ToastManager.showToast({
             type: 'info',
             title: 'Processing Call',
             message: 'Starting conversational intelligence analysis...',
             sound: false
-          }); 
-        } 
-      } catch(_) {}
+          });
+        }
+      } catch (_) { }
       let base = (window.crm && typeof window.crm.getApiBaseUrl === 'function')
         ? window.crm.getApiBaseUrl()
         : (window.PUBLIC_BASE_URL || window.API_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app');
@@ -5307,86 +5310,86 @@
         body: JSON.stringify({ callSid: callSid, recordingSid: recordingSid })
       });
       if (response.status === 404) {
-        try { 
-          if (window.ToastManager) { 
+        try {
+          if (window.ToastManager) {
             window.ToastManager.showToast({
               type: 'warning',
               title: 'Recording Not Ready',
               message: 'Please wait 5-10 seconds for the recording to be processed, then try again.'
-            }); 
-          } 
-        } catch(_) {}
-        try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch(_) {}
+            });
+          }
+        } catch (_) { }
+        try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch (_) { }
         return;
       }
       if (!response.ok) {
         try {
-          const err = await response.json().catch(()=>({}));
+          const err = await response.json().catch(() => ({}));
           console.error('[ContactDetail] CI request error response:', response.status, err);
           const msg = (err && (err.error || err.details)) ? String(err.error || err.details) : `CI request failed: ${response.status} ${response.statusText}`;
           if (window.ToastManager) { window.ToastManager.showToast(msg, 'error'); }
-        } catch(_) {
-          try { 
-            if (window.ToastManager) { 
+        } catch (_) {
+          try {
+            if (window.ToastManager) {
               window.ToastManager.showToast({
                 type: 'error',
                 title: 'Processing Failed',
                 message: 'Unable to start call analysis. Please try again.'
-              }); 
-            } 
-          } catch(__) {}
+              });
+            }
+          } catch (__) { }
         }
-        try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch(_) {}
+        try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch (_) { }
         return;
       }
-      const result = await response.json().catch(()=>({}));
-      try { console.log('[ContactDetail] CI processing initiated:', result); } catch(_) {}
-      
+      const result = await response.json().catch(() => ({}));
+      try { console.log('[ContactDetail] CI processing initiated:', result); } catch (_) { }
+
       // Keep spinner; backend/webhook will update UI when analysis completes
-      try { 
-        btn.title = 'Processing call insights...'; 
-        btn.classList.remove('not-processed'); 
-        btn.classList.add('processing'); 
-        
+      try {
+        btn.title = 'Processing call insights...';
+        btn.classList.remove('not-processed');
+        btn.classList.add('processing');
+
         // Store transcript SID for status checking
         if (result.transcriptSid) {
           btn.setAttribute('data-transcript-sid', result.transcriptSid);
         }
-      } catch(_) {}
-      
+      } catch (_) { }
+
       // Poll for insights becoming available and enable the button when ready
       try {
         pollInsightsUntilReady(callSid, btn);
-      } catch(_) {}
-      
+      } catch (_) { }
+
       // Show success toast with transcript SID for debugging
-      try { 
-        if (window.ToastManager && result.transcriptSid) { 
+      try {
+        if (window.ToastManager && result.transcriptSid) {
           window.ToastManager.showToast({
             type: 'success',
             title: 'Processing Started',
             message: `Transcript ID: ${result.transcriptSid.substring(0, 8)}...`
-          }); 
-        } 
-      } catch(_) {}
+          });
+        }
+      } catch (_) { }
     } catch (error) {
-      try { console.error('[ContactDetail] Failed to trigger CI processing:', error); } catch(_) {}
+      try { console.error('[ContactDetail] Failed to trigger CI processing:', error); } catch (_) { }
       // Reset button state on error
-      try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.disabled = false; } catch(_) {}
-      try { 
-        if (window.ToastManager) { 
+      try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.disabled = false; } catch (_) { }
+      try {
+        if (window.ToastManager) {
           window.ToastManager.showToast({
             type: 'error',
             title: 'Processing Failed',
             message: 'Unable to start call analysis. Please try again.'
-          }); 
-        } 
-      } catch(_) {}
+          });
+        }
+      } catch (_) { }
     }
   }
 
   // Firebase real-time listener for call insights (replaces API polling)
-  function pollInsightsUntilReady(callSid, btn){
+  function pollInsightsUntilReady(callSid, btn) {
     if (!window.firebaseDB) {
       console.warn('[ContactDetail] Firebase not available for real-time insights');
       return;
@@ -5408,7 +5411,7 @@
       const ciCompleted = !!(ci && typeof ci.status === 'string' && ci.status.toLowerCase() === 'completed');
       return (hasTranscript && hasInsights) || (hasTranscript && ciCompleted);
     };
-    
+
     const finalizeReady = (call) => {
       try {
         // Update state cache so future clicks render full insights
@@ -5422,9 +5425,9 @@
             return x;
           });
         }
-      } catch(_) {}
-      try { btn.innerHTML = svgEye(); btn.classList.remove('processing', 'not-processed'); btn.disabled = false; btn.title = 'View AI insights'; } catch(_) {}
-      try { if (window.ToastManager) { window.ToastManager.showToast({ type: 'success', title: 'Insights Ready', message: 'Click the eye icon to view call insights.' }); } } catch(_) {}
+      } catch (_) { }
+      try { btn.innerHTML = svgEye(); btn.classList.remove('processing', 'not-processed'); btn.disabled = false; btn.title = 'View AI insights'; } catch (_) { }
+      try { if (window.ToastManager) { window.ToastManager.showToast({ type: 'success', title: 'Insights Ready', message: 'Click the eye icon to view call insights.' }); } } catch (_) { }
     };
 
     // Firebase real-time listener
@@ -5454,20 +5457,20 @@
   }
 
   // Inline expanding details under an rc-item
-  function toggleRcDetails(btn, call){
+  function toggleRcDetails(btn, call) {
     const item = btn.closest('.rc-item');
     if (!item) return;
     const existing = item.nextElementSibling && item.nextElementSibling.classList && item.nextElementSibling.classList.contains('rc-details') ? item.nextElementSibling : null;
     const idStr = String(call.id || call.twilioSid || call.callSid || '');
     if (existing) {
       // Track explicit close so periodic refresh pauses correctly
-      try { if (state._rcOpenIds && state._rcOpenIds instanceof Set) state._rcOpenIds.delete(idStr); } catch(_) {}
+      try { if (state._rcOpenIds && state._rcOpenIds instanceof Set) state._rcOpenIds.delete(idStr); } catch (_) { }
       // collapse then remove
       animateCollapse(existing, () => existing.remove());
       return;
     }
     // Ensure open tracker exists and add current id
-    try { if (!state._rcOpenIds || !(state._rcOpenIds instanceof Set)) state._rcOpenIds = new Set(); state._rcOpenIds.add(idStr); } catch(_) {}
+    try { if (!state._rcOpenIds || !(state._rcOpenIds instanceof Set)) state._rcOpenIds = new Set(); state._rcOpenIds.add(idStr); } catch (_) { }
     const panel = document.createElement('div');
     panel.className = 'rc-details';
     panel.innerHTML = `<div class="rc-details-inner">${insightsInlineHtml(call)}</div>`;
@@ -5476,45 +5479,45 @@
 
     // Background transcript fetch if missing
     try {
-      const candidateSid = call.twilioSid || call.callSid || (typeof call.id==='string' && /^CA[0-9a-zA-Z]+$/.test(call.id) ? call.id : '');
-      if ((!call.transcript || String(call.transcript).trim()==='') && candidateSid) {
+      const candidateSid = call.twilioSid || call.callSid || (typeof call.id === 'string' && /^CA[0-9a-zA-Z]+$/.test(call.id) ? call.id : '');
+      if ((!call.transcript || String(call.transcript).trim() === '') && candidateSid) {
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
         const url = base ? `${base}/api/twilio/ai-insights` : '/api/twilio/ai-insights';
         fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ callSid: candidateSid })
-        }).then(res=>res.json()).then(data=>{
+        }).then(res => res.json()).then(data => {
           if (data && data.transcript) {
             call.transcript = data.transcript;
             const tEl = panel.querySelector('.pc-transcript');
             if (tEl) tEl.textContent = data.transcript;
           }
-        }).catch(()=>{});
+        }).catch(() => { });
       }
-    } catch(_) {}
+    } catch (_) { }
   }
-  function animateExpand(el){
+  function animateExpand(el) {
     el.style.height = '0px'; el.style.opacity = '0';
     const h = el.scrollHeight; // measure
-    requestAnimationFrame(()=>{
+    requestAnimationFrame(() => {
       el.classList.add('expanding');
       el.style.transition = 'height 180ms ease, opacity 180ms ease';
       el.style.height = h + 'px'; el.style.opacity = '1';
-      setTimeout(()=>{ el.style.height = ''; el.style.transition = ''; el.classList.remove('expanding'); }, 200);
+      setTimeout(() => { el.style.height = ''; el.style.transition = ''; el.classList.remove('expanding'); }, 200);
     });
   }
-  function animateCollapse(el, done){
+  function animateCollapse(el, done) {
     const h = el.scrollHeight;
     el.style.height = h + 'px'; el.style.opacity = '1';
-    requestAnimationFrame(()=>{
+    requestAnimationFrame(() => {
       el.classList.add('collapsing');
       el.style.transition = 'height 140ms ease, opacity 140ms ease';
       el.style.height = '0px'; el.style.opacity = '0';
-      setTimeout(()=>{ el.classList.remove('collapsing'); done && done(); }, 160);
+      setTimeout(() => { el.classList.remove('collapsing'); done && done(); }, 160);
     });
   }
-  function insightsInlineHtml(r){
+  function insightsInlineHtml(r) {
     const AI = r.aiInsights || {};
     // Build summary: prefer Twilio Operator summary, then fallback to constructed paragraph
     let paragraph = '';
@@ -5522,7 +5525,7 @@
     const rawTwilioSummary = (AI && typeof AI.summary === 'string') ? AI.summary.trim() : '';
     if (rawTwilioSummary) {
       // Twilio format: "Paragraph. • Bullet 1 • Bullet 2 ..."
-      const parts = rawTwilioSummary.split(' • ').map(s=>s.trim()).filter(Boolean);
+      const parts = rawTwilioSummary.split(' • ').map(s => s.trim()).filter(Boolean);
       paragraph = parts.shift() || '';
       bulletItems = parts;
     } else if (r.aiSummary && String(r.aiSummary).trim()) {
@@ -5530,7 +5533,7 @@
     } else if (AI && Object.keys(AI).length) {
       const sentiment = AI.sentiment || 'Unknown';
       const disposition = AI.disposition || '';
-      const topics = Array.isArray(AI.keyTopics) ? AI.keyTopics.slice(0,3).join(', ') : '';
+      const topics = Array.isArray(AI.keyTopics) ? AI.keyTopics.slice(0, 3).join(', ') : '';
       const who = r.contactName ? `Call with ${r.contactName}` : 'Call';
       let p = `${who}`;
       if (disposition) p += ` — ${disposition.toLowerCase()} disposition`;
@@ -5542,7 +5545,7 @@
     }
     // Filter bullets to avoid redundancy with right-hand sections (energy, topics, steps, pain, entities, budget, timeline)
     const redundant = /(current rate|rate type|supplier|utility|contract|usage|term|budget|timeline|topic|next step|pain point|entities?)/i;
-    const filteredBullets = (bulletItems||[]).filter(b => b && !redundant.test(b)).slice(0,6);
+    const filteredBullets = (bulletItems || []).filter(b => b && !redundant.test(b)).slice(0, 6);
     const sentiment = AI.sentiment || 'Unknown';
     const disposition = AI.disposition || '';
     const keyTopics = Array.isArray(AI.keyTopics) ? AI.keyTopics : [];
@@ -5551,56 +5554,56 @@
     const flags = AI.flags || {};
 
     // Helper to normalize values across snake_case and camelCase keys
-    const get = (obj, keys, d='') => { for (const k of keys){ const v = obj && obj[k]; if (v !== undefined && v !== null && v !== '') return v; } return d; };
+    const get = (obj, keys, d = '') => { for (const k of keys) { const v = obj && obj[k]; if (v !== undefined && v !== null && v !== '') return v; } return d; };
 
     // Transcript rendering with speaker/timestamp lines
-    const toMMSS = (s)=>{ const m=Math.floor((s||0)/60), ss=(s||0)%60; return `${String(m)}:${String(ss).padStart(2,'0')}`; };
-    function parseSpeakerTranscript(text){
-      const out=[]; if(!text) return out; const lines=String(text).split(/\r?\n/);
-      for(const raw of lines){
-        const line = raw.trim(); if(!line) continue;
+    const toMMSS = (s) => { const m = Math.floor((s || 0) / 60), ss = (s || 0) % 60; return `${String(m)}:${String(ss).padStart(2, '0')}`; };
+    function parseSpeakerTranscript(text) {
+      const out = []; if (!text) return out; const lines = String(text).split(/\r?\n/);
+      for (const raw of lines) {
+        const line = raw.trim(); if (!line) continue;
         let m = line.match(/^([A-Za-z][A-Za-z0-9 ]{0,30})\s+(\d+):(\d{2}):\s*(.*)$/);
-        if(!m){ m = line.match(/^([A-Za-z][A-Za-z0-9 ]{0,30})\s+\d+\s+(\d+):(\d{2}):\s*(.*)$/); if(m){ m=[m[0],m[1],m[2],m[3],m[4]]; } }
-        if(m){ const label=m[1].trim(); const mm=parseInt(m[2],10)||0; const ss=parseInt(m[3],10)||0; const txt=m[4]||''; out.push({label, t:mm*60+ss, text:txt}); continue; }
-        out.push({label:'', t:null, text:line});
+        if (!m) { m = line.match(/^([A-Za-z][A-Za-z0-9 ]{0,30})\s+\d+\s+(\d+):(\d{2}):\s*(.*)$/); if (m) { m = [m[0], m[1], m[2], m[3], m[4]]; } }
+        if (m) { const label = m[1].trim(); const mm = parseInt(m[2], 10) || 0; const ss = parseInt(m[3], 10) || 0; const txt = m[4] || ''; out.push({ label, t: mm * 60 + ss, text: txt }); continue; }
+        out.push({ label: '', t: null, text: line });
       }
       return out;
     }
-    function renderTranscriptHtml(A, raw){
+    function renderTranscriptHtml(A, raw) {
       let turns = Array.isArray(A?.speakerTurns) ? A.speakerTurns : [];
       // If roles missing, alternate
-      if (turns.length && !turns.some(t=>t && (t.role==='agent'||t.role==='customer'))){
-        let next='customer';
-        turns = turns.map(t=>({ t:Number(t.t)||0, role: next = (next==='agent'?'customer':'agent'), text: t.text||'' }));
+      if (turns.length && !turns.some(t => t && (t.role === 'agent' || t.role === 'customer'))) {
+        let next = 'customer';
+        turns = turns.map(t => ({ t: Number(t.t) || 0, role: next = (next === 'agent' ? 'customer' : 'agent'), text: t.text || '' }));
       }
-      if (turns.length){
-        const contactFirst = (String(r.contactName||'').trim().split(/\s+/)[0]) || 'Customer';
+      if (turns.length) {
+        const contactFirst = (String(r.contactName || '').trim().split(/\s+/)[0]) || 'Customer';
         const groups = [];
-        let current=null;
-        for(const t of turns){
-          const roleKey = t.role==='agent' ? 'agent' : (t.role==='customer' ? 'customer' : 'other');
-          const text = cd_normalizeSupplierTokens(t.text||'');
-          const ts = Number(t.t)||0;
-          if(current && current.role===roleKey){ current.texts.push(text); current.end=ts; }
-          else { if(current) groups.push(current); current={ role:roleKey, start:ts, texts:[text] }; }
+        let current = null;
+        for (const t of turns) {
+          const roleKey = t.role === 'agent' ? 'agent' : (t.role === 'customer' ? 'customer' : 'other');
+          const text = cd_normalizeSupplierTokens(t.text || '');
+          const ts = Number(t.t) || 0;
+          if (current && current.role === roleKey) { current.texts.push(text); current.end = ts; }
+          else { if (current) groups.push(current); current = { role: roleKey, start: ts, texts: [text] }; }
         }
-        if(current) groups.push(current);
-        return groups.map(g=>{
-          const label = g.role==='agent' ? 'You' : (g.role==='customer' ? contactFirst : 'Speaker');
-          const avatar = g.role==='agent' ? cd_getAgentAvatar() : cd_getContactAvatar(contactFirst, r);
+        if (current) groups.push(current);
+        return groups.map(g => {
+          const label = g.role === 'agent' ? 'You' : (g.role === 'customer' ? contactFirst : 'Speaker');
+          const avatar = g.role === 'agent' ? cd_getAgentAvatar() : cd_getContactAvatar(contactFirst, r);
           return `<div class=\"transcript-message ${g.role}\"><div class=\"transcript-avatar\">${avatar}</div><div class=\"transcript-content\"><div class=\"transcript-header\"><span class=\"transcript-speaker\">${label}</span><span class=\"transcript-time\">${toMMSS(g.start)}</span></div><div class=\"transcript-text\">${escapeHtml(g.texts.join(' ').trim())}</div></div></div>`;
         }).join('');
       }
-      const parsed = parseSpeakerTranscript(raw||'');
-      if(parsed.some(p=>p.label && p.t!=null)){
-        const contactFirst = (String(r.contactName||'').trim().split(/\s+/)[0]) || 'Customer';
-        let toggle='customer';
-        return parsed.map(p=>{
-          if(!p.label) return `<div class=\"transcript-message\"><div class=\"transcript-content\"><div class=\"transcript-text\">${escapeHtml(p.text||'')}</div></div></div>`;
-          let roleLabel=p.label; let role='other';
-          if(/^speaker\b/i.test(roleLabel)){ roleLabel = (toggle==='agent') ? 'You' : contactFirst; role=toggle; toggle=(toggle==='agent')?'customer':'agent'; }
-          const avatar = role==='agent'?cd_getAgentAvatar():cd_getContactAvatar(contactFirst, r);
-          return `<div class=\"transcript-message ${role}\"><div class=\"transcript-avatar\">${avatar}</div><div class=\"transcript-content\"><div class=\"transcript-header\"><span class=\"transcript-speaker\">${escapeHtml(roleLabel)}</span><span class=\"transcript-time\">${toMMSS(p.t)}</span></div><div class=\"transcript-text\">${escapeHtml(p.text||'')}</div></div></div>`;
+      const parsed = parseSpeakerTranscript(raw || '');
+      if (parsed.some(p => p.label && p.t != null)) {
+        const contactFirst = (String(r.contactName || '').trim().split(/\s+/)[0]) || 'Customer';
+        let toggle = 'customer';
+        return parsed.map(p => {
+          if (!p.label) return `<div class=\"transcript-message\"><div class=\"transcript-content\"><div class=\"transcript-text\">${escapeHtml(p.text || '')}</div></div></div>`;
+          let roleLabel = p.label; let role = 'other';
+          if (/^speaker\b/i.test(roleLabel)) { roleLabel = (toggle === 'agent') ? 'You' : contactFirst; role = toggle; toggle = (toggle === 'agent') ? 'customer' : 'agent'; }
+          const avatar = role === 'agent' ? cd_getAgentAvatar() : cd_getContactAvatar(contactFirst, r);
+          return `<div class=\"transcript-message ${role}\"><div class=\"transcript-avatar\">${avatar}</div><div class=\"transcript-content\"><div class=\"transcript-header\"><span class=\"transcript-speaker\">${escapeHtml(roleLabel)}</span><span class=\"transcript-time\">${toMMSS(p.t)}</span></div><div class=\"transcript-text\">${escapeHtml(p.text || '')}</div></div></div>`;
         }).join('');
       }
       const fallback = raw || (A && Object.keys(A).length ? 'Transcript processing...' : 'Transcript not available');
@@ -5608,7 +5611,7 @@
     }
 
     const chips = [
-      `<span class=\"pc-chip ${sentiment==='Positive'?'ok':sentiment==='Negative'?'danger':'info'}\">Sentiment: ${escapeHtml(sentiment)}</span>`,
+      `<span class=\"pc-chip ${sentiment === 'Positive' ? 'ok' : sentiment === 'Negative' ? 'danger' : 'info'}\">Sentiment: ${escapeHtml(sentiment)}</span>`,
       disposition ? `<span class=\"pc-chip info\">Disposition: ${escapeHtml(disposition)}</span>` : '',
       flags.nonEnglish ? '<span class="pc-chip warn">Non‑English</span>' : '',
       flags.voicemailDetected ? '<span class="pc-chip warn">Voicemail</span>' : '',
@@ -5616,17 +5619,17 @@
       flags.doNotContact ? '<span class="pc-chip danger">Do Not Contact</span>' : '',
       flags.recordingDisclosure ? '<span class="pc-chip ok">Recording Disclosure</span>' : ''
     ].filter(Boolean).join('');
-    const topicsHtml = keyTopics.length ? keyTopics.map(t=>`<span class=\"pc-chip\">${escapeHtml(t)}</span>`).join('') : '<span class="pc-chip">None</span>';
-    const nextHtml = nextSteps.length ? nextSteps.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None</div>';
-    const painHtml = pain.length ? pain.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None mentioned</div>';
+    const topicsHtml = keyTopics.length ? keyTopics.map(t => `<span class=\"pc-chip\">${escapeHtml(t)}</span>`).join('') : '<span class="pc-chip">None</span>';
+    const nextHtml = nextSteps.length ? nextSteps.map(t => `<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None</div>';
+    const painHtml = pain.length ? pain.map(t => `<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None mentioned</div>';
     // Prefer CI sentences + channelRoleMap for dual-channel mapping; fallback to formatted/plain transcript
     let transcriptHtml = '';
     try {
       const ci = r.conversationalIntelligence || {};
       const sentences = Array.isArray(ci.sentences) ? ci.sentences : [];
       const channelMap = ci.channelRoleMap || {};
-      const normalizeChannel = (c)=>{ const s=(c==null?'':String(c)).trim(); if(s==='0') return '1'; if(/^[Aa]$/.test(s)) return '1'; if(/^[Bb]$/.test(s)) return '2'; return s; };
-      const resolveRole = (ch)=>{
+      const normalizeChannel = (c) => { const s = (c == null ? '' : String(c)).trim(); if (s === '0') return '1'; if (/^[Aa]$/.test(s)) return '1'; if (/^[Bb]$/.test(s)) return '2'; return s; };
+      const resolveRole = (ch) => {
         const n = normalizeChannel(ch);
         const mapped = channelMap[n];
         if (mapped === 'agent' || mapped === 'customer') return mapped;
@@ -5635,10 +5638,10 @@
         if (agentCh) return 'customer';
         return '';
       };
-      if (sentences.length && (Object.keys(channelMap).length || ci.agentChannel!=null || channelMap.agentChannel!=null)){
-        const turns = sentences.map(s=>{
+      if (sentences.length && (Object.keys(channelMap).length || ci.agentChannel != null || channelMap.agentChannel != null)) {
+        const turns = sentences.map(s => {
           const role = resolveRole(s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex) || 'other';
-          const t = Math.max(0, Number(s.startTime||0));
+          const t = Math.max(0, Number(s.startTime || 0));
           const text = (s.text || s.transcript || '').trim();
           return { t, role, text };
         });
@@ -5647,8 +5650,8 @@
         const transcriptToUse = r.formattedTranscript || r.transcript;
         transcriptHtml = renderTranscriptHtml(AI, transcriptToUse);
       }
-    } catch (_){
-      try { const transcriptToUse = r.formattedTranscript || r.transcript; transcriptHtml = renderTranscriptHtml(AI, transcriptToUse); } catch(__){ transcriptHtml = 'Transcript not available'; }
+    } catch (_) {
+      try { const transcriptToUse = r.formattedTranscript || r.transcript; transcriptHtml = renderTranscriptHtml(AI, transcriptToUse); } catch (__) { transcriptHtml = 'Transcript not available'; }
     }
     const rawRec = r.audioUrl || r.recordingUrl || '';
     let audioSrc = '';
@@ -5666,26 +5669,26 @@
 
     // Energy & Contract details
     // Friendly long date formatter, e.g., "April 19, 2026"
-    function toLongDate(v){
-      try{
+    function toLongDate(v) {
+      try {
         const d = parseDateFlexible(v);
-        if(!d) return v || '';
-        return d.toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
-      }catch(_){ return v || ''; }
+        if (!d) return v || '';
+        return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+      } catch (_) { return v || ''; }
     }
 
     const contract = AI.contract || {};
-    const rate = get(contract, ['currentRate','current_rate','rate'], 'Unknown');
-    const supplier = get(contract, ['supplier','utility'], 'Unknown');
-    const contractEnd = get(contract, ['contractEnd','contract_end','endDate'], 'Not discussed');
+    const rate = get(contract, ['currentRate', 'current_rate', 'rate'], 'Unknown');
+    const supplier = get(contract, ['supplier', 'utility'], 'Unknown');
+    const contractEnd = get(contract, ['contractEnd', 'contract_end', 'endDate'], 'Not discussed');
     const contractEndDisplay = contractEnd ? toLongDate(contractEnd) : 'Not discussed';
-    const usage = String(get(contract, ['usageKWh','usage_k_wh','usage'], 'Not provided'));
-    const rateType = get(contract, ['rateType','rate_type'], 'Unknown');
-    const contractLength = String(get(contract, ['contractLength','contract_length'], 'Unknown'));
+    const usage = String(get(contract, ['usageKWh', 'usage_k_wh', 'usage'], 'Not provided'));
+    const rateType = get(contract, ['rateType', 'rate_type'], 'Unknown');
+    const contractLength = String(get(contract, ['contractLength', 'contract_length'], 'Unknown'));
     const budget = get(AI, ['budget'], 'Unclear');
     const timeline = get(AI, ['timeline'], 'Not specified');
     const entities = Array.isArray(AI.entities) ? AI.entities : [];
-    const entitiesHtml = entities.length ? entities.slice(0,20).map(e=>`<span class="pc-chip">${escapeHtml(e.type||'Entity')}: ${escapeHtml(e.text||'')}</span>`).join('') : '<span class="pc-chip">None</span>';
+    const entitiesHtml = entities.length ? entities.slice(0, 20).map(e => `<span class="pc-chip">${escapeHtml(e.type || 'Entity')}: ${escapeHtml(e.text || '')}</span>`).join('') : '<span class="pc-chip">None</span>';
     return `
       <div class="insights-grid">
         <div>
@@ -5696,7 +5699,7 @@
             </h4>
             <div class="pc-chips" style="margin:6px 0 10px 0;">${chips}</div>
             <div style="color:var(--text-secondary); line-height:1.5; margin-bottom:8px;">${escapeHtml(paragraph)}</div>
-            ${filteredBullets.length ? `<ul class="summary-bullets" style="margin:0; padding-left:18px; color:var(--text-secondary);">${filteredBullets.map(b=>`<li>${escapeHtml(b)}</li>`).join('')}</ul>` : ''}
+            ${filteredBullets.length ? `<ul class="summary-bullets" style="margin:0; padding-left:18px; color:var(--text-secondary);">${filteredBullets.map(b => `<li>${escapeHtml(b)}</li>`).join('')}</ul>` : ''}
           </div>
           <div class="ip-card" style="margin-top:12px;">
             <h4>
@@ -5737,12 +5740,12 @@
           <div class="ip-card" style="margin-top:12px;"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg> Next Steps</h4><div style="color:var(--text-secondary); font-size:12px;">${nextHtml}</div></div>
           <div class="ip-card" style="margin-top:12px;"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Pain Points</h4><div style="color:var(--text-secondary); font-size:12px;">${painHtml}</div></div>
           <div class="ip-card" style="margin-top:12px;"><h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle></svg> Entities</h4><div class="pc-chips">${entitiesHtml}</div></div>
-          <div class="ip-card" style="margin-top:12px; text-align:right;"><button class="rc-icon-btn" onclick="(function(){ try{ openInsightsModal && openInsightsModal('${String(r.id||'')}'); }catch(_){}})()" title="Open full modal" aria-label="Open full modal">${svgEye()}</button></div>
+          <div class="ip-card" style="margin-top:12px; text-align:right;"><button class="rc-icon-btn" onclick="(function(){ try{ openInsightsModal && openInsightsModal('${String(r.id || '')}'); }catch(_){}})()" title="Open full modal" aria-label="Open full modal">${svgEye()}</button></div>
         </div>
       </div>`;
   }
 
-  function svgEye(){
+  function svgEye() {
     return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
   }
 
@@ -5752,7 +5755,7 @@
     // If DB not available, update local state and exit gracefully
     if (!db || !id) {
       state.currentContact[field] = value;
-      try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) {}
+      try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) { }
       return;
     }
     try {
@@ -5763,18 +5766,18 @@
         const ev = new CustomEvent('pc:contact-updated', { detail: { id, changes: { [field]: value, updatedAt: payload.updatedAt } } });
         document.dispatchEvent(ev);
       } catch (_) { /* noop */ }
-      try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) {}
+      try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) { }
     } catch (e) {
       // Do not create new docs on failure; surface failure to user
       console.error('Failed to save field', field, e);
-      try { window.crm?.showToast && window.crm.showToast('Save failed'); } catch (_) {}
+      try { window.crm?.showToast && window.crm.showToast('Save failed'); } catch (_) { }
     }
   }
 
   function updateFieldText(wrap, value) {
     if (!wrap) return;
     let text = (value && String(value).trim()) ? escapeHtml(String(value)) : '--';
-    
+
     // Add comma formatting for annual usage display
     const field = wrap.getAttribute('data-field');
     if (field === 'annualUsage' && value && String(value).trim()) {
@@ -5783,13 +5786,13 @@
         text = escapeHtml(numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ','));
       }
     }
-    
+
     // Format phone numbers for display
     if ((field === 'phone' || field === 'mobile' || field === 'workDirectPhone' || field === 'otherPhone' || field === 'companyPhone') && value && String(value).trim()) {
       const formattedPhone = formatPhoneForDisplay(value);
       text = escapeHtml(formattedPhone);
     }
-    
+
     const span = document.createElement('span');
     span.className = 'info-value-text';
     span.innerHTML = text;
@@ -5822,9 +5825,9 @@
         await window.PCSaves.updateContact(id, { preferredPhoneField: type });
       } else if (window.firebaseDB) {
         await window.firebaseDB.collection('contacts').doc(id).set({ preferredPhoneField: type, updatedAt: Date.now() }, { merge: true });
-        try { document.dispatchEvent(new CustomEvent('pc:contact-updated', { detail: { id, changes: { preferredPhoneField: type, updatedAt: Date.now() } } })); } catch(_) {}
+        try { document.dispatchEvent(new CustomEvent('pc:contact-updated', { detail: { id, changes: { preferredPhoneField: type, updatedAt: Date.now() } } })); } catch (_) { }
       }
-      try { window.crm?.showToast && window.crm.showToast('Default phone updated'); } catch(_) {}
+      try { window.crm?.showToast && window.crm.showToast('Default phone updated'); } catch (_) { }
     } catch (e) {
       console.warn('Failed to set preferred phone type', e);
     }
@@ -5840,10 +5843,10 @@
     const cleanup = () => { if (pop && pop.parentElement) pop.parentElement.removeChild(pop); };
     if (pop) pop.classList.remove('--show');
     setTimeout(cleanup, 100);
-    try { document.removeEventListener('mousedown', _onDeletePopoverOutside, true); } catch(_) {}
-    try { document.removeEventListener('keydown', _onDeletePopoverKeydown, true); } catch(_) {}
-    try { window.removeEventListener('resize', _positionDeletePopover, true); } catch(_) {}
-    try { window.removeEventListener('scroll', _positionDeletePopover, true); } catch(_) {}
+    try { document.removeEventListener('mousedown', _onDeletePopoverOutside, true); } catch (_) { }
+    try { document.removeEventListener('keydown', _onDeletePopoverKeydown, true); } catch (_) { }
+    try { window.removeEventListener('resize', _positionDeletePopover, true); } catch (_) { }
+    try { window.removeEventListener('scroll', _positionDeletePopover, true); } catch (_) { }
     _onDeletePopoverOutside = null; _onDeletePopoverKeydown = null; _positionDeletePopover = null;
   }
 
@@ -5884,8 +5887,8 @@
         } else {
           top = Math.max(pad, rect.top - gap - ph);
         }
-        left = Math.round(Math.min(Math.max(pad, rect.left + rect.width/2 - pw/2), vw - pw - pad));
-        const arrowLeft = Math.round(rect.left + rect.width/2 - left);
+        left = Math.round(Math.min(Math.max(pad, rect.left + rect.width / 2 - pw / 2), vw - pw - pad));
+        const arrowLeft = Math.round(rect.left + rect.width / 2 - left);
         pop.style.setProperty('--arrow-left', `${arrowLeft}px`);
         pop.setAttribute('data-placement', placement);
       }
@@ -5922,11 +5925,11 @@
     document.addEventListener('mousedown', _onDeletePopoverOutside, true);
 
     // Reposition on viewport changes
-    try { window.addEventListener('resize', _positionDeletePopover, true); } catch(_) {}
-    try { window.addEventListener('scroll', _positionDeletePopover, true); } catch(_) {}
+    try { window.addEventListener('resize', _positionDeletePopover, true); } catch (_) { }
+    try { window.addEventListener('scroll', _positionDeletePopover, true); } catch (_) { }
 
     // Focus the Cancel button initially for safer default
-    setTimeout(() => { try { btnCancel?.focus(); } catch(_) {} }, 0);
+    setTimeout(() => { try { btnCancel?.focus(); } catch (_) { } }, 0);
   }
 
   // Minimal header styles for divider and layout
@@ -5961,56 +5964,64 @@
   let _positionContactSequencesPanel = null;
   let _onContactSequencesOutside = null;
 
-function closeContactSequencesPanel() {
-  const panel = document.getElementById('contact-sequences-panel');
-  const cleanup = () => {
-    if (panel && panel.parentElement) {
-      // Remove click handler before removing panel
-      if (panel._sequenceClickHandler) {
-        try {
-          panel.removeEventListener('click', panel._sequenceClickHandler);
-          panel._sequenceClickHandler = null;
-        } catch(_) {}
-      }
-      panel.parentElement.removeChild(panel);
-    }
-    try { 
-      if (_onContactSequencesOutside) {
-        document.removeEventListener('mousedown', _onContactSequencesOutside, true);
-      }
-    } catch(_) {}
-    // Reset trigger state and restore focus
-    try {
-      const trigger = document.getElementById('add-contact-to-sequences');
-      if (trigger) {
-        trigger.setAttribute('aria-expanded', 'false');
-        // Only restore focus if closed by keyboard (Escape), not by pointer
-        if (document.activeElement === trigger) {
-          trigger.focus();
+  function closeContactSequencesPanel() {
+    const panel = document.getElementById('contact-sequences-panel');
+
+    // CRITICAL FIX: Remove listeners BEFORE nullifying references
+    // Store references before cleanup to ensure proper removal
+    const keydownHandler = _onContactSequencesKeydown;
+    const positionHandler = _positionContactSequencesPanel;
+    const outsideHandler = _onContactSequencesOutside;
+
+    // Remove all listeners with stored references
+    try { if (keydownHandler) document.removeEventListener('keydown', keydownHandler, true); } catch (_) { }
+    try { if (positionHandler) window.removeEventListener('resize', positionHandler, true); } catch (_) { }
+    try { if (positionHandler) window.removeEventListener('scroll', positionHandler, true); } catch (_) { }
+    try { if (outsideHandler) document.removeEventListener('mousedown', outsideHandler, true); } catch (_) { }
+
+    // Now nullify the module-level references
+    _onContactSequencesKeydown = null;
+    _positionContactSequencesPanel = null;
+    _onContactSequencesOutside = null;
+
+    const cleanup = () => {
+      if (panel && panel.parentElement) {
+        // Remove click handler before removing panel
+        if (panel._sequenceClickHandler) {
+          try {
+            panel.removeEventListener('click', panel._sequenceClickHandler);
+            panel._sequenceClickHandler = null;
+          } catch (_) { }
         }
+        panel.parentElement.removeChild(panel);
       }
-    } catch(_) {}
-  };
-  if (panel) panel.classList.remove('--show');
-  setTimeout(cleanup, 120);
+      // Reset trigger state and restore focus
+      try {
+        const trigger = document.getElementById('add-contact-to-sequences');
+        if (trigger) {
+          trigger.setAttribute('aria-expanded', 'false');
+          // Only restore focus if closed by keyboard (Escape), not by pointer
+          if (document.activeElement === trigger) {
+            trigger.focus();
+          }
+        }
+      } catch (_) { }
+    };
+    if (panel) panel.classList.remove('--show');
+    setTimeout(cleanup, 120);
+  }
 
-  try { document.removeEventListener('keydown', _onContactSequencesKeydown, true); } catch(_) {}
-  try { window.removeEventListener('resize', _positionContactSequencesPanel, true); } catch(_) {}
-  try { window.removeEventListener('scroll', _positionContactSequencesPanel, true); } catch(_) {}
-  _onContactSequencesKeydown = null; _positionContactSequencesPanel = null; _onContactSequencesOutside = null;
-}
-
-function openContactSequencesPanel() {
-  if (document.getElementById('contact-sequences-panel')) return;
-  // Reuse styles from lists modal
-  injectContactListsStyles();
-  const panel = document.createElement('div');
-  panel.id = 'contact-sequences-panel';
-  panel.setAttribute('role', 'dialog');
-  panel.setAttribute('aria-label', 'Add to sequence');
-  const c = state.currentContact || {};
-  const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || 'this contact';
-  panel.innerHTML = `
+  function openContactSequencesPanel() {
+    if (document.getElementById('contact-sequences-panel')) return;
+    // Reuse styles from lists modal
+    injectContactListsStyles();
+    const panel = document.createElement('div');
+    panel.id = 'contact-sequences-panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-label', 'Add to sequence');
+    const c = state.currentContact || {};
+    const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || 'this contact';
+    panel.innerHTML = `
     <div class="list-header">
       <div class="list-title">Add ${escapeHtml(fullName)} to sequence</div>
       <button type="button" class="close-btn" id="contact-sequences-close" aria-label="Close">×</button>
@@ -6024,395 +6035,225 @@ function openContactSequencesPanel() {
       </div>
       <div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">Loading sequences…</div><div class="list-meta">Please wait</div></div></div>
     </div>`;
-  document.body.appendChild(panel);
+    document.body.appendChild(panel);
 
-  // Close button
-  const closeBtn = panel.querySelector('#contact-sequences-close');
-  if (closeBtn) closeBtn.addEventListener('click', () => closeContactSequencesPanel());
+    // Close button
+    const closeBtn = panel.querySelector('#contact-sequences-close');
+    if (closeBtn) closeBtn.addEventListener('click', () => closeContactSequencesPanel());
 
-  // Focus behavior
-  setTimeout(() => { const first = panel.querySelector('.list-item'); if (first) first.focus(); }, 0);
+    // Focus behavior
+    setTimeout(() => { const first = panel.querySelector('.list-item'); if (first) first.focus(); }, 0);
 
-  // Populate data
-  const container = panel.querySelector('#contact-sequences-body');
-  populateContactSequencesPanel(container);
+    // Populate data
+    const container = panel.querySelector('#contact-sequences-body');
+    populateContactSequencesPanel(container);
 
-  // Position and show
-  _positionContactSequencesPanel = function position() {
-    const btn = document.getElementById('add-contact-to-sequences');
-    const rect = btn ? btn.getBoundingClientRect() : null;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const pad = 8;
-    const gap = 8;
-    let placement = 'bottom';
-    let top = Math.max(pad, 72);
-    let left = Math.max(pad, (vw - panel.offsetWidth) / 2);
-    if (rect) {
-      const panelW = panel.offsetWidth;
-      const panelH = panel.offsetHeight || 320;
-      const fitsBottom = rect.bottom + gap + panelH + pad <= vh;
-      placement = fitsBottom ? 'bottom' : 'top';
-      if (placement === 'bottom') {
-        top = Math.min(vh - panelH - pad, rect.bottom + gap);
-      } else {
-        top = Math.max(pad, rect.top - gap - panelH);
+    // Position and show
+    _positionContactSequencesPanel = function position() {
+      const btn = document.getElementById('add-contact-to-sequences');
+      const rect = btn ? btn.getBoundingClientRect() : null;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const pad = 8;
+      const gap = 8;
+      let placement = 'bottom';
+      let top = Math.max(pad, 72);
+      let left = Math.max(pad, (vw - panel.offsetWidth) / 2);
+      if (rect) {
+        const panelW = panel.offsetWidth;
+        const panelH = panel.offsetHeight || 320;
+        const fitsBottom = rect.bottom + gap + panelH + pad <= vh;
+        placement = fitsBottom ? 'bottom' : 'top';
+        if (placement === 'bottom') {
+          top = Math.min(vh - panelH - pad, rect.bottom + gap);
+        } else {
+          top = Math.max(pad, rect.top - gap - panelH);
+        }
+        left = Math.round(
+          Math.min(
+            Math.max(pad, rect.left + (rect.width / 2) - (panelW / 2)),
+            vw - panelW - pad
+          )
+        );
+        const arrowLeft = Math.round(rect.left + rect.width / 2 - left);
+        panel.style.setProperty('--arrow-left', `${arrowLeft}px`);
+        panel.setAttribute('data-placement', placement);
       }
-      left = Math.round(
-        Math.min(
-          Math.max(pad, rect.left + (rect.width / 2) - (panelW / 2)),
-          vw - panelW - pad
-        )
-      );
-      const arrowLeft = Math.round(rect.left + rect.width / 2 - left);
-      panel.style.setProperty('--arrow-left', `${arrowLeft}px`);
-      panel.setAttribute('data-placement', placement);
-    }
-    panel.style.top = `${Math.round(top)}px`;
-    panel.style.left = `${Math.round(left)}px`;
-  };
-  _positionContactSequencesPanel();
-  setTimeout(() => panel.classList.add('--show'), 0);
-  
-  // Always attach resize/scroll listeners for this panel instance.
-  // closeContactSequencesPanel() will clean them up.
-    try { window.addEventListener('resize', _positionContactSequencesPanel, true); } catch (_) {}
-    try { window.addEventListener('scroll', _positionContactSequencesPanel, true); } catch (_) {}
+      panel.style.top = `${Math.round(top)}px`;
+      panel.style.left = `${Math.round(left)}px`;
+    };
+    _positionContactSequencesPanel();
+    setTimeout(() => panel.classList.add('--show'), 0);
 
-  // Interactions - use event delegation on panel to ensure it works after content updates
-  // Store handler reference so we can remove it later if needed
-  panel._sequenceClickHandler = (e) => {
-    const item = e.target.closest?.('.list-item');
-    if (!item || item.getAttribute('aria-disabled') === 'true') return;
-    console.log('[ContactDetail] Sequence item clicked:', item.getAttribute('data-name'));
-    handleSequenceChoose(item);
-  };
-  panel.addEventListener('click', panel._sequenceClickHandler);
+    // Always attach resize/scroll listeners for this panel instance.
+    // closeContactSequencesPanel() will clean them up.
+    try { window.addEventListener('resize', _positionContactSequencesPanel, true); } catch (_) { }
+    try { window.addEventListener('scroll', _positionContactSequencesPanel, true); } catch (_) { }
 
-  // Define keyboard handler before registering
-  _onContactSequencesKeydown = (e) => {
-    if (e.key === 'Escape') { e.preventDefault(); closeContactSequencesPanel(); return; }
-    if ((e.key === 'Enter' || e.key === ' ') && document.activeElement?.classList?.contains('list-item')) {
-      e.preventDefault();
-      handleSequenceChoose(document.activeElement);
-    }
-  };
-  
-  // Always attach keydown listener; closeContactSequencesPanel() removes it.
+    // Interactions - use event delegation on panel to ensure it works after content updates
+    // Store handler reference so we can remove it later if needed
+    panel._sequenceClickHandler = (e) => {
+      const item = e.target.closest?.('.list-item');
+      if (!item || item.getAttribute('aria-disabled') === 'true') return;
+      console.log('[ContactDetail] Sequence item clicked:', item.getAttribute('data-name'));
+      handleSequenceChoose(item);
+    };
+    panel.addEventListener('click', panel._sequenceClickHandler);
+
+    // Define keyboard handler before registering
+    _onContactSequencesKeydown = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); closeContactSequencesPanel(); return; }
+      if ((e.key === 'Enter' || e.key === ' ') && document.activeElement?.classList?.contains('list-item')) {
+        e.preventDefault();
+        handleSequenceChoose(document.activeElement);
+      }
+    };
+
+    // Always attach keydown listener; closeContactSequencesPanel() removes it.
     document.addEventListener('keydown', _onContactSequencesKeydown, true);
-  
-  _onContactSequencesOutside = (e) => {
-    const inside = panel.contains(e.target);
-    const isTrigger = !!(e.target.closest && e.target.closest('#add-contact-to-sequences'));
-    const isSearchBar = e.target.classList && e.target.classList.contains('search-input');
-    // Close if clicking outside the panel (including on other buttons)
-    if (!inside && !isTrigger) {
-      closeContactSequencesPanel();
-      if (isSearchBar && typeof e.target.focus === 'function') {
-        setTimeout(() => e.target.focus(), 120);
+
+    _onContactSequencesOutside = (e) => {
+      const inside = panel.contains(e.target);
+      const isTrigger = !!(e.target.closest && e.target.closest('#add-contact-to-sequences'));
+      const isSearchBar = e.target.classList && e.target.classList.contains('search-input');
+      // Close if clicking outside the panel (including on other buttons)
+      if (!inside && !isTrigger) {
+        closeContactSequencesPanel();
+        if (isSearchBar && typeof e.target.focus === 'function') {
+          setTimeout(() => e.target.focus(), 120);
+        }
       }
-    }
-  };
-  
-  // Always attach the listener (remove guard to ensure it works)
-  setTimeout(() => {
-    document.addEventListener('mousedown', _onContactSequencesOutside, true);
-  }, 0);
-}
+    };
 
-// Populate sequences into the contact sequences panel
-async function populateContactSequencesPanel(container) {
-  if (!container) return;
-  try {
-    const db = window.firebaseDB;
-    const contactId = state.currentContact?.id;
-    let sequences = [];
-    const membership = new Map(); // sequenceId -> memberDocId
-    if (db && typeof db.collection === 'function') {
-      // Load sequences (newest first if createdAt available)
-      let q = db.collection('sequences');
-      try { q = q.orderBy('createdAt', 'desc'); } catch(_) {}
-      const snap = await q.get();
-      sequences = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+    // Always attach the listener (remove guard to ensure it works)
+    setTimeout(() => {
+      document.addEventListener('mousedown', _onContactSequencesOutside, true);
+    }, 0);
+  }
 
-      // Load membership for this contact
-      if (contactId) {
-        let mq = db.collection('sequenceMembers').where('targetId', '==', contactId);
-        try { mq = mq.where('targetType', '==', 'people'); } catch(_) {}
-        const msnap = await mq.get();
-        msnap.docs.forEach(md => {
-          const m = md.data() || {};
-          if (m.sequenceId) membership.set(String(m.sequenceId), md.id);
-        });
+  // Populate sequences into the contact sequences panel
+  async function populateContactSequencesPanel(container) {
+    if (!container) return;
+    try {
+      const db = window.firebaseDB;
+      const contactId = state.currentContact?.id;
+      let sequences = [];
+      const membership = new Map(); // sequenceId -> memberDocId
+      if (db && typeof db.collection === 'function') {
+        // Load sequences (newest first if createdAt available)
+        let q = db.collection('sequences');
+        try { q = q.orderBy('createdAt', 'desc'); } catch (_) { }
+        const snap = await q.get();
+        sequences = snap.docs.map(d => ({ id: d.id, ...(d.data() || {}) }));
+
+        // Load membership for this contact
+        if (contactId) {
+          let mq = db.collection('sequenceMembers').where('targetId', '==', contactId);
+          try { mq = mq.where('targetType', '==', 'people'); } catch (_) { }
+          const msnap = await mq.get();
+          msnap.docs.forEach(md => {
+            const m = md.data() || {};
+            if (m.sequenceId) membership.set(String(m.sequenceId), md.id);
+          });
+        }
       }
-    }
 
-    // Render
-    // Keep the create row and replace only the loading row
-    const createRow = container.querySelector('.list-item[data-action="create"]');
-    const loadingRow = container.querySelector('.list-item[aria-disabled="true"]');
-  
-    if (!sequences.length) {
+      // Render
+      // Keep the create row and replace only the loading row
+      const createRow = container.querySelector('.list-item[data-action="create"]');
+      const loadingRow = container.querySelector('.list-item[aria-disabled="true"]');
+
+      if (!sequences.length) {
+        if (loadingRow) {
+          loadingRow.innerHTML = '<div><div class="list-name">No sequences</div><div class="list-meta">Create a sequence first</div></div>';
+        }
+        return;
+      }
+
+      // Remove loading row if it exists
       if (loadingRow) {
-        loadingRow.innerHTML = '<div><div class="list-name">No sequences</div><div class="list-meta">Create a sequence first</div></div>';
+        loadingRow.remove();
       }
-      return;
-    }
 
-    // Remove loading row if it exists
-    if (loadingRow) {
-      loadingRow.remove();
-    }
-
-    const frag = document.createDocumentFragment();
-    sequences.forEach(seq => {
-      const isMember = membership.has(String(seq.id));
-      const item = document.createElement('div');
-      item.className = 'list-item';
-      item.tabIndex = 0;
-      item.setAttribute('data-id', String(seq.id));
-      item.setAttribute('data-name', String(seq.name || 'Sequence'));
-      if (isMember) item.setAttribute('data-member-id', membership.get(String(seq.id)));
-      // Show member count
-      const memberCount = seq.stats?.active || 0;
-      const metaBits = [];
-      if (seq.isActive === false) metaBits.push('Inactive');
-      metaBits.push(`${memberCount} member${memberCount === 1 ? '' : 's'}`);
-      if (seq.stats && typeof seq.stats.delivered === 'number') metaBits.push(`${seq.stats.delivered} steps`);
-      const meta = metaBits.join(' • ');
-      item.innerHTML = `
+      const frag = document.createDocumentFragment();
+      sequences.forEach(seq => {
+        const isMember = membership.has(String(seq.id));
+        const item = document.createElement('div');
+        item.className = 'list-item';
+        item.tabIndex = 0;
+        item.setAttribute('data-id', String(seq.id));
+        item.setAttribute('data-name', String(seq.name || 'Sequence'));
+        if (isMember) item.setAttribute('data-member-id', membership.get(String(seq.id)));
+        // Show member count
+        const memberCount = seq.stats?.active || 0;
+        const metaBits = [];
+        if (seq.isActive === false) metaBits.push('Inactive');
+        metaBits.push(`${memberCount} member${memberCount === 1 ? '' : 's'}`);
+        if (seq.stats && typeof seq.stats.delivered === 'number') metaBits.push(`${seq.stats.delivered} steps`);
+        const meta = metaBits.join(' • ');
+        item.innerHTML = `
         <div>
           <div class="list-name">${escapeHtml(seq.name || 'Sequence')}</div>
           <div class="list-meta">${escapeHtml(meta || '')}</div>
         </div>
         <div class="list-check" aria-hidden="true">${isMember ? '✓' : ''}</div>`;
-      frag.appendChild(item);
-    });
-    container.appendChild(frag);
-  } catch (err) {
-    console.warn('Failed to load sequences', err);
-  }
-}
-
-function handleSequenceChoose(el) {
-  const action = el.getAttribute('data-action');
-  if (action === 'create') {
-    const name = window.prompt('New sequence name');
-    if (!name) return;
-    createContactSequenceThenAdd(name.trim());
-    return;
-  }
-  const id = el.getAttribute('data-id');
-  const name = el.getAttribute('data-name') || 'Sequence';
-  const memberDocId = el.getAttribute('data-member-id');
-  if (memberDocId) {
-    removeCurrentContactFromSequence(memberDocId, name);
-  } else {
-    addCurrentContactToSequence(id, name);
-  }
-}
-
-async function addCurrentContactToSequence(sequenceId, sequenceName) {
-  try {
-    const contactId = state.currentContact?.id;
-    if (!contactId) { closeContactSequencesPanel(); return; }
-    
-    const hasEmail = !!(state.currentContact.email && state.currentContact.email.trim() !== '');
-
-    // Gentle confirmation for contacts without email; do NOT block the whole CRM
-    if (!hasEmail) {
-      let proceed = true;
-      try {
-        proceed = window.confirm(
-          'This contact does not have an email address. They will still be added to the sequence, ' +
-          'but email steps will be skipped. Continue?'
-        );
-      } catch (_) {}
-      if (!proceed) {
-        closeContactSequencesPanel();
-        return;
-      }
+        frag.appendChild(item);
+      });
+      container.appendChild(frag);
+    } catch (err) {
+      console.warn('Failed to load sequences', err);
     }
-    
-    const db = window.firebaseDB;
-    if (db && typeof db.collection === 'function') {
-      const doc = { 
-        sequenceId, 
-        targetId: contactId, 
-        targetType: 'people',
-        hasEmail: hasEmail, // Track whether contact has email
-        skipEmailSteps: !hasEmail // Flag to skip email steps
-      };
-      if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
-        doc.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
-        doc.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
-      } else {
-        doc.createdAt = new Date();
-        doc.updatedAt = new Date();
-      }
-      await db.collection('sequenceMembers').add(doc);
-      
-      // Increment sequence stats.active count
-      if (window.firebase?.firestore?.FieldValue) {
-        await db.collection('sequences').doc(sequenceId).update({
-          "stats.active": window.firebase.firestore.FieldValue.increment(1)
-        });
-      }
-      
-      // ✅ AUTO-START: If sequence is active, automatically create sequenceActivation for this new contact
-      if (hasEmail) {
+  }
+
+  function handleSequenceChoose(el) {
+    const action = el.getAttribute('data-action');
+    if (action === 'create') {
+      const name = window.prompt('New sequence name');
+      if (!name) return;
+      createContactSequenceThenAdd(name.trim());
+      return;
+    }
+    const id = el.getAttribute('data-id');
+    const name = el.getAttribute('data-name') || 'Sequence';
+    const memberDocId = el.getAttribute('data-member-id');
+    if (memberDocId) {
+      removeCurrentContactFromSequence(memberDocId, name);
+    } else {
+      addCurrentContactToSequence(id, name);
+    }
+  }
+
+  async function addCurrentContactToSequence(sequenceId, sequenceName) {
+    try {
+      const contactId = state.currentContact?.id;
+      if (!contactId) { closeContactSequencesPanel(); return; }
+
+      const hasEmail = !!(state.currentContact.email && state.currentContact.email.trim() !== '');
+
+      // Gentle confirmation for contacts without email; do NOT block the whole CRM
+      if (!hasEmail) {
+        let proceed = true;
         try {
-          const sequenceDoc = await db.collection('sequences').doc(sequenceId).get();
-          const sequenceData = sequenceDoc.data();
-          const hasActiveMembers = (sequenceData?.stats?.active || 0) > 0;
-          
-          // Also check if there are any existing sequenceActivations for this sequence
-          let hasExistingActivations = false;
-          try {
-            const existingActivationsQuery = await db.collection('sequenceActivations')
-              .where('sequenceId', '==', sequenceId)
-              .where('status', 'in', ['pending', 'processing'])
-              .limit(1)
-              .get();
-            hasExistingActivations = !existingActivationsQuery.empty;
-          } catch (_) {
-            // Query might fail if index missing, but that's okay
-          }
-          
-          // If sequence is active, automatically create sequenceActivation for this new contact
-          if (hasActiveMembers || hasExistingActivations) {
-            console.log('[ContactDetail] Sequence is active, auto-starting for new contact:', state.currentContact.name);
-            
-            const getUserEmail = () => {
-              try {
-                if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
-                  return window.DataManager.getCurrentUserEmail().toLowerCase();
-                }
-                return (window.currentUserEmail || '').toLowerCase();
-              } catch (_) {
-                return (window.currentUserEmail || '').toLowerCase();
-              }
-            };
-            const userEmail = getUserEmail();
-            
-            // Create sequenceActivation for this single contact
-            const activationRef = db.collection('sequenceActivations').doc();
-            const activationId = activationRef.id;
-            
-            const sequenceActivationData = {
-              sequenceId: sequenceId,
-              contactIds: [contactId],
-              status: 'pending',
-              processedContacts: 0,
-              totalContacts: 1,
-              ownerId: userEmail || 'unknown',
-              assignedTo: userEmail || 'unknown',
-              createdBy: userEmail || 'unknown',
-              createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || Date.now()
-            };
-            
-            await activationRef.set(sequenceActivationData);
-            console.log('[ContactDetail] Created auto-sequenceActivation:', activationId);
-            
-            // Trigger immediate processing
-            try {
-              const baseUrl = window.API_BASE_URL || window.location.origin || '';
-              const response = await fetch(`${baseUrl}/api/process-sequence-activations`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                  immediate: true,
-                  activationId: activationId
-                })
-              });
-              
-              if (response.ok) {
-                const result = await response.json();
-                console.log('[ContactDetail] Auto-started sequence for new contact:', result);
-              } else {
-                console.warn('[ContactDetail] Auto-start failed, but contact was added. Will be picked up by next cron run.');
-              }
-            } catch (autoStartError) {
-              console.warn('[ContactDetail] Auto-start failed (non-fatal):', autoStartError);
-              // Contact is still added, cron will pick it up
-            }
-          }
-        } catch (autoStartError) {
-          console.warn('[ContactDetail] Failed to check/auto-start sequence (non-fatal):', autoStartError);
-          // Non-fatal - contact is still added
+          proceed = window.confirm(
+            'This contact does not have an email address. They will still be added to the sequence, ' +
+            'but email steps will be skipped. Continue?'
+          );
+        } catch (_) { }
+        if (!proceed) {
+          closeContactSequencesPanel();
+          return;
         }
       }
-    }
 
-    const message = `Added to "${sequenceName}"${!hasEmail ? ' (email steps will be skipped)' : ''}`;
-    window.crm?.showToast && window.crm.showToast(message, 'success');
-    
-    // Update the sequence item to show checkmark (keep panel open for multiple additions)
-    const panel = document.getElementById('contact-sequences-panel');
-    if (panel) {
-      const sequenceItem = panel.querySelector(`[data-id="${sequenceId}"]`);
-      if (sequenceItem) {
-        sequenceItem.setAttribute('data-member-id', 'pending');
-        const checkEl = sequenceItem.querySelector('.list-check');
-        if (checkEl) checkEl.textContent = '✓';
-      }
-    }
-  } catch (err) {
-    console.warn('Add to sequence failed', err);
-    window.crm?.showToast && window.crm.showToast('Failed to add to sequence', 'error');
-  }
-  // Don't close panel automatically - let user add multiple contacts or close manually
-}
-
-async function removeCurrentContactFromSequence(memberDocId, sequenceName) {
-  try {
-    const db = window.firebaseDB;
-    if (db && typeof db.collection === 'function' && memberDocId) {
-      // First get the sequenceId from the member document before deleting it
-      const memberDoc = await db.collection('sequenceMembers').doc(memberDocId).get();
-      const memberData = memberDoc.data();
-      const sequenceId = memberData?.sequenceId;
-      
-      await db.collection('sequenceMembers').doc(memberDocId).delete();
-      
-      // Decrement sequence stats.active count if we have the sequenceId
-      if (sequenceId && window.firebase?.firestore?.FieldValue) {
-        await db.collection('sequences').doc(sequenceId).update({
-          "stats.active": window.firebase.firestore.FieldValue.increment(-1)
-        });
-      }
-    }
-    window.crm?.showToast && window.crm.showToast(`Removed from "${sequenceName}"`);
-  } catch (err) {
-    console.warn('Remove from sequence failed', err);
-    window.crm?.showToast && window.crm.showToast('Failed to remove from sequence');
-  } finally {
-    closeContactSequencesPanel();
-  }
-}
-
-async function createContactSequenceThenAdd(name) {
-  try {
-    const db = window.firebaseDB;
-    let newId = null;
-    if (db && typeof db.collection === 'function') {
-      const payload = { name, stats: { active: 1, paused: 0, notSent: 0, bounced: 0, spamBlocked: 0, finished: 0, scheduled: 0, delivered: 0, replyPct: 0, interestedPct: 0 } };
-      if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
-        payload.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
-        payload.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
-      } else {
-        payload.createdAt = new Date();
-        payload.updatedAt = new Date();
-      }
-      const ref = await db.collection('sequences').add(payload);
-      newId = ref.id;
-    }
-    if (newId) {
-      // We've already set recordCount to 1, so we don't need to increment it in addCurrentContactToSequence
-      // We'll directly add the member document
-      const contactId = state.currentContact?.id;
-      if (contactId) {
-        const doc = { sequenceId: newId, targetId: contactId, targetType: 'people' };
+      const db = window.firebaseDB;
+      if (db && typeof db.collection === 'function') {
+        const doc = {
+          sequenceId,
+          targetId: contactId,
+          targetType: 'people',
+          hasEmail: hasEmail, // Track whether contact has email
+          skipEmailSteps: !hasEmail // Flag to skip email steps
+        };
         if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
           doc.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
           doc.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
@@ -6421,21 +6262,191 @@ async function createContactSequenceThenAdd(name) {
           doc.updatedAt = new Date();
         }
         await db.collection('sequenceMembers').add(doc);
+
+        // Increment sequence stats.active count
+        if (window.firebase?.firestore?.FieldValue) {
+          await db.collection('sequences').doc(sequenceId).update({
+            "stats.active": window.firebase.firestore.FieldValue.increment(1)
+          });
+        }
+
+        // ✅ AUTO-START: If sequence is active, automatically create sequenceActivation for this new contact
+        if (hasEmail) {
+          try {
+            const sequenceDoc = await db.collection('sequences').doc(sequenceId).get();
+            const sequenceData = sequenceDoc.data();
+            const hasActiveMembers = (sequenceData?.stats?.active || 0) > 0;
+
+            // Also check if there are any existing sequenceActivations for this sequence
+            let hasExistingActivations = false;
+            try {
+              const existingActivationsQuery = await db.collection('sequenceActivations')
+                .where('sequenceId', '==', sequenceId)
+                .where('status', 'in', ['pending', 'processing'])
+                .limit(1)
+                .get();
+              hasExistingActivations = !existingActivationsQuery.empty;
+            } catch (_) {
+              // Query might fail if index missing, but that's okay
+            }
+
+            // If sequence is active, automatically create sequenceActivation for this new contact
+            if (hasActiveMembers || hasExistingActivations) {
+              console.log('[ContactDetail] Sequence is active, auto-starting for new contact:', state.currentContact.name);
+
+              const getUserEmail = () => {
+                try {
+                  if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                    return window.DataManager.getCurrentUserEmail().toLowerCase();
+                  }
+                  return (window.currentUserEmail || '').toLowerCase();
+                } catch (_) {
+                  return (window.currentUserEmail || '').toLowerCase();
+                }
+              };
+              const userEmail = getUserEmail();
+
+              // Create sequenceActivation for this single contact
+              const activationRef = db.collection('sequenceActivations').doc();
+              const activationId = activationRef.id;
+
+              const sequenceActivationData = {
+                sequenceId: sequenceId,
+                contactIds: [contactId],
+                status: 'pending',
+                processedContacts: 0,
+                totalContacts: 1,
+                ownerId: userEmail || 'unknown',
+                assignedTo: userEmail || 'unknown',
+                createdBy: userEmail || 'unknown',
+                createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || Date.now()
+              };
+
+              await activationRef.set(sequenceActivationData);
+              console.log('[ContactDetail] Created auto-sequenceActivation:', activationId);
+
+              // Trigger immediate processing
+              try {
+                const baseUrl = window.API_BASE_URL || window.location.origin || '';
+                const response = await fetch(`${baseUrl}/api/process-sequence-activations`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    immediate: true,
+                    activationId: activationId
+                  })
+                });
+
+                if (response.ok) {
+                  const result = await response.json();
+                  console.log('[ContactDetail] Auto-started sequence for new contact:', result);
+                } else {
+                  console.warn('[ContactDetail] Auto-start failed, but contact was added. Will be picked up by next cron run.');
+                }
+              } catch (autoStartError) {
+                console.warn('[ContactDetail] Auto-start failed (non-fatal):', autoStartError);
+                // Contact is still added, cron will pick it up
+              }
+            }
+          } catch (autoStartError) {
+            console.warn('[ContactDetail] Failed to check/auto-start sequence (non-fatal):', autoStartError);
+            // Non-fatal - contact is still added
+          }
+        }
       }
-      window.crm?.showToast && window.crm.showToast(`Created sequence "${name}"`);
-    } else {
-      window.crm?.showToast && window.crm.showToast(`Created sequence "${name}" (offline)`);
+
+      const message = `Added to "${sequenceName}"${!hasEmail ? ' (email steps will be skipped)' : ''}`;
+      window.crm?.showToast && window.crm.showToast(message, 'success');
+
+      // Update the sequence item to show checkmark (keep panel open for multiple additions)
+      const panel = document.getElementById('contact-sequences-panel');
+      if (panel) {
+        const sequenceItem = panel.querySelector(`[data-id="${sequenceId}"]`);
+        if (sequenceItem) {
+          sequenceItem.setAttribute('data-member-id', 'pending');
+          const checkEl = sequenceItem.querySelector('.list-check');
+          if (checkEl) checkEl.textContent = '✓';
+        }
+      }
+    } catch (err) {
+      console.warn('Add to sequence failed', err);
+      window.crm?.showToast && window.crm.showToast('Failed to add to sequence', 'error');
+    }
+    // Don't close panel automatically - let user add multiple contacts or close manually
+  }
+
+  async function removeCurrentContactFromSequence(memberDocId, sequenceName) {
+    try {
+      const db = window.firebaseDB;
+      if (db && typeof db.collection === 'function' && memberDocId) {
+        // First get the sequenceId from the member document before deleting it
+        const memberDoc = await db.collection('sequenceMembers').doc(memberDocId).get();
+        const memberData = memberDoc.data();
+        const sequenceId = memberData?.sequenceId;
+
+        await db.collection('sequenceMembers').doc(memberDocId).delete();
+
+        // Decrement sequence stats.active count if we have the sequenceId
+        if (sequenceId && window.firebase?.firestore?.FieldValue) {
+          await db.collection('sequences').doc(sequenceId).update({
+            "stats.active": window.firebase.firestore.FieldValue.increment(-1)
+          });
+        }
+      }
+      window.crm?.showToast && window.crm.showToast(`Removed from "${sequenceName}"`);
+    } catch (err) {
+      console.warn('Remove from sequence failed', err);
+      window.crm?.showToast && window.crm.showToast('Failed to remove from sequence');
+    } finally {
       closeContactSequencesPanel();
     }
-  } catch (err) {
-    console.warn('Create sequence failed', err);
-    window.crm?.showToast && window.crm.showToast('Failed to create sequence');
-  } finally {
-    closeContactSequencesPanel();
   }
-}
 
-// ===== Lists integration (Add to List) =====
+  async function createContactSequenceThenAdd(name) {
+    try {
+      const db = window.firebaseDB;
+      let newId = null;
+      if (db && typeof db.collection === 'function') {
+        const payload = { name, stats: { active: 1, paused: 0, notSent: 0, bounced: 0, spamBlocked: 0, finished: 0, scheduled: 0, delivered: 0, replyPct: 0, interestedPct: 0 } };
+        if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+          payload.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
+          payload.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+        } else {
+          payload.createdAt = new Date();
+          payload.updatedAt = new Date();
+        }
+        const ref = await db.collection('sequences').add(payload);
+        newId = ref.id;
+      }
+      if (newId) {
+        // We've already set recordCount to 1, so we don't need to increment it in addCurrentContactToSequence
+        // We'll directly add the member document
+        const contactId = state.currentContact?.id;
+        if (contactId) {
+          const doc = { sequenceId: newId, targetId: contactId, targetType: 'people' };
+          if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+            doc.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
+            doc.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+          } else {
+            doc.createdAt = new Date();
+            doc.updatedAt = new Date();
+          }
+          await db.collection('sequenceMembers').add(doc);
+        }
+        window.crm?.showToast && window.crm.showToast(`Created sequence "${name}"`);
+      } else {
+        window.crm?.showToast && window.crm.showToast(`Created sequence "${name}" (offline)`);
+        closeContactSequencesPanel();
+      }
+    } catch (err) {
+      console.warn('Create sequence failed', err);
+      window.crm?.showToast && window.crm.showToast('Failed to create sequence');
+    } finally {
+      closeContactSequencesPanel();
+    }
+  }
+
+  // ===== Lists integration (Add to List) =====
   let _onContactListsKeydown = null;
   let _positionContactListsPanel = null;
   let _onContactListsOutside = null;
@@ -6539,6 +6550,24 @@ async function createContactSequenceThenAdd(name) {
 
   function closeContactListsPanel() {
     const panel = document.getElementById('contact-lists-panel');
+
+    // CRITICAL FIX: Remove listeners BEFORE nullifying references
+    // Store references before cleanup to ensure proper removal
+    const keydownHandler = _onContactListsKeydown;
+    const positionHandler = _positionContactListsPanel;
+    const outsideHandler = _onContactListsOutside;
+
+    // Remove all listeners with stored references
+    try { if (keydownHandler) document.removeEventListener('keydown', keydownHandler, true); } catch (_) { }
+    try { if (positionHandler) window.removeEventListener('resize', positionHandler, true); } catch (_) { }
+    try { if (positionHandler) window.removeEventListener('scroll', positionHandler, true); } catch (_) { }
+    try { if (outsideHandler) document.removeEventListener('mousedown', outsideHandler, true); } catch (_) { }
+
+    // Now nullify the module-level references
+    _onContactListsKeydown = null;
+    _positionContactListsPanel = null;
+    _onContactListsOutside = null;
+
     const cleanup = () => {
       // Clean up the click handler before removing the panel
       if (panel) {
@@ -6548,16 +6577,11 @@ async function createContactSequenceThenAdd(name) {
             container.removeEventListener('click', container._listItemClickHandler);
             container._listItemClickHandler = null;
             console.log('[ContactDetail] List item click handler removed');
-          } catch(_) {}
+          } catch (_) { }
         }
       }
-      
+
       if (panel && panel.parentElement) panel.parentElement.removeChild(panel);
-      try { 
-        if (_onContactListsOutside) {
-          document.removeEventListener('mousedown', _onContactListsOutside, true);
-        }
-      } catch(_) {}
       // Reset trigger state and restore focus
       try {
         const trigger = document.getElementById('add-contact-to-list');
@@ -6568,42 +6592,37 @@ async function createContactSequenceThenAdd(name) {
             trigger.focus();
           }
         }
-      } catch(_) {}
+      } catch (_) { }
     };
     if (panel) panel.classList.remove('--show');
     setTimeout(cleanup, 120);
-
-    try { document.removeEventListener('keydown', _onContactListsKeydown, true); } catch(_) {}
-    try { window.removeEventListener('resize', _positionContactListsPanel, true); } catch(_) {}
-    try { window.removeEventListener('scroll', _positionContactListsPanel, true); } catch(_) {}
-    _onContactListsKeydown = null; _positionContactListsPanel = null; _onContactListsOutside = null;
   }
 
   function openContactListsPanel() {
     if (document.getElementById('contact-lists-panel')) return;
-    
+
     // Comprehensive validation: ensure contact detail page is fully ready
     const isContactDetailReady = () => {
       // Check if critical DOM elements exist
       const header = document.getElementById('contact-detail-header');
       const view = document.getElementById('contact-detail-view');
       const addToListBtn = document.getElementById('add-contact-to-list');
-      
+
       if (!header || !view || !addToListBtn) return false;
-      
+
       // Check if data-contact-id attributes are set
       const headerId = header.getAttribute('data-contact-id');
       const viewId = view.getAttribute('data-contact-id');
-      
+
       if (!headerId || !viewId) return false;
-      
+
       // Check if state has contact ID
       if (!state.currentContact?.id) return false;
-      
+
       // All validations passed
       return true;
     };
-    
+
     // If not ready, show loading state and retry
     if (!isContactDetailReady()) {
       console.log('[ContactDetail] Contact detail not fully ready, showing loading state');
@@ -6611,7 +6630,7 @@ async function createContactSequenceThenAdd(name) {
       if (window.crm && typeof window.crm.showToast === 'function') {
         window.crm.showToast('Loading contact information...');
       }
-      
+
       // Retry after a short delay
       setTimeout(() => {
         if (isContactDetailReady()) {
@@ -6631,7 +6650,7 @@ async function createContactSequenceThenAdd(name) {
       }, 200);
       return;
     }
-    
+
     injectContactListsStyles();
     const panel = document.createElement('div');
     panel.id = 'contact-lists-panel';
@@ -6697,21 +6716,21 @@ async function createContactSequenceThenAdd(name) {
       panel.style.left = `${Math.round(left)}px`;
     };
     _positionContactListsPanel();
-    
+
     // Always attach resize/scroll listeners for this panel instance.
     // closeContactListsPanel() will clean them up.
-    try { window.addEventListener('resize', _positionContactListsPanel, true); } catch (_) {}
-    try { window.addEventListener('scroll', _positionContactListsPanel, true); } catch (_) {}
+    try { window.addEventListener('resize', _positionContactListsPanel, true); } catch (_) { }
+    try { window.addEventListener('scroll', _positionContactListsPanel, true); } catch (_) { }
 
     // Animate in
     requestAnimationFrame(() => { panel.classList.add('--show'); });
 
     // Mark trigger expanded
-    try { document.getElementById('add-contact-to-list')?.setAttribute('aria-expanded', 'true'); } catch(_) {}
+    try { document.getElementById('add-contact-to-list')?.setAttribute('aria-expanded', 'true'); } catch (_) { }
 
     // Load lists and memberships immediately since we've already validated everything is ready
     Promise.resolve(populateContactListsPanel(panel.querySelector('#contact-lists-body')))
-      .then(() => { try { _positionContactListsPanel && _positionContactListsPanel(); } catch(_) {} });
+      .then(() => { try { _positionContactListsPanel && _positionContactListsPanel(); } catch (_) { } });
 
     // Close button
     panel.querySelector('#contact-lists-close')?.addEventListener('click', () => closeContactListsPanel());
@@ -6725,9 +6744,9 @@ async function createContactSequenceThenAdd(name) {
         const el = document.activeElement; handleListChoose(el);
       }
     };
-    
+
     // Always attach keydown listener; closeContactListsPanel() removes it.
-      document.addEventListener('keydown', _onContactListsKeydown, true);
+    document.addEventListener('keydown', _onContactListsKeydown, true);
 
     // Click-away handler - closes when clicking outside or on other buttons
     _onContactListsOutside = (e) => {
@@ -6735,7 +6754,7 @@ async function createContactSequenceThenAdd(name) {
       const isTrigger = !!(e.target.closest && e.target.closest('#add-contact-to-list'));
       // Allow clicking on global search bar (class 'search-input') to close the modal and allow focus
       const isSearchBar = e.target.classList && e.target.classList.contains('search-input');
-      
+
       // Close if clicking outside the panel (including on other buttons like add-to-sequence)
       if (!inside && !isTrigger) {
         closeContactListsPanel();
@@ -6745,7 +6764,7 @@ async function createContactSequenceThenAdd(name) {
         }
       }
     };
-    
+
     // Always attach the listener (remove guard to ensure it works)
     setTimeout(() => {
       document.addEventListener('mousedown', _onContactListsOutside, true);
@@ -6754,22 +6773,22 @@ async function createContactSequenceThenAdd(name) {
   }
 
   // Handle list selection (moved to global scope to fix reference error)
-    function handleListChoose(el) {
-      const action = el.getAttribute('data-action');
-      if (action === 'create') {
-        const name = window.prompt('New list name');
-        if (!name) return;
-        createContactListThenAdd(name.trim());
-        return;
-      }
-      const id = el.getAttribute('data-id');
-      const name = el.getAttribute('data-name') || 'List';
-      const memberDocId = el.getAttribute('data-member-id');
-      if (memberDocId) {
-        // Already a member -> remove from list
-        removeCurrentContactFromList(memberDocId, name);
-      } else {
-        addCurrentContactToList(id, name);
+  function handleListChoose(el) {
+    const action = el.getAttribute('data-action');
+    if (action === 'create') {
+      const name = window.prompt('New list name');
+      if (!name) return;
+      createContactListThenAdd(name.trim());
+      return;
+    }
+    const id = el.getAttribute('data-id');
+    const name = el.getAttribute('data-name') || 'List';
+    const memberDocId = el.getAttribute('data-member-id');
+    if (memberDocId) {
+      // Already a member -> remove from list
+      removeCurrentContactFromList(memberDocId, name);
+    } else {
+      addCurrentContactToList(id, name);
     }
   }
 
@@ -6784,10 +6803,10 @@ async function createContactSequenceThenAdd(name) {
       try {
         id = document.querySelector('#contact-detail-header')?.getAttribute('data-contact-id') || id;
         id = document.querySelector('#contact-detail-view')?.getAttribute('data-contact-id') || id;
-      } catch(_) {}
+      } catch (_) { }
       if (id) return id;
       // 3) module singleton
-      try { id = window.ContactDetail?.state?.currentContact?.id || id; } catch(_) {}
+      try { id = window.ContactDetail?.state?.currentContact?.id || id; } catch (_) { }
       if (id) return id;
       // 4) people cache best-effort match (name + account)
       try {
@@ -6803,14 +6822,14 @@ async function createContactSequenceThenAdd(name) {
           });
           if (guessed && guessed.id) return guessed.id;
         }
-      } catch(_) {}
+      } catch (_) { }
       return '';
     };
 
     // Immediate attempt
     let resolved = tryResolveOnce();
     if (resolved) {
-      try { if (!state.currentContact) state.currentContact = {}; state.currentContact.id = resolved; } catch(_) {}
+      try { if (!state.currentContact) state.currentContact = {}; state.currentContact.id = resolved; } catch (_) { }
       return true;
     }
 
@@ -6820,7 +6839,7 @@ async function createContactSequenceThenAdd(name) {
       await new Promise(r => setTimeout(r, interval));
       resolved = tryResolveOnce();
       if (resolved) {
-        try { if (!state.currentContact) state.currentContact = {}; state.currentContact.id = resolved; } catch(_) {}
+        try { if (!state.currentContact) state.currentContact = {}; state.currentContact.id = resolved; } catch (_) { }
         return true;
       }
     }
@@ -6841,12 +6860,12 @@ async function createContactSequenceThenAdd(name) {
         // Load lists (people kind) with ownership filter for non-admin users
         const email = window.currentUserEmail || '';
         let q = db.collection('lists');
-        
+
         // CRITICAL: Add ownership filter FIRST for non-admin users (required by Firestore rules)
         if (window.currentUserRole !== 'admin' && email) {
           q = q.where('ownerId', '==', email);
         }
-        
+
         // Then add kind filter
         if (q.where) q = q.where('kind', '==', 'people');
         const snap = await (q.limit ? q.limit(200).get() : q.get());
@@ -6857,7 +6876,7 @@ async function createContactSequenceThenAdd(name) {
           let mq = db.collection('listMembers');
           if (mq.where) {
             mq = mq.where('targetId', '==', contactId);
-            try { mq = mq.where('targetType', '==', 'people'); } catch(_) {}
+            try { mq = mq.where('targetType', '==', 'people'); } catch (_) { }
           }
           try {
             const msnap = await (mq.limit ? mq.limit(500).get() : mq.get());
@@ -6928,11 +6947,11 @@ async function createContactSequenceThenAdd(name) {
         try {
           container.removeEventListener('click', container._listItemClickHandler);
           console.log('[ContactDetail] Removed old list item click handler');
-        } catch(e) {
+        } catch (e) {
           console.warn('[ContactDetail] Error removing old handler:', e);
         }
       }
-      
+
       // Create and store the handler function with detailed logging
       container._listItemClickHandler = (e) => {
         console.log('[ContactDetail] Click detected in list container', e.target);
@@ -6941,7 +6960,7 @@ async function createContactSequenceThenAdd(name) {
         if (listItem && !listItem.hasAttribute('aria-disabled')) {
           console.log('[ContactDetail] Calling handleListChoose for:', listItem.getAttribute('data-name'));
           try {
-          handleListChoose(listItem);
+            handleListChoose(listItem);
           } catch (err) {
             console.error('[ContactDetail] Error in handleListChoose:', err);
             if (window.crm?.showToast) {
@@ -6955,7 +6974,7 @@ async function createContactSequenceThenAdd(name) {
           });
         }
       };
-      
+
       // Attach the listener with capture phase to ensure it fires
       container.addEventListener('click', container._listItemClickHandler, true);
       console.log('[ContactDetail] List item click handler attached to container:', container.id);
@@ -6971,7 +6990,7 @@ async function createContactSequenceThenAdd(name) {
         if (typeof val === 'number') return val;
         if (typeof val === 'string') return new Date(val).getTime();
         if (val && typeof val.seconds === 'number') return val.seconds * 1000;
-      } catch {}
+      } catch { }
       return 0;
     }
   }
@@ -7007,35 +7026,35 @@ async function createContactSequenceThenAdd(name) {
   async function addCurrentContactToList(listId, listName) {
     try {
       let contactId = state.currentContact?.id;
-      
+
       // Enhanced fallback chain for contact ID resolution
       if (!contactId) {
         try {
           const fromDom = document.querySelector('[data-contact-id]')?.getAttribute('data-contact-id');
           if (fromDom) contactId = fromDom;
-        } catch(_) {}
+        } catch (_) { }
       }
-      
+
       if (!contactId && typeof window.getPeopleData === 'function') {
         try {
           // If we have a single newly-created contact with matching name/company, attempt to resolve id
           const c = state.currentContact || {};
           const people = window.getPeopleData() || [];
-          const guess = people.find(p => (p.firstName||p.name||'') === (c.firstName||c.name||'') && (p.accountId||p.companyId||'') === (c.accountId||''));
+          const guess = people.find(p => (p.firstName || p.name || '') === (c.firstName || c.name || '') && (p.accountId || p.companyId || '') === (c.accountId || ''));
           if (guess && guess.id) contactId = guess.id;
-        } catch(_) {}
+        } catch (_) { }
       }
-      
+
       if (!contactId) {
         // Enhanced fallback: wait longer and check multiple sources
         const start = Date.now();
         while (!contactId && Date.now() - start < 2000) {
           await new Promise(r => setTimeout(r, 100));
-          contactId = state.currentContact?.id || 
-                     document.querySelector('[data-contact-id]')?.getAttribute('data-contact-id') ||
-                     document.querySelector('#contact-detail-header [data-contact-id]')?.getAttribute('data-contact-id');
+          contactId = state.currentContact?.id ||
+            document.querySelector('[data-contact-id]')?.getAttribute('data-contact-id') ||
+            document.querySelector('#contact-detail-header [data-contact-id]')?.getAttribute('data-contact-id');
         }
-        
+
         if (!contactId) {
           console.warn('[ContactDetail] No contact ID available for list addition after extended wait', {
             contactId: contactId,
@@ -7043,7 +7062,7 @@ async function createContactSequenceThenAdd(name) {
             stateContactId: state.currentContact?.id,
             domElements: document.querySelectorAll('[data-contact-id]').length
           });
-          
+
           // Show user-friendly error message
           if (window.crm && typeof window.crm.showToast === 'function') {
             window.crm.showToast('Contact information not ready. Please try again in a moment.');
@@ -7063,35 +7082,35 @@ async function createContactSequenceThenAdd(name) {
           doc.updatedAt = new Date();
         }
         await db.collection('listMembers').add(doc);
-        
+
         // Update the recordCount field in the list document
         try {
-          const increment = window.firebase?.firestore?.FieldValue?.increment ? 
-            window.firebase.firestore.FieldValue.increment(1) : 
+          const increment = window.firebase?.firestore?.FieldValue?.increment ?
+            window.firebase.firestore.FieldValue.increment(1) :
             (await db.collection('lists').doc(listId).get()).data()?.recordCount + 1 || 1;
-          
+
           await db.collection('lists').doc(listId).update({
             recordCount: increment,
             updatedAt: (window.firebase?.firestore?.FieldValue?.serverTimestamp
               ? window.firebase.firestore.FieldValue.serverTimestamp()
               : new Date())
           });
-          
+
           console.log('[ContactDetail] Updated list recordCount for', listId);
         } catch (countError) {
           console.warn('[ContactDetail] Failed to update list count:', countError);
         }
-        
+
         // Update the cache for this list
         if (window.listMembersCache && window.listMembersCache[listId]) {
           window.listMembersCache[listId].people.add(contactId);
         }
-        
+
         // Refresh list membership if we're on a list detail page
         if (window.ListDetail && window.ListDetail.refreshListMembership) {
           window.ListDetail.refreshListMembership();
         }
-        
+
         // Refresh list counts on the lists overview page
         if (window.ListsOverview && window.ListsOverview.refreshCounts) {
           window.ListsOverview.refreshCounts();
@@ -7158,7 +7177,7 @@ async function createContactSequenceThenAdd(name) {
             } else {
               // Fallback: click compose and prefill
               document.getElementById('compose-email-btn')?.click();
-              setTimeout(()=>{ const to = document.getElementById('compose-to'); if (to) to.value = email; }, 120);
+              setTimeout(() => { const to = document.getElementById('compose-to'); if (to) to.value = email; }, 120);
             }
           } catch (e) { /* noop */ }
         }
@@ -7168,7 +7187,7 @@ async function createContactSequenceThenAdd(name) {
         if (contact) {
           console.log('[ContactDetail] Website button clicked for contact:', contact.name || contact.firstName + ' ' + contact.lastName);
           console.log('[ContactDetail] Contact company:', contact.companyName || contact.accountName);
-          
+
           // Get website from contact's company or account
           let website = contact.website || contact.companyWebsite || contact.accountWebsite;
           console.log('[ContactDetail] Contact website fields:', {
@@ -7177,7 +7196,7 @@ async function createContactSequenceThenAdd(name) {
             accountWebsite: contact.accountWebsite,
             found: website
           });
-          
+
           // If no website on contact, try to get from pre-loaded linked account
           if (!website) {
             try {
@@ -7194,11 +7213,11 @@ async function createContactSequenceThenAdd(name) {
               } else {
                 console.log('[ContactDetail] No linked account found');
               }
-            } catch (e) { 
+            } catch (e) {
               console.warn('[ContactDetail] Failed to find linked account for website:', e);
             }
           }
-          
+
           if (website) {
             // Ensure URL has protocol
             let url = website;
@@ -7221,7 +7240,7 @@ async function createContactSequenceThenAdd(name) {
         if (contactLinkedIn) {
           console.log('[ContactDetail] LinkedIn button clicked for contact:', contactLinkedIn.name || contactLinkedIn.firstName + ' ' + contactLinkedIn.lastName);
           console.log('[ContactDetail] Contact LinkedIn field:', contactLinkedIn.linkedin);
-          
+
           // If contact has a LinkedIn URL, use it directly (PERSONAL LinkedIn, not company)
           if (contactLinkedIn.linkedin) {
             console.log('[ContactDetail] Using contact personal LinkedIn:', contactLinkedIn.linkedin);
@@ -7249,13 +7268,13 @@ async function createContactSequenceThenAdd(name) {
     const c = state.currentContact;
     if (!c) return;
     let accountId = c.accountId || c.account_id || '';
-    
+
     // If no accountId, try to find account by name (case-insensitive)
     if (!accountId) {
       const companyName = c.companyName || c.accountName || '';
       if (companyName) {
         const normalizedName = normalizeStr(companyName);
-        
+
         // First try preloaded account (fastest - already loaded)
         if (state._preloadedAccount && state._preloadedAccount.id) {
           const accName = normalizeStr(state._preloadedAccount.accountName || state._preloadedAccount.name || state._preloadedAccount.companyName || '');
@@ -7263,7 +7282,7 @@ async function createContactSequenceThenAdd(name) {
             accountId = state._preloadedAccount.id;
           }
         }
-        
+
         // Fallback to BackgroundAccountsLoader (cost-effective: zero Firestore reads)
         if (!accountId && window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
           try {
@@ -7272,7 +7291,7 @@ async function createContactSequenceThenAdd(name) {
             if (match) accountId = match.id;
           } catch (_) { /* noop */ }
         }
-        
+
         // Final fallback to global getAccountsData (cost-effective: uses cache)
         if (!accountId && typeof window.getAccountsData === 'function') {
           try {
@@ -7283,7 +7302,7 @@ async function createContactSequenceThenAdd(name) {
         }
       }
     }
-    
+
     if (accountId && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
       try { window.AccountDetail.show(accountId); } catch (e) { /* noop */ }
     }
@@ -7316,7 +7335,7 @@ async function createContactSequenceThenAdd(name) {
         if (d.entity === 'account' && d.id === state._linkedAccountId) {
           const field = d.field;
           const value = d.value;
-          
+
           // Update the Energy & Contract section display
           const energyGrid = document.getElementById('contact-energy-grid');
           if (energyGrid) {
@@ -7324,7 +7343,7 @@ async function createContactSequenceThenAdd(name) {
             if (fieldWrap) {
               // Check if field is in editing mode
               const isEditing = fieldWrap.classList.contains('editing');
-              
+
               if (isEditing) {
                 // Update the input field value when in editing mode
                 const inputEl = fieldWrap.querySelector('.info-edit-input');
@@ -7361,11 +7380,11 @@ async function createContactSequenceThenAdd(name) {
             }
           }
         }
-      } catch(_) {}
+      } catch (_) { }
     };
-    
+
     document.addEventListener('pc:energy-updated', onEnergyUpdated);
-    
+
     // Return cleanup function
     return () => {
       document.removeEventListener('pc:energy-updated', onEnergyUpdated);
@@ -7391,7 +7410,7 @@ async function createContactSequenceThenAdd(name) {
         });
         console.log('[Contact Detail] Cleared phone widget context to prevent leakage');
       }
-    } catch(_) {}
+    } catch (_) { }
   }
 
   // Listen for new contact creation to update state when navigating from Account Details
@@ -7400,7 +7419,7 @@ async function createContactSequenceThenAdd(name) {
       try {
         const d = e.detail || {};
         const { id, doc } = d;
-        
+
         // If we're currently on the Contact Detail page but don't have a contact ID yet,
         // and this newly created contact matches our current state, update it
         if (id && doc && !state.currentContact?.id) {
@@ -7409,27 +7428,27 @@ async function createContactSequenceThenAdd(name) {
           const newName = doc.firstName || doc.name || '';
           const currentCompany = state.currentContact?.companyName || state.currentContact?.accountName || '';
           const newCompany = doc.companyName || '';
-          
+
           // If names match and we're on the contact detail page, update the state
-          if (currentName && newName && currentName.toLowerCase() === newName.toLowerCase() && 
-              currentCompany && newCompany && currentCompany.toLowerCase() === newCompany.toLowerCase()) {
+          if (currentName && newName && currentName.toLowerCase() === newName.toLowerCase() &&
+            currentCompany && newCompany && currentCompany.toLowerCase() === newCompany.toLowerCase()) {
             console.log('[Contact Detail] Updating state with new contact ID:', id);
             state.currentContact.id = id;
             state.currentContact = { ...state.currentContact, ...doc, id };
-            
+
             // Re-attach event handlers after contact creation
             setTimeout(() => {
               if (!state._contactDetailEventsAttached) {
                 attachContactDetailEvents();
               }
             }, 100);
-            
+
             // Update the DOM to reflect the new contact ID
             const contactIdEl = document.querySelector('[data-contact-id]');
             if (contactIdEl) {
               contactIdEl.setAttribute('data-contact-id', id);
             }
-            
+
             // Update the page title if it exists
             const pageTitle = document.querySelector('#contact-detail-header .contact-name');
             if (pageTitle && !pageTitle.getAttribute('data-contact-id')) {
@@ -7437,7 +7456,7 @@ async function createContactSequenceThenAdd(name) {
             }
           }
         }
-        
+
         // If we're on the contact detail page, always re-attach event handlers
         // This ensures add-to-list functionality works after contact creation
         const isOnContactDetailPage = document.getElementById('contact-detail-view') !== null;
@@ -7450,11 +7469,11 @@ async function createContactSequenceThenAdd(name) {
             attachContactDetailEvents();
           }, 100);
         }
-      } catch(_) {}
+      } catch (_) { }
     };
-    
+
     document.addEventListener('pc:contact-created', onContactCreated);
-    
+
     // Return cleanup function
     return () => {
       document.removeEventListener('pc:contact-created', onContactCreated);
@@ -7508,17 +7527,17 @@ async function createContactSequenceThenAdd(name) {
   // Cleanup function to remove event listeners and reset state
   function cleanup() {
     console.log('[ContactDetail] Cleaning up module...');
-    
+
     // Remove all tracked event listeners
     eventListeners.forEach(({ type, handler, target }) => {
       try {
         target.removeEventListener(type, handler);
-      } catch(e) {
+      } catch (e) {
         console.warn('[ContactDetail] Error removing listener:', e);
       }
     });
     eventListeners.length = 0;
-    
+
     // Reset global flags
     try {
       document._pcBackButtonDelegated = false;
@@ -7526,11 +7545,11 @@ async function createContactSequenceThenAdd(name) {
       if (contactDetailView) {
         contactDetailView._companyPhoneHandlerAdded = false;
       }
-    } catch(e) {}
-    
+    } catch (e) { }
+
     // Reset state flags
     state._contactDetailEventsAttached = false;
-    
+
     console.log('[ContactDetail] Cleanup complete');
   }
 
@@ -7539,33 +7558,33 @@ async function createContactSequenceThenAdd(name) {
     show: showContactDetail,
     setupEnergyUpdateListener: setupEnergyUpdateListener,
     setupContactCreatedListener: setupContactCreatedListener,
-  // Expose internal state for widgets to read linked account id
-  state: state,
-  // Expose cleanup function for hot reload support
-  _cleanup: cleanup
-};
+    // Expose internal state for widgets to read linked account id
+    state: state,
+    // Expose cleanup function for hot reload support
+    _cleanup: cleanup
+  };
 
-// Debug function to test phone input functionality
-window.testPhoneInput = function(value, cursorPos = 0) {
-  console.log('Testing phone input:', { value, cursorPos });
-  console.log('isTypingExtension:', isTypingExtension(value, cursorPos));
-  console.log('parsePhoneWithExtension:', parsePhoneWithExtension(value));
-  console.log('formatPhoneNumberForInput:', formatPhoneNumberForInput(value));
-  console.log('formatPhoneForDisplay:', formatPhoneForDisplay(value));
-};
+  // Debug function to test phone input functionality
+  window.testPhoneInput = function (value, cursorPos = 0) {
+    console.log('Testing phone input:', { value, cursorPos });
+    console.log('isTypingExtension:', isTypingExtension(value, cursorPos));
+    console.log('parsePhoneWithExtension:', parsePhoneWithExtension(value));
+    console.log('formatPhoneNumberForInput:', formatPhoneNumberForInput(value));
+    console.log('formatPhoneForDisplay:', formatPhoneForDisplay(value));
+  };
 
-// ===== Email Validation Modal for Contact Detail =====
-async function showContactDetailEmailValidationModal(contact) {
-  return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.className = 'pc-modal__backdrop';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    
-    const contactName = contact.name || (contact.firstName + ' ' + (contact.lastName || '')).trim() || 'Unknown';
-    const companyName = contact.company || contact.companyName || '';
-    
-    overlay.innerHTML = `
+  // ===== Email Validation Modal for Contact Detail =====
+  async function showContactDetailEmailValidationModal(contact) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'pc-modal__backdrop';
+      overlay.setAttribute('role', 'dialog');
+      overlay.setAttribute('aria-modal', 'true');
+
+      const contactName = contact.name || (contact.firstName + ' ' + (contact.lastName || '')).trim() || 'Unknown';
+      const companyName = contact.company || contact.companyName || '';
+
+      overlay.innerHTML = `
       <div class="pc-modal__dialog" style="max-width: 500px;">
         <div class="pc-modal__header">
           <h2 style="display: flex; align-items: center; gap: 12px;">
@@ -7598,44 +7617,44 @@ async function showContactDetailEmailValidationModal(contact) {
         </div>
       </div>
     `;
-    
-    document.body.appendChild(overlay);
-    
-    requestAnimationFrame(() => {
+
+      document.body.appendChild(overlay);
+
       requestAnimationFrame(() => {
-        overlay.classList.add('show');
+        requestAnimationFrame(() => {
+          overlay.classList.add('show');
+        });
       });
-    });
-    
-    const close = (result) => {
-      overlay.classList.remove('show');
-      setTimeout(() => {
-        if (overlay.parentElement) {
-          overlay.parentElement.removeChild(overlay);
+
+      const close = (result) => {
+        overlay.classList.remove('show');
+        setTimeout(() => {
+          if (overlay.parentElement) {
+            overlay.parentElement.removeChild(overlay);
+          }
+        }, 200);
+        resolve(result);
+      };
+
+      overlay.querySelector('#email-validation-close')?.addEventListener('click', () => close({ proceed: false }));
+      overlay.querySelector('#email-validation-cancel')?.addEventListener('click', () => close({ proceed: false }));
+      overlay.querySelector('#email-validation-proceed')?.addEventListener('click', () => close({ proceed: true }));
+
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          close({ proceed: false });
         }
-      }, 200);
-      resolve(result);
-    };
-    
-    overlay.querySelector('#email-validation-close')?.addEventListener('click', () => close({ proceed: false }));
-    overlay.querySelector('#email-validation-cancel')?.addEventListener('click', () => close({ proceed: false }));
-    overlay.querySelector('#email-validation-proceed')?.addEventListener('click', () => close({ proceed: true }));
-    
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) {
-        close({ proceed: false });
-      }
+      });
+
+      const onEscape = (e) => {
+        if (e.key === 'Escape') {
+          document.removeEventListener('keydown', onEscape);
+          close({ proceed: false });
+        }
+      };
+      document.addEventListener('keydown', onEscape);
     });
-    
-    const onEscape = (e) => {
-      if (e.key === 'Escape') {
-        document.removeEventListener('keydown', onEscape);
-        close({ proceed: false });
-      }
-    };
-    document.addEventListener('keydown', onEscape);
-  });
-}
+  }
 
 })();
 

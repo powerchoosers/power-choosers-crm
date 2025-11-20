@@ -15,7 +15,7 @@ class FreeSequenceAutomation {
   async startSequence(sequence, contactData) {
     try {
       console.log('[FreeSequence] Starting sequence:', sequence.name);
-      
+
       // Get current user email for ownership
       const getUserEmail = () => {
         try {
@@ -28,26 +28,26 @@ class FreeSequenceAutomation {
         }
       };
       const userEmail = getUserEmail();
-        
+
       // Get Firebase database reference
       const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
       if (!db) {
         throw new Error('Firebase not available');
       }
-      
+
       // Skip if contact has no email
       const hasEmail = contactData.email && contactData.email.trim() !== '';
       if (!hasEmail) {
         console.log(`[FreeSequenceAutomation] Skipping sequence for ${contactData.name} - no email address`);
         throw new Error('Contact must have an email address to start sequence');
       }
-      
+
       // Create sequenceActivations document
       const activationRef = db.collection('sequenceActivations').doc();
       const activationId = activationRef.id;
-      
+
       const sequenceActivationData = {
-          sequenceId: sequence.id,
+        sequenceId: sequence.id,
         contactIds: [contactData.id], // Single contact for this method
         status: 'pending',
         processedContacts: 0,
@@ -57,10 +57,10 @@ class FreeSequenceAutomation {
         createdBy: userEmail,
         createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
       };
-      
+
       await activationRef.set(sequenceActivationData);
       console.log('[FreeSequence] Created sequenceActivation:', activationId);
-      
+
       // Call server endpoint to process immediately
       try {
         const baseUrl = window.API_BASE_URL || window.location.origin || '';
@@ -69,52 +69,52 @@ class FreeSequenceAutomation {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             immediate: true,
             activationId: activationId
           })
         });
-        
+
         if (response.ok) {
           const result = await response.json();
           console.log('[FreeSequence] Activation processing triggered:', result);
-      
+
           // Dispatch event to refresh emails page
           window.dispatchEvent(new CustomEvent('pc:emails-updated'));
-      
-      return {
-        success: true,
+
+          return {
+            success: true,
             scheduledEmailCount: 0, // Will be updated by server
             message: 'Sequence queued for processing'
           };
         } else {
           const errorText = await response.text();
           console.error('[FreeSequence] Failed to trigger processing:', response.status, errorText);
-          
+
           // Update activation to failed
-          await activationRef.update({ 
-            status: 'failed', 
-            errorMessage: errorText 
+          await activationRef.update({
+            status: 'failed',
+            errorMessage: errorText
           });
-          
+
           throw new Error(`Failed to start sequence: ${errorText}`);
         }
       } catch (genError) {
         console.error('[FreeSequence] Error triggering processing:', genError);
-        
+
         // Update activation to failed
         try {
-          await activationRef.update({ 
-            status: 'failed', 
-            errorMessage: genError.message 
+          await activationRef.update({
+            status: 'failed',
+            errorMessage: genError.message
           });
         } catch (updateError) {
           console.error('[FreeSequence] Failed to update activation status:', updateError);
         }
-        
+
         throw genError;
       }
-      
+
     } catch (error) {
       console.error('[FreeSequence] Error starting sequence:', error);
       throw error;
@@ -126,9 +126,9 @@ class FreeSequenceAutomation {
    */
   calculateSendTime(previousTime, delay) {
     if (!delay) return previousTime + (24 * 60 * 60 * 1000); // Default 1 day
-    
+
     const delayStr = delay.toString().toLowerCase();
-    
+
     if (delayStr.includes('day')) {
       const days = parseInt(delayStr.match(/\d+/)?.[0] || '1');
       return previousTime + (days * 24 * 60 * 60 * 1000);
@@ -151,7 +151,7 @@ class FreeSequenceAutomation {
    */
   scheduleEmailCheck(email) {
     const timeUntilSend = email.scheduledSendTime - Date.now();
-    
+
     if (timeUntilSend <= 0) {
       // Email is due now, check immediately
       this.checkEmail(email);
@@ -170,31 +170,31 @@ class FreeSequenceAutomation {
     try {
       const now = Date.now();
       const timeUntilSend = email.scheduledSendTime - now;
-      
+
       if (timeUntilSend > 0) {
         // Not time yet, reschedule
         this.scheduleEmailCheck(email);
         return;
       }
-      
+
       console.log(`[FreeSequence] Email due: ${email.id}`);
-      
+
       // Check if email has been generated and approved
       if (email.status === 'not_generated') {
         // Generate email content (this would call your AI service)
         await this.generateEmailContent(email);
       }
-      
+
       if (email.status === 'pending_approval') {
         // Email needs approval - show notification
         this.showApprovalNotification(email);
       }
-      
+
       if (email.status === 'approved') {
         // Send the email
         await this.sendEmail(email);
       }
-      
+
     } catch (error) {
       console.error(`[FreeSequence] Error checking email ${email.id}:`, error);
     }
@@ -206,7 +206,7 @@ class FreeSequenceAutomation {
   async generateEmailContent(email) {
     try {
       console.log(`[FreeSequence] Generating content for ${email.id}`);
-      
+
       // Update status to generating (in memory and Firebase)
       email.status = 'generating';
       const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
@@ -220,7 +220,7 @@ class FreeSequenceAutomation {
           console.error('[FreeSequence] Failed to update email status in Firebase:', error);
         }
       }
-      
+
       // Call Perplexity email API endpoint (using existing endpoint)
       const baseUrl = window.API_BASE_URL || window.location.origin || '';
       const response = await fetch(`${baseUrl}/api/perplexity-email`, {
@@ -232,7 +232,7 @@ class FreeSequenceAutomation {
           contactCompany: email.contactCompany
         })
       });
-      
+
       if (response.ok) {
         const result = await response.json();
         email.html = result.html;
@@ -240,7 +240,7 @@ class FreeSequenceAutomation {
         email.subject = result.subject;
         email.status = 'pending_approval';
         email.generatedAt = Date.now();
-        
+
         // Update Firebase with generated content and status
         if (db) {
           try {
@@ -253,19 +253,19 @@ class FreeSequenceAutomation {
               updatedAt: new Date().toISOString()
             });
             console.log(`[FreeSequence] Updated email in Firebase with generated content: ${email.id}`);
-            
+
             // Dispatch event to refresh emails page
             window.dispatchEvent(new CustomEvent('pc:emails-updated'));
           } catch (error) {
             console.error('[FreeSequence] Failed to update email in Firebase:', error);
           }
         }
-        
+
         console.log(`[FreeSequence] Generated content for ${email.id}`);
       } else {
         email.status = 'error';
         email.errorMessage = 'Failed to generate content';
-        
+
         // Update Firebase with error status
         if (db) {
           try {
@@ -279,12 +279,12 @@ class FreeSequenceAutomation {
           }
         }
       }
-      
+
     } catch (error) {
       console.error(`[FreeSequence] Error generating content:`, error);
       email.status = 'error';
       email.errorMessage = error.message;
-      
+
       // Update Firebase with error status
       const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
       if (db) {
@@ -321,10 +321,10 @@ class FreeSequenceAutomation {
         </div>
       </div>
     `;
-    
+
     // Add to page
     document.body.appendChild(notification);
-    
+
     // Auto-remove after 30 seconds if not interacted with
     setTimeout(() => {
       if (notification.parentNode) {
@@ -343,31 +343,31 @@ class FreeSequenceAutomation {
       console.error('[FreeSequence] Firebase not available for approval');
       return;
     }
-    
+
     try {
       const emailDoc = await db.collection('emails').doc(emailId).get();
       if (!emailDoc.exists) {
         console.warn('[FreeSequence] Email not found for approval:', emailId);
         return;
       }
-      
+
       const email = { id: emailId, ...emailDoc.data() };
       const approvedAt = Date.now();
-      
+
       // Update Firebase
       await db.collection('emails').doc(emailId).update({
         status: 'approved',
         approvedAt: approvedAt,
         updatedAt: new Date().toISOString()
       });
-      
+
       // Dispatch event to refresh emails page
       window.dispatchEvent(new CustomEvent('pc:emails-updated'));
-      
+
       // Remove notification
       const notification = document.querySelector('.email-approval-notification');
       if (notification) notification.remove();
-      
+
       // Note: Email will be sent by server-side cron job (/api/send-scheduled-emails)
       // No need to call sendEmail() here anymore
       console.log(`[FreeSequence] Email ${emailId} approved. Will be sent by server at scheduled time.`);
@@ -387,30 +387,30 @@ class FreeSequenceAutomation {
       console.error('[FreeSequence] Firebase not available for rejection');
       return;
     }
-    
+
     try {
       const emailDoc = await db.collection('emails').doc(emailId).get();
       if (!emailDoc.exists) {
         console.warn('[FreeSequence] Email not found for rejection:', emailId);
         return;
       }
-      
+
       const rejectedAt = Date.now();
-      
+
       // Update Firebase
       await db.collection('emails').doc(emailId).update({
         status: 'rejected',
         rejectedAt: rejectedAt,
         updatedAt: new Date().toISOString()
       });
-      
+
       // Dispatch event to refresh emails page
       window.dispatchEvent(new CustomEvent('pc:emails-updated'));
-      
+
       // Remove notification
       const notification = document.querySelector('.email-approval-notification');
       if (notification) notification.remove();
-      
+
       console.log(`[FreeSequence] Email ${emailId} rejected`);
     } catch (error) {
       console.error('[FreeSequence] Failed to reject email:', error);
@@ -428,16 +428,16 @@ class FreeSequenceAutomation {
       console.error('[FreeSequence] Firebase not available for editing');
       return;
     }
-    
+
     try {
       const emailDoc = await db.collection('emails').doc(emailId).get();
       if (!emailDoc.exists) {
         console.warn('[FreeSequence] Email not found for editing:', emailId);
         return;
       }
-      
+
       const email = { id: emailId, ...emailDoc.data() };
-      
+
       // Open email editor (you would implement this)
       console.log(`[FreeSequence] Edit email ${emailId}`);
       // This would open your email editor modal
@@ -462,12 +462,12 @@ class FreeSequenceAutomation {
   async sendEmail(email) {
     try {
       console.log(`[FreeSequence] Sending email ${email.id}`);
-      
+
       // Get email settings from step or use defaults
       const step = email.step || {};
       const isAuto = step.type === 'auto-email';
       const emailSettings = step.emailSettings || getDefaultEmailSettings(isAuto);
-      
+
       // Build deliverability settings from email settings
       const deliverability = {
         enableTracking: emailSettings.deliverability?.openTracking !== false && emailSettings.deliverability?.clickTracking !== false,
@@ -478,13 +478,13 @@ class FreeSequenceAutomation {
         useBrandedHtmlTemplate: false,
         signatureImageEnabled: emailSettings.content?.signatureImage !== false
       };
-      
+
       // Get sender details from settings
       const settings = (window.SettingsPage?.getSettings?.()) || (JSON.parse(localStorage.getItem('crm-settings') || '{}'));
       const general = settings?.general || {};
       const firstName = general.firstName || '';
       const lastName = general.lastName || '';
-      
+
       // Priority: Settings (firstName + lastName) → Firebase auth displayName → "Power Choosers Team"
       let senderName = '';
       if (firstName && lastName) {
@@ -497,38 +497,38 @@ class FreeSequenceAutomation {
             senderName = user.displayName.trim();
             console.log('[FreeSequence] Using Firebase auth displayName as sender name:', senderName);
           }
-        } catch (_) {}
-        
+        } catch (_) { }
+
         // Final fallback to "Power Choosers Team" (NOT "Power Choosers CRM")
         if (!senderName) {
           senderName = 'Power Choosers Team';
         }
       }
-      
+
       const senderEmail = general.email || 'l.patterson@powerchoosers.com';
-      
+
       // Debug logging to verify sender name
       console.log('[FreeSequence] Sender details:', {
         email: senderEmail,
         name: senderName,
         source: 'settings + Firebase auth fallback'
       });
-      
+
       // Prepare email data for SendGrid
       const emailData = {
-          to: email.to,
-          subject: email.subject,
+        to: email.to,
+        subject: email.subject,
         content: email.html || email.content || '',
         from: senderEmail,
         fromName: senderName,
         isHtmlEmail: true, // Assume HTML for sequence emails
         _deliverability: deliverability
       };
-      
+
       // Send via SendGrid
       console.log('[FreeSequence] Sending email with fromName:', senderName);
       const result = await sendEmailViaSendGrid(emailData);
-      
+
       if (result.success) {
         email.status = 'sent';
         email.sentAt = Date.now();
@@ -539,7 +539,7 @@ class FreeSequenceAutomation {
         email.status = 'error';
         email.errorMessage = result.error || 'Failed to send email';
       }
-      
+
     } catch (error) {
       console.error(`[FreeSequence] Error sending email:`, error);
       email.status = 'error';
@@ -552,10 +552,10 @@ class FreeSequenceAutomation {
    */
   startFreeAutomation() {
     if (this.isRunning) return;
-    
+
     this.isRunning = true;
     console.log('[FreeSequence] Free automation started');
-    
+
     // Check every 5 minutes for any missed emails
     this.checkInterval = setInterval(() => {
       this.checkAllEmails();
@@ -567,7 +567,7 @@ class FreeSequenceAutomation {
    */
   checkAllEmails() {
     const now = Date.now();
-    
+
     for (const [id, email] of this.scheduledEmails) {
       if (email.scheduledSendTime <= now && email.status === 'not_generated') {
         this.checkEmail(email);
@@ -593,7 +593,9 @@ class FreeSequenceAutomation {
     currentSequence: null,
     editingTitle: false,
     tempTitle: '',
-    contacts: [] // Store sequence contacts
+    contacts: [], // Store sequence contacts
+    currentView: 'builder', // 'builder' or 'steps'
+    sequenceMembersCache: null // Cache for sequence members
   };
 
   const els = {};
@@ -604,7 +606,7 @@ class FreeSequenceAutomation {
     els.mainContent = els.page ? els.page.querySelector('.page-content') : null;
     return !!els.page && !!els.mainContent;
   }
-  
+
   // Sequence-level delete confirmation popover (anchored under trash icon)
   function openSequenceDeletePopover(anchorEl) {
     if (!anchorEl || !state.currentSequence) return;
@@ -613,7 +615,7 @@ class FreeSequenceAutomation {
     const titleWrap = document.querySelector('.contact-subtitle .seq-title-wrap');
     try {
       anchorEl.setAttribute('aria-expanded', 'true');
-    } catch (_) {}
+    } catch (_) { }
     if (titleWrap) titleWrap.classList.add('actions-pinned');
     const pop = document.createElement('div');
     pop.className = 'delete-popover';
@@ -714,11 +716,11 @@ class FreeSequenceAutomation {
           try {
             titleWrap.classList.add('no-hover');
             setTimeout(() => { titleWrap.classList.remove('no-hover'); }, 250);
-          } catch (_) {}
+          } catch (_) { }
         }
-        try { anchorEl.setAttribute('aria-expanded', 'false'); } catch (_) {}
+        try { anchorEl.setAttribute('aria-expanded', 'false'); } catch (_) { }
         // Blur the trigger so :focus-within no longer keeps actions visible
-        try { anchorEl.blur && anchorEl.blur(); } catch (_) {}
+        try { anchorEl.blur && anchorEl.blur(); } catch (_) { }
       }
     };
   }
@@ -786,10 +788,10 @@ class FreeSequenceAutomation {
                 ${details ? `<div class=\"contact-details\">${escapeHtml(details)}</div>` : ''}
               </div>
               <div class="contact-action">
-                ${isAlreadyAdded ? 
-                  '<span class="added-indicator">Added</span>' : 
-                  '<button class="btn-add-contact" aria-label="Add contact to sequence">Add</button>'
-                }
+                ${isAlreadyAdded ?
+              '<span class="added-indicator">Added</span>' :
+              '<button class="btn-add-contact" aria-label="Add contact to sequence">Add</button>'
+            }
               </div>
             </div>
           `;
@@ -907,12 +909,12 @@ class FreeSequenceAutomation {
     try {
       const db = window.firebaseDB;
       if (!db || !state.currentSequence?.id) return;
-      
+
       // Get user email using the same method as sequences.js
       const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
         ? window.DataManager.getCurrentUserEmail()
         : ((window.currentUserEmail || '').toLowerCase());
-      
+
       // Create sequenceMembers document with hasEmail flag
       const memberDoc = {
         sequenceId: state.currentSequence.id,
@@ -924,7 +926,7 @@ class FreeSequenceAutomation {
         createdBy: userEmail || 'unknown',
         assignedTo: userEmail || 'unknown'
       };
-      
+
       // Use server timestamps if available, otherwise use Date.now()
       if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
         memberDoc.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
@@ -934,41 +936,41 @@ class FreeSequenceAutomation {
         memberDoc.createdAt = now;
         memberDoc.updatedAt = now;
       }
-      
+
       // Add the sequenceMembers document
       await db.collection('sequenceMembers').add(memberDoc);
-      
+
       // Increment sequence stats.active count (same as contact-detail.js)
       if (window.firebase?.firestore?.FieldValue) {
         await db.collection('sequences').doc(state.currentSequence.id).update({
           "stats.active": window.firebase.firestore.FieldValue.increment(1)
         });
       }
-      
+
       // Update sequence document with contacts array and recordCount
       const updateData = {
         contacts: state.contacts,
         updatedAt: Date.now(),
         recordCount: state.contacts.length
       };
-      
+
       // Use server timestamp if available
       if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
         updateData.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
       }
-      
+
       await db.collection('sequences').doc(state.currentSequence.id).update(updateData);
-      
+
       // Update local sequence object
       state.currentSequence.contacts = state.contacts;
       state.currentSequence.recordCount = state.contacts.length;
-      
+
       // Invalidate sequenceMembers cache so it refreshes next time
       if (window._sequenceMembersCache) {
         const cacheKey = `sequence-members-${state.currentSequence.id}`;
         window._sequenceMembersCache.delete(cacheKey);
       }
-      
+
       // Update contact count display in UI
       updateContactCountDisplay();
 
@@ -980,14 +982,14 @@ class FreeSequenceAutomation {
       } catch (_) {
         // Non-fatal; sequences list will eventually refresh on next visit
       }
-      
+
       // ✅ NEW: If sequence is already active (has active members), automatically start sequence for this new contact
       // Check if sequence has active members (stats.active > 0 or existing sequenceActivations)
       try {
         const sequenceDoc = await db.collection('sequences').doc(state.currentSequence.id).get();
         const sequenceData = sequenceDoc.data();
         const hasActiveMembers = (sequenceData?.stats?.active || 0) > 0;
-        
+
         // Also check if there are any existing sequenceActivations for this sequence
         let hasExistingActivations = false;
         try {
@@ -1000,16 +1002,16 @@ class FreeSequenceAutomation {
         } catch (_) {
           // Query might fail if index missing, but that's okay - we'll use stats.active as fallback
         }
-        
+
         // If sequence is active, automatically create sequenceActivation for this new contact
         if (hasActiveMembers || hasExistingActivations) {
           if (contact.email && !contact._skipEmailSteps) {
             console.log('[SequenceBuilder] Sequence is active, auto-starting for new contact:', contact.name);
-            
+
             // Create sequenceActivation for this single contact
             const activationRef = db.collection('sequenceActivations').doc();
             const activationId = activationRef.id;
-            
+
             const sequenceActivationData = {
               sequenceId: state.currentSequence.id,
               contactIds: [contact.id],
@@ -1021,22 +1023,22 @@ class FreeSequenceAutomation {
               createdBy: userEmail || 'unknown',
               createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || Date.now()
             };
-            
+
             await activationRef.set(sequenceActivationData);
             console.log('[SequenceBuilder] Created auto-sequenceActivation:', activationId);
-            
+
             // Trigger immediate processing
             try {
               const baseUrl = window.API_BASE_URL || window.location.origin || '';
               const response = await fetch(`${baseUrl}/api/process-sequence-activations`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                   immediate: true,
                   activationId: activationId
                 })
               });
-              
+
               if (response.ok) {
                 const result = await response.json();
                 console.log('[SequenceBuilder] Auto-started sequence for new contact:', result);
@@ -1058,7 +1060,7 @@ class FreeSequenceAutomation {
         console.warn('[SequenceBuilder] Failed to check/auto-start sequence (non-fatal):', autoStartError);
         // Non-fatal - contact is still added, user can manually start if needed
       }
-      
+
     } catch (error) {
       console.error('Error saving contact to sequence:', error);
       if (window.crm && typeof window.crm.showToast === 'function') {
@@ -1066,7 +1068,7 @@ class FreeSequenceAutomation {
       }
     }
   }
-  
+
   function updateContactCountDisplay() {
     // Update any UI elements that show contact count
     const contactCountEl = document.querySelector('.contact-count-display');
@@ -1081,7 +1083,7 @@ class FreeSequenceAutomation {
       return;
     }
     state.currentSequence = sequence;
-    
+
     // Ensure all steps have position fields (backward compatibility)
     if (Array.isArray(state.currentSequence.steps)) {
       // Sort by existing position first, then assign sequential positions
@@ -1090,20 +1092,20 @@ class FreeSequenceAutomation {
         const posB = typeof b.position === 'number' ? b.position : 999999;
         return posA - posB;
       });
-      
+
       // Assign/update position fields
       state.currentSequence.steps.forEach((step, idx) => {
         step.position = idx;
       });
     }
-    
+
     // Initialize contacts from sequence payload first (for immediate UI)
     try {
       state.contacts = Array.isArray(sequence.contacts) ? [...sequence.contacts] : [];
     } catch (_) { state.contacts = []; }
 
     // Minimize flicker: temporarily hide Sequences page while navigating
-    try { document.documentElement.classList.add('pc-hide-sequences'); } catch (_) {}
+    try { document.documentElement.classList.add('pc-hide-sequences'); } catch (_) { }
     // Navigate to the sequence-builder page using the CRM router
     if (window.crm && typeof window.crm.navigateToPage === 'function') {
       try { window.crm.navigateToPage('sequence-builder'); } catch (e) { /* noop */ }
@@ -1123,36 +1125,36 @@ class FreeSequenceAutomation {
       requestAnimationFrame(() => requestAnimationFrame(() => {
         if (container) container.style.opacity = '1';
         // Remove temporary hide class shortly after builder is visible
-        setTimeout(() => { try { document.documentElement.classList.remove('pc-hide-sequences'); } catch (_) {} }, 240);
+        setTimeout(() => { try { document.documentElement.classList.remove('pc-hide-sequences'); } catch (_) { } }, 240);
       }));
       // Return early to avoid duplicate render below
       // Note: following render() call removed to prevent double work
       return;
-    } catch (_) {}
-    
+    } catch (_) { }
+
     // Fallback render if fade-in guard failed
     render();
-    
+
     // Then load contacts from sequenceMembers collection asynchronously (don't block render)
     loadContactsFromSequenceMembers(sequence.id).catch(err => {
       console.warn('Failed to load contacts from sequenceMembers:', err);
     });
   }
-  
+
   async function loadContactsFromSequenceMembers(sequenceId) {
     try {
       const db = window.firebaseDB;
       if (!db || !sequenceId) return;
-      
+
       // Check cache first for sequenceMembers (avoid repeated Firebase queries)
       let contactIds = [];
       const cacheKey = `sequence-members-${sequenceId}`;
-      
+
       // Try to get from memory cache first (per-session)
       if (!window._sequenceMembersCache) {
         window._sequenceMembersCache = new Map();
       }
-      
+
       if (window._sequenceMembersCache.has(cacheKey)) {
         const cached = window._sequenceMembersCache.get(cacheKey);
         const cacheAge = Date.now() - cached.timestamp;
@@ -1162,38 +1164,38 @@ class FreeSequenceAutomation {
           window._sequenceMembersCache.delete(cacheKey);
         }
       }
-      
+
       // If not in cache, query Firebase
       if (contactIds.length === 0) {
         const membersQuery = await db.collection('sequenceMembers')
           .where('sequenceId', '==', sequenceId)
           .where('targetType', '==', 'people')
           .get();
-        
+
         if (membersQuery.size === 0) {
           // No members found, clear contacts
           state.contacts = [];
           return;
         }
-        
+
         // Extract contact IDs
         membersQuery.forEach(doc => {
           const data = doc.data();
           if (data.targetId) contactIds.push(data.targetId);
         });
-        
+
         // Cache the result
         window._sequenceMembersCache.set(cacheKey, {
           contactIds: contactIds,
           timestamp: Date.now()
         });
       }
-      
+
       if (contactIds.length === 0) {
         state.contacts = [];
         return;
       }
-      
+
       // Load contact details: Priority 1 - BackgroundContactsLoader (cached, zero cost)
       let loadedContacts = [];
       if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
@@ -1202,7 +1204,7 @@ class FreeSequenceAutomation {
           return peopleData.find(p => p.id === id);
         }).filter(Boolean);
       }
-      
+
       // Priority 2 - window.getPeopleData (if people.js is loaded)
       if (loadedContacts.length < contactIds.length && typeof window.getPeopleData === 'function') {
         const peopleData = window.getPeopleData() || [];
@@ -1214,7 +1216,7 @@ class FreeSequenceAutomation {
         });
         // Additional contacts loaded from window.getPeopleData
       }
-      
+
       // Priority 3 - CacheManager (still cached, zero cost)
       if (loadedContacts.length < contactIds.length && window.CacheManager && typeof window.CacheManager.get === 'function') {
         try {
@@ -1230,14 +1232,14 @@ class FreeSequenceAutomation {
           console.warn('[SequenceBuilder] CacheManager read failed:', err);
         }
       }
-      
+
       // Only fetch from Firebase if contacts are still missing (last resort - costs money)
       if (loadedContacts.length < contactIds.length) {
         const missingIds = contactIds.filter(id => !loadedContacts.find(c => c.id === id));
-        
+
         try {
           // Batch fetch missing contacts (more efficient than individual reads)
-          const contactPromises = missingIds.map(id => 
+          const contactPromises = missingIds.map(id =>
             db.collection('contacts').doc(id).get().then(doc => {
               if (doc.exists) {
                 const data = doc.data();
@@ -1250,34 +1252,34 @@ class FreeSequenceAutomation {
               return null;
             })
           );
-          
+
           const fetchedContacts = await Promise.all(contactPromises);
           const validFetched = fetchedContacts.filter(Boolean);
-          
-            if (validFetched.length < missingIds.length) {
-              const notFound = missingIds.filter(id => !validFetched.find(c => c.id === id));
-              console.warn(`[SequenceBuilder] ${notFound.length} contacts not found in Firebase - may have been deleted`);
-              
-              // Optionally clean up orphaned sequenceMembers records
-              if (notFound.length > 0) {
-                console.log(`[SequenceBuilder] To clean up orphaned records, run: await cleanupOrphanedSequenceMembers('${sequenceId}')`);
-              }
+
+          if (validFetched.length < missingIds.length) {
+            const notFound = missingIds.filter(id => !validFetched.find(c => c.id === id));
+            console.warn(`[SequenceBuilder] ${notFound.length} contacts not found in Firebase - may have been deleted`);
+
+            // Optionally clean up orphaned sequenceMembers records
+            if (notFound.length > 0) {
+              console.log(`[SequenceBuilder] To clean up orphaned records, run: await cleanupOrphanedSequenceMembers('${sequenceId}')`);
             }
-          
+          }
+
           // Merge cached and fetched contacts
           loadedContacts = [...loadedContacts, ...validFetched];
-          
+
           // Update stats.active if we have orphaned records (contacts that don't exist)
           if (loadedContacts.length < contactIds.length && state.currentSequence?.id) {
             const orphanedCount = contactIds.length - loadedContacts.length;
             console.warn(`[SequenceBuilder] Found ${orphanedCount} orphaned sequenceMembers records. stats.active may be incorrect.`);
-            
+
             // Fix stats.active to match actual loaded contacts
             try {
               const currentStats = state.currentSequence.stats || {};
               const currentActive = currentStats.active || 0;
               const correctActive = loadedContacts.length;
-              
+
               if (currentActive !== correctActive) {
                 await db.collection('sequences').doc(state.currentSequence.id).update({
                   "stats.active": correctActive,
@@ -1294,7 +1296,7 @@ class FreeSequenceAutomation {
           console.warn('[SequenceBuilder] Failed to fetch contacts from Firebase:', err);
         }
       }
-      
+
       if (loadedContacts.length > 0) {
         // Ensure all contacts have required fields
         const validContacts = loadedContacts.filter(c => {
@@ -1303,7 +1305,7 @@ class FreeSequenceAutomation {
           }
           return true;
         });
-        
+
         state.contacts = validContacts;
         // Re-render with updated contacts
         render();
@@ -1311,7 +1313,7 @@ class FreeSequenceAutomation {
         // No contacts found, update state
         state.contacts = [];
       }
-      
+
       // Update sequence recordCount if it's incorrect
       if (state.currentSequence && state.currentSequence.recordCount !== contactIds.length) {
         try {
@@ -1335,7 +1337,230 @@ class FreeSequenceAutomation {
       console.warn('Failed to load contacts from sequenceMembers:', err);
     }
   }
-  function render() {
+
+  // Helper function for pagination
+  window.changeStepsPage = function (page) {
+    if (!state.stepsViewPage) state.stepsViewPage = 1;
+    state.stepsViewPage = page;
+    render();
+  };
+
+  // Helper function to get initials
+  function getInitials(name) {
+    if (!name) return '?';
+    const parts = name.trim().split(' ').filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  }
+
+  // Render the steps view showing each contact's progress
+  async function renderStepsView() {
+    const db = window.firebaseDB;
+    if (!db || !state.currentSequence) return '';
+
+    // Load both sequenceMembers AND emails for this sequence
+    let members = [];
+    let emails = [];
+
+    // Use cached members if available
+    if (state.sequenceMembersCache && state.sequenceMembersCache.sequenceId === state.currentSequence.id) {
+      members = state.sequenceMembersCache.data;
+    } else {
+      try {
+        const membersSnapshot = await db.collection('sequenceMembers')
+          .where('sequenceId', '==', state.currentSequence.id)
+          .get();
+
+        members = membersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        state.sequenceMembersCache = {
+          sequenceId: state.currentSequence.id,
+          data: members,
+          timestamp: Date.now()
+        };
+      } catch (err) {
+        console.error('Error loading sequence members:', err);
+        return `<div class="empty-state"><div class="empty-title">Error loading contacts</div><div class="empty-desc">${err.message}</div></div>`;
+      }
+    }
+
+    // Load emails for this sequence to get actual step progress
+    try {
+      const emailsSnapshot = await db.collection('emails')
+        .where('sequenceId', '==', state.currentSequence.id)
+        .get();
+
+      emails = emailsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log(`[StepsView] Loaded ${emails.length} emails for sequence`);
+    } catch (err) {
+      console.error('Error loading emails:', err);
+      // Continue without emails - will show "Not started" for everyone
+    }
+
+    if (members.length === 0) {
+      return `
+        <div class="empty-state">
+          <div class="empty-title">No contacts in this sequence yet</div>
+          <div class="empty-desc">Add contacts to see their progress here.</div>
+        </div>`;
+    }
+
+    // Resolve contact details using CacheManager
+    let contactsMap = new Map();
+    if (window.CacheManager) {
+      try {
+        const cachedContacts = await window.CacheManager.get('contacts');
+        if (Array.isArray(cachedContacts)) {
+          cachedContacts.forEach(c => contactsMap.set(c.id, c));
+        }
+      } catch (e) {
+        console.warn('Failed to load contacts from cache:', e);
+      }
+    }
+
+    // Create a map of contactId -> latest email for that contact
+    const contactEmailMap = new Map();
+    emails.forEach(email => {
+      const contactId = email.contactId;
+      if (!contactId) return;
+
+      const existing = contactEmailMap.get(contactId);
+      // Keep the email with the highest stepIndex (most recent progress)
+      if (!existing || (email.stepIndex || 0) > (existing.stepIndex || 0)) {
+        contactEmailMap.set(contactId, email);
+      }
+    });
+
+    console.log('[StepsView] Contact-email mapping:', contactEmailMap.size, 'contacts with emails');
+
+    // Generate rows
+    const rows = members.map(member => {
+      const contact = contactsMap.get(member.targetId) || {
+        firstName: 'Unknown',
+        lastName: 'Contact',
+        email: member.targetId
+      };
+
+      const email = contact.email || (member.targetId.includes('@') ? member.targetId : '');
+      const name = contact.firstName ? `${contact.firstName} ${contact.lastName || ''}`.trim() : (contact.name || email || 'Unknown');
+      const company = contact.company || '';
+      const initials = getInitials(name);
+
+      // Find the latest email for this contact
+      const latestEmail = contactEmailMap.get(member.targetId);
+
+      // Determine next step based on latest email
+      let nextStepStr = '-';
+      let scheduledStr = '-';
+
+      if (latestEmail) {
+        const stepIndex = latestEmail.stepIndex || 0;
+        const status = latestEmail.status;
+
+        // Show current step status
+        if (status === 'sent') {
+          // Email was sent - show next step if it exists
+          const nextStepIndex = stepIndex + 1;
+          if (nextStepIndex < state.currentSequence.steps.length) {
+            const nextStep = state.currentSequence.steps[nextStepIndex];
+            nextStepStr = nextStep ? (nextStep.name || nextStep.label || `Step ${nextStepIndex + 1}`) : `Step ${nextStepIndex + 1}`;
+
+            // Check if there's an email for the next step
+            const nextEmail = emails.find(e => e.contactId === member.targetId && (e.stepIndex || 0) === nextStepIndex);
+            if (nextEmail && nextEmail.scheduledSendTime) {
+              try {
+                const date = nextEmail.scheduledSendTime.toDate ? nextEmail.scheduledSendTime.toDate() : new Date(nextEmail.scheduledSendTime);
+                scheduledStr = date.toLocaleString();
+              } catch (e) {
+                scheduledStr = '-';
+              }
+            }
+          } else {
+            nextStepStr = '<span class="badge badge-success" style="background:#d4edda; color:#155724; padding:2px 8px; border-radius:12px; font-size:0.8rem;">Completed</span>';
+          }
+        } else if (status === 'error' || status === 'failed') {
+          const currentStep = state.currentSequence.steps[stepIndex];
+          nextStepStr = `<span class="badge badge-danger" style="background:#f8d7da; color:#721c24; padding:2px 8px; border-radius:12px; font-size:0.8rem;">Error: ${currentStep ? (currentStep.name || currentStep.label || `Step ${stepIndex + 1}`) : 'Unknown'}</span>`;
+        } else {
+          // Email is pending/approved/sending - show current step
+          const currentStep = state.currentSequence.steps[stepIndex];
+          nextStepStr = currentStep ? (currentStep.name || currentStep.label || `Step ${stepIndex + 1}`) : `Step ${stepIndex + 1}`;
+
+          // Show status badge
+          const statusLabels = {
+            'not_generated': 'Generating',
+            'pending_approval': 'Pending Review',
+            'approved': 'Approved',
+            'sending': 'Sending'
+          };
+          const statusLabel = statusLabels[status] || status;
+          nextStepStr += ` <span class="badge" style="background:#fff3cd; color:#856404; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-left:4px;">${statusLabel}</span>`;
+
+          // Show scheduled time
+          if (latestEmail.scheduledSendTime) {
+            try {
+              const date = latestEmail.scheduledSendTime.toDate ? latestEmail.scheduledSendTime.toDate() : new Date(latestEmail.scheduledSendTime);
+              scheduledStr = date.toLocaleString();
+            } catch (e) {
+              scheduledStr = '-';
+            }
+          }
+        }
+      } else {
+        // No emails found for this contact - not started
+        nextStepStr = 'Not started';
+        if (member.createdAt) {
+          try {
+            const date = member.createdAt.toDate ? member.createdAt.toDate() : new Date(member.createdAt);
+            scheduledStr = `Added ${date.toLocaleDateString()}`;
+          } catch (e) {
+            scheduledStr = '-';
+          }
+        }
+      }
+
+      return `
+        <tr style="border-bottom: 1px solid var(--border-light);">
+          <td style="padding: 12px 16px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div class="avatar" style="width: 32px; height: 32px; background: var(--bg-item); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--text-secondary);">
+                ${initials}
+              </div>
+              <div>
+                <div style="font-weight: 500; color: var(--text-primary);">${escapeHtml(name)}</div>
+                ${company ? `<div style="font-size: 0.8rem; color: var(--text-secondary);">${escapeHtml(company)}</div>` : ''}
+              </div>
+            </div>
+          </td>
+          <td style="padding: 12px 16px;"><a href="mailto:${escapeHtml(email)}" style="color: var(--text-secondary); text-decoration: none;">${escapeHtml(email)}</a></td>
+          <td style="padding: 12px 16px;">${nextStepStr}</td>
+          <td style="padding: 12px 16px; color: var(--text-secondary); font-size: 0.9rem;">${scheduledStr}</td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div class="table-container">
+        <div class="table-scroll">
+          <table class="crm-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr>
+                <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; background: var(--bg-card); position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 0 var(--border-light);">Contact</th>
+                <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; background: var(--bg-card); position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 0 var(--border-light);">Email</th>
+                <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; background: var(--bg-card); position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 0 var(--border-light);">Current Step</th>
+                <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; background: var(--bg-card); position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 0 var(--border-light);">Scheduled</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  }
+
+  async function render() {
     if (!state.currentSequence || !els.mainContent) return;
 
     const seq = state.currentSequence;
@@ -1371,6 +1596,10 @@ class FreeSequenceAutomation {
           </div>
         </div>
         <div class="page-actions">
+          <div class="view-toggle" id="sequence-view-toggle">
+            <button class="toggle-btn filter-tab ${state.currentView === 'builder' ? 'active' : ''}" data-view="builder" aria-selected="${state.currentView === 'builder' ? 'true' : 'false'}">Builder</button>
+            <button class="toggle-btn filter-tab ${state.currentView === 'steps' ? 'active' : ''}" data-view="steps" aria-selected="${state.currentView === 'steps' ? 'true' : 'false'}">Steps</button>
+          </div>
           <div class="contact-search-container">
             <input type="text" id="contact-search-input" class="search-input-small" placeholder="Search contacts to add..." aria-label="Search contacts to add to sequence" />
             <div class="contact-search-results" id="contact-search-results" hidden></div>
@@ -1387,11 +1616,16 @@ class FreeSequenceAutomation {
         </div>
       </div>`;
 
-    // Body content: show empty state or current steps
+    // Body content: check current view
     let bodyHtml = '';
-    const hasSteps = Array.isArray(seq.steps) && seq.steps.length > 0;
-    if (!hasSteps) {
-      bodyHtml = `
+    if (state.currentView === 'steps') {
+      // Render steps view (contact progress)
+      bodyHtml = `<div class="steps-view-container">${await renderStepsView()}</div>`;
+    } else {
+      // Render builder view (sequence steps editor)
+      const hasSteps = Array.isArray(seq.steps) && seq.steps.length > 0;
+      if (!hasSteps) {
+        bodyHtml = `
         <div class="builder-content" id="sequence-builder-view">
           <div class="empty-state">
             <div class="empty-title">Start building your sequence</div>
@@ -1401,9 +1635,9 @@ class FreeSequenceAutomation {
             </div>
           </div>
         </div>`;
-    } else {
-      const stepsHtml = renderSteps(seq.steps);
-      bodyHtml = `
+      } else {
+        const stepsHtml = renderSteps(seq.steps);
+        bodyHtml = `
         <div class="builder-content" id="sequence-builder-view">
           <div class="sequence-steps" id="sequence-steps">
             ${stepsHtml}
@@ -1412,6 +1646,7 @@ class FreeSequenceAutomation {
             </div>
           </div>
         </div>`;
+      }
     }
 
     // Replace header
@@ -1423,7 +1658,7 @@ class FreeSequenceAutomation {
     if (pageHeader && headerEl) {
       pageHeader.id = 'sequence-builder-header';
       pageHeader.classList.add('page-header');
-          pageHeader.innerHTML = headerEl.innerHTML;
+      pageHeader.innerHTML = headerEl.innerHTML;
     } else if (pageContainer && headerEl) {
       pageContainer.prepend(headerEl);
     }
@@ -1440,7 +1675,7 @@ class FreeSequenceAutomation {
     attachEvents();
     // Attach builder specific interactions
     attachBuilderEvents();
-    
+
     // Mark all step bodies as initially rendered (no animation on first load)
     setTimeout(() => {
       const container = document.getElementById('sequence-builder-view');
@@ -1624,7 +1859,7 @@ class FreeSequenceAutomation {
     overlay.tabIndex = -1;
 
     const contacts = Array.isArray(state.contacts) ? state.contacts.slice() : [];
-    
+
     // Sort by name (case-insensitive), similar to Apollo list ordering
     contacts.sort((a, b) => {
       const an = (a.name || a.fullName || `${a.firstName || ''} ${a.lastName || ''}`).trim().toLowerCase();
@@ -1644,15 +1879,15 @@ class FreeSequenceAutomation {
            </div>
          </div>
          <div class="contact-list" role="list">${contacts.map((c) => {
-            const nameRaw = c.name || c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed Contact';
-            const name = escapeHtml(nameRaw);
-            const title = escapeHtml(c.title || c.jobTitle || '');
-            const company = escapeHtml(c.company || c.companyName || '');
-            const subtitle = (title && company) ? `${title} at ${company}` : (title || company);
-            const initials = escapeHtml(getInitials(nameRaw));
-            const cid = escapeHtml(c.id || '');
-            
-            return `
+        const nameRaw = c.name || c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed Contact';
+        const name = escapeHtml(nameRaw);
+        const title = escapeHtml(c.title || c.jobTitle || '');
+        const company = escapeHtml(c.company || c.companyName || '');
+        const subtitle = (title && company) ? `${title} at ${company}` : (title || company);
+        const initials = escapeHtml(getInitials(nameRaw));
+        const cid = escapeHtml(c.id || '');
+
+        return `
               <div class="contact-row" role="listitem" data-id="${cid}">
                 <input type="checkbox" class="row-select" aria-label="Select contact" data-id="${cid}" />
                 <div class="left">
@@ -1667,7 +1902,7 @@ class FreeSequenceAutomation {
                   <button type="button" class="action-link danger remove-contact" data-id="${cid}">Remove</button>
                 </div>
               </div>`;
-          }).join('')}</div>`;
+      }).join('')}</div>`;
 
     overlay.innerHTML = `
       <div class="step-type-modal contacts-modal" role="dialog" aria-modal="true" aria-labelledby="contacts-modal-title" aria-describedby="contacts-modal-subtitle">
@@ -1687,7 +1922,7 @@ class FreeSequenceAutomation {
     const prevActive = document.activeElement;
     const close = () => {
       if (overlay.parentElement) overlay.parentElement.removeChild(overlay);
-      try { if (prevActive && typeof prevActive.focus === 'function') prevActive.focus(); } catch (_) {}
+      try { if (prevActive && typeof prevActive.focus === 'function') prevActive.focus(); } catch (_) { }
     };
     overlay.addEventListener('click', (e) => { if (e.target === overlay || (e.target.classList && e.target.classList.contains('close-btn'))) close(); });
     overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
@@ -1707,18 +1942,18 @@ class FreeSequenceAutomation {
         try {
           const db = window.firebaseDB;
           if (!db || !state.currentSequence?.id) return;
-          
+
           const updateData = {
             contacts: state.contacts,
             recordCount: state.contacts.length,
             updatedAt: Date.now()
           };
-          
+
           // Use server timestamp if available
           if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
             updateData.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
           }
-          
+
           await db.collection('sequences').doc(state.currentSequence.id).update(updateData);
           state.currentSequence.contacts = state.contacts;
           state.currentSequence.recordCount = state.contacts.length;
@@ -1749,7 +1984,7 @@ class FreeSequenceAutomation {
 
       const removeOne = async (id) => {
         if (!id) return;
-        
+
         // Delete sequenceMembers document from Firebase
         try {
           const db = window.firebaseDB;
@@ -1760,14 +1995,14 @@ class FreeSequenceAutomation {
               .where('targetId', '==', id)
               .where('targetType', '==', 'people')
               .get();
-            
+
             // Delete all matching documents (should be just one, but handle multiple)
             const deletePromises = [];
             membersQuery.forEach(doc => {
               deletePromises.push(doc.ref.delete());
             });
             await Promise.all(deletePromises);
-            
+
             // Decrement sequence stats.active count (same as contact-detail.js)
             if (window.firebase?.firestore?.FieldValue && state.currentSequence?.id) {
               await db.collection('sequences').doc(state.currentSequence.id).update({
@@ -1778,18 +2013,18 @@ class FreeSequenceAutomation {
         } catch (err) {
           console.warn('Failed to delete sequenceMembers document:', err);
         }
-        
+
         // Update state
         const idx = state.contacts.findIndex(c => c.id === id);
         if (idx >= 0) state.contacts.splice(idx, 1);
         await persist();
-        
+
         // Invalidate sequenceMembers cache so it refreshes next time
         if (window._sequenceMembersCache && state.currentSequence?.id) {
           const cacheKey = `sequence-members-${state.currentSequence.id}`;
           window._sequenceMembersCache.delete(cacheKey);
         }
-        
+
         // Update DOM
         const row = list ? list.querySelector(`.contact-row[data-id="${CSS.escape(id)}"]`) : null;
         if (row) row.remove();
@@ -1814,7 +2049,7 @@ class FreeSequenceAutomation {
       const viewOne = (id) => {
         if (!id) return;
         // Navigate to People then open ContactDetail
-        try { window.crm && window.crm.navigateToPage && window.crm.navigateToPage('people'); } catch (_) {}
+        try { window.crm && window.crm.navigateToPage && window.crm.navigateToPage('people'); } catch (_) { }
         const tryOpen = () => {
           if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
             try { window.ContactDetail.show(id); } catch (_) { /* noop */ }
@@ -1939,7 +2174,7 @@ class FreeSequenceAutomation {
       const cancel = overlay.querySelector('.btn-text');
       const confirm = overlay.querySelector('.btn-confirm');
       if (cancel) cancel.addEventListener('click', () => close());
-      if (confirm) confirm.addEventListener('click', () => { try { onConfirm && onConfirm(); } catch (_) {} close(); });
+      if (confirm) confirm.addEventListener('click', () => { try { onConfirm && onConfirm(); } catch (_) { } close(); });
       const first = confirm || cancel || overlay.querySelector('.close-btn');
       if (first) first.focus();
     }, 0);
@@ -2019,7 +2254,7 @@ class FreeSequenceAutomation {
       anchorEl.setAttribute('aria-haspopup', 'dialog');
       anchorEl.setAttribute('aria-expanded', 'true');
       anchorEl.setAttribute('aria-controls', popId);
-    } catch (_) {}
+    } catch (_) { }
 
     // Position below toolbar, centered horizontally
     const toolbarEl = anchorEl.closest('.editor-toolbar') || anchorEl;
@@ -2034,7 +2269,7 @@ class FreeSequenceAutomation {
     pop.style.left = `${left}px`;
 
     // Mark button as expanded for accessibility
-    try { anchorEl.setAttribute('aria-expanded', 'true'); } catch (_) {}
+    try { anchorEl.setAttribute('aria-expanded', 'true'); } catch (_) { }
 
     // Tab switching
     const tabs = pop.querySelectorAll('.vars-tab');
@@ -2073,18 +2308,18 @@ class FreeSequenceAutomation {
     function cleanup() {
       document.removeEventListener('click', onDocClick, true);
       document.removeEventListener('keydown', onEsc, true);
-      try { anchorEl.setAttribute('aria-expanded', 'false'); } catch (_) {}
+      try { anchorEl.setAttribute('aria-expanded', 'false'); } catch (_) { }
       try {
         pop.classList.add('closing');
-        const removeNow = () => { try { pop.remove(); } catch (_) {} };
+        const removeNow = () => { try { pop.remove(); } catch (_) { } };
         pop.addEventListener('animationend', removeNow, { once: true });
         setTimeout(removeNow, 180);
       } catch (_) {
-        try { pop.remove(); } catch (_) {}
+        try { pop.remove(); } catch (_) { }
       }
     }
     // Expose cleanup for external toggles
-    try { pop._cleanup = cleanup; } catch (_) {}
+    try { pop._cleanup = cleanup; } catch (_) { }
     setTimeout(() => {
       document.addEventListener('click', onDocClick, true);
       document.addEventListener('keydown', onEsc, true);
@@ -2313,8 +2548,8 @@ class FreeSequenceAutomation {
             <div class="spacer"></div>
             <div class="mode-toggle" role="group" aria-label="Compose mode">
               <div class="mode-toggle-wrap" id="mode-toggle-${escapeHtml(step.id)}">
-                <button class="toggle-btn${composeMode==='manual' ? ' active' : ''}" data-mode="manual" aria-selected="${composeMode==='manual'}" title="Manual compose">Manual</button>
-                <button class="toggle-btn${composeMode==='ai' ? ' active' : ''}" data-mode="ai" aria-selected="${composeMode==='ai'}" title="AI compose">AI</button>
+                <button class="toggle-btn${composeMode === 'manual' ? ' active' : ''}" data-mode="manual" aria-selected="${composeMode === 'manual'}" title="Manual compose">Manual</button>
+                <button class="toggle-btn${composeMode === 'ai' ? ' active' : ''}" data-mode="ai" aria-selected="${composeMode === 'ai'}" title="AI compose">AI</button>
               </div>
             </div>
             <button class="icon-btn-sm settings-step" title="Email settings" aria-label="Email settings">${svgSettings()}</button>
@@ -2339,7 +2574,7 @@ class FreeSequenceAutomation {
               </div>
             </div>
             <!-- Editor toolbar: hidden in AI mode -->
-            ${composeMode==='ai' ? '' : `
+            ${composeMode === 'ai' ? '' : `
             <div class="editor-toolbar" role="toolbar" aria-label="Email editor actions">
               <button class="toolbar-btn editor-only-btn" type="button" data-action="formatting" aria-label="Text formatting" ${htmlMode ? 'disabled aria-disabled="true"' : ''}>${svgTextTitleIcon()}</button>
               <button class="toolbar-btn editor-only-btn" type="button" data-action="link" aria-label="Insert link">${svgChain()}</button>
@@ -2349,7 +2584,7 @@ class FreeSequenceAutomation {
               <button class="toolbar-btn editor-only-btn" type="button" data-action="templates" aria-label="Load templates">${svgDoc()}</button>
               <button class="toolbar-btn editor-only-btn" type="button" data-action="variables" aria-label="Add dynamic variables">${svgBraces()}</button>
             </div>`}
-            ${composeMode==='ai' ? '' : (htmlMode ? '' : renderFormattingBar())}
+            ${composeMode === 'ai' ? '' : (htmlMode ? '' : renderFormattingBar())}
             <div class="link-bar" aria-hidden="true">
               <div class="field">
                 <label class="fmt-label" for="link-text-${escapeHtml(step.id)}">Text</label>
@@ -2366,7 +2601,7 @@ class FreeSequenceAutomation {
             </div>
             <div class="tab-panels">
               <div class="tab-panel ${editorActive ? '' : 'hidden'}" data-tab="editor">
-                ${composeMode==='ai' ? `
+                ${composeMode === 'ai' ? `
                 <div class="ai-mode-note">
                   <div class="ai-stars" aria-hidden="true">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="264" height="264" role="img" focusable="false">
@@ -2391,8 +2626,8 @@ class FreeSequenceAutomation {
                 </div>
                 <div class="form-row">
                   ${htmlMode
-                    ? `<div class="html-editor-wrap"><div class="html-mode-badge" aria-hidden="true">HTML Mode</div><textarea class="textarea-dark body-input" data-editor="html" spellcheck="false">${escapeHtml(step.data?.body || '')}</textarea></div>`
-                    : `<div class="textarea-dark body-input" contenteditable="true" role="textbox" aria-multiline="true" data-editor="rich">${step.data?.body || ''}</div>`}
+          ? `<div class="html-editor-wrap"><div class="html-mode-badge" aria-hidden="true">HTML Mode</div><textarea class="textarea-dark body-input" data-editor="html" spellcheck="false">${escapeHtml(step.data?.body || '')}</textarea></div>`
+          : `<div class="textarea-dark body-input" contenteditable="true" role="textbox" aria-multiline="true" data-editor="rich">${step.data?.body || ''}</div>`}
                 </div>`}
                 ${step.data?.attachments && step.data.attachments.length ? `
                 <div class="attachments" role="group" aria-label="Attachments">
@@ -2410,7 +2645,7 @@ class FreeSequenceAutomation {
                 ` : ''}
               </div>
               <div class="tab-panel ${previewActive ? '' : 'hidden'}" data-tab="preview">
-                ${composeMode==='ai' ? `
+                ${composeMode === 'ai' ? `
                 <div class="ai-compose">
                   <div class="ai-bar open" aria-hidden="false" style="margin-bottom:12px;">
                     <div class="ai-inner">
@@ -2455,12 +2690,12 @@ class FreeSequenceAutomation {
                   </div>
                   <div class="ai-footbar" style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px;">
                     <div class="status-pill" aria-live="polite" style="font-size:12px; color: var(--text-secondary);">
-                      ${step.data?.aiStatus === 'saved' && step.data?.savedAt 
-                        ? `SAVED at ${new Date(step.data.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
-                        : escapeHtml((step.data?.aiStatus || 'draft').toUpperCase())}
+                      ${step.data?.aiStatus === 'saved' && step.data?.savedAt
+            ? `SAVED at ${new Date(step.data.savedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
+            : escapeHtml((step.data?.aiStatus || 'draft').toUpperCase())}
                     </div>
                     <div>
-                      <button class="btn-primary ai-save-to-step" ${step.data?.aiStatus==='generated' || step.data?.aiStatus==='draft' ? '' : 'disabled'}>Save to step</button>
+                      <button class="btn-primary ai-save-to-step" ${step.data?.aiStatus === 'generated' || step.data?.aiStatus === 'draft' ? '' : 'disabled'}>Save to step</button>
                     </div>
                   </div>
                 </div>
@@ -2553,15 +2788,15 @@ class FreeSequenceAutomation {
     const delayText = formatDelay(step.delayMinutes || 0);
     const shortDelay = formatDelayShort(step.delayMinutes || 0);
     const expanded = !step.collapsed;
-    
+
     // Map step types to display labels
     const typeLabels = {
       'li-connect': 'LinkedIn - send connection request',
-      'li-message': 'LinkedIn - send message', 
+      'li-message': 'LinkedIn - send message',
       'li-view-profile': 'LinkedIn - view profile',
       'li-interact-post': 'LinkedIn - interact with post'
     };
-    
+
     const labelText = escapeHtml(step.label || typeLabels[step.type] || 'LinkedIn task');
     const labelDesc = `Schedules task ${escapeHtml(shortDelay)}`;
     const labelMarkup = `
@@ -2570,14 +2805,14 @@ class FreeSequenceAutomation {
         <span class="label">${labelText}</span>
         <span class="label-desc">${labelDesc}</span>
       </span>`;
-    
+
     const priority = step.data?.priority || 'normal';
     const note = step.data?.note || '';
     const skipAfterDueEnabled = !!step.data?.skipAfterDueEnabled;
     const skipAfterDays = (Number.isFinite(Number(step.data?.skipAfterDays)) && Number(step.data?.skipAfterDays) > 0)
       ? Number(step.data.skipAfterDays)
       : 3;
-    
+
     return `
       <div class="step-item" data-id="${escapeHtml(step.id)}">
         <div class="delay-container">
@@ -2779,7 +3014,7 @@ class FreeSequenceAutomation {
 
   // Get a random CTA based on role (all = show all, finance = show finance + all)
   function getRandomCTA(role = 'all') {
-    const filtered = COLD_EMAIL_CTA_VARIANTS.filter(cta => 
+    const filtered = COLD_EMAIL_CTA_VARIANTS.filter(cta =>
       cta.role === 'all' || cta.role === role
     );
     if (filtered.length === 0) return COLD_EMAIL_CTA_VARIANTS[0].text;
@@ -2788,7 +3023,7 @@ class FreeSequenceAutomation {
   }
 
   // ========== FOLLOW-UP CTA VARIANTS ==========
-  
+
   // CTA variants for Follow-up #1 (Value Add - No Response)
   const FOLLOWUP_CTA_VARIANTS_STEP2 = [
     {
@@ -2859,7 +3094,7 @@ class FreeSequenceAutomation {
 
   // Get random CTA for follow-up #1
   function getRandomFollowUpCTA1(role = 'all') {
-    const filtered = FOLLOWUP_CTA_VARIANTS_STEP2.filter(cta => 
+    const filtered = FOLLOWUP_CTA_VARIANTS_STEP2.filter(cta =>
       cta.role === 'all' || cta.role === role
     );
     if (filtered.length === 0) return FOLLOWUP_CTA_VARIANTS_STEP2[0].text;
@@ -2869,7 +3104,7 @@ class FreeSequenceAutomation {
 
   // Get random CTA for follow-up #2
   function getRandomFollowUpCTA2(role = 'all') {
-    const filtered = FOLLOWUP_CTA_VARIANTS_STEP3.filter(cta => 
+    const filtered = FOLLOWUP_CTA_VARIANTS_STEP3.filter(cta =>
       cta.role === 'all' || cta.role === role
     );
     if (filtered.length === 0) return FOLLOWUP_CTA_VARIANTS_STEP3[0].text;
@@ -2880,7 +3115,7 @@ class FreeSequenceAutomation {
   // Build improved first email introduction prompt with dynamic CTA
   function buildFirstEmailIntroPrompt(ctaVariant = true, role = 'all') {
     const cta = ctaVariant ? getRandomCTA(role) : COLD_EMAIL_CTA_VARIANTS[0].text;
-    
+
     return `Write a cold introduction email that MUST:
 
 1. GREETING (RANDOMIZE FOR VARIETY)
@@ -2979,7 +3214,7 @@ GUARDRAILS (AVOID FAKE FEAR):
 
   function buildFollowUpValuePrompt(ctaVariant = true, role = 'all') {
     const cta = ctaVariant ? getRandomFollowUpCTA1(role) : FOLLOWUP_CTA_VARIANTS_STEP2[0].text;
-    
+
     return `Write Follow-Up #1 (DAY 2 - VALUE ADD, NO RESPONSE):
 
 CONTEXT: This is 2 days after the intro email. They haven't responded. DON'T mention the first email.
@@ -3033,7 +3268,7 @@ GUARDRAILS (AVOID FAKE FEAR):
 
   function buildFollowUpCuriosityPrompt(ctaVariant = true, role = 'all') {
     const cta = ctaVariant ? getRandomFollowUpCTA2(role) : FOLLOWUP_CTA_VARIANTS_STEP3[0].text;
-    
+
     return `Write Follow-Up #2 (DAY 5 - ADDRESS OBJECTION/FAQ):
 
 CONTEXT: This is 5 days after intro. Still no response. Address a common objection or FAQ.
@@ -3433,26 +3668,26 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     try {
       // Get email settings (step-specific or default)
       const emailSettings = step.emailSettings || getDefaultEmailSettings(isAuto);
-      
+
       // Check if signature should be included
       if (!emailSettings?.content?.includeSignature) {
         return '';
       }
-      
+
       // Get signature from settings
       const signature = window.getEmailSignature ? window.getEmailSignature() : '';
       if (!signature) return '';
-      
+
       // Check if signature image should be included
       const settings = (window.SettingsPage?.getSettings?.()) || {};
       const deliver = settings?.emailDeliverability || {};
-      
+
       // If signature image is disabled in settings, remove it from signature
       let signatureHtml = signature;
       if (deliver.signatureImageEnabled === false) {
         signatureHtml = signature.replace(/<img[^>]*alt=["']Signature["'][\s\S]*?>/gi, '');
       }
-      
+
       // Return signature HTML (will be appended to preview body)
       return signatureHtml || '';
     } catch (error) {
@@ -3468,12 +3703,12 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         ? window.SettingsPage.getSetting('general.firstName')
         : null;
       if (v && String(v).trim()) return String(v).trim();
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       const v = window.SettingsPage?.instance?.state?.settings?.general?.firstName;
       if (v && String(v).trim()) return String(v).trim();
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       const raw = localStorage.getItem('crm-settings');
@@ -3482,13 +3717,13 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         const v = parsed?.general?.firstName;
         if (v && String(v).trim()) return String(v).trim();
       }
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       const u = window.firebase?.auth?.().currentUser;
       const dn = u?.displayName || '';
       if (dn && dn.trim()) return dn.trim().split(' ')[0] || '';
-    } catch (_) {}
+    } catch (_) { }
 
     return '';
   }
@@ -3546,7 +3781,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
   // Substitute bracket-style tokens like [contact_company], [company_name], etc.
   function substituteBracketTokensInPrompt(prompt, contact) {
     if (!prompt || !contact) return prompt;
-    
+
     // Try multiple ways to get company name - prioritize account data
     let companyName = getAccountFieldFromContact(contact, 'name') || '';
     if (!companyName) {
@@ -3567,7 +3802,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         }
       }
     }
-    
+
     const contactCompany = companyName; // Same as company_name for consistency
     const contactFirstName = contact.first_name || contact.firstName || (contact.name?.split(' ')[0] || '');
     const contactName = contact.name || contact.full_name || `${contactFirstName} ${contact.last_name || contact.lastName || ''}`.trim();
@@ -3581,7 +3816,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     const companyWebsite = getAccountFieldFromContact(contact, 'website') || contact.website || contact.companyWebsite || '';
     const contactLinkedinRecentActivity = contact.linkedin_recent_activity || contact.recentActivity || '';
     const role = contactJobTitle;
-    
+
     return String(prompt)
       .replace(/\[contact_company\]/gi, companyName || '[Company Name]')
       .replace(/\[company_name\]/gi, companyName || '[Company Name]')
@@ -3648,17 +3883,17 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     try {
       // COST OPTIMIZATION: Use cache-first approach (zero Firebase queries after first load)
       let contactsData = [];
-      
+
       // Priority 1: BackgroundContactsLoader (cached, zero cost)
       if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
         contactsData = window.BackgroundContactsLoader.getContactsData() || [];
       }
-      
+
       // Priority 2: window.getPeopleData (if people.js is loaded)
       if (contactsData.length === 0 && typeof window.getPeopleData === 'function') {
         contactsData = window.getPeopleData() || [];
       }
-      
+
       // Priority 3: CacheManager (still cached, zero cost)
       if (contactsData.length === 0 && window.CacheManager && typeof window.CacheManager.get === 'function') {
         try {
@@ -3667,34 +3902,34 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           console.warn('[SequenceBuilder] CacheManager read failed:', err);
         }
       }
-      
+
       // Only fetch from Firebase if cache is completely empty (last resort - costs money)
       if (contactsData.length === 0 && window.firebaseDB) {
         console.warn('[SequenceBuilder] No cached contacts found, fetching from Firestore (costs money)');
-      const email = window.currentUserEmail || '';
-      let snapshot;
-      if (window.currentUserRole !== 'admin' && email) {
-        // Non-admin: use scoped query
-        const [ownedSnap, assignedSnap] = await Promise.all([
-          window.firebaseDB.collection('contacts').where('ownerId','==',email).get(),
-          window.firebaseDB.collection('contacts').where('assignedTo','==',email).get()
-        ]);
-        const map = new Map();
-        ownedSnap.forEach(d=>map.set(d.id, d));
-        assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
-        snapshot = { forEach: (callback) => map.forEach(callback) };
-      } else {
-        // Admin: use unfiltered query
-        snapshot = await window.firebaseDB.collection('contacts').get();
-      }
-      
+        const email = window.currentUserEmail || '';
+        let snapshot;
+        if (window.currentUserRole !== 'admin' && email) {
+          // Non-admin: use scoped query
+          const [ownedSnap, assignedSnap] = await Promise.all([
+            window.firebaseDB.collection('contacts').where('ownerId', '==', email).get(),
+            window.firebaseDB.collection('contacts').where('assignedTo', '==', email).get()
+          ]);
+          const map = new Map();
+          ownedSnap.forEach(d => map.set(d.id, d));
+          assignedSnap.forEach(d => { if (!map.has(d.id)) map.set(d.id, d); });
+          snapshot = { forEach: (callback) => map.forEach(callback) };
+        } else {
+          // Admin: use unfiltered query
+          snapshot = await window.firebaseDB.collection('contacts').get();
+        }
+
         // Convert snapshot to array
         contactsData = [];
-      snapshot.forEach(doc => {
+        snapshot.forEach(doc => {
           contactsData.push({ id: doc.id, ...doc.data() });
         });
       }
-      
+
       // Filter contacts by search query (client-side, no Firebase cost)
       const out = [];
       contactsData.forEach(person => {
@@ -4182,7 +4417,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
   let _openDelayPopover = null; // { el, cleanup }
   function closeDelayPopover() {
     if (_openDelayPopover) {
-      try { _openDelayPopover.cleanup && _openDelayPopover.cleanup(); } catch (_) {}
+      try { _openDelayPopover.cleanup && _openDelayPopover.cleanup(); } catch (_) { }
       _openDelayPopover = null;
     }
   }
@@ -4232,7 +4467,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
   }
   function createEmailSettingsHTML(settings, step) {
     const isAuto = step.type === 'auto-email';
-    
+
     // Inject CSS for email settings if not already injected
     if (!document.querySelector('#email-settings-styles')) {
       const style = document.createElement('style');
@@ -4437,7 +4672,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       `;
       document.head.appendChild(style);
     }
-    
+
     return `
       <div class="step-tabs" role="tablist">
         <button class="tab active" role="tab" data-tab="settings">Settings</button>
@@ -4671,16 +4906,20 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       aiPrompt: stepCard.querySelector('[data-setting="aiPrompt"]')?.value || ''
     };
 
-    // Find the step and update its settings
-    const step = window.sequenceBuilder?.currentSequence?.steps?.find(s => s.id === stepId);
+    // Find the step and update its settings - FIX: Use state instead of window.sequenceBuilder
+    const step = state.currentSequence?.steps?.find(s => s.id === stepId);
     if (step) {
       step.emailSettings = settings;
+      console.log('[EmailSettings] Settings saved for step:', stepId, settings);
+
+      // Persist to Firestore
       try {
         scheduleStepSave(stepId);
-        console.log('[EmailSettings] Settings saved for step:', stepId, settings);
       } catch (error) {
-        console.error('[EmailSettings] Error saving settings:', error);
+        console.error('[EmailSettings] Error scheduling save:', error);
       }
+    } else {
+      console.error('[EmailSettings] Step not found:', stepId);
     }
 
     closeEmailSettings();
@@ -4877,15 +5116,15 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     const panel = document.getElementById('sequence-contacts-panel');
     const cleanup = () => {
       if (panel && panel.parentElement) panel.parentElement.removeChild(panel);
-      try { document.removeEventListener('mousedown', _onSequenceContactsOutside, true); } catch(_) {}
-      try { window.removeEventListener('resize', _positionSequenceContactsPanel, true); } catch(_) {}
-      try { window.removeEventListener('scroll', _positionSequenceContactsPanel, true); } catch(_) {}
+      try { document.removeEventListener('mousedown', _onSequenceContactsOutside, true); } catch (_) { }
+      try { window.removeEventListener('resize', _positionSequenceContactsPanel, true); } catch (_) { }
+      try { window.removeEventListener('scroll', _positionSequenceContactsPanel, true); } catch (_) { }
       try {
         const trigger = document.getElementById('contacts-btn');
         if (trigger) {
           trigger.setAttribute('aria-expanded', 'false');
         }
-      } catch(_) {}
+      } catch (_) { }
       _positionSequenceContactsPanel = null;
       _onSequenceContactsOutside = null;
     };
@@ -4899,41 +5138,41 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
 
   function openSequenceContactsPanel(anchorEl) {
     if (document.getElementById('sequence-contacts-panel')) return;
-    
+
     injectSequenceContactsStyles();
-    
+
     const panel = document.createElement('div');
     panel.id = 'sequence-contacts-panel';
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-label', 'Sequence contacts');
-    
+
     const contacts = Array.isArray(state.contacts) ? state.contacts.slice() : [];
     const total = contacts.length;
-    
+
     // Sort by name
     contacts.sort((a, b) => {
       const an = (a.name || a.fullName || `${a.firstName || ''} ${a.lastName || ''}`).trim().toLowerCase();
       const bn = (b.name || b.fullName || `${b.firstName || ''} ${b.lastName || ''}`).trim().toLowerCase();
       return an.localeCompare(bn);
     });
-    
+
     panel.innerHTML = `
       <div class="list-header">
         <div class="list-title">Sequence Contacts (${total})</div>
         <button type="button" class="close-btn" id="sequence-contacts-close" aria-label="Close">×</button>
       </div>
       <div class="list-body" id="sequence-contacts-body">
-        ${total === 0 
-          ? '<div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">No contacts in this sequence</div><div class="list-meta">Add contacts using the search bar</div></div></div>'
-          : contacts.map(c => {
-              const nameRaw = c.name || c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed Contact';
-              const name = escapeHtml(nameRaw);
-              const title = escapeHtml(c.title || c.jobTitle || '');
-              const company = escapeHtml(c.company || c.companyName || '');
-              const initials = escapeHtml(getInitials(nameRaw));
-              const cid = escapeHtml(c.id || '');
-              
-              return `
+        ${total === 0
+        ? '<div class="list-item" tabindex="-1" aria-disabled="true"><div><div class="list-name">No contacts in this sequence</div><div class="list-meta">Add contacts using the search bar</div></div></div>'
+        : contacts.map(c => {
+          const nameRaw = c.name || c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed Contact';
+          const name = escapeHtml(nameRaw);
+          const title = escapeHtml(c.title || c.jobTitle || '');
+          const company = escapeHtml(c.company || c.companyName || '');
+          const initials = escapeHtml(getInitials(nameRaw));
+          const cid = escapeHtml(c.id || '');
+
+          return `
                 <div class="list-item" tabindex="0" data-id="${cid}">
                   <div class="name-cell__wrap">
                     <span class="avatar-initials" aria-hidden="true">${initials}</span>
@@ -4944,12 +5183,12 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                     </div>
                   </div>
                 </div>`;
-            }).join('')
-        }
+        }).join('')
+      }
       </div>`;
-    
+
     document.body.appendChild(panel);
-    
+
     // Position panel
     _positionSequenceContactsPanel = function position() {
       if (!panel || !anchorEl) return;
@@ -4958,46 +5197,46 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       const viewportHeight = window.innerHeight;
       const spaceBelow = viewportHeight - r.bottom;
       const spaceAbove = r.top;
-      
+
       // Calculate arrow position first (centered with button)
       const buttonCenter = r.left + (r.width / 2);
-      
+
       // Try to center panel with button, but keep in viewport
       const idealLeft = buttonCenter - (panelRect.width / 2);
       let left = idealLeft;
-      
+
       let placement = 'bottom';
       let top = r.bottom + 8;
-      
+
       if (spaceBelow < panelRect.height && spaceAbove > spaceBelow) {
         placement = 'top';
         top = r.top - panelRect.height - 8;
       }
-      
+
       if (left + panelRect.width > window.innerWidth - 16) {
         left = window.innerWidth - panelRect.width - 16;
       }
       if (left < 16) left = 16;
-      
+
       // Arrow position: distance from button center to panel left edge
       const arrowLeft = buttonCenter - left;
       panel.style.setProperty('--arrow-left', `${Math.max(20, Math.min(arrowLeft, panelRect.width - 20))}px`);
-      
+
       panel.style.left = `${left}px`;
       panel.style.top = `${top}px`;
       panel.setAttribute('data-placement', placement);
     };
-    
+
     _positionSequenceContactsPanel();
     // Only recalculate on resize, not on scroll (prevents modal from shifting when scrolling)
     window.addEventListener('resize', _positionSequenceContactsPanel, true);
     // Note: Scroll listener removed - modal should stay in fixed position relative to viewport
-    
+
     // Show panel with animation
     requestAnimationFrame(() => {
       panel.classList.add('--show');
     });
-    
+
     // Close button
     const closeBtn = panel.querySelector('#sequence-contacts-close');
     if (closeBtn) {
@@ -5007,7 +5246,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         closeSequenceContactsPanel();
       });
     }
-    
+
     // Click outside to close
     _onSequenceContactsOutside = (e) => {
       if (!panel.contains(e.target) && !anchorEl.contains(e.target)) {
@@ -5017,17 +5256,17 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     setTimeout(() => {
       document.addEventListener('mousedown', _onSequenceContactsOutside, true);
     }, 0);
-    
+
     // Keyboard navigation
     const onKey = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         closeSequenceContactsPanel();
-        try { anchorEl.focus(); } catch(_) {}
+        try { anchorEl.focus(); } catch (_) { }
       }
     };
     document.addEventListener('keydown', onKey, true);
-    
+
     // Contact click handler
     const body = panel.querySelector('#sequence-contacts-body');
     if (body) {
@@ -5037,15 +5276,15 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           const contactId = item.getAttribute('data-id');
           if (contactId) {
             // Navigate to contact detail
-            try { 
-              window.crm && window.crm.navigateToPage && window.crm.navigateToPage('people'); 
-            } catch (_) {}
+            try {
+              window.crm && window.crm.navigateToPage && window.crm.navigateToPage('people');
+            } catch (_) { }
             const tryOpen = () => {
               if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-                try { 
-                  window.ContactDetail.show(contactId); 
+                try {
+                  window.ContactDetail.show(contactId);
                   closeSequenceContactsPanel();
-                } catch (_) {}
+                } catch (_) { }
               } else {
                 setTimeout(tryOpen, 80);
               }
@@ -5057,12 +5296,12 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         }
       });
     }
-    
+
     // Set aria-expanded
     if (anchorEl) {
       anchorEl.setAttribute('aria-expanded', 'true');
     }
-    
+
     // Load contacts if needed
     if (state.currentSequence?.id && contacts.length === 0) {
       loadContactsFromSequenceMembers(state.currentSequence.id).then(() => {
@@ -5073,7 +5312,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             const bn = (b.name || b.fullName || `${b.firstName || ''} ${b.lastName || ''}`).trim().toLowerCase();
             return an.localeCompare(bn);
           });
-          
+
           body.innerHTML = freshContacts.map(c => {
             const nameRaw = c.name || c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed Contact';
             const name = escapeHtml(nameRaw);
@@ -5081,7 +5320,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             const company = escapeHtml(c.company || c.companyName || '');
             const initials = escapeHtml(getInitials(nameRaw));
             const cid = escapeHtml(c.id || '');
-            
+
             return `
               <div class="list-item" tabindex="0" data-id="${cid}">
                 <div class="name-cell__wrap">
@@ -5094,7 +5333,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                 </div>
               </div>`;
           }).join('');
-          
+
           // Update header count
           const titleEl = panel.querySelector('.list-title');
           if (titleEl) {
@@ -5111,7 +5350,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
   let _openDeletePopover = null; // { el, cleanup }
   function closeDeletePopover() {
     if (_openDeletePopover) {
-      try { _openDeletePopover.cleanup && _openDeletePopover.cleanup(); } catch (_) {}
+      try { _openDeletePopover.cleanup && _openDeletePopover.cleanup(); } catch (_) { }
       _openDeletePopover = null;
     }
   }
@@ -5120,7 +5359,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
   let _openAddContactPopover = null; // { el, cleanup }
   function closeAddContactPopover() {
     if (_openAddContactPopover) {
-      try { _openAddContactPopover.cleanup && _openAddContactPopover.cleanup(); } catch (_) {}
+      try { _openAddContactPopover.cleanup && _openAddContactPopover.cleanup(); } catch (_) { }
       _openAddContactPopover = null;
     }
   }
@@ -5200,7 +5439,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     const confirmBtn = pop.querySelector('.btn-confirm');
     cancelBtn?.addEventListener('click', () => closeAddContactPopover());
     confirmBtn?.addEventListener('click', async () => {
-      try { await addContactToSequence(contact); } catch (_) {}
+      try { await addContactToSequence(contact); } catch (_) { }
       closeAddContactPopover();
     });
 
@@ -5216,13 +5455,13 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         window.removeEventListener('scroll', position, true);
         try {
           pop.classList.add('closing');
-          const removeNow = () => { try { pop.remove(); } catch (_) {} };
+          const removeNow = () => { try { pop.remove(); } catch (_) { } };
           pop.addEventListener('animationend', removeNow, { once: true });
           setTimeout(removeNow, 180);
         } catch (_) {
-          try { pop.remove(); } catch (_) {}
+          try { pop.remove(); } catch (_) { }
         }
-        try { anchorEl.blur && anchorEl.blur(); } catch (_) {}
+        try { anchorEl.blur && anchorEl.blur(); } catch (_) { }
       }
     };
   }
@@ -5324,29 +5563,29 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         window.removeEventListener('scroll', position, true);
         try {
           pop.classList.add('closing');
-          const removeNow = () => { try { pop.remove(); } catch (_) {} };
+          const removeNow = () => { try { pop.remove(); } catch (_) { } };
           pop.addEventListener('animationend', removeNow, { once: true });
           setTimeout(removeNow, 180);
         } catch (_) {
-          try { pop.remove(); } catch (_) {}
+          try { pop.remove(); } catch (_) { }
         }
         // Blur the trigger so any hover/focus-reveal actions hide after cancel
-        try { anchorEl.blur && anchorEl.blur(); } catch (_) {}
+        try { anchorEl.blur && anchorEl.blur(); } catch (_) { }
       }
     };
   }
-  
+
   function openEmailSettings(anchorEl, step) {
     if (!anchorEl || !step) return;
-    
+
     // Close any other open settings first
     closeEmailSettings();
-    
+
     // Set the step to show settings instead of editor
     step.showSettings = true;
     step.collapsed = false; // Expand to show settings
     render();
-    
+
     // Wire up AI suggestion events after render
     setTimeout(() => {
       const stepCard = document.querySelector(`[data-step-id="${step.id}"]`);
@@ -5355,13 +5594,13 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         aiSuggestions.forEach(btn => {
           btn.addEventListener('click', (e) => {
             e.preventDefault();
-            
+
             // Check if this button uses dynamic templates
             const isVariant = btn.getAttribute('data-cta-variant') === 'true';
             const template = btn.getAttribute('data-prompt-template');
-            
+
             let prompt;
-            
+
             if (template) {
               // Handle template-based prompts
               switch (template) {
@@ -5371,81 +5610,81 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                   const stepId = stepCard.getAttribute('data-step-id');
                   const step = state.currentSequence?.steps?.find(s => s.id === stepId);
                   const contactRole = step?.data?.previewContact?.title || step?.data?.previewContact?.job || 'all';
-                  
+
                   // Determine if finance role for CTA selection
-                  const role = (contactRole && typeof contactRole === 'string' && 
-                               (contactRole.toLowerCase().includes('finance') || 
-                                contactRole.toLowerCase().includes('cfo') || 
-                                contactRole.toLowerCase().includes('controller') ||
-                                contactRole.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
-                  
+                  const role = (contactRole && typeof contactRole === 'string' &&
+                    (contactRole.toLowerCase().includes('finance') ||
+                      contactRole.toLowerCase().includes('cfo') ||
+                      contactRole.toLowerCase().includes('controller') ||
+                      contactRole.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
+
                   prompt = buildFirstEmailIntroPrompt(true, role);
                   break;
-                  
+
                 case 'follow-up-value':
                   // Try to detect role from step or contact if available
                   const stepId2 = stepCard.getAttribute('data-step-id');
                   const step2 = state.currentSequence?.steps?.find(s => s.id === stepId2);
                   const contactRole2 = step2?.data?.previewContact?.title || step2?.data?.previewContact?.job || 'all';
-                  
+
                   // Determine if finance role for CTA selection
-                  const role2 = (contactRole2 && typeof contactRole2 === 'string' && 
-                               (contactRole2.toLowerCase().includes('finance') || 
-                                contactRole2.toLowerCase().includes('cfo') || 
-                                contactRole2.toLowerCase().includes('controller') ||
-                                contactRole2.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
-                  
+                  const role2 = (contactRole2 && typeof contactRole2 === 'string' &&
+                    (contactRole2.toLowerCase().includes('finance') ||
+                      contactRole2.toLowerCase().includes('cfo') ||
+                      contactRole2.toLowerCase().includes('controller') ||
+                      contactRole2.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
+
                   prompt = buildFollowUpValuePrompt(true, role2);
                   break;
-                  
+
                 case 'follow-up-curiosity':
                   // Try to detect role from step or contact if available
                   const stepId3 = stepCard.getAttribute('data-step-id');
                   const step3 = state.currentSequence?.steps?.find(s => s.id === stepId3);
                   const contactRole3 = step3?.data?.previewContact?.title || step3?.data?.previewContact?.job || 'all';
-                  
+
                   // Determine if finance role for CTA selection
-                  const role3 = (contactRole3 && typeof contactRole3 === 'string' && 
-                               (contactRole3.toLowerCase().includes('finance') || 
-                                contactRole3.toLowerCase().includes('cfo') || 
-                                contactRole3.toLowerCase().includes('controller') ||
-                                contactRole3.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
-                  
+                  const role3 = (contactRole3 && typeof contactRole3 === 'string' &&
+                    (contactRole3.toLowerCase().includes('finance') ||
+                      contactRole3.toLowerCase().includes('cfo') ||
+                      contactRole3.toLowerCase().includes('controller') ||
+                      contactRole3.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
+
                   prompt = buildFollowUpCuriosityPrompt(true, role3);
                   break;
-                  
+
                 case 'nurture-value':
                   prompt = buildNurtureValuePrompt();
                   break;
-                  
+
                 case 'post-convo-recap':
                   prompt = buildPostConvoRecapPrompt();
                   break;
-                  
+
                 case 'info-request-bill':
                   prompt = buildInfoRequestBillPrompt();
                   break;
-                  
+
                 case 'final-ask-close':
                   prompt = buildFinalAskClosePrompt();
                   break;
-                  
+
                 case 'objection-all-set':
                   prompt = buildObjectionAllSetPrompt();
                   break;
-                  
+
                 case 'objection-interested':
                   prompt = buildObjectionInterestedPrompt();
                   break;
-                  
+
                 case 'objection-not-interested':
                   prompt = buildObjectionNotInterestedPrompt();
                   break;
-                  
+
                 case 'breakup-email':
                   prompt = buildBreakupEmailPrompt();
                   break;
-                  
+
                 default:
                   // Fallback to static prompt
                   prompt = btn.getAttribute('data-prompt');
@@ -5454,7 +5693,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               // Use static prompt
               prompt = btn.getAttribute('data-prompt');
             }
-            
+
             const textarea = stepCard.querySelector('[data-setting="aiPrompt"]');
             if (textarea && prompt) {
               textarea.value = prompt;
@@ -5512,7 +5751,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       </div>
     `;
     document.body.appendChild(pop);
-    
+
     // Position under anchor, centered horizontally, with viewport clamping and caret alignment
     const position = () => {
       const iconCandidate = anchorEl.querySelector('.icon-btn-sm, .icon, svg, i');
@@ -5546,7 +5785,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       pop.style.visibility = 'visible';
     };
     position();
-    
+
     const modeRadios = Array.from(pop.querySelectorAll('input[name="delay-mode"]'));
     const amountEl = pop.querySelector('input[type="number"]');
     const unitEl = pop.querySelector('select.unit-select');
@@ -5560,7 +5799,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     };
     setDisabled();
     modeRadios.forEach(r => r.addEventListener('change', setDisabled));
-    
+
     const toMinutes = () => {
       const mode = (modeRadios.find(r => r.checked)?.value) || 'immediate';
       if (mode === 'immediate') return 0;
@@ -5570,7 +5809,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       if (unit === 'hours') return Math.min(10080, amt * 60);
       return Math.min(10080, amt);
     };
-    
+
     const apply = () => {
       const mins = toMinutes();
       step.delayMinutes = mins;
@@ -5578,10 +5817,10 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       closeDelayPopover();
       render();
     };
-    
+
     applyBtn.addEventListener('click', apply);
     cancelBtn.addEventListener('click', () => closeDelayPopover());
-    
+
     // Focus management and trap
     const focusables = () => Array.from(pop.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter(el => !el.disabled && el.offsetParent !== null);
     const firstFocusable = () => focusables()[0];
@@ -5616,7 +5855,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       }
     };
     document.addEventListener('keydown', onKey, true);
-    
+
     // Outside click to close
     const onDocPointer = (e) => {
       if (pop.contains(e.target) || anchorEl.contains(e.target)) return;
@@ -5627,13 +5866,13 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       window.addEventListener('resize', position);
       window.addEventListener('scroll', position, true);
     }, 0);
-    
+
     // Initial focus
     const initial = pop.querySelector('input[name="delay-mode"][value="immediate"]');
     if (existingMinutes === 0 && initial) initial.focus();
     else if (amountEl && !amountEl.disabled) amountEl.focus();
     else if (firstFocusable()) firstFocusable().focus();
-    
+
     _openDelayPopover = {
       el: pop,
       cleanup: () => {
@@ -5644,19 +5883,19 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         // Play closing animation then remove
         try {
           pop.classList.add('closing');
-          const removeNow = () => { try { pop.remove(); } catch (_) {} };
+          const removeNow = () => { try { pop.remove(); } catch (_) { } };
           pop.addEventListener('animationend', removeNow, { once: true });
           // Safety timeout in case animationend doesn't fire
           setTimeout(removeNow, 180);
         } catch (_) {
-          try { pop.remove(); } catch (_) {}
+          try { pop.remove(); } catch (_) { }
         }
         // Return focus to the anchor for accessibility
         try {
           anchorEl.setAttribute('aria-expanded', 'false');
           anchorEl.removeAttribute('aria-controls');
           anchorEl.focus();
-        } catch (_) {}
+        } catch (_) { }
       }
     };
   }
@@ -5666,6 +5905,23 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     if (backBtn) {
       backBtn.addEventListener('click', () => {
         try { window.crm && window.crm.navigateToPage('sequences'); } catch (e) { /* noop */ }
+      });
+    }
+
+    // View toggle click handler (Builder / Steps)
+    const viewToggle = document.getElementById('sequence-view-toggle');
+    if (viewToggle) {
+      viewToggle.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button.toggle-btn');
+        if (!btn) return;
+        const newView = btn.getAttribute('data-view');
+        if (!newView || newView === state.currentView) return;
+
+        // Update state
+        state.currentView = newView;
+
+        // Re-render
+        await render();
       });
     }
 
@@ -5704,7 +5960,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     // Contact search functionality
     const contactSearchInput = document.getElementById('contact-search-input');
     const contactSearchResults = document.getElementById('contact-search-results');
-    
+
     if (contactSearchInput && contactSearchResults) {
       let searchTimeout;
 
@@ -5835,7 +6091,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       });
     };
     if (input) {
-      setTimeout(() => { try { input.focus(); input.select && input.select(); } catch (_) {} }, 0);
+      setTimeout(() => { try { input.focus(); input.select && input.select(); } catch (_) { } }, 0);
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') { e.preventDefault(); doSave(); }
         else if (e.key === 'Escape') { e.preventDefault(); doCancel(); }
@@ -5855,48 +6111,48 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         const id = card?.getAttribute('data-id');
         const step = state.currentSequence.steps.find(s => s.id === id);
         if (!step) return;
-        
+
         const stepBody = card.querySelector('.step-body');
         if (!stepBody) {
           // Fallback to simple toggle if body not found
-        step.collapsed = !step.collapsed;
-        render();
+          step.collapsed = !step.collapsed;
+          render();
           return;
         }
-        
+
         const isCollapsed = step.collapsed;
         // Skip animation on initial render
         const isInitialRender = stepBody.dataset.initialRender === 'true';
         if (isInitialRender) {
           stepBody.dataset.initialRender = 'false';
         }
-        
+
         if (isCollapsed) {
           // Expand
           step.collapsed = false;
           stepBody.removeAttribute('hidden');
-          
+
           if (isInitialRender) {
             // No animation on initial render
             btn.setAttribute('aria-expanded', 'true');
             btn.innerHTML = svgChevronDown();
             return;
           }
-          
+
           // Get natural height
           const naturalHeight = stepBody.scrollHeight;
           const naturalPaddingTop = window.getComputedStyle(stepBody).paddingTop;
           const naturalPaddingBottom = window.getComputedStyle(stepBody).paddingBottom;
-          
+
           // Set initial state
           stepBody.style.height = '0';
           stepBody.style.opacity = '0';
           stepBody.style.paddingTop = '0';
           stepBody.style.paddingBottom = '0';
-          
+
           // Force reflow
           void stepBody.offsetHeight;
-          
+
           // Animate to natural height
           requestAnimationFrame(() => {
             stepBody.style.transition = 'height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, padding 0.4s ease';
@@ -5904,7 +6160,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             stepBody.style.opacity = '1';
             stepBody.style.paddingTop = naturalPaddingTop;
             stepBody.style.paddingBottom = naturalPaddingBottom;
-            
+
             // Clean up after animation
             setTimeout(() => {
               stepBody.style.height = '';
@@ -5913,7 +6169,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               stepBody.style.paddingBottom = '';
             }, 400);
           });
-          
+
           // Update button icon
           btn.setAttribute('aria-expanded', 'true');
           btn.innerHTML = svgChevronDown();
@@ -5927,19 +6183,19 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             btn.innerHTML = svgChevronRight();
             return;
           }
-          
+
           const currentHeight = stepBody.scrollHeight;
           const currentPaddingTop = window.getComputedStyle(stepBody).paddingTop;
           const currentPaddingBottom = window.getComputedStyle(stepBody).paddingBottom;
-          
+
           // Set explicit height before animating
           stepBody.style.height = currentHeight + 'px';
           stepBody.style.paddingTop = currentPaddingTop;
           stepBody.style.paddingBottom = currentPaddingBottom;
-          
+
           // Force reflow
           void stepBody.offsetHeight;
-          
+
           // Animate to 0
           requestAnimationFrame(() => {
             step.collapsed = true;
@@ -5948,7 +6204,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             stepBody.style.opacity = '0';
             stepBody.style.paddingTop = '0';
             stepBody.style.paddingBottom = '0';
-            
+
             // Set hidden after animation completes
             setTimeout(() => {
               stepBody.setAttribute('hidden', '');
@@ -5958,12 +6214,12 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               stepBody.style.paddingBottom = '';
             }, 400);
           });
-          
+
           // Update button icon
           btn.setAttribute('aria-expanded', 'false');
           btn.innerHTML = svgChevronRight();
         }
-        
+
         // Save the collapsed state
         try { scheduleStepSave(step.id, false); } catch (_) { /* noop */ }
       });
@@ -6051,7 +6307,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             b.setAttribute('aria-selected', on ? 'true' : 'false');
           });
         }
-        try { scheduleStepSave(step.id); } catch (_) {}
+        try { scheduleStepSave(step.id); } catch (_) { }
         render();
       });
     });
@@ -6093,7 +6349,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         const id = card?.getAttribute('data-id');
         const step = state.currentSequence.steps.find(s => s.id === id);
         if (!step) return;
-        
+
         // Toggle: if settings are already shown, close them; otherwise open
         if (step.showSettings) {
           closeEmailSettings();
@@ -6478,7 +6734,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             break;
           }
           case 'templates': {
-            try { window.crm && window.crm.showToast && window.crm.showToast('Templates coming soon'); } catch (_) {}
+            try { window.crm && window.crm.showToast && window.crm.showToast('Templates coming soon'); } catch (_) { }
             break;
           }
           case 'variables': {
@@ -6506,7 +6762,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               else existingPopover.remove();
             } else if (existingVarsModal) {
               existingVarsModal.remove();
-              try { btn.setAttribute('aria-expanded', 'false'); } catch (_) {}
+              try { btn.setAttribute('aria-expanded', 'false'); } catch (_) { }
             } else {
               open();
             }
@@ -6518,147 +6774,147 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       });
     });
 
-  // Helper functions for AI email formatting
-  function formatTemplatedEmail(result, recipient, templateType) {
-    try {
-      // Clean all string fields in result to remove citations
-      if (result && typeof result === 'object') {
-        Object.keys(result).forEach(key => {
-          if (typeof result[key] === 'string') {
-            result[key] = result[key].replace(/\[\d+\]/g, '').trim();
-          } else if (Array.isArray(result[key])) {
-            result[key] = result[key].map(item => 
-              typeof item === 'string' ? item.replace(/\[\d+\]/g, '').trim() : item
-            );
-          }
-        });
-      }
-      
-      const subject = (result.subject || 'Energy Solutions');
-      const html = result.output || result.html || '<p>Email content</p>';
-      // Light de-salesify on subject only (avoid mutating structured HTML templates)
-      const cleanSubject = String(subject)
-        .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
-        .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
-        .replace(/\bPower Choosers helps\b/gi, 'We help')
-        .replace(/\bPower Choosers can help\b/gi, 'We can help')
-        .replace(/\bPower Choosers\b/gi, 'We');
-      // HTML content is already cleaned above
-      const cleanHtml = String(html);
-      return { subject: cleanSubject, html: cleanHtml };
-    } catch (error) {
-      console.error('Error formatting templated email:', error);
-      return { subject: 'Energy Solutions', html: '<p>Error generating email content.</p>' };
-    }
-  }
-
-  function formatGeneratedEmail(result, recipient, mode) {
-    try {
-      // Resolve sender first name robustly
-      const senderFirst = getSenderFirstName();
-
-      // Handle JSON response format
-      let jsonData = null;
+    // Helper functions for AI email formatting
+    function formatTemplatedEmail(result, recipient, templateType) {
       try {
-        const jsonText = String(result || '').trim()
-          .replace(/^\s*```json\s*/i, '')
-          .replace(/^\s*```\s*/i, '')
-          .replace(/\s*```\s*$/i, '');
-        const match = jsonText.match(/\{[\s\S]*\}/);
-        if (match) {
-          jsonData = JSON.parse(match[0]);
+        // Clean all string fields in result to remove citations
+        if (result && typeof result === 'object') {
+          Object.keys(result).forEach(key => {
+            if (typeof result[key] === 'string') {
+              result[key] = result[key].replace(/\[\d+\]/g, '').trim();
+            } else if (Array.isArray(result[key])) {
+              result[key] = result[key].map(item =>
+                typeof item === 'string' ? item.replace(/\[\d+\]/g, '').trim() : item
+              );
+            }
+          });
         }
-      } catch (_) {
-        // Not JSON, use as-is
-      }
 
-      if (jsonData) {
-        // Clean all string fields in jsonData to remove citations
-        Object.keys(jsonData).forEach(key => {
-          if (typeof jsonData[key] === 'string') {
-            jsonData[key] = jsonData[key].replace(/\[\d+\]/g, '').trim();
-          } else if (Array.isArray(jsonData[key])) {
-            jsonData[key] = jsonData[key].map(item => 
-              typeof item === 'string' ? item.replace(/\[\d+\]/g, '').trim() : item
-            );
-          }
-        });
-        
-        const subject = (jsonData.subject || 'Energy Solutions')
+        const subject = (result.subject || 'Energy Solutions');
+        const html = result.output || result.html || '<p>Email content</p>';
+        // Light de-salesify on subject only (avoid mutating structured HTML templates)
+        const cleanSubject = String(subject)
           .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
           .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
           .replace(/\bPower Choosers helps\b/gi, 'We help')
           .replace(/\bPower Choosers can help\b/gi, 'We can help')
           .replace(/\bPower Choosers\b/gi, 'We');
-        const paragraphs = [];
-        if (jsonData.greeting) paragraphs.push(jsonData.greeting);
-        if (jsonData.paragraph1) paragraphs.push(jsonData.paragraph1);
-        if (jsonData.paragraph2) paragraphs.push(jsonData.paragraph2);
-        if (jsonData.paragraph3) paragraphs.push(jsonData.paragraph3);
-
-        // Always enforce closing as "Best regards, <FirstName>"
-        const enforcedClosing = `Best regards,\n${senderFirst}`;
-        paragraphs.push(enforcedClosing);
-
-        // De-salesify body text (plain paragraphs only; not HTML templates)
-        const body = paragraphs.join('\n\n')
-          .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
-          .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
-          .replace(/\bPower Choosers helps\b/gi, 'We help')
-          .replace(/\bPower Choosers can help\b/gi, 'We can help')
-          .replace(/\bPower Choosers\b/gi, 'We');
-
-        // Convert to HTML with readable color
-        const htmlBody = body
-          .split(/\n\n/)
-          .map(p => p.trim())
-          .filter(Boolean)
-          .map(p => {
-            const withLineBreaks = p.replace(/\n/g, '<br>');
-            return `<p style="margin: 0 0 16px 0; color:#222;">${withLineBreaks}</p>`;
-          })
-          .join('');
-
-        return { subject, html: htmlBody };
-      } else {
-        // Fallback: treat as plain text
-        const subject = 'Energy Solutions';
-        const raw = String(result || 'Email content');
-        const sanitizedRaw = raw
-          .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
-          .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
-          .replace(/\bPower Choosers helps\b/gi, 'We help')
-          .replace(/\bPower Choosers can help\b/gi, 'We can help')
-          .replace(/\bPower Choosers\b/gi, 'We')
-          .replace(/\[\d+\]/g, ''); // Remove citation brackets
-        const hasClosing = /best\s*regards[\s,]*$/i.test(sanitizedRaw.trim());
-        const appended = hasClosing ? sanitizedRaw : `${sanitizedRaw}\n\nBest regards,\n${senderFirst}`;
-        const html = '<p style="color:#222;">'
-          + appended.replace(/\n\n/g, '</p><p style="color:#222;">').replace(/\n/g, '<br>')
-          + '</p>';
-        return { subject, html };
+        // HTML content is already cleaned above
+        const cleanHtml = String(html);
+        return { subject: cleanSubject, html: cleanHtml };
+      } catch (error) {
+        console.error('Error formatting templated email:', error);
+        return { subject: 'Energy Solutions', html: '<p>Error generating email content.</p>' };
       }
-    } catch (error) {
-      console.error('Error formatting generated email:', error);
-      return { subject: 'Energy Solutions', html: '<p>Error generating email content.</p>' };
     }
-  }
+
+    function formatGeneratedEmail(result, recipient, mode) {
+      try {
+        // Resolve sender first name robustly
+        const senderFirst = getSenderFirstName();
+
+        // Handle JSON response format
+        let jsonData = null;
+        try {
+          const jsonText = String(result || '').trim()
+            .replace(/^\s*```json\s*/i, '')
+            .replace(/^\s*```\s*/i, '')
+            .replace(/\s*```\s*$/i, '');
+          const match = jsonText.match(/\{[\s\S]*\}/);
+          if (match) {
+            jsonData = JSON.parse(match[0]);
+          }
+        } catch (_) {
+          // Not JSON, use as-is
+        }
+
+        if (jsonData) {
+          // Clean all string fields in jsonData to remove citations
+          Object.keys(jsonData).forEach(key => {
+            if (typeof jsonData[key] === 'string') {
+              jsonData[key] = jsonData[key].replace(/\[\d+\]/g, '').trim();
+            } else if (Array.isArray(jsonData[key])) {
+              jsonData[key] = jsonData[key].map(item =>
+                typeof item === 'string' ? item.replace(/\[\d+\]/g, '').trim() : item
+              );
+            }
+          });
+
+          const subject = (jsonData.subject || 'Energy Solutions')
+            .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
+            .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
+            .replace(/\bPower Choosers helps\b/gi, 'We help')
+            .replace(/\bPower Choosers can help\b/gi, 'We can help')
+            .replace(/\bPower Choosers\b/gi, 'We');
+          const paragraphs = [];
+          if (jsonData.greeting) paragraphs.push(jsonData.greeting);
+          if (jsonData.paragraph1) paragraphs.push(jsonData.paragraph1);
+          if (jsonData.paragraph2) paragraphs.push(jsonData.paragraph2);
+          if (jsonData.paragraph3) paragraphs.push(jsonData.paragraph3);
+
+          // Always enforce closing as "Best regards, <FirstName>"
+          const enforcedClosing = `Best regards,\n${senderFirst}`;
+          paragraphs.push(enforcedClosing);
+
+          // De-salesify body text (plain paragraphs only; not HTML templates)
+          const body = paragraphs.join('\n\n')
+            .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
+            .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
+            .replace(/\bPower Choosers helps\b/gi, 'We help')
+            .replace(/\bPower Choosers can help\b/gi, 'We can help')
+            .replace(/\bPower Choosers\b/gi, 'We');
+
+          // Convert to HTML with readable color
+          const htmlBody = body
+            .split(/\n\n/)
+            .map(p => p.trim())
+            .filter(Boolean)
+            .map(p => {
+              const withLineBreaks = p.replace(/\n/g, '<br>');
+              return `<p style="margin: 0 0 16px 0; color:#222;">${withLineBreaks}</p>`;
+            })
+            .join('');
+
+          return { subject, html: htmlBody };
+        } else {
+          // Fallback: treat as plain text
+          const subject = 'Energy Solutions';
+          const raw = String(result || 'Email content');
+          const sanitizedRaw = raw
+            .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
+            .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
+            .replace(/\bPower Choosers helps\b/gi, 'We help')
+            .replace(/\bPower Choosers can help\b/gi, 'We can help')
+            .replace(/\bPower Choosers\b/gi, 'We')
+            .replace(/\[\d+\]/g, ''); // Remove citation brackets
+          const hasClosing = /best\s*regards[\s,]*$/i.test(sanitizedRaw.trim());
+          const appended = hasClosing ? sanitizedRaw : `${sanitizedRaw}\n\nBest regards,\n${senderFirst}`;
+          const html = '<p style="color:#222;">'
+            + appended.replace(/\n\n/g, '</p><p style="color:#222;">').replace(/\n/g, '<br>')
+            + '</p>';
+          return { subject, html };
+        }
+      } catch (error) {
+        console.error('Error formatting generated email:', error);
+        return { subject: 'Energy Solutions', html: '<p>Error generating email content.</p>' };
+      }
+    }
     // AI bar interactions (event delegation per step-card) – only present in AI mode in Preview
     container.querySelectorAll('.step-card .ai-bar').forEach(bar => {
       // Get card reference for this bar
       const card = bar.closest('.step-card');
-      
+
       // AI suggestion buttons
       bar.querySelectorAll('.ai-suggestion').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
-          
+
           // Check if this button uses dynamic templates
           const isVariant = btn.getAttribute('data-cta-variant') === 'true';
           const template = btn.getAttribute('data-prompt-template');
-          
+
           let prompt;
-          
+
           if (template) {
             // Handle template-based prompts
             switch (template) {
@@ -6669,79 +6925,79 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                 const step = state.currentSequence?.steps?.find(s => s.id === stepId);
                 const selectedContact = step?.data?.previewContact;
                 const contactRole = selectedContact?.title || selectedContact?.job || selectedContact?.role || 'all';
-                
+
                 // Determine if finance role for CTA selection
-                const role = (contactRole && typeof contactRole === 'string' && 
-                             (contactRole.toLowerCase().includes('finance') || 
-                              contactRole.toLowerCase().includes('cfo') || 
-                              contactRole.toLowerCase().includes('controller') ||
-                              contactRole.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
-                
+                const role = (contactRole && typeof contactRole === 'string' &&
+                  (contactRole.toLowerCase().includes('finance') ||
+                    contactRole.toLowerCase().includes('cfo') ||
+                    contactRole.toLowerCase().includes('controller') ||
+                    contactRole.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
+
                 prompt = buildFirstEmailIntroPrompt(true, role);
                 break;
-                
+
               case 'follow-up-value':
                 // Try to detect role from selected contact if available
                 const stepId2 = card?.getAttribute('data-id');
                 const step2 = state.currentSequence?.steps?.find(s => s.id === stepId2);
                 const selectedContact2 = step2?.data?.previewContact;
                 const contactRole2 = selectedContact2?.title || selectedContact2?.job || selectedContact2?.role || 'all';
-                
+
                 // Determine if finance role for CTA selection
-                const role2 = (contactRole2 && typeof contactRole2 === 'string' && 
-                             (contactRole2.toLowerCase().includes('finance') || 
-                              contactRole2.toLowerCase().includes('cfo') || 
-                              contactRole2.toLowerCase().includes('controller') ||
-                              contactRole2.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
-                
+                const role2 = (contactRole2 && typeof contactRole2 === 'string' &&
+                  (contactRole2.toLowerCase().includes('finance') ||
+                    contactRole2.toLowerCase().includes('cfo') ||
+                    contactRole2.toLowerCase().includes('controller') ||
+                    contactRole2.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
+
                 prompt = buildFollowUpValuePrompt(true, role2);
                 break;
-                
+
               case 'follow-up-curiosity':
                 // Try to detect role from selected contact if available
                 const stepId3 = card?.getAttribute('data-id');
                 const step3 = state.currentSequence?.steps?.find(s => s.id === stepId3);
                 const selectedContact3 = step3?.data?.previewContact;
                 const contactRole3 = selectedContact3?.title || selectedContact3?.job || selectedContact3?.role || 'all';
-                
+
                 // Determine if finance role for CTA selection
-                const role3 = (contactRole3 && typeof contactRole3 === 'string' && 
-                             (contactRole3.toLowerCase().includes('finance') || 
-                              contactRole3.toLowerCase().includes('cfo') || 
-                              contactRole3.toLowerCase().includes('controller') ||
-                              contactRole3.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
-                
+                const role3 = (contactRole3 && typeof contactRole3 === 'string' &&
+                  (contactRole3.toLowerCase().includes('finance') ||
+                    contactRole3.toLowerCase().includes('cfo') ||
+                    contactRole3.toLowerCase().includes('controller') ||
+                    contactRole3.toLowerCase().includes('accounting'))) ? 'finance' : 'all';
+
                 prompt = buildFollowUpCuriosityPrompt(true, role3);
                 break;
-                
+
               case 'nurture-value':
                 prompt = buildNurtureValuePrompt();
                 break;
-                
+
               case 'post-convo-recap':
                 prompt = buildPostConvoRecapPrompt();
                 break;
-                
+
               case 'info-request-bill':
                 prompt = buildInfoRequestBillPrompt();
                 break;
-                
+
               case 'final-ask-close':
                 prompt = buildFinalAskClosePrompt();
                 break;
-                
+
               case 'objection-all-set':
                 prompt = buildObjectionAllSetPrompt();
                 break;
-                
+
               case 'objection-interested':
                 prompt = buildObjectionInterestedPrompt();
                 break;
-                
+
               case 'objection-not-interested':
                 prompt = buildObjectionNotInterestedPrompt();
                 break;
-                
+
               case 'breakup-email':
                 prompt = buildBreakupEmailPrompt();
                 break;
@@ -6754,7 +7010,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             // Use static prompt
             prompt = btn.getAttribute('data-prompt');
           }
-          
+
           const textarea = bar.querySelector('.ai-prompt');
           if (textarea && prompt) {
             textarea.value = prompt;
@@ -6770,37 +7026,37 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           const textarea = bar.querySelector('.ai-prompt');
           const status = bar.querySelector('.ai-status');
           const mode = btn.getAttribute('data-mode');
-          
+
           if (!textarea) return;
-          
+
           // Check if we're in Preview tab
           const previewTab = card.querySelector('.tab[data-tab="preview"]');
           const isPreviewActive = previewTab?.classList.contains('active');
-          
+
           if (!isPreviewActive) {
             if (status) status.textContent = 'Switch to Preview tab to generate';
             return;
           }
-          
+
           // Get step data and selected contact
           const stepId = card.getAttribute('data-id');
           const step = state.currentSequence?.steps?.find(s => s.id === stepId);
           const selectedContact = step?.data?.previewContact;
-          
+
           if (!selectedContact) {
             if (status) status.textContent = 'Please select a contact in Preview tab';
             return;
           }
-          
+
           const prompt = textarea.value.trim();
           if (!prompt) {
             if (status) status.textContent = 'Please enter a prompt';
             return;
           }
-          
+
           if (status) status.textContent = 'Generating preview...';
           btn.disabled = true;
-          
+
           try {
             // Call AI generation API with selected contact data
             const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
@@ -6811,12 +7067,12 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             const aiTemplates = settings?.aiTemplates || {};
             const marketContext = aiTemplates.marketContext || { enabled: false };
             const meetingPreferences = aiTemplates.meetingPreferences || { enabled: false };
-            
+
             // Substitute bracket tokens in prompt before sending to API
-            const substitutedPrompt = selectedContact 
+            const substitutedPrompt = selectedContact
               ? substituteBracketTokensInPrompt(prompt, selectedContact)
               : prompt;
-            
+
             const response = await fetch(`${base}/api/perplexity-email`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -6838,7 +7094,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                     department: selectedContact.department || '',
                     industry: selectedContact.industry || selectedContact.account?.industry || ''
                   };
-                  
+
                   // Add account data if available
                   if (selectedContact.account || selectedContact.account_id) {
                     const accountId = selectedContact.account?.id || selectedContact.account_id;
@@ -6848,7 +7104,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                       const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
                       account = accounts.find(a => a.id === accountId) || null;
                     }
-                    
+
                     if (account) {
                       recipient.account = {
                         id: account.id,
@@ -6868,21 +7124,21 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                         currentRate: account.currentRate || '',
                         contractEndDate: account.contractEndDate || account.contractEnd || account.contract_end_date || ''
                       };
-                      
+
                       recipient.energy = {
                         supplier: account.electricitySupplier || '',
                         currentRate: account.currentRate || '',
                         usage: account.annualUsage || '',
                         contractEnd: account.contractEndDate || account.contractEnd || ''
                       };
-                      
+
                       // Set industry from account if not already set
                       if (!recipient.industry && account.industry) {
                         recipient.industry = account.industry;
                       }
                     }
                   }
-                  
+
                   // Also include account data directly from contact if present
                   if (selectedContact.account) {
                     recipient.account = { ...selectedContact.account };
@@ -6890,7 +7146,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                       recipient.industry = selectedContact.account.industry;
                     }
                   }
-                  
+
                   return recipient;
                 })(),
                 senderName: senderFirst || ' ',
@@ -6899,18 +7155,18 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                 industrySegmentation: industrySegmentation
               })
             });
-            
+
             if (response.ok) {
               const result = await response.json();
-              
+
               // Update PREVIEW, not editor
               const previewBodyEl = card.querySelector('.preview-body');
               const previewSubjectEl = card.querySelector('.preview-subject');
-              
+
               // Format the result similar to email-compose-global.js
               let html = '';
               let subject = '';
-              
+
               if (result.templateType) {
                 // HTML template format
                 const formatted = formatTemplatedEmail(result.output || result, selectedContact, result.templateType);
@@ -6922,15 +7178,15 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                 subject = formatted.subject;
                 html = formatted.html;
               }
-              
+
               // Get signature for preview
               const stepId = card.getAttribute('data-id');
               const step = state.currentSequence?.steps?.find(s => s.id === stepId);
               const isAuto = step?.type === 'auto-email';
               const signature = step ? getSignatureForPreview(step, isAuto) : '';
-              
-              if (previewBodyEl && html) { 
-                previewBodyEl.innerHTML = html + signature; 
+
+              if (previewBodyEl && html) {
+                previewBodyEl.innerHTML = html + signature;
               }
               if (previewSubjectEl && subject) { previewSubjectEl.textContent = subject; }
 
@@ -6939,9 +7195,9 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                 if (!step.data) step.data = {};
                 step.data.aiOutput = { subject, html };
                 step.data.aiStatus = 'generated';
-                try { scheduleStepSave(step.id); } catch (_) {}
+                try { scheduleStepSave(step.id); } catch (_) { }
               }
-              
+
               if (status) status.textContent = 'Preview generated!';
             } else {
               const errorData = await response.json().catch(() => ({}));
@@ -6955,7 +7211,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           }
         });
       });
-      
+
       // Update AI bar status based on tab and contact selection
       const updateAIBarStatus = () => {
         const card = bar.closest('.step-card');
@@ -6965,7 +7221,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         const stepId = card?.getAttribute('data-id');
         const step = state.currentSequence?.steps?.find(s => s.id === stepId);
         const hasContact = step?.data?.previewContact;
-        
+
         if (status) {
           if (isPreviewActive) {
             const phase = step?.data?.aiStatus || 'draft';
@@ -6976,14 +7232,14 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           }
         }
       };
-      
+
       // Watch for tab changes
       card?.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', () => {
           setTimeout(updateAIBarStatus, 100);
         });
       });
-      
+
       // Watch for contact selection changes
       const contactInput = card?.querySelector('.preview-contact-input');
       if (contactInput) {
@@ -6991,7 +7247,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           setTimeout(updateAIBarStatus, 100);
         });
       }
-      
+
       // Initial status update
       setTimeout(updateAIBarStatus, 100);
     });
@@ -7004,29 +7260,29 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         const step = state.currentSequence.steps.find(s => s.id === id);
         if (!step || !step.data?.aiOutput) return;
         if (!step.data) step.data = {};
-        
+
         // Preserve the AI prompt text from the textarea
         const promptTextarea = card.querySelector('.ai-prompt');
         if (promptTextarea && promptTextarea.value.trim()) {
           step.data.aiPrompt = promptTextarea.value.trim();
         }
-        
+
         step.data.subject = step.data.aiOutput.subject || step.data.subject || '';
         step.data.body = step.data.aiOutput.html || step.data.body || '';
         step.data.aiStatus = 'saved';
         step.data.savedAt = Date.now(); // Store timestamp
-        try { scheduleStepSave(step.id, true); } catch (_) {}
-        
+        try { scheduleStepSave(step.id, true); } catch (_) { }
+
         // Show toast notification
         if (window.crm && typeof window.crm.showToast === 'function') {
-          const timeStr = new Date().toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
+          const timeStr = new Date().toLocaleTimeString('en-US', {
+            hour: 'numeric',
             minute: '2-digit',
-            hour12: true 
+            hour12: true
           });
           window.crm.showToast(`AI prompt saved at ${timeStr}`);
         }
-        
+
         render();
       });
     });
@@ -7038,7 +7294,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         if (!step) return;
         if (!step.data) step.data = {};
         step.data.mode = 'manual';
-        try { scheduleStepSave(step.id); } catch (_) {}
+        try { scheduleStepSave(step.id); } catch (_) { }
         render();
       });
     });
@@ -7182,10 +7438,10 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           let hex = '#ffd54f';
           if (val === 'none') {
             if (isRich) {
-              try { execRich(editor, 'hiliteColor', 'transparent'); } catch (_) {}
-              try { execRich(editor, 'backColor', 'transparent'); } catch (_) {}
-              try { execRich(editor, 'hiliteColor', 'initial'); } catch (_) {}
-              try { execRich(editor, 'backColor', 'initial'); } catch (_) {}
+              try { execRich(editor, 'hiliteColor', 'transparent'); } catch (_) { }
+              try { execRich(editor, 'backColor', 'transparent'); } catch (_) { }
+              try { execRich(editor, 'hiliteColor', 'initial'); } catch (_) { }
+              try { execRich(editor, 'backColor', 'initial'); } catch (_) { }
               persistRich(step, editor);
             } else {
               // Non-rich fallback: no-op (avoids stripping other formatting). User can retype without highlight.
@@ -7404,7 +7660,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         const bodyRaw = (step?.data?.body || '');
         const isAuto = step?.type === 'auto-email';
         const signature = getSignatureForPreview(step, isAuto);
-        
+
         if (contact) {
           subjEl && (subjEl.innerHTML = substituteContactTokensInText(subjRaw, contact) || '(no subject)');
           bodyEl && (bodyEl.innerHTML = (processBodyHtmlWithContact(bodyRaw, contact) || '(empty)') + signature);
@@ -7546,9 +7802,9 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           e.target.closest('button, input, textarea, select, .toolbar-btn, .toggle-switch, .editor-toolbar, .link-bar, .attachments, .preview-contact-picker') ||
           e.target.closest('[contenteditable="true"], .body-input, .input-dark')
         ) return;
-        
+
         startPos = { x: e.clientX, y: e.clientY };
-        
+
         holdTimer = setTimeout(() => {
           const itemEl = stepCard.closest('.step-item') || stepCard;
           startDrag(itemEl, e);
@@ -7590,7 +7846,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       dragState.draggedStepId = stepItem.getAttribute('data-id');
       dragState.startY = e.clientY;
       dragState.lastClientY = e.clientY;
-      
+
       const rect = stepItem.getBoundingClientRect();
       dragState.offsetY = e.clientY - rect.top;
 
@@ -7604,8 +7860,8 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         document.body.style.webkitUserSelect = 'none';
         document.body.style.msUserSelect = 'none';
         document.addEventListener('selectstart', preventTextSelection, true);
-      } catch (_) {}
-      
+      } catch (_) { }
+
       // Create drop placeholder
       createDropPlaceholder(stepItem);
       // Insert placeholder at the current position to preserve layout space
@@ -7613,8 +7869,8 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         if (stepItem.parentNode) {
           stepItem.parentNode.insertBefore(dragState.dropPlaceholder, stepItem);
         }
-      } catch (_) {}
-      
+      } catch (_) { }
+
       // Make the dragged element follow the cursor (overlay)
       stepItem.style.position = 'fixed';
       stepItem.style.width = rect.width + 'px';
@@ -7622,32 +7878,32 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       stepItem.style.top = (e.clientY - dragState.offsetY) + 'px';
       stepItem.style.pointerEvents = 'none';
       stepItem.style.zIndex = '1000';
-      
+
       // Attach global mouse events
       document.addEventListener('mousemove', handleDragMove);
       document.addEventListener('mouseup', handleDragEnd);
-      
+
       e.preventDefault();
     }
 
     function createDropPlaceholder(stepItem) {
       dragState.dropPlaceholder = document.createElement('div');
       dragState.dropPlaceholder.className = 'step-drop-placeholder';
-      
+
       // Match the height of the dragged item
       const rect = stepItem.getBoundingClientRect();
       dragState.dropPlaceholder.style.minHeight = rect.height + 'px';
-      
+
       // Initially hide it
       dragState.dropPlaceholder.style.opacity = '0';
     }
 
     function handleDragMove(e) {
       if (!dragState.isDragging) return;
-      
+
       // Auto-scroll logic
       handleAutoScroll(e.clientY);
-      
+
       // Update dragged element position to follow cursor
       if (dragState.draggedElement) {
         dragState.draggedElement.style.top = (e.clientY - dragState.offsetY) + 'px';
@@ -7656,7 +7912,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       // Find drop position and show placeholder
       updateDropIndicator(e.clientY);
       dragState.lastClientY = e.clientY;
-      
+
       e.preventDefault();
     }
 
@@ -7749,13 +8005,13 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       const stepItems = container.querySelectorAll('.step-item:not(.dragging)');
       let insertIndex = 0;
       let insertBefore = null;
-      
+
       // Find where to insert based on mouse Y position
       for (let i = 0; i < stepItems.length; i++) {
         const item = stepItems[i];
         const rect = item.getBoundingClientRect();
         const midY = rect.top + rect.height / 2;
-        
+
         if (clientY < midY) {
           insertIndex = i;
           insertBefore = item;
@@ -7763,15 +8019,15 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         }
         insertIndex = i + 1;
       }
-      
+
       // Store the target index for later use
       dragState.targetIndex = insertIndex;
-      
+
       // Remove placeholder from current position
       if (dragState.dropPlaceholder.parentNode) {
         dragState.dropPlaceholder.parentNode.removeChild(dragState.dropPlaceholder);
       }
-      
+
       // Insert placeholder at new position
       if (insertBefore) {
         insertBefore.parentNode.insertBefore(dragState.dropPlaceholder, insertBefore);
@@ -7782,7 +8038,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       } else {
         container.appendChild(dragState.dropPlaceholder);
       }
-      
+
       // Show placeholder
       dragState.dropPlaceholder.classList.add('active');
       dragState.dropPlaceholder.style.opacity = '1';
@@ -7790,22 +8046,22 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
 
     function handleDragEnd(e) {
       if (!dragState.isDragging) return;
-      
+
       // Clear auto-scroll
       if (dragState.scrollInterval) {
         clearInterval(dragState.scrollInterval);
         dragState.scrollInterval = null;
       }
-      
+
       // Perform the reorder using the stored target index
       const currentIndex = getCurrentStepIndex();
       if (dragState.targetIndex !== undefined && dragState.targetIndex !== currentIndex) {
         reorderStep(dragState.draggedStepId, dragState.targetIndex, currentIndex);
       }
-      
+
       // Clean up
       cleanup();
-      
+
       // Remove global event listeners
       document.removeEventListener('mousemove', handleDragMove);
       document.removeEventListener('mouseup', handleDragEnd);
@@ -7813,21 +8069,21 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
 
     function getDropPosition() {
       if (!dragState.dropPlaceholder || !dragState.dropPlaceholder.parentNode) return -1;
-      
+
       const stepItems = container.querySelectorAll('.step-item');
       const placeholder = dragState.dropPlaceholder;
-      
+
       let position = 0;
       for (let i = 0; i < stepItems.length; i++) {
         const item = stepItems[i];
         if (item.classList.contains('dragging')) continue;
-        
+
         if (item.compareDocumentPosition(placeholder) & Node.DOCUMENT_POSITION_FOLLOWING) {
           break;
         }
         position++;
       }
-      
+
       return position;
     }
 
@@ -7838,23 +8094,23 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
 
     function reorderStep(stepId, newIndex, currentIndex) {
       if (!state.currentSequence?.steps) return;
-      
+
       const steps = state.currentSequence.steps;
       if (currentIndex === -1 || currentIndex === newIndex) return;
-      
+
       // Remove step from current position
       const [step] = steps.splice(currentIndex, 1);
-      
+
       // Insert at new position. newIndex is computed against a list
       // that excludes the dragged element (see updateDropIndicator),
       // so no additional adjustment is needed here.
       steps.splice(newIndex, 0, step);
-      
+
       // Update position fields for all steps to maintain explicit order
       steps.forEach((s, idx) => {
         s.position = idx;
       });
-      
+
       // Save and re-render
       try { scheduleStepSave(stepId, true); } catch (_) { /* noop */ }
       render();
@@ -7871,11 +8127,11 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         dragState.draggedElement.style.pointerEvents = '';
         dragState.draggedElement.style.zIndex = '';
       }
-      
+
       if (dragState.dropPlaceholder && dragState.dropPlaceholder.parentNode) {
         dragState.dropPlaceholder.parentNode.removeChild(dragState.dropPlaceholder);
       }
-      
+
       document.body.style.cursor = '';
       try {
         document.body.classList.remove('dragging-steps');
@@ -7883,8 +8139,8 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         document.body.style.webkitUserSelect = '';
         document.body.style.msUserSelect = '';
         document.removeEventListener('selectstart', preventTextSelection, true);
-      } catch (_) {}
-      
+      } catch (_) { }
+
       dragState = {
         isDragging: false,
         draggedElement: null,
@@ -7902,36 +8158,36 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
   // Function to create tasks from sequence steps
   function createTasksFromSequence(sequence, contactData) {
     if (!sequence.steps || !Array.isArray(sequence.steps)) return [];
-    
+
     const tasks = [];
     let cumulativeDelay = 0;
-    
+
     sequence.steps.forEach((step, index) => {
       // Skip if step is paused
       if (step.paused) return;
-      
+
       // Calculate due date based on cumulative delay
       const dueDate = new Date(Date.now() + cumulativeDelay * 60 * 1000);
       cumulativeDelay += step.delayMinutes || 0;
-      
+
       // Create task based on step type
       let task = null;
-      
+
       if (step.type === 'li-connect' || step.type === 'li-message' || step.type === 'li-view-profile' || step.type === 'li-interact-post') {
         const typeLabels = {
           'li-connect': 'linkedin-connect',
-          'li-message': 'linkedin-message', 
+          'li-message': 'linkedin-message',
           'li-view-profile': 'linkedin-view',
           'li-interact-post': 'linkedin-interact'
         };
-        
+
         const taskTitles = {
           'li-connect': 'Add on LinkedIn',
           'li-message': 'Send a message on LinkedIn',
-          'li-view-profile': 'View LinkedIn profile', 
+          'li-view-profile': 'View LinkedIn profile',
           'li-interact-post': 'Interact with LinkedIn Post'
         };
-        
+
         task = {
           id: `seq_${sequence.id}_${step.id}`,
           title: step.data?.note || taskTitles[step.type] || 'LinkedIn task',
@@ -7983,21 +8239,21 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           notes: step.data?.note || ''
         };
       }
-      
+
       if (task) {
         tasks.push(task);
       }
     });
-    
+
     return tasks;
   }
 
   // Function to calculate scheduled send time based on delay
   function calculateScheduledSendTime(previousStepTime, delay) {
     if (!delay) return previousStepTime + (24 * 60 * 60 * 1000); // Default 1 day
-    
+
     const delayStr = delay.toString().toLowerCase();
-    
+
     // Parse delay string (e.g., "2 days", "3 hours", "1 week")
     if (delayStr.includes('day')) {
       const days = parseInt(delayStr.match(/\d+/)?.[0] || '1');
@@ -8028,11 +8284,11 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         },
         body: JSON.stringify(emailData)
       });
-      
+
       if (!response.ok) {
         throw new Error(`Email send failed: ${response.statusText}`);
       }
-      
+
       const result = await response.json();
       return result;
     } catch (error) {
@@ -8045,7 +8301,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
   async function startSequenceForContact(sequence, contactData) {
     try {
       console.log('[SequenceBuilder] Starting sequence for single contact via server-side processing:', contactData);
-      
+
       // Get user email for ownership
       const getUserEmail = () => {
         try {
@@ -8053,19 +8309,19 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             return window.DataManager.getCurrentUserEmail();
           }
           return (window.currentUserEmail || '').toLowerCase();
-        } catch(_) {
+        } catch (_) {
           return (window.currentUserEmail || '').toLowerCase();
         }
       };
       const userEmail = getUserEmail();
-      
+
       if (!userEmail) {
         throw new Error('User email not found');
       }
-      
+
       // Resolve contact ID from contactData
       let contactId = contactData.id || contactData.contactId;
-      
+
       if (!contactId) {
         // Try to find contact by email in people data
         if (contactData.email && window.getPeopleData && typeof window.getPeopleData === 'function') {
@@ -8075,18 +8331,18 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             contactId = match.id;
           }
         }
-        
+
         // If still no contact ID, generate a temporary one
         if (!contactId) {
           contactId = `temp_contact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           console.warn('[SequenceBuilder] Generated temporary contact ID:', contactId);
         }
       }
-      
+
       // Create sequenceActivation document with single contact
       const activationRef = window.firebaseDB.collection('sequenceActivations').doc();
       const activationId = activationRef.id;
-      
+
       const sequenceActivationData = {
         sequenceId: sequence.id,
         contactIds: [contactId],
@@ -8098,15 +8354,15 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         createdBy: userEmail,
         createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
       };
-      
+
       await activationRef.set(sequenceActivationData);
       console.log('[SequenceBuilder] Created sequenceActivation:', activationId);
-      
+
       // Show progress toast
       if (window.crm && typeof window.crm.showToast === 'function') {
         window.crm.showToast(`Sequence queued for ${contactData.name || contactData.email}. Processing...`, 'info');
       }
-      
+
       // Call server endpoint to process immediately
       try {
         const baseUrl = window.API_BASE_URL || window.location.origin || '';
@@ -8115,20 +8371,20 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             immediate: true,
             activationId: activationId
           })
         });
-        
+
         if (response.ok) {
           const result = await response.json();
           console.log('[SequenceBuilder] Sequence activation triggered:', result);
-          
-      if (window.crm && typeof window.crm.showToast === 'function') {
+
+          if (window.crm && typeof window.crm.showToast === 'function') {
             window.crm.showToast(`✓ Sequence started for ${contactData.name || contactData.email}!`, 'success');
           }
-          
+
           return {
             tasks: [],
             scheduledEmailCount: result.emailsCreated || 0,
@@ -8137,17 +8393,17 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         } else {
           const errorText = await response.text();
           console.error('[SequenceBuilder] Failed to trigger processing:', response.status, errorText);
-          
+
           // Update activation to failed
-          await activationRef.update({ 
-            status: 'failed', 
-            errorMessage: errorText 
+          await activationRef.update({
+            status: 'failed',
+            errorMessage: errorText
           });
-          
+
           if (window.crm && typeof window.crm.showToast === 'function') {
             window.crm.showToast(`Failed to start sequence: ${errorText}`, 'error');
           }
-          
+
           return {
             tasks: [],
             scheduledEmailCount: 0,
@@ -8156,21 +8412,21 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         }
       } catch (apiError) {
         console.error('[SequenceBuilder] Error calling API:', apiError);
-        
+
         // Update activation to failed
         try {
-          await activationRef.update({ 
-            status: 'failed', 
-            errorMessage: apiError.message 
+          await activationRef.update({
+            status: 'failed',
+            errorMessage: apiError.message
           });
         } catch (updateError) {
           console.error('[SequenceBuilder] Failed to update activation status:', updateError);
         }
-        
+
         if (window.crm && typeof window.crm.showToast === 'function') {
           window.crm.showToast(`Failed to start sequence: ${apiError.message}`, 'error');
         }
-        
+
         return {
           tasks: [],
           scheduledEmailCount: 0,
@@ -8402,69 +8658,69 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         console.log('[SequenceBuilder] Usage: await window.SequenceBuilder.cleanupOrphanedSequenceMembers("seq-1755363808050")');
         return { cleaned: 0, errors: 0 };
       }
-      
+
       const db = window.firebaseDB;
       if (!db) {
         console.error('[SequenceBuilder] Firebase not available');
         return { cleaned: 0, errors: 0 };
       }
-      
-        try {
-          // Get all sequenceMembers for this sequence
-          const membersQuery = await db.collection('sequenceMembers')
-            .where('sequenceId', '==', sequenceId)
-            .where('targetType', '==', 'people')
-            .get();
-          
-          if (membersQuery.size === 0) {
-            return { cleaned: 0, errors: 0 };
+
+      try {
+        // Get all sequenceMembers for this sequence
+        const membersQuery = await db.collection('sequenceMembers')
+          .where('sequenceId', '==', sequenceId)
+          .where('targetType', '==', 'people')
+          .get();
+
+        if (membersQuery.size === 0) {
+          return { cleaned: 0, errors: 0 };
+        }
+
+        const orphanedIds = [];
+        const deletePromises = [];
+
+        // Check each member to see if the contact exists
+        for (const memberDoc of membersQuery.docs) {
+          const memberData = memberDoc.data();
+          const targetId = memberData.targetId;
+
+          if (!targetId) {
+            orphanedIds.push(memberDoc.id);
+            deletePromises.push(memberDoc.ref.delete());
+            continue;
           }
-          
-          const orphanedIds = [];
-          const deletePromises = [];
-          
-          // Check each member to see if the contact exists
-          for (const memberDoc of membersQuery.docs) {
-            const memberData = memberDoc.data();
-            const targetId = memberData.targetId;
-            
-            if (!targetId) {
-              orphanedIds.push(memberDoc.id);
-              deletePromises.push(memberDoc.ref.delete());
-              continue;
-            }
-            
-            // Check if contact exists
-            const contactDoc = await db.collection('contacts').doc(targetId).get();
-            
-            if (!contactDoc.exists) {
-              orphanedIds.push(memberDoc.id);
-              deletePromises.push(memberDoc.ref.delete());
-            }
+
+          // Check if contact exists
+          const contactDoc = await db.collection('contacts').doc(targetId).get();
+
+          if (!contactDoc.exists) {
+            orphanedIds.push(memberDoc.id);
+            deletePromises.push(memberDoc.ref.delete());
           }
-          
-          // Delete all orphaned records
-          if (deletePromises.length > 0) {
-            await Promise.all(deletePromises);
-            
-            // Update stats.active and recordCount
-            const remainingMembers = membersQuery.size - deletePromises.length;
-            await db.collection('sequences').doc(sequenceId).update({
-              "stats.active": remainingMembers,
-              recordCount: remainingMembers
-            });
-            
-            return { cleaned: deletePromises.length, errors: 0 };
-          } else {
-            return { cleaned: 0, errors: 0 };
-          }
+        }
+
+        // Delete all orphaned records
+        if (deletePromises.length > 0) {
+          await Promise.all(deletePromises);
+
+          // Update stats.active and recordCount
+          const remainingMembers = membersQuery.size - deletePromises.length;
+          await db.collection('sequences').doc(sequenceId).update({
+            "stats.active": remainingMembers,
+            recordCount: remainingMembers
+          });
+
+          return { cleaned: deletePromises.length, errors: 0 };
+        } else {
+          return { cleaned: 0, errors: 0 };
+        }
       } catch (err) {
         console.error('[SequenceBuilder] Cleanup failed:', err);
         return { cleaned: 0, errors: 1 };
       }
     }
   };
-  
+
   // Also create a standalone global function for easier access
   window.cleanupOrphanedSequenceMembers = async (sequenceId) => {
     if (window.SequenceBuilder && typeof window.SequenceBuilder.cleanupOrphanedSequenceMembers === 'function') {
@@ -8482,16 +8738,16 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       overlay.className = 'pc-modal__backdrop';
       overlay.setAttribute('role', 'dialog');
       overlay.setAttribute('aria-modal', 'true');
-      
+
       const validCount = totalContacts ? (totalContacts - contactsWithoutEmail.length) : 0;
       const invalidCount = contactsWithoutEmail.length;
       const isSingle = invalidCount === 1 && !totalContacts;
-      
-      const contactsList = contactsWithoutEmail.slice(0, 5).map(c => 
+
+      const contactsList = contactsWithoutEmail.slice(0, 5).map(c =>
         `<li style="margin-bottom: 8px;">• ${escapeHtml(c.name || (c.firstName + ' ' + (c.lastName || '')).trim() || 'Unknown')} ${c.company ? `(${escapeHtml(c.company)})` : ''}</li>`
       ).join('');
       const moreCount = invalidCount > 5 ? ` + ${invalidCount - 5} more` : '';
-      
+
       overlay.innerHTML = `
         <div class="pc-modal__dialog" style="max-width: 500px;">
           <div class="pc-modal__header">
@@ -8539,16 +8795,16 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           </div>
         </div>
       `;
-      
+
       document.body.appendChild(overlay);
-      
+
       // Show modal with animation
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           overlay.classList.add('show');
         });
       });
-      
+
       // Event handlers
       const close = (result) => {
         overlay.classList.remove('show');
@@ -8559,19 +8815,19 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         }, 200);
         resolve(result);
       };
-      
+
       overlay.querySelector('#email-validation-close')?.addEventListener('click', () => close({ proceed: false }));
       overlay.querySelector('#email-validation-cancel')?.addEventListener('click', () => close({ proceed: false }));
       overlay.querySelector('#email-validation-proceed')?.addEventListener('click', () => close({ proceed: true, validOnly: false }));
       overlay.querySelector('#email-validation-valid-only')?.addEventListener('click', () => close({ proceed: true, validOnly: true }));
-      
+
       // Click outside to close
       overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
           close({ proceed: false });
         }
       });
-      
+
       // Escape key
       const onEscape = (e) => {
         if (e.key === 'Escape') {
