@@ -66,12 +66,28 @@ export default async function handler(req, res) {
         logAlways(`Found ${members.length} sequence members`);
 
         //Get all emails to determine current progress
-        const emailsSnapshot = await db.collection('emails')
-            .where('type', '==', 'scheduled')
-            .get();
+        // FIX: Query both 'scheduled' AND 'sent' emails (sent emails have type='sent')
+        const [scheduledEmails, sentEmails] = await Promise.all([
+            db.collection('emails').where('type', '==', 'scheduled').get(),
+            db.collection('emails').where('type', '==', 'sent').get()
+        ]);
 
         const emailsBySequenceAndContact = new Map();
-        emailsSnapshot.forEach(doc => {
+        
+        // Process scheduled emails
+        scheduledEmails.forEach(doc => {
+            const email = { id: doc.id, ...doc.data() };
+            if (email.sequenceId && email.contactId) {
+                const key = `${email.sequenceId}_${email.contactId}`;
+                if (!emailsBySequenceAndContact.has(key)) {
+                    emailsBySequenceAndContact.set(key, []);
+                }
+                emailsBySequenceAndContact.get(key).push(email);
+            }
+        });
+        
+        // Process sent emails (these are the ones that were already sent)
+        sentEmails.forEach(doc => {
             const email = { id: doc.id, ...doc.data() };
             if (email.sequenceId && email.contactId) {
                 const key = `${email.sequenceId}_${email.contactId}`;
@@ -82,7 +98,7 @@ export default async function handler(req, res) {
             }
         });
 
-        logAlways(`Found ${emailsSnapshot.size} sequence emails`);
+        logAlways(`Found ${scheduledEmails.size + sentEmails.size} total sequence emails (${scheduledEmails.size} scheduled, ${sentEmails.size} sent)`);
 
         // Get all existing tasks to avoid duplicates
         const tasksSnapshot = await db.collection('tasks')
