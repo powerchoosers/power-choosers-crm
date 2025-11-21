@@ -777,13 +777,22 @@
     try {
       const key = getUserTasksKey();
       const userTasks = JSON.parse(localStorage.getItem(key) || '[]');
-      const filteredTasks = userTasks.filter(t => t.id !== state.currentTask.id);
+      const filteredTasks = userTasks.filter(t => t && t.id !== state.currentTask.id);
       localStorage.setItem(key, JSON.stringify(filteredTasks));
 
-      // Also clean up legacy key
+      // Also clean up legacy key (for cross-browser compatibility)
       const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-      const filteredLegacy = legacyTasks.filter(t => t.id !== state.currentTask.id);
+      const filteredLegacy = legacyTasks.filter(t => t && t.id !== state.currentTask.id);
       localStorage.setItem('userTasks', JSON.stringify(filteredLegacy));
+
+      // CRITICAL FIX: Also clean up from BackgroundTasksLoader cache if available
+      if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.removeTask === 'function') {
+        try {
+          window.BackgroundTasksLoader.removeTask(state.currentTask.id);
+        } catch (e) {
+          console.warn('[TaskDetail] Could not remove task from BackgroundTasksLoader:', e);
+        }
+      }
     } catch (e) {
       console.warn('Could not remove task from localStorage:', e);
     }
@@ -850,9 +859,14 @@
       console.warn('[TaskDetail] Failed to invalidate cache:', cacheError);
     }
 
-    // Trigger tasks updated event for other components
+    // Trigger tasks updated event for other components (with taskId for cleanup)
     window.dispatchEvent(new CustomEvent('tasksUpdated', {
-      detail: { source: 'taskCompletion' }
+      detail: { source: 'taskCompletion', taskId: state.currentTask.id, deleted: true }
+    }));
+
+    // CRITICAL FIX: Also dispatch to document for cross-browser sync
+    document.dispatchEvent(new CustomEvent('pc:task-deleted', {
+      detail: { taskId: state.currentTask.id, source: 'task-detail' }
     }));
 
     // Navigate to next task instead of going back
@@ -2022,26 +2036,22 @@
     // Render task-specific content (split layout similar to Apollo screenshot)
     renderTaskContent();
 
-    // Re-attach event handlers after content is rendered (with retry logic)
-    const attachHandlers = () => {
+    // CRITICAL FIX: Event handlers are now set up once using event delegation
+    // No need to re-attach - they work automatically for dynamically added elements
+    // Just ensure they're initialized if not already
+    if (!document._taskDetailCompanyHandlersBound) {
       setupCompanyLinkHandlers();
+    }
+    if (!document._taskDetailContactHandlersBound) {
       setupContactLinkHandlers();
+    }
 
-      // Verify handlers were attached
-      const companyLinks = document.querySelectorAll('#task-detail-page .company-link');
-      const contactLinks = document.querySelectorAll('#task-detail-page .contact-link');
-
-      if (companyLinks.length > 0 || contactLinks.length > 0) {
-        console.log(`[TaskDetail] Attached handlers to ${companyLinks.length} company links and ${contactLinks.length} contact links`);
-      }
-    };
-
-    // Immediate attachment
-    attachHandlers();
-
-    // Retry attachment after a short delay to catch dynamically added elements
-    setTimeout(attachHandlers, 100);
-    setTimeout(attachHandlers, 300);
+    // Verify links exist (for debugging)
+    const companyLinks = document.querySelectorAll('#task-detail-page .company-link');
+    const contactLinks = document.querySelectorAll('#task-detail-page .contact-link');
+    if (companyLinks.length > 0 || contactLinks.length > 0) {
+      console.log(`[TaskDetail] Found ${companyLinks.length} company links and ${contactLinks.length} contact links (handlers use event delegation)`);
+    }
 
     // Load widgets
     loadTaskWidgets();
@@ -2093,50 +2103,68 @@
   }
 
   function setupCompanyLinkHandlers() {
-    // Add click handlers for company links
-    const companyLinks = document.querySelectorAll('#task-detail-page .company-link');
-    companyLinks.forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        const accountId = link.getAttribute('data-account-id');
-        const accountName = link.getAttribute('data-account-name');
+    // CRITICAL FIX: Use document-level guard like fix-duplicate-listeners.js pattern
+    if (document._taskDetailCompanyHandlersBound) return;
+    document._taskDetailCompanyHandlersBound = true;
 
-        // Capture task detail state for back navigation
-        if (state.currentTask) {
-          window.__taskDetailRestoreData = {
-            taskId: state.currentTask.id,
-            source: window._taskNavigationSource || 'dashboard',
-            timestamp: Date.now()
-          };
-          // Set navigation source for account details
-          window._accountNavigationSource = 'task-detail';
-        }
+    // Handle company link clicks using event delegation (works after re-renders)
+    document.addEventListener('click', (e) => {
+      const companyLink = e.target.closest('#task-detail-page .company-link');
+      if (!companyLink) return;
 
-        if (accountId && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
-          try {
-            window.AccountDetail.show(accountId);
-          } catch (error) {
-            console.error('Failed to navigate to account detail:', error);
+      e.preventDefault();
+      const accountId = companyLink.getAttribute('data-account-id');
+      const accountName = companyLink.getAttribute('data-account-name');
+
+      console.log('[TaskDetail] Company link clicked:', { accountId, accountName });
+
+      // Capture task detail state for back navigation
+      if (state.currentTask) {
+        window.__taskDetailRestoreData = {
+          taskId: state.currentTask.id,
+          source: window._taskNavigationSource || 'dashboard',
+          timestamp: Date.now()
+        };
+        // Set navigation source for account details
+        window._accountNavigationSource = 'task-detail';
+      }
+
+      if (accountId && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+        try {
+          window.AccountDetail.show(accountId);
+        } catch (error) {
+          console.error('[TaskDetail] Failed to navigate to account detail:', error);
+          if (window.crm && typeof window.crm.showToast === 'function') {
+            window.crm.showToast('Failed to open account. Please try again.', 'error');
           }
-        } else if (accountName && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
-          // Fallback: try to find account by name
-          try {
-            if (typeof window.getAccountsData === 'function') {
-              const accounts = window.getAccountsData() || [];
-              const account = accounts.find(acc => {
-                const accName = (acc.accountName || acc.name || acc.companyName || '').toLowerCase().trim();
-                const searchName = accountName.toLowerCase().trim();
-                return accName === searchName || accName.includes(searchName) || searchName.includes(accName);
-              });
-              if (account) {
-                window.AccountDetail.show(account.id);
+        }
+      } else if (accountName && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+        // Fallback: try to find account by name
+        try {
+          if (typeof window.getAccountsData === 'function') {
+            const accounts = window.getAccountsData() || [];
+            const account = accounts.find(acc => {
+              const accName = (acc.accountName || acc.name || acc.companyName || '').toLowerCase().trim();
+              const searchName = accountName.toLowerCase().trim();
+              return accName === searchName || accName.includes(searchName) || searchName.includes(accName);
+            });
+            if (account && account.id) {
+              console.log('[TaskDetail] Found account by name:', account.id);
+              window.AccountDetail.show(account.id);
+            } else {
+              console.warn('[TaskDetail] Account not found:', accountName);
+              if (window.crm && typeof window.crm.showToast === 'function') {
+                window.crm.showToast('Account not found in system. Please check Accounts page.', 'error');
               }
             }
-          } catch (error) {
-            console.error('Failed to find account by name:', error);
+          }
+        } catch (error) {
+          console.error('[TaskDetail] Error finding account by name:', error);
+          if (window.crm && typeof window.crm.showToast === 'function') {
+            window.crm.showToast('Error finding account. Please try again.', 'error');
           }
         }
-      });
+      }
     });
   }
 
@@ -3075,9 +3103,9 @@
     if (document._taskDetailContactHandlersBound) return;
     document._taskDetailContactHandlersBound = true;
 
-    // Handle contact link clicks in header
+    // Handle contact link clicks in header (scoped to task-detail-page)
     document.addEventListener('click', (e) => {
-      const contactLink = e.target.closest('.contact-link');
+      const contactLink = e.target.closest('#task-detail-page .contact-link');
       if (!contactLink) return;
 
       e.preventDefault();
