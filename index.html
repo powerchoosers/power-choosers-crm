@@ -43,7 +43,7 @@
       "contactPoint": {
         "@type": "ContactPoint",
         "contactType": "Customer Service",
-        "email": "renewals@powerchoosers.com"
+        "email": "info@powerchoosers.com"
       },
       "sameAs": [
         "https://www.linkedin.com/company/power-choosers"
@@ -266,7 +266,7 @@
       }
     </style>
     <!-- Apollo Tracking Script -->
-    <script>function initApollo(){var n=Math.random().toString(36).substring(7),o=document.createElement("script");o.src="https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache="+n,o.async=!0,o.defer=!0,o.onload=function(){window.trackingFunctions.onLoad({appId:"67ec3b5820289a0021c5a43c"})},document.head.appendChild(o)}initApollo();</script>
+    <script>function initApollo(){try{var n=Math.random().toString(36).substring(7),o=document.createElement("script");o.src="https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache="+n,o.async=!0,o.defer=!0,o.onload=function(){try{window.trackingFunctions&&window.trackingFunctions.onLoad({appId:"67ec3b5820289a0021c5a43c"})}catch(e){}},o.onerror=function(){},document.head.appendChild(o)}catch(e){}}initApollo();</script>
 </head>
 <body>
   <!-- Header -->
@@ -433,7 +433,7 @@
           </div>
           <div>
             <label for="phone">Phone Number</label>
-            <input id="phone" name="phone" placeholder="(972) 834-2317" required>
+            <input id="phone" name="phone" placeholder="+1 (817) 809-3367" required>
           </div>
           <div class="full">
             <label for="email">Email Address</label>
@@ -488,8 +488,8 @@
     <div>
         <h4 style="font-weight:700;margin-bottom:16px;font-size:16px">Contact</h4>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <a href="tel:19728342317" style="color:var(--muted);font-size:14px">(972) 834-2317</a>
-          <a href="mailto:renewals@powerchoosers.com" style="color:var(--muted);font-size:14px">renewals@powerchoosers.com</a>
+          <a href="tel:+18178093367" style="color:var(--muted);font-size:14px">+1 (817) 809-3367</a>
+          <a href="mailto:info@powerchoosers.com" style="color:var(--muted);font-size:14px">info@powerchoosers.com</a>
         </div>
       </div>
     </div>
@@ -668,7 +668,7 @@
         `Phone: ${data.phone || ''}\n`+
         `Email: ${data.email || ''}`
       );
-      window.location.href = `mailto:renewals@powerchoosers.com?subject=${subject}&body=${body}`;
+      window.location.href = `mailto:info@powerchoosers.com?subject=${subject}&body=${body}`;
     });
 
     // Modal contact form handling
@@ -684,7 +684,7 @@
         `Need: ${data.need || ''}\n\n`+
         `${data.message || ''}`
       );
-      window.location.href = `mailto:renewals@powerchoosers.com?subject=${subject}&body=${body}`;
+      window.location.href = `mailto:info@powerchoosers.com?subject=${subject}&body=${body}`;
       setTimeout(()=>{ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); }, 300);
     });
 
