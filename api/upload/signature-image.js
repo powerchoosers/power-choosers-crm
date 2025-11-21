@@ -8,7 +8,7 @@ import { cors } from '../_cors.js';
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '5mb',
+      sizeLimit: '10mb', // Increased for featured images which may be larger
     },
   },
 };

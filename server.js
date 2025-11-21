@@ -463,9 +463,10 @@ function readJsonBody(req) {
     let data = '';
     req.on('data', (chunk) => {
       data += chunk;
-      if (data.length > 1e6) { // 1MB guard
+      // Increased to 10MB to support featured image uploads (base64 encoded images can be large)
+      if (data.length > 10e6) { // 10MB guard
         req.connection.destroy();
-        reject(new Error('Payload too large'));
+        reject(new Error('Payload too large (max 10MB)'));
       }
     });
     req.on('end', () => {
