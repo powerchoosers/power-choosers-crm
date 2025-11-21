@@ -3612,67 +3612,69 @@ class PowerChoosersCRM {
                 
                 await batch.commit();
                 
-                // 4. Update list count once
-                const increment = window.firebase?.firestore?.FieldValue?.increment?.(newRecordIds.length);
-                if (increment) {
+                // 4. CRITICAL FIX: Calculate ACTUAL count from listMembers collection (ensures accuracy)
+                // This is more reliable than incrementing, especially after bulk imports
+                try {
+                    const actualCountQuery = await db.collection('listMembers')
+                        .where('listId', '==', listId)
+                        .where('targetType', '==', targetType)
+                        .get();
+                    
+                    const actualCount = actualCountQuery.size;
+                    
+                    // Update list document with actual count
                     await db.collection('lists').doc(listId).update({
-                        count: increment,
-                        recordCount: increment,
+                        count: actualCount,
+                        recordCount: actualCount,
                         updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
                     });
                     
+                    console.log(`✓ Updated list ${listId} with actual count: ${actualCount} ${targetType}`);
+                    
                     // Update BackgroundListsLoader cache immediately (cost-effective: no Firestore read)
-                    let newCount = null;
-                    let listName = 'List';
                     if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
-                        // Get current count from cache, then add new records
-                        const currentList = window.BackgroundListsLoader.getListsData().find(l => l.id === listId);
-                        const currentCount = currentList?.recordCount || currentList?.count || 0;
-                        newCount = currentCount + newRecordIds.length;
-                        listName = currentList?.name || 'List';
-                        window.BackgroundListsLoader.updateListCountLocally(listId, newCount);
-                        console.log(`[Main] ✓ Updated BackgroundListsLoader cache: list ${listId} count = ${newCount}`);
+                        window.BackgroundListsLoader.updateListCountLocally(listId, actualCount);
                     }
                     
                     // Update CacheManager cache (cost-effective: IndexedDB write only)
                     if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
-                        const currentList = window.BackgroundListsLoader?.getListsData()?.find(l => l.id === listId);
-                        const currentCount = currentList?.recordCount || currentList?.count || 0;
-                        const cacheNewCount = currentCount + newRecordIds.length;
                         window.CacheManager.updateRecord('lists', listId, {
-                            recordCount: cacheNewCount,
-                            count: cacheNewCount,
+                            recordCount: actualCount,
+                            count: actualCount,
                             updatedAt: new Date()
                         }).catch(err => console.warn('[Main] CacheManager update failed:', err));
                     }
                     
-                    // Dispatch event for lists page to refresh (legacy event)
+                    // Dispatch event for lists page to refresh with ACTUAL count
                     try {
                         document.dispatchEvent(new CustomEvent('pc:list-updated', {
                             detail: {
                                 id: listId,
-                                recordCount: newRecordIds.length,
-                                targetType: targetType
+                                recordCount: actualCount, // Send actual count
+                                targetType: targetType,
+                                isActualCount: true // Flag to indicate this is actual count, not increment
+                            }
+                        }));
+                        
+                        // Also dispatch count-updated event for lists-overview
+                        document.dispatchEvent(new CustomEvent('pc:list-count-updated', {
+                            detail: {
+                                listId: listId,
+                                newCount: actualCount,
+                                kind: targetType
                             }
                         }));
                     } catch (_) {}
-                    
-                    // CRITICAL FIX: Dispatch count update event for lists-overview page
-                    if (newCount !== null) {
-                        try {
-                            document.dispatchEvent(new CustomEvent('pc:list-count-updated', {
-                                detail: {
-                                    listId,
-                                    listName,
-                                    kind: targetType === 'people' ? 'people' : 'accounts',
-                                    addedCount: newRecordIds.length,
-                                    newCount: newCount
-                                }
-                            }));
-                            console.log(`[Main] ✓ Dispatched list count updated event: list ${listId} = ${newCount}`);
-                        } catch (e) {
-                            console.warn('[Main] Failed to dispatch count update event:', e);
-                        }
+                } catch (countError) {
+                    console.error('Failed to calculate actual list count:', countError);
+                    // Fallback to increment if count query fails
+                    const increment = window.firebase?.firestore?.FieldValue?.increment?.(newRecordIds.length);
+                    if (increment) {
+                        await db.collection('lists').doc(listId).update({
+                            count: increment,
+                            recordCount: increment,
+                            updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
+                        });
                     }
                 }
                 
@@ -4304,9 +4306,64 @@ class PowerChoosersCRM {
                 await this.batchAssignToList(db, queuedMergeAssignments);
             }
             
-            // Invalidate cache for all affected lists to ensure list detail pages refresh
+            // CRITICAL FIX: Recalculate actual counts for all affected lists after bulk import
+            // This ensures counts match actual members in listMembers collection
             const affectedLists = new Set([...listAssignments, ...queuedMergeAssignments].map(a => a.listId));
             for (const listId of affectedLists) {
+                try {
+                    // Get the list to determine its kind
+                    const listDoc = await db.collection('lists').doc(listId).get();
+                    if (!listDoc.exists) continue;
+                    
+                    const listData = listDoc.data();
+                    const listKind = listData.kind || listData.targetType || modal._importType || 'people';
+                    const targetType = listKind === 'accounts' ? 'accounts' : 'people';
+                    
+                    // Calculate ACTUAL count from listMembers collection
+                    const actualCountQuery = await db.collection('listMembers')
+                        .where('listId', '==', listId)
+                        .where('targetType', '==', targetType)
+                        .get();
+                    
+                    const actualCount = actualCountQuery.size;
+                    
+                    // Update list document with actual count
+                    await db.collection('lists').doc(listId).update({
+                        count: actualCount,
+                        recordCount: actualCount,
+                        updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
+                    });
+                    
+                    console.log(`✓ Updated list ${listId} with actual count: ${actualCount} ${targetType}`);
+                    
+                    // Update BackgroundListsLoader cache (cost-effective: no Firestore read)
+                    if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
+                        window.BackgroundListsLoader.updateListCountLocally(listId, actualCount);
+                    }
+                    
+                    // Update CacheManager cache (cost-effective: IndexedDB write only)
+                    if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+                        window.CacheManager.updateRecord('lists', listId, {
+                            recordCount: actualCount,
+                            count: actualCount,
+                            updatedAt: new Date()
+                        }).catch(err => console.warn('[Main] CacheManager update failed:', err));
+                    }
+                    
+                    // Dispatch count update event for lists-overview
+                    try {
+                        document.dispatchEvent(new CustomEvent('pc:list-count-updated', {
+                            detail: {
+                                listId: listId,
+                                newCount: actualCount,
+                                kind: targetType
+                            }
+                        }));
+                    } catch (_) {}
+                } catch (countError) {
+                    console.warn(`Failed to recalculate count for list ${listId}:`, countError);
+                }
+                
                 // Clear in-memory cache (most important - IndexedDB can lag)
                 if (window.listMembersCache && window.listMembersCache[listId]) {
                     delete window.listMembersCache[listId];
@@ -4323,23 +4380,6 @@ class PowerChoosersCRM {
                     }
                 }
                 
-                // CRITICAL FIX: Get updated count from BackgroundListsLoader cache to dispatch accurate count
-                let newCount = null;
-                let listName = 'List';
-                try {
-                    if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
-                        const listsData = window.BackgroundListsLoader.getListsData() || [];
-                        const list = listsData.find(l => l.id === listId);
-                        if (list) {
-                            newCount = list.recordCount || list.count || 0;
-                            listName = list.name || 'List';
-                            console.log(`✓ Got updated count from cache for list ${listId}: ${newCount}`);
-                        }
-                    }
-                } catch (countErr) {
-                    console.warn('Failed to get count from cache:', countErr);
-                }
-                
                 // CRITICAL FIX: Dispatch event to notify pages to reload
                 try {
                     document.dispatchEvent(new CustomEvent('pc:bulk-import-complete', {
@@ -4348,24 +4388,6 @@ class PowerChoosersCRM {
                     console.log(`✓ Dispatched bulk import complete event for ${listId}`);
                 } catch (e) {
                     console.warn('Failed to dispatch bulk import event:', e);
-                }
-                
-                // CRITICAL FIX: Also dispatch count update event for lists-overview page
-                if (newCount !== null) {
-                    try {
-                        document.dispatchEvent(new CustomEvent('pc:list-count-updated', {
-                            detail: {
-                                listId,
-                                listName,
-                                kind: modal._importType || 'people',
-                                addedCount: newCount, // Total count after import
-                                newCount: newCount
-                            }
-                        }));
-                        console.log(`✓ Dispatched list count updated event for ${listId}: ${newCount}`);
-                    } catch (e) {
-                        console.warn('Failed to dispatch count update event:', e);
-                    }
                 }
             }
             

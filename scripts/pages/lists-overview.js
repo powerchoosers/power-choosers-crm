@@ -2349,23 +2349,46 @@
   // Listen for list count update events (alternative event name)
   document.addEventListener('pc:list-count-updated', (event) => {
     try {
-      const { listId, deletedCount, newCount } = event.detail || {};
+      const { listId, deletedCount, newCount, kind } = event.detail || {};
       if (!listId) return;
       
-      console.log('[ListsOverview] List count updated (alt):', { listId, deletedCount, newCount });
+      console.log('[ListsOverview] List count updated (alt):', { listId, deletedCount, newCount, kind });
+      
+      // Calculate final count first (before updating lists)
+      let finalCount = null;
+      const allLists = [...state.peopleLists, ...state.accountLists];
+      const foundList = allLists.find(l => l.id === listId);
+      if (foundList) {
+        finalCount = typeof newCount === 'number' ? newCount : 
+          (deletedCount ? Math.max(0, (foundList.count || foundList.recordCount || 0) - deletedCount) : 
+          (foundList.count || foundList.recordCount || 0));
+      } else if (typeof newCount === 'number') {
+        finalCount = newCount;
+      }
       
       // COST-EFFECTIVE: Update local state and BackgroundListsLoader cache (no Firestore reads)
       const updateListCount = (list) => {
         if (list.id === listId) {
-          const finalCount = typeof newCount === 'number' ? newCount : 
+          // CRITICAL FIX: Use newCount if provided (actual count from Firestore), otherwise calculate
+          const count = typeof newCount === 'number' ? newCount : 
             (deletedCount ? Math.max(0, (list.count || list.recordCount || 0) - deletedCount) : 
             (list.count || list.recordCount || 0));
-          list.count = finalCount;
-          list.recordCount = finalCount;
+          
+          list.count = count;
+          list.recordCount = count;
           
           // Update BackgroundListsLoader cache locally (cost-effective)
           if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
-            window.BackgroundListsLoader.updateListCountLocally(listId, finalCount);
+            window.BackgroundListsLoader.updateListCountLocally(listId, count);
+          }
+          
+          // Update CacheManager cache (cost-effective: IndexedDB write only)
+          if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+            window.CacheManager.updateRecord('lists', listId, {
+              recordCount: count,
+              count: count,
+              updatedAt: new Date()
+            }).catch(err => console.warn('[ListsOverview] CacheManager update failed:', err));
           }
           
           return true;
@@ -2374,14 +2397,19 @@
       };
       
       let updated = false;
-      for (const list of state.peopleLists) {
+      // Check the appropriate list array based on kind
+      const targetLists = (kind === 'accounts') ? state.accountLists : state.peopleLists;
+      for (const list of targetLists) {
         if (updateListCount(list)) {
           updated = true;
           break;
         }
       }
+      
+      // If not found in target lists, check the other array (in case kind is wrong)
       if (!updated) {
-        for (const list of state.accountLists) {
+        const otherLists = (kind === 'accounts') ? state.peopleLists : state.accountLists;
+        for (const list of otherLists) {
           if (updateListCount(list)) {
             updated = true;
             break;
@@ -2392,7 +2420,23 @@
       if (updated) {
         // Re-render to show updated count
         applyFilters();
-        console.log('[ListsOverview] Updated list count immediately from event (no Firestore reads)');
+        console.log('[ListsOverview] ✓ Updated list count immediately from event (no Firestore reads):', finalCount || newCount || 'unknown');
+      } else {
+        console.warn('[ListsOverview] List not found in current state:', listId);
+        // List not in current view - refresh from BackgroundListsLoader
+        if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
+          const listsData = window.BackgroundListsLoader.getListsData() || [];
+          const updatedList = listsData.find(l => l.id === listId);
+          if (updatedList) {
+            // Update BackgroundListsLoader cache
+            if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
+              const finalCount = typeof newCount === 'number' ? newCount : (updatedList.count || updatedList.recordCount || 0);
+              window.BackgroundListsLoader.updateListCountLocally(listId, finalCount);
+            }
+            // Reload lists for current kind
+            loadLists(state.kind).catch(err => console.warn('[ListsOverview] Failed to reload lists:', err));
+          }
+        }
       }
     } catch (error) {
       console.error('[ListsOverview] Error handling list count update (alt):', error);
@@ -2423,24 +2467,40 @@
   if (!document._listsUpdateListenerBound) {
     document.addEventListener('pc:list-updated', (e) => {
       try {
-        const { id, recordCount, targetType } = e.detail || {};
-        if (!id || !recordCount) return;
+        const { id, recordCount, targetType, isActualCount } = e.detail || {};
+        if (!id || recordCount === undefined || recordCount === null) return;
         
-        console.log('[ListsOverview] Received pc:list-updated event:', { id, recordCount, targetType });
+        console.log('[ListsOverview] Received pc:list-updated event:', { id, recordCount, targetType, isActualCount });
         
         // Find the list in current state
         const allLists = [...state.peopleLists, ...state.accountLists];
         const list = allLists.find(l => l.id === id);
         
         if (list) {
-          // Update count locally
+          // CRITICAL FIX: If isActualCount flag is set, use recordCount as actual count
+          // Otherwise, treat as increment for backward compatibility
           const currentCount = list.recordCount || list.count || 0;
-          const newCount = currentCount + recordCount;
+          const newCount = isActualCount ? recordCount : (currentCount + recordCount);
+          
           list.recordCount = newCount;
           list.count = newCount;
           list.updatedAt = new Date();
           
-          console.log('[ListsOverview] ✓ Updated list count locally:', { id, oldCount: currentCount, newCount });
+          // Update BackgroundListsLoader cache (cost-effective)
+          if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
+            window.BackgroundListsLoader.updateListCountLocally(id, newCount);
+          }
+          
+          // Update CacheManager cache (cost-effective: IndexedDB write only)
+          if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+            window.CacheManager.updateRecord('lists', id, {
+              recordCount: newCount,
+              count: newCount,
+              updatedAt: new Date()
+            }).catch(err => console.warn('[ListsOverview] CacheManager update failed:', err));
+          }
+          
+          console.log('[ListsOverview] ✓ Updated list count locally:', { id, oldCount: currentCount, newCount, isActualCount });
           
           // Re-render the affected list card
           renderFilteredItems(state.kind === 'people' ? state.peopleLists : state.accountLists);
@@ -2454,7 +2514,7 @@
             // Update BackgroundListsLoader cache if needed
             if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
               const currentCount = updatedList.recordCount || updatedList.count || 0;
-              const newCount = currentCount + recordCount;
+              const newCount = isActualCount ? recordCount : (currentCount + recordCount);
               window.BackgroundListsLoader.updateListCountLocally(id, newCount);
             }
             
