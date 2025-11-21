@@ -30,7 +30,8 @@
       insertedImagesSection: document.getElementById('inserted-images-section'),
       insertedImagesList: document.getElementById('inserted-images-list'),
       saveDraftBtn: document.getElementById('save-draft-btn'),
-      publishBtn: document.getElementById('publish-post-btn')
+      publishBtn: document.getElementById('publish-post-btn'),
+      aiGenerateBtn: document.getElementById('ai-generate-post-btn')
     };
   }
 
@@ -890,6 +891,290 @@
     }
   }
 
+  // ========== AI GENERATION FUNCTIONS ==========
+  
+  // Start generating animation with skeletons
+  function startGeneratingAnimation(els) {
+    if (!els.modal) return;
+    
+    // Add orange glow to modal
+    els.modal.classList.add('ai-generating');
+    
+    // Add skeletons to all input fields
+    if (els.titleInput) createSkeletonInField(els.titleInput, 'title');
+    if (els.slugInput) createSkeletonInField(els.slugInput, 'slug');
+    if (els.categoryInput) createSkeletonInField(els.categoryInput, 'category');
+    if (els.metaDescInput) createSkeletonInField(els.metaDescInput, 'meta');
+    if (els.keywordsInput) createSkeletonInField(els.keywordsInput, 'keywords');
+    if (els.editor) createSkeletonInField(els.editor, 'content');
+    
+    console.log('[Post Editor AI] Started generating animation');
+  }
+  
+  // Stop generating animation
+  function stopGeneratingAnimation(els) {
+    if (!els.modal) return;
+    
+    // Remove orange glow from modal
+    els.modal.classList.remove('ai-generating');
+    
+    // Remove skeletons from all fields
+    if (els.titleInput) removeSkeletonFromField(els.titleInput);
+    if (els.slugInput) removeSkeletonFromField(els.slugInput);
+    if (els.categoryInput) removeSkeletonFromField(els.categoryInput);
+    if (els.metaDescInput) removeSkeletonFromField(els.metaDescInput);
+    if (els.keywordsInput) removeSkeletonFromField(els.keywordsInput);
+    if (els.editor) removeSkeletonFromField(els.editor);
+    
+    console.log('[Post Editor AI] Stopped generating animation');
+  }
+  
+  // Create skeleton in field
+  function createSkeletonInField(field, type) {
+    if (!field) return;
+    
+    // For input/textarea, use overlay approach
+    const isInput = field.tagName === 'INPUT' || field.tagName === 'TEXTAREA';
+    const isContentEditable = field.contentEditable === 'true';
+    
+    // Store original value/content
+    if (isInput) {
+      field.dataset.originalValue = field.value;
+      field.value = '';
+      field.style.color = 'transparent';
+    } else {
+      field.dataset.originalContent = field.innerHTML;
+      field.innerHTML = '';
+    }
+    
+    // Create skeleton container
+    const skeletonContainer = document.createElement('div');
+    skeletonContainer.className = 'post-field-skeleton-container';
+    
+    let skeletonHTML = '';
+    if (type === 'title' || type === 'slug') {
+      skeletonHTML = `
+        <div class="post-skeleton-bar post-skeleton-short"></div>
+        <div class="post-skeleton-bar post-skeleton-medium"></div>
+      `;
+    } else if (type === 'category') {
+      skeletonHTML = `
+        <div class="post-skeleton-bar post-skeleton-short"></div>
+      `;
+    } else if (type === 'meta') {
+      skeletonHTML = `
+        <div class="post-skeleton-bar post-skeleton-medium"></div>
+        <div class="post-skeleton-bar post-skeleton-wide"></div>
+        <div class="post-skeleton-bar post-skeleton-medium"></div>
+      `;
+    } else if (type === 'keywords') {
+      skeletonHTML = `
+        <div class="post-skeleton-bar post-skeleton-medium"></div>
+      `;
+    } else if (type === 'content') {
+      skeletonHTML = `
+        <div class="post-skeleton-bar post-skeleton-wide"></div>
+        <div class="post-skeleton-bar post-skeleton-medium"></div>
+        <div class="post-skeleton-bar post-skeleton-wide"></div>
+        <div class="post-skeleton-bar post-skeleton-medium"></div>
+        <div class="post-skeleton-bar post-skeleton-wide"></div>
+      `;
+    }
+    
+    skeletonContainer.innerHTML = skeletonHTML;
+    
+    // Insert skeleton
+    if (isInput) {
+      // For inputs, create wrapper with overlay
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'relative';
+      wrapper.style.width = '100%';
+      wrapper.className = 'post-skeleton-wrapper';
+      
+      // Insert wrapper before field
+      field.parentNode.insertBefore(wrapper, field);
+      
+      // Move field into wrapper and make it transparent
+      wrapper.appendChild(field);
+      field.style.background = 'transparent';
+      field.style.position = 'relative';
+      field.style.zIndex = '2';
+      
+      // Add skeleton as overlay
+      skeletonContainer.style.position = 'absolute';
+      skeletonContainer.style.top = '10px';
+      skeletonContainer.style.left = '14px';
+      skeletonContainer.style.right = '14px';
+      skeletonContainer.style.pointerEvents = 'none';
+      skeletonContainer.style.zIndex = '1';
+      wrapper.appendChild(skeletonContainer);
+    } else {
+      // For contentEditable, insert directly
+      if (!isContentEditable) {
+        field.contentEditable = 'true';
+        field.dataset.wasContentEditable = 'false';
+      }
+      field.appendChild(skeletonContainer);
+    }
+    
+    // Start animation
+    setTimeout(() => {
+      const bars = skeletonContainer.querySelectorAll('.post-skeleton-bar');
+      bars.forEach((bar, index) => {
+        bar.style.animationDelay = `${index * 0.15}s`;
+        bar.classList.add('skeleton-animate');
+      });
+    }, 50);
+  }
+  
+  // Remove skeleton from field
+  function removeSkeletonFromField(field) {
+    if (!field) return;
+    
+    const isInput = field.tagName === 'INPUT' || field.tagName === 'TEXTAREA';
+    let skeletonContainer = null;
+    let wrapper = null;
+    
+    if (isInput) {
+      // For inputs, skeleton is in wrapper
+      wrapper = field.closest('.post-skeleton-wrapper');
+      if (wrapper) {
+        skeletonContainer = wrapper.querySelector('.post-field-skeleton-container');
+      }
+    } else {
+      // For contentEditable, skeleton is direct child
+      skeletonContainer = field.querySelector('.post-field-skeleton-container');
+    }
+    
+    if (skeletonContainer) {
+      // Fade out skeleton
+      skeletonContainer.style.opacity = '0';
+      skeletonContainer.style.transition = 'opacity 0.3s ease';
+      
+      // Remove after fade
+      setTimeout(() => {
+        if (skeletonContainer && skeletonContainer.parentNode) {
+          skeletonContainer.remove();
+        }
+        
+        // Restore field
+        if (isInput) {
+          field.style.color = '';
+          field.style.background = '';
+          field.style.position = '';
+          field.style.zIndex = '';
+          
+          // Remove wrapper and restore field to original position
+          if (wrapper && wrapper.parentNode) {
+            wrapper.parentNode.insertBefore(field, wrapper);
+            wrapper.remove();
+          }
+        } else {
+          if (field.dataset.wasContentEditable === 'false') {
+            field.contentEditable = 'false';
+            delete field.dataset.wasContentEditable;
+          }
+        }
+      }, 300);
+    }
+  }
+  
+  // Generate post with AI
+  async function generateWithAI(els) {
+    if (!els.modal) return;
+    
+    try {
+      // Start animation
+      startGeneratingAnimation(els);
+      
+      // Disable AI button
+      if (els.aiGenerateBtn) {
+        els.aiGenerateBtn.disabled = true;
+        els.aiGenerateBtn.style.opacity = '0.6';
+      }
+      
+      // Get API base URL
+      const apiBase = window.API_BASE_URL || (window.location.hostname === 'localhost'
+        ? 'http://localhost:3000'
+        : 'https://power-choosers-crm-792458658491.us-south1.run.app');
+      
+      // Call API
+      const response = await fetch(`${apiBase}/api/posts/generate-ai`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (!result.success || !result.post) {
+        throw new Error('Invalid response from API');
+      }
+      
+      const post = result.post;
+      
+      // Stop animation
+      stopGeneratingAnimation(els);
+      
+      // Populate fields with generated content
+      if (post.title && els.titleInput) {
+        els.titleInput.value = post.title;
+        // Trigger input event to auto-generate slug
+        els.titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      
+      if (post.slug && els.slugInput) {
+        els.slugInput.value = post.slug;
+      }
+      
+      if (post.category && els.categoryInput) {
+        els.categoryInput.value = post.category;
+      }
+      
+      if (post.metaDescription && els.metaDescInput) {
+        els.metaDescInput.value = post.metaDescription;
+      }
+      
+      if (post.keywords && els.keywordsInput) {
+        els.keywordsInput.value = post.keywords;
+      }
+      
+      if (post.content && els.editor) {
+        // Insert content into editor using existing function
+        setEditorContent(els.editor, post.content);
+        // Focus editor
+        setTimeout(() => {
+          els.editor.focus();
+        }, 100);
+      }
+      
+      // Show success message
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast('Post generated successfully!', 'success');
+      }
+      
+      console.log('[Post Editor AI] Post generated successfully');
+      
+    } catch (error) {
+      console.error('[Post Editor AI] Generation failed:', error);
+      stopGeneratingAnimation(els);
+      
+      // Show error message
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast('Failed to generate post. Please try again.', 'error');
+      }
+    } finally {
+      // Re-enable AI button
+      if (els.aiGenerateBtn) {
+        els.aiGenerateBtn.disabled = false;
+        els.aiGenerateBtn.style.opacity = '';
+      }
+    }
+  }
+
   // Initialize
   function init() {
     const els = initDomRefs();
@@ -920,6 +1205,15 @@
     setupRichTextEditor(els);
     setupSlugGeneration(els);
     setupFeaturedImagePreview(els);
+    
+    // Setup AI generate button
+    if (els.aiGenerateBtn) {
+      els.aiGenerateBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        generateWithAI(els);
+      });
+    }
     
     // Close on Escape key
     document.addEventListener('keydown', (e) => {
