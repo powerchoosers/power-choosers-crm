@@ -21,26 +21,49 @@ function getStorageBucket() {
     throw new Error('Firebase Admin not initialized');
   }
   
+  const projectId = process.env.FIREBASE_PROJECT_ID || 'power-choosers-crm';
+  
   // Check for _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET first (Cloud Run env var)
   // Then FIREBASE_STORAGE_BUCKET, then default
   let storageBucket = process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 
-    process.env.FIREBASE_STORAGE_BUCKET || 
-    `${process.env.FIREBASE_PROJECT_ID || 'power-choosers-crm'}.appspot.com`;
+    process.env.FIREBASE_STORAGE_BUCKET;
   
-  // Convert .firebasestorage.app to .appspot.com for Admin SDK
-  // The Admin SDK needs the actual bucket name (appspot.com), not the public URL domain
-  if (storageBucket.includes('.firebasestorage.app')) {
-    storageBucket = storageBucket.replace('.firebasestorage.app', '.appspot.com');
+  // Remove gs:// prefix if present (Admin SDK doesn't need it)
+  if (storageBucket && storageBucket.startsWith('gs://')) {
+    storageBucket = storageBucket.replace('gs://', '');
   }
   
-  // If it's just the project ID without domain, add .appspot.com
-  if (!storageBucket.includes('.') && !storageBucket.includes('gs://')) {
-    storageBucket = `${storageBucket}.appspot.com`;
+  // If no bucket specified, use the project's default bucket name
+  // Try .firebasestorage.app first (newer format), then .appspot.com (legacy)
+  if (!storageBucket || (!storageBucket.includes('.') && !storageBucket.includes('gs://'))) {
+    // Try newer format first
+    storageBucket = `${projectId}.firebasestorage.app`;
   }
   
-  console.log('[GenerateStatic] Using storage bucket:', storageBucket);
+  console.log('[GenerateStatic] Attempting to use storage bucket:', storageBucket);
+  console.log('[GenerateStatic] Project ID:', projectId);
+  console.log('[GenerateStatic] Env vars - _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:', process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+  console.log('[GenerateStatic] Env vars - FIREBASE_STORAGE_BUCKET:', process.env.FIREBASE_STORAGE_BUCKET);
   
-  return admin.storage().bucket(storageBucket);
+  try {
+    const bucket = admin.storage().bucket(storageBucket);
+    console.log('[GenerateStatic] Bucket object created successfully');
+    return bucket;
+  } catch (error) {
+    console.error('[GenerateStatic] Error creating bucket with name:', storageBucket, error);
+    // Try using default bucket (no name specified - uses project default)
+    console.log('[GenerateStatic] Trying default bucket (no name specified)...');
+    try {
+      const defaultBucket = admin.storage().bucket();
+      console.log('[GenerateStatic] Default bucket created successfully');
+      return defaultBucket;
+    } catch (defaultError) {
+      console.error('[GenerateStatic] Error with default bucket:', defaultError);
+      // Last resort: try with just project ID
+      console.log('[GenerateStatic] Trying bucket with just project ID:', projectId);
+      return admin.storage().bucket(projectId);
+    }
+  }
 }
 
 // Generate HTML for a single post
@@ -387,9 +410,10 @@ async function updatePostsList(bucket, posts) {
     lastUpdated: new Date().toISOString()
   };
   
-  const file = bucket.file('posts-list.json');
-  
   try {
+    const file = bucket.file('posts-list.json');
+    console.log('[GenerateStatic] Updating posts-list.json in bucket:', bucket.name);
+    
     await file.save(JSON.stringify(listData, null, 2), {
       metadata: {
         contentType: 'application/json',
@@ -398,12 +422,18 @@ async function updatePostsList(bucket, posts) {
       public: true,
     });
     
+    console.log('[GenerateStatic] posts-list.json saved, making public...');
     await file.makePublic();
-    console.log('[GenerateStatic] posts-list.json created/updated with', posts.length, 'posts');
     
-    return file.publicUrl();
+    const publicUrl = file.publicUrl();
+    console.log('[GenerateStatic] posts-list.json created/updated with', posts.length, 'posts');
+    console.log('[GenerateStatic] posts-list.json public URL:', publicUrl);
+    
+    return publicUrl;
   } catch (error) {
     console.error('[GenerateStatic] Error updating posts-list.json:', error);
+    console.error('[GenerateStatic] Bucket name:', bucket.name);
+    console.error('[GenerateStatic] Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     throw error;
   }
 }
@@ -428,7 +458,19 @@ export default async function handler(req, res) {
     
     // If regenerateList is true, just update posts-list.json without generating HTML
     if (regenerateList) {
-      const bucket = getStorageBucket();
+      let bucket;
+      try {
+        bucket = getStorageBucket();
+        console.log('[GenerateStatic] Bucket retrieved successfully for list regeneration');
+      } catch (bucketError) {
+        console.error('[GenerateStatic] Failed to get storage bucket:', bucketError);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          error: 'Failed to access Firebase Storage',
+          details: bucketError.message
+        }));
+        return;
+      }
       
       // Get all published posts
       let publishedPosts = [];
@@ -515,7 +557,19 @@ export default async function handler(req, res) {
     }
     
     // Get storage bucket
-    const bucket = getStorageBucket();
+    let bucket;
+    try {
+      bucket = getStorageBucket();
+      console.log('[GenerateStatic] Bucket retrieved successfully');
+    } catch (bucketError) {
+      console.error('[GenerateStatic] Failed to get storage bucket:', bucketError);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Failed to access Firebase Storage',
+        details: bucketError.message
+      }));
+      return;
+    }
     
     // Get recent posts (excluding current post, limit to 3 most recent)
     let recentPosts = [];
