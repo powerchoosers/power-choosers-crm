@@ -281,10 +281,8 @@ function generatePostHTML(post, recentPosts = []) {
                 const recentDesc = recentPost.metaDescription || '';
                 const recentImage = recentPost.featuredImage || '';
                 const recentCategory = recentPost.category || '';
-                const recentSlug = recentPost.slug || recentPost.id;
-                const recentPath = `posts/${recentSlug}.html`;
-                const encodedPath = encodeURIComponent(recentPath);
-                const recentUrl = `https://firebasestorage.googleapis.com/v0/b/${publicStorageBucket}/o/${encodedPath}?alt=media`;
+                // Use signed URL if available (generated before calling this function)
+                const recentUrl = recentPost.signedUrl || '';
                 
                 // Truncate description to ~150 characters
                 const preview = recentDesc.length > 150 ? recentDesc.substring(0, 150).trim() + '...' : recentDesc;
@@ -382,23 +380,28 @@ async function uploadHTMLToStorage(bucket, filename, htmlContent) {
     const file = bucket.file(`posts/${filename}`);
     console.log('[GenerateStatic] File path: posts/' + filename);
     
+    // With uniform bucket-level access and domain-restricted sharing, we can't use public IAM
+    // Use signed URLs with long expiration instead (10 years = effectively permanent)
     await file.save(htmlContent, {
       metadata: {
         contentType: 'text/html',
         cacheControl: 'public, max-age=3600',
       },
-      public: true,
     });
     
-    console.log('[GenerateStatic] File saved, making public...');
+    console.log('[GenerateStatic] File saved successfully');
     
-    // Make file publicly accessible
-    await file.makePublic();
+    // Generate signed URL with 10-year expiration (effectively permanent for blog posts)
+    // This works even with domain-restricted sharing policies
+    const expiresIn = 10 * 365 * 24 * 60 * 60 * 1000; // 10 years in milliseconds
+    const [signedUrl] = await file.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + expiresIn,
+    });
     
-    const publicUrl = file.publicUrl();
-    console.log('[GenerateStatic] File made public, URL:', publicUrl);
+    console.log('[GenerateStatic] Signed URL generated (expires in 10 years)');
     
-    return publicUrl;
+    return signedUrl;
   } catch (error) {
     console.error('[GenerateStatic] Error uploading HTML file:', error);
     console.error('[GenerateStatic] Bucket name:', bucket.name);
@@ -417,8 +420,24 @@ async function uploadHTMLToStorage(bucket, filename, htmlContent) {
 // Update posts-list.json in Firebase Storage
 async function updatePostsList(bucket, posts) {
   // Always create/update posts-list.json, even if empty
-  const listData = {
-    posts: posts.map(post => ({
+  // Generate signed URLs for each post (since we can't use public IAM due to domain restrictions)
+  const postsWithUrls = await Promise.all(posts.map(async (post) => {
+    const postFile = bucket.file(`posts/${post.slug || post.id}.html`);
+    const expiresIn = 10 * 365 * 24 * 60 * 60 * 1000; // 10 years
+    let signedUrl = '';
+    try {
+      const [url] = await postFile.getSignedUrl({
+        action: 'read',
+        expires: Date.now() + expiresIn,
+      });
+      signedUrl = url;
+    } catch (error) {
+      console.warn('[GenerateStatic] Could not generate signed URL for post:', post.id, error.message);
+      // Fallback to constructing URL manually (won't work without access, but at least structure is correct)
+      signedUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/posts%2F${encodeURIComponent(post.slug || post.id)}.html?alt=media`;
+    }
+    
+    return {
       id: post.id,
       title: post.title,
       slug: post.slug,
@@ -431,8 +450,12 @@ async function updatePostsList(bucket, posts) {
       createdAt: post.createdAt ? 
         (post.createdAt.toDate ? post.createdAt.toDate().toISOString() : new Date(post.createdAt).toISOString()) : 
         null,
-      url: `posts/${post.slug || post.id}.html`
-    })),
+      url: signedUrl // Use signed URL instead of path
+    };
+  }));
+  
+  const listData = {
+    posts: postsWithUrls,
     lastUpdated: new Date().toISOString()
   };
   
@@ -440,22 +463,29 @@ async function updatePostsList(bucket, posts) {
     console.log('[GenerateStatic] Updating posts-list.json in bucket:', bucket.name);
     const file = bucket.file('posts-list.json');
     
+    // With uniform bucket-level access and domain-restricted sharing, we can't use public IAM
+    // Use signed URLs with long expiration instead (10 years = effectively permanent)
     await file.save(JSON.stringify(listData, null, 2), {
       metadata: {
         contentType: 'application/json',
         cacheControl: 'public, max-age=300',
       },
-      public: true,
     });
     
-    console.log('[GenerateStatic] posts-list.json saved, making public...');
-    await file.makePublic();
+    console.log('[GenerateStatic] posts-list.json saved successfully');
     
-    const publicUrl = file.publicUrl();
+    // Generate signed URL with 10-year expiration (effectively permanent)
+    // This works even with domain-restricted sharing policies
+    const expiresIn = 10 * 365 * 24 * 60 * 60 * 1000; // 10 years in milliseconds
+    const [signedUrl] = await file.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + expiresIn,
+    });
+    
     console.log('[GenerateStatic] posts-list.json created/updated with', posts.length, 'posts');
-    console.log('[GenerateStatic] posts-list.json public URL:', publicUrl);
+    console.log('[GenerateStatic] posts-list.json signed URL generated (expires in 10 years)');
     
-    return publicUrl;
+    return signedUrl;
   } catch (error) {
     console.error('[GenerateStatic] Error updating posts-list.json:', error);
     console.error('[GenerateStatic] Bucket name:', bucket.name);
@@ -626,10 +656,33 @@ export default async function handler(req, res) {
       });
       
       // Get top 3 most recent
-      recentPosts = allPublished.slice(0, 3);
+      const recentPostsData = allPublished.slice(0, 3);
+      
+      // Generate signed URLs for recent posts (10-year expiration)
+      const expiresIn = 10 * 365 * 24 * 60 * 60 * 1000; // 10 years
+      recentPosts = await Promise.all(recentPostsData.map(async (rp) => {
+        const recentPostFile = bucket.file(`posts/${rp.slug || rp.id}.html`);
+        let signedUrl = '';
+        try {
+          const [url] = await recentPostFile.getSignedUrl({
+            action: 'read',
+            expires: Date.now() + expiresIn,
+          });
+          signedUrl = url;
+        } catch (error) {
+          console.warn('[GenerateStatic] Could not generate signed URL for recent post:', rp.id, error.message);
+          // Fallback URL (won't work without access, but structure is correct)
+          signedUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/posts%2F${encodeURIComponent(rp.slug || rp.id)}.html?alt=media`;
+        }
+        return {
+          ...rp,
+          signedUrl // Add signed URL to recent post data
+        };
+      }));
     } catch (error) {
       console.warn('[GenerateStatic] Error fetching recent posts:', error);
       // Continue without recent posts if there's an error
+      recentPosts = [];
     }
     
     // Generate HTML
