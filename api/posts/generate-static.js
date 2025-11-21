@@ -45,24 +45,28 @@ function getStorageBucket() {
   console.log('[GenerateStatic] Env vars - _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:', process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
   console.log('[GenerateStatic] Env vars - FIREBASE_STORAGE_BUCKET:', process.env.FIREBASE_STORAGE_BUCKET);
   
+  // Firebase Admin SDK: Use default bucket (no name) - this automatically uses the project's default bucket
+  // The default bucket is created automatically when Firebase Storage is enabled
+  // This avoids bucket name format issues between Firebase Storage URLs and GCS bucket names
+  console.log('[GenerateStatic] Using default bucket (no name specified - uses project default)');
   try {
-    const bucket = admin.storage().bucket(storageBucket);
-    console.log('[GenerateStatic] Bucket object created successfully');
+    const bucket = admin.storage().bucket(); // No name = uses default bucket
+    console.log('[GenerateStatic] Default bucket retrieved successfully');
     return bucket;
   } catch (error) {
-    console.error('[GenerateStatic] Error creating bucket with name:', storageBucket, error);
-    // Try using default bucket (no name specified - uses project default)
-    console.log('[GenerateStatic] Trying default bucket (no name specified)...');
-    try {
-      const defaultBucket = admin.storage().bucket();
-      console.log('[GenerateStatic] Default bucket created successfully');
-      return defaultBucket;
-    } catch (defaultError) {
-      console.error('[GenerateStatic] Error with default bucket:', defaultError);
-      // Last resort: try with just project ID
-      console.log('[GenerateStatic] Trying bucket with just project ID:', projectId);
-      return admin.storage().bucket(projectId);
+    console.error('[GenerateStatic] Failed to get default bucket:', error);
+    
+    // Fallback: Try with explicit bucket name if env var is set
+    if (storageBucket) {
+      console.log('[GenerateStatic] Trying explicit bucket name as fallback:', storageBucket);
+      try {
+        return admin.storage().bucket(storageBucket);
+      } catch (fallbackError) {
+        console.error('[GenerateStatic] Fallback bucket also failed:', fallbackError);
+      }
     }
+    
+    throw new Error(`Failed to access storage bucket. Error: ${error.message}`);
   }
 }
 
@@ -373,19 +377,41 @@ function escapeHtml(text) {
 
 // Upload HTML file to Firebase Storage
 async function uploadHTMLToStorage(bucket, filename, htmlContent) {
-  const file = bucket.file(`posts/${filename}`);
-  await file.save(htmlContent, {
-    metadata: {
-      contentType: 'text/html',
-      cacheControl: 'public, max-age=3600',
-    },
-    public: true,
-  });
-  
-  // Make file publicly accessible
-  await file.makePublic();
-  
-  return file.publicUrl();
+  try {
+    console.log('[GenerateStatic] Uploading to bucket:', bucket.name);
+    const file = bucket.file(`posts/${filename}`);
+    console.log('[GenerateStatic] File path: posts/' + filename);
+    
+    await file.save(htmlContent, {
+      metadata: {
+        contentType: 'text/html',
+        cacheControl: 'public, max-age=3600',
+      },
+      public: true,
+    });
+    
+    console.log('[GenerateStatic] File saved, making public...');
+    
+    // Make file publicly accessible
+    await file.makePublic();
+    
+    const publicUrl = file.publicUrl();
+    console.log('[GenerateStatic] File made public, URL:', publicUrl);
+    
+    return publicUrl;
+  } catch (error) {
+    console.error('[GenerateStatic] Error uploading HTML file:', error);
+    console.error('[GenerateStatic] Bucket name:', bucket.name);
+    console.error('[GenerateStatic] Error code:', error.code);
+    console.error('[GenerateStatic] Error message:', error.message);
+    
+    // If bucket doesn't exist, provide helpful error
+    if (error.code === 404 || error.message.includes('does not exist')) {
+      throw new Error(`Storage bucket "${bucket.name}" does not exist. Please check your Firebase Storage bucket name in the Firebase Console.`);
+    }
+    
+    throw error;
+  }
 }
 
 // Update posts-list.json in Firebase Storage
@@ -411,8 +437,8 @@ async function updatePostsList(bucket, posts) {
   };
   
   try {
-    const file = bucket.file('posts-list.json');
     console.log('[GenerateStatic] Updating posts-list.json in bucket:', bucket.name);
+    const file = bucket.file('posts-list.json');
     
     await file.save(JSON.stringify(listData, null, 2), {
       metadata: {
@@ -433,7 +459,14 @@ async function updatePostsList(bucket, posts) {
   } catch (error) {
     console.error('[GenerateStatic] Error updating posts-list.json:', error);
     console.error('[GenerateStatic] Bucket name:', bucket.name);
-    console.error('[GenerateStatic] Error details:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    console.error('[GenerateStatic] Error code:', error.code);
+    console.error('[GenerateStatic] Error message:', error.message);
+    
+    // If bucket doesn't exist, provide helpful error
+    if (error.code === 404 || error.message.includes('does not exist')) {
+      throw new Error(`Storage bucket "${bucket.name}" does not exist. Please verify the bucket exists in Firebase Console → Storage.`);
+    }
+    
     throw error;
   }
 }
