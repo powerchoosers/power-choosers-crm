@@ -984,28 +984,60 @@
     
     // Insert skeleton
     if (isInput) {
-      // For inputs, create wrapper with overlay
-      const wrapper = document.createElement('div');
-      wrapper.style.position = 'relative';
-      wrapper.style.width = '100%';
-      wrapper.className = 'post-skeleton-wrapper';
+      // For inputs, create a simple overlay without moving the field
+      // Wrap field in a positioned container if needed
+      const parent = field.parentElement;
+      let container = parent;
       
-      // Insert wrapper before field
-      field.parentNode.insertBefore(wrapper, field);
+      // Check if parent is already a suitable container
+      const parentStyle = window.getComputedStyle(parent);
+      const needsWrapper = parentStyle.position === 'static' && !parent.classList.contains('post-skeleton-wrapper');
       
-      // Move field into wrapper
-      wrapper.appendChild(field);
-      field.style.position = 'relative';
-      field.style.zIndex = '2';
+      if (needsWrapper) {
+        // Create a minimal wrapper that doesn't break layout
+        container = document.createElement('div');
+        container.className = 'post-skeleton-wrapper';
+        container.style.position = 'relative';
+        container.style.width = '100%';
+        // Preserve parent's display style
+        const parentDisplay = window.getComputedStyle(parent).display;
+        if (parentDisplay === 'flex' || parentDisplay === 'grid') {
+          container.style.display = parentDisplay;
+        } else {
+          container.style.display = 'block';
+        }
+        
+        // Insert wrapper and move field into it
+        parent.insertBefore(container, field);
+        container.appendChild(field);
+        field.dataset.skeletonWrapped = 'true';
+      }
       
-      // Add skeleton as overlay
+      // Ensure container is positioned
+      if (window.getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
+        container.dataset.skeletonPositioned = 'true';
+      }
+      
+      // Position skeleton overlay
       skeletonContainer.style.position = 'absolute';
       skeletonContainer.style.top = '10px';
       skeletonContainer.style.left = '14px';
       skeletonContainer.style.right = '14px';
       skeletonContainer.style.pointerEvents = 'none';
-      skeletonContainer.style.zIndex = '1';
-      wrapper.appendChild(skeletonContainer);
+      skeletonContainer.style.zIndex = '10';
+      
+      // Make field appear above skeleton
+      field.style.position = 'relative';
+      field.style.zIndex = '11';
+      
+      // Store reference for cleanup
+      const skeletonId = `skeleton-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      skeletonContainer.dataset.skeletonId = skeletonId;
+      field.dataset.skeletonId = skeletonId;
+      
+      // Insert skeleton into container
+      container.appendChild(skeletonContainer);
     } else {
       // For contentEditable, insert directly as overlay
       if (!isContentEditable) {
@@ -1051,10 +1083,18 @@
     let wrapper = null;
     
     if (isInput) {
-      // For inputs, skeleton is in wrapper
+      // For inputs, find skeleton by data attribute
+      const skeletonId = field.dataset.skeletonId;
+      if (skeletonId) {
+        skeletonContainer = document.querySelector(`[data-skeleton-id="${skeletonId}"]`);
+      }
+      // Fallback: search in parent/wrapper
       wrapper = field.closest('.post-skeleton-wrapper');
-      if (wrapper) {
+      if (!skeletonContainer && wrapper) {
         skeletonContainer = wrapper.querySelector('.post-field-skeleton-container');
+      }
+      if (!skeletonContainer && field.parentElement) {
+        skeletonContainer = field.parentElement.querySelector('.post-field-skeleton-container');
       }
     } else {
       // For contentEditable, skeleton is direct child
@@ -1072,15 +1112,24 @@
           skeletonContainer.remove();
         }
         
-        // Restore field
+        // Restore field styles
         if (isInput) {
           field.style.position = '';
           field.style.zIndex = '';
+          delete field.dataset.skeletonId;
           
-          // Remove wrapper and restore field to original position
-          if (wrapper && wrapper.parentNode) {
+          // Remove wrapper if we created one
+          if (field.dataset.skeletonWrapped === 'true' && wrapper && wrapper.parentNode) {
             wrapper.parentNode.insertBefore(field, wrapper);
             wrapper.remove();
+            delete field.dataset.skeletonWrapped;
+          }
+          
+          // Restore parent position if we changed it
+          const parent = field.parentElement;
+          if (parent && parent.dataset.skeletonPositioned === 'true') {
+            parent.style.position = '';
+            delete parent.dataset.skeletonPositioned;
           }
         } else {
           field.style.position = '';

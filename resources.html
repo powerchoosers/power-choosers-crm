@@ -138,7 +138,7 @@
       }
     </style>
     <!-- Apollo Tracking Script -->
-    <script>function initApollo(){var n=Math.random().toString(36).substring(7),o=document.createElement("script");o.src="https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache="+n,o.async=!0,o.defer=!0,o.onload=function(){window.trackingFunctions.onLoad({appId:"67ec3b5820289a0021c5a43c"})},document.head.appendChild(o)}initApollo();</script>
+    <script>function initApollo(){try{var n=Math.random().toString(36).substring(7),o=document.createElement("script");o.src="https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache="+n,o.async=!0,o.defer=!0,o.onload=function(){try{window.trackingFunctions&&window.trackingFunctions.onLoad({appId:"67ec3b5820289a0021c5a43c"})}catch(e){}},o.onerror=function(){},document.head.appendChild(o)}catch(e){}}initApollo();</script>
     
     <!-- Posts Loader - Uses API endpoint to get posts with signed URLs -->
     <script>
@@ -231,7 +231,7 @@
       </button>
       <div class="nav-links">
         <a href="index.html" class="btn btn-outline">Home</a>
-        <a href="index.html#services" class="btn btn-outline">Services</a>
+        <a href="services.html" class="btn btn-outline">Services</a>
         <a href="about.html" class="btn btn-outline">About</a>
         <a href="resources.html" class="btn btn-outline">Resources</a>
         <a href="schedule.html" class="btn btn-outline">Schedule</a>
@@ -379,8 +379,8 @@
       <div>
         <h4>Contact</h4>
         <div class="footer-links">
-          <a href="tel:19728342317">(972) 834-2317</a>
-          <a href="mailto:renewals@powerchoosers.com">renewals@powerchoosers.com</a>
+          <a href="tel:+18178093367">+1 (817) 809-3367</a>
+          <a href="mailto:info@powerchoosers.com">info@powerchoosers.com</a>
         </div>
       </div>
     </div>

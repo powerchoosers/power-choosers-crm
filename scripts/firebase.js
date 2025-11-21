@@ -45,7 +45,7 @@
 
     try {
       window.firebase.initializeApp(firebaseConfig);
-      console.log('[Firebase] Initialized', { projectId: firebaseConfig.projectId });
+      // console.log('[Firebase] Initialized', { projectId: firebaseConfig.projectId });
       window.firebaseProjectId = firebaseConfig.projectId;
     } catch (e) {
       console.warn('Firebase init warning:', e);
@@ -67,12 +67,12 @@
         testQuery.limit(1).get()
           .then(snap => {
             const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-            console.log('[Firebase] Firestore reachable', { projectId: window.firebaseProjectId, listsSample: snap?.size || 0, tookMs: Math.round(t1 - t0) });
+            // console.log('[Firebase] Firestore reachable', { projectId: window.firebaseProjectId, listsSample: snap?.size || 0, tookMs: Math.round(t1 - t0) });
           })
           .catch(err => {
             // Expected for employees if they don't have lists - not a real error
             if (err.code === 'permission-denied' && window.currentUserRole !== 'admin') {
-              console.log('[Firebase] Firestore reachable (no lists access for employee, expected)');
+              // console.log('[Firebase] Firestore reachable (no lists access for employee, expected)');
             } else {
               console.warn('[Firebase] Firestore lists read failed', err);
             }
@@ -122,7 +122,7 @@
           return this.update('contacts', id, changes, { eventName: 'pc:contact-updated' });
         }
       };
-      console.log('[Firebase] PCSaves helper installed');
+      // console.log('[Firebase] PCSaves helper installed');
     }
   } catch (_) {}
 })();
