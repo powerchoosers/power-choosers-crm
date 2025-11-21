@@ -502,7 +502,10 @@ async function parseRequestBody(req) {
     return readFormUrlEncodedBody(req);
   } else {
     // Default to form-urlencoded for Twilio webhooks that may not specify content-type
-    console.warn(`[Server] Unspecified or unknown Content-Type: ${contentType} for URL: ${req.url} - attempting form-urlencoded parse`);
+    // Only log in development to reduce production logging costs
+    if (process.env.NODE_ENV !== 'production') {
+      logger.warn(`Unspecified or unknown Content-Type: ${contentType} for URL: ${req.url} - attempting form-urlencoded parse`, 'Server');
+    }
     return readFormUrlEncodedBody(req);
   }
 }
