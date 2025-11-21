@@ -23,9 +23,22 @@ function getStorageBucket() {
   
   // Check for _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET first (Cloud Run env var)
   // Then FIREBASE_STORAGE_BUCKET, then default
-  const storageBucket = process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 
+  let storageBucket = process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 
     process.env.FIREBASE_STORAGE_BUCKET || 
-    `${process.env.FIREBASE_PROJECT_ID}.appspot.com`;
+    `${process.env.FIREBASE_PROJECT_ID || 'power-choosers-crm'}.appspot.com`;
+  
+  // Convert .firebasestorage.app to .appspot.com for Admin SDK
+  // The Admin SDK needs the actual bucket name (appspot.com), not the public URL domain
+  if (storageBucket.includes('.firebasestorage.app')) {
+    storageBucket = storageBucket.replace('.firebasestorage.app', '.appspot.com');
+  }
+  
+  // If it's just the project ID without domain, add .appspot.com
+  if (!storageBucket.includes('.') && !storageBucket.includes('gs://')) {
+    storageBucket = `${storageBucket}.appspot.com`;
+  }
+  
+  console.log('[GenerateStatic] Using storage bucket:', storageBucket);
   
   return admin.storage().bucket(storageBucket);
 }
@@ -41,15 +54,20 @@ function generatePostHTML(post, recentPosts = []) {
     (post.publishDate.toDate ? post.publishDate.toDate() : new Date(post.publishDate)) : 
     new Date();
   
-  // Get storage bucket for post URLs (use same format as resources.html)
-  // Default to firebasestorage.app format if bucket name doesn't include it
-  let storageBucket = process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 
+  // Get storage bucket for public URLs (use .firebasestorage.app format for public URLs)
+  // This is different from Admin SDK bucket name which uses .appspot.com
+  let publicStorageBucket = process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 
     process.env.FIREBASE_STORAGE_BUCKET || 
-    `${process.env.FIREBASE_PROJECT_ID}.appspot.com`;
+    `${process.env.FIREBASE_PROJECT_ID || 'power-choosers-crm'}.firebasestorage.app`;
   
-  // Ensure we use the correct format (firebasestorage.app or appspot.com)
-  if (!storageBucket.includes('.firebasestorage.app') && !storageBucket.includes('.appspot.com')) {
-    storageBucket = `${process.env.FIREBASE_PROJECT_ID || 'power-choosers-crm'}.firebasestorage.app`;
+  // Convert .appspot.com to .firebasestorage.app for public URLs
+  if (publicStorageBucket.includes('.appspot.com')) {
+    publicStorageBucket = publicStorageBucket.replace('.appspot.com', '.firebasestorage.app');
+  }
+  
+  // Ensure we use .firebasestorage.app format for public URLs
+  if (!publicStorageBucket.includes('.firebasestorage.app') && !publicStorageBucket.includes('.appspot.com')) {
+    publicStorageBucket = `${process.env.FIREBASE_PROJECT_ID || 'power-choosers-crm'}.firebasestorage.app`;
   }
   
   const formattedDate = publishDate.toLocaleDateString('en-US', { 
@@ -239,7 +257,7 @@ function generatePostHTML(post, recentPosts = []) {
                 const recentSlug = recentPost.slug || recentPost.id;
                 const recentPath = `posts/${recentSlug}.html`;
                 const encodedPath = encodeURIComponent(recentPath);
-                const recentUrl = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodedPath}?alt=media`;
+                const recentUrl = `https://firebasestorage.googleapis.com/v0/b/${publicStorageBucket}/o/${encodedPath}?alt=media`;
                 
                 // Truncate description to ~150 characters
                 const preview = recentDesc.length > 150 ? recentDesc.substring(0, 150).trim() + '...' : recentDesc;
