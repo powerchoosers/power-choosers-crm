@@ -328,14 +328,15 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
                 const recentDesc = recentPost.metaDescription || '';
                 const recentImage = recentPost.featuredImage || '';
                 const recentCategory = recentPost.category || '';
-                // Use signed URL if available (generated before calling this function)
-                const recentUrl = recentPost.signedUrl || '';
+                // Use clean URL (powerchoosers.com/posts/slug)
+                const slug = recentPost.slug || recentPost.id;
+                const recentUrl = `https://powerchoosers.com/posts/${slug}`;
                 
                 // Truncate description to ~150 characters
                 const preview = recentDesc.length > 150 ? recentDesc.substring(0, 150).trim() + '...' : recentDesc;
                 
                 return `
-                    <a href="${escapeHtml(recentUrl)}" class="recent-post-card" target="_blank" rel="noopener">
+                    <a href="${escapeHtml(recentUrl)}" class="recent-post-card">
                         ${recentImage ? `<img src="${escapeHtml(recentImage)}" alt="${escapeHtml(recentTitle)}" class="recent-post-image">` : ''}
                         <div class="recent-post-content">
                             ${recentCategory ? `<span class="recent-post-category">${escapeHtml(recentCategory)}</span>` : ''}
@@ -467,22 +468,10 @@ async function uploadHTMLToStorage(bucket, filename, htmlContent) {
 // Update posts-list.json in Firebase Storage
 async function updatePostsList(bucket, posts) {
   // Always create/update posts-list.json, even if empty
-  // Generate signed URLs for each post (since we can't use public IAM due to domain restrictions)
-  const postsWithUrls = await Promise.all(posts.map(async (post) => {
-    const postFile = bucket.file(`posts/${post.slug || post.id}.html`);
-    const expiresIn = 10 * 365 * 24 * 60 * 60 * 1000; // 10 years
-    let signedUrl = '';
-    try {
-      const [url] = await postFile.getSignedUrl({
-        action: 'read',
-        expires: Date.now() + expiresIn,
-      });
-      signedUrl = url;
-    } catch (error) {
-      console.warn('[GenerateStatic] Could not generate signed URL for post:', post.id, error.message);
-      // Fallback to constructing URL manually (won't work without access, but at least structure is correct)
-      signedUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/posts%2F${encodeURIComponent(post.slug || post.id)}.html?alt=media`;
-    }
+  // Use clean URLs (powerchoosers.com/posts/slug) instead of signed URLs
+  const postsWithUrls = posts.map((post) => {
+    const slug = post.slug || post.id;
+    const cleanUrl = `https://powerchoosers.com/posts/${slug}`;
     
     return {
       id: post.id,
@@ -497,9 +486,9 @@ async function updatePostsList(bucket, posts) {
       createdAt: post.createdAt ? 
         (post.createdAt.toDate ? post.createdAt.toDate().toISOString() : new Date(post.createdAt).toISOString()) : 
         null,
-      url: signedUrl // Use signed URL instead of path
+      url: cleanUrl // Use clean URL instead of signed URL
     };
-  }));
+  });
   
   const listData = {
     posts: postsWithUrls,
@@ -705,27 +694,15 @@ export default async function handler(req, res) {
       // Get top 3 most recent
       const recentPostsData = allPublished.slice(0, 3);
       
-      // Generate signed URLs for recent posts (10-year expiration)
-      const expiresIn = 10 * 365 * 24 * 60 * 60 * 1000; // 10 years
-      recentPosts = await Promise.all(recentPostsData.map(async (rp) => {
-        const recentPostFile = bucket.file(`posts/${rp.slug || rp.id}.html`);
-        let signedUrl = '';
-        try {
-          const [url] = await recentPostFile.getSignedUrl({
-            action: 'read',
-            expires: Date.now() + expiresIn,
-          });
-          signedUrl = url;
-        } catch (error) {
-          console.warn('[GenerateStatic] Could not generate signed URL for recent post:', rp.id, error.message);
-          // Fallback URL (won't work without access, but structure is correct)
-          signedUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/posts%2F${encodeURIComponent(rp.slug || rp.id)}.html?alt=media`;
-        }
+      // Use clean URLs for recent posts (powerchoosers.com/posts/slug)
+      recentPosts = recentPostsData.map((rp) => {
+        const slug = rp.slug || rp.id;
+        const cleanUrl = `https://powerchoosers.com/posts/${slug}`;
         return {
           ...rp,
-          signedUrl // Add signed URL to recent post data
+          signedUrl: cleanUrl // Use clean URL instead of signed URL
         };
-      }));
+      });
     } catch (error) {
       console.warn('[GenerateStatic] Error fetching recent posts:', error);
       // Continue without recent posts if there's an error
