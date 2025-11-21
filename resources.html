@@ -153,10 +153,18 @@
           
           try {
             // Fetch posts list from Firebase Storage
-            const response = await fetch(postsListUrl);
+            const response = await fetch(postsListUrl, {
+              cache: 'no-cache' // Always fetch fresh data
+            });
             
             if (!response.ok) {
-              throw new Error('Failed to load posts');
+              // If 404, posts-list.json doesn't exist yet (no posts published)
+              if (response.status === 404) {
+                console.log('[Resources] posts-list.json not found - no posts published yet');
+                container.innerHTML = '<div class="resource-card" style="text-align: center; padding: 48px;"><p style="color: var(--muted);">No posts available yet. Check back soon!</p></div>';
+                return;
+              }
+              throw new Error(`Failed to load posts: ${response.status} ${response.statusText}`);
             }
             
             const data = await response.json();
