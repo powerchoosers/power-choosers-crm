@@ -71,7 +71,7 @@ function getStorageBucket() {
 }
 
 // Generate HTML for a single post
-function generatePostHTML(post, recentPosts = []) {
+function generatePostHTML(post, recentPosts = [], authorInfo = null) {
   const title = post.title || 'Untitled Post';
   const metaDescription = post.metaDescription || '';
   const keywords = post.keywords || '';
@@ -188,6 +188,26 @@ function generatePostHTML(post, recentPosts = []) {
       .article-content a{color:var(--brand-orange);text-decoration:underline}
       .article-content a:hover{color:#d97706}
       
+      /* Author Bio Section */
+      .author-bio-section{max-width:var(--container);margin:60px auto 0;padding:0 24px}
+      .author-bio-container{background:linear-gradient(135deg,#f8fafc 0%, #ffffff 100%);border:1px solid var(--border);border-radius:var(--radius);padding:32px;box-shadow:0 4px 12px rgba(0,0,0,.05)}
+      .author-bio-content{display:flex;align-items:center;gap:24px}
+      .author-avatar{flex-shrink:0}
+      .author-avatar img{width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--brand-orange);box-shadow:0 4px 12px rgba(245,158,11,.2)}
+      .author-info{flex:1}
+      .author-name{font-size:24px;font-weight:700;margin:0 0 8px 0;color:var(--brand-blue)}
+      .author-title{font-size:16px;color:var(--muted);margin:0 0 12px 0}
+      .author-social{display:flex;align-items:center;gap:12px}
+      .linkedin-link{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:8px;background:var(--brand-blue);color:#ffffff;transition:all .3s ease;text-decoration:none}
+      .linkedin-link:hover{background:var(--brand-orange);transform:translateY(-2px);box-shadow:0 4px 12px rgba(245,158,11,.3);text-decoration:none}
+      .linkedin-link svg{width:20px;height:20px}
+      
+      @media (max-width: 768px){
+        .author-bio-content{flex-direction:column;text-align:center}
+        .author-avatar img{width:64px;height:64px}
+        .author-name{font-size:20px}
+      }
+      
       /* Recent Posts Section */
       .recent-posts-section{max-width:1400px;margin:80px auto 0;padding:80px 24px;background:linear-gradient(135deg,#f8fafc 0%, #ffffff 100%);border-top:1px solid var(--border)}
       .recent-posts-section h2{font-size:40px;font-weight:800;margin-bottom:48px;text-align:center;background:linear-gradient(135deg,var(--brand-blue) 0%, #1e3a8a 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
@@ -271,6 +291,33 @@ function generatePostHTML(post, recentPosts = []) {
             ${content}
         </div>
     </article>
+    
+    ${authorInfo && (authorInfo.firstName || authorInfo.lastName) ? `
+    <section class="author-bio-section">
+        <div class="author-bio-container">
+            <div class="author-bio-content">
+                ${authorInfo.hostedPhotoURL || authorInfo.photoURL ? `
+                <div class="author-avatar">
+                    <img src="${escapeHtml(authorInfo.hostedPhotoURL || authorInfo.photoURL)}" alt="${escapeHtml((authorInfo.firstName || '') + ' ' + (authorInfo.lastName || ''))}">
+                </div>
+                ` : ''}
+                <div class="author-info">
+                    <h3 class="author-name">${escapeHtml((authorInfo.firstName || '') + ' ' + (authorInfo.lastName || ''))}</h3>
+                    ${authorInfo.jobTitle ? `<p class="author-title">${escapeHtml(authorInfo.jobTitle)}</p>` : ''}
+                    ${authorInfo.linkedIn ? `
+                    <div class="author-social">
+                        <a href="${escapeHtml(authorInfo.linkedIn)}" target="_blank" rel="noopener" class="linkedin-link" aria-label="LinkedIn Profile">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                            </svg>
+                        </a>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    </section>
+    ` : ''}
     
     ${recentPosts.length > 0 ? `
     <section class="recent-posts-section">
@@ -685,8 +732,36 @@ export default async function handler(req, res) {
       recentPosts = [];
     }
     
+    // Fetch author info from settings
+    let authorInfo = null;
+    try {
+      // Try to get settings - admin uses 'user-settings', employees use 'user-settings-{email}'
+      // For blog posts, we'll use admin settings (user-settings) as default
+      const settingsDoc = await db.collection('settings').doc('user-settings').get();
+      
+      if (settingsDoc.exists) {
+        const settings = settingsDoc.data();
+        const general = settings.general || {};
+        
+        // Only include author info if we have at least a first or last name
+        if (general.firstName || general.lastName) {
+          authorInfo = {
+            firstName: general.firstName || '',
+            lastName: general.lastName || '',
+            jobTitle: general.jobTitle || '',
+            hostedPhotoURL: general.hostedPhotoURL || '',
+            photoURL: general.photoURL || '',
+            linkedIn: general.linkedIn || ''
+          };
+        }
+      }
+    } catch (settingsError) {
+      console.warn('[GenerateStatic] Could not fetch author info from settings:', settingsError.message);
+      // Continue without author info if settings fetch fails
+    }
+    
     // Generate HTML
-    const htmlContent = generatePostHTML(post, recentPosts);
+    const htmlContent = generatePostHTML(post, recentPosts, authorInfo);
     const filename = `${post.slug || post.id}.html`;
     
     // Upload HTML file
