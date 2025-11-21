@@ -1314,6 +1314,7 @@
                                                 <th>Title</th>
                                                 <th>Category</th>
                                                 <th>Status</th>
+                                                <th>Author</th>
                                                 <th>Slug</th>
                                                 <th>Publish Date</th>
                                                 <th>Updated</th>
@@ -2685,6 +2686,20 @@
                                                         Your company name (white-label support)
                                                     </small>
                                                 </div>
+                                                
+                                                <!-- LinkedIn Profile (Editable) -->
+                                                <div class="settings-field">
+                                                    <label for="user-linkedin">LinkedIn Profile URL</label>
+                                                    <input 
+                                                        type="url" 
+                                                        id="user-linkedin" 
+                                                        class="settings-input" 
+                                                        placeholder="https://linkedin.com/in/yourprofile"
+                                                    >
+                                                    <small style="color: var(--text-secondary); font-size: 12px; margin-top: 4px; display: block;">
+                                                        Your LinkedIn profile URL (appears in blog post author bio)
+                                                    </small>
+                                                </div>
                                             </div>
                                             
                                             <div class="settings-group">
@@ -3054,10 +3069,9 @@
             <div class="pc-modal__header">
                 <h3 id="create-post-title">Create Post</h3>
                 <button type="button" class="ai-generate-post-btn" id="ai-generate-post-btn" aria-label="AI Generate Post" title="Generate post with AI">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-                        <path d="M2 17l10 5 10-5"></path>
-                        <path d="M2 12l10 5 10-5"></path>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 48 48">
+                        <path fill="white" d="M23.426,31.911l-1.719,3.936c-0.661,1.513-2.754,1.513-3.415,0l-1.719-3.936	c-1.529-3.503-4.282-6.291-7.716-7.815l-4.73-2.1c-1.504-0.668-1.504-2.855,0-3.523l4.583-2.034	c3.522-1.563,6.324-4.455,7.827-8.077l1.741-4.195c0.646-1.557,2.797-1.557,3.443,0l1.741,4.195	c1.503,3.622,4.305,6.514,7.827,8.077l4.583,2.034c1.504,0.668,1.504,2.855,0,3.523l-4.73,2.1	C27.708,25.62,24.955,28.409,23.426,31.911z"></path>
+                        <path fill="white" d="M38.423,43.248l-0.493,1.131c-0.361,0.828-1.507,0.828-1.868,0l-0.493-1.131	c-0.879-2.016-2.464-3.621-4.44-4.5l-1.52-0.675c-0.822-0.365-0.822-1.56,0-1.925l1.435-0.638c2.027-0.901,3.64-2.565,4.504-4.65	l0.507-1.222c0.353-0.852,1.531-0.852,1.884,0l0.507,1.222c0.864,2.085,2.477,3.749,4.504,4.65l1.435,0.638	c0.822,0.365,0.822,1.56,0,1.925l-1.52,0.675C40.887,39.627,39.303,41.232,38.423,43.248z"></path>
                     </svg>
                     <span>AI Generate</span>
                 </button>

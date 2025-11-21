@@ -11,7 +11,8 @@
     currentPage: 1,
     errorMsg: '',
     totalCount: 0, // Total posts in database (for footer display)
-    hasAnimated: false // Track if initial animation has played
+    hasAnimated: false, // Track if initial animation has played
+    authorInfo: null // Author info from settings (firstName, lastName, jobTitle)
   };
 
   const els = {};
@@ -126,6 +127,25 @@
           updatedAt: data.updatedAt || data.createdAt || window.firebase.firestore.FieldValue.serverTimestamp()
         });
       });
+      
+      // Fetch author info from settings
+      try {
+        const settingsDoc = await window.firebaseDB.collection('settings').doc('user-settings').get();
+        if (settingsDoc.exists) {
+          const settings = settingsDoc.data();
+          const general = settings.general || {};
+          if (general.firstName || general.lastName) {
+            state.authorInfo = {
+              firstName: general.firstName || '',
+              lastName: general.lastName || '',
+              jobTitle: general.jobTitle || ''
+            };
+          }
+        }
+      } catch (settingsError) {
+        console.warn('[News] Could not fetch author info from settings:', settingsError);
+        state.authorInfo = null;
+      }
       
       state.totalCount = state.data.length;
       state.filtered = state.data.slice();
@@ -290,6 +310,11 @@
     const publishDate = formatDateOrNA(post.publishDate);
     const updatedStr = formatDateOrNA(post.updatedAt || post.createdAt);
     
+    // Get author name from state
+    const authorName = state.authorInfo 
+      ? `${state.authorInfo.firstName || ''} ${state.authorInfo.lastName || ''}`.trim() || '—'
+      : '—';
+    
     const isSelected = state.selected.has(post.id);
     const checked = isSelected ? ' checked' : '';
     const rowClass = isSelected ? ' class="row-selected"' : '';
@@ -305,6 +330,7 @@
   <td class="name-cell"><a href="#post-detail" class="post-link" data-id="${pid}" title="View post details"><span class="name-text">${escapeHtml(title)}</span></a></td>
   <td>${escapeHtml(category)}</td>
   <td>${statusBadge}</td>
+  <td>${escapeHtml(authorName)}</td>
   <td><code style="font-size: 0.875rem; color: var(--text-secondary);">${escapeHtml(slug)}</code></td>
   <td>${escapeHtml(publishDate)}</td>
   <td>${escapeHtml(updatedStr)}</td>
@@ -334,7 +360,7 @@
     const msg = state.errorMsg || 'No posts found.';
     return `
 <tr>
-  <td colspan="8" style="opacity:.75; text-align: center; padding: 2rem;">${escapeHtml(msg)}</td>
+  <td colspan="9" style="opacity:.75; text-align: center; padding: 2rem;">${escapeHtml(msg)}</td>
 </tr>`;
   }
 

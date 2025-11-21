@@ -98,8 +98,6 @@ import apolloHealthHandler from './api/apollo/health.js';
 import uploadHostGoogleAvatarHandler from './api/upload/host-google-avatar.js';
 import uploadSignatureImageHandler from './api/upload/signature-image.js';
 import generateStaticPostHandler from './api/posts/generate-static.js';
-import postsListHandler from './api/posts/list.js';
-import generateAiPostHandler from './api/posts/generate-ai.js';
 import algoliaReindexHandler from './api/algolia/reindex.js';
 import mapsConfigHandler from './api/maps/config.js';
 import debugCallHandler from './api/debug/call.js';
@@ -890,12 +888,6 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/posts/generate-static') {
     return handleApiGenerateStaticPost(req, res);
   }
-  if (pathname === '/api/posts/list') {
-    return handleApiPostsList(req, res);
-  }
-  if (pathname === '/api/posts/generate-ai') {
-    return handleApiGenerateAiPost(req, res);
-  }
   if (pathname === '/api/algolia/reindex') {
     return handleApiAlgoliaReindex(req, res);
   }
@@ -1161,33 +1153,6 @@ async function handleApiGenerateStaticPost(req, res) {
     return await generateStaticPostHandler(req, res);
   } catch (error) {
     console.error('[Server] Error in generate static post handler wrapper:', error);
-    if (!res.headersSent) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Server error', message: error.message }));
-    }
-  }
-}
-
-async function handleApiPostsList(req, res) {
-  try {
-    return await postsListHandler(req, res);
-  } catch (error) {
-    console.error('[Server] Error in posts list handler wrapper:', error);
-    if (!res.headersSent) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Server error', message: error.message }));
-    }
-  }
-}
-
-async function handleApiGenerateAiPost(req, res) {
-  try {
-    if (req.method === 'POST') {
-      req.body = await parseRequestBody(req);
-    }
-    return await generateAiPostHandler(req, res);
-  } catch (error) {
-    console.error('[Server] Error in generate AI post handler wrapper:', error);
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Server error', message: error.message }));

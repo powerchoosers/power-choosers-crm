@@ -933,18 +933,17 @@
   function createSkeletonInField(field, type) {
     if (!field) return;
     
-    // For input/textarea, use overlay approach
+    // For input/textarea, use overlay approach without clearing content
     const isInput = field.tagName === 'INPUT' || field.tagName === 'TEXTAREA';
     const isContentEditable = field.contentEditable === 'true';
     
-    // Store original value/content
+    // Store original value/content (but don't clear it)
     if (isInput) {
       field.dataset.originalValue = field.value;
-      field.value = '';
-      field.style.color = 'transparent';
+      // Don't make transparent - skeleton will overlay
     } else {
       field.dataset.originalContent = field.innerHTML;
-      field.innerHTML = '';
+      // Don't make transparent - skeleton will overlay
     }
     
     // Create skeleton container
@@ -994,9 +993,8 @@
       // Insert wrapper before field
       field.parentNode.insertBefore(wrapper, field);
       
-      // Move field into wrapper and make it transparent
+      // Move field into wrapper
       wrapper.appendChild(field);
-      field.style.background = 'transparent';
       field.style.position = 'relative';
       field.style.zIndex = '2';
       
@@ -1009,12 +1007,29 @@
       skeletonContainer.style.zIndex = '1';
       wrapper.appendChild(skeletonContainer);
     } else {
-      // For contentEditable, insert directly
+      // For contentEditable, insert directly as overlay
       if (!isContentEditable) {
         field.contentEditable = 'true';
         field.dataset.wasContentEditable = 'false';
       }
+      // Store original min-height
+      const originalMinHeight = field.style.minHeight || '';
+      field.style.minHeight = field.style.minHeight || '200px';
+      field.style.position = 'relative';
+      
+      // Insert skeleton as overlay
+      skeletonContainer.style.position = 'absolute';
+      skeletonContainer.style.top = '0';
+      skeletonContainer.style.left = '0';
+      skeletonContainer.style.right = '0';
+      skeletonContainer.style.pointerEvents = 'none';
+      skeletonContainer.style.zIndex = '1';
       field.appendChild(skeletonContainer);
+      
+      // Store original min-height for restoration
+      if (originalMinHeight) {
+        field.dataset.originalMinHeight = originalMinHeight;
+      }
     }
     
     // Start animation
@@ -1059,8 +1074,6 @@
         
         // Restore field
         if (isInput) {
-          field.style.color = '';
-          field.style.background = '';
           field.style.position = '';
           field.style.zIndex = '';
           
@@ -1070,6 +1083,13 @@
             wrapper.remove();
           }
         } else {
+          field.style.position = '';
+          if (field.dataset.originalMinHeight) {
+            field.style.minHeight = field.dataset.originalMinHeight;
+            delete field.dataset.originalMinHeight;
+          } else {
+            field.style.minHeight = '';
+          }
           if (field.dataset.wasContentEditable === 'false') {
             field.contentEditable = 'false';
             delete field.dataset.wasContentEditable;
@@ -1116,40 +1136,43 @@
       
       const post = result.post;
       
-      // Stop animation
+      // Stop animation first (this starts the fade-out)
       stopGeneratingAnimation(els);
       
-      // Populate fields with generated content
-      if (post.title && els.titleInput) {
-        els.titleInput.value = post.title;
-        // Trigger input event to auto-generate slug
-        els.titleInput.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-      
-      if (post.slug && els.slugInput) {
-        els.slugInput.value = post.slug;
-      }
-      
-      if (post.category && els.categoryInput) {
-        els.categoryInput.value = post.category;
-      }
-      
-      if (post.metaDescription && els.metaDescInput) {
-        els.metaDescInput.value = post.metaDescription;
-      }
-      
-      if (post.keywords && els.keywordsInput) {
-        els.keywordsInput.value = post.keywords;
-      }
-      
-      if (post.content && els.editor) {
-        // Insert content into editor using existing function
-        setEditorContent(els.editor, post.content);
-        // Focus editor
-        setTimeout(() => {
-          els.editor.focus();
-        }, 100);
-      }
+      // Wait for skeleton fade-out to complete, then populate fields
+      setTimeout(() => {
+        // Populate fields with generated content
+        if (post.title && els.titleInput) {
+          els.titleInput.value = post.title;
+          // Trigger input event to auto-generate slug
+          els.titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        
+        if (post.slug && els.slugInput) {
+          els.slugInput.value = post.slug;
+        }
+        
+        if (post.category && els.categoryInput) {
+          els.categoryInput.value = post.category;
+        }
+        
+        if (post.metaDescription && els.metaDescInput) {
+          els.metaDescInput.value = post.metaDescription;
+        }
+        
+        if (post.keywords && els.keywordsInput) {
+          els.keywordsInput.value = post.keywords;
+        }
+        
+        if (post.content && els.editor) {
+          // Insert content into editor using existing function
+          setEditorContent(els.editor, post.content);
+          // Focus editor
+          setTimeout(() => {
+            els.editor.focus();
+          }, 100);
+        }
+      }, 350); // Wait for skeleton fade-out (300ms) + small buffer
       
       // Show success message
       if (window.crm && typeof window.crm.showToast === 'function') {

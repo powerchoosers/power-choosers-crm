@@ -137,6 +137,7 @@ class SettingsPage {
                     location: 'Fort Worth, TX',
                     phone: '',              // Personal/direct line
                     companyName: 'Power Choosers',
+                    linkedIn: '',           // LinkedIn profile URL
                     
                     // Existing fields
                     agentName: 'Power Choosers',
@@ -524,7 +525,8 @@ class SettingsPage {
             { id: 'user-job-title', key: 'jobTitle' },
             { id: 'user-location', key: 'location' },
             { id: 'user-phone', key: 'phone' },
-            { id: 'company-name', key: 'companyName' }
+            { id: 'company-name', key: 'companyName' },
+            { id: 'user-linkedin', key: 'linkedIn' }
         ];
 
         profileFields.forEach(({ id, key }) => {
@@ -1362,6 +1364,11 @@ class SettingsPage {
         const companyName = document.getElementById('company-name');
         if (companyName) {
             companyName.value = g.companyName || 'Power Choosers';
+        }
+        
+        const userLinkedIn = document.getElementById('user-linkedin');
+        if (userLinkedIn) {
+            userLinkedIn.value = g.linkedIn || '';
         }
         
         // Render avatar preview if available
