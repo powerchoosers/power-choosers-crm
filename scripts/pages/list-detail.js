@@ -2064,14 +2064,25 @@
           
           // If we're viewing the affected list, clear cache and reload
           if (listId && state.listId === listId) {
-            // Clear in-memory cache for this list
-            if (window.listMembersCache) {
-              delete window.listMembersCache[listId];
-              console.log('[ListDetail] ✓ Cleared in-memory cache for current list');
-            }
+            console.log('[ListDetail] Current list matches bulk import, refreshing...');
             
-            // Force reload of list members
+            // Use refreshListMembership which now properly invalidates all caches
             await refreshListMembership();
+            
+            // Also update BackgroundListsLoader cache if available (cost-effective)
+            try {
+              const listData = window.BackgroundListsLoader?.getListsData?.() || [];
+              const list = listData.find(l => l.id === listId);
+              if (list) {
+                const actualCount = state.membersPeople.size + state.membersAccounts.size;
+                if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
+                  window.BackgroundListsLoader.updateListCountLocally(listId, actualCount);
+                  console.log('[ListDetail] ✓ Updated BackgroundListsLoader cache with actual count:', actualCount);
+                }
+              }
+            } catch (cacheUpdateErr) {
+              console.warn('[ListDetail] Failed to update BackgroundListsLoader cache:', cacheUpdateErr);
+            }
             
             console.log('[ListDetail] ✓ Reloaded list after bulk import');
           }
@@ -2340,14 +2351,62 @@
   async function refreshListMembership() {
     if (state.listId) {
       console.log('[ListDetail] Refreshing list membership for:', state.listId);
-      // Clear the cache for this list
+      
+      // CRITICAL FIX: Invalidate ALL caches before re-fetching
+      // 1. Clear in-memory cache
       if (window.listMembersCache && window.listMembersCache[state.listId]) {
         delete window.listMembersCache[state.listId];
+        console.log('[ListDetail] ✓ Cleared in-memory cache');
       }
-      // Re-fetch members
+      
+      // 2. Invalidate IndexedDB cache (CRITICAL - prevents stale cache reads)
+      if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
+        try {
+          await window.CacheManager.invalidateListCache(state.listId);
+          console.log('[ListDetail] ✓ Invalidated IndexedDB cache');
+        } catch (cacheErr) {
+          console.warn('[ListDetail] Cache invalidation failed:', cacheErr);
+        }
+      }
+      
+      // 3. Reset member Sets to force fresh fetch
+      state.membersPeople = new Set();
+      state.membersAccounts = new Set();
+      
+      // 4. Re-fetch members from Firestore (will bypass cache now)
       await fetchMembers(state.listId);
-      // Re-apply filters
+      
+      // 5. Verify count matches expected (same check as in init)
+      try {
+        const listData = window.BackgroundListsLoader?.getListsData?.() || [];
+        const list = listData.find(l => l.id === state.listId);
+        const expectedCount = list?.recordCount || list?.count || 0;
+        const actualPeopleCount = state.membersPeople?.size || 0;
+        const actualAccountsCount = state.membersAccounts?.size || 0;
+        const actualTotal = actualPeopleCount + actualAccountsCount;
+        
+        console.log('[ListDetail] Count verification after refresh:', {
+          expected: expectedCount,
+          actual: actualTotal,
+          people: actualPeopleCount,
+          accounts: actualAccountsCount
+        });
+        
+        // If still mismatched, log warning (but don't loop - we just invalidated cache)
+        if (expectedCount > 0 && actualTotal > 0 && Math.abs(expectedCount - actualTotal) > Math.max(10, expectedCount * 0.1)) {
+          console.warn(`[ListDetail] ⚠ Count still mismatched after refresh: expected ${expectedCount}, got ${actualTotal}. This may indicate a data sync issue.`);
+        }
+      } catch (countCheckErr) {
+        console.warn('[ListDetail] Error checking count after refresh:', countCheckErr);
+      }
+      
+      // 6. Re-apply filters to update display
       applyFilters();
+      
+      console.log('[ListDetail] ✓ Refresh complete:', {
+        people: state.membersPeople.size,
+        accounts: state.membersAccounts.size
+      });
     }
   }
 
@@ -4052,30 +4111,141 @@ function exportSelectedToCsv() {
 async function removeSelectedFromList() {
   try {
     const page = document.getElementById('list-detail-page');
-    const listId = window.listDetailContext?.listId;
+    const state = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
+    const listId = state?.listId || window.listDetailContext?.listId;
     if (!listId || !window.firebaseDB) { window.crm?.showToast && window.crm.showToast('Cannot remove from list'); return; }
+    
     // Use state.view instead of removed toggle button
-    const view = (window.ListDetail && window.ListDetail._getState && window.ListDetail._getState().view) || 'people';
+    const view = (state && state.view) || 'people';
     const ids = Array.from(document.querySelectorAll('#list-detail-table .row-select:checked')).map(cb => cb.getAttribute('data-id'));
     if (!ids.length) return;
-    const col = window.firebaseDB.collection('lists').doc(listId).collection('members');
-    const snap = await col.get();
+    
+    // CRITICAL FIX: Check BOTH top-level listMembers collection AND subcollection
     const ops = [];
-    snap.forEach(doc => {
-      const m = doc.data() || {};
-      const t = (m.targetType || m.type || '').toLowerCase();
-      const id = m.targetId || m.id || doc.id;
-      const matchesView = (view === 'people' ? (t === 'people' || t === 'contact' || t === 'contacts') : (t === 'accounts' || t === 'account'));
-      if (matchesView && ids.includes(id)) ops.push(col.doc(doc.id).delete());
-    });
-    await Promise.all(ops);
-    window.crm?.showToast && window.crm.showToast(`Removed ${ids.length} from list`);
-    // Refresh members and re-apply filters
-    if (window.ListDetail && typeof window.ListDetail.init === 'function') {
-      // re-fetch members only
-      // Fallback: trigger a soft reload sequence
-      const ctx = window.listDetailContext || {};
-      window.ListDetail.init(ctx);
+    let removedCount = 0;
+    
+    // Priority 1: Top-level listMembers collection (where new additions go)
+    try {
+      const topLevelQuery = await window.firebaseDB.collection('listMembers')
+        .where('listId', '==', listId)
+        .get();
+      
+      topLevelQuery.forEach(doc => {
+        const m = doc.data() || {};
+        const t = (m.targetType || m.type || '').toLowerCase();
+        const id = m.targetId || m.id || doc.id;
+        const matchesView = (view === 'people' ? (t === 'people' || t === 'contact' || t === 'contacts') : (t === 'accounts' || t === 'account'));
+        if (matchesView && ids.includes(id)) {
+          ops.push(doc.ref.delete());
+          removedCount++;
+        }
+      });
+    } catch (topErr) {
+      console.warn('[ListDetail] Top-level delete query failed:', topErr);
+    }
+    
+    // Priority 2: Also check subcollection for legacy data
+    try {
+      const col = window.firebaseDB.collection('lists').doc(listId).collection('members');
+      const snap = await col.get();
+      snap.forEach(doc => {
+        const m = doc.data() || {};
+        const t = (m.targetType || m.type || '').toLowerCase();
+        const id = m.targetId || m.id || doc.id;
+        const matchesView = (view === 'people' ? (t === 'people' || t === 'contact' || t === 'contacts') : (t === 'accounts' || t === 'account'));
+        if (matchesView && ids.includes(id)) {
+          ops.push(col.doc(doc.id).delete());
+          removedCount++;
+        }
+      });
+    } catch (subErr) {
+      console.warn('[ListDetail] Subcollection delete query failed:', subErr);
+    }
+    
+    if (ops.length > 0) {
+      await Promise.all(ops);
+      
+      // Update list recordCount
+      try {
+        const decrement = window.firebase?.firestore?.FieldValue?.increment ? 
+          window.firebase.firestore.FieldValue.increment(-removedCount) : null;
+        
+        // Get current count from cache (cost-effective)
+        let currentCount = null;
+        if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
+          const listsData = window.BackgroundListsLoader.getListsData() || [];
+          const list = listsData.find(l => l.id === listId);
+          if (list) {
+            currentCount = list.recordCount || list.count || 0;
+          }
+        }
+        
+        // Fallback: read from Firestore if not in cache
+        if (currentCount === null) {
+          const listDoc = await window.firebaseDB.collection('lists').doc(listId).get();
+          currentCount = listDoc.data()?.recordCount || 0;
+        }
+        
+        const newRecordCount = Math.max(0, currentCount - removedCount);
+        
+        // Update Firestore
+        if (decrement) {
+          await window.firebaseDB.collection('lists').doc(listId).update({
+            recordCount: decrement,
+            updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp || new Date()
+          });
+        } else {
+          await window.firebaseDB.collection('lists').doc(listId).update({
+            recordCount: newRecordCount,
+            updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp || new Date()
+          });
+        }
+        
+        // Update BackgroundListsLoader cache (cost-effective)
+        if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
+          window.BackgroundListsLoader.updateListCountLocally(listId, newRecordCount);
+        }
+        
+        // Dispatch event to notify lists-overview
+        try {
+          document.dispatchEvent(new CustomEvent('pc:list-count-updated', {
+            detail: {
+              listId,
+              listName: state?.listName || 'List',
+              kind: view,
+              deletedCount: removedCount,
+              newCount: newRecordCount
+            }
+          }));
+        } catch (e) {
+          console.warn('[ListDetail] Failed to dispatch count update event:', e);
+        }
+      } catch (countError) {
+        console.warn('[ListDetail] Failed to update list recordCount:', countError);
+      }
+      
+      // Invalidate cache and refresh
+      if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
+        await window.CacheManager.invalidateListCache(listId);
+      }
+      if (window.listMembersCache && window.listMembersCache[listId]) {
+        // Remove deleted IDs from cache
+        const cache = window.listMembersCache[listId];
+        if (view === 'people' && cache.people) {
+          ids.forEach(id => cache.people.delete(id));
+        } else if (view === 'accounts' && cache.accounts) {
+          ids.forEach(id => cache.accounts.delete(id));
+        }
+      }
+      
+      window.crm?.showToast && window.crm.showToast(`Removed ${removedCount} from list`);
+      
+      // Use efficient refresh instead of full init
+      if (window.ListDetail && typeof window.ListDetail.refreshListMembership === 'function') {
+        await window.ListDetail.refreshListMembership();
+      }
+    } else {
+      window.crm?.showToast && window.crm.showToast('No matching members found to remove');
     }
   } catch (e) {
     console.warn('Remove from list failed', e);
@@ -4235,7 +4405,8 @@ async function handleDeleteConfirm(ids, view) {
       }
       
       // Update list recordCount by decrementing for successfully deleted items
-      const listId = window.listDetailContext?.listId;
+      const state = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
+      const listId = state?.listId || window.listDetailContext?.listId;
       if (listId && completed > 0 && window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
         try {
           const decrement = window.firebase?.firestore?.FieldValue?.increment ? 
@@ -4277,6 +4448,16 @@ async function handleDeleteConfirm(ids, view) {
             console.log(`[Bulk Delete] Updated list ${listId} recordCount from ${currentCount} to ${newRecordCount}`);
           }
           
+          // CRITICAL FIX: Invalidate CacheManager cache to prevent stale data
+          if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
+            try {
+              await window.CacheManager.invalidateListCache(listId);
+              console.log('[Bulk Delete] ✓ Invalidated CacheManager cache for list:', listId);
+            } catch (cacheErr) {
+              console.warn('[Bulk Delete] Cache invalidation failed:', cacheErr);
+            }
+          }
+          
           // Update listMembersCache to reflect deleted items
           if (window.listMembersCache && window.listMembersCache[listId]) {
             const cache = window.listMembersCache[listId];
@@ -4312,6 +4493,7 @@ async function handleDeleteConfirm(ids, view) {
                 newCount: newRecordCount
               }
             }));
+            console.log('[Bulk Delete] ✓ Dispatched count update event:', { listId, deletedCount: completed, newCount: newRecordCount });
           } catch (e) {
             console.warn('[Bulk Delete] Failed to dispatch count update event:', e);
           }
@@ -4356,8 +4538,11 @@ async function handleDeleteConfirm(ids, view) {
       
       hideBulkActionsBar();
       
-      // Refresh the list data
-      if (window.ListDetail && typeof window.ListDetail._render === 'function') {
+      // CRITICAL FIX: Refresh list membership to reflect deletions (efficient refresh, not full init)
+      if (window.ListDetail && typeof window.ListDetail.refreshListMembership === 'function') {
+        await window.ListDetail.refreshListMembership();
+        console.log('[Bulk Delete] ✓ Refreshed list membership after deletion');
+      } else if (window.ListDetail && typeof window.ListDetail._render === 'function') {
         window.ListDetail._render();
       } else if (window.ListDetail && typeof window.ListDetail.init === 'function') {
         const ctx = window.listDetailContext || {};

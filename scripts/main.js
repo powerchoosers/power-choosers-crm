@@ -3622,27 +3622,31 @@ class PowerChoosersCRM {
                     });
                     
                     // Update BackgroundListsLoader cache immediately (cost-effective: no Firestore read)
+                    let newCount = null;
+                    let listName = 'List';
                     if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
                         // Get current count from cache, then add new records
                         const currentList = window.BackgroundListsLoader.getListsData().find(l => l.id === listId);
                         const currentCount = currentList?.recordCount || currentList?.count || 0;
-                        const newCount = currentCount + newRecordIds.length;
+                        newCount = currentCount + newRecordIds.length;
+                        listName = currentList?.name || 'List';
                         window.BackgroundListsLoader.updateListCountLocally(listId, newCount);
+                        console.log(`[Main] ✓ Updated BackgroundListsLoader cache: list ${listId} count = ${newCount}`);
                     }
                     
                     // Update CacheManager cache (cost-effective: IndexedDB write only)
                     if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
                         const currentList = window.BackgroundListsLoader?.getListsData()?.find(l => l.id === listId);
                         const currentCount = currentList?.recordCount || currentList?.count || 0;
-                        const newCount = currentCount + newRecordIds.length;
+                        const cacheNewCount = currentCount + newRecordIds.length;
                         window.CacheManager.updateRecord('lists', listId, {
-                            recordCount: newCount,
-                            count: newCount,
+                            recordCount: cacheNewCount,
+                            count: cacheNewCount,
                             updatedAt: new Date()
                         }).catch(err => console.warn('[Main] CacheManager update failed:', err));
                     }
                     
-                    // Dispatch event for lists page to refresh
+                    // Dispatch event for lists page to refresh (legacy event)
                     try {
                         document.dispatchEvent(new CustomEvent('pc:list-updated', {
                             detail: {
@@ -3652,6 +3656,24 @@ class PowerChoosersCRM {
                             }
                         }));
                     } catch (_) {}
+                    
+                    // CRITICAL FIX: Dispatch count update event for lists-overview page
+                    if (newCount !== null) {
+                        try {
+                            document.dispatchEvent(new CustomEvent('pc:list-count-updated', {
+                                detail: {
+                                    listId,
+                                    listName,
+                                    kind: targetType === 'people' ? 'people' : 'accounts',
+                                    addedCount: newRecordIds.length,
+                                    newCount: newCount
+                                }
+                            }));
+                            console.log(`[Main] ✓ Dispatched list count updated event: list ${listId} = ${newCount}`);
+                        } catch (e) {
+                            console.warn('[Main] Failed to dispatch count update event:', e);
+                        }
+                    }
                 }
                 
                 console.log(`✓ Batch assigned ${newRecordIds.length} ${targetType} to list ${listId} (${recordIds.length - newRecordIds.length} already existed)`);
@@ -4301,6 +4323,23 @@ class PowerChoosersCRM {
                     }
                 }
                 
+                // CRITICAL FIX: Get updated count from BackgroundListsLoader cache to dispatch accurate count
+                let newCount = null;
+                let listName = 'List';
+                try {
+                    if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.getListsData === 'function') {
+                        const listsData = window.BackgroundListsLoader.getListsData() || [];
+                        const list = listsData.find(l => l.id === listId);
+                        if (list) {
+                            newCount = list.recordCount || list.count || 0;
+                            listName = list.name || 'List';
+                            console.log(`✓ Got updated count from cache for list ${listId}: ${newCount}`);
+                        }
+                    }
+                } catch (countErr) {
+                    console.warn('Failed to get count from cache:', countErr);
+                }
+                
                 // CRITICAL FIX: Dispatch event to notify pages to reload
                 try {
                     document.dispatchEvent(new CustomEvent('pc:bulk-import-complete', {
@@ -4309,6 +4348,24 @@ class PowerChoosersCRM {
                     console.log(`✓ Dispatched bulk import complete event for ${listId}`);
                 } catch (e) {
                     console.warn('Failed to dispatch bulk import event:', e);
+                }
+                
+                // CRITICAL FIX: Also dispatch count update event for lists-overview page
+                if (newCount !== null) {
+                    try {
+                        document.dispatchEvent(new CustomEvent('pc:list-count-updated', {
+                            detail: {
+                                listId,
+                                listName,
+                                kind: modal._importType || 'people',
+                                addedCount: newCount, // Total count after import
+                                newCount: newCount
+                            }
+                        }));
+                        console.log(`✓ Dispatched list count updated event for ${listId}: ${newCount}`);
+                    } catch (e) {
+                        console.warn('Failed to dispatch count update event:', e);
+                    }
                 }
             }
             
