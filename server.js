@@ -116,6 +116,7 @@ import energyNewsHandler from './api/energy-news.js';
 import twilioBridgeHandler from './api/twilio/bridge.js';
 import twilioOperatorWebhookHandler from './api/twilio/operator-webhook.js';
 import twilio from 'twilio';
+import { admin } from './api/_firebase.js';
 
 // Import body parsers
 import { readFormUrlEncodedBody } from './api/_form-parser.js';
@@ -947,6 +948,18 @@ const server = http.createServer(async (req, res) => {
     return handleApiTwilioOperatorWebhook(req, res);
   }
 
+  // Handle blog post routes: /posts/:slug
+  if (pathname.startsWith('/posts/')) {
+    // Extract slug from pathname (remove /posts/ prefix and .html suffix if present)
+    let slug = pathname.replace('/posts/', '').replace(/\.html$/, '').trim();
+    // Remove trailing slash if present
+    slug = slug.replace(/\/$/, '');
+    // Only proceed if slug is not empty
+    if (slug) {
+      return await handlePostRoute(req, res, slug);
+    }
+  }
+
   // Default to crm-dashboard.html for root requests
   if (pathname === '/') {
     pathname = '/crm-dashboard.html';
@@ -1015,6 +1028,144 @@ const server = http.createServer(async (req, res) => {
     `);
   }
 });
+
+// ---------------- Blog Post Route Handler ----------------
+
+// Get Firebase Storage bucket (same logic as generate-static.js)
+function getStorageBucket() {
+  if (!admin.apps || admin.apps.length === 0) {
+    throw new Error('Firebase Admin not initialized');
+  }
+  
+  const projectId = process.env.FIREBASE_PROJECT_ID || 'power-choosers-crm';
+  
+  // Check for _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET first (Cloud Run env var)
+  // Then FIREBASE_STORAGE_BUCKET, then default
+  let storageBucket = process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 
+    process.env.FIREBASE_STORAGE_BUCKET;
+  
+  // Remove gs:// prefix if present
+  if (storageBucket && storageBucket.startsWith('gs://')) {
+    storageBucket = storageBucket.replace('gs://', '');
+  }
+  
+  // If no bucket specified, use the project's default bucket name
+  if (!storageBucket || (!storageBucket.includes('.') && !storageBucket.includes('gs://'))) {
+    storageBucket = `${projectId}.firebasestorage.app`;
+  }
+  
+  // Use default bucket (no name = uses project default)
+  try {
+    return admin.storage().bucket();
+  } catch (error) {
+    if (storageBucket) {
+      return admin.storage().bucket(storageBucket);
+    }
+    throw error;
+  }
+}
+
+// Handle blog post route: /posts/:slug
+async function handlePostRoute(req, res, slug) {
+  try {
+    // Only handle GET requests
+    if (req.method !== 'GET') {
+      res.writeHead(405, { 'Content-Type': 'text/plain' });
+      res.end('Method Not Allowed');
+      return;
+    }
+
+    // Get Firebase Storage bucket
+    const bucket = getStorageBucket();
+    
+    // Construct file path in Firebase Storage
+    const filename = `${slug}.html`;
+    const filePath = `posts/${filename}`;
+    
+    logger.debug('Fetching post from Firebase Storage', 'PostRoute', { slug, filePath });
+    
+    // Get the file from Firebase Storage
+    const file = bucket.file(filePath);
+    
+    // Check if file exists
+    const [exists] = await file.exists();
+    if (!exists) {
+      logger.warn('Post not found in Firebase Storage', 'PostRoute', { slug, filePath });
+      res.writeHead(404, { 'Content-Type': 'text/html' });
+      res.end(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>404 - Post Not Found</title>
+            <style>
+                body { font-family: Arial, sans-serif; background-color: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                .container { background-color: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); text-align: center; }
+                h1 { color: #ff5722; font-size: 2.5em; margin-bottom: 10px; }
+                p { color: #555; font-size: 1.1em; margin-bottom: 20px; }
+                a { color: #ff5722; text-decoration: none; font-weight: bold; }
+                a:hover { text-decoration: underline; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>404 - Post Not Found</h1>
+                <p>The blog post "${slug}" was not found.</p>
+                <p><a href="/">Back to Power Choosers</a></p>
+            </div>
+        </body>
+        </html>
+      `);
+      return;
+    }
+    
+    // Download the file content
+    const [fileContent] = await file.download();
+    const htmlContent = fileContent.toString('utf8');
+    
+    logger.debug('Post fetched successfully', 'PostRoute', { slug, contentLength: htmlContent.length });
+    
+    // Serve the HTML with proper headers
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+      'X-Content-Type-Options': 'nosniff'
+    });
+    res.end(htmlContent);
+    
+  } catch (error) {
+    logger.error('Error serving post', 'PostRoute', { slug, error: error.message });
+    console.error('[PostRoute] Error details:', error);
+    
+    res.writeHead(500, { 'Content-Type': 'text/html' });
+    res.end(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>500 - Server Error</title>
+          <style>
+              body { font-family: Arial, sans-serif; background-color: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+              .container { background-color: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); text-align: center; }
+              h1 { color: #ff5722; font-size: 2.5em; margin-bottom: 10px; }
+              p { color: #555; font-size: 1.1em; margin-bottom: 20px; }
+              a { color: #ff5722; text-decoration: none; font-weight: bold; }
+              a:hover { text-decoration: underline; }
+          </style>
+      </head>
+      <body>
+          <div class="container">
+              <h1>500 - Server Error</h1>
+              <p>An error occurred while loading the blog post.</p>
+              <p><a href="/">Back to Power Choosers</a></p>
+          </div>
+      </body>
+      </html>
+    `);
+  }
+}
 
 // ---------------- Additional API Handler Functions ----------------
 

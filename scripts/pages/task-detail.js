@@ -849,6 +849,31 @@
       console.warn('Could not refresh Today\'s Tasks widget:', e);
     }
 
+    // CRITICAL FIX: If this is a sequence task, trigger next step creation
+    if (state.currentTask && (state.currentTask.isSequenceTask || state.currentTask.sequenceId)) {
+      try {
+        console.log('[TaskDetail] Completed sequence task, creating next step...', state.currentTask.id);
+        const baseUrl = window.API_BASE_URL || window.location.origin;
+        const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId: state.currentTask.id })
+        });
+        const result = await response.json();
+
+        if (result.success) {
+          console.log('[TaskDetail] Next step created:', result.nextStepType);
+          // If next step is a task, it will appear in tasks list after reload
+          // If next step is an email, user can see it in Emails page
+        } else {
+          console.warn('[TaskDetail] Failed to create next step:', result.message || result.error);
+        }
+      } catch (error) {
+        console.error('[TaskDetail] Error creating next sequence step:', error);
+        // Don't block - task was already completed
+      }
+    }
+
     // CRITICAL FIX: Invalidate cache after task completion to prevent stale data
     try {
       if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
@@ -1973,8 +1998,16 @@
         if (els.title && contactName) {
           const contactId = person.id || '';
           console.log('[TaskDetail] Rendering contact link:', { contactName, contactId, hasPerson: !!person });
-          const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(contactId)}" data-contact-name="${escapeHtml(contactName)}">${escapeHtml(contactName)}</a>`;
+          const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(contactId)}" data-contact-name="${escapeHtml(contactName)}" style="color: var(--grey-400); text-decoration: none; font-weight: 400; transition: var(--transition-fast);" onmouseover="this.style.color='var(--text-inverse)'" onmouseout="this.style.color='var(--grey-400)'">${escapeHtml(contactName)}</a>`;
           els.title.innerHTML = `Call ${contactLinkHTML}`;
+          
+          // Ensure contact link handler is attached (event delegation should handle it, but ensure it's set up)
+          setTimeout(() => {
+            const contactLink = els.title.querySelector('.contact-link');
+            if (contactLink) {
+              console.log('[TaskDetail] Contact link rendered and ready:', contactLink.getAttribute('data-contact-id'));
+            }
+          }, 100);
         }
 
         // Create or update contact info element (no avatar here)
@@ -2018,7 +2051,23 @@
         // Ensure we have valid initials
         const finalInitials = initials && initials !== '?' ? initials : (contactName ? contactName.charAt(0).toUpperCase() : 'C');
         console.log('Contact task - Rendering avatar with initials:', finalInitials);
-        renderAvatarOrIcon('.contact-header-text', escapeHtml(finalInitials), true);
+        
+        // Render avatar with retry - ensure it's inside .contact-header-text
+        const titleSection = document.querySelector('.contact-header-text');
+        if (titleSection) {
+          // Clean up any existing avatars first
+          const existingAvatars = titleSection.querySelectorAll('.avatar-initials, .avatar-absolute');
+          existingAvatars.forEach(el => el.remove());
+          
+          // Create avatar element
+          const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true" style="position: absolute; left: -50px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: var(--orange-subtle); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; letter-spacing: 0.5px;">${escapeHtml(finalInitials)}</span>`;
+          titleSection.insertAdjacentHTML('beforeend', avatarHTML);
+          console.log('[TaskDetail] Avatar rendered successfully with initials:', finalInitials);
+        } else {
+          // Fallback to retry helper if element not found
+          console.warn('[TaskDetail] .contact-header-text not found, using retry helper');
+          renderAvatarOrIcon('.contact-header-text', escapeHtml(finalInitials), true);
+        }
       }
     } else {
       // For non-phone-call tasks, set title and subtitle normally
