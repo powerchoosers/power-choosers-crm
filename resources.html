@@ -176,15 +176,14 @@
             }
             
             // Render posts
+            // Note: post.url now contains signed URLs (10-year expiration) instead of paths
             container.innerHTML = posts.map(post => {
               const category = post.category || 'News';
               const title = post.title || 'Untitled';
               const description = post.metaDescription || '';
               const featuredImage = post.featuredImage || '';
-              // Construct Firebase Storage URL for the post HTML file
-              const postPath = post.url || `posts/${post.slug || post.id}.html`;
-              const encodedPath = encodeURIComponent(postPath);
-              const postUrl = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodedPath}?alt=media`;
+              // Use the signed URL directly from posts-list.json (already includes full signed URL)
+              const postUrl = post.url || '';
               
               return `
                 <div class="resource-card">
