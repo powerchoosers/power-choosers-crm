@@ -315,6 +315,7 @@ export default async function handler(req, res) {
                 assignedTo: member.ownerId,
                 createdBy: member.ownerId,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                timestamp: admin.firestore.FieldValue.serverTimestamp(), // CRITICAL: Required for orderBy query in BackgroundTasksLoader
                 backfilled: true // Mark as backfilled for tracking
             });
         }

@@ -303,7 +303,7 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
                 ` : ''}
                 <div class="author-info">
                     <h3 class="author-name">${escapeHtml((authorInfo.firstName || '') + ' ' + (authorInfo.lastName || ''))}</h3>
-                    ${authorInfo.jobTitle ? `<p class="author-title">${escapeHtml(authorInfo.jobTitle)}</p>` : ''}
+                    <p class="author-title">${escapeHtml(authorInfo.jobTitle || 'Energy Strategist')}</p>
                     ${authorInfo.linkedIn ? `
                     <div class="author-social">
                         <a href="${escapeHtml(authorInfo.linkedIn)}" target="_blank" rel="noopener" class="linkedin-link" aria-label="LinkedIn Profile">
