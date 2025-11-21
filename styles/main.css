@@ -876,11 +876,24 @@ button:hover:not(:disabled),
     position: absolute;
     z-index: 1;
     pointer-events: none;
+    background: transparent !important; /* Ensure no background covers input */
+    /* Make sure skeleton bars don't have solid backgrounds that cover text */
 }
 
 .post-skeleton-wrapper {
     position: relative;
     width: 100%;
+}
+
+/* Ensure input fields are always visible above skeletons */
+.post-skeleton-wrapper input,
+.post-skeleton-wrapper textarea,
+input[data-skeleton-id],
+textarea[data-skeleton-id] {
+    position: relative !important;
+    z-index: 2 !important;
+    background: transparent !important;
+    color: inherit !important;
 }
 
 .post-skeleton-bar {
@@ -895,6 +908,8 @@ button:hover:not(:disabled),
     transform: translateX(-10px);
     transition: all 0.3s ease;
     backdrop-filter: blur(2px);
+    /* Ensure bars don't cover input text - use multiply blend mode to blend with background */
+    mix-blend-mode: multiply;
 }
 
 .post-skeleton-bar.skeleton-animate {
