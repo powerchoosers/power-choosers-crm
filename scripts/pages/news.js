@@ -311,6 +311,7 @@
   <td class="qa-cell">
     <div class="qa-actions">
       <button type="button" class="qa-btn" data-action="edit" data-id="${pid}" aria-label="Edit" title="Edit">${svgIcon('edit')}</button>
+      ${status === 'published' ? `<button type="button" class="qa-btn" data-action="regenerate" data-id="${pid}" aria-label="Regenerate Static HTML" title="Regenerate Static HTML">${svgIcon('refresh')}</button>` : ''}
       <button type="button" class="qa-btn" data-action="publish" data-id="${pid}" data-status="${status}" aria-label="${status === 'published' ? 'Unpublish' : 'Publish'}" title="${status === 'published' ? 'Unpublish' : 'Publish'}">${svgIcon(status === 'published' ? 'unpublish' : 'publish')}</button>
       <button type="button" class="qa-btn" data-action="delete" data-id="${pid}" aria-label="Delete" title="Delete">${svgIcon('delete')}</button>
     </div>
@@ -323,7 +324,8 @@
       edit: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>',
       publish: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="5,12 10,17 19,8"></polyline></svg>',
       unpublish: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>',
-      delete: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"></polyline><path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"></path><path d="M10,11v6M14,11v6"></path></svg>'
+      delete: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"></polyline><path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"></path><path d="M10,11v6M14,11v6"></path></svg>',
+      refresh: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23,4 23,10 17,10"></polyline><polyline points="1,20 1,14 7,14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>'
     };
     return icons[name] || '';
   }
@@ -401,6 +403,9 @@
           console.warn('[News] PostEditor not available');
         }
         break;
+      case 'regenerate':
+        regenerateStaticHTML(post);
+        break;
       case 'publish':
       case 'unpublish':
         togglePublishStatus(post);
@@ -410,6 +415,57 @@
           deletePost(id);
         }
         break;
+    }
+  }
+
+  async function regenerateStaticHTML(post) {
+    if (post.status !== 'published') {
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast('Only published posts can be regenerated', 'info');
+      }
+      return;
+    }
+    
+    try {
+      const apiBase = window.API_BASE_URL || 
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? 'http://localhost:3000'
+          : 'https://power-choosers-crm-792458658491.us-south1.run.app');
+      
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast('Regenerating static HTML...', 'info');
+      }
+      
+      const response = await fetch(`${apiBase}/api/posts/generate-static`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ postId: post.id })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (!result.skipped) {
+          console.log('[News] Static HTML regenerated for post:', post.id);
+          if (window.crm && typeof window.crm.showToast === 'function') {
+            window.crm.showToast('Static HTML regenerated successfully', 'success');
+          }
+        } else {
+          if (window.crm && typeof window.crm.showToast === 'function') {
+            window.crm.showToast('Post is not published', 'info');
+          }
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('[News] Failed to regenerate static HTML:', response.status, errorText);
+        if (window.crm && typeof window.crm.showToast === 'function') {
+          window.crm.showToast('Failed to regenerate static HTML', 'error');
+        }
+      }
+    } catch (error) {
+      console.error('[News] Error regenerating static HTML:', error);
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast('Error regenerating static HTML', 'error');
+      }
     }
   }
 
