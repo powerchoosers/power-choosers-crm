@@ -5232,7 +5232,7 @@ class PowerChoosersCRM {
                         const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
                         localStorage.setItem(namespacedKey, JSON.stringify(mergedTasks));
                         localStorage.setItem('userTasks', JSON.stringify(mergedTasks)); // Legacy key for compatibility
-                    } catch (e) {
+        } catch (e) {
                         console.warn('Could not save merged tasks to localStorage cache:', e);
                     }
                     

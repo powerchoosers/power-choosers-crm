@@ -1481,50 +1481,151 @@
       // If not found, try Firebase (with ownership filtering)
       if (!task && window.firebaseDB) {
         try {
-          console.log('Loading task from Firebase:', taskId);
+          console.log('[TaskDetail] Loading task from Firebase:', taskId);
 
-          // Use ownership-aware query for non-admin users
-          if (!isAdmin()) {
-            const email = getUserEmail();
-            if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
-              const allTasks = await window.DataManager.queryWithOwnership('tasks');
-              task = allTasks.find(t => t.id === taskId);
-            } else if (email) {
-              // Fallback: two separate queries
-              const [ownedSnap, assignedSnap] = await Promise.all([
-                window.firebaseDB.collection('tasks')
-                  .where('id', '==', taskId)
-                  .where('ownerId', '==', email)
-                  .limit(1)
-                  .get(),
-                window.firebaseDB.collection('tasks')
-                  .where('id', '==', taskId)
-                  .where('assignedTo', '==', email)
-                  .limit(1)
-                  .get()
-              ]);
-
-              if (!ownedSnap.empty) {
-                const doc = ownedSnap.docs[0];
-                const data = doc.data();
-                task = { ...data, id: data.id || doc.id };
-              } else if (!assignedSnap.empty) {
-                const doc = assignedSnap.docs[0];
-                const data = doc.data();
-                task = { ...data, id: data.id || doc.id };
+          // CRITICAL FIX: Try multiple strategies to find the task
+          // Strategy 1: Try to get document directly by ID (if taskId is a document ID)
+          try {
+            const directDoc = await window.firebaseDB.collection('tasks').doc(taskId).get();
+            if (directDoc.exists) {
+              const data = directDoc.data();
+              // Verify ownership for non-admin users
+              if (isAdmin() || !data.ownerId && !data.assignedTo) {
+                // Admin or no ownership fields - allow
+                task = { ...data, id: data.id || directDoc.id };
+                console.log('[TaskDetail] Found task by document ID:', directDoc.id);
+              } else {
+                const email = getUserEmail();
+                const ownerId = (data.ownerId || '').toLowerCase();
+                const assignedTo = (data.assignedTo || '').toLowerCase();
+                const createdBy = (data.createdBy || '').toLowerCase();
+                if (ownerId === email || assignedTo === email || createdBy === email) {
+                  task = { ...data, id: data.id || directDoc.id };
+                  console.log('[TaskDetail] Found task by document ID (ownership verified):', directDoc.id);
+                }
               }
             }
-          } else {
-            // Admin: unrestricted query
-            const snapshot = await window.firebaseDB.collection('tasks')
-              .where('id', '==', taskId)
-              .limit(1)
-              .get();
+          } catch (directError) {
+            console.log('[TaskDetail] Direct document lookup failed, trying queries:', directError);
+          }
 
-            if (!snapshot.empty) {
-              const doc = snapshot.docs[0];
-              const data = doc.data();
-              task = { ...data, id: data.id || doc.id };
+          // Strategy 2: Query by 'id' field (if taskId is stored as a field)
+          if (!task) {
+            // Use ownership-aware query for non-admin users
+            if (!isAdmin()) {
+              const email = getUserEmail();
+              if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+                const allTasks = await window.DataManager.queryWithOwnership('tasks');
+                task = allTasks.find(t => (t.id === taskId) || (t.id && String(t.id) === String(taskId)));
+                if (task) {
+                  console.log('[TaskDetail] Found task via DataManager.queryWithOwnership');
+                }
+              } else if (email) {
+                // Fallback: try queries with 'id' field
+                try {
+                  const [ownedSnap, assignedSnap] = await Promise.all([
+                    window.firebaseDB.collection('tasks')
+                      .where('id', '==', taskId)
+                      .where('ownerId', '==', email)
+                      .limit(1)
+                      .get(),
+                    window.firebaseDB.collection('tasks')
+                      .where('id', '==', taskId)
+                      .where('assignedTo', '==', email)
+                      .limit(1)
+                      .get()
+                  ]);
+
+                  if (!ownedSnap.empty) {
+                    const doc = ownedSnap.docs[0];
+                    const data = doc.data();
+                    task = { ...data, id: data.id || doc.id };
+                    console.log('[TaskDetail] Found task via ownerId query:', doc.id);
+                  } else if (!assignedSnap.empty) {
+                    const doc = assignedSnap.docs[0];
+                    const data = doc.data();
+                    task = { ...data, id: data.id || doc.id };
+                    console.log('[TaskDetail] Found task via assignedTo query:', doc.id);
+                  }
+                } catch (queryError) {
+                  console.warn('[TaskDetail] Query by id field failed (may not be indexed):', queryError);
+                }
+              }
+            } else {
+              // Admin: unrestricted query
+              try {
+                const snapshot = await window.firebaseDB.collection('tasks')
+                  .where('id', '==', taskId)
+                  .limit(1)
+                  .get();
+
+                if (!snapshot.empty) {
+                  const doc = snapshot.docs[0];
+                  const data = doc.data();
+                  task = { ...data, id: data.id || doc.id };
+                  console.log('[TaskDetail] Found task via admin query:', doc.id);
+                }
+              } catch (queryError) {
+                console.warn('[TaskDetail] Admin query by id field failed (may not be indexed):', queryError);
+              }
+            }
+          }
+
+          // Strategy 3: Load all tasks and find by ID (fallback if queries fail)
+          if (!task) {
+            console.log('[TaskDetail] Trying fallback: load all tasks and find by ID');
+            try {
+              let allTasks = [];
+              if (!isAdmin()) {
+                const email = getUserEmail();
+                if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+                  allTasks = await window.DataManager.queryWithOwnership('tasks');
+                } else if (email) {
+                  const [ownedSnap, assignedSnap] = await Promise.all([
+                    window.firebaseDB.collection('tasks')
+                      .where('ownerId', '==', email)
+                      .limit(200)
+                      .get(),
+                    window.firebaseDB.collection('tasks')
+                      .where('assignedTo', '==', email)
+                      .limit(200)
+                      .get()
+                  ]);
+                  const tasksMap = new Map();
+                  ownedSnap.docs.forEach(doc => {
+                    const data = doc.data();
+                    tasksMap.set(doc.id, { ...data, id: data.id || doc.id });
+                  });
+                  assignedSnap.docs.forEach(doc => {
+                    if (!tasksMap.has(doc.id)) {
+                      const data = doc.data();
+                      tasksMap.set(doc.id, { ...data, id: data.id || doc.id });
+                    }
+                  });
+                  allTasks = Array.from(tasksMap.values());
+                }
+              } else {
+                const snapshot = await window.firebaseDB.collection('tasks')
+                  .limit(200)
+                  .get();
+                allTasks = snapshot.docs.map(doc => {
+                  const data = doc.data();
+                  return { ...data, id: data.id || doc.id };
+                });
+              }
+              
+              // Find task by matching id field or document ID
+              task = allTasks.find(t => {
+                const tId = t.id || '';
+                const docId = t._docId || '';
+                return String(tId) === String(taskId) || String(docId) === String(taskId);
+              });
+              
+              if (task) {
+                console.log('[TaskDetail] Found task via fallback search through all tasks');
+              }
+            } catch (fallbackError) {
+              console.warn('[TaskDetail] Fallback search failed:', fallbackError);
             }
           }
 
@@ -1533,21 +1634,33 @@
               task.timestamp.toDate().getTime() : task.timestamp) || Date.now();
             task.createdAt = createdAt;
             task.status = task.status || 'pending';
+            console.log('[TaskDetail] Task loaded successfully:', { id: task.id, type: task.type, title: task.title });
+          } else {
+            console.warn('[TaskDetail] Task not found in Firebase after all strategies:', taskId);
           }
         } catch (error) {
-          console.warn('Could not load task from Firebase:', error);
+          console.error('[TaskDetail] Error loading task from Firebase:', error);
         }
       }
 
       if (!task) {
-        console.error('Task not found:', taskId);
+        console.error('[TaskDetail] Task not found after all attempts:', taskId);
+        console.log('[TaskDetail] Debug info:', {
+          taskId,
+          hasFirebase: !!window.firebaseDB,
+          hasBackgroundLoader: !!window.BackgroundTasksLoader,
+          backgroundLoaderCount: window.BackgroundTasksLoader ? (window.BackgroundTasksLoader.getTasksData() || []).length : 0,
+          localStorageKey: getUserTasksKey(),
+          localStorageCount: (JSON.parse(localStorage.getItem(getUserTasksKey()) || '[]')).length,
+          legacyLocalStorageCount: (JSON.parse(localStorage.getItem('userTasks') || '[]')).length
+        });
 
         // CRITICAL FIX: Treat this as a stale/ghost task and clean it up locally
         try {
           cleanupStaleTask(taskId);
         } catch (_) { }
 
-        showTaskError('Task not found or you do not have access to this task.');
+        showTaskError('Task not found or you do not have access to this task. Please refresh the page.');
         state.loadingTask = false;
         return;
       }
@@ -1555,10 +1668,30 @@
       // CRITICAL FIX: Validate task data before normalization
       if (typeof task !== 'object' || !task.id) {
         console.error('[TaskDetail] Invalid task data:', task);
+        console.log('[TaskDetail] Task object keys:', task ? Object.keys(task) : 'null');
         showTaskError('Invalid task data. Please refresh the page.');
         state.loadingTask = false;
         return;
       }
+
+      // CRITICAL FIX: Ensure task has all required fields with defaults
+      task.title = task.title || 'Untitled Task';
+      task.type = task.type || 'custom-task';
+      task.status = task.status || 'pending';
+      task.dueDate = task.dueDate || '';
+      task.dueTime = task.dueTime || '';
+      task.contact = task.contact || '';
+      task.account = task.account || '';
+      task.contactId = task.contactId || '';
+      task.accountId = task.accountId || '';
+      
+      console.log('[TaskDetail] Task validated and normalized:', {
+        id: task.id,
+        type: task.type,
+        title: task.title,
+        hasContact: !!task.contact,
+        hasAccount: !!task.account
+      });
 
       // Normalize legacy task shapes/titles/types
       const normType = (t) => {
@@ -1587,11 +1720,36 @@
       state.currentTask = task;
       state.taskType = task.type;
 
+      console.log('[TaskDetail] Task loaded, preparing to render:', {
+        id: task.id,
+        type: task.type,
+        title: task.title,
+        contact: task.contact,
+        account: task.account
+      });
+
       // Load contact/account data
       loadContactAccountData(task);
 
+      // CRITICAL FIX: Ensure DOM is ready before rendering
+      if (!els.content) {
+        console.warn('[TaskDetail] Content element not found, retrying DOM init...');
+        if (!initDomRefs()) {
+          console.error('[TaskDetail] Failed to initialize DOM refs for rendering');
+          showTaskError('Page not ready. Please refresh.');
+          state.loadingTask = false;
+          return;
+        }
+      }
+
       // Render the task page
-      renderTaskPage();
+      try {
+        renderTaskPage();
+        console.log('[TaskDetail] Task page rendered successfully');
+      } catch (renderError) {
+        console.error('[TaskDetail] Error rendering task page:', renderError);
+        showTaskError('Failed to render task. Please refresh the page.');
+      }
     } catch (error) {
       console.error('[TaskDetail] Error loading task data:', error);
       showTaskError('Failed to load task. Please try again.');
@@ -1884,7 +2042,17 @@
   }
 
   function renderTaskPage() {
-    if (!state.currentTask) return;
+    if (!state.currentTask) {
+      console.error('[TaskDetail] Cannot render: no current task in state');
+      showTaskError('No task data available. Please refresh the page.');
+      return;
+    }
+
+    console.log('[TaskDetail] Rendering task page for task:', {
+      id: state.currentTask.id,
+      type: state.currentTask.type,
+      title: state.currentTask.title
+    });
 
     // CRITICAL: Ensure DOM refs are initialized
     if (!els.content) {
@@ -1893,6 +2061,13 @@
         setTimeout(() => renderTaskPage(), 100);
         return;
       }
+    }
+
+    // CRITICAL FIX: Ensure task has minimum required data
+    if (!state.currentTask.id) {
+      console.error('[TaskDetail] Task missing ID:', state.currentTask);
+      showTaskError('Invalid task data. Please refresh the page.');
+      return;
     }
 
     // Clean up any existing avatars/icons first
@@ -2099,30 +2274,41 @@
         console.log('[TaskDetail] Rendering LinkedIn contact link:', { contactName, contactId, hasPerson: !!person });
         const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(contactId)}" data-contact-name="${escapeHtml(contactName)}" style="color: var(--grey-400); text-decoration: none; font-weight: 400; transition: var(--transition-fast);" onmouseover="this.style.color='var(--text-inverse)'" onmouseout="this.style.color='var(--grey-400)'">${escapeHtml(contactName)}</a>`;
         
-        // Determine action text based on task type
-        let actionText = '';
+        // Determine action text based on task type (contact name goes in the middle)
+        let actionPrefix = '';
+        let actionSuffix = '';
         switch (state.taskType) {
           case 'li-connect':
           case 'linkedin-connect':
-            actionText = 'Add on LinkedIn';
+            actionPrefix = 'Add';
+            actionSuffix = 'on LinkedIn';
             break;
           case 'li-message':
           case 'linkedin-message':
-            actionText = 'Send a message on LinkedIn';
+            actionPrefix = 'Send a message to';
+            actionSuffix = 'on LinkedIn';
             break;
           case 'li-view-profile':
           case 'linkedin-view':
-            actionText = 'View LinkedIn profile';
+            actionPrefix = 'View';
+            actionSuffix = 'on LinkedIn';
             break;
           case 'li-interact-post':
           case 'linkedin-interact':
-            actionText = 'Interact with LinkedIn Post';
+            actionPrefix = 'Interact with';
+            actionSuffix = 'on LinkedIn';
             break;
           default:
-            actionText = 'LinkedIn Task';
+            actionPrefix = 'LinkedIn Task for';
+            actionSuffix = '';
         }
         
-        els.title.innerHTML = `${escapeHtml(actionText)} ${contactLinkHTML}`;
+        // Format: "Add [contact name] on LinkedIn"
+        if (actionSuffix) {
+          els.title.innerHTML = `${escapeHtml(actionPrefix)} ${contactLinkHTML} ${escapeHtml(actionSuffix)}`;
+        } else {
+          els.title.innerHTML = `${escapeHtml(actionPrefix)} ${contactLinkHTML}`;
+        }
         
         // Ensure contact link handler is attached
         setTimeout(() => {
