@@ -833,6 +833,121 @@ button:hover:not(:disabled),
     animation: compose-glow 2s ease-in-out infinite alternate;
 }
 
+/* ========== POST EDITOR AI GENERATION ANIMATIONS ========== */
+
+/* Orange glow on modal during AI generation */
+.pc-modal.ai-generating {
+    position: relative;
+}
+
+.pc-modal.ai-generating .pc-modal__dialog {
+    box-shadow:
+        0 0 20px rgba(245, 158, 11, 0.5),
+        0 0 40px rgba(245, 158, 11, 0.3),
+        0 0 60px rgba(245, 158, 11, 0.1),
+        0 4px 24px rgba(0, 0, 0, 0.15);
+    border: 2px solid rgba(245, 158, 11, 0.3);
+    animation: post-ai-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes post-ai-glow {
+    0% {
+        box-shadow:
+            0 0 20px rgba(245, 158, 11, 0.5),
+            0 0 40px rgba(245, 158, 11, 0.3),
+            0 0 60px rgba(245, 158, 11, 0.1),
+            0 4px 24px rgba(0, 0, 0, 0.15);
+    }
+    100% {
+        box-shadow:
+            0 0 30px rgba(245, 158, 11, 0.7),
+            0 0 50px rgba(245, 158, 11, 0.5),
+            0 0 70px rgba(245, 158, 11, 0.2),
+            0 4px 24px rgba(0, 0, 0, 0.15);
+    }
+}
+
+/* Post editor skeleton animations */
+.post-field-skeleton-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 0;
+    position: relative;
+    z-index: 1;
+}
+
+.post-skeleton-bar {
+    height: 16px;
+    background: linear-gradient(90deg,
+            rgba(255, 255, 255, 0.1) 25%,
+            rgba(255, 255, 255, 0.2) 50%,
+            rgba(255, 255, 255, 0.1) 75%);
+    background-size: 200% 100%;
+    border-radius: 4px;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: all 0.3s ease;
+}
+
+.post-skeleton-bar.skeleton-animate {
+    opacity: 1;
+    transform: translateX(0);
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+/* Skeleton bar widths */
+.post-skeleton-bar.post-skeleton-short {
+    width: 40%;
+}
+
+.post-skeleton-bar.post-skeleton-medium {
+    width: 65%;
+}
+
+.post-skeleton-bar.post-skeleton-wide {
+    width: 90%;
+}
+
+/* AI Generate button styling */
+.ai-generate-post-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--orange-subtle);
+    color: var(--orange-primary);
+    border: 1px solid var(--orange-primary);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-right: 8px;
+}
+
+.ai-generate-post-btn:hover:not(:disabled) {
+    background: var(--orange-primary);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.ai-generate-post-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.ai-generate-post-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.ai-generate-post-btn svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2.5;
+}
+
 /* Field-specific skeleton animations */
 .field-skeleton-container {
     display: flex;
@@ -9809,8 +9924,18 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: var(--spacing-sm);
     padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-base) var(--spacing-lg);
     border-bottom: 1px solid var(--border-light);
+}
+
+.pc-modal__header h3 {
+    flex: 1;
+    margin: 0;
+}
+
+.pc-modal__header .ai-generate-post-btn {
+    margin-left: auto;
 }
 
 .pc-modal__header .card-title {
