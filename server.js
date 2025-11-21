@@ -100,6 +100,7 @@ import uploadSignatureImageHandler from './api/upload/signature-image.js';
 import generateStaticPostHandler from './api/posts/generate-static.js';
 import generateAiPostHandler from './api/posts/generate-ai.js';
 import postsListHandler from './api/posts/list.js';
+import sitemapHandler from './api/sitemap.js';
 import algoliaReindexHandler from './api/algolia/reindex.js';
 import mapsConfigHandler from './api/maps/config.js';
 import debugCallHandler from './api/debug/call.js';
@@ -946,6 +947,11 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/twilio/operator-webhook') {
     return handleApiTwilioOperatorWebhook(req, res);
+  }
+
+  // Handle sitemap.xml route
+  if (pathname === '/sitemap.xml') {
+    return await sitemapHandler(req, res);
   }
 
   // Handle blog post routes: /posts/:slug
