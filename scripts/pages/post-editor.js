@@ -940,7 +940,9 @@
     // Store original value/content (but don't clear it)
     if (isInput) {
       field.dataset.originalValue = field.value;
-      // Don't make transparent - skeleton will overlay
+      // Ensure field text is visible
+      field.style.color = '';
+      field.style.opacity = '1';
     } else {
       field.dataset.originalContent = field.innerHTML;
       // Don't make transparent - skeleton will overlay
@@ -1019,17 +1021,20 @@
         container.dataset.skeletonPositioned = 'true';
       }
       
-      // Position skeleton overlay
+      // Position skeleton overlay - make sure it doesn't cover the input text
       skeletonContainer.style.position = 'absolute';
-      skeletonContainer.style.top = '10px';
-      skeletonContainer.style.left = '14px';
-      skeletonContainer.style.right = '14px';
+      skeletonContainer.style.top = '0';
+      skeletonContainer.style.left = '0';
+      skeletonContainer.style.right = '0';
+      skeletonContainer.style.bottom = '0';
       skeletonContainer.style.pointerEvents = 'none';
-      skeletonContainer.style.zIndex = '10';
+      skeletonContainer.style.zIndex = '1';
+      skeletonContainer.style.backgroundColor = 'transparent'; // Ensure transparent background
       
-      // Make field appear above skeleton
+      // Make field appear above skeleton with proper styling
       field.style.position = 'relative';
-      field.style.zIndex = '11';
+      field.style.zIndex = '2';
+      field.style.backgroundColor = 'transparent'; // Ensure field background is visible
       
       // Store reference for cleanup
       const skeletonId = `skeleton-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -1106,6 +1111,13 @@
       skeletonContainer.style.opacity = '0';
       skeletonContainer.style.transition = 'opacity 0.3s ease';
       
+      // Immediately ensure field is visible
+      if (isInput) {
+        field.style.color = '';
+        field.style.opacity = '1';
+        field.style.backgroundColor = '';
+      }
+      
       // Remove after fade
       setTimeout(() => {
         if (skeletonContainer && skeletonContainer.parentNode) {
@@ -1116,6 +1128,7 @@
         if (isInput) {
           field.style.position = '';
           field.style.zIndex = '';
+          field.style.backgroundColor = '';
           delete field.dataset.skeletonId;
           
           // Remove wrapper if we created one
@@ -1151,6 +1164,14 @@
   // Generate post with AI
   async function generateWithAI(els) {
     if (!els.modal) return;
+    
+    // Ensure modal stays visible
+    if (!els.modal.classList.contains('show')) {
+      els.modal.classList.add('show');
+    }
+    if (els.modal.hasAttribute('hidden')) {
+      els.modal.removeAttribute('hidden');
+    }
     
     try {
       // Start animation
