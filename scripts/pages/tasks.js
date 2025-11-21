@@ -1589,7 +1589,41 @@
 
   // Listen for cross-page task updates and refresh immediately
   function bindUpdates() {
-    window.addEventListener('tasksUpdated', async () => {
+    window.addEventListener('tasksUpdated', async (event) => {
+      const { taskId, deleted } = event.detail || {};
+      
+      // CRITICAL FIX: If a task was deleted, clean it up from localStorage immediately
+      if (deleted && taskId) {
+        try {
+          const getUserEmail = () => {
+            try {
+              if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                return window.DataManager.getCurrentUserEmail();
+              }
+              return (window.currentUserEmail || '').toLowerCase();
+            } catch (_) {
+              return (window.currentUserEmail || '').toLowerCase();
+            }
+          };
+          const email = getUserEmail();
+          const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
+          
+          // Remove from namespaced key
+          const namespacedTasks = JSON.parse(localStorage.getItem(namespacedKey) || '[]');
+          const filteredNamespaced = namespacedTasks.filter(t => t && t.id !== taskId);
+          localStorage.setItem(namespacedKey, JSON.stringify(filteredNamespaced));
+          
+          // Also remove from legacy key
+          const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+          const filteredLegacy = legacyTasks.filter(t => t && t.id !== taskId);
+          localStorage.setItem('userTasks', JSON.stringify(filteredLegacy));
+          
+          console.log('[Tasks] Cleaned up deleted task from localStorage:', taskId);
+        } catch (e) {
+          console.warn('[Tasks] Could not clean up deleted task from localStorage:', e);
+        }
+      }
+      
       // Rebuild from localStorage + Firebase + LinkedIn tasks
       await loadData();
     });
@@ -1598,6 +1632,44 @@
     document.addEventListener('pc:tasks-loaded', async () => {
       console.log('[Tasks] Background tasks loaded, refreshing data...');
       await loadData();
+    });
+
+    // CRITICAL FIX: Listen for task deletion events for cross-browser sync
+    document.addEventListener('pc:task-deleted', async (event) => {
+      const { taskId } = event.detail || {};
+      if (taskId) {
+        try {
+          const getUserEmail = () => {
+            try {
+              if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                return window.DataManager.getCurrentUserEmail();
+              }
+              return (window.currentUserEmail || '').toLowerCase();
+            } catch (_) {
+              return (window.currentUserEmail || '').toLowerCase();
+            }
+          };
+          const email = getUserEmail();
+          const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
+          
+          // Remove from namespaced key
+          const namespacedTasks = JSON.parse(localStorage.getItem(namespacedKey) || '[]');
+          const filteredNamespaced = namespacedTasks.filter(t => t && t.id !== taskId);
+          localStorage.setItem(namespacedKey, JSON.stringify(filteredNamespaced));
+          
+          // Also remove from legacy key
+          const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+          const filteredLegacy = legacyTasks.filter(t => t && t.id !== taskId);
+          localStorage.setItem('userTasks', JSON.stringify(filteredLegacy));
+          
+          console.log('[Tasks] Cleaned up deleted task from localStorage (cross-browser sync):', taskId);
+          
+          // Refresh the page if we're on the tasks page
+          await loadData();
+        } catch (e) {
+          console.warn('[Tasks] Could not clean up deleted task from localStorage:', e);
+        }
+      }
     });
 
     // Listen for auto-task events from other pages

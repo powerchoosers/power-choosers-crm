@@ -231,8 +231,23 @@
 
   // Listen for task updates and reload data
   window.addEventListener('tasksUpdated', async (event) => {
-    const { source } = event.detail || {};
-    console.log('[BackgroundTasksLoader] Tasks updated from:', source);
+    const { source, taskId, deleted } = event.detail || {};
+    console.log('[BackgroundTasksLoader] Tasks updated from:', source, deleted ? '(deleted)' : '');
+
+    // CRITICAL FIX: If a task was deleted, remove it from local cache immediately
+    if (deleted && taskId) {
+      try {
+        tasksData = tasksData.filter(t => t && t.id !== taskId);
+        console.log('[BackgroundTasksLoader] Removed deleted task from cache:', taskId);
+        
+        // Also update cache
+        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+          await window.CacheManager.set('tasks', tasksData);
+        }
+      } catch (e) {
+        console.warn('[BackgroundTasksLoader] Could not remove deleted task from cache:', e);
+      }
+    }
 
     // Invalidate cache and reload from Firestore
     try {
@@ -248,6 +263,30 @@
       }
     } catch (error) {
       console.error('[BackgroundTasksLoader] Error handling tasksUpdated event:', error);
+    }
+  });
+
+  // CRITICAL FIX: Listen for task deletion events for cross-browser sync
+  document.addEventListener('pc:task-deleted', async (event) => {
+    const { taskId } = event.detail || {};
+    if (taskId) {
+      try {
+        // Remove from local cache
+        tasksData = tasksData.filter(t => t && t.id !== taskId);
+        console.log('[BackgroundTasksLoader] Removed deleted task from cache (cross-browser sync):', taskId);
+        
+        // Update cache
+        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+          await window.CacheManager.set('tasks', tasksData);
+        }
+        
+        // Trigger Today's Tasks widget to refresh
+        if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
+          window.crm.loadTodaysTasks();
+        }
+      } catch (e) {
+        console.warn('[BackgroundTasksLoader] Could not remove deleted task from cache:', e);
+      }
     }
   });
 

@@ -65,6 +65,58 @@ class PowerChoosersCRM {
             }
         });
         
+        // CRITICAL FIX: Listen for task deletion events to refresh Today's Tasks widget
+        document.addEventListener('pc:task-deleted', async (e) => {
+            const { taskId } = e.detail || {};
+            if (taskId) {
+                console.log('[CRM] Task deleted, refreshing Today\'s Tasks widget:', taskId);
+                // Clean up from localStorage
+                try {
+                    const getUserEmail = () => {
+                        try {
+                            if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                                return window.DataManager.getCurrentUserEmail();
+                            }
+                            return (window.currentUserEmail || '').toLowerCase();
+                        } catch (_) {
+                            return (window.currentUserEmail || '').toLowerCase();
+                        }
+                    };
+                    const email = getUserEmail();
+                    const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
+                    
+                    // Remove from namespaced key
+                    const namespacedTasks = JSON.parse(localStorage.getItem(namespacedKey) || '[]');
+                    const filteredNamespaced = namespacedTasks.filter(t => t && t.id !== taskId);
+                    localStorage.setItem(namespacedKey, JSON.stringify(filteredNamespaced));
+                    
+                    // Also remove from legacy key
+                    const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+                    const filteredLegacy = legacyTasks.filter(t => t && t.id !== taskId);
+                    localStorage.setItem('userTasks', JSON.stringify(filteredLegacy));
+                } catch (err) {
+                    console.warn('[CRM] Could not clean up deleted task from localStorage:', err);
+                }
+                
+                // Refresh Today's Tasks widget
+                if (typeof this.loadTodaysTasks === 'function') {
+                    this.loadTodaysTasks();
+                }
+            }
+        });
+        
+        // CRITICAL FIX: Listen for tasksUpdated events with deleted flag
+        window.addEventListener('tasksUpdated', async (e) => {
+            const { taskId, deleted } = e.detail || {};
+            if (deleted && taskId) {
+                console.log('[CRM] Task deleted via tasksUpdated event, refreshing Today\'s Tasks widget:', taskId);
+                // Refresh Today's Tasks widget
+                if (typeof this.loadTodaysTasks === 'function') {
+                    this.loadTodaysTasks();
+                }
+            }
+        });
+        
         // Listen for booking/lead creation events and show notifications
         window.addEventListener('pc:booking-created', (e) => {
             const { contactName, companyName, appointmentDate, selectedTime, source, taskId } = e.detail || {};
@@ -5050,13 +5102,25 @@ class PowerChoosersCRM {
         };
         
         // Load localStorage tasks first for immediate rendering
+        // CRITICAL FIX: Use namespaced key to match task-detail.js and avoid stale data
         let localTasks = [];
         try {
-            localTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+            // Try namespaced key first (matches task-detail.js)
+            const email = getUserEmail();
+            const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
+            const namespacedTasks = JSON.parse(localStorage.getItem(namespacedKey) || '[]');
+            
+            // Also check legacy key for cross-browser compatibility
+            const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
+            
+            // Merge both sources, preferring namespaced key
+            const tasksMap = new Map();
+            namespacedTasks.forEach(t => { if (t && t.id) tasksMap.set(t.id, t); });
+            legacyTasks.forEach(t => { if (t && t.id && !tasksMap.has(t.id)) tasksMap.set(t.id, t); });
+            localTasks = Array.from(tasksMap.values());
             
             // CRITICAL: Filter by ownership for non-admin users (localStorage bypasses Firestore rules)
             if (!isAdmin() && localTasks.length > 0) {
-                const email = getUserEmail();
                 localTasks = localTasks.filter(t => {
                     if (!t) return false;
                     const ownerId = (t.ownerId || '').toLowerCase();
@@ -5089,8 +5153,13 @@ class PowerChoosersCRM {
                             firebaseTasks.forEach(t => { if (t && t.id) mergedTasksMap.set(t.id, t); });
                             localTasks.forEach(t => { if (t && t.id && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t); });
                             const mergedTasks = Array.from(mergedTasksMap.values());
+                            
+                            // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
                             try {
-                                localStorage.setItem('userTasks', JSON.stringify(mergedTasks));
+                                const email = getUserEmail();
+                                const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
+                                localStorage.setItem(namespacedKey, JSON.stringify(mergedTasks));
+                                localStorage.setItem('userTasks', JSON.stringify(mergedTasks)); // Legacy key for compatibility
                             } catch (e) {
                                 console.warn('Could not save merged tasks to localStorage cache:', e);
                             }
@@ -5123,8 +5192,13 @@ class PowerChoosersCRM {
                             firebaseTasks.forEach(t => { if (t && t.id) mergedTasksMap.set(t.id, t); });
                             localTasks.forEach(t => { if (t && t.id && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t); });
                             const mergedTasks = Array.from(mergedTasksMap.values());
+                            
+                            // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
                             try {
-                                localStorage.setItem('userTasks', JSON.stringify(mergedTasks));
+                                const email = getUserEmail();
+                                const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
+                                localStorage.setItem(namespacedKey, JSON.stringify(mergedTasks));
+                                localStorage.setItem('userTasks', JSON.stringify(mergedTasks)); // Legacy key for compatibility
                             } catch (e) {
                                 console.warn('Could not save merged tasks to localStorage cache:', e);
                             }
@@ -5152,10 +5226,13 @@ class PowerChoosersCRM {
                     localTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
                     const mergedTasks = Array.from(allTasksMap.values());
                     
-                    // Save merged data back to localStorage cache for next refresh
+                    // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
                     try {
-                        localStorage.setItem('userTasks', JSON.stringify(mergedTasks));
-        } catch (e) {
+                        const email = getUserEmail();
+                        const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
+                        localStorage.setItem(namespacedKey, JSON.stringify(mergedTasks));
+                        localStorage.setItem('userTasks', JSON.stringify(mergedTasks)); // Legacy key for compatibility
+                    } catch (e) {
                         console.warn('Could not save merged tasks to localStorage cache:', e);
                     }
                     
