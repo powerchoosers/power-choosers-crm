@@ -2069,8 +2069,128 @@
           renderAvatarOrIcon('.contact-header-text', escapeHtml(finalInitials), true);
         }
       }
+    } else if (state.taskType === 'li-connect' || state.taskType === 'li-message' || state.taskType === 'li-view-profile' || state.taskType === 'li-interact-post' || 
+               state.taskType === 'linkedin-connect' || state.taskType === 'linkedin-message' || state.taskType === 'linkedin-view' || state.taskType === 'linkedin-interact') {
+      // LinkedIn task header (same styling as call tasks)
+      const contactName = state.currentTask.contact || '';
+      const accountName = state.currentTask.account || '';
+      const person = (typeof window.getPeopleData === 'function' ? (window.getPeopleData() || []).find(p => {
+        const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+        return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+      }) : null) || {};
+      const title = person.title || '';
+      const company = person.companyName || accountName;
+
+      // Compute initials for avatar (same logic as people.js)
+      const initials = (() => {
+        const parts = String(contactName || '').trim().split(/\s+/).filter(Boolean);
+        const chars = parts.length > 1 ? [parts[0][0], parts[parts.length - 1][0]] : (parts[0] ? [parts[0][0]] : []);
+        const str = chars.join('').toUpperCase();
+        if (str) return str;
+        const e = String(person.email || '').trim();
+        return e ? e[0].toUpperCase() : '?';
+      })();
+
+      console.log('LinkedIn task - Contact name:', contactName, 'Initials:', initials);
+
+      // Update the main title to include clickable contact name
+      if (els.title && contactName) {
+        const contactId = person.id || '';
+        console.log('[TaskDetail] Rendering LinkedIn contact link:', { contactName, contactId, hasPerson: !!person });
+        const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(contactId)}" data-contact-name="${escapeHtml(contactName)}" style="color: var(--grey-400); text-decoration: none; font-weight: 400; transition: var(--transition-fast);" onmouseover="this.style.color='var(--text-inverse)'" onmouseout="this.style.color='var(--grey-400)'">${escapeHtml(contactName)}</a>`;
+        
+        // Determine action text based on task type
+        let actionText = '';
+        switch (state.taskType) {
+          case 'li-connect':
+          case 'linkedin-connect':
+            actionText = 'Add on LinkedIn';
+            break;
+          case 'li-message':
+          case 'linkedin-message':
+            actionText = 'Send a message on LinkedIn';
+            break;
+          case 'li-view-profile':
+          case 'linkedin-view':
+            actionText = 'View LinkedIn profile';
+            break;
+          case 'li-interact-post':
+          case 'linkedin-interact':
+            actionText = 'Interact with LinkedIn Post';
+            break;
+          default:
+            actionText = 'LinkedIn Task';
+        }
+        
+        els.title.innerHTML = `${escapeHtml(actionText)} ${contactLinkHTML}`;
+        
+        // Ensure contact link handler is attached
+        setTimeout(() => {
+          const contactLink = els.title.querySelector('.contact-link');
+          if (contactLink) {
+            console.log('[TaskDetail] LinkedIn contact link rendered and ready:', contactLink.getAttribute('data-contact-id'));
+          }
+        }, 100);
+      }
+
+      // Create or update contact info element
+      let contactInfoEl = document.getElementById('task-contact-info');
+      if (!contactInfoEl) {
+        contactInfoEl = document.createElement('div');
+        contactInfoEl.id = 'task-contact-info';
+        contactInfoEl.className = 'task-contact-info';
+        contactInfoEl.style.cssText = 'margin-top: 0px; color: var(--text-secondary); font-size: 14px;';
+
+        // Insert between title and subtitle
+        const titleSection = document.querySelector('.contact-header-text');
+        const subtitle = document.getElementById('task-detail-subtitle');
+        if (titleSection && subtitle) {
+          subtitle.insertAdjacentElement('beforebegin', contactInfoEl);
+        }
+      }
+
+      // Create contact details content
+      let contactDetailsHTML = '';
+
+      if (title && company) {
+        const linkedAccount = findAssociatedAccount(person);
+        const accountId = linkedAccount?.id || '';
+        const companyLink = `<a href="#account-details" class="company-link" id="task-header-company-link" title="View account details" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>`;
+        contactDetailsHTML = `${title} at ${companyLink}`;
+      } else if (title) {
+        contactDetailsHTML = title;
+      } else if (company) {
+        const linkedAccount = findAssociatedAccount(person);
+        const accountId = linkedAccount?.id || '';
+        const companyLink = `<a href="#account-details" class="company-link" id="task-header-company-link" title="View account details" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>`;
+        contactDetailsHTML = companyLink;
+      }
+
+      // Set the contact details content
+      contactInfoEl.innerHTML = `<div class="contact-details-normal">${contactDetailsHTML}</div>`;
+
+      // Add absolutely positioned avatar to the main title container
+      const finalInitials = initials && initials !== '?' ? initials : (contactName ? contactName.charAt(0).toUpperCase() : 'C');
+      console.log('LinkedIn task - Rendering avatar with initials:', finalInitials);
+      
+      // Render avatar with retry - ensure it's inside .contact-header-text
+      const titleSection = document.querySelector('.contact-header-text');
+      if (titleSection) {
+        // Clean up any existing avatars first
+        const existingAvatars = titleSection.querySelectorAll('.avatar-initials, .avatar-absolute');
+        existingAvatars.forEach(el => el.remove());
+        
+        // Create avatar element
+        const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true" style="position: absolute; left: -50px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: var(--orange-subtle); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; letter-spacing: 0.5px;">${escapeHtml(finalInitials)}</span>`;
+        titleSection.insertAdjacentHTML('beforeend', avatarHTML);
+        console.log('[TaskDetail] LinkedIn avatar rendered successfully with initials:', finalInitials);
+      } else {
+        // Fallback to retry helper if element not found
+        console.warn('[TaskDetail] .contact-header-text not found, using retry helper');
+        renderAvatarOrIcon('.contact-header-text', escapeHtml(finalInitials), true);
+      }
     } else {
-      // For non-phone-call tasks, set title and subtitle normally
+      // For other non-phone-call tasks, set title and subtitle normally
       if (els.title) {
         els.title.textContent = state.currentTask.title;
       }
@@ -2250,6 +2370,97 @@
     }
 
     els.content.innerHTML = contentHtml;
+    
+    // Attach event handlers for task-specific buttons after rendering
+    setTimeout(() => {
+      attachTaskSpecificHandlers();
+    }, 50);
+  }
+  
+  function attachTaskSpecificHandlers() {
+    // LinkedIn task handlers
+    const accessLinkedInBtn = document.getElementById('access-linkedin-btn');
+    const markCompleteLinkedInBtn = document.getElementById('mark-complete-linkedin-btn');
+    
+    if (accessLinkedInBtn) {
+      // Remove existing listener if any
+      accessLinkedInBtn.replaceWith(accessLinkedInBtn.cloneNode(true));
+      const newBtn = document.getElementById('access-linkedin-btn');
+      newBtn.addEventListener('click', handleAccessLinkedIn);
+    }
+    
+    if (markCompleteLinkedInBtn) {
+      // Remove existing listener if any
+      markCompleteLinkedInBtn.replaceWith(markCompleteLinkedInBtn.cloneNode(true));
+      const newBtn = document.getElementById('mark-complete-linkedin-btn');
+      newBtn.addEventListener('click', async () => {
+        // Get notes from textarea
+        const notesEl = document.getElementById('linkedin-notes');
+        const notes = notesEl ? notesEl.value.trim() : '';
+        
+        // Save notes if provided
+        if (notes && state.currentTask) {
+          try {
+            await saveTaskNotesToRecentActivity(state.currentTask, notes);
+          } catch (e) {
+            console.warn('Could not save LinkedIn task notes to recent activity:', e);
+          }
+        }
+        
+        // Complete the task
+        await handleTaskComplete();
+      });
+    }
+  }
+  
+  function handleAccessLinkedIn() {
+    if (!state.currentTask) return;
+    
+    const contactName = state.currentTask.contact || '';
+    const contactId = state.currentTask.contactId || '';
+    
+    // Try to find the contact in the people data
+    let person = null;
+    if (typeof window.getPeopleData === 'function') {
+      const people = window.getPeopleData() || [];
+      if (contactId) {
+        person = people.find(p => p.id === contactId);
+      }
+      if (!person && contactName) {
+        person = people.find(p => {
+          const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+          return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+        });
+      }
+    }
+    
+    // Use the same LinkedIn logic as contact-detail.js
+    if (person && person.linkedin) {
+      console.log('[TaskDetail] Using contact personal LinkedIn:', person.linkedin);
+      try {
+        window.open(person.linkedin, '_blank', 'noopener');
+      } catch (e) {
+        console.error('[TaskDetail] Failed to open LinkedIn URL:', e);
+        if (window.crm && typeof window.crm.showToast === 'function') {
+          window.crm.showToast('Failed to open LinkedIn. Please check the URL.', 'error');
+        }
+      }
+    } else {
+      // Fallback to search for the person
+      const fullName = person ? ([person.firstName, person.lastName].filter(Boolean).join(' ') || person.name || '') : contactName;
+      const query = encodeURIComponent(fullName);
+      const url = `https://www.linkedin.com/search/results/people/?keywords=${query}`;
+      console.log('[TaskDetail] No personal LinkedIn, searching for person:', fullName);
+      console.log('[TaskDetail] LinkedIn search URL:', url);
+      try {
+        window.open(url, '_blank', 'noopener');
+      } catch (e) {
+        console.error('[TaskDetail] Failed to open LinkedIn search:', e);
+        if (window.crm && typeof window.crm.showToast === 'function') {
+          window.crm.showToast('Failed to open LinkedIn search. Please try again.', 'error');
+        }
+      }
+    }
   }
 
   function renderAccountTaskContent(task) {
@@ -2652,47 +2863,235 @@
   }
 
   function renderLinkedInTaskContent(task) {
+    // Get contact information (same as call tasks)
+    const contactName = task.contact || '';
+    const accountName = task.account || '';
+    const person = (typeof window.getPeopleData === 'function' ? (window.getPeopleData() || []).find(p => {
+      const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+      return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+    }) : null) || {};
+
+    // Get contact details for the sidebar
+    const contactId = person.id || person.contactId || '';
+    const email = person.email || '';
+    const city = person.city || person.locationCity || '';
+    const stateVal = person.state || person.locationState || '';
+    const industry = person.industry || person.companyIndustry || '';
+    const seniority = person.seniority || '';
+    const department = person.department || '';
+    const companyName = person.companyName || accountName;
+    const linkedinUrl = person.linkedin || '';
+
+    // Get account information if available
+    const linkedAccount = findAssociatedAccount(person) || null;
+
+    // Get location data from both contact and account
+    const finalCity = city || linkedAccount?.city || linkedAccount?.locationCity || '';
+    const finalState = stateVal || linkedAccount?.state || linkedAccount?.locationState || '';
+    const finalIndustry = industry || linkedAccount?.industry || '';
+
+    const electricitySupplier = linkedAccount?.electricitySupplier || '';
+    const annualUsage = linkedAccount?.annualUsage || '';
+    const currentRate = linkedAccount?.currentRate || '';
+    const contractEndDate = linkedAccount?.contractEndDate || '';
+    const shortDescription = linkedAccount?.shortDescription || '';
+    const companyPhone = linkedAccount?.companyPhone || linkedAccount?.phone || linkedAccount?.primaryPhone || linkedAccount?.mainPhone || '';
+
+    // Prepare company icon using global favicon helper
+    const deriveDomain = (input) => {
+      try {
+        if (!input) return '';
+        let s = String(input).trim();
+        if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
+        if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
+        return '';
+      } catch (_) { return ''; }
+    };
+    const domain = linkedAccount?.domain ? String(linkedAccount.domain).replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./i, '') : deriveDomain(linkedAccount?.website || '');
+    const logoUrl = linkedAccount?.logoUrl || '';
+    let companyIconHTML = '';
+    try {
+      if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+        companyIconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
+      }
+    } catch (_) { /* noop */ }
+    if (!companyIconHTML) {
+      if (window.__pcAccountsIcon) companyIconHTML = window.__pcAccountsIcon();
+      else companyIconHTML = `<div class="company-logo-fallback">${companyName ? companyName.charAt(0).toUpperCase() : 'C'}</div>`;
+    }
+
+    // Build company description: prefer shortDescription; fallback to previous industry/location line
+    const locationPart = city && stateVal ? ` • Located in ${escapeHtml(city)}, ${escapeHtml(stateVal)}` : (city ? ` • Located in ${escapeHtml(city)}` : (stateVal ? ` • Located in ${escapeHtml(stateVal)}` : ''));
+    const companyDescriptionHTML = shortDescription ? escapeHtml(shortDescription) : `${industry ? `Industry: ${escapeHtml(industry)}` : ''}${locationPart}`;
+
+    // Get primary phone data with type information
+    const phoneData = getPrimaryPhoneData(person);
+    const { value: primaryPhone, type: phoneType } = phoneData;
+
+    // Determine LinkedIn task action text
     const taskType = task.type;
     let actionText = '';
+    let guidanceText = '';
 
     switch (taskType) {
       case 'li-connect':
+      case 'linkedin-connect':
         actionText = 'Add on LinkedIn';
+        guidanceText = 'Click "Access LinkedIn" to open the contact\'s LinkedIn profile. Send them a connection request, then mark this task as complete.';
         break;
       case 'li-message':
+      case 'linkedin-message':
         actionText = 'Send a message on LinkedIn';
+        guidanceText = 'Click "Access LinkedIn" to open the contact\'s LinkedIn profile. Send them a message, then mark this task as complete.';
         break;
       case 'li-view-profile':
+      case 'linkedin-view':
         actionText = 'View LinkedIn profile';
+        guidanceText = 'Click "Access LinkedIn" to open the contact\'s LinkedIn profile. Review their profile for context, then mark this task as complete.';
         break;
       case 'li-interact-post':
+      case 'linkedin-interact':
         actionText = 'Interact with LinkedIn Post';
+        guidanceText = 'Click "Access LinkedIn" to open the contact\'s LinkedIn profile. Like, comment, or share one of their recent posts, then mark this task as complete.';
         break;
+      default:
+        actionText = 'LinkedIn Task';
+        guidanceText = 'Click "Access LinkedIn" to open the contact\'s LinkedIn profile and complete the required action.';
     }
 
     return `
-      <div class="task-content">
-        <div class="linkedin-task-section">
-          <h3>LinkedIn Task: ${actionText}</h3>
-          <div class="linkedin-info">
+      <div class="main-content">
+        <!-- LinkedIn Task Card -->
+        <div class="task-card" id="linkedin-task-card">
+          <h3 class="section-title">${actionText}</h3>
+          <div class="linkedin-task-info">
             <div class="info-item">
               <label>Contact</label>
-              <div class="info-value">${task.contact || 'Not specified'}</div>
+              <div class="info-value">${escapeHtml(contactName) || 'Not specified'}</div>
             </div>
             <div class="info-item">
               <label>Company</label>
-              <div class="info-value">${task.account || 'Not specified'}</div>
+              <div class="info-value">${escapeHtml(companyName) || 'Not specified'}</div>
             </div>
           </div>
           
-          <div class="linkedin-actions">
-            <button class="btn-primary" id="open-linkedin-btn">Open LinkedIn Profile</button>
-            <button class="btn-secondary" id="mark-complete-btn">Mark as Complete</button>
+          <div class="form-row">
+            <label>Notes</label>
+            <textarea class="input-dark" id="linkedin-notes" rows="3" placeholder="Add notes about this LinkedIn interaction...">${task.notes ? escapeHtml(task.notes) : ''}</textarea>
+          </div>
+          
+          <div class="actions">
+            <button class="btn-primary" id="access-linkedin-btn">Access LinkedIn</button>
+            <button class="btn-secondary" id="mark-complete-linkedin-btn">Mark as Complete</button>
           </div>
           
           <div class="linkedin-guidance">
-            <h4>Guidance</h4>
-            <p>Click "Open LinkedIn Profile" to view the contact's LinkedIn profile. Complete the ${actionText.toLowerCase()} action manually, then click "Mark as Complete" when finished.</p>
+            <p>${guidanceText}</p>
+          </div>
+        </div>
+        
+        <!-- Company Summary Card -->
+        <div class="company-summary-card">
+          <div class="company-summary-header">
+            <div class="company-logo">
+              ${companyIconHTML}
+            </div>
+            <div class="company-name">${companyName ? `<a href="#account-details" class="company-link" id="task-company-link" title="View account details" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName)}">${escapeHtml(companyName)}</a>` : 'Unknown Company'}</div>
+          </div>
+          <div class="company-details">
+            <div class="company-detail-item">
+              <span class="detail-label">Location:</span>
+              <span class="detail-value">${finalCity && finalState ? `${escapeHtml(finalCity)}, ${escapeHtml(finalState)}` : (finalCity ? escapeHtml(finalCity) : (finalState ? escapeHtml(finalState) : '--'))}</span>
+            </div>
+            <div class="company-detail-item">
+              <span class="detail-label">Industry:</span>
+              <span class="detail-value">${escapeHtml(finalIndustry) || '--'}</span>
+            </div>
+          </div>
+          <div class="company-description">
+            ${companyDescriptionHTML}
+          </div>
+        </div>
+      </div>
+      
+      <div class="sidebar-content">
+        <!-- Contact Information -->
+        <div class="contact-info-section">
+          <h3 class="section-title">Contact Information</h3>
+          <div class="info-grid">
+            <div class="info-row">
+              <div class="info-label">EMAIL</div>
+              <div class="info-value ${!email ? 'empty' : ''}">${email ? `<span class="email-text" data-email="${escapeHtml(email)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}">${escapeHtml(email)}</span>` : '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">${phoneType.toUpperCase()}</div>
+              <div class="info-value ${!primaryPhone ? 'empty' : ''}">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-company-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-phone-type="${phoneType}">${escapeHtml(primaryPhone)}</span>` : '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">COMPANY PHONE</div>
+              <div class="info-value ${!companyPhone ? 'empty' : ''}">${companyPhone ? `<span class="phone-text" data-phone="${escapeHtml(companyPhone)}" data-contact-name="" data-contact-id="" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-company-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-is-company-phone="true">${escapeHtml(companyPhone)}</span>` : '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">CITY</div>
+              <div class="info-value ${!city ? 'empty' : ''}">${escapeHtml(city) || '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">STATE</div>
+              <div class="info-value ${!stateVal ? 'empty' : ''}">${escapeHtml(stateVal) || '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">INDUSTRY</div>
+              <div class="info-value ${!industry ? 'empty' : ''}">${escapeHtml(industry) || '--'}</div>
+            </div>
+          </div>
+        </div>
+        
+        ${linkedAccount ? `
+        <!-- Energy & Contract Details -->
+        <div class="contact-info-section">
+          <h3 class="section-title">Energy & Contract</h3>
+          <div class="info-grid">
+            <div class="info-row">
+              <div class="info-label">ELECTRICITY SUPPLIER</div>
+              <div class="info-value ${!electricitySupplier ? 'empty' : ''}">${escapeHtml(electricitySupplier) || '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">ANNUAL USAGE</div>
+              <div class="info-value ${!annualUsage ? 'empty' : ''}">${escapeHtml(annualUsage) || '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">CURRENT RATE</div>
+              <div class="info-value ${!currentRate ? 'empty' : ''}">${escapeHtml(currentRate) || '--'}</div>
+            </div>
+            <div class="info-row">
+              <div class="info-label">CONTRACT END</div>
+              <div class="info-value ${!contractEndDate ? 'empty' : ''}">${escapeHtml(contractEndDate) || '--'}</div>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+        
+        ${shortDescription ? `
+        <!-- Company Summary -->
+        <div class="company-summary-section">
+          <div class="info-label">COMPANY SUMMARY</div>
+          <div class="company-summary-text">${escapeHtml(shortDescription)}</div>
+        </div>
+        ` : ''}
+        
+        <!-- Recent Activity -->
+        <div class="activity-section">
+          <h3 class="section-title">Recent Activity</h3>
+          <div class="activity-timeline" id="task-activity-timeline">
+            <div class="activity-placeholder">
+              <div class="placeholder-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M12 1v6m0 6v6"/>
+                </svg>
+              </div>
+              <div class="placeholder-text">No recent activity</div>
+            </div>
           </div>
         </div>
       </div>
@@ -3446,3 +3845,4 @@
     }
   });
 })();
+
