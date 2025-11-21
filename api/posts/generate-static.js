@@ -349,6 +349,7 @@ async function uploadHTMLToStorage(bucket, filename, htmlContent) {
 
 // Update posts-list.json in Firebase Storage
 async function updatePostsList(bucket, posts) {
+  // Always create/update posts-list.json, even if empty
   const listData = {
     posts: posts.map(post => ({
       id: post.id,
@@ -369,17 +370,24 @@ async function updatePostsList(bucket, posts) {
   };
   
   const file = bucket.file('posts-list.json');
-  await file.save(JSON.stringify(listData, null, 2), {
-    metadata: {
-      contentType: 'application/json',
-      cacheControl: 'public, max-age=300',
-    },
-    public: true,
-  });
   
-  await file.makePublic();
-  
-  return file.publicUrl();
+  try {
+    await file.save(JSON.stringify(listData, null, 2), {
+      metadata: {
+        contentType: 'application/json',
+        cacheControl: 'public, max-age=300',
+      },
+      public: true,
+    });
+    
+    await file.makePublic();
+    console.log('[GenerateStatic] posts-list.json created/updated with', posts.length, 'posts');
+    
+    return file.publicUrl();
+  } catch (error) {
+    console.error('[GenerateStatic] Error updating posts-list.json:', error);
+    throw error;
+  }
 }
 
 export default async function handler(req, res) {
@@ -398,7 +406,57 @@ export default async function handler(req, res) {
   }
   
   try {
-    const { postId } = req.body || {};
+    const { postId, regenerateList } = req.body || {};
+    
+    // If regenerateList is true, just update posts-list.json without generating HTML
+    if (regenerateList) {
+      const bucket = getStorageBucket();
+      
+      // Get all published posts
+      let publishedPosts = [];
+      try {
+        const publishedPostsSnapshot = await db.collection('posts')
+          .where('status', '==', 'published')
+          .orderBy('publishDate', 'desc')
+          .get();
+        
+        publishedPostsSnapshot.forEach(doc => {
+          publishedPosts.push({ id: doc.id, ...doc.data() });
+        });
+      } catch (indexError) {
+        console.warn('[GenerateStatic] Composite index not found, using fallback query:', indexError.message);
+        try {
+          const publishedPostsSnapshot = await db.collection('posts')
+            .where('status', '==', 'published')
+            .get();
+          
+          publishedPostsSnapshot.forEach(doc => {
+            publishedPosts.push({ id: doc.id, ...doc.data() });
+          });
+          
+          // Sort in memory by publishDate
+          publishedPosts.sort((a, b) => {
+            const dateA = a.publishDate ? (a.publishDate.toDate ? a.publishDate.toDate() : new Date(a.publishDate)) : new Date(0);
+            const dateB = b.publishDate ? (b.publishDate.toDate ? b.publishDate.toDate() : new Date(b.publishDate)) : new Date(0);
+            return dateB - dateA;
+          });
+        } catch (fallbackError) {
+          console.error('[GenerateStatic] Error fetching published posts:', fallbackError);
+          publishedPosts = [];
+        }
+      }
+      
+      // Update posts-list.json
+      const listUrl = await updatePostsList(bucket, publishedPosts);
+      
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        listUrl,
+        message: 'Posts list regenerated successfully'
+      }));
+      return;
+    }
     
     if (!postId) {
       console.log('[GenerateStatic] No postId provided');
