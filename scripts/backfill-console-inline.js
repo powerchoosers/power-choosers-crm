@@ -235,6 +235,329 @@
     }
   }
 
+  // Clean up sent emails that are still marked as scheduled
+  async function cleanupSentScheduledEmails(options = {}) {
+    const { deleteOrphaned = false, markAllPastAsSent = false } = options;
+    console.log('[Backfill] Cleaning up sent emails that are still marked as scheduled...');
+    console.log(`[Backfill] Mode: ${deleteOrphaned ? 'DELETE orphaned emails' : markAllPastAsSent ? 'MARK ALL past emails as sent' : 'MARK as sent (smart detection)'}`);
+    
+    if (!window.firebaseDB) {
+      console.error('[Backfill] Firebase not available');
+      return;
+    }
+
+    try {
+      // Get all scheduled emails
+      const scheduledSnapshot = await window.firebaseDB.collection('emails')
+        .where('type', '==', 'scheduled')
+        .get();
+
+      console.log(`[Backfill] Found ${scheduledSnapshot.size} scheduled emails to check`);
+
+      let fixedCount = 0;
+      let deletedCount = 0;
+      const fixedEmails = [];
+      const deletedEmails = [];
+      const updates = []; // Collect all updates first
+      const deletes = []; // Collect all deletes first
+
+      scheduledSnapshot.forEach(doc => {
+        const data = doc.data();
+        
+        // Check if email was actually sent (multiple indicators)
+        const hasSentAt = data.sentAt && (typeof data.sentAt === 'number' || typeof data.sentAt === 'string' || (data.sentAt && data.sentAt.toDate));
+        const hasSendgridId = data.sendgridMessageId || data.sgMessageId || data.messageId;
+        const statusIsSent = data.status === 'sent' || data.status === 'delivered';
+        
+        // Check if email is an orphaned sent email (no content, past send time)
+        const now = Date.now();
+        let scheduledTimeMs = null;
+        if (data.scheduledSendTime) {
+          if (typeof data.scheduledSendTime === 'number') {
+            scheduledTimeMs = data.scheduledSendTime;
+          } else if (data.scheduledSendTime.toDate) {
+            scheduledTimeMs = data.scheduledSendTime.toDate().getTime();
+          } else if (data.scheduledSendTime.seconds) {
+            scheduledTimeMs = data.scheduledSendTime.seconds * 1000;
+          }
+        }
+        
+        // Check if email has no content (indicates it was sent and content was cleared)
+        const hasNoContent = !data.subject || data.subject === '(No Subject)' || 
+                             (!data.html && !data.text && !data.content);
+        
+        // Check if scheduled time is in the past (more than 5 minutes ago - more lenient)
+        const isPastSendTime = scheduledTimeMs && scheduledTimeMs < (now - 5 * 60 * 1000);
+        
+        // AGGRESSIVE CLEANUP: If email has no content AND send time is past, it's likely sent
+        // Also check if status is 'approved' or 'sending' with past time (stuck emails)
+        const isStuckApproved = data.status === 'approved' && isPastSendTime;
+        const isStuckSending = data.status === 'sending' && isPastSendTime;
+        const isOrphanedSent = hasNoContent && isPastSendTime;
+        
+        // AGGRESSIVE MODE: Mark ALL past emails as sent (regardless of content/status)
+        const shouldMarkAsSent = markAllPastAsSent 
+          ? isPastSendTime  // In aggressive mode, any past email is marked as sent
+          : (hasSentAt || hasSendgridId || statusIsSent || isOrphanedSent || isStuckApproved || isStuckSending);
+        
+        // If email has any indication it was sent, mark it as sent
+        // OR if it's clearly orphaned (no content, past time), handle it
+        if (shouldMarkAsSent) {
+          
+          // If deleteOrphaned mode and email has no content, delete it instead of marking as sent
+          if (deleteOrphaned && hasNoContent && !hasSentAt && !hasSendgridId && !statusIsSent) {
+            deletes.push(doc.ref);
+            deletedCount++;
+            deletedEmails.push({
+              id: doc.id,
+              to: Array.isArray(data.to) ? data.to[0] : data.to,
+              subject: data.subject || '(No Subject)',
+              reason: 'orphaned (no content, past send time, no sent indicators)'
+            });
+            return; // Skip to next email
+          }
+          const updateData = {
+            type: 'sent',
+            status: 'sent',
+            emailType: 'sent',
+            isSentEmail: true
+          };
+          
+          // Preserve existing sentAt if it exists (don't overwrite)
+          // Only set sentAt if it's missing
+          if (!data.sentAt) {
+            // Try to use scheduledSendTime as fallback
+            if (data.scheduledSendTime) {
+              if (typeof data.scheduledSendTime === 'number') {
+                updateData.sentAt = data.scheduledSendTime;
+              } else if (data.scheduledSendTime.toDate) {
+                updateData.sentAt = data.scheduledSendTime.toDate().getTime();
+              } else if (data.scheduledSendTime.seconds) {
+                updateData.sentAt = data.scheduledSendTime.seconds * 1000;
+              } else {
+                // Use serverTimestamp as last resort
+                if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+                  updateData.sentAt = window.firebase.firestore.FieldValue.serverTimestamp();
+                } else {
+                  updateData.sentAt = Date.now();
+                }
+              }
+            } else {
+              // No scheduledSendTime either, use serverTimestamp or now
+              if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+                updateData.sentAt = window.firebase.firestore.FieldValue.serverTimestamp();
+              } else {
+                updateData.sentAt = Date.now();
+              }
+            }
+          }
+          // If sentAt already exists, we don't need to set it (Firestore will preserve it)
+          
+          // Set updatedAt
+          if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
+            updateData.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
+          } else {
+            updateData.updatedAt = new Date().toISOString();
+          }
+          
+          updates.push({ ref: doc.ref, data: updateData });
+          
+          fixedCount++;
+          
+          // Get sentAt for logging
+          let sentAtForLog = 'Unknown';
+          if (data.sentAt) {
+            if (data.sentAt.toDate) {
+              sentAtForLog = data.sentAt.toDate().toLocaleString();
+            } else if (data.sentAt.seconds) {
+              sentAtForLog = new Date(data.sentAt.seconds * 1000).toLocaleString();
+            } else if (typeof data.sentAt === 'number') {
+              sentAtForLog = new Date(data.sentAt).toLocaleString();
+            } else if (typeof data.sentAt === 'string') {
+              sentAtForLog = new Date(data.sentAt).toLocaleString();
+            }
+          } else if (data.scheduledSendTime) {
+            if (data.scheduledSendTime.toDate) {
+              sentAtForLog = data.scheduledSendTime.toDate().toLocaleString();
+            } else if (data.scheduledSendTime.seconds) {
+              sentAtForLog = new Date(data.scheduledSendTime.seconds * 1000).toLocaleString();
+            } else if (typeof data.scheduledSendTime === 'number') {
+              sentAtForLog = new Date(data.scheduledSendTime).toLocaleString();
+            }
+          }
+          
+          // Determine reason for fixing
+          let reason = 'unknown';
+          if (markAllPastAsSent) reason = 'past send time (aggressive mode)';
+          else if (hasSentAt) reason = 'has sentAt';
+          else if (hasSendgridId) reason = 'has sendgridMessageId';
+          else if (statusIsSent) reason = 'status is sent';
+          else if (isStuckApproved) reason = 'stuck approved (past send time)';
+          else if (isStuckSending) reason = 'stuck sending (past send time)';
+          else if (isOrphanedSent) reason = 'orphaned (no content, past send time)';
+          
+          fixedEmails.push({
+            id: doc.id,
+            to: Array.isArray(data.to) ? data.to[0] : data.to,
+            subject: data.subject || '(No Subject)',
+            sentAt: sentAtForLog,
+            reason: reason
+          });
+        }
+      });
+
+      // Commit deletes first (if any)
+      if (deletes.length > 0) {
+        const BATCH_SIZE = 500;
+        for (let i = 0; i < deletes.length; i += BATCH_SIZE) {
+          const batch = window.firebaseDB.batch();
+          const chunk = deletes.slice(i, i + BATCH_SIZE);
+          chunk.forEach(ref => {
+            batch.delete(ref);
+          });
+          await batch.commit();
+          console.log(`[Backfill] Deleted batch ${Math.floor(i / BATCH_SIZE) + 1} (${chunk.length} emails)`);
+        }
+        console.log(`[Backfill] ✅ Deleted ${deletedCount} orphaned emails`);
+        if (deletedEmails.length > 0) {
+          console.table(deletedEmails);
+        }
+      }
+      
+      // Commit updates in batches (Firestore limit is 500 per batch)
+      if (updates.length > 0) {
+        const BATCH_SIZE = 500;
+        for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+          const batch = window.firebaseDB.batch();
+          const chunk = updates.slice(i, i + BATCH_SIZE);
+          chunk.forEach(({ ref, data }) => {
+            batch.update(ref, data);
+          });
+          await batch.commit();
+          console.log(`[Backfill] Committed batch ${Math.floor(i / BATCH_SIZE) + 1} (${chunk.length} emails)`);
+        }
+        console.log(`[Backfill] ✅ Fixed ${fixedCount} emails (marked as sent)`);
+        if (fixedEmails.length > 0) {
+          console.table(fixedEmails);
+        }
+      }
+      
+      // Invalidate cache and reload emails if there were any changes
+      if (updates.length > 0 || deletes.length > 0) {
+        // Invalidate cache and reload emails
+        if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+          await window.CacheManager.invalidate('emails');
+          console.log('[Backfill] ✓ Emails cache invalidated');
+        }
+        
+        // Force reload emails
+        if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.forceReload === 'function') {
+          await window.BackgroundEmailsLoader.forceReload();
+          console.log('[Backfill] ✓ Emails reloaded');
+        }
+        
+        // Trigger emails page refresh
+        document.dispatchEvent(new CustomEvent('pc:emails-updated', { 
+          detail: { count: fixedCount + deletedCount, fromCleanup: true } 
+        }));
+        
+        const totalFixed = fixedCount + deletedCount;
+        if (window.crm?.showToast) {
+          const message = deletedCount > 0 
+            ? `Fixed ${fixedCount} emails and deleted ${deletedCount} orphaned emails`
+            : `Fixed ${fixedCount} sent emails (removed from scheduled tab)`;
+          window.crm.showToast(message, 'success');
+        }
+      } else {
+        console.log('[Backfill] No sent emails found that need fixing');
+        if (window.crm?.showToast) {
+          window.crm.showToast('All scheduled emails are correctly marked', 'info');
+        }
+      }
+
+      return { fixed: fixedCount, deleted: deletedCount, total: scheduledSnapshot.size };
+    } catch (error) {
+      console.error('[Backfill] Error cleaning up emails:', error);
+      if (window.crm?.showToast) {
+        window.crm.showToast(`Failed to cleanup emails: ${error.message}`, 'error');
+      }
+      throw error;
+    }
+  }
+
+  // Delete ALL scheduled emails (simple, no questions asked)
+  async function deleteAllScheduledEmails() {
+    console.log('[Backfill] Deleting ALL scheduled emails...');
+    
+    if (!window.firebaseDB) {
+      console.error('[Backfill] Firebase not available');
+      return;
+    }
+
+    try {
+      // Get all scheduled emails
+      const scheduledSnapshot = await window.firebaseDB.collection('emails')
+        .where('type', '==', 'scheduled')
+        .get();
+
+      console.log(`[Backfill] Found ${scheduledSnapshot.size} scheduled emails to delete`);
+
+      if (scheduledSnapshot.size === 0) {
+        console.log('[Backfill] No scheduled emails to delete');
+        if (window.crm?.showToast) {
+          window.crm.showToast('No scheduled emails found', 'info');
+        }
+        return { deleted: 0 };
+      }
+
+      // Delete in batches
+      const BATCH_SIZE = 500;
+      let deletedCount = 0;
+      
+      for (let i = 0; i < scheduledSnapshot.size; i += BATCH_SIZE) {
+        const batch = window.firebaseDB.batch();
+        const chunk = scheduledSnapshot.docs.slice(i, i + BATCH_SIZE);
+        
+        chunk.forEach(doc => {
+          batch.delete(doc.ref);
+          deletedCount++;
+        });
+        
+        await batch.commit();
+        console.log(`[Backfill] Deleted batch ${Math.floor(i / BATCH_SIZE) + 1} (${chunk.length} emails)`);
+      }
+
+      console.log(`[Backfill] ✅ Deleted ${deletedCount} scheduled emails`);
+
+      // Invalidate cache and reload emails
+      if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+        await window.CacheManager.invalidate('emails');
+        console.log('[Backfill] ✓ Emails cache invalidated');
+      }
+      
+      if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.forceReload === 'function') {
+        await window.BackgroundEmailsLoader.forceReload();
+        console.log('[Backfill] ✓ Emails reloaded');
+      }
+      
+      document.dispatchEvent(new CustomEvent('pc:emails-updated', { 
+        detail: { count: deletedCount, fromCleanup: true } 
+      }));
+
+      if (window.crm?.showToast) {
+        window.crm.showToast(`Deleted ${deletedCount} scheduled emails`, 'success');
+      }
+
+      return { deleted: deletedCount };
+    } catch (error) {
+      console.error('[Backfill] Error deleting scheduled emails:', error);
+      if (window.crm?.showToast) {
+        window.crm.showToast(`Failed to delete emails: ${error.message}`, 'error');
+      }
+      throw error;
+    }
+  }
+
   // Manual refresh function to see new tasks
   async function refreshTasks() {
     console.log('[Backfill] Refreshing tasks...');
@@ -288,6 +611,8 @@
   window.runBackfill = runBackfill;
   window.refreshTasks = refreshTasks;
   window.fixBackfilledTasks = fixBackfilledTasks;
+  window.cleanupSentScheduledEmails = cleanupSentScheduledEmails;
+  window.deleteAllScheduledEmails = deleteAllScheduledEmails;
 
   // Show instructions
   console.log(`
@@ -312,8 +637,22 @@
 5. Fix existing backfilled tasks (add timestamp field):
    await fixBackfilledTasks();
 
+6. Clean up sent emails from scheduled tab:
+   await cleanupSentScheduledEmails();
+   
+7. Delete orphaned emails (no content, past send time):
+   await cleanupSentScheduledEmails({ deleteOrphaned: true });
+
+8. Mark ALL past scheduled emails as sent (aggressive):
+   await cleanupSentScheduledEmails({ markAllPastAsSent: true });
+
+9. Delete ALL scheduled emails (simple, removes everything):
+   await deleteAllScheduledEmails();
+
 💡 Recommended: Run dry run first, then real run
 💡 If tasks don't appear: Run await fixBackfilledTasks(); then await refreshTasks();
+💡 If sent emails show in scheduled tab: Run await cleanupSentScheduledEmails();
+💡 To delete ALL scheduled emails: Run await deleteAllScheduledEmails();
   `);
 
   return { runBackfill };

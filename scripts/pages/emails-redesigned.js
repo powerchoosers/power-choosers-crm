@@ -70,10 +70,11 @@
               // Previously this called loadData() without the flag, which updated
               // in-memory data but didn't call applyFilters()/render(), forcing
               // a manual refresh or tab toggle for users to see changes.
+              console.log('[EmailsPage] Real-time update detected, refreshing...');
               loadData(true); 
             }
           } catch(_) {}
-        }, 1000); // 1 second debounce
+        }, 500); // Reduced to 500ms for faster updates when emails are sent
       };
       
       document.addEventListener('pc:emails-loaded', () => {
@@ -86,6 +87,7 @@
       });
       document.addEventListener('pc:emails-updated', debouncedLoadData);
       document._emailsRealtimeBound = true;
+      console.log('[EmailsPage] Real-time listeners bound');
     } catch(_) {}
   }
 
@@ -212,8 +214,11 @@
         if (emailsData.length > 0) {
           processAndSetData(emailsData);
           if (showImmediately) {
+            // CRITICAL: Always refresh when showImmediately is true (for real-time updates)
+            // This ensures sent emails are removed from scheduled tab immediately
             applyFilters();
             render();
+            console.log('[EmailsPage] Refreshed display (showImmediately=true)');
           }
         }
         
@@ -280,8 +285,18 @@
       }
       
       // If we didn't show immediately, apply filters now
+      // CRITICAL: Always apply filters when showImmediately is false to ensure data is filtered
       if (!showImmediately && state.data.length > 0) {
         applyFilters();
+        render(); // Also render to ensure UI is updated
+      }
+      
+      // CRITICAL: If showImmediately was true but we didn't have data initially,
+      // make sure we still refresh once data is loaded
+      if (showImmediately && state.data.length > 0) {
+        // Double-check: ensure filters are applied and rendered
+        applyFilters();
+        render();
       }
     } catch (error) {
       console.error('[EmailsPage] Failed to load emails:', error);
@@ -410,9 +425,14 @@
       
       // OPTIMIZATION: Simplified filter logic - fewer variable assignments
       filtered = filtered.filter(email => {
-        // Fast path: early returns for common cases
-        // Exclude if type is 'sent' (already sent, even if type wasn't updated properly)
-        if (email.type === 'sent' || email.deleted) return false;
+        // CRITICAL: Exclude sent emails immediately (multiple checks for robustness)
+        // Check type first (most reliable indicator)
+        if (email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail === true) {
+          return false;
+        }
+        
+        // Exclude deleted emails
+        if (email.deleted) return false;
         
         // Only show emails that are actually scheduled
         if (email.type !== 'scheduled') return false;
@@ -420,6 +440,7 @@
         const status = email.status || '';
         
         // Fast path: exclude already sent emails (multiple status indicators)
+        // CRITICAL: Check status to catch emails that were sent but type wasn't updated
         if (status === 'sent' || status === 'delivered' || status === 'error') return false;
         
         // Exclude emails stuck in 'sending' state if send time has passed (likely already sent)
@@ -637,15 +658,22 @@
         const now = Date.now();
         const oneMinuteAgo = now - 60000;
         filtered = filtered.filter(email => {
-          // Exclude if type is 'sent' (already sent, even if type wasn't updated properly)
-          if (email.type === 'sent' || email.deleted) return false;
+          // CRITICAL: Exclude sent emails immediately (multiple checks for robustness)
+          // Check type first (most reliable indicator)
+          if (email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail === true) {
+            return false;
+          }
+          
+          // Exclude deleted emails
+          if (email.deleted) return false;
           
           // Only show emails that are actually scheduled
           if (email.type !== 'scheduled') return false;
           
           const status = email.status || '';
           
-          // Exclude already sent emails (multiple status indicators)
+          // Fast path: exclude already sent emails (multiple status indicators)
+          // CRITICAL: Check status to catch emails that were sent but type wasn't updated
           if (status === 'sent' || status === 'delivered' || status === 'error') return false;
           
           // Exclude emails stuck in 'sending' state if send time has passed (likely already sent)
