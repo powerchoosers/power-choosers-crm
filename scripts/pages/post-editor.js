@@ -444,23 +444,50 @@
           });
           
           // Upload to Imgur
-          const apiBase = window.location.hostname === 'localhost' 
-            ? 'http://localhost:3000'
-            : 'https://power-choosers-crm-792458658491.us-south1.run.app';
+          // Use window.API_BASE_URL if available, otherwise fallback
+          const apiBase = window.API_BASE_URL || 
+            (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+              ? 'http://localhost:3000'
+              : 'https://power-choosers-crm-792458658491.us-south1.run.app');
           
-          const response = await fetch(`${apiBase}/api/upload/signature-image`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: base64, type: 'featured-image' })
-          });
+          // Check if base64 is too large (warn if over 8MB)
+          const base64SizeMB = (base64.length * 3) / 4 / 1024 / 1024;
+          if (base64SizeMB > 8) {
+            if (window.crm && typeof window.crm.showToast === 'function') {
+              window.crm.showToast('Image is very large. This may take a moment...', 'info');
+            }
+          }
+          
+          // Create abort controller for timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+          
+          let response;
+          try {
+            response = await fetch(`${apiBase}/api/upload/signature-image`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: base64, type: 'featured-image' }),
+              signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+          } catch (fetchError) {
+            clearTimeout(timeoutId);
+            if (fetchError.name === 'AbortError') {
+              throw new Error('Upload timed out. The image may be too large.');
+            }
+            throw fetchError;
+          }
           
           if (!response.ok) {
-            throw new Error('Upload failed');
+            const errorText = await response.text();
+            console.error('[Post Editor] Upload failed:', response.status, errorText);
+            throw new Error(`Upload failed: ${response.status}`);
           }
           
           const result = await response.json();
           if (!result.success || !result.imageUrl) {
-            throw new Error('Upload failed');
+            throw new Error('Upload failed: Invalid response');
           }
           
           // Set the image URL
@@ -471,11 +498,31 @@
           els.featuredImagePreviewImg.src = result.imageUrl;
           els.featuredImagePreview.style.display = 'block';
           
+          // Reset button state
+          if (els.uploadFeaturedBtn) {
+            els.uploadFeaturedBtn.disabled = false;
+            els.uploadFeaturedBtn.textContent = 'Upload Image';
+          }
+          
           if (window.crm && typeof window.crm.showToast === 'function') {
             window.crm.showToast('Featured image uploaded successfully', 'success');
           }
         } catch (error) {
           console.error('[Post Editor] Featured image upload error:', error);
+          
+          // Reset button state
+          if (els.uploadFeaturedBtn) {
+            els.uploadFeaturedBtn.disabled = false;
+            els.uploadFeaturedBtn.textContent = 'Upload Image';
+          }
+          
+          let errorMessage = 'Failed to upload featured image';
+          if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+            errorMessage = 'Upload timed out. The image may be too large. Try a smaller image or use a URL instead.';
+          } else if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_RESET')) {
+            errorMessage = 'Connection error. The image may be too large. Try compressing the image or using a URL instead.';
+          }
+          
           if (window.crm && typeof window.crm.showToast === 'function') {
             window.crm.showToast('Failed to upload featured image', 'error');
           }
