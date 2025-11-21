@@ -824,7 +824,13 @@
       }
       
       // Refresh news list if available
-      if (window.newsModule && typeof window.newsModule.loadDataOnce === 'function') {
+      if (window.newsModule && typeof window.newsModule.reloadData === 'function') {
+        window.newsModule.reloadData();
+      } else if (window.newsModule && typeof window.newsModule.loadDataOnce === 'function') {
+        // Fallback: reset loaded state and reload
+        if (window.newsModule.state) {
+          window.newsModule.state.loaded = false;
+        }
         window.newsModule.loadDataOnce();
       }
       

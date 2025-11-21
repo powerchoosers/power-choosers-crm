@@ -62,7 +62,24 @@
     try {
       const d = dateVal.toDate ? dateVal.toDate() : new Date(dateVal);
       if (isNaN(d.getTime())) return '—';
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const postDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      
+      const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      
+      if (postDate.getTime() === today.getTime()) {
+        return `Today, ${timeStr}`;
+      } else if (postDate.getTime() === yesterday.getTime()) {
+        return `Yesterday, ${timeStr}`;
+      } else {
+        // More than 2 days ago - show full date
+        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return `${dateStr}, ${timeStr}`;
+      }
     } catch (_) {
       return '—';
     }
@@ -79,6 +96,11 @@
 
   async function loadDataOnce() {
     if (state.loaded || !window.firebaseDB) return;
+    await reloadData();
+  }
+
+  async function reloadData() {
+    if (!window.firebaseDB) return;
     
     // Admin-only access check
     if (!isAdmin()) {
@@ -405,8 +427,60 @@
         post.publishDate = new Date();
       }
       
-      applyFilters();
-      if (window.showToast) {
+      // If published, trigger static HTML generation
+      // If unpublished, also regenerate posts-list.json to remove it
+      if (newStatus === 'published' || newStatus === 'draft') {
+        try {
+          const apiBase = window.API_BASE_URL || 
+            (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+              ? 'http://localhost:3000'
+              : 'https://power-choosers-crm-792458658491.us-south1.run.app');
+          
+          if (newStatus === 'published') {
+            // Generate static HTML for published post
+            const response = await fetch(`${apiBase}/api/posts/generate-static`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ postId: post.id })
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              if (!result.skipped) {
+                console.log('[News] Static HTML generated for post:', post.id);
+                if (window.crm && typeof window.crm.showToast === 'function') {
+                  window.crm.showToast('Post published and static HTML generated', 'success');
+                }
+              }
+            } else {
+              const errorText = await response.text();
+              console.error('[News] Failed to generate static HTML:', response.status, errorText);
+            }
+          } else {
+            // Unpublished - regenerate posts-list.json to remove this post
+            // Call generate-static for any published post to trigger list update
+            const publishedResponse = await fetch(`${apiBase}/api/posts/generate-static`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ regenerateList: true })
+            });
+            
+            if (publishedResponse.ok) {
+              console.log('[News] Posts list regenerated after unpublish');
+            }
+          }
+        } catch (error) {
+          console.error('[News] Error generating static HTML:', error);
+          // Don't fail the publish/unpublish if static generation fails
+        }
+      }
+      
+      // Reload data to get fresh post list
+      await reloadData();
+      
+      if (window.crm && typeof window.crm.showToast === 'function') {
+        window.crm.showToast(`Post ${newStatus === 'published' ? 'published' : 'unpublished'} successfully`, 'success');
+      } else if (window.showToast) {
         window.showToast(`Post ${newStatus === 'published' ? 'published' : 'unpublished'} successfully`, 'success');
       }
     } catch (error) {
@@ -422,7 +496,8 @@
       await window.firebaseDB.collection('posts').doc(id).delete();
       state.data = state.data.filter(p => p.id !== id);
       state.selected.delete(id);
-      applyFilters();
+      // Reload data to ensure consistency
+      await reloadData();
       if (window.showToast) {
         window.showToast('Post deleted successfully', 'success');
       }
@@ -545,6 +620,7 @@
   window.newsModule = {
     init,
     loadDataOnce,
+    reloadData,
     applyFilters,
     render
   };
