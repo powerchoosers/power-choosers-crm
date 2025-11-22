@@ -104,6 +104,6 @@ images:
 # Build options
 options:
   logging: CLOUD_LOGGING_ONLY
-  machineType: 'E2_HIGHCPU_2'  # Reduced from E2_HIGHCPU_8 to save costs (~$20-30/month savings)
+  machineType: 'e2-highcpu-2'  # Reduced from e2-highcpu-8 to save costs (~$20-30/month savings)
 
 
