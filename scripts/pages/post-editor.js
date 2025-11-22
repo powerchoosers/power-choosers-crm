@@ -814,12 +814,24 @@
               if (window.crm && typeof window.crm.showToast === 'function') {
                 window.crm.showToast('Post published and static HTML generated', 'success');
               }
+            } else {
+              console.warn('[Post Editor] Static generation skipped:', result.message);
+              if (window.crm && typeof window.crm.showToast === 'function') {
+                window.crm.showToast('Post saved, but static HTML generation was skipped', 'warning');
+              }
             }
           } else {
-            console.warn('[Post Editor] Failed to generate static HTML, but post was saved');
+            const errorText = await response.text().catch(() => 'Unknown error');
+            console.error('[Post Editor] Failed to generate static HTML:', response.status, errorText);
+            if (window.crm && typeof window.crm.showToast === 'function') {
+              window.crm.showToast(`Post saved, but static HTML generation failed (${response.status}). Please regenerate manually.`, 'error');
+            }
           }
         } catch (error) {
           console.error('[Post Editor] Error generating static HTML:', error);
+          if (window.crm && typeof window.crm.showToast === 'function') {
+            window.crm.showToast('Post saved, but static HTML generation failed. Please regenerate manually.', 'error');
+          }
           // Don't fail the save if static generation fails
         }
       }
