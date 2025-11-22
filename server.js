@@ -969,9 +969,9 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // Default to crm-dashboard.html for root requests
+  // Default to index.html for root requests (public landing page)
   if (pathname === '/') {
-    pathname = '/crm-dashboard.html';
+    pathname = '/index.html';
   }
 
   // Construct file path using the robust __dirname equivalent
