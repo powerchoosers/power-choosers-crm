@@ -812,7 +812,10 @@
             if (!result.skipped) {
               console.log('[Post Editor] Static HTML generated:', result.htmlUrl);
               if (window.crm && typeof window.crm.showToast === 'function') {
-                window.crm.showToast('Post published and static HTML generated', 'success');
+                const message = currentPostId 
+                  ? 'Post updated and static HTML regenerated' 
+                  : 'Post published and static HTML generated';
+                window.crm.showToast(message, 'success');
               }
             } else {
               console.warn('[Post Editor] Static generation skipped:', result.message);
