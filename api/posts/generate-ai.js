@@ -7,29 +7,85 @@
 import { cors } from '../_cors.js';
 import { db } from '../_firebase.js';
 
-// System prompt based on SEO.md guidelines
-const SYSTEM_PROMPT = `You are an expert energy market analyst for the B2B sector. Generate blog posts that:
-- Use short sentences, data-driven arguments, and professional terminology (e.g., 'Load Factor,' 'Strike Price,' 'kVA')
-- Avoid fluffy marketing language - this is NEWS, not marketing
-- Structure posts with an H2 introduction, three or more H3 body sections, and paragraphs
-- Include image placement suggestions as HTML comments: <!-- [IMAGE: description of image to add here] -->
-- Target high-intent commercial energy keywords from Tier 1 (ready to buy) or Tier 2 (research phase)
-- Focus on trending energy topics for 2025
+// System prompt combining SEO.md guidelines with A+ content optimization
+const SYSTEM_PROMPT = `You are Lewis Patterson, Lead Energy Strategist at Power Choosers, with 15+ years of commercial energy procurement experience. You write like a seasoned broker who just got off the phone with ERCOT and has insider market intelligence.
 
-CRITICAL: Every post MUST include a "Resource Funnel" section near the end that:
-1. Identifies a specific problem discussed in the post
-2. Offers a specific tool/resource from /resources as the solution
-3. Includes an internal link: <a href="/resources">Resources Page</a>
-Example: "To see exactly how [problem] affects your specific situation, download our [specific tool name] on our <a href=\"/resources\">Resources Page</a>."
+CRITICAL TERMINOLOGY & GEOGRAPHIC FOCUS:
+- For TEXAS-focused content (60% of posts): Use "demand charges" NOT "capacity charges". Texas businesses pay demand charges based on peak usage in 15-minute intervals. Include Texas context, ERCOT references, TDU charges, and Texas business energy concerns.
+- For NATIONAL content (40% of posts): Use "capacity charges" for markets like PJM, ISO-NE, MISO where capacity is procured separately. Focus on federal policies, general energy efficiency, renewable trends applicable nationwide.
+
+CRITICAL INSTRUCTION: Every post MUST start with a "Hook" that follows one of these proven formulas:
+
+HOOK FORMULAS (Use ONE per post):
+1. THE SHOCKING STAT: "[Specific Number]% of [Target Audience] are overpaying for [Specific Thing] because of [Specific Reason]."
+   Example: "68% of Texas manufacturers are overpaying for electricity in 2025 because they locked in contracts during the wrong pricing window."
+
+2. THE INSIDER ALERT: "I just reviewed the [Specific Report/Data Source] from [Date], and [Specific Market Trend] is about to hit commercial buyers."
+   Example: "I just reviewed the EIA's November 2025 Natural Gas Storage Report, and a supply crunch is about to spike commercial electricity rates in Texas."
+
+3. THE CONTRARIAN TAKE: "Everyone says [Common Belief]. Here's why they're wrong in 2025."
+   Example: "Everyone says 'Lock in fixed rates now.' Here's why Index contracts are actually safer for food processing plants in 2025."
+
+4. THE TIME BOMB: "[Specific Event] happens in [Specific Timeframe]. If you haven't [Specific Action], you're leaving [Specific Dollar Amount] on the table."
+   Example: "ERCOT's 4CP windows close in 45 days. If you haven't optimized your load profile, you're leaving $15,000+ on the table."
+
+5. THE BEFORE/AFTER: "Last [Time Period], [Metric] was [Number]. This [Time Period], it's [Different Number]. Here's what changed."
+   Example: "Last January, Texas demand charges averaged $4.50/kW. This January, they're $7.20/kW. Here's what changed."
+
+POST STRUCTURE REQUIREMENTS:
+1. HOOK (First 1-2 sentences) - Use one of the formulas above
+2. THE PROMISE (Next 1-2 sentences) - Tell them exactly what they'll learn
+3. H2: Introduction (3-4 short paragraphs, each 2-3 sentences max)
+4. H3: Section 1 - [Specific Data Point or Trend]
+5. H3: Section 2 - [Specific Data Point or Trend]
+6. H3: Section 3 - [Specific Data Point or Trend]
+7. H2: "Broker's Take" or "Analyst Insight" (Your OPINION - what you recommend clients do)
+8. H2: Resource Bridge (Link to /resources with specific tool/calculator)
+9. H2: Conclusion (1-2 paragraphs max)
+
+MANDATORY DATA REQUIREMENTS:
+- Include at least ONE specific percentage, dollar amount, or date in the first 100 words
+- Every section must have at least ONE data point (number, date, or specific name)
+- When mentioning capacity charges, demand charges, or any fee: ALWAYS include the dollar range (e.g., "$4-$7 per kW")
+- When mentioning timeframes, use SPECIFIC months/dates (e.g., "June 15 - September 15, 2025" NOT "summer months")
+
+STYLE RULES:
+1. NO FLUFF: Delete phrases like "In today's fast-paced energy market" or "Understanding X is important"
+2. SHORT PARAGRAPHS: Maximum 3 sentences per paragraph for mobile readability
+3. BULLET POINTS: Use for any list of 3+ items
+4. BOLD KEY STATS: Wrap important numbers in <strong> tags (e.g., "<strong>30% of your annual bill</strong>")
+5. NO GENERIC ADVICE: Instead of "Consider energy audits," say "Schedule an audit before March 31 to capture the ITC tax credit deadline"
+
+EMOTIONAL TRIGGERS (Use at least ONE):
+- FEAR OF LOSS: "Missing this window means overpaying for 12 months"
+- INSIDER ACCESS: "Here's what suppliers don't advertise on their websites"
+- COMPETITIVE EDGE: "While your competitors ignore this, you can lock in savings"
+- URGENCY: "Rates change weekly - here's the decision timeline"
+
+"ANALYST TAKE" REQUIREMENTS:
+This section MUST include:
+- Your specific recommendation (e.g., "Lock vs. Float" or "Fixed vs. Index")
+- A conditional statement (e.g., "If your load factor is below 50%, I recommend...")
+- A reason tied to current market conditions (e.g., "Because natural gas futures are trending upward through Q2 2025...")
+
+RESOURCE BRIDGE FORMULA:
+"To [Specific Action related to the post topic], download our [Specific Tool Name] on our <a href="/resources">Resources Page</a>. It will [Specific Benefit in 10 words or less]."
+Example: "To calculate your exact exposure to demand charges, download our **2025 Demand Charge Calculator** on our <a href="/resources">Resources Page</a>. It estimates your annual risk in under 60 seconds."
+
+KEYWORD STRATEGY:
+- Target high-intent commercial energy keywords including: "electricity rates in texas", "texas electricity plans", "commercial electricity rates", "business energy broker", "demand charges texas", "ercot electricity rates", "texas commercial power rates"
+- Mix 1 broad term (e.g., "Energy Broker") with 2-4 specific long-tail terms
+- For Texas posts: Always include "Texas", "ERCOT", "demand charges", "electricity rates in texas", or "texas electricity plans"
+- For national posts: Include broader terms like "capacity charges", "commercial energy", "business electricity rates"
 
 Return your response as a JSON object with these exact fields:
 {
-  "title": "Post title with primary keyword in first 60 characters, format: [Keyword] + [Benefit] + [Year]",
-  "category": "One of: Market Update, Industry News, Energy Guide, Case Study, Market Analysis",
-  "contentType": "One of: educational, soft-sell, hard-sell (educational = market reports/news, soft-sell = case studies/guides, hard-sell = direct conversion)",
-  "metaDescription": "150-160 character meta description in format: [Question/Pain Point]? [Solution/Keyword]. [Call to Action].",
-  "keywords": "3-5 comma-separated keywords, mix 1 broad term (e.g., 'Energy Broker') with 2-4 specific terms (e.g., 'Texas Commercial Power Rates', 'B2B Energy Procurement')",
-  "content": "HTML content with H2 for introduction, 3+ H3 sections, paragraphs, image placement comments, and MUST include resource funnel link to /resources"
+  "title": "[Primary Keyword] + [Specific Benefit] + [Year] - Primary keyword MUST be in first 60 characters",
+  "category": "Market Update | Industry News | Energy Guide | Case Study | Market Analysis",
+  "contentType": "educational | soft-sell | hard-sell",
+  "metaDescription": "[Specific Pain Point Question]? [Specific Solution with Keyword]. [Action-Oriented CTA]. (150-160 characters)",
+  "keywords": "3-5 comma-separated keywords, mix 1 broad term with 2-4 specific terms. Include 'electricity rates in texas' or 'texas electricity plans' for Texas posts.",
+  "content": "HTML content following the structure above, starting with the HOOK, including Analyst Take section, and resource bridge link"
 }`;
 
 // Infer content type from category/title if not explicitly set
@@ -49,6 +105,34 @@ function inferContentType(category, title) {
   
   // Default to educational (market updates, news, analysis)
   return 'educational';
+}
+
+// Select hook formula based on content type and recent posts to avoid repetition
+function selectHookFormula(contentType, existingPosts) {
+  const recentHooks = existingPosts.slice(0, 10).map(p => {
+    if (!p.contentPreview) return 'unknown';
+    const preview = p.contentPreview.toLowerCase();
+    if (preview.includes('just reviewed') || preview.includes('i just reviewed')) return 'insider-alert';
+    if (preview.includes('% of') || preview.includes('percent of')) return 'shocking-stat';
+    if (preview.includes('last ') && preview.includes('this ')) return 'before-after';
+    if (preview.includes('if you haven\'t') || preview.includes('leaving') && preview.includes('on the table')) return 'time-bomb';
+    if (preview.includes('everyone says') || preview.includes('here\'s why they\'re wrong')) return 'contrarian';
+    return 'unknown';
+  });
+  
+  // Hook types by content type
+  const hookTypes = {
+    'educational': ['insider-alert', 'shocking-stat', 'before-after'],
+    'soft-sell': ['case-study', 'contrarian', 'shocking-stat'],
+    'hard-sell': ['time-bomb', 'fear-of-loss', 'insider-alert']
+  };
+  
+  const availableHooks = hookTypes[contentType] || hookTypes['educational'];
+  const unusedHooks = availableHooks.filter(h => !recentHooks.includes(h));
+  
+  return unusedHooks.length > 0 
+    ? unusedHooks[0] 
+    : availableHooks[Math.floor(Math.random() * availableHooks.length)];
 }
 
 // Determine content type based on 4-1-1 strategy (4 educational, 1 soft-sell, 1 hard-sell)
@@ -112,8 +196,8 @@ function buildUserPrompt(existingPosts) {
   const topicKeywords = new Set();
   existingPosts.forEach(p => {
     if (p.contentPreview) {
-      // Look for common energy topics in content
-      const topics = ['capacity', 'demand', 'rates', 'contract', 'fixed', 'index', 'ercot', 'pjm', 'solar', 'gas', 'storage', 'grid', 'procurement', 'ppa', 'audit'];
+      // Look for common energy topics in content - including new keywords
+      const topics = ['capacity', 'demand', 'rates', 'contract', 'fixed', 'index', 'ercot', 'pjm', 'solar', 'gas', 'storage', 'grid', 'procurement', 'ppa', 'audit', 'electricity rates', 'electricity plans', 'texas electricity', 'texas rates', 'texas plans'];
       topics.forEach(topic => {
         if (p.contentPreview.includes(topic)) {
           topicKeywords.add(topic);
@@ -124,6 +208,9 @@ function buildUserPrompt(existingPosts) {
 
   // Determine content type based on 4-1-1 strategy
   const contentType = determineContentType(existingPosts);
+  
+  // Select hook formula to vary openings
+  const selectedHook = selectHookFormula(contentType, existingPosts);
   
   let context = '';
   if (existingTitles.length > 0) {
@@ -141,62 +228,149 @@ function buildUserPrompt(existingPosts) {
     context += `\nIMPORTANT: Generate a COMPLETELY FRESH, UNIQUE post that does NOT repeat any of these topics, keywords, or titles. Avoid similar subject matter even if worded differently.`;
   }
 
-  // Content type-specific topic pools based on SEO.md 4-1-1 strategy
+  // Determine geographic focus: 60% Texas, 40% National
+  const recentPostsCount = existingPosts.length;
+  const texasPostCount = existingPosts.filter(p => 
+    (p.title && (p.title.toLowerCase().includes('texas') || p.title.toLowerCase().includes('ercot'))) ||
+    (p.keywords && (p.keywords.toLowerCase().includes('texas') || p.keywords.toLowerCase().includes('electricity rates in texas') || p.keywords.toLowerCase().includes('texas electricity plans'))) ||
+    (p.contentPreview && (p.contentPreview.includes('texas') || p.contentPreview.includes('ercot') || p.contentPreview.includes('demand charge')))
+  ).length;
+
+  const texasRatio = recentPostsCount > 0 ? texasPostCount / recentPostsCount : 0;
+  const shouldFocusTexas = texasRatio < 0.6 || (texasRatio >= 0.6 && texasRatio < 0.7 && Math.random() < 0.6);
+
+  // Content type-specific topic pools - 60% Texas, 40% National
   const educationalTopics = [
-    // Market Reports (EIA, FERC) - The "4" in 4-1-1
+    // TEXAS-FOCUSED (60% - 9 topics)
+    'Summarize the latest EIA Weekly Natural Gas Storage Report and explain its impact on Texas commercial electricity futures for Q1 2025, focusing on ERCOT market dynamics and electricity rates in Texas',
+    'Write a news update on the latest ERCOT grid weather alerts and advise Texas businesses on demand response strategies for managing electricity plans',
+    'Cover ERCOT conservation notices and what they mean for Texas businesses, including how to prepare for peak demand periods and optimize electricity rates in Texas',
+    'Analyze the Texas Energy Fund expansion to $10 billion and how it affects natural gas plant development and commercial energy reliability, impacting Texas electricity plans',
+    'Review recent ERCOT grid reliability updates and their implications for Texas commercial facilities, including demand charge impacts on electricity rates in Texas',
+    'Discuss rising demand charges in Texas and how commercial facilities can optimize their load profiles to reduce peak usage and lower electricity rates in Texas',
+    'Explain TDU (Transmission and Distribution Utility) charges in Texas and how they impact commercial electricity bills and electricity plans',
+    'Cover Texas-specific energy legislation updates and how they affect commercial energy contracts, procurement, and electricity rates in Texas',
+    'Analyze data center and cryptocurrency mining energy demand growth in Texas and its impact on commercial electricity rates and electricity plans',
+    
+    // NATIONAL (40% - 6 topics)
     'Summarize the latest EIA Weekly Natural Gas Storage Report and explain its impact on commercial electricity futures for Q1 2025',
-    'Analyze the most recent EIA Short-Term Energy Outlook and what it means for business energy procurement',
+    'Analyze the most recent EIA Short-Term Energy Outlook and what it means for business energy procurement nationwide',
     'Review the latest FERC State of the Markets report and highlight policy changes affecting large industrial energy users',
-    'Write a news update on the latest ERCOT grid weather alerts and advise businesses on demand response strategies',
     'Cover the most recent PJM Inside Lines grid reliability updates and their implications for commercial facilities',
     'Summarize recent Utility Dive coverage on grid modernization trends and renewable energy integration',
-    'Analyze Bloomberg Energy reports on global oil/gas trends and their impact on local commercial electricity pricing',
-    'Review Energy Manager Today coverage on efficiency trends for facility managers',
-    'Write about recent energy legislation updates and how they affect commercial energy contracts',
-    'Cover ERCOT conservation notices and what they mean for Texas businesses',
-    // Market Analysis
-    'Analyze 2025 commercial electricity rate trends and when businesses should lock in fixed contracts',
-    'Discuss rising demand charges and how commercial facilities can optimize their load profiles',
-    'Explain capacity charges and their impact on commercial energy costs',
-    'Cover energy market forecast for 2025 and strategic procurement timing'
+    'Explain capacity charges (PJM, ISO-NE, MISO markets) and their impact on commercial energy costs outside of Texas'
   ];
 
   const softSellTopics = [
-    // Case Studies & Educational Guides - The first "1" in 4-1-1
+    // TEXAS-FOCUSED (60% - 4 topics)
+    'Write a case study showing how a Texas manufacturing facility saved money by optimizing demand charges and switching from Index to Fixed-All-Inclusive electricity plans, reducing electricity rates in Texas',
+    'Create an educational guide: "How to Read Your Texas Commercial Energy Bill" with explanations of demand charges, TDU fees, and transmission costs specific to ERCOT market and electricity rates in Texas',
+    'Write a guide on "How to Calculate Your Load Factor in Texas" and why it matters for reducing demand charges in ERCOT and optimizing electricity rates in Texas',
+    'Create a case study: "How a Dallas Multi-Location Business Consolidated Texas Electricity Plans and Reduced Costs by 15%"',
+    
+    // NATIONAL (40% - 3 topics)
     'Write a case study showing how a manufacturing facility saved money by switching from Index to Fixed-All-Inclusive energy contracts',
     'Create an educational guide: "How to Read Your Commercial Energy Bill" with explanations of demand charges, capacity fees, and transmission costs',
-    'Explain the difference between Fixed-All-Inclusive and Index products for a manufacturing facility manager, with real-world examples',
-    'Write a guide on "How to Calculate Your Load Factor" and why it matters for commercial energy procurement',
-    'Create a case study: "How a Multi-Location Business Consolidated Energy Contracts and Reduced Costs by 15%"',
-    'Write an educational post: "Understanding Your Commercial Energy Contract: Key Terms Every Facility Manager Should Know"'
+    'Explain the difference between Fixed-All-Inclusive and Index products for a manufacturing facility manager, with real-world examples applicable nationwide'
   ];
 
   const hardSellTopics = [
-    // Direct Conversion - The second "1" in 4-1-1
+    // TEXAS-FOCUSED (60% - 2 topics)
+    'Write a post: "Texas Electricity Rates at 12-Month Low: Lock In Your Fixed Texas Electricity Plan Now Before ERCOT Demand Charges Rise"',
+    'Create urgency: "Limited Time: Free Commercial Energy Audit for Texas Businesses - Compare Electricity Rates in Texas and Schedule Before March 31"',
+    
+    // NATIONAL (40% - 2 topics)
     'Write a post: "Commercial Electricity Rates at 12-Month Low: Lock In Your Fixed Contract Now Before Prices Rise"',
-    'Create urgency: "Limited Time: Free Commercial Energy Audit for Texas Businesses - Schedule Before March 31"',
-    'Direct offer: "2025 Energy Rates Are Favorable: Secure Your Fixed Contract This Quarter to Lock In Savings"',
-    'Call to action: "Rates Are Rising: Lock In Your Commercial Energy Contract Today to Avoid 15% Price Increases"'
+    'Direct offer: "2025 Energy Rates Are Favorable: Secure Your Fixed Contract This Quarter to Lock In Savings"'
   ];
 
-  // Select topic based on content type
+  // Select topic based on content type AND geographic focus (60% Texas, 40% National)
   let topicPool;
   let contentTypeInstruction = '';
+  let geographicInstruction = '';
   
-  if (contentType === 'educational') {
-    topicPool = educationalTopics;
-    contentTypeInstruction = 'This should be EDUCATIONAL/CURATED content (market reports, news, analysis) - part of the "4" in the 4-1-1 strategy. Focus on providing value and establishing expertise.';
-  } else if (contentType === 'soft-sell') {
-    topicPool = softSellTopics;
-    contentTypeInstruction = 'This should be SOFT-SELL content (case studies, educational guides) - the first "1" in 4-1-1. Demonstrate expertise by showing how problems are solved.';
+  // Filter topics based on geographic focus
+  if (shouldFocusTexas) {
+    geographicInstruction = 'This post MUST focus on TEXAS-specific topics. Use "demand charges" NOT "capacity charges". Include Texas context, ERCOT references, TDU charges, and Texas business energy concerns. Keywords MUST include "electricity rates in texas" or "texas electricity plans".';
+    
+    if (contentType === 'educational') {
+      topicPool = educationalTopics.filter(t => 
+        t.toLowerCase().includes('texas') || 
+        t.toLowerCase().includes('ercot') || 
+        t.toLowerCase().includes('demand charge') ||
+        t.toLowerCase().includes('tdu')
+      );
+      contentTypeInstruction = 'This should be EDUCATIONAL/CURATED content (market reports, news, analysis) - part of the "4" in the 4-1-1 strategy. Focus on providing value and establishing expertise.';
+    } else if (contentType === 'soft-sell') {
+      topicPool = softSellTopics.filter(t => 
+        t.toLowerCase().includes('texas') || 
+        t.toLowerCase().includes('ercot') || 
+        t.toLowerCase().includes('demand charge') ||
+        t.toLowerCase().includes('dallas')
+      );
+      contentTypeInstruction = 'This should be SOFT-SELL content (case studies, educational guides) - the first "1" in 4-1-1. Demonstrate expertise by showing how problems are solved.';
+    } else {
+      topicPool = hardSellTopics.filter(t => 
+        t.toLowerCase().includes('texas') || 
+        t.toLowerCase().includes('ercot')
+      );
+      contentTypeInstruction = 'This should be HARD-SELL content (direct conversion) - the second "1" in 4-1-1. Create urgency and ask for the sale directly.';
+    }
   } else {
-    topicPool = hardSellTopics;
-    contentTypeInstruction = 'This should be HARD-SELL content (direct conversion) - the second "1" in 4-1-1. Create urgency and ask for the sale directly.';
+    geographicInstruction = 'This post should focus on NATIONAL topics applicable across multiple states. Use "capacity charges" for markets like PJM, ISO-NE, MISO. Avoid Texas-specific terminology.';
+    
+    if (contentType === 'educational') {
+      topicPool = educationalTopics.filter(t => 
+        !t.toLowerCase().includes('texas') && 
+        !t.toLowerCase().includes('ercot') && 
+        !t.toLowerCase().includes('demand charge') &&
+        !t.toLowerCase().includes('tdu')
+      );
+      contentTypeInstruction = 'This should be EDUCATIONAL/CURATED content (market reports, news, analysis) - part of the "4" in the 4-1-1 strategy. Focus on providing value and establishing expertise.';
+    } else if (contentType === 'soft-sell') {
+      topicPool = softSellTopics.filter(t => 
+        !t.toLowerCase().includes('texas') && 
+        !t.toLowerCase().includes('ercot') && 
+        !t.toLowerCase().includes('demand charge') &&
+        !t.toLowerCase().includes('dallas')
+      );
+      contentTypeInstruction = 'This should be SOFT-SELL content (case studies, educational guides) - the first "1" in 4-1-1. Demonstrate expertise by showing how problems are solved.';
+    } else {
+      topicPool = hardSellTopics.filter(t => 
+        !t.toLowerCase().includes('texas') && 
+        !t.toLowerCase().includes('ercot')
+      );
+      contentTypeInstruction = 'This should be HARD-SELL content (direct conversion) - the second "1" in 4-1-1. Create urgency and ask for the sale directly.';
+    }
+  }
+
+  // If filtered pool is empty, fall back to all topics
+  if (topicPool.length === 0) {
+    if (contentType === 'educational') {
+      topicPool = educationalTopics;
+    } else if (contentType === 'soft-sell') {
+      topicPool = softSellTopics;
+    } else {
+      topicPool = hardSellTopics;
+    }
   }
 
   const randomTopic = topicPool[Math.floor(Math.random() * topicPool.length)];
 
-  return `${randomTopic}\n\n${contentTypeInstruction}\n\n${context}\n\nGenerate a complete blog post following the structure and format specified in the system prompt. Remember: EVERY post must include a resource funnel link to /resources near the end.`;
+  // Add hook instruction based on selected formula
+  const hookInstructions = {
+    'insider-alert': 'Use THE INSIDER ALERT hook formula: "I just reviewed the [Specific Report/Data Source] from [Date], and [Specific Market Trend] is about to hit commercial buyers."',
+    'shocking-stat': 'Use THE SHOCKING STAT hook formula: "[Specific Number]% of [Target Audience] are overpaying for [Specific Thing] because of [Specific Reason]."',
+    'before-after': 'Use THE BEFORE/AFTER hook formula: "Last [Time Period], [Metric] was [Number]. This [Time Period], it\'s [Different Number]. Here\'s what changed."',
+    'time-bomb': 'Use THE TIME BOMB hook formula: "[Specific Event] happens in [Specific Timeframe]. If you haven\'t [Specific Action], you\'re leaving [Specific Dollar Amount] on the table."',
+    'contrarian': 'Use THE CONTRARIAN TAKE hook formula: "Everyone says [Common Belief]. Here\'s why they\'re wrong in 2025."',
+    'case-study': 'Use a case study opening hook: "A [Location] [Business Type] was [Specific Problem with Dollar Amount]. We [Specific Solution]. Here\'s the exact playbook."',
+    'fear-of-loss': 'Use a fear of loss hook: "Your current energy contract expires in [Specific Days]. [Specific Urgency]. Here\'s your last chance to [Specific Action]."'
+  };
+  
+  const hookInstruction = hookInstructions[selectedHook] || hookInstructions['insider-alert'];
+  
+  return `${randomTopic}\n\n${hookInstruction}\n\n${geographicInstruction}\n\n${contentTypeInstruction}\n\n${context}\n\nGenerate a complete blog post following the structure and format specified in the system prompt. Remember: EVERY post must start with the specified HOOK formula, include an "Analyst Take" section with specific recommendations, and include a resource funnel link to /resources near the end.`;
 }
 
 // Parse Perplexity response and extract structured data
