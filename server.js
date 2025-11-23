@@ -975,40 +975,82 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Construct file path using the robust __dirname equivalent
-  const filePath = path.join(__dirname, pathname);
+  let filePath = path.join(__dirname, pathname);
 
   logger.debug('Attempting to serve static file', 'Server', { filePath });
 
   // Check if file exists first
   if (!fs.existsSync(filePath)) {
-    console.error(`[Server] File not found at constructed path: ${filePath}`);
-    res.writeHead(404, { 'Content-Type': 'text/html' });
-    res.end(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>404 - File Not Found</title>
-          <style>
-              body { font-family: Arial, sans-serif; background-color: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-              .container { background-color: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); text-align: center; }
-              h1 { color: #ff5722; font-size: 2.5em; margin-bottom: 10px; }
-              p { color: #555; font-size: 1.1em; margin-bottom: 20px; }
-              a { color: #ff5722; text-decoration: none; font-weight: bold; }
-              a:hover { text-decoration: underline; }
-          </style>
-      </head>
-      <body>
-          <div class="container">
-              <h1>404 - File Not Found</h1>
-              <p>The requested file ${pathname} was not found.</p>
-              <p><a href="/">Back to Power Choosers CRM</a></p>
-          </div>
-      </body>
-      </html>
-    `);
-    return;
+    // If file doesn't exist and pathname doesn't have an extension, try adding .html
+    // This allows clean URLs like /resources instead of /resources.html
+    const ext = path.extname(pathname);
+    if (!ext && pathname !== '/') {
+      const htmlPath = pathname + '.html';
+      const htmlFilePath = path.join(__dirname, htmlPath);
+      if (fs.existsSync(htmlFilePath)) {
+        filePath = htmlFilePath;
+        pathname = htmlPath; // Update pathname for logging
+        logger.debug('Found file with .html extension', 'Server', { original: pathname, found: htmlPath });
+      } else {
+        console.error(`[Server] File not found at constructed path: ${filePath} or ${htmlFilePath}`);
+        res.writeHead(404, { 'Content-Type': 'text/html' });
+        res.end(`
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>404 - File Not Found</title>
+              <style>
+                  body { font-family: Arial, sans-serif; background-color: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                  .container { background-color: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); text-align: center; }
+                  h1 { color: #ff5722; font-size: 2.5em; margin-bottom: 10px; }
+                  p { color: #555; font-size: 1.1em; margin-bottom: 20px; }
+                  a { color: #ff5722; text-decoration: none; font-weight: bold; }
+                  a:hover { text-decoration: underline; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>404 - File Not Found</h1>
+                  <p>The requested file ${pathname} was not found.</p>
+                  <p><a href="/">Back to Power Choosers CRM</a></p>
+              </div>
+          </body>
+          </html>
+        `);
+        return;
+      }
+    } else {
+      console.error(`[Server] File not found at constructed path: ${filePath}`);
+      res.writeHead(404, { 'Content-Type': 'text/html' });
+      res.end(`
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>404 - File Not Found</title>
+            <style>
+                body { font-family: Arial, sans-serif; background-color: #f0f0f0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                .container { background-color: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); text-align: center; }
+                h1 { color: #ff5722; font-size: 2.5em; margin-bottom: 10px; }
+                p { color: #555; font-size: 1.1em; margin-bottom: 20px; }
+                a { color: #ff5722; text-decoration: none; font-weight: bold; }
+                a:hover { text-decoration: underline; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>404 - File Not Found</h1>
+                <p>The requested file ${pathname} was not found.</p>
+                <p><a href="/">Back to Power Choosers CRM</a></p>
+            </div>
+        </body>
+        </html>
+      `);
+      return;
+    }
   }
 
   try {
@@ -1129,6 +1171,24 @@ async function handlePostRoute(req, res, slug) {
       return;
     }
     
+    // Get file metadata for cache control
+    const [metadata] = await file.getMetadata();
+    const updatedTime = metadata.updated ? new Date(metadata.updated).getTime() : Date.now();
+    const etag = `"${metadata.etag || updatedTime}"`;
+    
+    // Check if client has cached version (If-None-Match header)
+    const ifNoneMatch = req.headers['if-none-match'];
+    if (ifNoneMatch === etag) {
+      logger.debug('Post not modified, returning 304', 'PostRoute', { slug });
+      res.writeHead(304, {
+        'ETag': etag,
+        'Cache-Control': 'public, max-age=300, must-revalidate', // 5 minutes, must revalidate
+        'Last-Modified': new Date(updatedTime).toUTCString()
+      });
+      res.end();
+      return;
+    }
+    
     // Download the file content
     const [fileContent] = await file.download();
     const htmlContent = fileContent.toString('utf8');
@@ -1136,9 +1196,13 @@ async function handlePostRoute(req, res, slug) {
     logger.debug('Post fetched successfully', 'PostRoute', { slug, contentLength: htmlContent.length });
     
     // Serve the HTML with proper headers
+    // Reduced cache time to 5 minutes with must-revalidate for faster updates
+    // Load balancer will respect these headers
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
-      'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+      'Cache-Control': 'public, max-age=300, must-revalidate', // 5 minutes, must revalidate
+      'ETag': etag,
+      'Last-Modified': new Date(updatedTime).toUTCString(),
       'X-Content-Type-Options': 'nosniff'
     });
     res.end(htmlContent);
