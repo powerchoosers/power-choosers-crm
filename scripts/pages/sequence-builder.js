@@ -8921,6 +8921,65 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         console.error('[SequenceBuilder] Cleanup failed:', err);
         return { cleaned: 0, errors: 1 };
       }
+    },
+    fixStuckMembers: async (sequenceId) => {
+      // Diagnostic tool to find members that have no activation record and start them
+      if (!sequenceId) return console.error('Please provide a sequenceId');
+      const db = window.firebaseDB;
+      console.log(`[Fix] Checking sequence ${sequenceId}...`);
+
+      // 1. Get all members
+      const membersSnap = await db.collection('sequenceMembers').where('sequenceId', '==', sequenceId).get();
+      const memberContactIds = new Set();
+      membersSnap.forEach(doc => memberContactIds.add(doc.data().targetId));
+      console.log(`[Fix] Found ${memberContactIds.size} members.`);
+
+      // 2. Get all activations
+      const activationsSnap = await db.collection('sequenceActivations').where('sequenceId', '==', sequenceId).get();
+      const activatedContactIds = new Set();
+      activationsSnap.forEach(doc => {
+        const d = doc.data();
+        if (d.contactIds) d.contactIds.forEach(id => activatedContactIds.add(id));
+      });
+      console.log(`[Fix] Found ${activatedContactIds.size} contacts already activated.`);
+
+      // 3. Find missing
+      const missingIds = [...memberContactIds].filter(id => !activatedContactIds.has(id));
+      console.log(`[Fix] Found ${missingIds.length} stuck contacts.`);
+
+      if (missingIds.length === 0) return 'All good! No stuck contacts.';
+
+      // 4. Create activations
+      const batchSize = 25;
+      let created = 0;
+      const userEmail = (window.currentUserEmail || 'admin').toLowerCase();
+
+      for (let i = 0; i < missingIds.length; i += batchSize) {
+        const batchIds = missingIds.slice(i, i + batchSize);
+        const ref = db.collection('sequenceActivations').doc();
+        await ref.set({
+          sequenceId,
+          contactIds: batchIds,
+          status: 'pending',
+          processedContacts: 0,
+          totalContacts: batchIds.length,
+          ownerId: userEmail,
+          assignedTo: userEmail,
+          createdBy: userEmail,
+          createdAt: new Date(),
+          progress: { emailsCreated: 0 },
+          failedContactIds: []
+        });
+        created++;
+
+        // Trigger immediate processing
+        fetch('/api/process-sequence-activations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ immediate: true, activationId: ref.id })
+        }).catch(e => console.warn(e));
+      }
+      return `Fixed! Started ${created} activation batches for ${missingIds.length} contacts.`;
     }
   };
 
