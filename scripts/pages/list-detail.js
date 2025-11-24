@@ -64,10 +64,10 @@
     'actions',
     'updated'
   ];
-  
+
   const PEOPLE_COL_STORAGE_KEY = 'list_detail_people_column_order';
   const ACCOUNTS_COL_STORAGE_KEY = 'list_detail_accounts_column_order';
-  
+
   let peopleColumnOrder = DEFAULT_PEOPLE_COL_ORDER.slice();
   let accountsColumnOrder = DEFAULT_ACCOUNTS_COL_ORDER.slice();
 
@@ -78,11 +78,11 @@
         return window.DataManager.getCurrentUserEmail();
       }
       return (window.currentUserEmail || '').toLowerCase();
-    } catch(_) {
+    } catch (_) {
       return (window.currentUserEmail || '').toLowerCase();
     }
   }
-  
+
   function loadColumnOrder() {
     try {
       const peopleRaw = localStorage.getItem(PEOPLE_COL_STORAGE_KEY);
@@ -98,7 +98,7 @@
           });
         }
       }
-      
+
       const accountsRaw = localStorage.getItem(ACCOUNTS_COL_STORAGE_KEY);
       if (accountsRaw) {
         const accountsArr = JSON.parse(accountsRaw);
@@ -116,7 +116,7 @@
       console.warn('Failed to load column order:', e);
     }
   }
-  
+
   function persistColumnOrder() {
     try {
       localStorage.setItem(PEOPLE_COL_STORAGE_KEY, JSON.stringify(peopleColumnOrder));
@@ -130,7 +130,7 @@
   function parsePhoneWithExtension(input) {
     const raw = (input || '').toString().trim();
     if (!raw) return { number: '', extension: '' };
-    
+
     const extensionPatterns = [
       /ext\.?\s*(\d+)/i,
       /extension\s*(\d+)/i,
@@ -138,10 +138,10 @@
       /#\s*(\d+)/i,
       /\s+(\d{3,6})\s*$/
     ];
-    
+
     let number = raw;
     let extension = '';
-    
+
     for (const pattern of extensionPatterns) {
       const match = number.match(pattern);
       if (match) {
@@ -150,33 +150,33 @@
         break;
       }
     }
-    
+
     return { number, extension };
   }
 
   function formatPhoneForDisplay(phone) {
     if (!phone) return '';
-    
+
     const parsed = parsePhoneWithExtension(phone);
     if (!parsed.number) return phone;
-    
+
     let formattedNumber = '';
     const cleaned = parsed.number.replace(/\D/g, '');
-    
+
     if (cleaned.length === 11 && cleaned.startsWith('1')) {
-      formattedNumber = `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+      formattedNumber = `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
     } else if (cleaned.length === 10) {
-      formattedNumber = `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+      formattedNumber = `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
     } else if (/^\+/.test(String(parsed.number))) {
       formattedNumber = parsed.number;
     } else {
       formattedNumber = parsed.number;
     }
-    
+
     if (parsed.extension) {
       return `${formattedNumber} ext. ${parsed.extension}`;
     }
-    
+
     return formattedNumber;
   }
 
@@ -294,21 +294,23 @@
             console.log('[ListDetail] Back button: Returning to lists page with restore data:', restore);
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               window.crm.navigateToPage('lists');
-              
+
               // Dispatch event to restore lists page state
               setTimeout(() => {
                 try {
-                  const ev = new CustomEvent('pc:lists-restore', { detail: {
-                    page: restore.page,
-                    scroll: restore.scroll,
-                    filters: restore.filters,
-                    searchTerm: restore.searchTerm,
-                    selectedItems: restore.selectedItems,
-                    timestamp: Date.now()
-                  }});
+                  const ev = new CustomEvent('pc:lists-restore', {
+                    detail: {
+                      page: restore.page,
+                      scroll: restore.scroll,
+                      filters: restore.filters,
+                      searchTerm: restore.searchTerm,
+                      selectedItems: restore.selectedItems,
+                      timestamp: Date.now()
+                    }
+                  });
                   document.dispatchEvent(ev);
                   console.log('[ListDetail] Back button: Dispatched pc:lists-restore event');
-                } catch(_) {}
+                } catch (_) { }
               }, 60);
             }
             // Clear navigation markers after successful navigation
@@ -317,7 +319,7 @@
           } catch (_) { /* noop */ }
           return;
         }
-        
+
         // Default: just navigate to lists
         if (window.crm && typeof window.crm.navigateToPage === 'function') {
           window.crm.navigateToPage('lists');
@@ -333,7 +335,7 @@
     // Quick search
     if (els.quickSearch) {
       const debounce = (fn, delay = 120) => {
-        let t; return function(){ clearTimeout(t); const args = arguments; t = setTimeout(() => fn.apply(this, args), delay); };
+        let t; return function () { clearTimeout(t); const args = arguments; t = setTimeout(() => fn.apply(this, args), delay); };
       };
       const debouncedFilter = debounce(() => applyFilters(), 120);
       els.quickSearch.addEventListener('input', debouncedFilter);
@@ -371,7 +373,7 @@
             window._contactNavigationSource = 'list-detail';
             window._contactNavigationListId = state.listId;
             window._contactNavigationListName = state.listName;
-            
+
             // Capture state for restoration
             try {
               window._listDetailReturn = {
@@ -388,18 +390,18 @@
               };
               console.log('[ListDetail] Captured state for back navigation (contact):', window._listDetailReturn);
             } catch (_) { /* noop */ }
-            
+
             // Navigate via existing people route to ensure modules are bound, then open detail with retry mechanism
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               window.crm.navigateToPage('people');
-              
+
               // Use requestAnimationFrame with additional delay to ensure the page is fully loaded
               requestAnimationFrame(() => {
                 setTimeout(() => {
                   if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
                     console.log('[List Detail] Showing contact detail:', contactId);
                     try {
-                          window.ContactDetail.show(contactId);
+                      window.ContactDetail.show(contactId);
                     } catch (error) {
                       console.error('[List Detail] Error showing contact detail:', error);
                     }
@@ -413,7 +415,7 @@
                       attempts++;
                       if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
                         console.log('[List Detail] ContactDetail ready after', attempts, 'attempts');
-                          window.ContactDetail.show(contactId);
+                        window.ContactDetail.show(contactId);
                       } else if (attempts < maxAttempts) {
                         setTimeout(retry, retryInterval);
                       } else {
@@ -427,7 +429,7 @@
             }
           }
         }
-        
+
         // Handle company name clicks (for contacts)
         // COST-EFFECTIVE: Use findAccountByName() which checks cache first, then BackgroundAccountsLoader (zero Firestore reads)
         if (anchor.matches('.company-link[data-company-name]')) {
@@ -435,14 +437,14 @@
           const accountId = anchor.getAttribute('data-account-id');
           // Note: getAttribute returns the decoded value, no need to decode HTML entities here
           const companyName = anchor.getAttribute('data-company-name');
-          
+
           let account = null;
-          
+
           // If data-account-id exists, use it directly (fastest path)
           if (accountId) {
             // Try to find account in local state first
             account = state.dataAccounts.find(acc => acc.id === accountId);
-            
+
             // Fallback to BackgroundAccountsLoader (cost-effective: zero Firestore reads)
             if (!account && window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
               try {
@@ -450,7 +452,7 @@
                 account = allAccounts.find(acc => acc.id === accountId);
               } catch (_) { /* noop */ }
             }
-            
+
             // Final fallback to global getAccountsData (cost-effective: uses cache)
             if (!account && typeof window.getAccountsData === 'function') {
               try {
@@ -462,7 +464,7 @@
             // No account ID - find by name (case-insensitive, with fallback to global accounts data)
             account = findAccountByName(companyName);
           }
-          
+
           if (account && account.id) {
             console.log('[ListDetail] Navigating to account:', account.id, account.accountName || account.name);
             // Store navigation context for back button
@@ -470,7 +472,7 @@
             window._accountNavigationListId = state.listId;
             window._accountNavigationListName = state.listName;
             window._accountNavigationListView = 'people';
-            
+
             // Capture state for restoration
             try {
               window._listDetailReturn = {
@@ -487,9 +489,9 @@
               };
               console.log('[ListDetail] Captured state for back navigation:', window._listDetailReturn);
             } catch (_) { /* noop */ }
-            
+
             // Prefetch account object and open detail immediately
-            try { window._prefetchedAccountForDetail = account; } catch (_) {}
+            try { window._prefetchedAccountForDetail = account; } catch (_) { }
             if (window.showAccountDetail && typeof window.showAccountDetail === 'function') {
               window.showAccountDetail(account.id);
             } else if (window.crm && typeof window.crm.navigateToPage === 'function') {
@@ -500,7 +502,7 @@
             console.warn('[ListDetail] ⚠ Cannot navigate: account not found for company:', companyName);
           }
         }
-        
+
         // Handle account name clicks (for accounts view)
         if (anchor.matches('.company-link[data-account-id]') || anchor.matches('.acct-link[data-account-id]')) {
           e.preventDefault();
@@ -512,7 +514,7 @@
             window._accountNavigationListId = state.listId;
             window._accountNavigationListName = state.listName;
             window._accountNavigationListView = 'accounts';
-            
+
             // Capture state for restoration
             try {
               window._listDetailReturn = {
@@ -529,12 +531,12 @@
               };
               console.log('[ListDetail] Captured state for back navigation:', window._listDetailReturn);
             } catch (_) { /* noop */ }
-            
+
             // Prefetch account object if available and open detail immediately
             try {
               const acct = (state.dataAccounts || []).find(a => a.id === accountId);
               if (acct) window._prefetchedAccountForDetail = acct;
-            } catch (_) {}
+            } catch (_) { }
             if (window.showAccountDetail && typeof window.showAccountDetail === 'function') {
               window.showAccountDetail(accountId);
             } else if (window.crm && typeof window.crm.navigateToPage === 'function') {
@@ -553,25 +555,25 @@
         try {
           // Sync DOM chip state to internal state
           const t = Array.from(document.querySelectorAll('#list-detail-filter-title-chips .chip'))
-            .map(ch => ch.textContent.replace('×','').trim()).filter(Boolean);
+            .map(ch => ch.textContent.replace('×', '').trim()).filter(Boolean);
           const c = Array.from(document.querySelectorAll('#list-detail-filter-company-chips .chip'))
-            .map(ch => ch.textContent.replace('×','').trim()).filter(Boolean);
+            .map(ch => ch.textContent.replace('×', '').trim()).filter(Boolean);
           state.chips.title = t;
           state.chips.company = c;
           const city = Array.from(document.querySelectorAll('#list-detail-filter-city-chips .chip'))
-            .map(ch => ch.textContent.replace('×','').trim()).filter(Boolean);
+            .map(ch => ch.textContent.replace('×', '').trim()).filter(Boolean);
           const st = Array.from(document.querySelectorAll('#list-detail-filter-state-chips .chip'))
-            .map(ch => ch.textContent.replace('×','').trim()).filter(Boolean);
+            .map(ch => ch.textContent.replace('×', '').trim()).filter(Boolean);
           const emp = Array.from(document.querySelectorAll('#list-detail-filter-employees-chips .chip'))
-            .map(ch => ch.textContent.replace('×','').trim()).filter(Boolean);
+            .map(ch => ch.textContent.replace('×', '').trim()).filter(Boolean);
           const ind = Array.from(document.querySelectorAll('#list-detail-filter-industry-chips .chip'))
-            .map(ch => ch.textContent.replace('×','').trim()).filter(Boolean);
+            .map(ch => ch.textContent.replace('×', '').trim()).filter(Boolean);
           const dom = Array.from(document.querySelectorAll('#list-detail-filter-visitor-domain-chips .chip'))
-            .map(ch => ch.textContent.replace('×','').trim()).filter(Boolean);
+            .map(ch => ch.textContent.replace('×', '').trim()).filter(Boolean);
           state.chips.city = city; state.chips.state = st; state.chips.employees = emp; state.chips.industry = ind; state.chips.visitorDomain = dom;
           state.flags.hasEmail = !!(els.pHasEmail && els.pHasEmail.checked);
           state.flags.hasPhone = !!(els.pHasPhone && els.pHasPhone.checked);
-        } catch(_) {}
+        } catch (_) { }
         applyFilters();
       });
     }
@@ -618,7 +620,7 @@
           hideEmployeesSuggestions();
           hideIndustrySuggestions();
           hideVisitorDomainSuggestions();
-        } catch(_) {}
+        } catch (_) { }
         applyFilters();
       });
     }
@@ -914,13 +916,13 @@
     // COST OPTIMIZATION: Only load the data type needed for this list (people OR accounts, not both)
     const needsPeople = state.view === 'people' && !state.loadedPeople;
     const needsAccounts = state.view === 'accounts' && !state.loadedAccounts;
-    
+
     // If both already loaded or nothing needed, return early
     if (!needsPeople && !needsAccounts) return;
-    
+
     try {
       if (console.time) console.time('[ListDetail] loadDataOnce');
-      
+
       // PRIORITY 1: Use BackgroundContactsLoader and BackgroundAccountsLoader for instant data access
       // COST OPTIMIZATION: Only load what's needed for the current list view
       if (needsPeople) {
@@ -934,7 +936,7 @@
           console.debug('[ListDetail] loadDataOnce: people loaded from getPeopleData', { count: state.dataPeople.length });
         }
       }
-      
+
       if (needsAccounts) {
         if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
           state.dataAccounts = window.BackgroundAccountsLoader.getAccountsData() || [];
@@ -946,17 +948,17 @@
           console.debug('[ListDetail] loadDataOnce: accounts loaded from getAccountsData', { count: state.dataAccounts.length });
         }
       }
-      
+
       // FALLBACK: If background loaders not ready yet, wait for them
       // COST OPTIMIZATION: Only wait for the loader we actually need
       if ((needsPeople && !state.loadedPeople && window.BackgroundContactsLoader) ||
-          (needsAccounts && !state.loadedAccounts && window.BackgroundAccountsLoader)) {
+        (needsAccounts && !state.loadedAccounts && window.BackgroundAccountsLoader)) {
         console.log('[ListDetail] Background loaders not ready yet, waiting...');
-        
+
         // Wait up to 3 seconds (30 attempts x 100ms)
         for (let attempt = 0; attempt < 30; attempt++) {
           await new Promise(resolve => setTimeout(resolve, 100));
-          
+
           if (needsPeople && !state.loadedPeople && window.BackgroundContactsLoader) {
             const contacts = window.BackgroundContactsLoader.getContactsData() || [];
             if (contacts.length > 0) {
@@ -965,7 +967,7 @@
               console.log('[ListDetail] ✓ BackgroundContactsLoader ready after', (attempt + 1) * 100, 'ms with', contacts.length, 'contacts');
             }
           }
-          
+
           if (needsAccounts && !state.loadedAccounts && window.BackgroundAccountsLoader) {
             const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
             if (accounts.length > 0) {
@@ -974,13 +976,13 @@
               console.log('[ListDetail] ✓ BackgroundAccountsLoader ready after', (attempt + 1) * 100, 'ms with', accounts.length, 'accounts');
             }
           }
-          
+
           // Break if what we need is loaded
           if ((needsPeople && state.loadedPeople) || (needsAccounts && state.loadedAccounts)) {
             break;
           }
         }
-        
+
         if ((needsPeople && !state.loadedPeople) || (needsAccounts && !state.loadedAccounts)) {
           console.warn('[ListDetail] ⚠ Timeout waiting for background loaders after 3 seconds', {
             peopleLoaded: state.loadedPeople,
@@ -990,7 +992,7 @@
           });
         }
       }
-      
+
       // FINAL FALLBACK: Use CacheManager or Firestore
       // COST OPTIMIZATION: Only load what's needed
       if ((needsPeople && !state.loadedPeople) || (needsAccounts && !state.loadedAccounts)) {
@@ -1000,7 +1002,7 @@
             state.loadedPeople = true;
             console.debug('[ListDetail] loadDataOnce: people loaded from CacheManager', { count: state.dataPeople.length });
           }
-          
+
           if (needsAccounts && !state.loadedAccounts) {
             state.dataAccounts = await window.CacheManager.get('accounts') || [];
             state.loadedAccounts = true;
@@ -1009,7 +1011,7 @@
         } else if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
           // Firestore fallback - SCOPED queries for security compliance
           const email = getUserEmail();
-          
+
           if (needsPeople && !state.loadedPeople) {
             let peopleSnap;
             if (window.currentUserRole !== 'admin' && email) {
@@ -1030,7 +1032,7 @@
             state.loadedPeople = true;
             console.debug('[ListDetail] loadDataOnce: people loaded from Firestore (scoped)', { count: state.dataPeople.length });
           }
-          
+
           if (needsAccounts && !state.loadedAccounts) {
             let accountsSnap;
             if (window.currentUserRole !== 'admin' && email) {
@@ -1053,7 +1055,7 @@
           }
         }
       }
-      
+
       // Ensure defaults (only for what we actually loaded)
       if (needsPeople) {
         state.dataPeople = state.dataPeople || [];
@@ -1063,10 +1065,10 @@
         state.dataAccounts = state.dataAccounts || [];
         state.loadedAccounts = true;
       }
-      
+
     } catch (e) {
       console.error('[ListDetail] Failed loading data (preserving cache):', e);
-      
+
       // COST-EFFECTIVE: Preserve cache on error (don't clear existing data)
       // Try to use BackgroundLoaders as fallback (only for what we need)
       if (needsPeople && !state.loadedPeople && window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
@@ -1081,7 +1083,7 @@
           console.warn('[ListDetail] Contacts cache fallback failed:', cacheErr);
         }
       }
-      
+
       if (needsAccounts && !state.loadedAccounts && window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
         try {
           const cached = window.BackgroundAccountsLoader.getAccountsData() || [];
@@ -1094,7 +1096,7 @@
           console.warn('[ListDetail] Accounts cache fallback failed:', cacheErr);
         }
       }
-      
+
       // Ensure defaults (only for what we actually needed)
       if (needsPeople) {
         state.dataPeople = state.dataPeople || [];
@@ -1105,7 +1107,7 @@
         state.loadedAccounts = true;
       }
     }
-    
+
     if (console.timeEnd) console.timeEnd('[ListDetail] loadDataOnce');
     buildSuggestionPools();
     // Don't render here during initial load - let init() handle the final render after all data is ready
@@ -1116,14 +1118,14 @@
     // COST-EFFECTIVE: Always initialize Sets (preserves cache on errors)
     state.membersPeople = new Set();
     state.membersAccounts = new Set();
-    
+
     if (!listId) {
       console.log('[ListDetail] No listId provided, skipping member fetch');
       return;
     }
-    
+
     if (console.time) console.time(`[ListDetail] fetchMembers ${listId}`);
-    
+
     // 1) Check IndexedDB cache first (10-minute expiry) - COST-EFFECTIVE: zero Firestore reads
     try {
       const cached = await window.CacheManager.getCachedListMembers(listId);
@@ -1131,7 +1133,7 @@
         state.membersPeople = cached.people instanceof Set ? cached.people : new Set(cached.people || []);
         state.membersAccounts = cached.accounts instanceof Set ? cached.accounts : new Set(cached.accounts || []);
         console.log(`[ListDetail] ✓ Loaded ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts from cache (zero cost)`);
-        
+
         // Update legacy in-memory cache for backward compatibility
         window.listMembersCache = window.listMembersCache || {};
         window.listMembersCache[listId] = {
@@ -1139,7 +1141,7 @@
           accounts: new Set(state.membersAccounts),
           loaded: true
         };
-        
+
         if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
         return;
       }
@@ -1160,7 +1162,7 @@
       // CRITICAL FIX: Check BOTH collections and merge results
       // All new additions go to top-level 'listMembers', but legacy data might be in subcollection
       // We need to check both to ensure we get ALL members
-      
+
       // Priority 1: Top-level listMembers collection (where all new additions go)
       try {
         const lmSnap = await window.firebaseDB.collection('listMembers').where('listId', '==', listId).limit(5000).get();
@@ -1177,7 +1179,7 @@
       } catch (lmErr) {
         console.warn('[ListDetail] Top-level query failed:', lmErr);
       }
-      
+
       // Priority 2: Also check subcollection for any legacy data (merge with top-level results)
       try {
         const subSnap = await window.firebaseDB.collection('lists').doc(listId).collection('members').get();
@@ -1200,7 +1202,7 @@
       } catch (subErr) {
         console.warn('[ListDetail] Subcollection query failed (non-critical):', subErr);
       }
-      
+
       // 3) Cache the results for next time (COST-EFFECTIVE: IndexedDB write only)
       if (state.membersPeople.size > 0 || state.membersAccounts.size > 0) {
         try {
@@ -1210,9 +1212,9 @@
           console.warn('[ListDetail] Cache write failed (non-critical):', cacheErr);
         }
       }
-      
+
       console.log(`[ListDetail] ✓ Fetched from Firebase: ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts`);
-      
+
       // 4) Update legacy in-memory cache for backward compatibility
       window.listMembersCache = window.listMembersCache || {};
       window.listMembersCache[listId] = {
@@ -1220,19 +1222,19 @@
         accounts: new Set(state.membersAccounts),
         loaded: true
       };
-      
+
     } catch (err) {
       console.error('[ListDetail] Failed to fetch list members (preserving empty Sets):', err);
       // COST-EFFECTIVE: Preserve empty Sets on error - allows filtering to work without crashing
     }
-    
+
     if (console.timeEnd) console.timeEnd(`[ListDetail] fetchMembers ${listId}`);
   }
 
   function applyFilters() {
     const q = normalize(els.quickSearch ? els.quickSearch.value : '');
     const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-    
+
     // Define qMatch outside so it's available for both people and accounts views
     const qMatch = (str) => !q || normalize(str).includes(q);
 
@@ -1246,10 +1248,10 @@
       const domainTokens = (state.chips.visitorDomain || []).map(normalize).filter(Boolean);
       const seniorityTokens = (state.chips.seniority || []).map(normalize).filter(Boolean);
       const departmentTokens = (state.chips.department || []).map(normalize).filter(Boolean);
-      const tokenMatch = (tokens) => (str) => { 
-        if (!tokens || tokens.length === 0) return true; 
-        const n = normalize(str); 
-        return tokens.some((t) => n.includes(t)); 
+      const tokenMatch = (tokens) => (str) => {
+        if (!tokens || tokens.length === 0) return true;
+        const n = normalize(str);
+        return tokens.some((t) => n.includes(t));
       };
       const titleMatch = tokenMatch(titleTokens);
       const companyMatch = tokenMatch(companyTokens);
@@ -1278,7 +1280,7 @@
           seniorityMatch(c.seniority || '') && departmentMatch(c.department || '')
         );
       });
-      
+
       // Filter by list membership
       if (state.listId) {
         console.log('[ListDetail] Filtering people by list membership:', {
@@ -1297,7 +1299,7 @@
         const acct = a.accountName || a.name || '';
         return qMatch(acct) || qMatch(a.industry) || qMatch(a.domain);
       });
-      
+
       if (state.listId) {
         console.log('[ListDetail] Filtering accounts by list membership:', {
           listId: state.listId,
@@ -1341,7 +1343,7 @@
   }
 
   function normalize(s) { return (s || '').toString().trim().toLowerCase(); }
-  
+
   // Helper to decode HTML entities (for company name matching)
   function decodeHtmlEntities(str) {
     if (!str) return '';
@@ -1349,25 +1351,25 @@
     txt.innerHTML = str;
     return txt.value;
   }
-  
+
   // Helper to find account by name (case-insensitive, with fallback to global accounts data)
   function findAccountByName(companyName) {
     if (!companyName) return null;
     // Decode HTML entities first (e.g., &#039; → ', &amp; → &)
     const decodedName = decodeHtmlEntities(companyName);
     const normalizedName = normalize(decodedName);
-    
+
     // First try state.dataAccounts (local cache)
     let account = state.dataAccounts.find(acc => {
       const accName = normalize(acc.accountName || acc.name || acc.companyName || '');
       return accName === normalizedName;
     });
-    
+
     if (account) {
       console.debug('[ListDetail] Found account in state.dataAccounts:', decodedName, '→', account.id);
       return account;
     }
-    
+
     // Fallback to BackgroundAccountsLoader (cost-effective: zero Firestore reads)
     if (!account && window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
       try {
@@ -1381,7 +1383,7 @@
         }
       } catch (_) { /* noop */ }
     }
-    
+
     // Final fallback to global getAccountsData (cost-effective: uses cache)
     if (!account && typeof window.getAccountsData === 'function') {
       try {
@@ -1395,11 +1397,11 @@
         }
       } catch (_) { /* noop */ }
     }
-    
+
     if (!account) {
       console.warn('[ListDetail] ⚠ Account not found for company:', decodedName, '(original:', companyName + ')');
     }
-    
+
     return account || null;
   }
 
@@ -1483,7 +1485,7 @@
 
     updateHeaderSelectAll();
     renderRowSelectionHighlights();
-    
+
     // Note: Drag and drop is initialized after data load in init() function
   }
 
@@ -1533,7 +1535,7 @@
     const title = escapeHtml(c.title || '');
     const company = c.companyName || ''; // Don't escape here - will escape when inserting into HTML
     const email = escapeHtml(c.email || '');
-    
+
     // Phone: prefer user-selected default, then fallback to priority order
     const preferredKey = String(c.preferredPhoneField || '').trim();
     let phoneRaw = '';
@@ -1543,14 +1545,14 @@
     if (!phoneRaw) phoneRaw = c.workDirectPhone || c.mobile || c.otherPhone || c.phone || '';
     const phone = phoneRaw;
     const phoneFormatted = phone ? formatPhoneForDisplay(phone) : '';
-    
+
     const locCity = c.city || (c.location && c.location.city) || '';
     const locState = c.state || (c.location && (c.location.state || c.location.region)) || '';
     const location = escapeHtml([locCity, locState].filter(Boolean).join(', '));
     const updatedStr = escapeHtml(formatDateOrNA(c.updatedAt, c.createdAt));
     const checked = state.selectedPeople.has(id) ? ' checked' : '';
     const rowClass = state.selectedPeople.has(id) ? ' class="row-selected"' : '';
-    
+
     // Compute initials for avatar (first letter of first and last word)
     const initials = (() => {
       const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
@@ -1560,9 +1562,9 @@
       const e = String(c.email || '').trim();
       return e ? e[0].toUpperCase() : '?';
     })();
-    
+
     let html = `<tr${rowClass}>`;
-    
+
     peopleColumnOrder.forEach(col => {
       switch (col) {
         case 'select':
@@ -1581,12 +1583,12 @@
           const faviconHTML = (() => {
             let domain = '';
             let logoUrl = '';
-            
+
             if (acct) {
               domain = String(acct.domain || acct.website || '').trim();
               logoUrl = acct.logoUrl || acct.logoURL || '';
             }
-            
+
             // If no domain from account, try to derive from company name (fallback for logo rendering)
             if (!domain && company) {
               // Try to extract domain from company name if it looks like a domain
@@ -1595,12 +1597,12 @@
                 domain = nameStr.replace(/^www\./i, '');
               }
             }
-            
+
             if (/^https?:\/\//i.test(domain)) {
-              try { domain = new URL(domain).hostname; } catch(_) { domain = domain.replace(/^https?:\/\//i, '').split('/')[0]; }
+              try { domain = new URL(domain).hostname; } catch (_) { domain = domain.replace(/^https?:\/\//i, '').split('/')[0]; }
             }
             domain = domain ? domain.replace(/^www\./i, '') : '';
-            
+
             if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
               const html = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
               return html && String(html).trim() ? html : '<span class="company-favicon placeholder" aria-hidden="true"></span>';
@@ -1610,7 +1612,7 @@
             }
             return '<span class="company-favicon placeholder" aria-hidden="true"></span>';
           })();
-          
+
           // Add data-account-id if account found (enables proper navigation)
           const accountIdAttr = acct && acct.id ? ` data-account-id="${escapeHtml(acct.id)}"` : '';
           html += `<td><a href="#" class="company-link" data-company-name="${escapeHtml(company)}"${accountIdAttr}><span class="company-cell__wrap">${faviconHTML}<span class="company-name">${escapeHtml(company)}</span></span></a></td>`;
@@ -1639,7 +1641,7 @@
           break;
       }
     });
-    
+
     html += '</tr>';
     return html;
   }
@@ -1665,28 +1667,28 @@
     const checked = state.selectedAccounts.has(a.id) ? ' checked' : '';
     const rowClass = state.selectedAccounts.has(a.id) ? ' class="row-selected"' : '';
     const aid = escapeHtml(a.id);
-    
+
     // Compute favicon domain (mirror accounts page logic)
     const favDomain = (() => {
       let d = String(domain || '').trim();
       if (/^https?:\/\//i.test(d)) {
-        try { d = new URL(d).hostname; } catch(_) { d = d.replace(/^https?:\/\//i, '').split('/')[0]; }
+        try { d = new URL(d).hostname; } catch (_) { d = d.replace(/^https?:\/\//i, '').split('/')[0]; }
       }
       if (!d && (a.website || a.site)) {
         try { d = new URL(a.website || a.site).hostname; } catch (_) { d = String(a.website || a.site).replace(/^https?:\/\//i, '').split('/')[0]; }
       }
       return d ? d.replace(/^www\./i, '') : '';
     })();
-    
+
     let html = `<tr${rowClass} data-account-id="${aid}">`;
-    
+
     accountsColumnOrder.forEach(col => {
       switch (col) {
         case 'select':
           html += `<td class="col-select"><input type="checkbox" class="row-select" data-id="${aid}" aria-label="Select account"${checked}></td>`;
           break;
         case 'name':
-          html += `<td class="name-cell"><a href="#" class="acct-link" data-account-id="${aid}" data-account-name="${escapeHtml(name)}" title="View account details"><span class="company-cell__wrap">${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: a.logoUrl, domain: favDomain, size: 32 }) : (favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 32) : '') : '')}<span class="name-text account-name">${name}</span></span></a></td>`;
+          html += `<td class="name-cell"><a href="#" class="acct-link" data-account-id="${aid}" data-account-name="${escapeHtml(name)}" title="View account details"><span class="company-cell__wrap">${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: a.logoUrl, domain: favDomain, size: 32 }) : (favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 32) : '') : '')}<span class="name-text account-name">${name}</span></span></a></td>`;
           break;
         case 'industry':
           html += `<td>${industry}</td>`;
@@ -1726,7 +1728,7 @@
           break;
       }
     });
-    
+
     html += '</tr>';
     return html;
   }
@@ -1738,10 +1740,10 @@
 
   function renderTableHead() {
     if (!els.theadRow) return;
-    
+
     const currentOrder = state.view === 'people' ? peopleColumnOrder : accountsColumnOrder;
     let html = '';
-    
+
     currentOrder.forEach(col => {
       switch (col) {
         case 'select':
@@ -1794,13 +1796,13 @@
           break;
       }
     });
-    
+
     els.theadRow.innerHTML = html;
   }
 
   function renderPagination() {
     if (!els.pagination || !els.paginationSummary) return;
-    
+
     const total = state.filtered.length;
     const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
     const start = total === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1;
@@ -1810,7 +1812,7 @@
     const label = state.view === 'people' ? (total === 1 ? 'contact' : 'contacts') : (total === 1 ? 'account' : 'accounts');
     const listLabel = state.listName ? ` in "${state.listName}"` : '';
     els.paginationSummary.textContent = `Showing ${start}–${end} of ${total} ${label}${listLabel}`;
-    
+
     // Always use unified pagination component (even for empty lists)
     if (window.crm && window.crm.createPagination) {
       window.crm.createPagination(
@@ -1819,7 +1821,7 @@
         (page) => {
           state.currentPage = page;
           render();
-          
+
           // Scroll to top after page change (same as people/accounts pages)
           try {
             requestAnimationFrame(() => {
@@ -1884,7 +1886,7 @@
           if (next !== state.currentPage) {
             state.currentPage = next;
             render();
-            
+
             // Scroll to top after page change
             try {
               requestAnimationFrame(() => {
@@ -1913,20 +1915,20 @@
 
   function buildSuggestionPools() {
     const dedupe = (arr, limit = 2000) => {
-      const set = new Set(); 
+      const set = new Set();
       const out = [];
       for (const v of arr) {
-        const s = (v || '').toString().trim(); 
+        const s = (v || '').toString().trim();
         if (!s) continue;
-        const key = normalize(s); 
-        if (set.has(key)) continue; 
-        set.add(key); 
-        out.push(s); 
+        const key = normalize(s);
+        if (set.has(key)) continue;
+        set.add(key);
+        out.push(s);
         if (out.length >= limit) break;
       }
       return out;
     };
-    
+
     try {
       state.pools.title = dedupe(state.dataPeople.map(c => c.title || ''));
       state.pools.company = dedupe(state.dataPeople.map(c => c.companyName || ''));
@@ -1937,7 +1939,7 @@
       state.pools.visitorDomain = dedupe(state.dataPeople.map(c => c.domain || c.companyDomain || c.website || ''));
       state.pools.seniority = dedupe(state.dataPeople.map(c => c.seniority || ''));
       state.pools.department = dedupe(state.dataPeople.map(c => c.department || ''));
-    } catch {}
+    } catch { }
   }
 
   // ----- Chip render helpers (Seniority / Department) -----
@@ -1990,10 +1992,87 @@
   function updateSenioritySuggestions() { if (!els.pSenioritySuggest) return; const q = normalize(els.pSeniority ? els.pSeniority.value : ''); if (!q) { hideSenioritySuggestions(); return; } const items = []; for (let i = 0; i < state.pools.seniority.length && items.length < 8; i++) { const s = state.pools.seniority[i]; if (normalize(s).includes(q) && !(state.chips.seniority || []).some((x) => normalize(x) === normalize(s))) items.push(s); } if (items.length === 0) { hideSenioritySuggestions(); return; } els.pSenioritySuggest.innerHTML = items.map((s) => `<div class="item" data-sugg="${escapeHtml(s)}">${escapeHtml(s)}</div>`).join(''); els.pSenioritySuggest.removeAttribute('hidden'); }
   function updateDepartmentSuggestions() { if (!els.pDepartmentSuggest) return; const q = normalize(els.pDepartment ? els.pDepartment.value : ''); if (!q) { hideDepartmentSuggestions(); return; } const items = []; for (let i = 0; i < state.pools.department.length && items.length < 8; i++) { const s = state.pools.department[i]; if (normalize(s).includes(q) && !(state.chips.department || []).some((x) => normalize(x) === normalize(s))) items.push(s); } if (items.length === 0) { hideDepartmentSuggestions(); return; } els.pDepartmentSuggest.innerHTML = items.map((s) => `<div class="item" data-sugg="${escapeHtml(s)}">${escapeHtml(s)}</div>`).join(''); els.pDepartmentSuggest.removeAttribute('hidden'); }
 
+  // Helper to fetch missing contacts/accounts that are in the list but not in local data
+  async function fetchMissingContacts(ids) {
+    if (!ids || ids.length === 0) return;
+    if (!window.firebaseDB) return;
+
+    // Chunk IDs into batches of 10 (Firestore limit for 'in' queries)
+    const chunks = [];
+    for (let i = 0; i < ids.length; i += 10) {
+      chunks.push(ids.slice(i, i + 10));
+    }
+
+    try {
+      const promises = chunks.map(chunk =>
+        window.firebaseDB.collection('contacts')
+          .where(window.firebase.firestore.FieldPath.documentId(), 'in', chunk)
+          .get()
+      );
+
+      const snapshots = await Promise.all(promises);
+      let fetchedCount = 0;
+
+      snapshots.forEach(snap => {
+        snap.docs.forEach(doc => {
+          const data = { id: doc.id, ...doc.data() };
+          // Avoid duplicates
+          if (!state.dataPeople.find(c => c.id === data.id)) {
+            state.dataPeople.push(data);
+            fetchedCount++;
+          }
+        });
+      });
+
+      console.log(`[ListDetail] ✓ Fetched ${fetchedCount} missing contacts`);
+
+    } catch (e) {
+      console.warn('[ListDetail] Error fetching missing contacts:', e);
+    }
+  }
+
+  async function fetchMissingAccounts(ids) {
+    if (!ids || ids.length === 0) return;
+    if (!window.firebaseDB) return;
+
+    // Chunk IDs into batches of 10 (Firestore limit for 'in' queries)
+    const chunks = [];
+    for (let i = 0; i < ids.length; i += 10) {
+      chunks.push(ids.slice(i, i + 10));
+    }
+
+    try {
+      const promises = chunks.map(chunk =>
+        window.firebaseDB.collection('accounts')
+          .where(window.firebase.firestore.FieldPath.documentId(), 'in', chunk)
+          .get()
+      );
+
+      const snapshots = await Promise.all(promises);
+      let fetchedCount = 0;
+
+      snapshots.forEach(snap => {
+        snap.docs.forEach(doc => {
+          const data = { id: doc.id, ...doc.data() };
+          // Avoid duplicates
+          if (!state.dataAccounts.find(a => a.id === data.id)) {
+            state.dataAccounts.push(data);
+            fetchedCount++;
+          }
+        });
+      });
+
+      console.log(`[ListDetail] ✓ Fetched ${fetchedCount} missing accounts`);
+
+    } catch (e) {
+      console.warn('[ListDetail] Error fetching missing accounts:', e);
+    }
+  }
+
   async function init(context) {
     console.log('[ListDetail] Initializing with context:', context);
     if (console.time) console.time('[ListDetail] init');
-    
+
     if (!initDomRefs()) {
       console.error('[ListDetail] Failed to initialize DOM refs');
       return;
@@ -2001,7 +2080,7 @@
 
     // Load column order from localStorage
     loadColumnOrder();
-    
+
     // Set context
     if (context) {
       state.listId = context.listId;
@@ -2010,7 +2089,7 @@
       state.view = context.listKind || 'people';
       // Avoid clearing tbody immediately to prevent flicker; it will be replaced on first render
     }
-    
+
     // Check if we're restoring from back navigation
     if (window.__restoringListDetail && window._listDetailReturn) {
       const restore = window._listDetailReturn;
@@ -2029,22 +2108,22 @@
 
     attachEvents();
     injectListDetailBulkStyles();
-    
+
     // Only hide table body if this is a fresh load (not a restore)
     // If restoring, data should already be visible, so skip the opacity hide
     const isRestoring = window.__restoringListDetail && window._listDetailReturn;
-    
+
     // Check for cached data from BackgroundLoaders (faster check)
-    const hasPeopleData = (state.dataPeople && state.dataPeople.length > 0) || 
-                         (window.BackgroundContactsLoader && window.BackgroundContactsLoader.getContactsData && 
-                          window.BackgroundContactsLoader.getContactsData().length > 0);
-    const hasAccountsData = (state.dataAccounts && state.dataAccounts.length > 0) || 
-                           (window.BackgroundAccountsLoader && window.BackgroundAccountsLoader.getAccountsData && 
-                            window.BackgroundAccountsLoader.getAccountsData().length > 0);
-    const hasCachedData = state.listId && 
-                         ((state.view === 'people' && hasPeopleData) || 
-                          (state.view === 'accounts' && hasAccountsData));
-    
+    const hasPeopleData = (state.dataPeople && state.dataPeople.length > 0) ||
+      (window.BackgroundContactsLoader && window.BackgroundContactsLoader.getContactsData &&
+        window.BackgroundContactsLoader.getContactsData().length > 0);
+    const hasAccountsData = (state.dataAccounts && state.dataAccounts.length > 0) ||
+      (window.BackgroundAccountsLoader && window.BackgroundAccountsLoader.getAccountsData &&
+        window.BackgroundAccountsLoader.getAccountsData().length > 0);
+    const hasCachedData = state.listId &&
+      ((state.view === 'people' && hasPeopleData) ||
+        (state.view === 'accounts' && hasAccountsData));
+
     if (!isRestoring && !hasCachedData && els.tbody) {
       // Only hide for fresh loads without cached data
       els.tbody.style.opacity = '0';
@@ -2054,14 +2133,14 @@
       els.tbody.style.transition = 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
       els.tbody.style.opacity = '1'; // Keep visible if we have data
     }
-    
+
     // CRITICAL FIX: Listen for bulk import completion to invalidate stale caches
     if (!window._listDetailBulkImportListenerBound) {
       document.addEventListener('pc:bulk-import-complete', async (event) => {
         try {
           const { listId, type } = event.detail || {};
           console.log('[ListDetail] Bulk import complete, refreshing data for:', { listId, type });
-          
+
           // If we're viewing the affected list, clear cache and reload
           if (listId && state.listId === listId) {
             // Clear in-memory cache for this list
@@ -2069,7 +2148,7 @@
               delete window.listMembersCache[listId];
               console.log('[ListDetail] ✓ Cleared in-memory cache for current list');
             }
-            
+
             // CRITICAL FIX: Also invalidate IndexedDB cache
             if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
               try {
@@ -2079,10 +2158,10 @@
                 console.warn('[ListDetail] Cache invalidation failed:', cacheError);
               }
             }
-            
+
             // Force reload of list members (will fetch fresh from Firestore)
             await refreshListMembership();
-            
+
             console.log('[ListDetail] ✓ Reloaded list after bulk import:', {
               people: state.membersPeople.size,
               accounts: state.membersAccounts.size
@@ -2094,18 +2173,18 @@
       });
       window._listDetailBulkImportListenerBound = true;
     }
-    
+
     // Listen for restoration event from back navigation (with guard to prevent duplicates)
     if (!window._listDetailRestoreListenerBound) {
       document.addEventListener('pc:list-detail-restore', (e) => {
         if (!e.detail) return;
         const { page, scroll, filters, view, listId, listName } = e.detail;
-        
+
         console.log('[ListDetail] Restore event received:', e.detail);
-        
+
         // Mark as animated to prevent row animations
         state.hasAnimated = true;
-        
+
         // Restore list context (view, listId, listName)
         if (view) {
           state.view = view;
@@ -2121,12 +2200,12 @@
             els.detailTitle.textContent = listName;
           }
         }
-        
+
         // Restore page (accept 1 as valid; only skip if undefined/null)
         if (page !== undefined && page !== null) {
           state.currentPage = Math.max(1, parseInt(page, 10));
         }
-        
+
         // Restore filters
         if (filters) {
           if (filters.quickSearch && els.quickSearch) {
@@ -2139,16 +2218,16 @@
             state.flags = { ...state.flags, ...filters.flags };
           }
         }
-        
+
         // Re-render table header for correct columns (people vs accounts)
         renderTableHead();
-        
+
         // Re-render with restored state without resetting pagination
         state.suppressPageReset = true;
         applyFilters();
         // Release suppression next tick
-        setTimeout(() => { try { state.suppressPageReset = false; } catch(_) {} }, 0);
-        
+        setTimeout(() => { try { state.suppressPageReset = false; } catch (_) { } }, 0);
+
         // Ensure table is visible after restore with smooth transition
         if (els.tbody) {
           // Set transition for smooth appearance
@@ -2161,7 +2240,7 @@
             }
           });
         }
-        
+
         // Re-initialize drag and drop after restoration
         setTimeout(() => {
           try {
@@ -2172,7 +2251,7 @@
             console.warn('[ListDetail] Failed to re-initialize drag and drop:', e);
           }
         }, 100);
-        
+
         // Restore scroll position - use requestAnimationFrame for better timing
         if (scroll !== undefined) {
           requestAnimationFrame(() => {
@@ -2180,14 +2259,14 @@
               try {
                 window.scrollTo(0, scroll);
                 console.log('[ListDetail] ✓ Restored scroll position:', scroll);
-                
+
                 // Clear restoration flag after successful restore
                 try {
                   window.__restoringListDetail = false;
                   window.__restoringListDetailUntil = 0;
                   console.log('[ListDetail] ✓ Cleared restoration flag');
-                } catch (_) {}
-              } catch (_) {}
+                } catch (_) { }
+              } catch (_) { }
             });
           });
         } else {
@@ -2197,38 +2276,38 @@
               window.__restoringListDetail = false;
               window.__restoringListDetailUntil = 0;
             }, 100);
-          } catch (_) {}
+          } catch (_) { }
         }
       });
       window._listDetailRestoreListenerBound = true;
     }
-    
+
     // Instant paint: draw header (but don't render table body until data is ready)
     renderTableHead();
-    
+
     // Skip cached render during initial load to prevent flicker; wait for full data load instead
     // This prevents showing empty state or incomplete data that causes flicker
-    
+
     // Extra guard: if restoring hint is set but stale, clear it
     if (window.__restoringListDetailUntil && Date.now() > window.__restoringListDetailUntil) {
       try {
         window.__restoringListDetail = false;
         window.__restoringListDetailUntil = 0;
         console.log('[ListDetail] Cleared stale restoration flag');
-      } catch (_) {}
+      } catch (_) { }
     }
-    
+
     // Load data in parallel for faster loading
     if (!window.__restoringListDetail) {
       state.currentPage = 1;
     }
-    
+
     // COST-EFFECTIVE: Load data and members in parallel (cache-first, zero cost if cached)
     const [dataLoaded, membersLoaded] = await Promise.all([
       loadDataOnce(),
       fetchMembers(state.listId)
     ]);
-    
+
     // CRITICAL FIX: If list recordCount doesn't match fetched members, invalidate cache and re-fetch
     // This handles cases where cache is stale or incomplete (e.g., only showing 12 out of 174 contacts)
     if (state.listId) {
@@ -2239,31 +2318,51 @@
         const actualPeopleCount = state.membersPeople?.size || 0;
         const actualAccountsCount = state.membersAccounts?.size || 0;
         const actualTotal = actualPeopleCount + actualAccountsCount;
-        
+
         // If there's a significant mismatch (more than 10% difference or more than 10 items), invalidate cache and re-fetch
         if (expectedCount > 0 && actualTotal > 0 && Math.abs(expectedCount - actualTotal) > Math.max(10, expectedCount * 0.1)) {
           console.warn(`[ListDetail] Count mismatch detected: expected ${expectedCount}, got ${actualTotal}. Invalidating cache and re-fetching...`);
-          
+
           // Invalidate cache
           if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
             await window.CacheManager.invalidateListCache(state.listId);
           }
-          
+
           // Clear in-memory cache
           if (window.listMembersCache && window.listMembersCache[state.listId]) {
             delete window.listMembersCache[state.listId];
           }
-          
+
           // Re-fetch members
           await fetchMembers(state.listId);
-          
+
           console.log(`[ListDetail] ✓ Re-fetched after cache invalidation: ${state.membersPeople.size} people, ${state.membersAccounts.size} accounts`);
         }
       } catch (countCheckErr) {
         console.warn('[ListDetail] Error checking count mismatch:', countCheckErr);
       }
     }
-    
+
+    // NEW LOGIC: Fetch missing members that weren't in the initial data load
+    // This ensures we show all list members even if they weren't loaded by the initial scoped query
+    if (state.view === 'people' && state.membersPeople.size > 0) {
+      const loadedIds = new Set(state.dataPeople.map(c => c.id));
+      const missingIds = Array.from(state.membersPeople).filter(id => !loadedIds.has(id));
+
+      if (missingIds.length > 0) {
+        console.log(`[ListDetail] Found ${missingIds.length} members missing from local data, fetching...`);
+        await fetchMissingContacts(missingIds);
+      }
+    } else if (state.view === 'accounts' && state.membersAccounts.size > 0) {
+      const loadedIds = new Set(state.dataAccounts.map(a => a.id));
+      const missingIds = Array.from(state.membersAccounts).filter(id => !loadedIds.has(id));
+
+      if (missingIds.length > 0) {
+        console.log(`[ListDetail] Found ${missingIds.length} accounts missing from local data, fetching...`);
+        await fetchMissingAccounts(missingIds);
+      }
+    }
+
     // CRITICAL: Ensure members are loaded before filtering (fixes race condition)
     // Verify members Sets are initialized (even if empty)
     if (!state.membersPeople || !(state.membersPeople instanceof Set)) {
@@ -2274,17 +2373,17 @@
       state.membersAccounts = new Set();
       console.warn('[ListDetail] Accounts Set not initialized, creating empty Set');
     }
-    
+
     console.log('[ListDetail] ✓ Data and members loaded, ready to filter:', {
       people: state.dataPeople.length,
       accounts: state.dataAccounts.length,
       membersPeople: state.membersPeople.size,
       membersAccounts: state.membersAccounts.size
     });
-    
+
     // Re-render with loaded data - batch all DOM updates in a single frame
     renderTableHead();
-    
+
     // Render chip DOM from internal state (if pre-set)
     try {
       window.__listDetailState = window.__listDetailState || {};
@@ -2302,16 +2401,16 @@
       renderEmployeesChips();
       renderIndustryChips();
       renderVisitorDomainChips();
-    } catch(_) {}
-    
+    } catch (_) { }
+
     // Apply filters and render table body, then fade it in smoothly
     // CRITICAL: Members are now guaranteed to be loaded before filtering
     applyFilters();
-    
+
     // Only fade in if table was hidden (fresh load)
     // If restoring or data was cached, it should already be visible
     const shouldFadeIn = !isRestoring && !hasCachedData && els.tbody && parseFloat(els.tbody.style.opacity) === 0;
-    
+
     if (shouldFadeIn && els.tbody) {
       // Use requestAnimationFrame to ensure DOM is ready before showing
       requestAnimationFrame(() => {
@@ -2326,14 +2425,14 @@
       // If restoring or cached, just ensure it's visible immediately
       els.tbody.style.opacity = '1';
     }
-    
+
     // Initialize drag and drop after everything is rendered
     setTimeout(() => {
       console.log('[ListDetail] Initializing drag and drop after data load');
       initHeaderDragAndDrop();
       attachListDetailHeaderDnDHooks();
     }, 100);
-    
+
     // Initialize click-to-call and click-to-email after table is rendered
     setTimeout(() => {
       console.log('[ListDetail] Initializing click-to-call and click-to-email');
@@ -2344,7 +2443,7 @@
         window.ClickToEmail.init();
       }
     }, 150);
-    
+
     if (console.timeEnd) console.timeEnd('[ListDetail] init');
   }
 
@@ -2358,7 +2457,7 @@
         delete window.listMembersCache[state.listId];
         console.log('[ListDetail] ✓ Cleared in-memory cache');
       }
-      
+
       // CRITICAL FIX: Also invalidate IndexedDB cache to ensure fresh data
       if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
         try {
@@ -2368,13 +2467,13 @@
           console.warn('[ListDetail] Cache invalidation failed:', cacheError);
         }
       }
-      
+
       // Re-fetch members (will query Firestore since cache is invalidated)
       await fetchMembers(state.listId);
-      
+
       // Re-apply filters to show all members
       applyFilters();
-      
+
       console.log('[ListDetail] ✓ Refreshed list membership:', {
         people: state.membersPeople.size,
         accounts: state.membersAccounts.size
@@ -2425,15 +2524,15 @@
       console.warn('[ListDetail] No theadRow found for drag and drop');
       return;
     }
-    
+
     let dragSrcTh = null;
     let dragOverTh = null;
     let isDragging = false;
     const ths = Array.from(els.theadRow.querySelectorAll('th'));
-    
+
     console.log('[ListDetail] Found', ths.length, 'draggable headers');
     console.log('[ListDetail] Headers found:', ths.map(th => th.textContent.trim()));
-    
+
     // Helper to commit a move given a source and highlighted target
     function commitHeaderMove(sourceTh, targetTh) {
       if (!sourceTh || !targetTh) return false;
@@ -2446,17 +2545,17 @@
 
     // Global drop handler for the entire header row
     els.theadRow.addEventListener('dragover', (e) => {
-        e.preventDefault();
+      e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      
+
       const th = e.target.closest('th');
       if (!th || !th.hasAttribute('draggable')) return;
-      
+
       // Remove previous highlight
       if (dragOverTh && dragOverTh !== th) {
         dragOverTh.classList.remove('drag-over');
       }
-      
+
       // Add highlight to current target
       if (th !== dragSrcTh) {
         th.classList.add('drag-over');
@@ -2476,12 +2575,12 @@
 
     els.theadRow.addEventListener('drop', (e) => {
       e.preventDefault();
-      
+
       // Remove highlight
       if (dragOverTh) {
         dragOverTh.classList.remove('drag-over');
       }
-      
+
       // Commit the move - this will insert the dragged column before the highlighted target
       if (commitHeaderMove(dragSrcTh, dragOverTh)) {
         // Update the column order and persist
@@ -2497,14 +2596,14 @@
           render();
         }
       }
-      
+
       dragOverTh = null;
     });
-    
+
     // Attach drag start/end to individual headers
     ths.forEach((th) => {
       th.setAttribute('draggable', 'true');
-      
+
       th.addEventListener('dragstart', (e) => {
         console.log('[ListDetail] Drag start triggered on:', th.textContent.trim());
         dragSrcTh = th;
@@ -2550,19 +2649,19 @@
         if (!v) return;
         const arr = state.chips[kind] = state.chips[kind] || [];
         if (!arr.includes(v)) arr.push(v);
-      } catch (_) {}
+      } catch (_) { }
     },
     _clearChips: (kind) => {
-      try { state.chips[kind] = []; } catch (_) {}
+      try { state.chips[kind] = []; } catch (_) { }
     },
     _getState: () => {
       try { return state; } catch (_) { return {}; }
     },
     _render: () => {
-      try { if (typeof render === 'function') render(); } catch (_) {}
+      try { if (typeof render === 'function') render(); } catch (_) { }
     },
     _getPageItems: () => {
-      try { 
+      try {
         const state = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
         if (!state) return [];
         const pageSize = state.pageSize || 50;
@@ -2579,7 +2678,7 @@
       const checkboxes = document.querySelectorAll('#list-detail-table .row-select');
       const checkedCount = document.querySelectorAll('#list-detail-table .row-select:checked').length;
       const bar = page?.querySelector('#list-detail-bulk-actions');
-      
+
       const report = {
         pageFound: !!page,
         containerFound: !!container,
@@ -2592,9 +2691,9 @@
         currentView: state.view,
         tbodyBound: !!els._tbodyBound
       };
-      
+
       alert(JSON.stringify(report, null, 2));
-      
+
       // Force show bar for testing
       if (checkedCount > 0) {
         showBulkActionsBar(true);
@@ -2603,7 +2702,7 @@
           alert('After forcing show: Bar exists = ' + !!barAfter);
         }, 100);
       }
-      
+
       return report;
     }
   };
@@ -2621,7 +2720,7 @@ function renderRowSelectionHighlights() {
       if (!cb) return;
       tr.classList.toggle('row-selected', !!cb.checked);
     });
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function updateHeaderSelectAll() {
@@ -2634,13 +2733,13 @@ function updateHeaderSelectAll() {
     const checked = boxes.filter(cb => cb.checked).length;
     headerCb.checked = checked > 0 && checked === boxes.length;
     headerCb.indeterminate = checked > 0 && checked < boxes.length;
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function addTitleToken(label) {
   const s = (label || '').trim(); if (!s) return;
   if (window.ListDetail && ListDetail._addChip) ListDetail._addChip('title', s);
-  try { window.__listDetailState = window.__listDetailState || {}; } catch(_) {}
+  try { window.__listDetailState = window.__listDetailState || {}; } catch (_) { }
   const arr = (window.__listDetailState.titleChips = window.__listDetailState.titleChips || []);
   if (!arr.includes(s)) arr.push(s);
   if (typeof renderTitleChips === 'function') renderTitleChips();
@@ -2649,7 +2748,7 @@ function addTitleToken(label) {
 function addCompanyToken(label) {
   const s = (label || '').trim(); if (!s) return;
   if (window.ListDetail && ListDetail._addChip) ListDetail._addChip('company', s);
-  try { window.__listDetailState = window.__listDetailState || {}; } catch(_) {}
+  try { window.__listDetailState = window.__listDetailState || {}; } catch (_) { }
   const arr = (window.__listDetailState.companyChips = window.__listDetailState.companyChips || []);
   if (!arr.includes(s)) arr.push(s);
   if (typeof renderCompanyChips === 'function') renderCompanyChips();
@@ -2674,7 +2773,7 @@ function renderTitleChips() {
         document.getElementById('list-detail-apply-filters')?.click();
       });
     });
-  } catch(_) {}
+  } catch (_) { }
 }
 
 function renderCompanyChips() {
@@ -2695,12 +2794,12 @@ function renderCompanyChips() {
         document.getElementById('list-detail-apply-filters')?.click();
       });
     });
-  } catch(_) {}
+  } catch (_) { }
 }
 
-function hideTitleSuggestions(){ const el = document.getElementById('list-detail-filter-title-suggest'); if (el) el.hidden = true; }
-function hideCompanySuggestions(){ const el = document.getElementById('list-detail-filter-company-suggest'); if (el) el.hidden = true; }
-function updateTitleSuggestions(){
+function hideTitleSuggestions() { const el = document.getElementById('list-detail-filter-title-suggest'); if (el) el.hidden = true; }
+function hideCompanySuggestions() { const el = document.getElementById('list-detail-filter-company-suggest'); if (el) el.hidden = true; }
+function updateTitleSuggestions() {
   const el = document.getElementById('list-detail-filter-title-suggest');
   const input = document.getElementById('list-detail-filter-title');
   if (!el || !input) return;
@@ -2712,7 +2811,7 @@ function updateTitleSuggestions(){
   el.hidden = false;
 }
 
-function updateCompanySuggestions(){
+function updateCompanySuggestions() {
   const el = document.getElementById('list-detail-filter-company-suggest');
   const input = document.getElementById('list-detail-filter-company');
   if (!el || !input) return;
@@ -2727,7 +2826,7 @@ function updateCompanySuggestions(){
 function addCityToken(label) {
   const s = (label || '').trim(); if (!s) return;
   if (window.ListDetail && ListDetail._addChip) ListDetail._addChip('city', s);
-  try { window.__listDetailState = window.__listDetailState || {}; } catch(_) {}
+  try { window.__listDetailState = window.__listDetailState || {}; } catch (_) { }
   const arr = (window.__listDetailState.cityChips = window.__listDetailState.cityChips || []);
   if (!arr.includes(s)) arr.push(s);
   if (typeof renderCityChips === 'function') renderCityChips();
@@ -2751,11 +2850,11 @@ function renderCityChips() {
         document.getElementById('list-detail-apply-filters')?.click();
       });
     });
-  } catch(_) {}
+  } catch (_) { }
 }
 
-function hideCitySuggestions(){ const el = document.getElementById('list-detail-filter-city-suggest'); if (el) el.hidden = true; }
-function updateCitySuggestions(){
+function hideCitySuggestions() { const el = document.getElementById('list-detail-filter-city-suggest'); if (el) el.hidden = true; }
+function updateCitySuggestions() {
   const el = document.getElementById('list-detail-filter-city-suggest');
   const input = document.getElementById('list-detail-filter-city');
   if (!el || !input) return;
@@ -2770,7 +2869,7 @@ function updateCitySuggestions(){
 function addStateToken(label) {
   const s = (label || '').trim(); if (!s) return;
   if (window.ListDetail && ListDetail._addChip) ListDetail._addChip('state', s);
-  try { window.__listDetailState = window.__listDetailState || {}; } catch(_) {}
+  try { window.__listDetailState = window.__listDetailState || {}; } catch (_) { }
   const arr = (window.__listDetailState.stateChips = window.__listDetailState.stateChips || []);
   if (!arr.includes(s)) arr.push(s);
   if (typeof renderStateChips === 'function') renderStateChips();
@@ -2794,11 +2893,11 @@ function renderStateChips() {
         document.getElementById('list-detail-apply-filters')?.click();
       });
     });
-  } catch(_) {}
+  } catch (_) { }
 }
 
-function hideStateSuggestions(){ const el = document.getElementById('list-detail-filter-state-suggest'); if (el) el.hidden = true; }
-function updateStateSuggestions(){
+function hideStateSuggestions() { const el = document.getElementById('list-detail-filter-state-suggest'); if (el) el.hidden = true; }
+function updateStateSuggestions() {
   const el = document.getElementById('list-detail-filter-state-suggest');
   const input = document.getElementById('list-detail-filter-state');
   if (!el || !input) return;
@@ -2813,7 +2912,7 @@ function updateStateSuggestions(){
 function addEmployeesToken(label) {
   const s = (label || '').trim(); if (!s) return;
   if (window.ListDetail && ListDetail._addChip) ListDetail._addChip('employees', s);
-  try { window.__listDetailState = window.__listDetailState || {}; } catch(_) {}
+  try { window.__listDetailState = window.__listDetailState || {}; } catch (_) { }
   const arr = (window.__listDetailState.employeesChips = window.__listDetailState.employeesChips || []);
   if (!arr.includes(s)) arr.push(s);
   if (typeof renderEmployeesChips === 'function') renderEmployeesChips();
@@ -2837,11 +2936,11 @@ function renderEmployeesChips() {
         document.getElementById('list-detail-apply-filters')?.click();
       });
     });
-  } catch(_) {}
+  } catch (_) { }
 }
 
-function hideEmployeesSuggestions(){ const el = document.getElementById('list-detail-filter-employees-suggest'); if (el) el.hidden = true; }
-function updateEmployeesSuggestions(){
+function hideEmployeesSuggestions() { const el = document.getElementById('list-detail-filter-employees-suggest'); if (el) el.hidden = true; }
+function updateEmployeesSuggestions() {
   const el = document.getElementById('list-detail-filter-employees-suggest');
   const input = document.getElementById('list-detail-filter-employees');
   if (!el || !input) return;
@@ -2856,7 +2955,7 @@ function updateEmployeesSuggestions(){
 function addIndustryToken(label) {
   const s = (label || '').trim(); if (!s) return;
   if (window.ListDetail && ListDetail._addChip) ListDetail._addChip('industry', s);
-  try { window.__listDetailState = window.__listDetailState || {}; } catch(_) {}
+  try { window.__listDetailState = window.__listDetailState || {}; } catch (_) { }
   const arr = (window.__listDetailState.industryChips = window.__listDetailState.industryChips || []);
   if (!arr.includes(s)) arr.push(s);
   if (typeof renderIndustryChips === 'function') renderIndustryChips();
@@ -2880,11 +2979,11 @@ function renderIndustryChips() {
         document.getElementById('list-detail-apply-filters')?.click();
       });
     });
-  } catch(_) {}
+  } catch (_) { }
 }
 
-function hideIndustrySuggestions(){ const el = document.getElementById('list-detail-filter-industry-suggest'); if (el) el.hidden = true; }
-function updateIndustrySuggestions(){
+function hideIndustrySuggestions() { const el = document.getElementById('list-detail-filter-industry-suggest'); if (el) el.hidden = true; }
+function updateIndustrySuggestions() {
   const el = document.getElementById('list-detail-filter-industry-suggest');
   const input = document.getElementById('list-detail-filter-industry');
   if (!el || !input) return;
@@ -2899,7 +2998,7 @@ function updateIndustrySuggestions(){
 function addVisitorDomainToken(label) {
   const s = (label || '').trim(); if (!s) return;
   if (window.ListDetail && ListDetail._addChip) ListDetail._addChip('visitorDomain', s);
-  try { window.__listDetailState = window.__listDetailState || {}; } catch(_) {}
+  try { window.__listDetailState = window.__listDetailState || {}; } catch (_) { }
   const arr = (window.__listDetailState.visitorDomainChips = window.__listDetailState.visitorDomainChips || []);
   if (!arr.includes(s)) arr.push(s);
   if (typeof renderVisitorDomainChips === 'function') renderVisitorDomainChips();
@@ -2923,11 +3022,11 @@ function renderVisitorDomainChips() {
         document.getElementById('list-detail-apply-filters')?.click();
       });
     });
-  } catch(_) {}
+  } catch (_) { }
 }
 
-function hideVisitorDomainSuggestions(){ const el = document.getElementById('list-detail-filter-visitor-domain-suggest'); if (el) el.hidden = true; }
-function updateVisitorDomainSuggestions(){
+function hideVisitorDomainSuggestions() { const el = document.getElementById('list-detail-filter-visitor-domain-suggest'); if (el) el.hidden = true; }
+function updateVisitorDomainSuggestions() {
   const el = document.getElementById('list-detail-filter-visitor-domain-suggest');
   const input = document.getElementById('list-detail-filter-visitor-domain');
   if (!el || !input) return;
@@ -3041,28 +3140,28 @@ function injectListDetailBulkStyles() {
 function openBulkSelectPopover() {
   const page = document.getElementById('list-detail-page');
   if (!page) return;
-  
+
   // Get state and els via API
   const state = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
   if (!state) return;
-  
+
   // Get els via closure or query
-  const tableContainer = page.querySelector('.table-container') || 
-                         page.querySelector('#list-detail-table')?.closest('.table-container');
+  const tableContainer = page.querySelector('.table-container') ||
+    page.querySelector('#list-detail-table')?.closest('.table-container');
   if (!tableContainer) return;
-  
+
   // Check if popover already exists
   const existingPopover = document.getElementById('list-detail-bulk-popover');
   if (existingPopover) return;
-  
+
   closeBulkSelectPopover();
   const view = state.view || 'people';
   const totalFiltered = (state.filtered || []).length;
-  
+
   // Get page items via API
   const pageItems = window.ListDetail && window.ListDetail._getPageItems ? window.ListDetail._getPageItems() : [];
   const pageCount = pageItems.length;
-  
+
   // Backdrop
   const backdrop = document.createElement('div');
   backdrop.className = 'bulk-select-backdrop';
@@ -3075,14 +3174,14 @@ function openBulkSelectPopover() {
     closeBulkSelectPopover();
   });
   document.body.appendChild(backdrop);
-  
+
   const pop = document.createElement('div');
   pop.id = 'list-detail-bulk-popover';
   pop.className = 'bulk-select-popover';
   pop.setAttribute('role', 'dialog');
   pop.setAttribute('aria-label', 'Bulk selection');
   pop.setAttribute('aria-modal', 'true');
-  
+
   const itemType = view === 'people' ? 'people' : 'accounts';
   pop.innerHTML = `
     <div class="option">
@@ -3111,9 +3210,9 @@ function openBulkSelectPopover() {
       <button class="btn-primary" id="bulk-apply">Apply</button>
     </div>
   `;
-  
+
   document.body.appendChild(pop);
-  
+
   function positionPopover() {
     const selectAll = document.getElementById('select-all-list-detail');
     if (!selectAll) return;
@@ -3127,12 +3226,12 @@ function openBulkSelectPopover() {
     pop.style.left = left + 'px';
     pop.style.top = top + 'px';
   }
-  
+
   positionPopover();
   const reposition = () => positionPopover();
   window.addEventListener('resize', reposition);
   window.addEventListener('scroll', reposition, true);
-  
+
   // Enable/disable custom count input
   const applyBtnRef = pop.querySelector('#bulk-apply');
   const customInput = pop.querySelector('#bulk-custom-count');
@@ -3147,12 +3246,12 @@ function openBulkSelectPopover() {
   }
   radios.forEach((r) => r.addEventListener('change', () => { updateCustomEnabled(); if (r.value === 'custom' && customInput && !customInput.disabled) customInput.focus(); }));
   updateCustomEnabled();
-  
+
   // Pressing Enter in the number field applies selection
   if (customInput) {
     customInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applyBtnRef && applyBtnRef.click(); } });
   }
-  
+
   // Focus trap and Escape
   const focusables = Array.from(pop.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'));
   const firstFocusable = focusables[0];
@@ -3175,7 +3274,7 @@ function openBulkSelectPopover() {
   };
   document.addEventListener('keydown', onKeyDown);
   if (page) page._bulkKeydownHandler = onKeyDown;
-  
+
   // Store cleanup handler
   if (page) {
     if (page._bulkPopoverCleanup) page._bulkPopoverCleanup();
@@ -3188,11 +3287,11 @@ function openBulkSelectPopover() {
       } catch (e) { /* noop */ }
     };
   }
-  
+
   // Focus first control
   const firstInput = pop.querySelector('#bulk-custom-count') || pop.querySelector('input,button');
   if (firstInput && typeof firstInput.focus === 'function') firstInput.focus();
-  
+
   // Wire events
   const cancelBtn = pop.querySelector('#bulk-cancel');
   if (cancelBtn) {
@@ -3202,19 +3301,19 @@ function openBulkSelectPopover() {
       closeBulkSelectPopover();
     });
   }
-  
+
   // Use event delegation for Apply button
   pop.addEventListener('click', (e) => {
     if (e.target && e.target.id === 'bulk-apply') {
       const checkedRadio = pop.querySelector('input[name="bulk-mode"]:checked');
       const mode = checkedRadio ? checkedRadio.value : 'custom';
       closeBulkSelectPopover();
-      
+
       // Get fresh state to ensure we have the latest filtered data
       const freshState = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : state;
       const freshFiltered = freshState.filtered || [];
       const freshPageItems = window.ListDetail && window.ListDetail._getPageItems ? window.ListDetail._getPageItems() : pageItems;
-      
+
       // Apply selection based on mode
       if (mode === 'custom') {
         const raw = parseInt(pop.querySelector('#bulk-custom-count').value || '0', 10);
@@ -3229,11 +3328,11 @@ function openBulkSelectPopover() {
         console.log('[ListDetail] Selecting all filtered items:', { totalFiltered: freshFiltered.length, allIds: allIds.length });
         selectIds(allIds);
       }
-      
+
       // Note: selectIds() already calls _render() and showBulkActionsBar(), so no need to call again
     }
   });
-  
+
   // Close on outside click
   let outside;
   setTimeout(() => {
@@ -3308,40 +3407,40 @@ function selectFirstNFiltered(n) {
 function showBulkActionsBar(forceShow) {
   const page = document.getElementById('list-detail-page');
   if (!page) return;
-  
+
   // Try to get container from els if available, otherwise query for it
   let container = null;
   if (window.ListDetail && window.ListDetail._getTableContainer) {
     container = window.ListDetail._getTableContainer();
   }
   if (!container) {
-    container = page.querySelector('.table-container') || 
-                page.querySelector('#list-detail-table')?.closest('.table-container');
+    container = page.querySelector('.table-container') ||
+      page.querySelector('#list-detail-table')?.closest('.table-container');
   }
   if (!container) {
     console.warn('[Bulk Actions] Container not found');
     return;
   }
-  
+
   // Use state.view instead of removed toggle button
   const view = (window.ListDetail && window.ListDetail._getState && window.ListDetail._getState().view) || 'people';
-  const count = view === 'people' 
+  const count = view === 'people'
     ? (window.ListDetail && ListDetail._getSelectedCount ? ListDetail._getSelectedCount('people') : document.querySelectorAll('#list-detail-table .row-select:checked').length)
     : (window.ListDetail && ListDetail._getSelectedCount ? ListDetail._getSelectedCount('accounts') : document.querySelectorAll('#list-detail-table .row-select:checked').length);
-  
+
   const shouldShow = !!forceShow || count > 0;
   let bar = page.querySelector('#list-detail-bulk-actions');
-  
-  if (!shouldShow) { 
+
+  if (!shouldShow) {
     if (bar && bar.parentNode) {
       bar.classList.remove('--show');
       setTimeout(() => {
         if (bar && bar.parentNode) bar.parentNode.removeChild(bar);
       }, 200);
     }
-    return; 
+    return;
   }
-  
+
   if (!bar) {
     bar = document.createElement('div');
     bar.id = 'list-detail-bulk-actions';
@@ -3359,7 +3458,7 @@ function showBulkActionsBar(forceShow) {
     setTimeout(() => {
       bar.classList.add('--show');
     }, 10);
-    
+
     // Bind actions
     bar.querySelector('#ld-bulk-sequence')?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -3374,7 +3473,7 @@ function showBulkActionsBar(forceShow) {
     bar.querySelector('#ld-bulk-delete')?.addEventListener('click', () => showDeleteConfirmation());
   } else {
     // Update existing bar count
-    const span = bar.querySelector('#ld-selected-count'); 
+    const span = bar.querySelector('#ld-selected-count');
     if (span) span.textContent = String(count);
   }
 }
@@ -3388,7 +3487,7 @@ function hideBulkActionsBar() {
         if (el && el.parentNode) el.parentNode.removeChild(el);
       }, 200);
     }
-  } catch(_) {}
+  } catch (_) { }
 }
 
 // ===== Sequence dropdown panel =====
@@ -3428,7 +3527,7 @@ function closeListDetailSequencePanel() {
       window.removeEventListener('scroll', _positionListDetailSequencePanel, true);
       _positionListDetailSequencePanel = null;
     }
-  } catch(_) {}
+  } catch (_) { }
 }
 
 function openListDetailSequencePanel(triggerBtn) {
@@ -3436,23 +3535,23 @@ function openListDetailSequencePanel(triggerBtn) {
     closeListDetailSequencePanel();
     return;
   }
-  
+
   const page = document.getElementById('list-detail-page');
   if (!page) return;
-  
+
   const view = (window.ListDetail && window.ListDetail._getState && window.ListDetail._getState().view) || 'people';
-  const selectedCount = view === 'people' 
+  const selectedCount = view === 'people'
     ? (window.ListDetail && ListDetail._getSelectedCount ? ListDetail._getSelectedCount('people') : document.querySelectorAll('#list-detail-table .row-select:checked').length)
     : (window.ListDetail && ListDetail._getSelectedCount ? ListDetail._getSelectedCount('accounts') : document.querySelectorAll('#list-detail-table .row-select:checked').length);
-  
+
   if (selectedCount === 0) {
     if (window.crm?.showToast) window.crm.showToast('Please select contacts first');
     return;
   }
-  
+
   // Inject styles if needed
   injectListDetailSequenceStyles();
-  
+
   const panel = document.createElement('div');
   panel.id = 'list-detail-sequence-panel';
   panel.setAttribute('role', 'dialog');
@@ -3469,7 +3568,7 @@ function openListDetailSequencePanel(triggerBtn) {
     </div>
   `;
   document.body.appendChild(panel);
-  
+
   // Position panel
   _positionListDetailSequencePanel = function position() {
     if (!panel || !triggerBtn) return;
@@ -3477,12 +3576,12 @@ function openListDetailSequencePanel(triggerBtn) {
     const panelRect = panel.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
-    
+
     // Try bottom placement first
     const spaceBelow = viewportHeight - triggerRect.bottom;
     const spaceAbove = triggerRect.top;
     const useTop = spaceBelow < panelRect.height && spaceAbove > spaceBelow;
-    
+
     let top, left, placement;
     if (useTop) {
       placement = 'top';
@@ -3491,37 +3590,37 @@ function openListDetailSequencePanel(triggerBtn) {
       placement = 'bottom';
       top = triggerRect.bottom + 8;
     }
-    
+
     // Center horizontally relative to trigger button
     left = triggerRect.left + (triggerRect.width / 2) - (panelRect.width / 2);
-    
+
     // Keep within viewport
     left = Math.max(8, Math.min(left, viewportWidth - panelRect.width - 8));
     top = Math.max(8, Math.min(top, viewportHeight - panelRect.height - 8));
-    
+
     panel.style.left = `${left}px`;
     panel.style.top = `${top}px`;
     panel.setAttribute('data-placement', placement);
     panel.style.setProperty('--arrow-left', `${triggerRect.left + (triggerRect.width / 2) - left}px`);
   };
-  
+
   _positionListDetailSequencePanel();
   window.addEventListener('resize', _positionListDetailSequencePanel, true);
   window.addEventListener('scroll', _positionListDetailSequencePanel, true);
-  
+
   // Show with animation
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       panel.classList.add('--show');
     });
   });
-  
+
   // Load sequences
   populateListDetailSequences(panel.querySelector('#list-detail-sequence-body'), view);
-  
+
   // Close button
   panel.querySelector('.close-btn')?.addEventListener('click', () => closeListDetailSequencePanel());
-  
+
   // Keyboard handling
   _onListDetailSequenceKeydown = (e) => {
     if (e.key === 'Escape') {
@@ -3535,7 +3634,7 @@ function openListDetailSequencePanel(triggerBtn) {
     }
   };
   document.addEventListener('keydown', _onListDetailSequenceKeydown, true);
-  
+
   // Click outside to close
   _onListDetailSequenceOutside = (e) => {
     const inside = panel.contains(e.target);
@@ -3547,7 +3646,7 @@ function openListDetailSequencePanel(triggerBtn) {
   setTimeout(() => {
     document.addEventListener('mousedown', _onListDetailSequenceOutside, true);
   }, 0);
-  
+
   // Focus management
   setTimeout(() => {
     const first = panel.querySelector('.list-item:not([aria-disabled="true"]), .close-btn');
@@ -3557,16 +3656,16 @@ function openListDetailSequencePanel(triggerBtn) {
 
 async function populateListDetailSequences(container, view) {
   if (!container) return;
-  
+
   try {
     let sequences = [];
-    
+
     // Cache-first loading using BackgroundSequencesLoader
     if (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function') {
       sequences = window.BackgroundSequencesLoader.getSequencesData() || [];
       console.log('[ListDetail] Loaded', sequences.length, 'sequences from BackgroundSequencesLoader');
     }
-    
+
     // Fallback to CacheManager
     if (sequences.length === 0 && window.CacheManager && typeof window.CacheManager.get === 'function') {
       try {
@@ -3579,19 +3678,19 @@ async function populateListDetailSequences(container, view) {
         console.warn('[ListDetail] CacheManager get failed:', e);
       }
     }
-    
+
     // Fallback to Firestore
     if (sequences.length === 0 && window.firebaseDB) {
       try {
         const isAdmin = window.currentUserRole === 'admin';
         const email = getUserEmail();
         let q = window.firebaseDB.collection('sequences');
-        
+
         if (!isAdmin && email) {
           // Non-admin: filter by ownerId, assignedTo, or createdBy
           q = q.where('ownerId', '==', email);
         }
-        
+
         const snap = await q.get();
         sequences = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         console.log('[ListDetail] Loaded', sequences.length, 'sequences from Firestore');
@@ -3599,7 +3698,7 @@ async function populateListDetailSequences(container, view) {
         console.warn('[ListDetail] Firestore query failed:', e);
       }
     }
-    
+
     // Filter sequences for non-admin users (in case cache had all sequences)
     const isAdmin = window.currentUserRole === 'admin';
     if (!isAdmin && sequences.length > 0) {
@@ -3612,23 +3711,23 @@ async function populateListDetailSequences(container, view) {
         return owner === email || assigned === email || created === email;
       });
     }
-    
+
     // Remove loading row
     const loadingRow = container.querySelector('.list-item[aria-disabled="true"]');
     if (loadingRow) loadingRow.remove();
-    
+
     if (sequences.length === 0) {
       container.innerHTML = '<div class="list-item" aria-disabled="true"><div><div class="list-name">No sequences</div><div class="list-meta">Create a sequence first</div></div></div>';
       return;
     }
-    
+
     // Sort by name
     sequences.sort((a, b) => {
       const nameA = (a.name || '').toLowerCase();
       const nameB = (b.name || '').toLowerCase();
       return nameA.localeCompare(nameB);
     });
-    
+
     // Render sequences
     const frag = document.createDocumentFragment();
     sequences.forEach(seq => {
@@ -3637,7 +3736,7 @@ async function populateListDetailSequences(container, view) {
       item.tabIndex = 0;
       item.setAttribute('data-id', String(seq.id));
       item.setAttribute('data-name', String(seq.name || 'Sequence'));
-      
+
       const memberCount = seq.stats?.active || 0;
       const stepCount = Array.isArray(seq.steps) ? seq.steps.length : 0;
       const metaBits = [];
@@ -3645,18 +3744,18 @@ async function populateListDetailSequences(container, view) {
       metaBits.push(`${memberCount} member${memberCount === 1 ? '' : 's'}`);
       if (stepCount > 0) metaBits.push(`${stepCount} step${stepCount === 1 ? '' : 's'}`);
       const meta = metaBits.join(' • ');
-      
+
       item.innerHTML = `
         <div>
           <div class="list-name">${escapeHtmlForSequence(seq.name || 'Sequence')}</div>
           <div class="list-meta">${escapeHtmlForSequence(meta || '')}</div>
         </div>
       `;
-      
+
       item.addEventListener('click', () => handleListDetailSequenceChoose(item, view));
       frag.appendChild(item);
     });
-    
+
     container.appendChild(frag);
   } catch (err) {
     console.warn('[ListDetail] Failed to load sequences:', err);
@@ -3670,45 +3769,45 @@ async function populateListDetailSequences(container, view) {
 async function handleListDetailSequenceChoose(el, view) {
   const sequenceId = el.getAttribute('data-id');
   const sequenceName = el.getAttribute('data-name') || 'Sequence';
-  
+
   if (!sequenceId) return;
-  
+
   let progressToast = null;
-  
+
   try {
     // Get selected IDs
     const selectedIds = Array.from(document.querySelectorAll('#list-detail-table .row-select:checked'))
       .map(cb => cb.getAttribute('data-id'))
       .filter(Boolean);
-    
+
     if (selectedIds.length === 0) {
       closeListDetailSequencePanel();
       return;
     }
-    
+
     const db = window.firebaseDB;
     if (!db) {
       if (window.crm?.showToast) window.crm.showToast('Database not available');
       closeListDetailSequencePanel();
       return;
     }
-    
+
     // Close panel early to show progress toast
     closeListDetailSequencePanel();
-    
+
     const email = getUserEmail();
     const targetType = view === 'people' ? 'people' : 'accounts';
     const itemLabel = view === 'people' ? 'contact' : 'account';
     const itemLabelPlural = view === 'people' ? 'contacts' : 'accounts';
-    
+
     // Show initial progress toast - Step 1: Loading data
-    progressToast = window.crm?.showProgressToast ? 
+    progressToast = window.crm?.showProgressToast ?
       window.crm.showProgressToast(`Adding ${selectedIds.length} ${selectedIds.length === 1 ? itemLabel : itemLabelPlural} to "${sequenceName}"...`, 3, 0) : null;
-    
+
     // ✅ NEW: Load full contact data and validate emails
     const contactsData = [];
     const collectionName = targetType === 'people' ? 'people' : 'accounts';
-    
+
     for (const id of selectedIds) {
       try {
         const docRef = await db.collection(collectionName).doc(id).get();
@@ -3719,16 +3818,16 @@ async function handleListDetailSequenceChoose(el, view) {
         console.warn(`Failed to load ${targetType} ${id}:`, err);
       }
     }
-    
+
     // Update progress - Step 1 complete
     if (progressToast && typeof progressToast.update === 'function') {
       progressToast.update(1, 3);
     }
-    
+
     // Validate emails
     const contactsWithoutEmail = contactsData.filter(c => !c.email || c.email.trim() === '');
     let idsToAdd = selectedIds;
-    
+
     if (contactsWithoutEmail.length > 0) {
       const result = await showListDetailEmailValidationModal(contactsWithoutEmail, contactsData.length);
       if (!result.proceed) {
@@ -3751,34 +3850,34 @@ async function handleListDetailSequenceChoose(el, view) {
         }
       }
     }
-    
+
     // Check for existing memberships to avoid duplicates
     const existingQuery = await db.collection('sequenceMembers')
       .where('sequenceId', '==', sequenceId)
       .where('targetType', '==', targetType)
       .get();
-    
+
     const existingIds = new Set();
     existingQuery.forEach(doc => {
       const data = doc.data();
       if (data.targetId) existingIds.add(String(data.targetId));
     });
-    
+
     // Update progress - Step 2 complete
     if (progressToast && typeof progressToast.update === 'function') {
       progressToast.update(2, 3);
     }
-    
+
     // Add new members
     const batch = db.batch();
     const newIds = idsToAdd.filter(id => !existingIds.has(id));
     let addedCount = 0;
-    
+
     for (const targetId of newIds) {
       const contact = contactsData.find(c => c.id === targetId);
       // CRITICAL FIX: Ensure hasEmail is always boolean, never undefined
       const hasEmail = !!(contact && contact.email && contact.email.trim() !== '');
-      
+
       const memberRef = db.collection('sequenceMembers').doc();
       const memberData = {
         sequenceId,
@@ -3794,10 +3893,10 @@ async function handleListDetailSequenceChoose(el, view) {
       batch.set(memberRef, memberData);
       addedCount++;
     }
-    
+
     if (addedCount > 0) {
       await batch.commit();
-      
+
       // Update sequence stats - increment stats.active and recalculate recordCount
       if (window.firebase?.firestore?.FieldValue) {
         // First, get current count to calculate new recordCount
@@ -3805,21 +3904,21 @@ async function handleListDetailSequenceChoose(el, view) {
           .where('sequenceId', '==', sequenceId)
           .where('targetType', '==', targetType)
           .get();
-        
+
         const actualCount = membersQuery.size;
-        
+
         await db.collection('sequences').doc(sequenceId).update({
           'stats.active': window.firebase.firestore.FieldValue.increment(addedCount),
           'recordCount': actualCount  // CRITICAL: Set recordCount to actual count from sequenceMembers
         });
       }
-      
+
       // ✅ AUTO-START: If sequence is active, automatically create sequenceActivations for new contacts
       try {
         const sequenceDoc = await db.collection('sequences').doc(sequenceId).get();
         const sequenceData = sequenceDoc.data();
         const hasActiveMembers = (sequenceData?.stats?.active || 0) > 0;
-        
+
         // Also check if there are any existing sequenceActivations for this sequence
         let hasExistingActivations = false;
         try {
@@ -3832,25 +3931,25 @@ async function handleListDetailSequenceChoose(el, view) {
         } catch (_) {
           // Query might fail if index missing, but that's okay
         }
-        
+
         // If sequence is active, automatically create sequenceActivations for new contacts with emails
         if (hasActiveMembers || hasExistingActivations) {
           const contactsWithEmail = newIds.filter(id => {
             const contact = contactsData.find(c => c.id === id);
             return contact && contact.email && contact.email.trim() !== '';
           });
-          
+
           if (contactsWithEmail.length > 0) {
             console.log('[ListDetail] Sequence is active, auto-starting for ' + contactsWithEmail.length + ' new contacts');
-            
+
             // Create sequenceActivations in batches (process-sequence-activations handles up to 25 contacts per activation)
             const BATCH_SIZE = 25;
             for (let i = 0; i < contactsWithEmail.length; i += BATCH_SIZE) {
               const batchContacts = contactsWithEmail.slice(i, i + BATCH_SIZE);
-              
+
               const activationRef = db.collection('sequenceActivations').doc();
               const activationId = activationRef.id;
-              
+
               const sequenceActivationData = {
                 sequenceId: sequenceId,
                 contactIds: batchContacts,
@@ -3862,22 +3961,22 @@ async function handleListDetailSequenceChoose(el, view) {
                 createdBy: email,
                 createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || Date.now()
               };
-              
+
               await activationRef.set(sequenceActivationData);
               console.log('[ListDetail] Created auto-sequenceActivation:', activationId, 'for', batchContacts.length, 'contacts');
-              
+
               // Trigger immediate processing
               try {
                 const baseUrl = window.API_BASE_URL || window.location.origin || '';
                 const response = await fetch(`${baseUrl}/api/process-sequence-activations`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ 
+                  body: JSON.stringify({
                     immediate: true,
                     activationId: activationId
                   })
                 });
-                
+
                 if (response.ok) {
                   const result = await response.json();
                   console.log('[ListDetail] Auto-started sequence for batch:', result);
@@ -3896,15 +3995,15 @@ async function handleListDetailSequenceChoose(el, view) {
         // Non-fatal - contacts are still added
       }
     }
-    
+
     // Update progress - Step 3 complete
     if (progressToast && typeof progressToast.update === 'function') {
       progressToast.update(3, 3);
     }
-    
+
     const skippedCount = selectedIds.length - addedCount;
     const withoutEmailCount = contactsWithoutEmail.length;
-    
+
     // Show completion message
     let message = `Added ${addedCount} ${addedCount === 1 ? itemLabel : itemLabelPlural} to "${sequenceName}"`;
     if (withoutEmailCount > 0) {
@@ -3913,13 +4012,13 @@ async function handleListDetailSequenceChoose(el, view) {
     if (skippedCount > withoutEmailCount) {
       message += ` (${skippedCount - withoutEmailCount} already in sequence)`;
     }
-    
+
     if (progressToast && typeof progressToast.complete === 'function') {
       progressToast.complete(message);
     } else {
       if (window.crm?.showToast) window.crm.showToast(message, 'success');
     }
-    
+
     // Refresh sequence panel to show updated member count
     const sequencePanel = document.getElementById('list-detail-sequence-panel');
     if (sequencePanel && sequencePanel.classList.contains('--show')) {
@@ -3929,7 +4028,7 @@ async function handleListDetailSequenceChoose(el, view) {
         await populateListDetailSequences(sequenceBody, view);
       }
     }
-    
+
     // Clear selection
     document.querySelectorAll('#list-detail-table .row-select:checked').forEach(cb => cb.checked = false);
     const selectAll = document.getElementById('select-all-list-detail');
@@ -3937,7 +4036,7 @@ async function handleListDetailSequenceChoose(el, view) {
       selectAll.checked = false;
       selectAll.indeterminate = false;
     }
-    
+
     // Update state
     if (window.ListDetail && window.ListDetail._getState) {
       const state = window.ListDetail._getState();
@@ -3947,9 +4046,9 @@ async function handleListDetailSequenceChoose(el, view) {
         state.selectedAccounts.clear();
       }
     }
-    
+
     showBulkActionsBar();
-    
+
   } catch (err) {
     console.error('[ListDetail] Failed to add to sequence:', err);
     if (progressToast && typeof progressToast.error === 'function') {
@@ -4072,8 +4171,8 @@ function exportSelectedToCsv() {
     const data = window.ListDetail && ListDetail._getFiltered ? ListDetail._getFiltered(view) : [];
     const map = new Map(data.map(d => [d.id, d]));
     const chosen = rows.map(id => map.get(id)).filter(Boolean);
-    const headers = view === 'people' ? ['id','firstName','lastName','title','companyName','email','phone'] : ['id','accountName','industry','domain','phone'];
-    const csv = [headers.join(',')].concat(chosen.map(r => headers.map(h => JSON.stringify((r[h] ?? '')).replace(/^"|"$/g,'')).join(','))).join('\n');
+    const headers = view === 'people' ? ['id', 'firstName', 'lastName', 'title', 'companyName', 'email', 'phone'] : ['id', 'accountName', 'industry', 'domain', 'phone'];
+    const csv = [headers.join(',')].concat(chosen.map(r => headers.map(h => JSON.stringify((r[h] ?? '')).replace(/^"|"$/g, '')).join(','))).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `list-${view}-export.csv`; a.click(); URL.revokeObjectURL(url);
@@ -4130,7 +4229,7 @@ function showDeleteConfirmation() {
   const state = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
   const view = (state && state.view) || 'people';
   const ids = Array.from(document.querySelectorAll('#list-detail-table .row-select:checked')).map(cb => cb.getAttribute('data-id'));
-  
+
   if (!ids.length) {
     window.crm?.showToast && window.crm.showToast('No items selected');
     return;
@@ -4139,7 +4238,7 @@ function showDeleteConfirmation() {
   // Find the delete button to anchor the popover
   const bar = page.querySelector('#list-detail-bulk-actions');
   const delBtn = bar?.querySelector('#ld-bulk-delete');
-  
+
   // Backdrop for click-away
   const backdrop = document.createElement('div');
   backdrop.id = 'list-detail-delete-backdrop';
@@ -4195,7 +4294,7 @@ function showDeleteConfirmation() {
     if (!pop.contains(t)) closeBulkDeleteConfirm();
   };
   document.addEventListener('mousedown', onOutside, true);
-  
+
   function closeBulkDeleteConfirm() {
     const pop = document.getElementById('list-detail-delete-popover');
     const backdrop = document.getElementById('list-detail-delete-backdrop');
@@ -4216,7 +4315,7 @@ async function handleDeleteConfirm(ids, view) {
   // Show progress toast before setTimeout so it's accessible in catch
   let progressToast = null;
   try {
-    progressToast = window.crm?.showProgressToast ? 
+    progressToast = window.crm?.showProgressToast ?
       window.crm.showProgressToast(`Deleting ${ids.length} ${view === 'people' ? 'contact' : 'account'}${ids.length === 1 ? '' : 's'}...`, ids.length, 0) : null;
   } catch (e) {
     console.error('Error creating progress toast:', e);
@@ -4230,9 +4329,9 @@ async function handleDeleteConfirm(ids, view) {
 
       // Use Firebase directly like people.js and accounts.js do
       const collectionName = view === 'people' ? 'contacts' : 'accounts';
-      
+
       console.log(`[Bulk Delete] Deleting ${ids.length} ${view} items from list-detail page`);
-      
+
       if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
         // Process deletions sequentially to show progress
         for (const id of ids) {
@@ -4253,7 +4352,7 @@ async function handleDeleteConfirm(ids, view) {
               progressToast.update(completed, ids.length);
             }
           }
-          
+
           // Small delay to prevent UI blocking
           await new Promise(resolve => setTimeout(resolve, 10));
         }
@@ -4264,7 +4363,7 @@ async function handleDeleteConfirm(ids, view) {
           progressToast.update(completed, ids.length);
         }
       }
-      
+
       // CRITICAL FIX: Calculate ACTUAL count from listMembers collection after deletion
       // This ensures accuracy instead of relying on decrement
       const listId = window.listDetailContext?.listId || (window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState().listId : null);
@@ -4276,29 +4375,29 @@ async function handleDeleteConfirm(ids, view) {
             const listData = listDoc.data();
             const listKind = listData.kind || listData.targetType || view || 'people';
             const targetType = listKind === 'accounts' ? 'accounts' : 'people';
-            
+
             // Calculate ACTUAL count from listMembers collection
             const actualCountQuery = await window.firebaseDB.collection('listMembers')
               .where('listId', '==', listId)
               .where('targetType', '==', targetType)
               .get();
-            
+
             const actualCount = actualCountQuery.size;
-            
+
             // Update Firestore with actual count
             await window.firebaseDB.collection('lists').doc(listId).update({
               recordCount: actualCount,
               count: actualCount,
               updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
             });
-            
+
             console.log(`[Bulk Delete] Updated list ${listId} with actual count: ${actualCount} ${targetType}`);
-            
+
             // Update BackgroundListsLoader cache (cost-effective: no Firestore read)
             if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
               window.BackgroundListsLoader.updateListCountLocally(listId, actualCount);
             }
-            
+
             // Update CacheManager cache (cost-effective: IndexedDB write only)
             if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
               window.CacheManager.updateRecord('lists', listId, {
@@ -4307,7 +4406,7 @@ async function handleDeleteConfirm(ids, view) {
                 updatedAt: new Date()
               }).catch(err => console.warn('[Bulk Delete] CacheManager update failed:', err));
             }
-            
+
             // Dispatch event with actual count for lists-overview
             try {
               const listState = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
@@ -4326,7 +4425,7 @@ async function handleDeleteConfirm(ids, view) {
               console.warn('[Bulk Delete] Failed to dispatch count update event:', e);
             }
           }
-          
+
           // Update listMembersCache to reflect deleted items
           if (window.listMembersCache && window.listMembersCache[listId]) {
             const cache = window.listMembersCache[listId];
@@ -4343,12 +4442,12 @@ async function handleDeleteConfirm(ids, view) {
               cache.count = cache.accounts?.size || 0;
             }
           }
-          
+
           // Update BackgroundListsLoader cache locally (cost-effective: avoids Firestore read)
           if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
             window.BackgroundListsLoader.updateListCountLocally(listId, newRecordCount);
           }
-          
+
           // Dispatch event to notify lists-overview of count change
           try {
             const listState = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
@@ -4369,7 +4468,7 @@ async function handleDeleteConfirm(ids, view) {
           console.warn('[Bulk Delete] Failed to update list recordCount:', countError);
         }
       }
-      
+
       // Clear selection state
       const state = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
       if (state) {
@@ -4395,7 +4494,7 @@ async function handleDeleteConfirm(ids, view) {
           }
         }
       }
-      
+
       // Clear DOM checkboxes
       document.querySelectorAll('#list-detail-table .row-select:checked').forEach(cb => cb.checked = false);
       const selectAll = document.getElementById('select-all-list-detail');
@@ -4403,9 +4502,9 @@ async function handleDeleteConfirm(ids, view) {
         selectAll.checked = false;
         selectAll.indeterminate = false;
       }
-      
+
       hideBulkActionsBar();
-      
+
       // Refresh the list data
       if (window.ListDetail && typeof window.ListDetail._render === 'function') {
         window.ListDetail._render();
@@ -4413,7 +4512,7 @@ async function handleDeleteConfirm(ids, view) {
         const ctx = window.listDetailContext || {};
         window.ListDetail.init(ctx);
       }
-      
+
       // Trigger lists-overview refresh via event (more reliable than direct call)
       try {
         document.dispatchEvent(new CustomEvent('pc:lists-count-updated', {
@@ -4422,14 +4521,14 @@ async function handleDeleteConfirm(ids, view) {
       } catch (e) {
         console.warn('[Bulk Delete] Failed to dispatch lists update event:', e);
       }
-      
+
       // Also try direct call if available (fallback)
       if (window.ListsOverview && typeof window.ListsOverview.refreshCounts === 'function') {
         setTimeout(() => {
           window.ListsOverview.refreshCounts();
         }, 500);
       }
-      
+
       // Show completion toast with proper handling
       const successCount = completed;
       if (progressToast && typeof progressToast.complete === 'function') {
@@ -4443,7 +4542,7 @@ async function handleDeleteConfirm(ids, view) {
       } else {
         // Fallback if progress toast not available
         if (failed > 0) {
-          window.crm?.showToast ? window.crm.showToast(`Deleted ${completed} ${view === 'people' ? 'contact' : 'account'}${completed === 1 ? '' : 's'}, ${failed} failed`, 'warning') : 
+          window.crm?.showToast ? window.crm.showToast(`Deleted ${completed} ${view === 'people' ? 'contact' : 'account'}${completed === 1 ? '' : 's'}, ${failed} failed`, 'warning') :
             console.warn(`Deleted ${completed} ${view}, ${failed} failed`);
         } else {
           window.crm?.showToast ? window.crm.showToast(`Successfully deleted ${completed} ${view === 'people' ? 'contact' : 'account'}${completed === 1 ? '' : 's'}`, 'success') :
@@ -4469,15 +4568,15 @@ async function showListDetailEmailValidationModal(contactsWithoutEmail, totalCon
     overlay.className = 'pc-modal__backdrop';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
-    
+
     const validCount = totalContacts - contactsWithoutEmail.length;
     const invalidCount = contactsWithoutEmail.length;
-    
-    const contactsList = contactsWithoutEmail.slice(0, 5).map(c => 
+
+    const contactsList = contactsWithoutEmail.slice(0, 5).map(c =>
       `<li style="margin-bottom: 8px;">• ${escapeHtmlForSequence(c.name || (c.firstName + ' ' + (c.lastName || '')).trim() || 'Unknown')} ${c.company || c.companyName ? `(${escapeHtmlForSequence(c.company || c.companyName)})` : ''}</li>`
     ).join('');
     const moreCount = invalidCount > 5 ? ` + ${invalidCount - 5} more` : '';
-    
+
     overlay.innerHTML = `
       <div class="pc-modal__dialog" style="max-width: 500px;">
         <div class="pc-modal__header">
@@ -4517,15 +4616,15 @@ async function showListDetailEmailValidationModal(contactsWithoutEmail, totalCon
         </div>
       </div>
     `;
-    
+
     document.body.appendChild(overlay);
-    
+
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         overlay.classList.add('show');
       });
     });
-    
+
     const close = (result) => {
       overlay.classList.remove('show');
       setTimeout(() => {
@@ -4535,18 +4634,18 @@ async function showListDetailEmailValidationModal(contactsWithoutEmail, totalCon
       }, 200);
       resolve(result);
     };
-    
+
     overlay.querySelector('#email-validation-close')?.addEventListener('click', () => close({ proceed: false }));
     overlay.querySelector('#email-validation-cancel')?.addEventListener('click', () => close({ proceed: false }));
     overlay.querySelector('#email-validation-proceed')?.addEventListener('click', () => close({ proceed: true, validOnly: false }));
     overlay.querySelector('#email-validation-valid-only')?.addEventListener('click', () => close({ proceed: true, validOnly: true }));
-    
+
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) {
         close({ proceed: false });
       }
     });
-    
+
     const onEscape = (e) => {
       if (e.key === 'Escape') {
         document.removeEventListener('keydown', onEscape);
