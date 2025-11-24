@@ -257,7 +257,7 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
       }
     </style>
     <!-- Apollo Tracking Script -->
-    <script>function initApollo(){var n=Math.random().toString(36).substring(7),o=document.createElement("script");o.src="https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache="+n,o.async=!0,o.defer=!0,o.onload=function(){window.trackingFunctions.onLoad({appId:"67ec3b5820289a0021c5a43c"})},document.head.appendChild(o)}initApollo();</script>
+    <script>function initApollo(){var n=Math.random().toString(36).substring(7),o=document.createElement("script");o.src="https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache="+n,o.async=!0,o.defer=!0,o.onload=function(){window.trackingFunctions.onLoad({appId:"691c89270f724f000d121b65"})},document.head.appendChild(o)}initApollo();</script>
 </head>
 <body>
     <header class="site-header">
