@@ -13,6 +13,7 @@ const SYSTEM_PROMPT = `You are Lewis Patterson, Lead Energy Strategist at Power 
 CRITICAL TERMINOLOGY & GEOGRAPHIC FOCUS:
 - For TEXAS-focused content (60% of posts): Use "demand charges" NOT "capacity charges". Texas businesses pay demand charges based on peak usage in 15-minute intervals. Include Texas context, ERCOT references, TDU charges, and Texas business energy concerns.
 - For NATIONAL content (40% of posts): Use "capacity charges" for markets like PJM, ISO-NE, MISO where capacity is procured separately. Focus on federal policies, general energy efficiency, renewable trends applicable nationwide.
+- PRODUCT NEUTRALITY: We offer BOTH Fixed and Index plans. Do NOT advise users to universally switch away from Index plans. Instead, explain that Index plans can be beneficial for certain load profiles (e.g., high load factor, ability to curtail) while Fixed plans offer budget certainty. Frame the choice as "Strategic Fit" rather than "Good vs. Bad".
 
 CRITICAL INSTRUCTION: Every post MUST start with a "Hook" that follows one of these proven formulas:
 
@@ -92,17 +93,17 @@ Return your response as a JSON object with these exact fields:
 function inferContentType(category, title) {
   const cat = (category || '').toLowerCase();
   const tit = (title || '').toLowerCase();
-  
+
   // Hard-sell indicators
   if (cat.includes('offer') || cat.includes('sale') || tit.includes('lock in') || tit.includes('limited time') || tit.includes('now')) {
     return 'hard-sell';
   }
-  
+
   // Soft-sell indicators
   if (cat.includes('case study') || cat.includes('guide') || tit.includes('how to') || tit.includes('guide')) {
     return 'soft-sell';
   }
-  
+
   // Default to educational (market updates, news, analysis)
   return 'educational';
 }
@@ -119,19 +120,19 @@ function selectHookFormula(contentType, existingPosts) {
     if (preview.includes('everyone says') || preview.includes('here\'s why they\'re wrong')) return 'contrarian';
     return 'unknown';
   });
-  
+
   // Hook types by content type
   const hookTypes = {
     'educational': ['insider-alert', 'shocking-stat', 'before-after'],
     'soft-sell': ['case-study', 'contrarian', 'shocking-stat'],
     'hard-sell': ['time-bomb', 'fear-of-loss', 'insider-alert']
   };
-  
+
   const availableHooks = hookTypes[contentType] || hookTypes['educational'];
   const unusedHooks = availableHooks.filter(h => !recentHooks.includes(h));
-  
-  return unusedHooks.length > 0 
-    ? unusedHooks[0] 
+
+  return unusedHooks.length > 0
+    ? unusedHooks[0]
     : availableHooks[Math.floor(Math.random() * availableHooks.length)];
 }
 
@@ -144,7 +145,7 @@ function determineContentType(existingPosts) {
     'soft-sell': 0,
     'hard-sell': 0
   };
-  
+
   recentPosts.forEach(post => {
     // Infer content type from category if contentType not available
     const contentType = post.contentType || inferContentType(post.category, post.title);
@@ -152,20 +153,20 @@ function determineContentType(existingPosts) {
       contentTypeCounts[contentType]++;
     }
   });
-  
+
   // 4-1-1 ratio: prioritize educational (4), then soft-sell (1), then hard-sell (1)
   const total = contentTypeCounts.educational + contentTypeCounts['soft-sell'] + contentTypeCounts['hard-sell'];
-  
+
   if (total === 0) {
     // First post - start with educational
     return 'educational';
   }
-  
+
   // Calculate ratios
   const educationalRatio = contentTypeCounts.educational / total;
   const softSellRatio = contentTypeCounts['soft-sell'] / total;
   const hardSellRatio = contentTypeCounts['hard-sell'] / total;
-  
+
   // Target: 66.7% educational, 16.7% soft-sell, 16.7% hard-sell (4-1-1 ratio)
   if (educationalRatio < 0.6) {
     return 'educational';
@@ -191,7 +192,7 @@ function buildUserPrompt(existingPosts) {
     .map(k => k.trim())
     .filter(Boolean)
     .slice(0, 50);
-  
+
   // Extract topic keywords from content previews for better duplicate detection
   const topicKeywords = new Set();
   existingPosts.forEach(p => {
@@ -208,10 +209,10 @@ function buildUserPrompt(existingPosts) {
 
   // Determine content type based on 4-1-1 strategy
   const contentType = determineContentType(existingPosts);
-  
+
   // Select hook formula to vary openings
   const selectedHook = selectHookFormula(contentType, existingPosts);
-  
+
   let context = '';
   if (existingTitles.length > 0) {
     context += `\n\nEXISTING POSTS TO AVOID DUPLICATING (includes both published and draft posts):\n`;
@@ -230,7 +231,7 @@ function buildUserPrompt(existingPosts) {
 
   // Determine geographic focus: 60% Texas, 40% National
   const recentPostsCount = existingPosts.length;
-  const texasPostCount = existingPosts.filter(p => 
+  const texasPostCount = existingPosts.filter(p =>
     (p.title && (p.title.toLowerCase().includes('texas') || p.title.toLowerCase().includes('ercot'))) ||
     (p.keywords && (p.keywords.toLowerCase().includes('texas') || p.keywords.toLowerCase().includes('electricity rates in texas') || p.keywords.toLowerCase().includes('texas electricity plans'))) ||
     (p.contentPreview && (p.contentPreview.includes('texas') || p.contentPreview.includes('ercot') || p.contentPreview.includes('demand charge')))
@@ -251,7 +252,7 @@ function buildUserPrompt(existingPosts) {
     'Explain TDU (Transmission and Distribution Utility) charges in Texas and how they impact commercial electricity bills and electricity plans',
     'Cover Texas-specific energy legislation updates and how they affect commercial energy contracts, procurement, and electricity rates in Texas',
     'Analyze data center and cryptocurrency mining energy demand growth in Texas and its impact on commercial electricity rates and electricity plans',
-    
+
     // NATIONAL (40% - 6 topics)
     'Summarize the latest EIA Weekly Natural Gas Storage Report and explain its impact on commercial electricity futures for Q1 2025',
     'Analyze the most recent EIA Short-Term Energy Outlook and what it means for business energy procurement nationwide',
@@ -263,81 +264,81 @@ function buildUserPrompt(existingPosts) {
 
   const softSellTopics = [
     // TEXAS-FOCUSED (60% - 4 topics)
-    'Write a case study showing how a Texas manufacturing facility saved money by optimizing demand charges and switching from Index to Fixed-All-Inclusive electricity plans, reducing electricity rates in Texas',
+    'Write a case study showing how a Texas manufacturing facility saved money by optimizing demand charges while on a strategic Index electricity plan, leveraging load curtailment during price spikes',
     'Create an educational guide: "How to Read Your Texas Commercial Energy Bill" with explanations of demand charges, TDU fees, and transmission costs specific to ERCOT market and electricity rates in Texas',
     'Write a guide on "How to Calculate Your Load Factor in Texas" and why it matters for reducing demand charges in ERCOT and optimizing electricity rates in Texas',
     'Create a case study: "How a Dallas Multi-Location Business Consolidated Texas Electricity Plans and Reduced Costs by 15%"',
-    
+
     // NATIONAL (40% - 3 topics)
-    'Write a case study showing how a manufacturing facility saved money by switching from Index to Fixed-All-Inclusive energy contracts',
+    'Write a case study comparing Fixed vs. Index energy contracts for a manufacturing facility, highlighting how the right choice depends on risk tolerance and operational flexibility',
     'Create an educational guide: "How to Read Your Commercial Energy Bill" with explanations of demand charges, capacity fees, and transmission costs',
-    'Explain the difference between Fixed-All-Inclusive and Index products for a manufacturing facility manager, with real-world examples applicable nationwide'
+    'Explain the pros and cons of Fixed-All-Inclusive vs. Index products for a manufacturing facility manager, emphasizing that we offer both solutions to match their risk profile'
   ];
 
   const hardSellTopics = [
     // TEXAS-FOCUSED (60% - 2 topics)
-    'Write a post: "Texas Electricity Rates at 12-Month Low: Lock In Your Fixed Texas Electricity Plan Now Before ERCOT Demand Charges Rise"',
+    'Write a post: "Texas Electricity Rates at 12-Month Low: Secure Your Ideal Texas Electricity Plan (Fixed or Index) Now Before Summer Volatility"',
     'Create urgency: "Limited Time: Free Commercial Energy Audit for Texas Businesses - Compare Electricity Rates in Texas and Schedule Before March 31"',
-    
+
     // NATIONAL (40% - 2 topics)
-    'Write a post: "Commercial Electricity Rates at 12-Month Low: Lock In Your Fixed Contract Now Before Prices Rise"',
-    'Direct offer: "2025 Energy Rates Are Favorable: Secure Your Fixed Contract This Quarter to Lock In Savings"'
+    'Write a post: "Commercial Electricity Rates at 12-Month Low: Review Your Contract Options (Fixed vs. Index) Now Before Prices Rise"',
+    'Direct offer: "2025 Energy Rates Are Favorable: Secure Your Strategic Energy Contract This Quarter to Lock In Savings"'
   ];
 
   // Select topic based on content type AND geographic focus (60% Texas, 40% National)
   let topicPool;
   let contentTypeInstruction = '';
   let geographicInstruction = '';
-  
+
   // Filter topics based on geographic focus
   if (shouldFocusTexas) {
     geographicInstruction = 'This post MUST focus on TEXAS-specific topics. Use "demand charges" NOT "capacity charges". Include Texas context, ERCOT references, TDU charges, and Texas business energy concerns. Keywords MUST include "electricity rates in texas" or "texas electricity plans".';
-    
+
     if (contentType === 'educational') {
-      topicPool = educationalTopics.filter(t => 
-        t.toLowerCase().includes('texas') || 
-        t.toLowerCase().includes('ercot') || 
+      topicPool = educationalTopics.filter(t =>
+        t.toLowerCase().includes('texas') ||
+        t.toLowerCase().includes('ercot') ||
         t.toLowerCase().includes('demand charge') ||
         t.toLowerCase().includes('tdu')
       );
       contentTypeInstruction = 'This should be EDUCATIONAL/CURATED content (market reports, news, analysis) - part of the "4" in the 4-1-1 strategy. Focus on providing value and establishing expertise.';
     } else if (contentType === 'soft-sell') {
-      topicPool = softSellTopics.filter(t => 
-        t.toLowerCase().includes('texas') || 
-        t.toLowerCase().includes('ercot') || 
+      topicPool = softSellTopics.filter(t =>
+        t.toLowerCase().includes('texas') ||
+        t.toLowerCase().includes('ercot') ||
         t.toLowerCase().includes('demand charge') ||
         t.toLowerCase().includes('dallas')
       );
       contentTypeInstruction = 'This should be SOFT-SELL content (case studies, educational guides) - the first "1" in 4-1-1. Demonstrate expertise by showing how problems are solved.';
     } else {
-      topicPool = hardSellTopics.filter(t => 
-        t.toLowerCase().includes('texas') || 
+      topicPool = hardSellTopics.filter(t =>
+        t.toLowerCase().includes('texas') ||
         t.toLowerCase().includes('ercot')
       );
       contentTypeInstruction = 'This should be HARD-SELL content (direct conversion) - the second "1" in 4-1-1. Create urgency and ask for the sale directly.';
     }
   } else {
     geographicInstruction = 'This post should focus on NATIONAL topics applicable across multiple states. Use "capacity charges" for markets like PJM, ISO-NE, MISO. Avoid Texas-specific terminology.';
-    
+
     if (contentType === 'educational') {
-      topicPool = educationalTopics.filter(t => 
-        !t.toLowerCase().includes('texas') && 
-        !t.toLowerCase().includes('ercot') && 
+      topicPool = educationalTopics.filter(t =>
+        !t.toLowerCase().includes('texas') &&
+        !t.toLowerCase().includes('ercot') &&
         !t.toLowerCase().includes('demand charge') &&
         !t.toLowerCase().includes('tdu')
       );
       contentTypeInstruction = 'This should be EDUCATIONAL/CURATED content (market reports, news, analysis) - part of the "4" in the 4-1-1 strategy. Focus on providing value and establishing expertise.';
     } else if (contentType === 'soft-sell') {
-      topicPool = softSellTopics.filter(t => 
-        !t.toLowerCase().includes('texas') && 
-        !t.toLowerCase().includes('ercot') && 
+      topicPool = softSellTopics.filter(t =>
+        !t.toLowerCase().includes('texas') &&
+        !t.toLowerCase().includes('ercot') &&
         !t.toLowerCase().includes('demand charge') &&
         !t.toLowerCase().includes('dallas')
       );
       contentTypeInstruction = 'This should be SOFT-SELL content (case studies, educational guides) - the first "1" in 4-1-1. Demonstrate expertise by showing how problems are solved.';
     } else {
-      topicPool = hardSellTopics.filter(t => 
-        !t.toLowerCase().includes('texas') && 
+      topicPool = hardSellTopics.filter(t =>
+        !t.toLowerCase().includes('texas') &&
         !t.toLowerCase().includes('ercot')
       );
       contentTypeInstruction = 'This should be HARD-SELL content (direct conversion) - the second "1" in 4-1-1. Create urgency and ask for the sale directly.';
@@ -367,9 +368,9 @@ function buildUserPrompt(existingPosts) {
     'case-study': 'Use a case study opening hook: "A [Location] [Business Type] was [Specific Problem with Dollar Amount]. We [Specific Solution]. Here\'s the exact playbook."',
     'fear-of-loss': 'Use a fear of loss hook: "Your current energy contract expires in [Specific Days]. [Specific Urgency]. Here\'s your last chance to [Specific Action]."'
   };
-  
+
   const hookInstruction = hookInstructions[selectedHook] || hookInstructions['insider-alert'];
-  
+
   return `${randomTopic}\n\n${hookInstruction}\n\n${geographicInstruction}\n\n${contentTypeInstruction}\n\n${context}\n\nGenerate a complete blog post following the structure and format specified in the system prompt. Remember: EVERY post must start with the specified HOOK formula, include an "Analyst Take" section with specific recommendations, and include a resource funnel link to /resources near the end.`;
 }
 
@@ -378,19 +379,19 @@ function parseAIResponse(responseText) {
   try {
     // Try to extract JSON from response (may be wrapped in markdown code blocks)
     let jsonText = responseText.trim();
-    
+
     // Remove markdown code fences if present
     jsonText = jsonText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '');
     jsonText = jsonText.replace(/\s*```\s*$/i, '');
-    
+
     // Extract JSON object
     const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       jsonText = jsonMatch[0];
     }
-    
+
     const parsed = JSON.parse(jsonText);
-    
+
     // Validate and clean fields
     const title = String(parsed.title || '').trim();
     const category = String(parsed.category || 'Market Update').trim();
@@ -398,7 +399,7 @@ function parseAIResponse(responseText) {
     const metaDescription = String(parsed.metaDescription || '').trim();
     const keywords = String(parsed.keywords || '').trim();
     let content = String(parsed.content || '').trim();
-    
+
     // Ensure content includes resource funnel link
     if (!content.includes('/resources') && !content.includes('Resources Page')) {
       // Add resource funnel section if missing
@@ -407,7 +408,7 @@ function parseAIResponse(responseText) {
 <p>To see exactly how these trends affect your specific situation, visit our <a href="/resources">Resources Page</a> for tools, calculators, and market reports.</p>`;
       content += resourceSection;
     }
-    
+
     // Ensure content has proper HTML structure
     if (!content.includes('<h2>') && !content.includes('<H2>')) {
       // If no H2, wrap in paragraphs
@@ -418,7 +419,7 @@ function parseAIResponse(responseText) {
         return `<p>${p}</p>`;
       }).filter(Boolean).join('\n\n');
     }
-    
+
     // Generate slug from title
     const slug = title
       .toLowerCase()
@@ -426,7 +427,7 @@ function parseAIResponse(responseText) {
       .replace(/[^\w\s-]/g, '')
       .replace(/[\s_-]+/g, '-')
       .replace(/^-+|-+$/g, '');
-    
+
     return {
       title,
       slug,
@@ -446,16 +447,16 @@ function parseAIResponse(responseText) {
 // Fallback parser if JSON parsing fails
 function parseFallback(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  
+
   let title = '';
   let category = 'News';
   let metaDescription = '';
   let keywords = '';
   let content = '';
-  
+
   let inContent = false;
   const contentLines = [];
-  
+
   for (const line of lines) {
     if (line.toLowerCase().startsWith('title:')) {
       title = line.replace(/^title:\s*/i, '').trim();
@@ -472,9 +473,9 @@ function parseFallback(text) {
       }
     }
   }
-  
+
   content = contentLines.join('\n\n');
-  
+
   // Generate slug
   const slug = title
     .toLowerCase()
@@ -482,7 +483,7 @@ function parseFallback(text) {
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  
+
   return {
     title: title || 'Commercial Energy Market Update 2025',
     slug: slug || 'commercial-energy-market-update-2025',
@@ -496,13 +497,13 @@ function parseFallback(text) {
 export default async function handler(req, res) {
   // Handle CORS
   if (cors(req, res)) return;
-  
+
   if (req.method !== 'POST') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
-  
+
   try {
     // Fetch existing posts from Firestore (both published AND drafts to avoid duplicates)
     let existingPosts = [];
@@ -512,13 +513,13 @@ export default async function handler(req, res) {
         const snapshot = await db.collection('posts')
           .limit(100) // Increased to catch more duplicates
           .get();
-        
+
         existingPosts = snapshot.docs.map(doc => {
           const data = doc.data();
           // Extract content preview for better duplicate detection
           const content = data.content || '';
           const contentPreview = content.substring(0, 200).toLowerCase();
-          
+
           return {
             title: data.title || '',
             category: data.category || '',
@@ -529,25 +530,25 @@ export default async function handler(req, res) {
             status: data.status || 'draft' // Track status for logging
           };
         });
-        
+
         console.log(`[AI Post Generation] Loaded ${existingPosts.length} existing posts (published + drafts) for context`);
       } catch (firestoreError) {
         console.warn('[AI Post Generation] Failed to load existing posts:', firestoreError);
         // Continue without context if Firestore fails
       }
     }
-    
+
     // Build prompts
     const userPrompt = buildUserPrompt(existingPosts);
-    
+
     // Call Perplexity API
     const perplexityApiKey = process.env.PERPLEXITY_API_KEY;
     if (!perplexityApiKey) {
       throw new Error('PERPLEXITY_API_KEY not configured');
     }
-    
+
     console.log('[AI Post Generation] Calling Perplexity Sonar API...');
-    
+
     const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
@@ -564,36 +565,36 @@ export default async function handler(req, res) {
         temperature: 0.7
       })
     });
-    
+
     if (!perplexityResponse.ok) {
       const errorText = await perplexityResponse.text();
       console.error('[AI Post Generation] Perplexity API error:', perplexityResponse.status, errorText);
       throw new Error(`Perplexity API error: ${perplexityResponse.status}`);
     }
-    
+
     const perplexityData = await perplexityResponse.json();
     const responseText = perplexityData.choices?.[0]?.message?.content || '';
-    
+
     if (!responseText) {
       throw new Error('Empty response from Perplexity API');
     }
-    
+
     // Parse response
     const generatedPost = parseAIResponse(responseText);
-    
+
     console.log('[AI Post Generation] Successfully generated post:', {
       title: generatedPost.title,
       category: generatedPost.category,
       contentLength: generatedPost.content.length
     });
-    
+
     // Return generated post
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: true,
       post: generatedPost
     }));
-    
+
   } catch (error) {
     console.error('[AI Post Generation] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });

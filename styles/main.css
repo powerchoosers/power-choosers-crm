@@ -837,32 +837,33 @@ button:hover:not(:disabled),
 
 /* Orange glow on modal during AI generation */
 .pc-modal.ai-generating {
-    position: relative;
+    /* position: relative; - REMOVED: This causes the modal to lose its fixed positioning and disappear */
 }
 
 .pc-modal.ai-generating .pc-modal__dialog {
     box-shadow:
-        0 0 20px rgba(245, 158, 11, 0.5),
-        0 0 40px rgba(245, 158, 11, 0.3),
-        0 0 60px rgba(245, 158, 11, 0.1),
+        0 0 20px rgba(255, 107, 53, 0.5),
+        0 0 40px rgba(255, 107, 53, 0.3),
+        0 0 60px rgba(255, 107, 53, 0.1),
         0 4px 24px rgba(0, 0, 0, 0.15);
-    border: 2px solid rgba(245, 158, 11, 0.3);
+    border: 2px solid rgba(255, 107, 53, 0.3);
     animation: post-ai-glow 2s ease-in-out infinite alternate;
 }
 
 @keyframes post-ai-glow {
     0% {
         box-shadow:
-            0 0 20px rgba(245, 158, 11, 0.5),
-            0 0 40px rgba(245, 158, 11, 0.3),
-            0 0 60px rgba(245, 158, 11, 0.1),
+            0 0 20px rgba(255, 107, 53, 0.5),
+            0 0 40px rgba(255, 107, 53, 0.3),
+            0 0 60px rgba(255, 107, 53, 0.1),
             0 4px 24px rgba(0, 0, 0, 0.15);
     }
+
     100% {
         box-shadow:
-            0 0 30px rgba(245, 158, 11, 0.7),
-            0 0 50px rgba(245, 158, 11, 0.5),
-            0 0 70px rgba(245, 158, 11, 0.2),
+            0 0 30px rgba(255, 107, 53, 0.7),
+            0 0 50px rgba(255, 107, 53, 0.5),
+            0 0 70px rgba(255, 107, 53, 0.2),
             0 4px 24px rgba(0, 0, 0, 0.15);
     }
 }
@@ -876,7 +877,8 @@ button:hover:not(:disabled),
     position: absolute;
     z-index: 1;
     pointer-events: none;
-    background: transparent !important; /* Ensure no background covers input */
+    background: transparent !important;
+    /* Ensure no background covers input */
     /* Make sure skeleton bars don't have solid backgrounds that cover text */
 }
 
@@ -899,17 +901,23 @@ textarea[data-skeleton-id] {
 .post-skeleton-bar {
     height: 16px;
     background: linear-gradient(90deg,
-            rgba(245, 158, 11, 0.3) 25%,
-            rgba(245, 158, 11, 0.6) 50%,
-            rgba(245, 158, 11, 0.3) 75%);
+            rgba(255, 107, 53, 0.3) 25%,
+            rgba(255, 107, 53, 0.6) 50%,
+            rgba(255, 107, 53, 0.3) 75%);
     background-size: 200% 100%;
     border-radius: 4px;
     opacity: 0;
     transform: translateX(-10px);
     transition: all 0.3s ease;
     backdrop-filter: blur(2px);
-    /* Ensure bars don't cover input text - use multiply blend mode to blend with background */
-    mix-blend-mode: multiply;
+    /* Ensure bars don't cover input text - use screen blend mode for dark backgrounds */
+    mix-blend-mode: screen;
+}
+
+/* Hide placeholder text during generation */
+.ai-generating-placeholder::placeholder {
+    color: transparent !important;
+    opacity: 0 !important;
 }
 
 .post-skeleton-bar.skeleton-animate {
@@ -10329,8 +10337,8 @@ body {
     overflow: hidden;
     padding: 0 var(--spacing-base);
     transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-                padding 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.3s ease;
+        padding 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.3s ease;
     opacity: 0;
 }
 
@@ -22787,4 +22795,12 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     background: var(--orange-primary);
     color: #fff;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* Ensure editor paragraphs are visible */
+.compose-editor .editor-content p,
+.compose-editor .editor-content div,
+.compose-editor .editor-content span {
+    color: var(--text-primary);
+    opacity: 1;
 }
