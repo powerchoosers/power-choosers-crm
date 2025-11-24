@@ -265,9 +265,10 @@ export default async function handler(req, res) {
           // Add custom args for tracking
           customArgs: {
             emailId: emailDoc.id,
+            trackingId: emailDoc.id, // CRITICAL: Required for webhook to match event to email doc
             sequenceId: emailData.sequenceId || '',
             contactId: emailData.contactId || '',
-            stepIndex: emailData.stepIndex || 0
+            stepIndex: String(emailData.stepIndex || 0) // Ensure string for SendGrid
           }
         };
 
@@ -303,7 +304,8 @@ export default async function handler(req, res) {
           status: 'sent',
           sentAt: Date.now(),
           sendgridMessageId: sendResult[0].headers['x-message-id'],
-          sentBy: 'scheduled_job'
+          sentBy: 'scheduled_job',
+          provider: 'sendgrid' // Ensure consistent provider marking
           // Note: subject, html, text are preserved automatically by Firestore update()
         });
 
@@ -368,13 +370,13 @@ export default async function handler(req, res) {
                   if (!isProduction) {
                     console.log(`[SendScheduledEmails] Created next step email (step ${nextStepIndex}) for contact ${emailData.contactId}`);
                   }
-                } 
+                }
                 // If next step is a task, create task document
                 else if (['phone-call', 'li-connect', 'li-message', 'li-view-profile', 'li-interact-post', 'task'].includes(nextStep.type)) {
                   // Load contact data to get name and company
                   let contactName = emailData.contactName || '';
                   let contactCompany = emailData.contactCompany || '';
-                  
+
                   try {
                     const contactDoc = await db.collection('people').doc(emailData.contactId).get();
                     if (contactDoc.exists) {
