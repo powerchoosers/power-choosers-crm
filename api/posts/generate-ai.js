@@ -70,8 +70,21 @@ This section MUST include:
 - A reason tied to current market conditions (e.g., "Because natural gas futures are trending upward through Q2 2025...")
 
 RESOURCE BRIDGE FORMULA:
-"To [Specific Action related to the post topic], download our [Specific Tool Name] on our <a href="/resources">Resources Page</a>. It will [Specific Benefit in 10 words or less]."
-Example: "To calculate your exact exposure to demand charges, download our **2025 Demand Charge Calculator** on our <a href="/resources">Resources Page</a>. It estimates your annual risk in under 60 seconds."
+Only link to tools that actually exist. Currently, we have ONE tool available:
+- TDU Delivery Charges Calculator: https://powerchoosers.com/tdu-delivery-charges
+
+ONLY use this tool when the post topic is directly related to:
+- TDU charges, delivery charges, transmission and distribution utility fees
+- Texas electricity bills and bill breakdowns
+- Understanding commercial electricity bill components
+- ERCOT delivery charges and TDU rates
+
+When the topic is relevant, use this format:
+"To [Specific Action related to TDU/delivery charges], use our <a href="https://powerchoosers.com/tdu-delivery-charges">TDU Delivery Charges Calculator</a>. It will [Specific Benefit in 10 words or less]."
+Example: "To calculate your exact TDU delivery charges, use our <a href="https://powerchoosers.com/tdu-delivery-charges">TDU Delivery Charges Calculator</a>. It estimates your monthly and annual delivery costs based on your utility and usage."
+
+For posts NOT about TDU/delivery charges, use a generic resource link:
+"To explore more energy resources and tools, visit our <a href="/resources">Resources Page</a>."
 
 KEYWORD STRATEGY:
 - Target high-intent commercial energy keywords including: "electricity rates in texas", "texas electricity plans", "commercial electricity rates", "business energy broker", "demand charges texas", "ercot electricity rates", "texas commercial power rates"
@@ -371,7 +384,17 @@ function buildUserPrompt(existingPosts) {
 
   const hookInstruction = hookInstructions[selectedHook] || hookInstructions['insider-alert'];
 
-  return `${randomTopic}\n\n${hookInstruction}\n\n${geographicInstruction}\n\n${contentTypeInstruction}\n\n${context}\n\nGenerate a complete blog post following the structure and format specified in the system prompt. Remember: EVERY post must start with the specified HOOK formula, include an "Analyst Take" section with specific recommendations, and include a resource funnel link to /resources near the end.`;
+  // Determine if TDU tool is relevant based on topic
+  const tduRelevant = randomTopic.toLowerCase().includes('tdu') || 
+                      randomTopic.toLowerCase().includes('delivery charge') ||
+                      randomTopic.toLowerCase().includes('bill') ||
+                      randomTopic.toLowerCase().includes('transmission and distribution');
+  
+  const resourceInstruction = tduRelevant 
+    ? 'IMPORTANT: Since this post is about TDU charges or delivery charges, include a link to our TDU Delivery Charges Calculator: <a href="https://powerchoosers.com/tdu-delivery-charges">TDU Delivery Charges Calculator</a>. Only use this specific tool link when the topic is directly related to TDU/delivery charges.'
+    : 'IMPORTANT: This post is NOT about TDU/delivery charges. Use a generic link to /resources instead. Do NOT reference the TDU calculator or any other tools that don\'t exist yet.';
+
+  return `${randomTopic}\n\n${hookInstruction}\n\n${geographicInstruction}\n\n${contentTypeInstruction}\n\n${resourceInstruction}\n\n${context}\n\nGenerate a complete blog post following the structure and format specified in the system prompt. Remember: EVERY post must start with the specified HOOK formula, include an "Analyst Take" section with specific recommendations, and include an appropriate resource link (TDU calculator ONLY if topic is relevant, otherwise generic /resources link).`;
 }
 
 // Parse Perplexity response and extract structured data
@@ -400,12 +423,12 @@ function parseAIResponse(responseText) {
     const keywords = String(parsed.keywords || '').trim();
     let content = String(parsed.content || '').trim();
 
-    // Ensure content includes resource funnel link
-    if (!content.includes('/resources') && !content.includes('Resources Page')) {
-      // Add resource funnel section if missing
+    // Ensure content includes resource funnel link (but don't force TDU tool if not relevant)
+    if (!content.includes('/resources') && !content.includes('Resources Page') && !content.includes('tdu-delivery-charges')) {
+      // Add generic resource funnel section if missing
       const resourceSection = `
 <h3>Take Action: Access Our Resources</h3>
-<p>To see exactly how these trends affect your specific situation, visit our <a href="/resources">Resources Page</a> for tools, calculators, and market reports.</p>`;
+<p>To explore more energy resources and tools, visit our <a href="/resources">Resources Page</a>.</p>`;
       content += resourceSection;
     }
 

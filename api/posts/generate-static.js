@@ -20,31 +20,31 @@ function getStorageBucket() {
   if (!admin.apps || admin.apps.length === 0) {
     throw new Error('Firebase Admin not initialized');
   }
-  
+
   const projectId = process.env.FIREBASE_PROJECT_ID || 'power-choosers-crm';
-  
+
   // Check for _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET first (Cloud Run env var)
   // Then FIREBASE_STORAGE_BUCKET, then default
-  let storageBucket = process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 
+  let storageBucket = process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
     process.env.FIREBASE_STORAGE_BUCKET;
-  
+
   // Remove gs:// prefix if present (Admin SDK doesn't need it)
   if (storageBucket && storageBucket.startsWith('gs://')) {
     storageBucket = storageBucket.replace('gs://', '');
   }
-  
+
   // If no bucket specified, use the project's default bucket name
   // Try .firebasestorage.app first (newer format), then .appspot.com (legacy)
   if (!storageBucket || (!storageBucket.includes('.') && !storageBucket.includes('gs://'))) {
     // Try newer format first
     storageBucket = `${projectId}.firebasestorage.app`;
   }
-  
+
   console.log('[GenerateStatic] Attempting to use storage bucket:', storageBucket);
   console.log('[GenerateStatic] Project ID:', projectId);
   console.log('[GenerateStatic] Env vars - _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:', process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
   console.log('[GenerateStatic] Env vars - FIREBASE_STORAGE_BUCKET:', process.env.FIREBASE_STORAGE_BUCKET);
-  
+
   // Firebase Admin SDK: Use default bucket (no name) - this automatically uses the project's default bucket
   // The default bucket is created automatically when Firebase Storage is enabled
   // This avoids bucket name format issues between Firebase Storage URLs and GCS bucket names
@@ -55,7 +55,7 @@ function getStorageBucket() {
     return bucket;
   } catch (error) {
     console.error('[GenerateStatic] Failed to get default bucket:', error);
-    
+
     // Fallback: Try with explicit bucket name if env var is set
     if (storageBucket) {
       console.log('[GenerateStatic] Trying explicit bucket name as fallback:', storageBucket);
@@ -65,7 +65,7 @@ function getStorageBucket() {
         console.error('[GenerateStatic] Fallback bucket also failed:', fallbackError);
       }
     }
-    
+
     throw new Error(`Failed to access storage bucket. Error: ${error.message}`);
   }
 }
@@ -77,32 +77,32 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
   const keywords = post.keywords || '';
   const content = post.content || '';
   const featuredImage = post.featuredImage || '';
-  const publishDate = post.publishDate ? 
-    (post.publishDate.toDate ? post.publishDate.toDate() : new Date(post.publishDate)) : 
+  const publishDate = post.publishDate ?
+    (post.publishDate.toDate ? post.publishDate.toDate() : new Date(post.publishDate)) :
     new Date();
-  
+
   // Get storage bucket for public URLs (use .firebasestorage.app format for public URLs)
   // This is different from Admin SDK bucket name which uses .appspot.com
-  let publicStorageBucket = process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 
-    process.env.FIREBASE_STORAGE_BUCKET || 
+  let publicStorageBucket = process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+    process.env.FIREBASE_STORAGE_BUCKET ||
     `${process.env.FIREBASE_PROJECT_ID || 'power-choosers-crm'}.firebasestorage.app`;
-  
+
   // Convert .appspot.com to .firebasestorage.app for public URLs
   if (publicStorageBucket.includes('.appspot.com')) {
     publicStorageBucket = publicStorageBucket.replace('.appspot.com', '.firebasestorage.app');
   }
-  
+
   // Ensure we use .firebasestorage.app format for public URLs
   if (!publicStorageBucket.includes('.firebasestorage.app') && !publicStorageBucket.includes('.appspot.com')) {
     publicStorageBucket = `${process.env.FIREBASE_PROJECT_ID || 'power-choosers-crm'}.firebasestorage.app`;
   }
-  
-  const formattedDate = publishDate.toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+
+  const formattedDate = publishDate.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
   });
-  
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -144,6 +144,14 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
       a{color:var(--brand-orange);text-decoration:none}
       a:hover{text-decoration:underline}
       img{max-width:100%;display:block;height:auto}
+      
+      /* Animations */
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-on-scroll { opacity: 0; transform: translateY(30px); transition: opacity 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); will-change: opacity, transform; }
+      .animate-on-scroll.visible { opacity: 1; transform: translateY(0); }
       
       /* Header */
       .site-header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.95);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.05)}
@@ -324,18 +332,18 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
         <h2>Recent Posts</h2>
         <div class="recent-posts-grid">
             ${recentPosts.map(recentPost => {
-                const recentTitle = recentPost.title || 'Untitled';
-                const recentDesc = recentPost.metaDescription || '';
-                const recentImage = recentPost.featuredImage || '';
-                const recentCategory = recentPost.category || '';
-                // Use clean URL (powerchoosers.com/posts/slug)
-                const slug = recentPost.slug || recentPost.id;
-                const recentUrl = `https://powerchoosers.com/posts/${slug}`;
-                
-                // Truncate description to ~150 characters
-                const preview = recentDesc.length > 150 ? recentDesc.substring(0, 150).trim() + '...' : recentDesc;
-                
-                return `
+    const recentTitle = recentPost.title || 'Untitled';
+    const recentDesc = recentPost.metaDescription || '';
+    const recentImage = recentPost.featuredImage || '';
+    const recentCategory = recentPost.category || '';
+    // Use clean URL (powerchoosers.com/posts/slug)
+    const slug = recentPost.slug || recentPost.id;
+    const recentUrl = `https://powerchoosers.com/posts/${slug}`;
+
+    // Truncate description to ~150 characters
+    const preview = recentDesc.length > 150 ? recentDesc.substring(0, 150).trim() + '...' : recentDesc;
+
+    return `
                     <a href="${escapeHtml(recentUrl)}" class="recent-post-card">
                         ${recentImage ? `<img src="${escapeHtml(recentImage)}" alt="${escapeHtml(recentTitle)}" class="recent-post-image">` : ''}
                         <div class="recent-post-content">
@@ -346,7 +354,7 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
                         </div>
                     </a>
                 `;
-            }).join('')}
+  }).join('')}
         </div>
     </section>
     ` : ''}
@@ -406,6 +414,28 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
                 }
             });
         }
+
+        // Scroll Animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+        
+        // Elements to animate
+        const animatedElements = document.querySelectorAll('.article-header > *, .article-featured-image, .article-content > *, .author-bio-container, .recent-post-card');
+        animatedElements.forEach(el => {
+            el.classList.add('animate-on-scroll');
+            observer.observe(el);
+        });
     </script>
 </body>
 </html>`;
@@ -427,7 +457,7 @@ async function uploadHTMLToStorage(bucket, filename, htmlContent) {
     console.log('[GenerateStatic] Uploading to bucket:', bucket.name);
     const file = bucket.file(`posts/${filename}`);
     console.log('[GenerateStatic] File path: posts/' + filename);
-    
+
     // With uniform bucket-level access and domain-restricted sharing, we can't use public IAM
     // Use signed URLs with long expiration instead (10 years = effectively permanent)
     await file.save(htmlContent, {
@@ -436,9 +466,9 @@ async function uploadHTMLToStorage(bucket, filename, htmlContent) {
         cacheControl: 'public, max-age=3600',
       },
     });
-    
+
     console.log('[GenerateStatic] File saved successfully');
-    
+
     // Generate signed URL with 10-year expiration (effectively permanent for blog posts)
     // This works even with domain-restricted sharing policies
     const expiresIn = 10 * 365 * 24 * 60 * 60 * 1000; // 10 years in milliseconds
@@ -446,21 +476,21 @@ async function uploadHTMLToStorage(bucket, filename, htmlContent) {
       action: 'read',
       expires: Date.now() + expiresIn,
     });
-    
+
     console.log('[GenerateStatic] Signed URL generated (expires in 10 years)');
-    
+
     return signedUrl;
   } catch (error) {
     console.error('[GenerateStatic] Error uploading HTML file:', error);
     console.error('[GenerateStatic] Bucket name:', bucket.name);
     console.error('[GenerateStatic] Error code:', error.code);
     console.error('[GenerateStatic] Error message:', error.message);
-    
+
     // If bucket doesn't exist, provide helpful error
     if (error.code === 404 || error.message.includes('does not exist')) {
       throw new Error(`Storage bucket "${bucket.name}" does not exist. Please check your Firebase Storage bucket name in the Firebase Console.`);
     }
-    
+
     throw error;
   }
 }
@@ -472,7 +502,7 @@ async function updatePostsList(bucket, posts) {
   const postsWithUrls = posts.map((post) => {
     const slug = post.slug || post.id;
     const cleanUrl = `https://powerchoosers.com/posts/${slug}`;
-    
+
     return {
       id: post.id,
       title: post.title,
@@ -480,25 +510,25 @@ async function updatePostsList(bucket, posts) {
       category: post.category || '',
       metaDescription: post.metaDescription || '',
       featuredImage: post.featuredImage || '',
-      publishDate: post.publishDate ? 
-        (post.publishDate.toDate ? post.publishDate.toDate().toISOString() : new Date(post.publishDate).toISOString()) : 
+      publishDate: post.publishDate ?
+        (post.publishDate.toDate ? post.publishDate.toDate().toISOString() : new Date(post.publishDate).toISOString()) :
         null,
-      createdAt: post.createdAt ? 
-        (post.createdAt.toDate ? post.createdAt.toDate().toISOString() : new Date(post.createdAt).toISOString()) : 
+      createdAt: post.createdAt ?
+        (post.createdAt.toDate ? post.createdAt.toDate().toISOString() : new Date(post.createdAt).toISOString()) :
         null,
       url: cleanUrl // Use clean URL instead of signed URL
     };
   });
-  
+
   const listData = {
     posts: postsWithUrls,
     lastUpdated: new Date().toISOString()
   };
-  
+
   try {
     console.log('[GenerateStatic] Updating posts-list.json in bucket:', bucket.name);
     const file = bucket.file('posts-list.json');
-    
+
     // With uniform bucket-level access and domain-restricted sharing, we can't use public IAM
     // Use signed URLs with long expiration instead (10 years = effectively permanent)
     await file.save(JSON.stringify(listData, null, 2), {
@@ -507,9 +537,9 @@ async function updatePostsList(bucket, posts) {
         cacheControl: 'public, max-age=300',
       },
     });
-    
+
     console.log('[GenerateStatic] posts-list.json saved successfully');
-    
+
     // Generate signed URL with 10-year expiration (effectively permanent)
     // This works even with domain-restricted sharing policies
     const expiresIn = 10 * 365 * 24 * 60 * 60 * 1000; // 10 years in milliseconds
@@ -517,44 +547,44 @@ async function updatePostsList(bucket, posts) {
       action: 'read',
       expires: Date.now() + expiresIn,
     });
-    
+
     console.log('[GenerateStatic] posts-list.json created/updated with', posts.length, 'posts');
     console.log('[GenerateStatic] posts-list.json signed URL generated (expires in 10 years)');
-    
+
     return signedUrl;
   } catch (error) {
     console.error('[GenerateStatic] Error updating posts-list.json:', error);
     console.error('[GenerateStatic] Bucket name:', bucket.name);
     console.error('[GenerateStatic] Error code:', error.code);
     console.error('[GenerateStatic] Error message:', error.message);
-    
+
     // If bucket doesn't exist, provide helpful error
     if (error.code === 404 || error.message.includes('does not exist')) {
       throw new Error(`Storage bucket "${bucket.name}" does not exist. Please verify the bucket exists in Firebase Console → Storage.`);
     }
-    
+
     throw error;
   }
 }
 
 export default async function handler(req, res) {
   console.log('[GenerateStatic] Request received:', req.method);
-  
+
   if (cors(req, res)) {
     console.log('[GenerateStatic] CORS preflight handled');
     return;
   }
-  
+
   if (req.method !== 'POST') {
     console.log('[GenerateStatic] Invalid method:', req.method);
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
-  
+
   try {
     const { postId, regenerateList } = req.body || {};
-    
+
     // If regenerateList is true, just update posts-list.json without generating HTML
     if (regenerateList) {
       let bucket;
@@ -564,13 +594,13 @@ export default async function handler(req, res) {
       } catch (bucketError) {
         console.error('[GenerateStatic] Failed to get storage bucket:', bucketError);
         res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
+        res.end(JSON.stringify({
           error: 'Failed to access Firebase Storage',
           details: bucketError.message
         }));
         return;
       }
-      
+
       // Get all published posts
       let publishedPosts = [];
       try {
@@ -578,7 +608,7 @@ export default async function handler(req, res) {
           .where('status', '==', 'published')
           .orderBy('publishDate', 'desc')
           .get();
-        
+
         publishedPostsSnapshot.forEach(doc => {
           publishedPosts.push({ id: doc.id, ...doc.data() });
         });
@@ -588,11 +618,11 @@ export default async function handler(req, res) {
           const publishedPostsSnapshot = await db.collection('posts')
             .where('status', '==', 'published')
             .get();
-          
+
           publishedPostsSnapshot.forEach(doc => {
             publishedPosts.push({ id: doc.id, ...doc.data() });
           });
-          
+
           // Sort in memory by publishDate
           publishedPosts.sort((a, b) => {
             const dateA = a.publishDate ? (a.publishDate.toDate ? a.publishDate.toDate() : new Date(a.publishDate)) : new Date(0);
@@ -604,10 +634,10 @@ export default async function handler(req, res) {
           publishedPosts = [];
         }
       }
-      
+
       // Update posts-list.json
       const listUrl = await updatePostsList(bucket, publishedPosts);
-      
+
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         success: true,
@@ -616,45 +646,45 @@ export default async function handler(req, res) {
       }));
       return;
     }
-    
+
     if (!postId) {
       console.log('[GenerateStatic] No postId provided');
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'postId is required' }));
       return;
     }
-    
+
     if (!db) {
       console.error('[GenerateStatic] Firestore not initialized');
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Database not available' }));
       return;
     }
-    
+
     // Get post from Firestore
     const postDoc = await db.collection('posts').doc(postId).get();
-    
+
     if (!postDoc.exists) {
       console.log('[GenerateStatic] Post not found:', postId);
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Post not found' }));
       return;
     }
-    
+
     const post = { id: postDoc.id, ...postDoc.data() };
-    
+
     // Only generate static HTML for published posts
     if (post.status !== 'published') {
       console.log('[GenerateStatic] Post is not published, skipping static generation:', postId);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        success: true, 
+      res.end(JSON.stringify({
+        success: true,
         message: 'Post is not published, static generation skipped',
         skipped: true
       }));
       return;
     }
-    
+
     // Get storage bucket
     let bucket;
     try {
@@ -663,37 +693,37 @@ export default async function handler(req, res) {
     } catch (bucketError) {
       console.error('[GenerateStatic] Failed to get storage bucket:', bucketError);
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
+      res.end(JSON.stringify({
         error: 'Failed to access Firebase Storage',
         details: bucketError.message
       }));
       return;
     }
-    
+
     // Get recent posts (excluding current post, limit to 3 most recent)
     let recentPosts = [];
     try {
       const recentPostsSnapshot = await db.collection('posts')
         .where('status', '==', 'published')
         .get();
-      
+
       const allPublished = [];
       recentPostsSnapshot.forEach(doc => {
         if (doc.id !== postId) { // Exclude current post
           allPublished.push({ id: doc.id, ...doc.data() });
         }
       });
-      
+
       // Sort by publishDate descending
       allPublished.sort((a, b) => {
         const dateA = a.publishDate ? (a.publishDate.toDate ? a.publishDate.toDate() : new Date(a.publishDate)) : new Date(0);
         const dateB = b.publishDate ? (b.publishDate.toDate ? b.publishDate.toDate() : new Date(b.publishDate)) : new Date(0);
         return dateB - dateA;
       });
-      
+
       // Get top 3 most recent
       const recentPostsData = allPublished.slice(0, 3);
-      
+
       // Use clean URLs for recent posts (powerchoosers.com/posts/slug)
       recentPosts = recentPostsData.map((rp) => {
         const slug = rp.slug || rp.id;
@@ -708,18 +738,18 @@ export default async function handler(req, res) {
       // Continue without recent posts if there's an error
       recentPosts = [];
     }
-    
+
     // Fetch author info from settings
     let authorInfo = null;
     try {
       // Try to get settings - admin uses 'user-settings', employees use 'user-settings-{email}'
       // For blog posts, we'll use admin settings (user-settings) as default
       const settingsDoc = await db.collection('settings').doc('user-settings').get();
-      
+
       if (settingsDoc.exists) {
         const settings = settingsDoc.data();
         const general = settings.general || {};
-        
+
         // Only include author info if we have at least a first or last name
         if (general.firstName || general.lastName) {
           authorInfo = {
@@ -736,16 +766,16 @@ export default async function handler(req, res) {
       console.warn('[GenerateStatic] Could not fetch author info from settings:', settingsError.message);
       // Continue without author info if settings fetch fails
     }
-    
+
     // Generate HTML
     const htmlContent = generatePostHTML(post, recentPosts, authorInfo);
     const filename = `${post.slug || post.id}.html`;
-    
+
     // Upload HTML file
     console.log('[GenerateStatic] Uploading HTML file:', filename);
     const htmlUrl = await uploadHTMLToStorage(bucket, filename, htmlContent);
     console.log('[GenerateStatic] HTML uploaded:', htmlUrl);
-    
+
     // Get all published posts for index
     // Note: This query requires a Firestore composite index on (status, publishDate)
     // If index doesn't exist, it will fail - we'll catch and use a simpler query
@@ -755,7 +785,7 @@ export default async function handler(req, res) {
         .where('status', '==', 'published')
         .orderBy('publishDate', 'desc')
         .get();
-      
+
       publishedPostsSnapshot.forEach(doc => {
         publishedPosts.push({ id: doc.id, ...doc.data() });
       });
@@ -766,11 +796,11 @@ export default async function handler(req, res) {
         const publishedPostsSnapshot = await db.collection('posts')
           .where('status', '==', 'published')
           .get();
-        
+
         publishedPostsSnapshot.forEach(doc => {
           publishedPosts.push({ id: doc.id, ...doc.data() });
         });
-        
+
         // Sort in memory by publishDate
         publishedPosts.sort((a, b) => {
           const dateA = a.publishDate ? (a.publishDate.toDate ? a.publishDate.toDate() : new Date(a.publishDate)) : new Date(0);
@@ -783,12 +813,12 @@ export default async function handler(req, res) {
         publishedPosts = [{ id: post.id, ...post }];
       }
     }
-    
+
     // Update posts-list.json
     console.log('[GenerateStatic] Updating posts-list.json with', publishedPosts.length, 'posts');
     const listUrl = await updatePostsList(bucket, publishedPosts);
     console.log('[GenerateStatic] posts-list.json updated:', listUrl);
-    
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: true,
@@ -796,13 +826,13 @@ export default async function handler(req, res) {
       listUrl,
       message: 'Static HTML generated and uploaded successfully'
     }));
-    
+
   } catch (error) {
     console.error('[GenerateStatic] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ 
+    res.end(JSON.stringify({
       error: 'Failed to generate static HTML',
-      details: error.message 
+      details: error.message
     }));
   }
 }
