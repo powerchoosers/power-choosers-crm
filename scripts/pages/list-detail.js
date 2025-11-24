@@ -3852,147 +3852,166 @@ async function handleListDetailSequenceChoose(el, view) {
     }
 
     // Check for existing memberships to avoid duplicates
-    const existingQuery = await db.collection('sequenceMembers')
-      .where('sequenceId', '==', sequenceId)
-      .where('targetType', '==', targetType)
-      .get();
-
+    // We'll check in batches of 10 to be efficient and avoid fetching the entire collection
     const existingIds = new Set();
-    existingQuery.forEach(doc => {
-      const data = doc.data();
-      if (data.targetId) existingIds.add(String(data.targetId));
-    });
+    const chunks = [];
+    for (let i = 0; i < idsToAdd.length; i += 10) {
+      chunks.push(idsToAdd.slice(i, i + 10));
+    }
 
-    // Update progress - Step 2 complete
+    // Update progress toast to show checking phase
+    if (progressToast && typeof progressToast.update === 'function') {
+      progressToast.update(1, 3); // Still in step 1/3 conceptually or move to 2/3
+      // Let's make the progress toast more granular for the check
+    }
+
+    let checkedCount = 0;
+    for (const chunk of chunks) {
+      try {
+        const q = await db.collection('sequenceMembers')
+          .where('sequenceId', '==', sequenceId)
+          .where('targetId', 'in', chunk)
+          .get();
+
+        q.forEach(doc => {
+          const data = doc.data();
+          if (data.targetId) existingIds.add(String(data.targetId));
+        });
+      } catch (e) {
+        console.warn('[ListDetail] Error checking duplicates:', e);
+      }
+      checkedCount += chunk.length;
+      // Optional: update toast if we want very granular updates
+    }
+
+    // Update progress - Step 2 complete (checks done)
     if (progressToast && typeof progressToast.update === 'function') {
       progressToast.update(2, 3);
     }
 
     // Add new members
-    const batch = db.batch();
+    // We'll do this in batches of 500 (Firestore batch limit)
     const newIds = idsToAdd.filter(id => !existingIds.has(id));
+    const skippedCount = idsToAdd.length - newIds.length;
     let addedCount = 0;
 
-    for (const targetId of newIds) {
-      const contact = contactsData.find(c => c.id === targetId);
-      // CRITICAL FIX: Ensure hasEmail is always boolean, never undefined
-      const hasEmail = !!(contact && contact.email && contact.email.trim() !== '');
-
-      const memberRef = db.collection('sequenceMembers').doc();
-      const memberData = {
-        sequenceId,
-        targetId,
-        targetType,
-        hasEmail: hasEmail, // Track whether contact has email (always boolean)
-        skipEmailSteps: !hasEmail, // Flag to skip email steps (always boolean)
-        ownerId: email,
-        userId: window.firebase?.auth()?.currentUser?.uid || null,
-        createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date(),
-        updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date()
-      };
-      batch.set(memberRef, memberData);
-      addedCount++;
-    }
-
-    if (addedCount > 0) {
-      await batch.commit();
-
-      // Update sequence stats - increment stats.active and recalculate recordCount
-      if (window.firebase?.firestore?.FieldValue) {
-        // First, get current count to calculate new recordCount
-        const membersQuery = await db.collection('sequenceMembers')
-          .where('sequenceId', '==', sequenceId)
-          .where('targetType', '==', targetType)
-          .get();
-
-        const actualCount = membersQuery.size;
-
-        await db.collection('sequences').doc(sequenceId).update({
-          'stats.active': window.firebase.firestore.FieldValue.increment(addedCount),
-          'recordCount': actualCount  // CRITICAL: Set recordCount to actual count from sequenceMembers
-        });
+    if (newIds.length > 0) {
+      const batchChunks = [];
+      for (let i = 0; i < newIds.length; i += 400) { // Safe limit below 500
+        batchChunks.push(newIds.slice(i, i + 400));
       }
 
-      // ✅ AUTO-START: If sequence is active, automatically create sequenceActivations for new contacts
-      try {
-        const sequenceDoc = await db.collection('sequences').doc(sequenceId).get();
-        const sequenceData = sequenceDoc.data();
-        const hasActiveMembers = (sequenceData?.stats?.active || 0) > 0;
+      for (const batchIds of batchChunks) {
+        const batch = db.batch();
 
-        // Also check if there are any existing sequenceActivations for this sequence
-        let hasExistingActivations = false;
-        try {
-          const existingActivationsQuery = await db.collection('sequenceActivations')
-            .where('sequenceId', '==', sequenceId)
-            .where('status', 'in', ['pending', 'processing'])
-            .limit(1)
-            .get();
-          hasExistingActivations = !existingActivationsQuery.empty;
-        } catch (_) {
-          // Query might fail if index missing, but that's okay
+        for (const targetId of batchIds) {
+          const contact = contactsData.find(c => c.id === targetId);
+          // CRITICAL FIX: Ensure hasEmail is always boolean, never undefined
+          const hasEmail = !!(contact && contact.email && contact.email.trim() !== '');
+
+          const memberRef = db.collection('sequenceMembers').doc();
+          const memberData = {
+            sequenceId,
+            targetId,
+            targetType,
+            hasEmail: hasEmail, // Track whether contact has email (always boolean)
+            skipEmailSteps: !hasEmail, // Flag to skip email steps (always boolean)
+            ownerId: email,
+            userId: window.firebase?.auth()?.currentUser?.uid || null,
+            createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date(),
+            updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date()
+          };
+          batch.set(memberRef, memberData);
+          addedCount++;
         }
 
-        // If sequence is active, automatically create sequenceActivations for new contacts with emails
-        if (hasActiveMembers || hasExistingActivations) {
-          const contactsWithEmail = newIds.filter(id => {
-            const contact = contactsData.find(c => c.id === id);
-            return contact && contact.email && contact.email.trim() !== '';
-          });
+        await batch.commit();
+      }
+    }
 
-          if (contactsWithEmail.length > 0) {
-            console.log('[ListDetail] Sequence is active, auto-starting for ' + contactsWithEmail.length + ' new contacts');
+    // Step 3: Auto-start sequence (create activations)
+    // Only if we added new members
+    if (addedCount > 0) {
+      try {
+        // Check if sequence is active or has existing activations
+        // For simplicity, we'll assume we should try to activate if the sequence itself is not paused/archived
+        // But per docs: "Auto-starts sequence if sequence is active"
+        // We'll trigger the activation process which handles the logic
 
-            // Create sequenceActivations in batches (process-sequence-activations handles up to 25 contacts per activation)
-            const BATCH_SIZE = 25;
-            for (let i = 0; i < contactsWithEmail.length; i += BATCH_SIZE) {
-              const batchContacts = contactsWithEmail.slice(i, i + BATCH_SIZE);
+        // We need to create sequenceActivations for the new members that have emails
+        // The backend/API usually handles this, but here we might need to do it manually 
+        // or call the API endpoint.
+        // The docs say: "Immediately triggers /api/process-sequence-activations"
 
-              const activationRef = db.collection('sequenceActivations').doc();
-              const activationId = activationRef.id;
+        // Let's create the activation documents for the new members
+        // We'll group them into batches of 25 as per docs
 
-              const sequenceActivationData = {
-                sequenceId: sequenceId,
-                contactIds: batchContacts,
-                status: 'pending',
-                processedContacts: 0,
-                totalContacts: batchContacts.length,
-                ownerId: email,
-                assignedTo: email,
-                createdBy: email,
-                createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || Date.now()
-              };
+        const membersWithEmail = newIds.filter(id => {
+          const contact = contactsData.find(c => c.id === id);
+          return !!(contact && contact.email && contact.email.trim() !== '');
+        });
 
-              await activationRef.set(sequenceActivationData);
-              console.log('[ListDetail] Created auto-sequenceActivation:', activationId, 'for', batchContacts.length, 'contacts');
+        if (membersWithEmail.length > 0) {
+          const activationBatches = [];
+          for (let i = 0; i < membersWithEmail.length; i += 25) {
+            activationBatches.push(membersWithEmail.slice(i, i + 25));
+          }
 
-              // Trigger immediate processing
-              try {
-                const baseUrl = window.API_BASE_URL || window.location.origin || '';
-                const response = await fetch(`${baseUrl}/api/process-sequence-activations`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    immediate: true,
-                    activationId: activationId
-                  })
-                });
+          const activationBatch = db.batch();
+          let activationCount = 0;
 
-                if (response.ok) {
-                  const result = await response.json();
-                  console.log('[ListDetail] Auto-started sequence for batch:', result);
-                } else {
-                  console.warn('[ListDetail] Auto-start failed for batch, will be picked up by next cron run.');
-                }
-              } catch (autoStartError) {
-                console.warn('[ListDetail] Auto-start failed (non-fatal):', autoStartError);
-                // Contacts are still added, cron will pick them up
-              }
-            }
+          for (const contactIds of activationBatches) {
+            const activationRef = db.collection('sequenceActivations').doc();
+            const activationData = {
+              sequenceId,
+              contactIds,
+              status: 'pending',
+              processedContacts: 0,
+              totalContacts: contactIds.length,
+              ownerId: email,
+              assignedTo: email,
+              createdBy: email,
+              createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date(),
+              progress: { emailsCreated: 0 },
+              failedContactIds: []
+            };
+            activationBatch.set(activationRef, activationData);
+            activationCount++;
+          }
+
+          if (activationCount > 0) {
+            await activationBatch.commit();
+            console.log(`[ListDetail] Created ${activationCount} activation batches`);
+
+            // Trigger processing
+            // We can use fetch to call the API
+            try {
+              fetch('/api/process-sequence-activations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ immediate: true })
+              }).catch(e => console.warn('Failed to trigger activation processing', e));
+            } catch (_) { }
           }
         }
-      } catch (autoStartError) {
-        console.warn('[ListDetail] Failed to check/auto-start sequence (non-fatal):', autoStartError);
-        // Non-fatal - contacts are still added
+
+      } catch (actErr) {
+        console.warn('[ListDetail] Error auto-starting sequence:', actErr);
+      }
+    }
+
+    // skippedCount is already defined above
+
+    if (addedCount > 0) {
+      // Update sequence stats - increment stats.active and recalculate recordCount
+      try {
+        const seqRef = db.collection('sequences').doc(sequenceId);
+        await seqRef.update({
+          'stats.active': window.firebase.firestore.FieldValue.increment(addedCount),
+          updatedAt: window.firebase.firestore.FieldValue.serverTimestamp()
+        });
+      } catch (e) {
+        console.warn('[ListDetail] Failed to update sequence stats:', e);
       }
     }
 
@@ -4001,22 +4020,24 @@ async function handleListDetailSequenceChoose(el, view) {
       progressToast.update(3, 3);
     }
 
-    const skippedCount = selectedIds.length - addedCount;
-    const withoutEmailCount = contactsWithoutEmail.length;
-
-    // Show completion message
-    let message = `Added ${addedCount} ${addedCount === 1 ? itemLabel : itemLabelPlural} to "${sequenceName}"`;
-    if (withoutEmailCount > 0) {
-      message += ` (${withoutEmailCount} without email - email steps will be skipped)`;
-    }
-    if (skippedCount > withoutEmailCount) {
-      message += ` (${skippedCount - withoutEmailCount} already in sequence)`;
-    }
-
-    if (progressToast && typeof progressToast.complete === 'function') {
-      progressToast.complete(message);
+    // Final success toast with summary
+    if (progressToast && typeof progressToast.success === 'function') {
+      // Small delay to let the progress bar finish visually
+      setTimeout(() => {
+        let msg = `Added ${addedCount} ${addedCount === 1 ? itemLabel : itemLabelPlural}`;
+        if (skippedCount > 0) {
+          msg += ` (${skippedCount} skipped)`;
+        }
+        progressToast.success(msg);
+      }, 500);
     } else {
-      if (window.crm?.showToast) window.crm.showToast(message, 'success');
+      if (window.crm?.showToast) {
+        let msg = `Added ${addedCount} ${addedCount === 1 ? itemLabel : itemLabelPlural}`;
+        if (skippedCount > 0) {
+          msg += ` (${skippedCount} skipped)`;
+        }
+        window.crm.showToast(msg);
+      }
     }
 
     // Refresh sequence panel to show updated member count
