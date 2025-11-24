@@ -4010,6 +4010,39 @@ async function handleListDetailSequenceChoose(el, view) {
           'stats.active': window.firebase.firestore.FieldValue.increment(addedCount),
           updatedAt: window.firebase.firestore.FieldValue.serverTimestamp()
         });
+
+        // Update local cache immediately for live UI updates
+        try {
+          if (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function') {
+            const sequences = window.BackgroundSequencesLoader.getSequencesData();
+            const seq = sequences.find(s => s.id === sequenceId);
+            if (seq) {
+              if (!seq.stats) seq.stats = {};
+              seq.stats.active = (seq.stats.active || 0) + addedCount;
+              // Update recordCount as well since sequences.js prefers it
+              if (typeof seq.recordCount === 'number') {
+                seq.recordCount += addedCount;
+              } else {
+                seq.recordCount = seq.stats.active;
+              }
+
+              // Update CacheManager to persist across page navigations
+              if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+                window.CacheManager.updateRecord('sequences', sequenceId, {
+                  stats: seq.stats,
+                  recordCount: seq.recordCount
+                });
+              }
+
+              // Notify listeners (sequences.js)
+              document.dispatchEvent(new CustomEvent('pc:sequences-loaded', {
+                detail: { count: sequences.length, cached: true }
+              }));
+            }
+          }
+        } catch (e) {
+          console.warn('[ListDetail] Failed to update local sequence count:', e);
+        }
       } catch (e) {
         console.warn('[ListDetail] Failed to update sequence stats:', e);
       }
