@@ -6270,6 +6270,39 @@
           });
         }
 
+        // Update local cache immediately for live UI updates
+        try {
+          if (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function') {
+            const sequences = window.BackgroundSequencesLoader.getSequencesData();
+            const seq = sequences.find(s => s.id === sequenceId);
+            if (seq) {
+              if (!seq.stats) seq.stats = {};
+              seq.stats.active = (seq.stats.active || 0) + 1;
+              // Update recordCount as well since sequences.js prefers it
+              if (typeof seq.recordCount === 'number') {
+                seq.recordCount += 1;
+              } else {
+                seq.recordCount = seq.stats.active;
+              }
+
+              // Update CacheManager to persist across page navigations
+              if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+                window.CacheManager.updateRecord('sequences', sequenceId, {
+                  stats: seq.stats,
+                  recordCount: seq.recordCount
+                });
+              }
+
+              // Notify listeners (sequences.js)
+              document.dispatchEvent(new CustomEvent('pc:sequences-loaded', {
+                detail: { count: sequences.length, cached: true }
+              }));
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to update local sequence count:', e);
+        }
+
         // ✅ AUTO-START: If sequence is active, automatically create sequenceActivation for this new contact
         if (hasEmail) {
           try {
@@ -6366,6 +6399,24 @@
           sequenceItem.setAttribute('data-member-id', 'pending');
           const checkEl = sequenceItem.querySelector('.list-check');
           if (checkEl) checkEl.textContent = '✓';
+
+          // Update count in UI
+          try {
+            if (window.BackgroundSequencesLoader) {
+              const s = window.BackgroundSequencesLoader.getSequencesData().find(x => x.id === sequenceId);
+              if (s) {
+                const metaDiv = sequenceItem.querySelector('.list-meta');
+                if (metaDiv) {
+                  const memberCount = s.stats?.active || 0;
+                  const metaBits = [];
+                  if (s.isActive === false) metaBits.push('Inactive');
+                  metaBits.push(`${memberCount} member${memberCount === 1 ? '' : 's'}`);
+                  if (s.stats && typeof s.stats.delivered === 'number') metaBits.push(`${s.stats.delivered} steps`);
+                  metaDiv.textContent = metaBits.join(' • ');
+                }
+              }
+            }
+          } catch (_) { }
         }
       }
     } catch (err) {
@@ -6391,8 +6442,72 @@
           await db.collection('sequences').doc(sequenceId).update({
             "stats.active": window.firebase.firestore.FieldValue.increment(-1)
           });
+
+          // Update local cache immediately for live UI updates
+          try {
+            if (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function') {
+              const sequences = window.BackgroundSequencesLoader.getSequencesData();
+              const seq = sequences.find(s => s.id === sequenceId);
+              if (seq) {
+                if (!seq.stats) seq.stats = {};
+                seq.stats.active = Math.max(0, (seq.stats.active || 0) - 1);
+                // Update recordCount as well since sequences.js prefers it
+                if (typeof seq.recordCount === 'number') {
+                  seq.recordCount = Math.max(0, seq.recordCount - 1);
+                } else {
+                  seq.recordCount = seq.stats.active;
+                }
+
+                // Update CacheManager to persist across page navigations
+                if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+                  window.CacheManager.updateRecord('sequences', sequenceId, {
+                    stats: seq.stats,
+                    recordCount: seq.recordCount
+                  });
+                }
+
+                // Notify listeners (sequences.js)
+                document.dispatchEvent(new CustomEvent('pc:sequences-loaded', {
+                  detail: { count: sequences.length, cached: true }
+                }));
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to update local sequence count:', e);
+          }
         }
       }
+
+      // Update count in UI if panel is open
+      try {
+        const panel = document.getElementById('contact-sequences-panel');
+        if (panel) {
+          // We need sequenceId. We fetched it above.
+          if (sequenceId && window.BackgroundSequencesLoader) {
+            const sequenceItem = panel.querySelector(`[data-id="${sequenceId}"]`);
+            if (sequenceItem) {
+              // Remove checkmark
+              sequenceItem.removeAttribute('data-member-id');
+              const checkEl = sequenceItem.querySelector('.list-check');
+              if (checkEl) checkEl.textContent = '';
+
+              const s = window.BackgroundSequencesLoader.getSequencesData().find(x => x.id === sequenceId);
+              if (s) {
+                const metaDiv = sequenceItem.querySelector('.list-meta');
+                if (metaDiv) {
+                  const memberCount = s.stats?.active || 0;
+                  const metaBits = [];
+                  if (s.isActive === false) metaBits.push('Inactive');
+                  metaBits.push(`${memberCount} member${memberCount === 1 ? '' : 's'}`);
+                  if (s.stats && typeof s.stats.delivered === 'number') metaBits.push(`${s.stats.delivered} steps`);
+                  metaDiv.textContent = metaBits.join(' • ');
+                }
+              }
+            }
+          }
+        }
+      } catch (_) { }
+
       window.crm?.showToast && window.crm.showToast(`Removed from "${sequenceName}"`);
     } catch (err) {
       console.warn('Remove from sequence failed', err);
