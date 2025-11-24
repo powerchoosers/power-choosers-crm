@@ -250,77 +250,75 @@ async function processSingleActivation(activationId, isProduction) {
     }
 
     if (!firstAutoEmailStep) {
-      logAlways(`[ProcessSequenceActivations] No auto-email steps found in sequence ${data.sequenceId}`);
-      await db.collection('sequenceActivations').doc(activationId).update({
-        status: 'completed',
-        completedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-      return;
+      logAlways(`[ProcessSequenceActivations] No auto-email steps found in sequence ${data.sequenceId} - checking for tasks`);
+      // Do not return early, proceed to task creation
     }
 
-    // Determine default AI mode for this step (Standard vs HTML).
-    // We look at step.data.aiMode first (set by sequence-builder preview),
-    // then fall back to standard so emails default to NEPQ-style plain emails.
-    const defaultAiMode =
-      firstAutoEmailStep.data?.aiMode ||
-      firstAutoEmailStep.emailSettings?.aiMode ||
-      'standard';
+    if (firstAutoEmailStep) {
+      // Determine default AI mode for this step (Standard vs HTML).
+      // We look at step.data.aiMode first (set by sequence-builder preview),
+      // then fall back to standard so emails default to NEPQ-style plain emails.
+      const defaultAiMode =
+        firstAutoEmailStep.data?.aiMode ||
+        firstAutoEmailStep.emailSettings?.aiMode ||
+        'standard';
 
-    for (const contact of validContacts) {
-      if (!contact.email) {
-        failedContactIds.push(contact.id);
-        continue;
-      }
+      for (const contact of validContacts) {
+        if (!contact.email) {
+          failedContactIds.push(contact.id);
+          continue;
+        }
 
-      // Create email ONLY for the first auto-email step
-      const step = firstAutoEmailStep;
-      const stepIndex = firstAutoEmailStepIndex;
+        // Create email ONLY for the first auto-email step
+        const step = firstAutoEmailStep;
+        const stepIndex = firstAutoEmailStepIndex;
 
-      const delayMs = (step.delayMinutes || 0) * 60 * 1000;
-      const scheduledSendTime = Date.now() + delayMs;
+        const delayMs = (step.delayMinutes || 0) * 60 * 1000;
+        const scheduledSendTime = Date.now() + delayMs;
 
-      const emailId = `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const emailId = `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      emailsToCreate.push({
-        id: emailId,
-        type: 'scheduled',
-        status: 'not_generated',
-        scheduledSendTime,
-        contactId: contact.id,
-        contactName: contact.firstName ? `${contact.firstName} ${contact.lastName || ''}`.trim() : contact.name,
-        contactCompany: contact.company || contact.companyName || '',
-        to: contact.email,
-        sequenceId: data.sequenceId,
-        sequenceName: sequence.name,
-        stepIndex,
-        totalSteps: sequence.steps?.length || 1,
-        activationId,
-        aiPrompt: step.emailSettings?.aiPrompt || step.data?.aiPrompt || step.aiPrompt || step.content || 'Write a professional email',
-        aiMode: defaultAiMode,
-        ownerId: data.ownerId || data.userId,
-        assignedTo: data.ownerId || data.userId,
-        createdBy: data.ownerId || data.userId,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-    }
-
-    // Write emails in batches
-    if (emailsToCreate.length > 0) {
-      logAlways(`Creating ${emailsToCreate.length} emails for activation ${activationId}`);
-      for (let i = 0; i < emailsToCreate.length; i += BATCH_SIZE) {
-        const chunk = emailsToCreate.slice(i, i + BATCH_SIZE);
-        const batch = db.batch();
-
-        chunk.forEach(email => {
-          const ref = db.collection('emails').doc(email.id);
-          batch.set(ref, email);
+        emailsToCreate.push({
+          id: emailId,
+          type: 'scheduled',
+          status: 'not_generated',
+          scheduledSendTime,
+          contactId: contact.id,
+          contactName: contact.firstName ? `${contact.firstName} ${contact.lastName || ''}`.trim() : contact.name,
+          contactCompany: contact.company || contact.companyName || '',
+          to: contact.email,
+          sequenceId: data.sequenceId,
+          sequenceName: sequence.name,
+          stepIndex,
+          totalSteps: sequence.steps?.length || 1,
+          activationId,
+          aiPrompt: step.emailSettings?.aiPrompt || step.data?.aiPrompt || step.aiPrompt || step.content || 'Write a professional email',
+          aiMode: defaultAiMode,
+          ownerId: data.ownerId || data.userId,
+          assignedTo: data.ownerId || data.userId,
+          createdBy: data.ownerId || data.userId,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
-
-        await batch.commit();
-        logAlways(`Created ${chunk.length} emails (batch ${Math.floor(i / BATCH_SIZE) + 1})`);
       }
-    } else {
-      logAlways(`No emails to create for activation ${activationId} (all contacts missing email or no email steps)`);
+
+      // Write emails in batches
+      if (emailsToCreate.length > 0) {
+        logAlways(`Creating ${emailsToCreate.length} emails for activation ${activationId}`);
+        for (let i = 0; i < emailsToCreate.length; i += BATCH_SIZE) {
+          const chunk = emailsToCreate.slice(i, i + BATCH_SIZE);
+          const batch = db.batch();
+
+          chunk.forEach(email => {
+            const ref = db.collection('emails').doc(email.id);
+            batch.set(ref, email);
+          });
+
+          await batch.commit();
+          logAlways(`Created ${chunk.length} emails (batch ${Math.floor(i / BATCH_SIZE) + 1})`);
+        }
+      } else {
+        logAlways(`No emails to create for activation ${activationId} (all contacts missing email or no email steps)`);
+      }
     }
 
     // CREATE TASKS for FIRST non-email step only (progressive task creation like emails)
