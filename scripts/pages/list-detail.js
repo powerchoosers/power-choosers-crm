@@ -3946,15 +3946,15 @@ async function handleListDetailSequenceChoose(el, view) {
         // Let's create the activation documents for the new members
         // We'll group them into batches of 25 as per docs
 
-        const membersWithEmail = newIds.filter(id => {
-          const contact = contactsData.find(c => c.id === id);
-          return !!(contact && contact.email && contact.email.trim() !== '');
-        });
+        // We want to activate ALL new members, not just those with emails, 
+        // because the sequence might start with a Task (call, LinkedIn, etc.)
+        // The backend processor handles skipping email generation for contacts without emails.
+        const membersToActivate = newIds;
 
-        if (membersWithEmail.length > 0) {
+        if (membersToActivate.length > 0) {
           const activationBatches = [];
-          for (let i = 0; i < membersWithEmail.length; i += 25) {
-            activationBatches.push(membersWithEmail.slice(i, i + 25));
+          for (let i = 0; i < membersToActivate.length; i += 25) {
+            activationBatches.push(membersToActivate.slice(i, i + 25));
           }
 
           const activationBatch = db.batch();

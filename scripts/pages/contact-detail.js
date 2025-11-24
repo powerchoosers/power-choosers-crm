@@ -6304,7 +6304,8 @@
         }
 
         // ✅ AUTO-START: If sequence is active, automatically create sequenceActivation for this new contact
-        if (hasEmail) {
+        // We do this regardless of email presence, as the sequence might start with a Task.
+        if (true) {
           try {
             const sequenceDoc = await db.collection('sequences').doc(sequenceId).get();
             const sequenceData = sequenceDoc.data();
