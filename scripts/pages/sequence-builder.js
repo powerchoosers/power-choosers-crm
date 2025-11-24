@@ -1398,6 +1398,19 @@ class FreeSequenceAutomation {
       // Continue without emails - will show "Not started" for everyone
     }
 
+    // ✅ NEW: Load tasks for this sequence to get task step progress
+    let tasks = [];
+    try {
+      const tasksSnapshot = await db.collection('tasks')
+        .where('sequenceId', '==', state.currentSequence.id)
+        .get();
+
+      tasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log(`[StepsView] Loaded ${tasks.length} tasks for sequence`);
+    } catch (err) {
+      console.error('Error loading tasks:', err);
+    }
+
     if (members.length === 0) {
       return `
         <div class="empty-state">
@@ -1419,20 +1432,76 @@ class FreeSequenceAutomation {
       }
     }
 
-    // Create a map of contactId -> latest email for that contact
-    const contactEmailMap = new Map();
+    // Create a map of contactId -> latest progress (email or task)
+    const contactProgressMap = new Map();
+
+    // Process emails
     emails.forEach(email => {
       const contactId = email.contactId;
       if (!contactId) return;
 
-      const existing = contactEmailMap.get(contactId);
-      // Keep the email with the highest stepIndex (most recent progress)
-      if (!existing || (email.stepIndex || 0) > (existing.stepIndex || 0)) {
-        contactEmailMap.set(contactId, email);
+      const existing = contactProgressMap.get(contactId);
+      const stepIndex = email.stepIndex || 0;
+
+      // Keep the item with the highest stepIndex
+      if (!existing || stepIndex > existing.stepIndex) {
+        contactProgressMap.set(contactId, {
+          type: 'email',
+          data: email,
+          stepIndex: stepIndex,
+          status: email.status,
+          updatedAt: email.updatedAt || email.createdAt
+        });
+      } else if (stepIndex === existing.stepIndex) {
+        // If same step, prefer the one updated more recently
+        const emailTime = new Date(email.updatedAt || email.createdAt || 0).getTime();
+        const existingTime = new Date(existing.updatedAt || 0).getTime();
+        if (emailTime > existingTime) {
+          contactProgressMap.set(contactId, {
+            type: 'email',
+            data: email,
+            stepIndex: stepIndex,
+            status: email.status,
+            updatedAt: email.updatedAt || email.createdAt
+          });
+        }
       }
     });
 
-    console.log('[StepsView] Contact-email mapping:', contactEmailMap.size, 'contacts with emails');
+    // Process tasks
+    tasks.forEach(task => {
+      const contactId = task.contactId || (task.peopleIds && task.peopleIds[0]);
+      if (!contactId) return;
+
+      const existing = contactProgressMap.get(contactId);
+      const stepIndex = task.stepIndex || 0;
+
+      // Keep the item with the highest stepIndex
+      if (!existing || stepIndex > existing.stepIndex) {
+        contactProgressMap.set(contactId, {
+          type: 'task',
+          data: task,
+          stepIndex: stepIndex,
+          status: task.status,
+          updatedAt: task.updatedAt || task.createdAt
+        });
+      } else if (stepIndex === existing.stepIndex) {
+        // If same step, prefer the one updated more recently
+        const taskTime = new Date(task.updatedAt || task.createdAt || 0).getTime();
+        const existingTime = new Date(existing.updatedAt || 0).getTime();
+        if (taskTime > existingTime) {
+          contactProgressMap.set(contactId, {
+            type: 'task',
+            data: task,
+            stepIndex: stepIndex,
+            status: task.status,
+            updatedAt: task.updatedAt || task.createdAt
+          });
+        }
+      }
+    });
+
+    console.log('[StepsView] Contact progress mapping:', contactProgressMap.size, 'contacts with progress');
 
     // Generate rows
     const rows = members.map(member => {
@@ -1447,21 +1516,24 @@ class FreeSequenceAutomation {
       const company = contact.company || '';
       const initials = getInitials(name);
 
-      // Find the latest email for this contact
-      const latestEmail = contactEmailMap.get(member.targetId);
+      // Find the latest progress for this contact
+      const latestProgress = contactProgressMap.get(member.targetId);
 
-      // Determine next step based on latest email
+      // Determine next step based on latest progress
       let nextStepStr = '-';
       let scheduledStr = '-';
 
-      if (latestEmail) {
-        const stepIndex = latestEmail.stepIndex || 0;
-        const status = latestEmail.status;
-        const emailType = latestEmail.type || 'scheduled';
+      if (latestProgress) {
+        const stepIndex = latestProgress.stepIndex || 0;
+        const status = latestProgress.status;
+        const type = latestProgress.type;
+        const itemData = latestProgress.data;
 
-        // Show current step status
-        if (status === 'sent' || emailType === 'sent') {
-          // Email was sent - find and show next step
+        // Check if current step is completed
+        const isCompleted = status === 'sent' || status === 'completed' || status === 'done';
+
+        if (isCompleted) {
+          // Step completed - find and show next step
           let nextStepIndex = stepIndex + 1;
           let foundNextStep = false;
 
@@ -1470,10 +1542,10 @@ class FreeSequenceAutomation {
             const nextStep = state.currentSequence.steps[nextStepIndex];
             if (!nextStep.paused) {
               foundNextStep = true;
-              
+
               // Determine step label
               const stepLabel = nextStep.name || nextStep.label || nextStep.type || `Step ${nextStepIndex + 1}`;
-              
+
               // Format step type for display
               let displayLabel = stepLabel;
               if (nextStep.type === 'auto-email') {
@@ -1492,19 +1564,46 @@ class FreeSequenceAutomation {
 
               nextStepStr = displayLabel;
 
-              // Check if there's an email or task for the next step
+              // Check if there's an email or task ALREADY created for the next step
+              // This happens if the next step was triggered immediately
+              const nextProgress = contactProgressMap.get(member.targetId);
+              // Only use nextProgress if it matches the next step index (it should, if we are looking ahead)
+              // But wait, contactProgressMap only holds the *latest* item. 
+              // If the latest item is the completed one we just checked, then the next one hasn't been created/indexed yet 
+              // OR it wasn't picked up as "latest" (unlikely if index is higher).
+
+              // Actually, if the next step is created, it would have a higher index and would BE the latestProgress.
+              // So if we are here (isCompleted is true), it means the *latest known* item is completed, 
+              // and we haven't found a newer item for the next step yet.
+              // So the next step is likely "Pending Creation" or "Scheduled".
+
+              // However, for auto-emails, they might be scheduled but not "created" as a document if using the old system,
+              // but in the new system, they are created immediately.
+
+              // Let's look for any item in our raw lists that matches nextStepIndex
               const nextEmail = emails.find(e => e.contactId === member.targetId && (e.stepIndex || 0) === nextStepIndex);
+              const nextTask = tasks.find(t => (t.contactId === member.targetId || (t.peopleIds && t.peopleIds.includes(member.targetId))) && (t.stepIndex || 0) === nextStepIndex);
+
               if (nextEmail && nextEmail.scheduledSendTime) {
                 try {
                   const date = nextEmail.scheduledSendTime.toDate ? nextEmail.scheduledSendTime.toDate() : new Date(nextEmail.scheduledSendTime);
                   scheduledStr = date.toLocaleString();
+                  nextStepStr += ` <span class="badge" style="background:#e2e3e5; color:#383d41; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-left:4px;">Scheduled</span>`;
                 } catch (e) {
-                  scheduledStr = '-';
+                  scheduledStr = 'Scheduled';
                 }
-              } else if (nextStep.type !== 'auto-email') {
-                // For task steps, check if task exists (would need to query tasks collection)
-                // For now, just show the step without scheduled time
+              } else if (nextTask && nextTask.dueDate) {
+                try {
+                  const date = nextTask.dueDate.toDate ? nextTask.dueDate.toDate() : new Date(nextTask.dueDate);
+                  scheduledStr = date.toLocaleDateString();
+                  nextStepStr += ` <span class="badge" style="background:#e2e3e5; color:#383d41; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-left:4px;">Pending</span>`;
+                } catch (e) {
+                  scheduledStr = 'Pending';
+                }
+              } else {
+                // Not yet created/scheduled
                 scheduledStr = 'Pending';
+                nextStepStr += ` <span class="badge" style="background:#e2e3e5; color:#383d41; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-left:4px;">Next</span>`;
               }
               break;
             }
@@ -1512,46 +1611,81 @@ class FreeSequenceAutomation {
           }
 
           if (!foundNextStep) {
-            nextStepStr = '<span class="badge badge-success" style="background:#d4edda; color:#155724; padding:2px 8px; border-radius:12px; font-size:0.8rem;">Completed</span>';
+            nextStepStr = '<span class="badge badge-success" style="background:#d4edda; color:#155724; padding:2px 8px; border-radius:12px; font-size:0.8rem;">Sequence Completed</span>';
+            scheduledStr = 'Done';
           }
         } else if (status === 'error' || status === 'failed') {
           const currentStep = state.currentSequence.steps[stepIndex];
           nextStepStr = `<span class="badge badge-danger" style="background:#f8d7da; color:#721c24; padding:2px 8px; border-radius:12px; font-size:0.8rem;">Error: ${currentStep ? (currentStep.name || currentStep.label || `Step ${stepIndex + 1}`) : 'Unknown'}</span>`;
         } else {
-          // Email is pending/approved/sending - show current step
+          // In progress (Pending, Approved, Sending, etc.)
           const currentStep = state.currentSequence.steps[stepIndex];
           const stepLabel = currentStep ? (currentStep.name || currentStep.label || `Step ${stepIndex + 1}`) : `Step ${stepIndex + 1}`;
-          
+
           // Format step type for display
           let displayLabel = stepLabel;
-          if (currentStep && currentStep.type === 'auto-email') {
-            displayLabel = 'Automatic email';
+          if (currentStep) {
+            if (currentStep.type === 'auto-email') displayLabel = 'Automatic email';
+            else if (currentStep.type === 'phone-call') displayLabel = 'Phone call';
+            else if (currentStep.type === 'li-connect') displayLabel = 'LinkedIn connect';
+            else if (currentStep.type === 'li-message') displayLabel = 'LinkedIn message';
+            else if (currentStep.type === 'li-view-profile') displayLabel = 'LinkedIn view profile';
+            else if (currentStep.type === 'li-interact-post') displayLabel = 'LinkedIn interact';
           }
-          
+
           nextStepStr = displayLabel;
 
           // Show status badge
-          const statusLabels = {
-            'not_generated': 'Generating',
-            'pending_approval': 'Pending Review',
-            'approved': 'Approved',
-            'sending': 'Sending'
-          };
-          const statusLabel = statusLabels[status] || status;
-          nextStepStr += ` <span class="badge" style="background:#fff3cd; color:#856404; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-left:4px;">${statusLabel}</span>`;
+          let statusLabel = status;
+          let badgeColor = '#fff3cd'; // yellow/warning
+          let textColor = '#856404';
 
-          // Show scheduled time
-          if (latestEmail.scheduledSendTime) {
-            try {
-              const date = latestEmail.scheduledSendTime.toDate ? latestEmail.scheduledSendTime.toDate() : new Date(latestEmail.scheduledSendTime);
-              scheduledStr = date.toLocaleString();
-            } catch (e) {
-              scheduledStr = '-';
+          if (type === 'email') {
+            const statusLabels = {
+              'not_generated': 'Generating',
+              'pending_approval': 'Pending Review',
+              'approved': 'Approved',
+              'sending': 'Sending'
+            };
+            statusLabel = statusLabels[status] || status;
+
+            // Show scheduled time
+            if (itemData.scheduledSendTime) {
+              try {
+                const date = itemData.scheduledSendTime.toDate ? itemData.scheduledSendTime.toDate() : new Date(itemData.scheduledSendTime);
+                scheduledStr = date.toLocaleString();
+              } catch (e) {
+                scheduledStr = '-';
+              }
+            }
+          } else {
+            // Task
+            const statusLabels = {
+              'pending': 'Pending',
+              'in_progress': 'In Progress',
+              'overdue': 'Overdue'
+            };
+            statusLabel = statusLabels[status] || status;
+            if (status === 'overdue') {
+              badgeColor = '#f8d7da';
+              textColor = '#721c24';
+            }
+
+            // Show due date
+            if (itemData.dueDate) {
+              try {
+                const date = itemData.dueDate.toDate ? itemData.dueDate.toDate() : new Date(itemData.dueDate);
+                scheduledStr = date.toLocaleDateString();
+              } catch (e) {
+                scheduledStr = '-';
+              }
             }
           }
+
+          nextStepStr += ` <span class="badge" style="background:${badgeColor}; color:${textColor}; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-left:4px;">${statusLabel}</span>`;
         }
       } else {
-        // No emails found for this contact - not started
+        // No progress found for this contact - not started
         nextStepStr = 'Not started';
         if (member.createdAt) {
           try {
@@ -1647,6 +1781,11 @@ class FreeSequenceAutomation {
             <input type="text" id="contact-search-input" class="search-input-small" placeholder="Search contacts to add..." aria-label="Search contacts to add to sequence" />
             <div class="contact-search-results" id="contact-search-results" hidden></div>
           </div>
+          ${state.currentView === 'steps' ? `<button class="quick-action-btn list-header-btn" id="refresh-steps-btn" aria-label="Refresh steps" title="Refresh progress">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+            </svg>
+          </button>` : ''}
           <button class="quick-action-btn list-header-btn" id="contacts-btn" aria-label="Sequence Contacts" title="Sequence Contacts" aria-haspopup="dialog">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -5963,8 +6102,29 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         // Update state
         state.currentView = newView;
 
+        // Invalidate cache when switching to steps view to ensure fresh data
+        if (newView === 'steps') {
+          state.sequenceMembersCache = null;
+          console.log('[SequenceBuilder] Switching to Steps view, cache invalidated');
+        }
+
         // Re-render
         await render();
+      });
+    }
+
+    // ✅ NEW: Refresh button for Steps tab
+    const refreshBtn = document.getElementById('refresh-steps-btn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', async () => {
+        console.log('[SequenceBuilder] Manual refresh triggered');
+        // Invalidate cache to force fresh data load
+        state.sequenceMembersCache = null;
+        // Re-render
+        await render();
+        if (window.crm?.showToast) {
+          window.crm.showToast('Progress refreshed', 'success');
+        }
       });
     }
 
