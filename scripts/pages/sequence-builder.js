@@ -1741,6 +1741,8 @@ class FreeSequenceAutomation {
     if (!state.currentSequence || !els.mainContent) return;
 
     const seq = state.currentSequence;
+    // Expose ID globally for diagnostics
+    window.currentSequenceId = seq.id;
     const title = seq.name || 'Untitled Sequence';
     const isEditingTitle = !!state.editingTitle;
 
@@ -8924,7 +8926,35 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     },
     fixStuckMembers: async (sequenceId) => {
       // Diagnostic tool to find members that have no activation record and start them
-      if (!sequenceId) return console.error('Please provide a sequenceId');
+
+      // 1. Try passed ID
+      if (!sequenceId) {
+        // 2. Try global variable exposed by render()
+        if (window.currentSequenceId) {
+          sequenceId = window.currentSequenceId;
+        }
+
+        // 3. Try URL hash (fallback)
+        const hash = window.location.hash;
+        if (hash) {
+          const parts = hash.split('/');
+          const seqPart = parts.find(p => p.startsWith('seq-'));
+          if (seqPart) sequenceId = seqPart;
+        }
+      }
+
+      // 4. Try DOM (look for header or container with ID)
+      if (!sequenceId) {
+        const header = document.getElementById('sequence-builder-header');
+        // Sometimes ID is stored on the container or we can find it in the edit button
+        const editBtn = document.getElementById('edit-seq-title-btn');
+        // Or look for any element with data-id starting with seq-
+        const seqEl = document.querySelector('[data-id^="seq-"]');
+        if (seqEl) sequenceId = seqEl.getAttribute('data-id');
+      }
+
+      if (!sequenceId) return console.error('Could not detect sequenceId. Please provide it: fixStuckMembers("seq-...")');
+
       const db = window.firebaseDB;
       console.log(`[Fix] Checking sequence ${sequenceId}...`);
 

@@ -3,41 +3,41 @@
 // Strategic navigation and interactive features
 
 (function suppressNoisyFirestoreHandshakeErrors() {
-	try {
-		const shouldSuppress = localStorage.getItem('pc-suppress-fs-400') !== 'false';
-		if (!shouldSuppress) return;
-		const originalConsoleError = window.console && window.console.error ? window.console.error.bind(window.console) : null;
-		if (originalConsoleError) {
-			window.console.error = function (...args) {
-				try {
-					const text = args.map((a) => {
-						if (a && a.message) return String(a.message);
-						if (a && a.stack) return String(a.stack);
-						return String(a);
-					}).join(' ');
-					// Hide Firestore WebChannel Listen/channel 400 noise only
-					if (/google\.firestore\.v1\.Firestore\/Listen\/channel|WebChannel.*400|Listen\/channel.*400/i.test(text)) return;
-				} catch (_) { /* noop */ }
-			return originalConsoleError.apply(this, args);
-			};
-		}
-		// Also prevent unhandledrejection spam from the same source (without masking real errors)
-		window.addEventListener('unhandledrejection', (e) => {
-			try {
-				const msg = String((e && e.reason && (e.reason.message || e.reason)) || '');
-				if (/google\.firestore\.v1\.Firestore\/Listen\/channel|WebChannel.*400|Listen\/channel.*400/i.test(msg)) {
-					e.preventDefault();
-				}
-			} catch (_) { /* noop */ }
-		}, { capture: true });
-	} catch (_) { /* noop */ }
+    try {
+        const shouldSuppress = localStorage.getItem('pc-suppress-fs-400') !== 'false';
+        if (!shouldSuppress) return;
+        const originalConsoleError = window.console && window.console.error ? window.console.error.bind(window.console) : null;
+        if (originalConsoleError) {
+            window.console.error = function (...args) {
+                try {
+                    const text = args.map((a) => {
+                        if (a && a.message) return String(a.message);
+                        if (a && a.stack) return String(a.stack);
+                        return String(a);
+                    }).join(' ');
+                    // Hide Firestore WebChannel Listen/channel 400 noise only
+                    if (/google\.firestore\.v1\.Firestore\/Listen\/channel|WebChannel.*400|Listen\/channel.*400/i.test(text)) return;
+                } catch (_) { /* noop */ }
+                return originalConsoleError.apply(this, args);
+            };
+        }
+        // Also prevent unhandledrejection spam from the same source (without masking real errors)
+        window.addEventListener('unhandledrejection', (e) => {
+            try {
+                const msg = String((e && e.reason && (e.reason.message || e.reason)) || '');
+                if (/google\.firestore\.v1\.Firestore\/Listen\/channel|WebChannel.*400|Listen\/channel.*400/i.test(msg)) {
+                    e.preventDefault();
+                }
+            } catch (_) { /* noop */ }
+        }, { capture: true });
+    } catch (_) { /* noop */ }
 })();
 
 class PowerChoosersCRM {
     constructor() {
         this.currentPage = 'dashboard';
         this.sidebar = document.getElementById('sidebar');
-        
+
         // Sidebar hover state
         this.sidebarOpenTimer = null;
         this.sidebarCloseTimer = null;
@@ -47,12 +47,12 @@ class PowerChoosersCRM {
         this.sidebarLastMouseY = 0;
         this.sidebarMouseMoved = false;
         this.sidebarLastEdgeCheck = 0;
-        
+
         // Email automation
         this.emailAutomationInterval = null;
-        
+
         this.init();
-        
+
         // PRE-LOAD ESSENTIAL DATA THEN LOAD WIDGETS
         this.initializeDashboardData();
 
@@ -64,7 +64,7 @@ class PowerChoosersCRM {
                 this.loadHomeActivities(forceRefresh);
             }
         });
-        
+
         // CRITICAL FIX: Listen for task deletion events to refresh Today's Tasks widget
         document.addEventListener('pc:task-deleted', async (e) => {
             const { taskId } = e.detail || {};
@@ -84,12 +84,12 @@ class PowerChoosersCRM {
                     };
                     const email = getUserEmail();
                     const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
-                    
+
                     // Remove from namespaced key
                     const namespacedTasks = JSON.parse(localStorage.getItem(namespacedKey) || '[]');
                     const filteredNamespaced = namespacedTasks.filter(t => t && t.id !== taskId);
                     localStorage.setItem(namespacedKey, JSON.stringify(filteredNamespaced));
-                    
+
                     // Also remove from legacy key
                     const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
                     const filteredLegacy = legacyTasks.filter(t => t && t.id !== taskId);
@@ -97,14 +97,14 @@ class PowerChoosersCRM {
                 } catch (err) {
                     console.warn('[CRM] Could not clean up deleted task from localStorage:', err);
                 }
-                
+
                 // Refresh Today's Tasks widget
                 if (typeof this.loadTodaysTasks === 'function') {
                     this.loadTodaysTasks();
                 }
             }
         });
-        
+
         // CRITICAL FIX: Listen for tasksUpdated events with deleted flag
         window.addEventListener('tasksUpdated', async (e) => {
             const { taskId, deleted } = e.detail || {};
@@ -116,20 +116,20 @@ class PowerChoosersCRM {
                 }
             }
         });
-        
+
         // Listen for booking/lead creation events and show notifications
         window.addEventListener('pc:booking-created', (e) => {
             const { contactName, companyName, appointmentDate, selectedTime, source, taskId } = e.detail || {};
             if (!contactName || !companyName) return;
-            
+
             // Use existing Notifications system
             if (window.Notifications && typeof window.Notifications.add === 'function') {
                 const isBooking = source !== 'home-page';
                 const title = isBooking ? 'New Consultation Scheduled' : 'New Lead Received';
-                const message = isBooking 
+                const message = isBooking
                     ? `${contactName} from ${companyName} scheduled a consultation${appointmentDate ? ` for ${appointmentDate}` : ''}${selectedTime ? ` at ${selectedTime}` : ''}`
                     : `${contactName} from ${companyName} submitted a lead form`;
-                
+
                 window.Notifications.add(
                     isBooking ? 'new-lead' : 'new-lead',
                     title,
@@ -145,7 +145,7 @@ class PowerChoosersCRM {
                 );
             }
         });
-        
+
         // Memory monitoring (development mode)
         if (window.location.hostname === 'localhost' || localStorage.getItem('debug-memory') === 'true') {
             this.startMemoryMonitoring();
@@ -155,23 +155,23 @@ class PowerChoosersCRM {
     // Initialize dashboard data and widgets in correct order
     async initializeDashboardData() {
         console.log('[CRM] Initializing dashboard data...');
-        
+
         // STEP 1: Pre-load essential data and WAIT for completion
         await this.preloadEssentialData();
-        
+
         // STEP 2: Now load widgets that depend on this data
         this.loadDashboardWidgets();
     }
-    
+
     // Load dashboard widgets after data is ready
     loadDashboardWidgets() {
         console.log('[CRM] Loading dashboard widgets...');
-        
+
         // Setup one-time animation handlers to prevent re-animation
         this.setupOneTimeAnimations();
         // Observe dashboard containers and animate height once when real content arrives
         this.setupEntranceObservers();
-        
+
         // Load home activities
         const loadActivities = () => {
             if (window.ActivityManager && document.getElementById('dashboard-page')?.classList.contains('active')) {
@@ -182,55 +182,55 @@ class PowerChoosersCRM {
                 setTimeout(loadActivities, 200);
             }
         };
-        
+
         // Try with small delays to ensure DOM is ready
         setTimeout(loadActivities, 50);
         setTimeout(loadActivities, 200);
-        
+
         // Start background calls loading immediately
         // This ensures calls data is pre-loaded before user clicks calls page
         // BackgroundCallsLoader now starts immediately on module init (like contacts/accounts)
         // No need for delayed start - it loads from cache instantly
     }
-    
+
     // Observe first render of dashboard containers and animate height once
     setupEntranceObservers() {
         const widgetConfigs = [
             { containerSelector: '.tasks-list', itemSelector: '.task-item' },
             { containerSelector: '.news-list', itemSelector: '.news-item' }
         ];
-        
+
         const activitiesConfig = { containerSelector: '.activities-list', itemSelector: '.activity-item' };
-        
+
         const animateHeightOnce = (el) => {
             if (!el || el.dataset.heightAnimated === '1') return;
             el.dataset.heightAnimated = '1';
-            
+
             const startHeight = el.offsetHeight;
             const targetHeight = el.scrollHeight;
             el.style.overflow = 'hidden';
             el.style.maxHeight = startHeight + 'px';
             el.style.transition = 'max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
-            
+
             if (getComputedStyle(el).opacity === '0') el.style.opacity = '1';
-            
+
             requestAnimationFrame(() => {
                 el.style.maxHeight = Math.max(targetHeight, startHeight) + 'px';
-        setTimeout(() => {
+                setTimeout(() => {
                     el.style.maxHeight = '';
                     el.style.overflow = '';
                 }, 600);
             });
         };
-        
+
         // Check if BOTH tasks and news are ready before animating either
         const checkBothWidgetsReady = () => {
             const tasksContainer = document.querySelector('.tasks-list');
             const newsContainer = document.querySelector('.news-list');
-            
+
             const tasksReady = tasksContainer && tasksContainer.querySelector('.task-item');
             const newsReady = newsContainer && newsContainer.querySelector('.news-item');
-            
+
             // Only animate when BOTH are ready
             if (tasksReady && newsReady) {
                 console.log('[CRM] Both tasks and news ready - animating together');
@@ -240,17 +240,17 @@ class PowerChoosersCRM {
             }
             return false;
         };
-        
+
         // Watch both containers and animate together when both have content
         widgetConfigs.forEach(({ containerSelector }) => {
             const container = document.querySelector(containerSelector);
             if (!container) return;
             if (container.dataset.observerAttached === '1') return;
             container.dataset.observerAttached = '1';
-            
+
             // Check if both are ready on initial load
             if (checkBothWidgetsReady()) return;
-            
+
             // Observe for content arrival
             const mo = new MutationObserver(() => {
                 if (checkBothWidgetsReady()) {
@@ -259,12 +259,12 @@ class PowerChoosersCRM {
             });
             mo.observe(container, { childList: true });
         });
-        
+
         // Activities animate independently
         const activitiesContainer = document.querySelector(activitiesConfig.containerSelector);
         if (activitiesContainer && !activitiesContainer.dataset.observerAttached) {
             activitiesContainer.dataset.observerAttached = '1';
-            
+
             if (activitiesContainer.querySelector(activitiesConfig.itemSelector)) {
                 animateHeightOnce(activitiesContainer);
             } else {
@@ -283,11 +283,11 @@ class PowerChoosersCRM {
     setupOneTimeAnimations() {
         const containers = [
             { selector: '.activities-list', items: '.activity-item' },
-            { selector: '.tasks-list', items: '.task-item' }, 
+            { selector: '.tasks-list', items: '.task-item' },
             { selector: '.news-list', items: '.news-item' },
             { selector: '.quick-actions', items: '.action-btn' }
         ];
-        
+
         containers.forEach(({ selector, items }) => {
             const container = document.querySelector(selector);
             if (container && !container.classList.contains('animated')) {
@@ -306,7 +306,7 @@ class PowerChoosersCRM {
     // Pre-load essential data for widgets and navigation
     async preloadEssentialData() {
         console.log('[CRM] Pre-loading essential data for widgets...');
-        
+
         try {
             // Load accounts data for account navigation and activity logos
             if (window.CacheManager && typeof window.CacheManager.get === 'function') {
@@ -314,7 +314,7 @@ class PowerChoosersCRM {
                 if (accountsData && Array.isArray(accountsData)) {
                     // Limit to 200 most recent for widgets/navigation to save memory
                     window._essentialAccountsData = accountsData.slice(0, 200);
-                    
+
                     // Lazy-load full data function (loads on demand)
                     window.getAccountsData = (forceFullData = false) => {
                         // If called from a page that needs full data, return full dataset
@@ -328,14 +328,14 @@ class PowerChoosersCRM {
                     console.log('[CRM] ✓ Pre-loaded 200 accounts (from', accountsData.length, 'total) - full data available on demand');
                 }
             }
-            
+
             // Load contacts data for contact navigation
             if (window.CacheManager && typeof window.CacheManager.get === 'function') {
                 const contactsData = await window.CacheManager.get('contacts');
                 if (contactsData && Array.isArray(contactsData)) {
                     // Limit to 200 most recent for widgets/navigation to save memory
                     window._essentialContactsData = contactsData.slice(0, 200);
-                    
+
                     // Lazy-load full data function (loads on demand)
                     window.getPeopleData = (forceFullData = false) => {
                         // Added 'dashboard' for task rendering with full contact data, added 'calls' for call enrichment
@@ -348,7 +348,7 @@ class PowerChoosersCRM {
                     console.log('[CRM] ✓ Pre-loaded 200 contacts (from', contactsData.length, 'total) - full data available on demand');
                 }
             }
-            
+
             // Load tasks - use tasks module if available, otherwise load from Firebase
             if (window.tasksModule && typeof window.tasksModule.getTasksData === 'function') {
                 // Tasks module already loaded, use its data
@@ -363,7 +363,7 @@ class PowerChoosersCRM {
             } else if (window.firebaseDB) {
                 // Fallback: load directly from Firebase with ownership filters
                 let tasksData = [];
-                
+
                 // Helper functions
                 const getUserEmail = () => {
                     try {
@@ -371,7 +371,7 @@ class PowerChoosersCRM {
                             return window.DataManager.getCurrentUserEmail();
                         }
                         return (window.currentUserEmail || '').toLowerCase();
-                    } catch(_) {
+                    } catch (_) {
                         return (window.currentUserEmail || '').toLowerCase();
                     }
                 };
@@ -381,11 +381,11 @@ class PowerChoosersCRM {
                             return window.DataManager.isCurrentUserAdmin();
                         }
                         return window.currentUserRole === 'admin';
-                    } catch(_) {
+                    } catch (_) {
                         return window.currentUserRole === 'admin';
                     }
                 };
-                
+
                 try {
                     if (!isAdmin()) {
                         // Non-admin: use ownership-aware query
@@ -414,7 +414,7 @@ class PowerChoosersCRM {
                             .get();
                         tasksData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     }
-                    
+
                     // Merge with localStorage (filtered by ownership for non-admin)
                     try {
                         let localTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
@@ -431,7 +431,7 @@ class PowerChoosersCRM {
                         const existingIds = new Set(tasksData.map(t => t.id));
                         const newLocalTasks = localTasks.filter(t => !existingIds.has(t.id));
                         window._essentialTasksData = [...tasksData, ...newLocalTasks];
-                    } catch(e) {
+                    } catch (e) {
                         window._essentialTasksData = tasksData;
                     }
                     console.log('[CRM] ✓ Pre-loaded', window._essentialTasksData.length, 'tasks from Firebase');
@@ -452,22 +452,22 @@ class PowerChoosersCRM {
                         }
                         window._essentialTasksData = localTasks;
                         console.log('[CRM] ✓ Pre-loaded', window._essentialTasksData.length, 'tasks from localStorage fallback');
-                    } catch(e) {
+                    } catch (e) {
                         window._essentialTasksData = [];
                     }
                 }
             }
-            
+
             console.log('[CRM] ✓✓✓ All essential data pre-loaded successfully');
         } catch (error) {
             console.error('[CRM] Error pre-loading essential data:', error);
         }
     }
-    
+
     // Clean up page-specific memory on navigation
     cleanupPageMemory(previousPage) {
         console.log('[CRM] Cleaning up memory for:', previousPage);
-        
+
         try {
             // Don't clean up dashboard - it's always potentially active
             // Dashboard widgets need persistent state for task rendering and activities
@@ -475,7 +475,7 @@ class PowerChoosersCRM {
                 console.log('[CRM] Skipping dashboard cleanup - preserving widget state');
                 return;
             }
-            
+
             // Call page-specific cleanup functions
             if (previousPage === 'people' && window.peopleModule?.cleanup) {
                 window.peopleModule.cleanup();
@@ -486,24 +486,24 @@ class PowerChoosersCRM {
             if (previousPage === 'calls' && window.callsModule?.cleanup) {
                 window.callsModule.cleanup();
             }
-            
+
             console.log('[CRM] Memory cleanup complete for:', previousPage);
         } catch (error) {
             console.warn('[CRM] Error during memory cleanup:', error);
         }
     }
-    
+
     // Memory monitoring for development
     startMemoryMonitoring() {
         console.log('[CRM] Memory monitoring enabled (to disable, run: localStorage.removeItem("debug-memory"))');
-        
+
         setInterval(() => {
             if (performance.memory) {
                 const used = Math.round(performance.memory.usedJSHeapSize / 1048576);
                 const total = Math.round(performance.memory.totalJSHeapSize / 1048576);
                 const limit = Math.round(performance.memory.jsHeapSizeLimit / 1048576);
                 console.log(`[Memory] ${used}MB / ${total}MB (limit: ${limit}MB)`);
-                
+
                 // Warn if approaching 80% of limit
                 if (used > limit * 0.8) {
                     console.warn('[Memory] ⚠️ High memory usage! Consider refreshing page.');
@@ -512,624 +512,624 @@ class PowerChoosersCRM {
         }, 30000); // Log every 30 seconds
     }
 
-  createAddAccountModal() {
-    const modal = document.getElementById('modal-add-account');
-    if (!modal) {
-      this.showToast('Add Account modal not found');
-      return;
-    }
-
-    const dialog = modal.querySelector('.pc-modal__dialog');
-    const backdrop = modal.querySelector('.pc-modal__backdrop');
-    const form = modal.querySelector('#form-add-account');
-
-    // Open modal with animation
-    modal.removeAttribute('hidden');
-    
-    // Double requestAnimationFrame ensures browser is ready for smooth animation
-    // This prevents choppy first render by giving browser time to create compositor layers
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        modal.classList.add('show');
-      });
-    });
-
-    // Focus management: move focus to Close button if present, else first input
-    setTimeout(() => {
-      const closeBtn = modal.querySelector('.pc-modal__close');
-      const firstInput = modal.querySelector('input,button,select,textarea,[tabindex]:not([tabindex="-1"])');
-      if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
-      else if (firstInput && typeof firstInput.focus === 'function') firstInput.focus();
-      
-      // Setup parent company autocomplete
-      const searchInput = modal.querySelector('#parent-company-search');
-      const dropdown = modal.querySelector('#parent-company-dropdown');
-      const hiddenId = modal.querySelector('#parent-company-id');
-      if (searchInput && dropdown && hiddenId && window.AccountDetail && typeof window.AccountDetail.setupParentCompanyAutocomplete === 'function') {
-        window.AccountDetail.setupParentCompanyAutocomplete(searchInput, dropdown, hiddenId);
-      }
-    }, 0);
-
-    // Focus trap within dialog
-    const getFocusables = () => Array.from(dialog.querySelectorAll('a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])'))
-      .filter(el => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        close();
-      } else if (e.key === 'Tab') {
-        const f = getFocusables();
-        if (!f.length) return;
-        const first = f[0];
-        const last = f[f.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
+    createAddAccountModal() {
+        const modal = document.getElementById('modal-add-account');
+        if (!modal) {
+            this.showToast('Add Account modal not found');
+            return;
         }
-      }
-    };
 
-    const close = () => {
-      // Start exit animation
-      modal.classList.remove('show');
-      
-      // Hide modal after animation completes
-      setTimeout(() => {
-      modal.setAttribute('hidden', '');
-      dialog.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('keydown', handleKeyDown);
-      }, 300); // Match CSS transition duration
-    };
+        const dialog = modal.querySelector('.pc-modal__dialog');
+        const backdrop = modal.querySelector('.pc-modal__backdrop');
+        const form = modal.querySelector('#form-add-account');
 
-    // One-time static bindings (click handlers, focus ring, submit)
-    if (!modal._bound) {
-      // Click-away and close buttons
-      if (backdrop) backdrop.addEventListener('click', close);
-      modal.querySelectorAll('[data-close="account"]').forEach(btn => btn.addEventListener('click', close));
+        // Open modal with animation
+        modal.removeAttribute('hidden');
 
-      // Subtle orange focus ring on inputs
-      modal.querySelectorAll('input').forEach(input => {
-        input.addEventListener('focus', () => input.classList.add('focus-orange'));
-        input.addEventListener('blur', () => input.classList.remove('focus-orange'));
-      });
+        // Double requestAnimationFrame ensures browser is ready for smooth animation
+        // This prevents choppy first render by giving browser time to create compositor layers
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                modal.classList.add('show');
+            });
+        });
 
-      // Service address plus and minus button handler (event delegation)
-      const serviceAddressesContainer = modal.querySelector('#service-addresses-container');
-      if (serviceAddressesContainer) {
-        serviceAddressesContainer.addEventListener('click', (e) => {
-          const plusBtn = e.target.closest('.add-service-address-btn');
-          const minusBtn = e.target.closest('.remove-service-address-btn');
-          
-          if (plusBtn) {
-            e.preventDefault();
-            const container = modal.querySelector('#service-addresses-container');
-            const currentRows = container.querySelectorAll('.service-address-input-row');
-            const newIndex = currentRows.length;
-            const newRow = document.createElement('div');
-            newRow.className = 'service-address-input-row';
-            newRow.style.cssText = 'display: flex; gap: 8px; align-items: center;';
-            newRow.innerHTML = `
+        // Focus management: move focus to Close button if present, else first input
+        setTimeout(() => {
+            const closeBtn = modal.querySelector('.pc-modal__close');
+            const firstInput = modal.querySelector('input,button,select,textarea,[tabindex]:not([tabindex="-1"])');
+            if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
+            else if (firstInput && typeof firstInput.focus === 'function') firstInput.focus();
+
+            // Setup parent company autocomplete
+            const searchInput = modal.querySelector('#parent-company-search');
+            const dropdown = modal.querySelector('#parent-company-dropdown');
+            const hiddenId = modal.querySelector('#parent-company-id');
+            if (searchInput && dropdown && hiddenId && window.AccountDetail && typeof window.AccountDetail.setupParentCompanyAutocomplete === 'function') {
+                window.AccountDetail.setupParentCompanyAutocomplete(searchInput, dropdown, hiddenId);
+            }
+        }, 0);
+
+        // Focus trap within dialog
+        const getFocusables = () => Array.from(dialog.querySelectorAll('a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])'))
+            .filter(el => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
+
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                close();
+            } else if (e.key === 'Tab') {
+                const f = getFocusables();
+                if (!f.length) return;
+                const first = f[0];
+                const last = f[f.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
+        };
+
+        const close = () => {
+            // Start exit animation
+            modal.classList.remove('show');
+
+            // Hide modal after animation completes
+            setTimeout(() => {
+                modal.setAttribute('hidden', '');
+                dialog.removeEventListener('keydown', handleKeyDown);
+                document.removeEventListener('keydown', handleKeyDown);
+            }, 300); // Match CSS transition duration
+        };
+
+        // One-time static bindings (click handlers, focus ring, submit)
+        if (!modal._bound) {
+            // Click-away and close buttons
+            if (backdrop) backdrop.addEventListener('click', close);
+            modal.querySelectorAll('[data-close="account"]').forEach(btn => btn.addEventListener('click', close));
+
+            // Subtle orange focus ring on inputs
+            modal.querySelectorAll('input').forEach(input => {
+                input.addEventListener('focus', () => input.classList.add('focus-orange'));
+                input.addEventListener('blur', () => input.classList.remove('focus-orange'));
+            });
+
+            // Service address plus and minus button handler (event delegation)
+            const serviceAddressesContainer = modal.querySelector('#service-addresses-container');
+            if (serviceAddressesContainer) {
+                serviceAddressesContainer.addEventListener('click', (e) => {
+                    const plusBtn = e.target.closest('.add-service-address-btn');
+                    const minusBtn = e.target.closest('.remove-service-address-btn');
+
+                    if (plusBtn) {
+                        e.preventDefault();
+                        const container = modal.querySelector('#service-addresses-container');
+                        const currentRows = container.querySelectorAll('.service-address-input-row');
+                        const newIndex = currentRows.length;
+                        const newRow = document.createElement('div');
+                        newRow.className = 'service-address-input-row';
+                        newRow.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+                        newRow.innerHTML = `
               <input type="text" name="serviceAddress_${newIndex}" class="input-dark" placeholder="123 Main St, City, State" style="flex: 1;" />
               <button type="button" class="remove-service-address-btn" style="background: var(--grey-600); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Remove this service address">-</button>
               <button type="button" class="add-service-address-btn" style="background: var(--orange-primary); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Add another service address">+</button>
             `;
-            // Add focus ring to new input
-            const newInput = newRow.querySelector('input');
-            if (newInput) {
-              newInput.addEventListener('focus', () => newInput.classList.add('focus-orange'));
-              newInput.addEventListener('blur', () => newInput.classList.remove('focus-orange'));
-            }
-            container.appendChild(newRow);
-          } else if (minusBtn) {
-            e.preventDefault();
-            const container = modal.querySelector('#service-addresses-container');
-            const currentRows = container.querySelectorAll('.service-address-input-row');
-            // Only remove if there's more than one row
-            if (currentRows.length > 1) {
-              const rowToRemove = minusBtn.closest('.service-address-input-row');
-              if (rowToRemove) {
-                rowToRemove.remove();
-              }
-            }
-          }
-        });
-      }
-
-      // Submit handler -> Firestore save
-      if (form) {
-        form.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const data = {};
-          form.querySelectorAll('input, textarea').forEach(inp => { data[inp.name] = (inp.value || '').trim(); });
-
-          // Sanitize if available
-          if (window.escapeHtml) {
-            Object.keys(data).forEach(k => { data[k] = window.escapeHtml(data[k]); });
-          }
-
-          // Derive domain from website if present
-          if (data.website) {
-            try {
-              const u = new URL(data.website.startsWith('http') ? data.website : `https://${data.website}`);
-              data.domain = u.hostname.replace(/^www\./i, '');
-            } catch (_) {
-              // Fallback simple parse: strip protocol/path
-              data.domain = data.website.replace(/^https?:\/\//i, '').split('/')[0].replace(/^www\./i, '');
-            }
-          }
-
-          // If explicit logo/icon URL provided, persist as logoUrl
-          if (data.logoUrl) {
-            data.logoUrl = data.logoUrl.trim();
-          }
-
-          // Remove empty fields
-          Object.keys(data).forEach(k => { if (!data[k]) delete data[k]; });
-
-          // Collect service addresses
-          const serviceAddresses = [];
-          form.querySelectorAll('[name^="serviceAddress_"]').forEach((input, idx) => {
-            if (input.value.trim()) {
-              serviceAddresses.push({
-                address: input.value.trim(),
-                isPrimary: idx === 0
-              });
-            }
-          });
-
-          try {
-            const db = window.firebaseDB;
-            const fv = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue;
-            if (!db) throw new Error('Firestore not initialized');
-            const now = fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : Date.now();
-
-            // Normalize company phone if provided
-            if (data.phone) {
-              try { data.phone = this.normalizePhone(data.phone); } catch(_) {}
-            }
-
-            // Get user email for ownership fields
-            const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
-              ? window.DataManager.getCurrentUserEmail()
-              : ((window.currentUserEmail || '').toLowerCase());
-
-            const doc = {
-              // Known account fields (flexible)
-              accountName: data.accountName || data.name || 'New Account',
-              industry: data.industry || '',
-              domain: data.domain || '',
-              website: data.website || '',
-              companyPhone: data.phone || '',
-              city: data.city || '',
-              state: data.state || '',
-              squareFootage: data.squareFootage || '',
-              occupancyPct: data.occupancyPct || '',
-              employees: data.employees || '',
-              parentCompanyId: data.parentCompanyId || '',
-              parentCompanyName: data.parentCompanyName || '',
-              shortDescription: data.shortDescription || '',
-              electricitySupplier: data.electricitySupplier || '',
-              benefits: data.benefits || '',
-              painPoints: data.painPoints || '',
-              linkedin: data.linkedin || '',
-              // Branding
-              logoUrl: data.logoUrl || '',
-              // Ownership fields (required for Firestore rules)
-              ownerId: userEmail || '',
-              assignedTo: userEmail || '',
-              createdBy: userEmail || '',
-              // Timestamps
-              createdAt: now,
-              updatedAt: now,
-            };
-
-            // Use DataManager.addOwnership if available for server timestamps
-            const finalDoc = (window.DataManager && typeof window.DataManager.addOwnership === 'function')
-              ? window.DataManager.addOwnership(doc)
-              : doc;
-
-            // Add service addresses if any
-            if (serviceAddresses.length > 0) {
-              finalDoc.serviceAddresses = serviceAddresses;
-            }
-
-            const ref = await db.collection('accounts').add(finalDoc);
-
-            // Create UI document for notifications and navigation
-            // Use finalDoc instead of doc to include serviceAddresses and all other fields
-            const uiDoc = Object.assign({}, finalDoc, { createdAt: new Date(), updatedAt: new Date() });
-
-            // Notify Accounts page to update its state without reload
-            try {
-              document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: ref.id, doc: uiDoc } }));
-            } catch (_) { /* noop */ }
-
-            if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Account added!');
-            
-            // Navigate to account details page after successful creation
-            try {
-              // Set up navigation source tracking for back button
-              window._accountNavigationSource = 'add-account';
-              // Use the state that was captured when the add account button was clicked
-              // If no state was captured, create a default one
-              if (!window._addAccountReturn) {
-                window._addAccountReturn = {
-                  page: window.crm?.currentPage || 'accounts',
-                  scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
-                  searchTerm: '',
-                  sortColumn: '',
-                  sortDirection: '',
-                  selectedItems: []
-                };
-              }
-              
-              // Navigate to account details page
-              console.log('[Add Account] Attempting navigation to account details for ID:', ref.id);
-              console.log('[Add Account] AccountDetail available:', !!window.AccountDetail);
-              console.log('[Add Account] AccountDetail.show available:', !!(window.AccountDetail && typeof window.AccountDetail.show === 'function'));
-              
-              if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
-                // Prefetch the account data for immediate display
-                window._prefetchedAccountForDetail = Object.assign({}, uiDoc, { id: ref.id });
-                console.log('[Add Account] Calling AccountDetail.show with ID:', ref.id);
-                window.AccountDetail.show(ref.id);
-              } else {
-                // Try to navigate to account-details page and then show the account
-                console.log('[Add Account] AccountDetail not available, using fallback navigation');
-                if (window.crm && typeof window.crm.navigateToPage === 'function') {
-                  window.crm.navigateToPage('account-details');
-                  
-                  // Retry showing the account detail after page navigation
-                  let retryCount = 0;
-                  const maxRetries = 20; // 2 seconds with 100ms intervals
-                  const retryInterval = setInterval(() => {
-                    retryCount++;
-                    if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
-                      console.log('[Add Account] Retry successful, showing account detail');
-                      window._prefetchedAccountForDetail = Object.assign({}, uiDoc, { id: ref.id });
-                      window.AccountDetail.show(ref.id);
-                      clearInterval(retryInterval);
-                    } else if (retryCount >= maxRetries) {
-                      console.error('[Add Account] Failed to load AccountDetail after retries');
-                      clearInterval(retryInterval);
+                        // Add focus ring to new input
+                        const newInput = newRow.querySelector('input');
+                        if (newInput) {
+                            newInput.addEventListener('focus', () => newInput.classList.add('focus-orange'));
+                            newInput.addEventListener('blur', () => newInput.classList.remove('focus-orange'));
+                        }
+                        container.appendChild(newRow);
+                    } else if (minusBtn) {
+                        e.preventDefault();
+                        const container = modal.querySelector('#service-addresses-container');
+                        const currentRows = container.querySelectorAll('.service-address-input-row');
+                        // Only remove if there's more than one row
+                        if (currentRows.length > 1) {
+                            const rowToRemove = minusBtn.closest('.service-address-input-row');
+                            if (rowToRemove) {
+                                rowToRemove.remove();
+                            }
+                        }
                     }
-                  }, 100);
-                } else {
-                  console.error('[Add Account] No navigation method available');
-                }
-              }
-              
-              // Close modal after navigation is initiated
-              setTimeout(() => {
-            try { form.reset(); } catch (_) { /* noop */ }
-            close();
-              }, 100); // Small delay to ensure navigation starts
-              
-            } catch (e) {
-              console.error('Navigation to account details failed:', e);
-              // If navigation fails, still close the modal
-              try { form.reset(); } catch (_) { /* noop */ }
-              close();
+                });
             }
-          } catch (err) {
-            if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Failed to add account');
-            console.error('Add account failed', err);
-          }
-        });
-      }
 
-      modal._bound = true;
-    }
+            // Submit handler -> Firestore save
+            if (form) {
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const data = {};
+                    form.querySelectorAll('input, textarea').forEach(inp => { data[inp.name] = (inp.value || '').trim(); });
 
-    // Bind per-open listeners
-    dialog.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('keydown', handleKeyDown);
-  }
+                    // Sanitize if available
+                    if (window.escapeHtml) {
+                        Object.keys(data).forEach(k => { data[k] = window.escapeHtml(data[k]); });
+                    }
 
-  // Prefer PUBLIC_BASE_URL → API_BASE_URL → Vercel fallback → location.origin
-  getApiBaseUrl() {
-    try {
-      const fromWindow = (window.PUBLIC_BASE_URL || window.API_BASE_URL || '').toString().trim();
-      if (fromWindow) return fromWindow.replace(/\/$/, '');
-    } catch(_) {}
-    try {
-      if (typeof PUBLIC_BASE_URL !== 'undefined' && PUBLIC_BASE_URL) return String(PUBLIC_BASE_URL).replace(/\/$/, '');
-    } catch(_) {}
-    try {
-      if (typeof API_BASE_URL !== 'undefined' && API_BASE_URL) return String(API_BASE_URL).replace(/\/$/, '');
-    } catch(_) {}
-    const cloudRun = 'https://power-choosers-crm-792458658491.us-south1.run.app';
-    if (/^https?:\/\//i.test(cloudRun)) return cloudRun;
-    try { return (window.location && window.location.origin) ? window.location.origin.replace(/\/$/, '') : cloudRun; } catch(_) { return cloudRun; }
-  }
+                    // Derive domain from website if present
+                    if (data.website) {
+                        try {
+                            const u = new URL(data.website.startsWith('http') ? data.website : `https://${data.website}`);
+                            data.domain = u.hostname.replace(/^www\./i, '');
+                        } catch (_) {
+                            // Fallback simple parse: strip protocol/path
+                            data.domain = data.website.replace(/^https?:\/\//i, '').split('/')[0].replace(/^www\./i, '');
+                        }
+                    }
 
-  createAddContactModal() {
-    const modal = document.getElementById('modal-add-contact');
-    if (!modal) {
-      this.showToast('Add Contact modal not found');
-      return;
-    }
+                    // If explicit logo/icon URL provided, persist as logoUrl
+                    if (data.logoUrl) {
+                        data.logoUrl = data.logoUrl.trim();
+                    }
 
-    const dialog = modal.querySelector('.pc-modal__dialog');
-    const backdrop = modal.querySelector('.pc-modal__backdrop');
-    const form = modal.querySelector('#form-add-contact');
+                    // Remove empty fields
+                    Object.keys(data).forEach(k => { if (!data[k]) delete data[k]; });
 
-    // Open modal with animation
-    modal.removeAttribute('hidden');
-    
-    // Double requestAnimationFrame ensures browser is ready for smooth animation
-    // This prevents choppy first render by giving browser time to create compositor layers
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        modal.classList.add('show');
-      });
-    });
+                    // Collect service addresses
+                    const serviceAddresses = [];
+                    form.querySelectorAll('[name^="serviceAddress_"]').forEach((input, idx) => {
+                        if (input.value.trim()) {
+                            serviceAddresses.push({
+                                address: input.value.trim(),
+                                isPrimary: idx === 0
+                            });
+                        }
+                    });
 
-    // Focus management: move focus to Close button if present, else first input
-    setTimeout(() => {
-      const closeBtn = modal.querySelector('.pc-modal__close');
-      const firstInput = modal.querySelector('input,button,select,textarea,[tabindex]:not([tabindex="-1"])');
-      if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
-      else if (firstInput && typeof firstInput.focus === 'function') firstInput.focus();
-    }, 0);
+                    try {
+                        const db = window.firebaseDB;
+                        const fv = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue;
+                        if (!db) throw new Error('Firestore not initialized');
+                        const now = fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : Date.now();
 
-    // Focus trap within dialog
-    const getFocusables = () => Array.from(dialog.querySelectorAll('a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])'))
-      .filter(el => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
+                        // Normalize company phone if provided
+                        if (data.phone) {
+                            try { data.phone = this.normalizePhone(data.phone); } catch (_) { }
+                        }
 
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        close();
-      } else if (e.key === 'Tab') {
-        const f = getFocusables();
-        if (!f.length) return;
-        const first = f[0];
-        const last = f[f.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
+                        // Get user email for ownership fields
+                        const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+                            ? window.DataManager.getCurrentUserEmail()
+                            : ((window.currentUserEmail || '').toLowerCase());
+
+                        const doc = {
+                            // Known account fields (flexible)
+                            accountName: data.accountName || data.name || 'New Account',
+                            industry: data.industry || '',
+                            domain: data.domain || '',
+                            website: data.website || '',
+                            companyPhone: data.phone || '',
+                            city: data.city || '',
+                            state: data.state || '',
+                            squareFootage: data.squareFootage || '',
+                            occupancyPct: data.occupancyPct || '',
+                            employees: data.employees || '',
+                            parentCompanyId: data.parentCompanyId || '',
+                            parentCompanyName: data.parentCompanyName || '',
+                            shortDescription: data.shortDescription || '',
+                            electricitySupplier: data.electricitySupplier || '',
+                            benefits: data.benefits || '',
+                            painPoints: data.painPoints || '',
+                            linkedin: data.linkedin || '',
+                            // Branding
+                            logoUrl: data.logoUrl || '',
+                            // Ownership fields (required for Firestore rules)
+                            ownerId: userEmail || '',
+                            assignedTo: userEmail || '',
+                            createdBy: userEmail || '',
+                            // Timestamps
+                            createdAt: now,
+                            updatedAt: now,
+                        };
+
+                        // Use DataManager.addOwnership if available for server timestamps
+                        const finalDoc = (window.DataManager && typeof window.DataManager.addOwnership === 'function')
+                            ? window.DataManager.addOwnership(doc)
+                            : doc;
+
+                        // Add service addresses if any
+                        if (serviceAddresses.length > 0) {
+                            finalDoc.serviceAddresses = serviceAddresses;
+                        }
+
+                        const ref = await db.collection('accounts').add(finalDoc);
+
+                        // Create UI document for notifications and navigation
+                        // Use finalDoc instead of doc to include serviceAddresses and all other fields
+                        const uiDoc = Object.assign({}, finalDoc, { createdAt: new Date(), updatedAt: new Date() });
+
+                        // Notify Accounts page to update its state without reload
+                        try {
+                            document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: ref.id, doc: uiDoc } }));
+                        } catch (_) { /* noop */ }
+
+                        if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Account added!');
+
+                        // Navigate to account details page after successful creation
+                        try {
+                            // Set up navigation source tracking for back button
+                            window._accountNavigationSource = 'add-account';
+                            // Use the state that was captured when the add account button was clicked
+                            // If no state was captured, create a default one
+                            if (!window._addAccountReturn) {
+                                window._addAccountReturn = {
+                                    page: window.crm?.currentPage || 'accounts',
+                                    scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+                                    searchTerm: '',
+                                    sortColumn: '',
+                                    sortDirection: '',
+                                    selectedItems: []
+                                };
+                            }
+
+                            // Navigate to account details page
+                            console.log('[Add Account] Attempting navigation to account details for ID:', ref.id);
+                            console.log('[Add Account] AccountDetail available:', !!window.AccountDetail);
+                            console.log('[Add Account] AccountDetail.show available:', !!(window.AccountDetail && typeof window.AccountDetail.show === 'function'));
+
+                            if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+                                // Prefetch the account data for immediate display
+                                window._prefetchedAccountForDetail = Object.assign({}, uiDoc, { id: ref.id });
+                                console.log('[Add Account] Calling AccountDetail.show with ID:', ref.id);
+                                window.AccountDetail.show(ref.id);
+                            } else {
+                                // Try to navigate to account-details page and then show the account
+                                console.log('[Add Account] AccountDetail not available, using fallback navigation');
+                                if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                                    window.crm.navigateToPage('account-details');
+
+                                    // Retry showing the account detail after page navigation
+                                    let retryCount = 0;
+                                    const maxRetries = 20; // 2 seconds with 100ms intervals
+                                    const retryInterval = setInterval(() => {
+                                        retryCount++;
+                                        if (window.AccountDetail && typeof window.AccountDetail.show === 'function') {
+                                            console.log('[Add Account] Retry successful, showing account detail');
+                                            window._prefetchedAccountForDetail = Object.assign({}, uiDoc, { id: ref.id });
+                                            window.AccountDetail.show(ref.id);
+                                            clearInterval(retryInterval);
+                                        } else if (retryCount >= maxRetries) {
+                                            console.error('[Add Account] Failed to load AccountDetail after retries');
+                                            clearInterval(retryInterval);
+                                        }
+                                    }, 100);
+                                } else {
+                                    console.error('[Add Account] No navigation method available');
+                                }
+                            }
+
+                            // Close modal after navigation is initiated
+                            setTimeout(() => {
+                                try { form.reset(); } catch (_) { /* noop */ }
+                                close();
+                            }, 100); // Small delay to ensure navigation starts
+
+                        } catch (e) {
+                            console.error('Navigation to account details failed:', e);
+                            // If navigation fails, still close the modal
+                            try { form.reset(); } catch (_) { /* noop */ }
+                            close();
+                        }
+                    } catch (err) {
+                        if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Failed to add account');
+                        console.error('Add account failed', err);
+                    }
+                });
+            }
+
+            modal._bound = true;
         }
-      }
-    };
 
-    const close = () => {
-      // Start exit animation
-      modal.classList.remove('show');
-      
-      // Hide modal after animation completes
-      setTimeout(() => {
-      modal.setAttribute('hidden', '');
-      dialog.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('keydown', handleKeyDown);
-      }, 300); // Match CSS transition duration
-    };
-
-    // One-time static bindings (click handlers, focus ring, submit)
-    if (!modal._bound) {
-      // Click-away and close buttons
-      if (backdrop) backdrop.addEventListener('click', close);
-      modal.querySelectorAll('[data-close="contact"]').forEach(btn => btn.addEventListener('click', close));
-
-      // Subtle orange focus ring on inputs
-      modal.querySelectorAll('input').forEach(input => {
-        input.addEventListener('focus', () => input.classList.add('focus-orange'));
-        input.addEventListener('blur', () => input.classList.remove('focus-orange'));
-      });
-
-      // Submit handler -> Firestore save
-      if (form) {
-        form.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const data = {};
-          form.querySelectorAll('input, textarea').forEach(inp => { data[inp.name] = (inp.value || '').trim(); });
-
-          // Sanitize if available
-          if (window.escapeHtml) {
-            Object.keys(data).forEach(k => { data[k] = window.escapeHtml(data[k]); });
-          }
-
-          // Remove empty fields
-          Object.keys(data).forEach(k => { if (!data[k]) delete data[k]; });
-
-          try {
-            const db = window.firebaseDB;
-            const fv = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue;
-            if (!db) throw new Error('Firestore not initialized');
-            const now = fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : Date.now();
-
-            // Normalize contact phone fields
-            const normalized = {};
-            if (data.mobile) { try { normalized.mobile = this.normalizePhone(data.mobile); } catch(_) { normalized.mobile = data.mobile; } }
-            if (data.workDirectPhone) { try { normalized.workDirectPhone = this.normalizePhone(data.workDirectPhone); } catch(_) { normalized.workDirectPhone = data.workDirectPhone; } }
-            if (data.otherPhone) { try { normalized.otherPhone = this.normalizePhone(data.otherPhone); } catch(_) { normalized.otherPhone = data.otherPhone; } }
-
-            // Get user email for ownership fields
-            const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
-              ? window.DataManager.getCurrentUserEmail()
-              : ((window.currentUserEmail || '').toLowerCase());
-
-            const doc = {
-              // Known contact fields
-              firstName: data.firstName || '',
-              lastName: data.lastName || '',
-              title: data.title || '',
-              companyName: data.companyName || '',
-              email: data.email || '',
-              // Phones
-              mobile: normalized.mobile || '',
-              workDirectPhone: normalized.workDirectPhone || '',
-              otherPhone: normalized.otherPhone || '',
-              // Optional extras
-              city: data.city || '',
-              state: data.state || '',
-              industry: data.industry || '',
-              seniority: data.seniority || '',
-              department: data.department || '',
-              linkedin: data.linkedin || '',
-              // Ownership fields (required for Firestore rules)
-              ownerId: userEmail || '',
-              assignedTo: userEmail || '',
-              createdBy: userEmail || '',
-              // Timestamps
-              createdAt: now,
-              updatedAt: now,
-            };
-
-          // If adding from Account Details or Task Detail, link the contact to the current account immediately
-          try {
-            let accountId = window.AccountDetail?.state?.currentAccount?.id;
-            
-            // If not from Account Detail, check if we're from Task Detail with an account
-            if (!accountId && window.TaskDetail?.state?.currentTask) {
-              const task = window.TaskDetail.state.currentTask;
-              if (task.accountId) {
-                accountId = task.accountId;
-              } else if (task.account) {
-                // Try to find account by name
-                const accounts = window.getAccountsData?.() || [];
-                const account = accounts.find(a => 
-                  (a.accountName || a.name || a.companyName) === task.account
-                );
-                if (account) {
-                  accountId = account.id;
-                }
-              }
-            }
-            
-            if (accountId) {
-              doc.accountId = accountId;
-            }
-          } catch (_) { /* noop */ }
-
-            // Use DataManager.addOwnership if available for server timestamps
-            const finalDoc = (window.DataManager && typeof window.DataManager.addOwnership === 'function')
-              ? window.DataManager.addOwnership(doc)
-              : doc;
-
-            const ref = await db.collection('contacts').add(finalDoc);
-
-            // If LinkedIn URL provided and contact is linked to an account, update account's LinkedIn
-            if (doc.linkedin) {
-              let accountId = doc.accountId;
-              
-              // If no accountId but has companyName, try to find account by name
-              if (!accountId && doc.companyName) {
-                try {
-                  const accountQuery = await db.collection('accounts')
-                    .where('accountName', '==', doc.companyName)
-                    .limit(1)
-                    .get();
-                  if (!accountQuery.empty) {
-                    accountId = accountQuery.docs[0].id;
-                  }
-                } catch (_) {}
-              }
-              
-              if (accountId) {
-                try {
-                  await db.collection('accounts').doc(accountId).update({
-                    linkedin: doc.linkedin,
-                    updatedAt: now
-                  });
-                  console.log('[AddContact] Updated account LinkedIn from contact');
-                } catch (err) {
-                  console.warn('[AddContact] Failed to update account LinkedIn:', err);
-                }
-              }
-            }
-
-            // Broadcast for optional listeners (e.g., People page refresh)
-            // Use UI-friendly timestamps so the table doesn't show N/A while serverTimestamp resolves
-            try {
-              const uiDoc = Object.assign({}, doc, {
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              });
-              const newContact = { id: ref.id, ...uiDoc };
-              
-              // IMMEDIATELY inject into essential data
-              if (window._essentialContactsData) {
-                window._essentialContactsData.push(newContact);
-                console.log('[Contact] Added to essential data');
-              }
-              
-              // IMMEDIATELY update cache
-              if (window.CacheManager && typeof window.CacheManager.get === 'function') {
-                window.CacheManager.get('contacts').then(contacts => {
-                  if (contacts && Array.isArray(contacts)) {
-                    contacts.push(newContact);
-                    window.CacheManager.set('contacts', contacts);
-                    console.log('[Contact] Updated cache');
-                  }
-                }).catch(() => {});
-              }
-              
-              document.dispatchEvent(new CustomEvent('pc:contact-created', { 
-                detail: { 
-                  id: ref.id, 
-                  doc: uiDoc,
-                  contact: newContact  // Full contact object for immediate use
-                } 
-              }));
-            } catch (_) { /* noop */ }
-
-            if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Contact added!');
-            try { form.reset(); } catch (_) { /* noop */ }
-            close();
-
-            // Navigate to the newly created contact detail page
-            try {
-              // Navigate to people page first
-              if (window.crm && typeof window.crm.navigateToPage === 'function') {
-                window.crm.navigateToPage('people');
-                // Show the contact detail after a longer delay to ensure page is fully loaded
-                setTimeout(() => {
-                  if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-                    window.ContactDetail.show(ref.id);
-                  } else {
-                    // Enhanced retry mechanism with longer intervals
-                    let attempts = 0;
-                    const maxAttempts = 15;
-                    const retryInterval = 150;
-                    const retry = () => {
-                      attempts++;
-                      if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
-                        window.ContactDetail.show(ref.id);
-                      } else if (attempts < maxAttempts) {
-                        setTimeout(retry, retryInterval);
-                      } else {
-                        console.error('ContactDetail not available after', maxAttempts, 'attempts');
-                      }
-                    };
-                    retry();
-                  }
-                }, 200);
-              }
-            } catch (error) {
-              console.error('Error navigating to contact detail:', error);
-            }
-          } catch (err) {
-            if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Failed to add contact');
-            console.error('Add contact failed', err);
-          }
-        });
-      }
-
-      modal._bound = true;
+        // Bind per-open listeners
+        dialog.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keydown', handleKeyDown);
     }
 
-    // Bind per-open listeners
-    dialog.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('keydown', handleKeyDown);
-  }
+    // Prefer PUBLIC_BASE_URL → API_BASE_URL → Vercel fallback → location.origin
+    getApiBaseUrl() {
+        try {
+            const fromWindow = (window.PUBLIC_BASE_URL || window.API_BASE_URL || '').toString().trim();
+            if (fromWindow) return fromWindow.replace(/\/$/, '');
+        } catch (_) { }
+        try {
+            if (typeof PUBLIC_BASE_URL !== 'undefined' && PUBLIC_BASE_URL) return String(PUBLIC_BASE_URL).replace(/\/$/, '');
+        } catch (_) { }
+        try {
+            if (typeof API_BASE_URL !== 'undefined' && API_BASE_URL) return String(API_BASE_URL).replace(/\/$/, '');
+        } catch (_) { }
+        const cloudRun = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+        if (/^https?:\/\//i.test(cloudRun)) return cloudRun;
+        try { return (window.location && window.location.origin) ? window.location.origin.replace(/\/$/, '') : cloudRun; } catch (_) { return cloudRun; }
+    }
+
+    createAddContactModal() {
+        const modal = document.getElementById('modal-add-contact');
+        if (!modal) {
+            this.showToast('Add Contact modal not found');
+            return;
+        }
+
+        const dialog = modal.querySelector('.pc-modal__dialog');
+        const backdrop = modal.querySelector('.pc-modal__backdrop');
+        const form = modal.querySelector('#form-add-contact');
+
+        // Open modal with animation
+        modal.removeAttribute('hidden');
+
+        // Double requestAnimationFrame ensures browser is ready for smooth animation
+        // This prevents choppy first render by giving browser time to create compositor layers
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                modal.classList.add('show');
+            });
+        });
+
+        // Focus management: move focus to Close button if present, else first input
+        setTimeout(() => {
+            const closeBtn = modal.querySelector('.pc-modal__close');
+            const firstInput = modal.querySelector('input,button,select,textarea,[tabindex]:not([tabindex="-1"])');
+            if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
+            else if (firstInput && typeof firstInput.focus === 'function') firstInput.focus();
+        }, 0);
+
+        // Focus trap within dialog
+        const getFocusables = () => Array.from(dialog.querySelectorAll('a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])'))
+            .filter(el => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
+
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                close();
+            } else if (e.key === 'Tab') {
+                const f = getFocusables();
+                if (!f.length) return;
+                const first = f[0];
+                const last = f[f.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
+        };
+
+        const close = () => {
+            // Start exit animation
+            modal.classList.remove('show');
+
+            // Hide modal after animation completes
+            setTimeout(() => {
+                modal.setAttribute('hidden', '');
+                dialog.removeEventListener('keydown', handleKeyDown);
+                document.removeEventListener('keydown', handleKeyDown);
+            }, 300); // Match CSS transition duration
+        };
+
+        // One-time static bindings (click handlers, focus ring, submit)
+        if (!modal._bound) {
+            // Click-away and close buttons
+            if (backdrop) backdrop.addEventListener('click', close);
+            modal.querySelectorAll('[data-close="contact"]').forEach(btn => btn.addEventListener('click', close));
+
+            // Subtle orange focus ring on inputs
+            modal.querySelectorAll('input').forEach(input => {
+                input.addEventListener('focus', () => input.classList.add('focus-orange'));
+                input.addEventListener('blur', () => input.classList.remove('focus-orange'));
+            });
+
+            // Submit handler -> Firestore save
+            if (form) {
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const data = {};
+                    form.querySelectorAll('input, textarea').forEach(inp => { data[inp.name] = (inp.value || '').trim(); });
+
+                    // Sanitize if available
+                    if (window.escapeHtml) {
+                        Object.keys(data).forEach(k => { data[k] = window.escapeHtml(data[k]); });
+                    }
+
+                    // Remove empty fields
+                    Object.keys(data).forEach(k => { if (!data[k]) delete data[k]; });
+
+                    try {
+                        const db = window.firebaseDB;
+                        const fv = window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue;
+                        if (!db) throw new Error('Firestore not initialized');
+                        const now = fv && typeof fv.serverTimestamp === 'function' ? fv.serverTimestamp() : Date.now();
+
+                        // Normalize contact phone fields
+                        const normalized = {};
+                        if (data.mobile) { try { normalized.mobile = this.normalizePhone(data.mobile); } catch (_) { normalized.mobile = data.mobile; } }
+                        if (data.workDirectPhone) { try { normalized.workDirectPhone = this.normalizePhone(data.workDirectPhone); } catch (_) { normalized.workDirectPhone = data.workDirectPhone; } }
+                        if (data.otherPhone) { try { normalized.otherPhone = this.normalizePhone(data.otherPhone); } catch (_) { normalized.otherPhone = data.otherPhone; } }
+
+                        // Get user email for ownership fields
+                        const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+                            ? window.DataManager.getCurrentUserEmail()
+                            : ((window.currentUserEmail || '').toLowerCase());
+
+                        const doc = {
+                            // Known contact fields
+                            firstName: data.firstName || '',
+                            lastName: data.lastName || '',
+                            title: data.title || '',
+                            companyName: data.companyName || '',
+                            email: data.email || '',
+                            // Phones
+                            mobile: normalized.mobile || '',
+                            workDirectPhone: normalized.workDirectPhone || '',
+                            otherPhone: normalized.otherPhone || '',
+                            // Optional extras
+                            city: data.city || '',
+                            state: data.state || '',
+                            industry: data.industry || '',
+                            seniority: data.seniority || '',
+                            department: data.department || '',
+                            linkedin: data.linkedin || '',
+                            // Ownership fields (required for Firestore rules)
+                            ownerId: userEmail || '',
+                            assignedTo: userEmail || '',
+                            createdBy: userEmail || '',
+                            // Timestamps
+                            createdAt: now,
+                            updatedAt: now,
+                        };
+
+                        // If adding from Account Details or Task Detail, link the contact to the current account immediately
+                        try {
+                            let accountId = window.AccountDetail?.state?.currentAccount?.id;
+
+                            // If not from Account Detail, check if we're from Task Detail with an account
+                            if (!accountId && window.TaskDetail?.state?.currentTask) {
+                                const task = window.TaskDetail.state.currentTask;
+                                if (task.accountId) {
+                                    accountId = task.accountId;
+                                } else if (task.account) {
+                                    // Try to find account by name
+                                    const accounts = window.getAccountsData?.() || [];
+                                    const account = accounts.find(a =>
+                                        (a.accountName || a.name || a.companyName) === task.account
+                                    );
+                                    if (account) {
+                                        accountId = account.id;
+                                    }
+                                }
+                            }
+
+                            if (accountId) {
+                                doc.accountId = accountId;
+                            }
+                        } catch (_) { /* noop */ }
+
+                        // Use DataManager.addOwnership if available for server timestamps
+                        const finalDoc = (window.DataManager && typeof window.DataManager.addOwnership === 'function')
+                            ? window.DataManager.addOwnership(doc)
+                            : doc;
+
+                        const ref = await db.collection('contacts').add(finalDoc);
+
+                        // If LinkedIn URL provided and contact is linked to an account, update account's LinkedIn
+                        if (doc.linkedin) {
+                            let accountId = doc.accountId;
+
+                            // If no accountId but has companyName, try to find account by name
+                            if (!accountId && doc.companyName) {
+                                try {
+                                    const accountQuery = await db.collection('accounts')
+                                        .where('accountName', '==', doc.companyName)
+                                        .limit(1)
+                                        .get();
+                                    if (!accountQuery.empty) {
+                                        accountId = accountQuery.docs[0].id;
+                                    }
+                                } catch (_) { }
+                            }
+
+                            if (accountId) {
+                                try {
+                                    await db.collection('accounts').doc(accountId).update({
+                                        linkedin: doc.linkedin,
+                                        updatedAt: now
+                                    });
+                                    console.log('[AddContact] Updated account LinkedIn from contact');
+                                } catch (err) {
+                                    console.warn('[AddContact] Failed to update account LinkedIn:', err);
+                                }
+                            }
+                        }
+
+                        // Broadcast for optional listeners (e.g., People page refresh)
+                        // Use UI-friendly timestamps so the table doesn't show N/A while serverTimestamp resolves
+                        try {
+                            const uiDoc = Object.assign({}, doc, {
+                                createdAt: new Date(),
+                                updatedAt: new Date(),
+                            });
+                            const newContact = { id: ref.id, ...uiDoc };
+
+                            // IMMEDIATELY inject into essential data
+                            if (window._essentialContactsData) {
+                                window._essentialContactsData.push(newContact);
+                                console.log('[Contact] Added to essential data');
+                            }
+
+                            // IMMEDIATELY update cache
+                            if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+                                window.CacheManager.get('contacts').then(contacts => {
+                                    if (contacts && Array.isArray(contacts)) {
+                                        contacts.push(newContact);
+                                        window.CacheManager.set('contacts', contacts);
+                                        console.log('[Contact] Updated cache');
+                                    }
+                                }).catch(() => { });
+                            }
+
+                            document.dispatchEvent(new CustomEvent('pc:contact-created', {
+                                detail: {
+                                    id: ref.id,
+                                    doc: uiDoc,
+                                    contact: newContact  // Full contact object for immediate use
+                                }
+                            }));
+                        } catch (_) { /* noop */ }
+
+                        if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Contact added!');
+                        try { form.reset(); } catch (_) { /* noop */ }
+                        close();
+
+                        // Navigate to the newly created contact detail page
+                        try {
+                            // Navigate to people page first
+                            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+                                window.crm.navigateToPage('people');
+                                // Show the contact detail after a longer delay to ensure page is fully loaded
+                                setTimeout(() => {
+                                    if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                                        window.ContactDetail.show(ref.id);
+                                    } else {
+                                        // Enhanced retry mechanism with longer intervals
+                                        let attempts = 0;
+                                        const maxAttempts = 15;
+                                        const retryInterval = 150;
+                                        const retry = () => {
+                                            attempts++;
+                                            if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                                                window.ContactDetail.show(ref.id);
+                                            } else if (attempts < maxAttempts) {
+                                                setTimeout(retry, retryInterval);
+                                            } else {
+                                                console.error('ContactDetail not available after', maxAttempts, 'attempts');
+                                            }
+                                        };
+                                        retry();
+                                    }
+                                }, 200);
+                            }
+                        } catch (error) {
+                            console.error('Error navigating to contact detail:', error);
+                        }
+                    } catch (err) {
+                        if (window.crm && typeof window.crm.showToast === 'function') window.crm.showToast('Failed to add contact');
+                        console.error('Add contact failed', err);
+                    }
+                });
+            }
+
+            modal._bound = true;
+        }
+
+        // Bind per-open listeners
+        dialog.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keydown', handleKeyDown);
+    }
 
     init() {
         this.setupNavigation();
@@ -1143,32 +1143,32 @@ class PowerChoosersCRM {
         try {
             this.updateWidgetPanel(this.currentPage);
         } catch (_) { /* noop */ }
-        
+
         // Pre-warm modal animations for smooth first use (performance optimization)
         setTimeout(() => this.preWarmModalAnimations(), 500);
     }
-    
+
     // Pre-warm modal animations to prevent choppy first render
     preWarmModalAnimations() {
         // Force browser to create compositor layers for modals
         const modals = ['modal-add-contact', 'modal-add-account'];
-        
+
         modals.forEach(modalId => {
             const modal = document.getElementById(modalId);
             if (!modal) return;
-            
+
             const dialog = modal.querySelector('.pc-modal__dialog');
             const backdrop = modal.querySelector('.pc-modal__backdrop');
-            
+
             if (!dialog || !backdrop) return;
-            
+
             // Temporarily show modal off-screen to force layer creation
             // This pre-compiles the CSS and creates GPU layers without visible flash
             const originalHidden = modal.hasAttribute('hidden');
             const originalDisplay = modal.style.display;
             const originalTransform = dialog.style.transform;
             const originalOpacity = modal.style.opacity;
-            
+
             // Force layout calculation by briefly showing elements
             modal.removeAttribute('hidden');
             modal.style.display = 'block';
@@ -1177,16 +1177,16 @@ class PowerChoosersCRM {
             modal.style.position = 'fixed';
             modal.style.top = '-9999px';
             modal.style.left = '-9999px';
-            
+
             // Force browser to create compositor layers
             void dialog.offsetHeight; // Force layout
             void backdrop.offsetHeight; // Force layout
-            
+
             // Trigger a micro-animation to warm up the GPU
             requestAnimationFrame(() => {
                 dialog.style.transform = 'translate(-50%, -50%) scale(0.98) translateY(5px) translateZ(0)';
                 backdrop.style.opacity = '0.1';
-                
+
                 requestAnimationFrame(() => {
                     // Reset everything
                     dialog.style.transform = originalTransform || '';
@@ -1197,7 +1197,7 @@ class PowerChoosersCRM {
                     modal.style.position = '';
                     modal.style.top = '';
                     modal.style.left = '';
-                    
+
                     if (originalHidden) {
                         modal.setAttribute('hidden', '');
                     }
@@ -1213,17 +1213,17 @@ class PowerChoosersCRM {
 
         navItems.forEach(item => {
             if (!item._navBound) {
-            item.addEventListener('click', (e) => {
-                e.preventDefault();
-                const targetPage = item.getAttribute('data-page');
-                
-                // Collapse sidebar and lock to prevent immediate reopening
-                this.collapseSidebarAndLock();
-                
-                // No special handling needed for Client Management - it has its own page now
-                
-                this.navigateToPage(targetPage);
-            });
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const targetPage = item.getAttribute('data-page');
+
+                    // Collapse sidebar and lock to prevent immediate reopening
+                    this.collapseSidebarAndLock();
+
+                    // No special handling needed for Client Management - it has its own page now
+
+                    this.navigateToPage(targetPage);
+                });
                 item._navBound = true;
             }
         });
@@ -1234,17 +1234,17 @@ class PowerChoosersCRM {
         if (this.currentPage && this.currentPage !== pageName) {
             this.cleanupPageMemory(this.currentPage);
         }
-        
+
         // Update current page tracking
         this.currentPage = pageName;
-        
+
         // Handle URL parameters for specific pages
         if (pageName === 'email-detail' && params.emailId) {
             const url = new URL(window.location);
             url.searchParams.set('emailId', params.emailId);
             window.history.pushState({}, '', url);
         }
-        
+
         // Lazy load page scripts if needed
         if (window.loadPageScripts && typeof window.loadPageScripts === 'function') {
             try {
@@ -1253,42 +1253,42 @@ class PowerChoosersCRM {
                 console.error(`[CRM] Error loading scripts for ${pageName}:`, error);
             }
         }
-        
+
         // Use View Transitions API for smooth page transitions
         const performNavigation = () => {
-        // Hide all pages
-        document.querySelectorAll('.page').forEach(page => {
-            page.classList.remove('active');
-        });
-        
-        // Remove active class from all nav items
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        
-        // Show target page
-        const targetPage = document.getElementById(`${pageName}-page`);
-        if (targetPage) {
-            targetPage.classList.add('active');
-        }
-        
-        // Activate corresponding nav item
-        // When on Account Details, keep highlight on Accounts in the sidebar
-        // When on List Detail, keep highlight on Lists in the sidebar
-        const navPageToActivate = (pageName === 'account-details') ? 'accounts' : 
-                                 (pageName === 'list-detail') ? 'lists' : pageName;
-        const targetNav = document.querySelector(`[data-page="${navPageToActivate}"]`);
-        if (targetNav) {
-            targetNav.classList.add('active');
+            // Hide all pages
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+
+            // Remove active class from all nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+
+            // Show target page
+            const targetPage = document.getElementById(`${pageName}-page`);
+            if (targetPage) {
+                targetPage.classList.add('active');
+            }
+
+            // Activate corresponding nav item
+            // When on Account Details, keep highlight on Accounts in the sidebar
+            // When on List Detail, keep highlight on Lists in the sidebar
+            const navPageToActivate = (pageName === 'account-details') ? 'accounts' :
+                (pageName === 'list-detail') ? 'lists' : pageName;
+            const targetNav = document.querySelector(`[data-page="${navPageToActivate}"]`);
+            if (targetNav) {
+                targetNav.classList.add('active');
             }
         };
-        
+
         // Check if View Transitions API is supported
         if (document.startViewTransition) {
             // Determine transition scope based on page type
             const isSettingsPage = pageName === 'settings';
             const isFromSettingsPage = this.currentPage === 'settings';
-            
+
             if (isSettingsPage || isFromSettingsPage) {
                 // Settings page: whole screen transition (since it takes up full screen)
                 document.startViewTransition(() => {
@@ -1315,7 +1315,7 @@ class PowerChoosersCRM {
             // Fallback for browsers that don't support View Transitions API
             performNavigation();
         }
-        
+
         // Special handling for specific pages
         if (pageName === 'people' && window.peopleModule) {
             setTimeout(() => {
@@ -1324,7 +1324,7 @@ class PowerChoosersCRM {
                 }
             }, 50);
         }
-        
+
         if (pageName === 'accounts' && window.accountsModule) {
             setTimeout(() => {
                 if (typeof window.accountsModule.init === 'function') {
@@ -1332,26 +1332,26 @@ class PowerChoosersCRM {
                 }
             }, 50);
         }
-        
+
         // Load activities for home page
         if (pageName === 'dashboard' && window.ActivityManager) {
             setTimeout(() => {
                 this.loadHomeActivities();
             }, 50);
         }
-        
+
         // Tasks page - ensure data is loaded from Firebase and localStorage
         if (pageName === 'tasks') {
             setTimeout(() => {
                 // Trigger a refresh of tasks data when navigating to tasks page
                 if (window.dispatchEvent) {
-                    window.dispatchEvent(new CustomEvent('tasksUpdated', { 
-                        detail: { source: 'navigation' } 
+                    window.dispatchEvent(new CustomEvent('tasksUpdated', {
+                        detail: { source: 'navigation' }
                     }));
                 }
             }, 50);
         }
-        
+
         // Task detail page - initialize task detail functionality
         if (pageName === 'task-detail') {
             setTimeout(() => {
@@ -1360,7 +1360,7 @@ class PowerChoosersCRM {
                 }
             }, 100);
         }
-        
+
         // Contact detail page - initialize contact detail functionality
         if (pageName === 'contact-detail') {
             setTimeout(() => {
@@ -1369,7 +1369,7 @@ class PowerChoosersCRM {
                 }
             }, 100);
         }
-        
+
         // Lists page - ensure overview is shown by default
         if (pageName === 'lists') {
             // Make sure we show the overview, not any detail view
@@ -1380,21 +1380,21 @@ class PowerChoosersCRM {
                     listDetail.hidden = true;
                     listDetail.style.display = 'none';
                 }
-                
+
                 // Show the main lists content (overview)
                 const listsContent = document.querySelector('#lists-page .page-content');
                 if (listsContent) {
                     listsContent.style.display = 'block';
                     listsContent.classList.add('lists-grid');
                 }
-                
+
                 // Ensure lists overview module is initialized
                 if (window.ListsOverview && typeof window.ListsOverview.refreshCounts === 'function') {
                     window.ListsOverview.refreshCounts();
                 }
             }, 50);
         }
-        
+
         // Client Management page - initialize client management dashboard
         if (pageName === 'client-management') {
             setTimeout(() => {
@@ -1403,7 +1403,7 @@ class PowerChoosersCRM {
                 }
             }, 50);
         }
-        
+
         // Call Scripts page - store navigation source and initialize the module
         if (pageName === 'call-scripts') {
             // Store navigation source for back button functionality
@@ -1411,7 +1411,7 @@ class PowerChoosersCRM {
             if (currentPage && currentPage !== 'call-scripts') {
                 // Get current page state for restoration
                 let returnState = {};
-                
+
                 // Try to get state from current page modules
                 if (currentPage === 'people' && window.peopleModule && typeof window.peopleModule.getCurrentState === 'function') {
                     returnState = window.peopleModule.getCurrentState();
@@ -1429,13 +1429,13 @@ class PowerChoosersCRM {
                         timestamp: Date.now()
                     };
                 }
-                
+
                 window._callScriptsNavigationSource = currentPage;
                 window._callScriptsReturn = returnState;
-                
+
                 console.log('[Main] Stored call scripts navigation source:', currentPage, 'with state:', returnState);
             }
-            
+
             // Initialize the module
             if (window.callScriptsModule) {
                 setTimeout(() => {
@@ -1456,7 +1456,7 @@ class PowerChoosersCRM {
                     console.log('[Main] Skipping ListDetail.init() - restoring from back navigation');
                     return;
                 }
-                
+
                 // Initialize the list detail module if needed
                 if (window.ListDetail && typeof window.ListDetail.init === 'function') {
                     // Use context passed from the lists overview
@@ -1476,7 +1476,7 @@ class PowerChoosersCRM {
                 if (window.EmailDetail && typeof window.EmailDetail.init === 'function') {
                     window.EmailDetail.init();
                 }
-                
+
                 // Check if we have an emailId parameter to show
                 const urlParams = new URLSearchParams(window.location.search);
                 const emailId = urlParams.get('emailId');
@@ -1494,7 +1494,7 @@ class PowerChoosersCRM {
                 }
             }, 50);
         }
-        
+
         if (pageName === 'calls' && window.callsModule) {
             setTimeout(() => {
                 if (typeof window.callsModule.startAutoRefresh === 'function') {
@@ -1504,7 +1504,7 @@ class PowerChoosersCRM {
         } else if (window.callsModule && typeof window.callsModule.stopAutoRefresh === 'function') {
             window.callsModule.stopAutoRefresh();
         }
-        
+
         this.currentPage = pageName;
         this.updateWidgetPanel(pageName);
     }
@@ -1522,14 +1522,14 @@ class PowerChoosersCRM {
                 // Show visual feedback
                 refreshBtn.style.opacity = '0.5';
                 refreshBtn.disabled = true;
-                
+
                 console.log('[CRM] Refreshing all data...');
-                
+
                 // Invalidate all caches
                 if (window.CacheManager && typeof window.CacheManager.invalidateAll === 'function') {
                     await window.CacheManager.invalidateAll();
                     this.showToast('Data refreshed successfully', 'success');
-                    
+
                     // Reload current page to fetch fresh data
                     const currentPage = this.currentPage;
                     if (currentPage) {
@@ -1561,7 +1561,7 @@ class PowerChoosersCRM {
                 refreshBtn.disabled = false;
             }
         });
-        
+
         console.log('[CRM] Refresh button initialized');
     }
 
@@ -1571,21 +1571,21 @@ class PowerChoosersCRM {
         if (!sidebar) return;
 
         // Helpers with requestAnimationFrame for smooth animations
-        const openSidebar = () => { 
+        const openSidebar = () => {
             // Only open if not locked AND mouse has moved (prevents accidental reopening)
             if (!this.sidebarLockCollapse && this.sidebarMouseMoved) {
                 // Use requestAnimationFrame for smoother animation
                 requestAnimationFrame(() => {
-                    sidebar.classList.add('expanded'); 
+                    sidebar.classList.add('expanded');
                 });
             }
         };
-        
-        const closeSidebar = () => { 
+
+        const closeSidebar = () => {
             if (!this.sidebarPointerInside) {
                 // Use requestAnimationFrame for smoother animation
                 requestAnimationFrame(() => {
-                    sidebar.classList.remove('expanded'); 
+                    sidebar.classList.remove('expanded');
                 });
             }
         };
@@ -1613,7 +1613,7 @@ class PowerChoosersCRM {
                 // Throttle edge detection for performance (every 50ms max)
                 const now = Date.now();
                 const shouldCheckEdge = now - this.sidebarLastEdgeCheck >= 50;
-                
+
                 // Check if mouse has moved significantly (5px threshold)
                 const movedX = Math.abs(e.clientX - this.sidebarLastMouseX);
                 const movedY = Math.abs(e.clientY - this.sidebarLastMouseY);
@@ -1622,13 +1622,13 @@ class PowerChoosersCRM {
                     this.sidebarLastMouseX = e.clientX;
                     this.sidebarLastMouseY = e.clientY;
                 }
-                
+
                 // Edge-trigger: open when pointer approaches left edge (throttled)
                 if (shouldCheckEdge) {
                     this.sidebarLastEdgeCheck = now;
-                    
+
                     if (this.sidebarLockCollapse || sidebar.classList.contains('click-locked')) return;
-                    
+
                     const edgeWidth = 12; // px
                     if (e.clientX <= edgeWidth) {
                         if (this.sidebarCloseTimer) clearTimeout(this.sidebarCloseTimer);
@@ -1656,7 +1656,7 @@ class PowerChoosersCRM {
     // Collapse sidebar and lock it to prevent immediate reopening
     collapseSidebarAndLock(duration = 1200) {
         if (!this.sidebar) return;
-        
+
         // Use requestAnimationFrame for smoother collapse animation
         requestAnimationFrame(() => {
             this.sidebar.classList.add('click-locked');
@@ -1665,7 +1665,7 @@ class PowerChoosersCRM {
             this.clearSidebarTimers();
             this.sidebar.classList.remove('expanded');
         });
-        
+
         // Capture current mouse position for movement detection
         const captureCurrentPosition = (e) => {
             this.sidebarLastMouseX = e.clientX;
@@ -1673,7 +1673,7 @@ class PowerChoosersCRM {
             document.removeEventListener('pointermove', captureCurrentPosition, { once: true });
         };
         document.addEventListener('pointermove', captureCurrentPosition, { once: true });
-        
+
         // Unlock after duration
         setTimeout(() => {
             requestAnimationFrame(() => {
@@ -1697,18 +1697,18 @@ class PowerChoosersCRM {
         const searchBtn = document.querySelector('.search-btn');
 
         if (!searchInput._searchBound) {
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.performSearch(searchInput.value);
-            }
-        });
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.performSearch(searchInput.value);
+                }
+            });
             searchInput._searchBound = true;
         }
 
         if (!searchBtn._searchBound) {
-        searchBtn.addEventListener('click', () => {
-            this.performSearch(searchInput.value);
-        });
+            searchBtn.addEventListener('click', () => {
+                this.performSearch(searchInput.value);
+            });
             searchBtn._searchBound = true;
         }
 
@@ -1716,9 +1716,9 @@ class PowerChoosersCRM {
         const smallSearchInputs = document.querySelectorAll('.search-input-small');
         smallSearchInputs.forEach(input => {
             if (!input._smallSearchBound) {
-            input.addEventListener('input', (e) => {
-                this.filterPageContent(e.target.value);
-            });
+                input.addEventListener('input', (e) => {
+                    this.filterPageContent(e.target.value);
+                });
                 input._smallSearchBound = true;
             }
         });
@@ -1726,7 +1726,7 @@ class PowerChoosersCRM {
 
     performSearch(query) {
         if (!query.trim()) return;
-        
+
         console.log(`Searching for: ${query}`);
         // TODO: Implement actual search functionality
         this.showToast(`Searching for "${query}"...`);
@@ -1736,7 +1736,7 @@ class PowerChoosersCRM {
         // Filter current page content based on search
         const currentPageElement = document.querySelector('.page.active');
         const tableRows = currentPageElement.querySelectorAll('tbody tr');
-        
+
         tableRows.forEach(row => {
             const text = row.textContent.toLowerCase();
             const matches = text.includes(query.toLowerCase());
@@ -1783,7 +1783,7 @@ class PowerChoosersCRM {
                 ...options
             });
         }
-        
+
         // No fallback - ToastManager should always be available
         console.warn('ToastManager not available for toast notification:', message);
     }
@@ -1792,10 +1792,10 @@ class PowerChoosersCRM {
     createPagination(currentPage, totalPages, onPageChange, containerId = null) {
         // Always show pagination, even for single page or empty lists
         if (totalPages < 1) totalPages = 1;
-        
+
         const container = containerId ? document.getElementById(containerId) : null;
         const paginationId = `pagination-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        
+
         const html = `
             <div class="unified-pagination" id="${paginationId}">
                 <button class="pagination-arrow" data-action="prev" ${currentPage <= 1 ? 'disabled' : ''} aria-label="Previous page">
@@ -1825,19 +1825,19 @@ class PowerChoosersCRM {
                 </button>
             </div>
         `;
-        
+
         if (container) {
             container.innerHTML = html;
             this.attachPaginationEvents(paginationId, onPageChange, totalPages);
         }
-        
+
         return html;
     }
-    
+
     generatePagePickerPages(currentPage, totalPages, paginationId) {
         const pages = [];
         const maxVisible = 10; // Show up to 10 pages in picker
-        
+
         if (totalPages <= maxVisible) {
             // Show all pages
             for (let i = 1; i <= totalPages; i++) {
@@ -1847,14 +1847,14 @@ class PowerChoosersCRM {
             // Show smart range around current page
             let start = Math.max(1, currentPage - 4);
             let end = Math.min(totalPages, currentPage + 4);
-            
+
             // Adjust if we're near the beginning or end
             if (start === 1) {
                 end = Math.min(totalPages, start + maxVisible - 1);
             } else if (end === totalPages) {
                 start = Math.max(1, end - maxVisible + 1);
             }
-            
+
             // Add first page if not in range
             if (start > 1) {
                 pages.push(`<button class="picker-page" data-page="1">1</button>`);
@@ -1862,12 +1862,12 @@ class PowerChoosersCRM {
                     pages.push(`<span class="picker-ellipsis">...</span>`);
                 }
             }
-            
+
             // Add pages in range
             for (let i = start; i <= end; i++) {
                 pages.push(`<button class="picker-page ${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`);
             }
-            
+
             // Add last page if not in range
             if (end < totalPages) {
                 if (end < totalPages - 1) {
@@ -1876,35 +1876,35 @@ class PowerChoosersCRM {
                 pages.push(`<button class="picker-page" data-page="${totalPages}">${totalPages}</button>`);
             }
         }
-        
+
         return pages.join('');
     }
-    
+
     attachPaginationEvents(paginationId, onPageChange, totalPages) {
         const pagination = document.getElementById(paginationId);
         if (!pagination) return;
-        
+
         const currentBtn = pagination.querySelector('.pagination-current');
         const picker = pagination.querySelector('.pagination-picker');
         const prevBtn = pagination.querySelector('[data-action="prev"]');
         const nextBtn = pagination.querySelector('[data-action="next"]');
-        
+
         // Show/hide picker on hover
         let hoverTimeout;
-        
+
         currentBtn.addEventListener('mouseenter', () => {
             clearTimeout(hoverTimeout);
             picker.style.display = 'block';
             setTimeout(() => picker.classList.add('visible'), 10);
         });
-        
+
         pagination.addEventListener('mouseleave', () => {
             hoverTimeout = setTimeout(() => {
                 picker.classList.remove('visible');
                 setTimeout(() => picker.style.display = 'none', 200);
             }, 100);
         });
-        
+
         // Page selection in picker
         picker.addEventListener('click', (e) => {
             const pageBtn = e.target.closest('.picker-page');
@@ -1915,7 +1915,7 @@ class PowerChoosersCRM {
                 }
             }
         });
-        
+
         // Prev/Next buttons
         prevBtn.addEventListener('click', () => {
             const current = parseInt(currentBtn.textContent);
@@ -1923,7 +1923,7 @@ class PowerChoosersCRM {
                 onPageChange(current - 1);
             }
         });
-        
+
         nextBtn.addEventListener('click', () => {
             const current = parseInt(currentBtn.textContent);
             if (current < totalPages) {
@@ -1955,7 +1955,7 @@ class PowerChoosersCRM {
             align-items: center;
             gap: 12px;
         `;
-        
+
         // Create progress circle
         const progressCircle = document.createElement('div');
         progressCircle.style.cssText = `
@@ -1967,7 +1967,7 @@ class PowerChoosersCRM {
             animation: spin 1s linear infinite;
             flex-shrink: 0;
         `;
-        
+
         // Create text container
         const textContainer = document.createElement('div');
         textContainer.style.cssText = `
@@ -1976,25 +1976,25 @@ class PowerChoosersCRM {
             flex-direction: column;
             gap: 4px;
         `;
-        
+
         const messageEl = document.createElement('div');
         messageEl.textContent = message;
         messageEl.style.cssText = `
             font-weight: 500;
         `;
-        
+
         const progressText = document.createElement('div');
         progressText.style.cssText = `
             font-size: 0.75rem;
             color: var(--text-muted);
         `;
-        
+
         textContainer.appendChild(messageEl);
         textContainer.appendChild(progressText);
-        
+
         toast.appendChild(progressCircle);
         toast.appendChild(textContainer);
-        
+
         // Add CSS animation if not already present
         if (!document.querySelector('#progress-toast-styles')) {
             const style = document.createElement('style');
@@ -2007,24 +2007,24 @@ class PowerChoosersCRM {
             `;
             document.head.appendChild(style);
         }
-        
+
         document.body.appendChild(toast);
-        
+
         // Animate in
         setTimeout(() => {
             toast.style.opacity = '1';
             toast.style.transform = 'translateY(0)';
         }, 100);
-        
+
         // Update progress function
         const updateProgress = (current, total) => {
             const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
             progressText.textContent = `${current} of ${total} (${percentage}%)`;
         };
-        
+
         // Initial progress
         updateProgress(current, total);
-        
+
         // Return update function and cleanup function
         return {
             update: (newCurrent, newTotal = total) => {
@@ -2047,12 +2047,12 @@ class PowerChoosersCRM {
                         <polyline points="20,6 9,17 4,12"></polyline>
                     </svg>
                 `;
-                
+
                 if (successMessage) {
                     messageEl.textContent = successMessage;
                 }
                 progressText.textContent = 'Complete';
-                
+
                 // Remove after 2 seconds
                 setTimeout(() => {
                     toast.style.opacity = '0';
@@ -2082,12 +2082,12 @@ class PowerChoosersCRM {
                         <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
                 `;
-                
+
                 if (errorMessage) {
                     messageEl.textContent = errorMessage;
                 }
                 progressText.textContent = 'Failed';
-                
+
                 // Remove after 3 seconds
                 setTimeout(() => {
                     toast.style.opacity = '0';
@@ -2155,7 +2155,7 @@ class PowerChoosersCRM {
                     return;
                 }
             }
-            
+
             let left = Math.round(rect.left + (rect.width / 2) - (ttRect.width / 2));
             let top = Math.round(rect.top - ttRect.height - gap);
             // Keep in viewport
@@ -2194,7 +2194,7 @@ class PowerChoosersCRM {
                 tooltipEl.style.opacity = '1';
             });
             // Link for a11y
-            try { el.setAttribute('aria-describedby', 'pc-tooltip'); } catch (_) {}
+            try { el.setAttribute('aria-describedby', 'pc-tooltip'); } catch (_) { }
         };
 
         const hideTooltip = () => {
@@ -2203,7 +2203,7 @@ class PowerChoosersCRM {
             tooltipEl.style.opacity = '0';
             tooltipEl.style.visibility = 'hidden';
             if (anchorEl) {
-                try { anchorEl.removeAttribute('aria-describedby'); } catch (_) {}
+                try { anchorEl.removeAttribute('aria-describedby'); } catch (_) { }
             }
             anchorEl = null;
         };
@@ -2243,33 +2243,33 @@ class PowerChoosersCRM {
         };
 
         if (!document._tooltipKeydownBound) {
-        document.addEventListener('keydown', onKeyForModality, true);
+            document.addEventListener('keydown', onKeyForModality, true);
             document._tooltipKeydownBound = true;
         }
         if (!document._tooltipMousedownBound) {
-        document.addEventListener('mousedown', onPointerStart, true);
+            document.addEventListener('mousedown', onPointerStart, true);
             document._tooltipMousedownBound = true;
         }
         if (!document._tooltipTouchstartBound) {
-        document.addEventListener('touchstart', onPointerStart, { passive: true, capture: true });
+            document.addEventListener('touchstart', onPointerStart, { passive: true, capture: true });
             document._tooltipTouchstartBound = true;
         }
 
         // Use delegation so dynamically-added nodes are handled automatically
         if (!document._tooltipMouseenterBound) {
-        document.addEventListener('mouseenter', handleEnter, true);
+            document.addEventListener('mouseenter', handleEnter, true);
             document._tooltipMouseenterBound = true;
         }
         if (!document._tooltipFocusinBound) {
-        document.addEventListener('focusin', handleEnter, true);
+            document.addEventListener('focusin', handleEnter, true);
             document._tooltipFocusinBound = true;
         }
         if (!document._tooltipMouseleaveBound) {
-        document.addEventListener('mouseleave', handleLeave, true);
+            document.addEventListener('mouseleave', handleLeave, true);
             document._tooltipMouseleaveBound = true;
         }
         if (!document._tooltipFocusoutBound) {
-        document.addEventListener('focusout', handleLeave, true);
+            document.addEventListener('focusout', handleLeave, true);
             document._tooltipFocusoutBound = true;
         }
     }
@@ -2278,7 +2278,7 @@ class PowerChoosersCRM {
     updateWidgetPanel(pageName) {
         const widgetPanel = document.getElementById('widget-panel');
         const mainContentEl = document.querySelector('.main-content');
-        
+
         // Show/hide widget panel based on page
         if (pageName === 'settings') {
             if (widgetPanel) {
@@ -2309,10 +2309,10 @@ class PowerChoosersCRM {
         const quickActionBtns = document.querySelectorAll('.action-btn');
         quickActionBtns.forEach(btn => {
             if (!btn._quickActionBound) {
-            btn.addEventListener('click', () => {
-                const action = btn.textContent.trim();
-                this.handleQuickAction(action);
-            });
+                btn.addEventListener('click', () => {
+                    const action = btn.textContent.trim();
+                    this.handleQuickAction(action);
+                });
                 btn._quickActionBound = true;
             }
         });
@@ -2322,35 +2322,35 @@ class PowerChoosersCRM {
         const filterTabs = tasksPage ? tasksPage.querySelectorAll('.filter-tab') : [];
         filterTabs.forEach(tab => {
             if (!tab._filterTabBound) {
-            tab.addEventListener('click', (e) => {
-                // Only handle clicks originating inside #tasks-page
-                if (!tasksPage || !tasksPage.contains(tab)) return;
-                // Remove active from all tabs within tasks page
-                filterTabs.forEach(t => t.classList.remove('active'));
-                // Add active to clicked tab
-                tab.classList.add('active');
-                const filter = tab.textContent.trim().split(' ')[0].toLowerCase();
-                this.filterTasks(filter);
-            });
+                tab.addEventListener('click', (e) => {
+                    // Only handle clicks originating inside #tasks-page
+                    if (!tasksPage || !tasksPage.contains(tab)) return;
+                    // Remove active from all tabs within tasks page
+                    filterTabs.forEach(t => t.classList.remove('active'));
+                    // Add active to clicked tab
+                    tab.classList.add('active');
+                    const filter = tab.textContent.trim().split(' ')[0].toLowerCase();
+                    this.filterTasks(filter);
+                });
                 tab._filterTabBound = true;
             }
         });
 
         // Action buttons in tables
         if (!document._actionButtonsBound) {
-        document.addEventListener('click', (e) => {
-            // Don't interfere with bulk selection popover
-            if (e.target.closest && e.target.closest('#people-bulk-popover')) {
-                return;
-            }
-            
-            if (e.target.classList.contains('btn-success')) {
-                this.completeTask(e.target);
-            }
-            if (e.target.classList.contains('btn-text') && e.target.textContent === 'Edit') {
-                this.editTask(e.target);
-            }
-        });
+            document.addEventListener('click', (e) => {
+                // Don't interfere with bulk selection popover
+                if (e.target.closest && e.target.closest('#people-bulk-popover')) {
+                    return;
+                }
+
+                if (e.target.classList.contains('btn-success')) {
+                    this.completeTask(e.target);
+                }
+                if (e.target.classList.contains('btn-text') && e.target.textContent === 'Edit') {
+                    this.editTask(e.target);
+                }
+            });
             document._actionButtonsBound = true;
         }
 
@@ -2383,7 +2383,7 @@ class PowerChoosersCRM {
     }
 
     handleQuickAction(action) {
-        switch(action) {
+        switch (action) {
             case 'Add Contact':
                 this.showModal('add-contact');
                 break;
@@ -2417,7 +2417,7 @@ class PowerChoosersCRM {
             if (currentPage === 'accounts') {
                 const quickSearch = document.getElementById('accounts-quick-search');
                 if (quickSearch) pageState.searchTerm = quickSearch.value;
-                
+
                 // Try to get accounts page state if available
                 if (window.accountsModule && window.accountsModule.state) {
                     const state = window.accountsModule.state;
@@ -2428,7 +2428,7 @@ class PowerChoosersCRM {
             } else if (currentPage === 'people') {
                 const quickSearch = document.getElementById('people-quick-search');
                 if (quickSearch) pageState.searchTerm = quickSearch.value;
-                
+
                 // Try to get people page state if available
                 if (window.peopleModule && window.peopleModule.state) {
                     const state = window.peopleModule.state;
@@ -2439,7 +2439,7 @@ class PowerChoosersCRM {
             } else if (currentPage === 'calls') {
                 const quickSearch = document.getElementById('calls-quick-search');
                 if (quickSearch) pageState.searchTerm = quickSearch.value;
-                
+
                 // Try to get calls page state if available
                 if (window.callsModule && window.callsModule.state) {
                     const state = window.callsModule.state;
@@ -2468,19 +2468,19 @@ class PowerChoosersCRM {
 
     filterTasks(filter) {
         const tableRows = document.querySelectorAll('#tasks-page tbody tr');
-        
+
         tableRows.forEach(row => {
             if (filter === 'all') {
                 row.style.display = '';
             } else {
                 const statusBadge = row.querySelector('.status-badge');
                 const status = statusBadge ? statusBadge.textContent.trim() : '';
-                
+
                 const shouldShow = (
                     (filter === 'pending' && status === 'pending') ||
                     (filter === 'completed' && status === 'completed')
                 );
-                
+
                 row.style.display = shouldShow ? '' : 'none';
             }
         });
@@ -2489,16 +2489,16 @@ class PowerChoosersCRM {
     completeTask(button) {
         const row = button.closest('tr');
         const statusBadge = row.querySelector('.status-badge');
-        
+
         if (statusBadge) {
             statusBadge.textContent = 'completed';
             statusBadge.className = 'status-badge completed';
         }
-        
+
         button.textContent = 'Completed';
         button.disabled = true;
         button.style.opacity = '0.6';
-        
+
         this.showToast('Task marked as completed');
     }
 
@@ -2542,15 +2542,15 @@ class PowerChoosersCRM {
 
         // Reset modal to initial state
         this.resetBulkImportModal(modal);
-        
+
         // Show modal with animation
         modal.removeAttribute('hidden');
-        
+
         // Trigger animation after a brief delay to ensure DOM is ready
         requestAnimationFrame(() => {
             modal.classList.add('show');
         });
-        
+
         // Focus management
         setTimeout(() => {
             const firstInput = modal.querySelector('input[type="file"]');
@@ -2569,24 +2569,24 @@ class PowerChoosersCRM {
         const fileInput = modal.querySelector('#csv-file-input');
         const fileInfo = modal.querySelector('#csv-file-info');
         const dropZone = modal.querySelector('#csv-drop-zone');
-        
+
         if (fileInput) fileInput.value = '';
         if (fileInfo) fileInfo.hidden = true;
         if (dropZone) dropZone.style.display = 'flex';
-        
+
         // Reset step indicator
         modal.querySelectorAll('.csv-step').forEach(step => {
             step.classList.remove('active', 'completed');
         });
         modal.querySelector('.csv-step[data-step="1"]').classList.add('active');
-        
+
         // Reset to step 1 and ensure it's visible
         this.showCSVStep(modal, 1);
-        
+
         // Reset buttons
         const nextBtn1 = modal.querySelector('#csv-next-step-1');
         if (nextBtn1) nextBtn1.disabled = true;
-        
+
         // Reset Step 3 completion state
         const progressDiv = modal.querySelector('#csv-import-progress');
         const resultsDiv = modal.querySelector('#csv-import-results');
@@ -2595,7 +2595,7 @@ class PowerChoosersCRM {
         const finishBtn = modal.querySelector('#csv-finish-import');
         const reviewSummary = modal.querySelector('#csv-review-summary');
         const finalPreview = modal.querySelector('#csv-final-preview');
-        
+
         if (progressDiv) progressDiv.hidden = true;
         if (resultsDiv) resultsDiv.hidden = true;
         if (summaryDiv) summaryDiv.innerHTML = '';
@@ -2603,19 +2603,19 @@ class PowerChoosersCRM {
         if (finishBtn) finishBtn.hidden = true;
         if (reviewSummary) reviewSummary.innerHTML = '';
         if (finalPreview) finalPreview.innerHTML = '';
-        
+
         // Clear any stored data
         modal._csvData = null;
         modal._csvHeaders = null;
         modal._csvRows = null;
         modal._importType = 'contacts';
-        
+
         // Reset import type radio buttons to contacts
         const typeInputs = modal.querySelectorAll('input[name="importType"]');
         typeInputs.forEach(input => {
             input.checked = (input.value === 'contacts');
         });
-        
+
         // Reset list dropdown selection
         delete modal.dataset.selectedListId;
         delete modal.dataset.selectedListName;
@@ -2623,13 +2623,13 @@ class PowerChoosersCRM {
         if (trigger) trigger.textContent = 'No list assignment';
         const dropdown = modal.querySelector('#csv-list-dropdown');
         if (dropdown) dropdown.hidden = true;
-        
+
         // Clean up event listeners
         if (modal._csvDropdownCleanup) {
             modal._csvDropdownCleanup.forEach(cleanup => cleanup());
             modal._csvDropdownCleanup = [];
         }
-        
+
         // Reset initialization flag
         modal._csvDropdownInitialized = false;
     }
@@ -2640,28 +2640,28 @@ class PowerChoosersCRM {
             btn.addEventListener('click', () => {
                 // Start exit animation
                 modal.classList.remove('show');
-                
+
                 // Hide modal after animation completes
                 setTimeout(() => {
-                modal.setAttribute('hidden', '');
-                // Reset modal to initial state for next import
-                this.resetBulkImportModal(modal);
+                    modal.setAttribute('hidden', '');
+                    // Reset modal to initial state for next import
+                    this.resetBulkImportModal(modal);
                 }, 300); // Match CSS transition duration
             });
         });
 
         // File input and drop zone
         this.setupFileUpload(modal);
-        
+
         // Import type selection
         this.setupImportTypeSelection(modal);
-        
+
         // Step navigation
         this.setupStepNavigation(modal);
-        
+
         // Field mapping
         this.setupFieldMapping(modal);
-        
+
         // Import process
         this.setupImportProcess(modal);
     }
@@ -2671,7 +2671,7 @@ class PowerChoosersCRM {
         const browseBtn = modal.querySelector('#csv-browse-btn');
         const dropZone = modal.querySelector('#csv-drop-zone');
         const removeBtn = modal.querySelector('#csv-remove-file');
-        
+
         // Browse button
         if (browseBtn && !browseBtn._csvBrowseBound) {
             browseBtn.addEventListener('click', () => {
@@ -2679,7 +2679,7 @@ class PowerChoosersCRM {
             });
             browseBtn._csvBrowseBound = true;
         }
-        
+
         // File input change
         if (fileInput && !fileInput._csvFileInputBound) {
             fileInput.addEventListener('change', (e) => {
@@ -2689,23 +2689,23 @@ class PowerChoosersCRM {
             });
             fileInput._csvFileInputBound = true;
         }
-        
+
         // Drag and drop
         if (dropZone && !dropZone._csvDropZoneBound) {
             dropZone.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 dropZone.classList.add('dragover');
             });
-            
+
             dropZone.addEventListener('dragleave', (e) => {
                 e.preventDefault();
                 dropZone.classList.remove('dragover');
             });
-            
+
             dropZone.addEventListener('drop', (e) => {
                 e.preventDefault();
                 dropZone.classList.remove('dragover');
-                
+
                 if (e.dataTransfer.files.length > 0) {
                     const file = e.dataTransfer.files[0];
                     if (file.type === 'text/csv' || file.name.toLowerCase().endsWith('.csv')) {
@@ -2717,7 +2717,7 @@ class PowerChoosersCRM {
             });
             dropZone._csvDropZoneBound = true;
         }
-        
+
         // Remove file button
         if (removeBtn && !removeBtn._csvRemoveBound) {
             removeBtn.addEventListener('click', () => {
@@ -2729,18 +2729,18 @@ class PowerChoosersCRM {
 
     setupImportTypeSelection(modal) {
         const typeInputs = modal.querySelectorAll('input[name="importType"]');
-        
+
         // Set initial import type based on which radio is checked
         const checkedInput = Array.from(typeInputs).find(input => input.checked);
         if (checkedInput) {
             modal._importType = checkedInput.value;
         }
-        
+
         // Listen for changes and refresh list dropdown when type changes
         typeInputs.forEach(input => {
             input.addEventListener('change', (e) => {
                 modal._importType = e.target.value;
-                
+
                 // Refresh list dropdown to show correct kind of lists
                 // Only refresh if we're on step 2 (where the list dropdown is visible)
                 const step2 = modal.querySelector('#csv-step-2');
@@ -2759,7 +2759,7 @@ class PowerChoosersCRM {
                 console.log('Next button clicked, CSV data:', modal._csvData);
                 console.log('CSV headers:', modal._csvHeaders);
                 console.log('CSV rows:', modal._csvRows);
-                
+
                 if (modal._csvData) {
                     this.generateFieldMapping(modal);
                     this.showCSVStep(modal, 2);
@@ -2769,7 +2769,7 @@ class PowerChoosersCRM {
                 }
             });
         }
-        
+
         // Step 2 -> 3
         const nextBtn2 = modal.querySelector('#csv-next-step-2');
         if (nextBtn2) {
@@ -2780,7 +2780,7 @@ class PowerChoosersCRM {
                 this.showCSVStep(modal, 3);
             });
         }
-        
+
         // Back buttons
         const backBtn2 = modal.querySelector('#csv-back-step-2');
         if (backBtn2) {
@@ -2788,7 +2788,7 @@ class PowerChoosersCRM {
                 this.showCSVStep(modal, 1);
             });
         }
-        
+
         const backBtn3 = modal.querySelector('#csv-back-step-3');
         if (backBtn3) {
             backBtn3.addEventListener('click', () => {
@@ -2804,28 +2804,28 @@ class PowerChoosersCRM {
     setupImportProcess(modal) {
         const startBtn = modal.querySelector('#csv-start-import');
         const finishBtn = modal.querySelector('#csv-finish-import');
-        
+
         if (startBtn && !startBtn._csvStartBound) {
             startBtn.addEventListener('click', () => {
                 this.startImport(modal);
             });
             startBtn._csvStartBound = true;
         }
-        
+
         if (finishBtn && !finishBtn._csvFinishBound) {
             finishBtn.addEventListener('click', () => {
                 // Start exit animation
                 modal.classList.remove('show');
-                
+
                 // Hide modal after animation completes
                 setTimeout(() => {
-                modal.setAttribute('hidden', '');
-                // Reset modal to initial state for next import
-                this.resetBulkImportModal(modal);
-                // Trigger a page refresh if we're on contacts/accounts page
-                if (this.currentPage === 'people' || this.currentPage === 'accounts') {
-                    window.location.reload();
-                }
+                    modal.setAttribute('hidden', '');
+                    // Reset modal to initial state for next import
+                    this.resetBulkImportModal(modal);
+                    // Trigger a page refresh if we're on contacts/accounts page
+                    if (this.currentPage === 'people' || this.currentPage === 'accounts') {
+                        window.location.reload();
+                    }
                 }, 300); // Match CSS transition duration
             });
             finishBtn._csvFinishBound = true;
@@ -2838,39 +2838,39 @@ class PowerChoosersCRM {
             this.showToast('Please select a CSV file');
             return;
         }
-        
+
         if (file.size > 10 * 1024 * 1024) { // 10MB
             this.showToast('File size must be less than 10MB');
             return;
         }
-        
+
         try {
             // Read file
             const text = await this.readFileAsText(file);
             const { headers, rows } = this.parseCSV(text);
-            
+
             if (rows.length === 0) {
                 this.showToast('CSV file appears to be empty');
                 return;
             }
-            
+
             // Store data
             modal._csvData = text;
             modal._csvHeaders = headers;
             modal._csvRows = rows;
-            
+
             console.log('CSV data stored successfully:');
             console.log('Headers:', headers);
             console.log('Rows count:', rows.length);
             console.log('First few rows:', rows.slice(0, 2));
-            
+
             // Update UI
             this.displayFileInfo(modal, file, rows.length);
-            
+
             // Enable next button
             const nextBtn = modal.querySelector('#csv-next-step-1');
             if (nextBtn) nextBtn.disabled = false;
-            
+
         } catch (error) {
             console.error('Error reading CSV file:', error);
             this.showToast('Error reading CSV file. Please check the file format.');
@@ -2962,18 +2962,18 @@ class PowerChoosersCRM {
 
     cleanCSVField(field) {
         if (!field) return field;
-        
+
         // Remove leading apostrophe (common CSV issue)
         if (field.startsWith("'")) {
             field = field.slice(1);
         }
-        
+
         // Remove Excel formula wrappers
         field = field.replace(/^=\s*["']?(.+?)["']?$/u, '$1');
-        
+
         // Remove invisible characters
         field = field.replace(/[\u200B-\u200D\uFEFF]/g, '');
-        
+
         return field;
     }
 
@@ -3020,11 +3020,11 @@ class PowerChoosersCRM {
         const rowCountEl = modal.querySelector('#csv-row-count');
         const fileInfo = modal.querySelector('#csv-file-info');
         const dropZone = modal.querySelector('#csv-drop-zone');
-        
+
         if (fileName) fileName.textContent = file.name;
         if (fileSize) fileSize.textContent = this.formatFileSize(file.size);
         if (rowCountEl) rowCountEl.textContent = rowCount;
-        
+
         if (fileInfo) fileInfo.hidden = false;
         if (dropZone) dropZone.style.display = 'none';
     }
@@ -3042,12 +3042,12 @@ class PowerChoosersCRM {
         const fileInfo = modal.querySelector('#csv-file-info');
         const dropZone = modal.querySelector('#csv-drop-zone');
         const nextBtn = modal.querySelector('#csv-next-step-1');
-        
+
         if (fileInput) fileInput.value = '';
         if (fileInfo) fileInfo.hidden = true;
         if (dropZone) dropZone.style.display = 'flex';
         if (nextBtn) nextBtn.disabled = true;
-        
+
         modal._csvData = null;
         modal._csvHeaders = null;
         modal._csvRows = null;
@@ -3055,21 +3055,21 @@ class PowerChoosersCRM {
 
     showCSVStep(modal, stepNumber) {
         console.log(`Switching to step ${stepNumber}`);
-        
+
         // Hide all steps immediately
         modal.querySelectorAll('.csv-step-content').forEach(step => {
             if (step.id !== `csv-step-${stepNumber}`) {
                 step.classList.remove('active');
-            step.hidden = true;
+                step.hidden = true;
             }
         });
-        
+
         // Show target step
         const targetStep = modal.querySelector(`#csv-step-${stepNumber}`);
         if (targetStep) {
             console.log(`Found target step: ${targetStep.id}`);
             targetStep.hidden = false;
-            
+
             // Trigger fade-in animation
             requestAnimationFrame(() => {
                 targetStep.classList.add('active');
@@ -3077,12 +3077,12 @@ class PowerChoosersCRM {
         } else {
             console.error(`Target step #csv-step-${stepNumber} not found`);
         }
-        
+
         // Update step indicator
         modal.querySelectorAll('.csv-step').forEach(step => {
             const stepNum = parseInt(step.dataset.step);
             step.classList.remove('active', 'completed');
-            
+
             if (stepNum === stepNumber) {
                 step.classList.add('active');
             } else if (stepNum < stepNumber) {
@@ -3094,28 +3094,28 @@ class PowerChoosersCRM {
     generateFieldMapping(modal) {
         console.log('generateFieldMapping called');
         console.log('CSV headers:', modal._csvHeaders);
-        
+
         if (!modal._csvHeaders) {
             console.error('No CSV headers found!');
             return;
         }
-        
+
         const previewTable = modal.querySelector('#csv-preview-table');
         const mappingList = modal.querySelector('#csv-field-mapping');
-        
+
         console.log('Preview table element:', previewTable);
         console.log('Mapping list element:', mappingList);
-        
+
         // Generate preview table
         if (previewTable) {
             const previewRows = modal._csvRows.slice(0, 3);
             let tableHTML = '<table><thead><tr>';
-            
+
             modal._csvHeaders.forEach(header => {
                 tableHTML += `<th>${this.escapeHtml(header)}</th>`;
             });
             tableHTML += '</tr></thead><tbody>';
-            
+
             previewRows.forEach((row, idx) => {
                 tableHTML += '<tr>';
                 row.forEach((cell, idx2) => {
@@ -3125,12 +3125,12 @@ class PowerChoosersCRM {
                 });
                 tableHTML += '</tr>';
             });
-            
+
             tableHTML += '</tbody></table>';
             previewTable.innerHTML = tableHTML;
             console.log('Preview table HTML generated:', tableHTML.substring(0, 200) + '...');
         }
-        
+
         // Generate field mapping
         if (mappingList) {
             const importType = modal._importType || 'contacts';
@@ -3138,7 +3138,7 @@ class PowerChoosersCRM {
             const crmFields = this.getCRMFields(importType);
             console.log('CRM fields:', crmFields);
             let mappingHTML = '';
-            
+
             modal._csvHeaders.forEach((header, index) => {
                 mappingHTML += `
                     <div class="mapping-row">
@@ -3147,17 +3147,16 @@ class PowerChoosersCRM {
                         <div class="mapping-target">
                             <select data-csv-column="${index}">
                                 <option value="">-- Skip this field --</option>
-                                ${crmFields.map(field => 
-                                    `<option value="${field.value}" ${
-                                        this.suggestMapping(header, field) ? 'selected' : ''
-                                    }>${field.label}</option>`
-                                ).join('')}
+                                ${crmFields.map(field =>
+                    `<option value="${field.value}" ${this.suggestMapping(header, field) ? 'selected' : ''
+                    }>${field.label}</option>`
+                ).join('')}
                             </select>
                         </div>
                     </div>
                 `;
             });
-            
+
             mappingList.innerHTML = mappingHTML;
             console.log('Mapping HTML generated:', mappingHTML.substring(0, 200) + '...');
             // Restore saved mappings if available
@@ -3169,7 +3168,7 @@ class PowerChoosersCRM {
                 sel.addEventListener('change', () => this.saveFieldMappingToStorage(modal));
             });
         }
-        
+
         // Populate list assignment dropdown
         this.populateListAssignment(modal);
     }
@@ -3177,14 +3176,14 @@ class PowerChoosersCRM {
     async populateListAssignment(modal) {
         const dropdown = modal.querySelector('#csv-list-dropdown');
         if (!dropdown) return;
-        
+
         try {
             const db = window.firebaseDB;
             if (!db) return;
-            
+
             const importType = modal._importType || 'contacts';
             const listKind = importType === 'accounts' ? 'accounts' : 'people';
-            
+
             // Load lists of the appropriate kind
             let query = db.collection('lists');
             if (query.where) {
@@ -3192,10 +3191,10 @@ class PowerChoosersCRM {
             }
             const snap = await (query.limit ? query.limit(200).get() : query.get());
             const lists = (snap && snap.docs) ? snap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
-            
+
             // Sort by name
             lists.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-            
+
             // Build dropdown HTML
             let dropdownHTML = `
                 <div class="csv-list-create-form" id="csv-list-create-form">
@@ -3222,7 +3221,7 @@ class PowerChoosersCRM {
                         <span class="list-name">No list assignment</span>
                     </div>
             `;
-            
+
             // Add list items
             lists.forEach(list => {
                 const count = list.count || list.recordCount || 0;
@@ -3233,28 +3232,28 @@ class PowerChoosersCRM {
                     </div>
                 `;
             });
-            
+
             dropdownHTML += `</div>`;
             dropdown.innerHTML = dropdownHTML;
-            
+
             // Style the dropdown panel itself
             dropdown.style.borderRadius = 'var(--border-radius)';
             dropdown.style.border = '1px solid var(--border-light)';
             dropdown.style.overflow = 'hidden'; // Ensure content respects rounded corners
-            
+
             // Ensure create form is hidden by default using inline styles
             const createForm = dropdown.querySelector('#csv-list-create-form');
             if (createForm) {
                 createForm.style.display = 'none';
             }
-            
+
             // Apply styles to list items container
             const listItemsContainer = dropdown.querySelector('#csv-list-items');
             if (listItemsContainer) {
                 listItemsContainer.style.display = 'flex';
                 listItemsContainer.style.flexDirection = 'column';
             }
-            
+
             // Apply inline styles to all list items for guaranteed styling
             const allListItems = dropdown.querySelectorAll('.csv-list-item');
             allListItems.forEach(item => {
@@ -3266,7 +3265,7 @@ class PowerChoosersCRM {
                 item.style.borderBottom = '1px solid var(--border-light)';
                 item.style.transition = 'background-color 0.15s ease';
                 item.style.color = 'var(--text-primary)';
-                
+
                 // Style list name and count
                 const listName = item.querySelector('.list-name');
                 const listCount = item.querySelector('.list-count');
@@ -3279,13 +3278,13 @@ class PowerChoosersCRM {
                     listCount.style.color = 'var(--text-secondary)';
                     listCount.style.opacity = '0.8';
                 }
-                
+
                 // Special styling for "Create New List"
                 if (item.classList.contains('create-new')) {
                     item.style.borderBottom = '2px solid var(--border-medium)';
                     item.style.fontWeight = '600';
                     item.style.color = 'var(--orange-primary)';
-                    
+
                     const icon = item.querySelector('.list-icon');
                     if (icon) {
                         icon.style.display = 'inline-flex';
@@ -3293,7 +3292,7 @@ class PowerChoosersCRM {
                         icon.style.marginRight = '6px';
                     }
                 }
-                
+
                 // Hover effects
                 item.addEventListener('mouseenter', () => {
                     if (item.classList.contains('create-new')) {
@@ -3303,7 +3302,7 @@ class PowerChoosersCRM {
                         item.style.background = 'var(--grey-800)';
                     }
                 });
-                
+
                 item.addEventListener('mouseleave', () => {
                     if (!item.classList.contains('selected')) {
                         item.style.background = '';
@@ -3315,10 +3314,10 @@ class PowerChoosersCRM {
                     }
                 });
             });
-            
+
             // Initialize dropdown interaction handlers
             this.initCustomListDropdown(modal);
-            
+
         } catch (error) {
             console.error('Failed to load lists for assignment:', error);
         }
@@ -3328,7 +3327,7 @@ class PowerChoosersCRM {
         const trigger = modal.querySelector('#csv-list-trigger');
         const dropdown = modal.querySelector('#csv-list-dropdown');
         if (!trigger || !dropdown) return;
-        
+
         // Check if already initialized to prevent duplicate listeners
         if (modal._csvDropdownInitialized) {
             return;
@@ -3339,7 +3338,7 @@ class PowerChoosersCRM {
         const handleTriggerClick = (e) => {
             e.stopPropagation();
             const isOpen = !dropdown.hidden;
-            
+
             if (isOpen) {
                 dropdown.hidden = true;
                 trigger.classList.remove('open');
@@ -3404,7 +3403,7 @@ class PowerChoosersCRM {
         const trigger = modal.querySelector('#csv-list-trigger');
         const dropdown = modal.querySelector('#csv-list-dropdown');
         const selectedNameSpan = trigger?.querySelector('.selected-list-name');
-        
+
         if (!trigger || !dropdown) return;
 
         // Update trigger text
@@ -3452,13 +3451,13 @@ class PowerChoosersCRM {
         createForm.style.padding = '12px';
         createForm.style.borderBottom = '1px solid var(--border-light)';
         createForm.style.animation = 'formSlideIn 0.3s ease-out forwards';
-        
+
         // Style the input field
         if (nameInput) {
             nameInput.style.width = '100%';
             nameInput.style.marginBottom = '10px';
         }
-        
+
         // Focus input
         setTimeout(() => nameInput?.focus(), 100);
 
@@ -3481,16 +3480,16 @@ class PowerChoosersCRM {
                 const listKind = importType === 'accounts' ? 'accounts' : 'people';
 
                 // Create new list
-                const payload = { 
-                    name, 
-                    kind: listKind, 
+                const payload = {
+                    name,
+                    kind: listKind,
                     count: 0,
                     recordCount: 0,
                     ownerId: window.currentUserEmail || '',
                     createdBy: window.currentUserEmail || '',
                     assignedTo: window.currentUserEmail || ''
                 };
-                
+
                 if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
                     payload.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
                     payload.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
@@ -3504,12 +3503,12 @@ class PowerChoosersCRM {
 
                 // Notify lists overview page of new list creation
                 try {
-                    document.dispatchEvent(new CustomEvent('pc:list-created', { 
-                        detail: { 
-                            id: newListId, 
+                    document.dispatchEvent(new CustomEvent('pc:list-created', {
+                        detail: {
+                            id: newListId,
                             list: { id: newListId, ...payload },
                             kind: listKind
-                        } 
+                        }
                     }));
                 } catch (_) { /* noop */ }
 
@@ -3571,11 +3570,11 @@ class PowerChoosersCRM {
             return;
         }
         console.log('Assigning record to list:', recordId, 'listId:', listId);
-        
+
         try {
             const importType = modal._importType || 'contacts';
             const targetType = importType === 'accounts' ? 'accounts' : 'people';
-            
+
             // Check if already in list to avoid duplicates
             const existingQuery = await db.collection('listMembers')
                 .where('listId', '==', listId)
@@ -3583,7 +3582,7 @@ class PowerChoosersCRM {
                 .where('targetType', '==', targetType)
                 .limit(1)
                 .get();
-            
+
             if (existingQuery.empty) {
                 // Add to list
                 await db.collection('listMembers').add({
@@ -3592,7 +3591,7 @@ class PowerChoosersCRM {
                     targetType: targetType,
                     addedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
                 });
-                
+
                 // Increment list count
                 try {
                     const increment = window.firebase?.firestore?.FieldValue?.increment?.(1);
@@ -3614,7 +3613,7 @@ class PowerChoosersCRM {
 
     async batchAssignToList(db, assignments) {
         if (!assignments || assignments.length === 0) return;
-        
+
         try {
             // Group assignments by listId and targetType
             const grouped = {};
@@ -3629,27 +3628,27 @@ class PowerChoosersCRM {
                 }
                 grouped[key].recordIds.push(assignment.recordId);
             });
-            
+
             // Process each group
             for (const [key, group] of Object.entries(grouped)) {
                 const { listId, targetType, recordIds } = group;
-                
+
                 // 1. Get all existing members in one query
                 const existingQuery = await db.collection('listMembers')
                     .where('listId', '==', listId)
                     .where('targetType', '==', targetType)
                     .get();
-                
+
                 const existingIds = new Set(existingQuery.docs.map(doc => doc.data().targetId));
-                
+
                 // 2. Filter out records already in list
                 const newRecordIds = recordIds.filter(id => !existingIds.has(id));
-                
+
                 if (newRecordIds.length === 0) {
                     console.log(`All ${recordIds.length} ${targetType} already in list ${listId}`);
                     continue;
                 }
-                
+
                 // 3. Batch write all new assignments
                 const batch = db.batch();
                 newRecordIds.forEach(recordId => {
@@ -3661,9 +3660,9 @@ class PowerChoosersCRM {
                         addedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || Date.now()
                     });
                 });
-                
+
                 await batch.commit();
-                
+
                 // 4. CRITICAL FIX: Calculate ACTUAL count from listMembers collection (ensures accuracy)
                 // This is more reliable than incrementing, especially after bulk imports
                 try {
@@ -3671,23 +3670,23 @@ class PowerChoosersCRM {
                         .where('listId', '==', listId)
                         .where('targetType', '==', targetType)
                         .get();
-                    
+
                     const actualCount = actualCountQuery.size;
-                    
+
                     // Update list document with actual count
                     await db.collection('lists').doc(listId).update({
                         count: actualCount,
                         recordCount: actualCount,
                         updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
                     });
-                    
+
                     console.log(`✓ Updated list ${listId} with actual count: ${actualCount} ${targetType}`);
-                    
+
                     // Update BackgroundListsLoader cache immediately (cost-effective: no Firestore read)
                     if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
                         window.BackgroundListsLoader.updateListCountLocally(listId, actualCount);
                     }
-                    
+
                     // Update CacheManager cache (cost-effective: IndexedDB write only)
                     if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
                         window.CacheManager.updateRecord('lists', listId, {
@@ -3696,7 +3695,7 @@ class PowerChoosersCRM {
                             updatedAt: new Date()
                         }).catch(err => console.warn('[Main] CacheManager update failed:', err));
                     }
-                    
+
                     // Dispatch event for lists page to refresh with ACTUAL count
                     try {
                         document.dispatchEvent(new CustomEvent('pc:list-updated', {
@@ -3707,7 +3706,7 @@ class PowerChoosersCRM {
                                 isActualCount: true // Flag to indicate this is actual count, not increment
                             }
                         }));
-                        
+
                         // Also dispatch count-updated event for lists-overview
                         document.dispatchEvent(new CustomEvent('pc:list-count-updated', {
                             detail: {
@@ -3716,7 +3715,7 @@ class PowerChoosersCRM {
                                 kind: targetType
                             }
                         }));
-                    } catch (_) {}
+                    } catch (_) { }
                 } catch (countError) {
                     console.error('Failed to calculate actual list count:', countError);
                     // Fallback to increment if count query fails
@@ -3729,9 +3728,9 @@ class PowerChoosersCRM {
                         });
                     }
                 }
-                
+
                 console.log(`✓ Batch assigned ${newRecordIds.length} ${targetType} to list ${listId} (${recordIds.length - newRecordIds.length} already existed)`);
-                
+
                 // 5. Invalidate cache for this list so list detail page will refresh
                 if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
                     try {
@@ -3742,7 +3741,7 @@ class PowerChoosersCRM {
                     }
                 }
             }
-            
+
         } catch (error) {
             console.error('Batch list assignment failed:', error);
         }
@@ -3805,14 +3804,14 @@ class PowerChoosersCRM {
     suggestMapping(csvHeader, crmField) {
         const header = csvHeader.toLowerCase().replace(/[^a-z0-9]/g, '');
         const field = crmField.value.toLowerCase();
-        
+
         // Simple matching logic
         if (header.includes(field) || field.includes(header)) return true;
-        
+
         // Special cases
         const mappings = {
             'firstname': 'firstName',
-            'lastname': 'lastName', 
+            'lastname': 'lastName',
             'name': 'firstName',
             'company': 'companyName',
             'jobtitle': 'title',
@@ -3830,23 +3829,23 @@ class PowerChoosersCRM {
             'phone': 'companyPhone',
             'linkedin': 'companyLinkedin'
         };
-        
+
         return mappings[header] === crmField.value;
     }
 
     generateReviewSummary(modal) {
         const summaryDiv = modal.querySelector('#csv-review-summary');
         const previewDiv = modal.querySelector('#csv-final-preview');
-        
+
         if (!modal._csvRows || !summaryDiv) return;
-        
+
         // Get field mappings
         const mappings = this.getFieldMappings(modal);
         const mappedFieldCount = Object.keys(mappings).length;
-        
+
         // Get selected list info from modal dataset (custom dropdown)
         const selectedListName = modal.dataset.selectedListName || 'No list assignment';
-        
+
         // Generate summary
         const summaryHTML = `
             <div class="summary-item">
@@ -3866,20 +3865,20 @@ class PowerChoosersCRM {
                 <div class="summary-label">List Assignment</div>
             </div>
         `;
-        
+
         summaryDiv.innerHTML = summaryHTML;
-        
+
         // Generate final preview
         if (previewDiv) {
             const previewRows = modal._csvRows.slice(0, 5);
             let tableHTML = '<table><thead><tr>';
-            
+
             // Show only mapped fields
             Object.values(mappings).forEach(fieldLabel => {
                 tableHTML += `<th>${this.escapeHtml(fieldLabel)}</th>`;
             });
             tableHTML += '</tr></thead><tbody>';
-            
+
             previewRows.forEach(row => {
                 tableHTML += '<tr>';
                 Object.keys(mappings).forEach(csvIndex => {
@@ -3893,7 +3892,7 @@ class PowerChoosersCRM {
                 });
                 tableHTML += '</tr>';
             });
-            
+
             tableHTML += '</tbody></table>';
             previewDiv.innerHTML = tableHTML;
         }
@@ -3982,11 +3981,11 @@ class PowerChoosersCRM {
         const resultsDiv = modal.querySelector('#csv-import-results');
         const startBtn = modal.querySelector('#csv-start-import');
         const finishBtn = modal.querySelector('#csv-finish-import');
-        
+
         // Show progress, hide other elements
         if (progressDiv) progressDiv.hidden = false;
         if (startBtn) startBtn.hidden = true;
-        
+
         // Use current select values for actual import
         const mappings = {};
         const selects = modal.querySelectorAll('#csv-field-mapping select');
@@ -3995,9 +3994,9 @@ class PowerChoosersCRM {
                 mappings[select.dataset.csvColumn] = select.value;
             }
         });
-        
+
         const updateExisting = modal.querySelector('#csv-update-existing')?.checked;
-        
+
         let imported = 0;
         let enriched = 0;
         let failed = 0;
@@ -4005,14 +4004,14 @@ class PowerChoosersCRM {
         // Queue possible merges for end-of-import confirmation
         const queuedContactMerges = [];
         const queuedAccountMerges = [];
-        
+
         try {
             const db = window.firebaseDB;
             const fv = window.firebase?.firestore?.FieldValue;
             if (!db) throw new Error('Database not available');
-            
+
             const collection = modal._importType === 'accounts' ? 'accounts' : 'contacts';
-            
+
             // Pre-fetch existing contacts for duplicate detection (once, not per row)
             let existingContacts = [];
             if (updateExisting && modal._importType === 'contacts' && window.ContactMerger) {
@@ -4021,12 +4020,12 @@ class PowerChoosersCRM {
                 if (window.currentUserRole !== 'admin' && email) {
                     // Non-admin: use scoped query
                     const [ownedSnap, assignedSnap] = await Promise.all([
-                        db.collection('contacts').where('ownerId','==',email).get(),
-                        db.collection('contacts').where('assignedTo','==',email).get()
+                        db.collection('contacts').where('ownerId', '==', email).get(),
+                        db.collection('contacts').where('assignedTo', '==', email).get()
                     ]);
                     const map = new Map();
-                    ownedSnap.forEach(d=>map.set(d.id,{ id:d.id, ...d.data() }));
-                    assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
+                    ownedSnap.forEach(d => map.set(d.id, { id: d.id, ...d.data() }));
+                    assignedSnap.forEach(d => { if (!map.has(d.id)) map.set(d.id, { id: d.id, ...d.data() }); });
                     existingContacts = Array.from(map.values());
                 } else {
                     // Admin: use unfiltered query
@@ -4038,204 +4037,204 @@ class PowerChoosersCRM {
                 }
                 console.log(`Loaded ${existingContacts.length} existing contacts for comparison`);
             }
-            
+
             // Initialize batch list assignment collection
             const listAssignments = [];
-            
+
             // Process in batches
             const batchSize = 10;
             for (let i = 0; i < modal._csvRows.length; i += batchSize) {
                 const batch = modal._csvRows.slice(i, i + batchSize);
-                
+
                 // Add timeout protection to prevent hanging
                 const batchPromises = batch.map(async (row) => {
-                    const timeoutPromise = new Promise((_, reject) => 
+                    const timeoutPromise = new Promise((_, reject) =>
                         setTimeout(() => reject(new Error('Row processing timeout')), 30000)
                     );
-                    
-                    const rowPromise = (async () => {
-                    try {
-                        const doc = {};
-                        
-                        // Map CSV data to CRM fields
-                        Object.entries(mappings).forEach(([csvIndex, crmField]) => {
-                            const raw = row[parseInt(csvIndex)];
-                            const value = typeof raw === 'string' ? raw.trim() : raw;
-                            if (value) {
-                                // Special handling for service addresses
-                                const fieldKey = crmField;
-                                const fieldLc = String(crmField).toLowerCase();
-                                if (fieldLc === 'serviceaddresses') {
-                                    // Split by semicolon and create array of address objects
-                                    const addresses = String(value).split(';').map((addr, idx) => ({
-                                        address: addr.trim(),
-                                        isPrimary: idx === 0
-                                    })).filter(a => a.address.length > 0);
-                                    // Preserve the selected field name (camelCase) on the document
-                                    doc[fieldKey] = addresses;
-                                } else {
-                                    // Field-specific normalization (e.g., strip Excel leading apostrophe on phone)
-                                    doc[fieldKey] = this.normalizeForField(fieldKey, value);
-                                }
-                            }
-                        });
 
-                        // Derive domain from website fields post-mapping (accounts import)
+                    const rowPromise = (async () => {
                         try {
-                            if (modal._importType === 'accounts') {
-                                if (doc.website && !doc.domain) {
-                                    const src = String(doc.website).trim();
-                                    try {
-                                        const u = new URL(src.startsWith('http') ? src : `https://${src}`);
-                                        doc.domain = (u.hostname || '').replace(/^www\./i, '');
-                                    } catch (_) {
-                                        doc.domain = src.replace(/^https?:\/\//i, '').split('/')[0].replace(/^www\./i, '');
+                            const doc = {};
+
+                            // Map CSV data to CRM fields
+                            Object.entries(mappings).forEach(([csvIndex, crmField]) => {
+                                const raw = row[parseInt(csvIndex)];
+                                const value = typeof raw === 'string' ? raw.trim() : raw;
+                                if (value) {
+                                    // Special handling for service addresses
+                                    const fieldKey = crmField;
+                                    const fieldLc = String(crmField).toLowerCase();
+                                    if (fieldLc === 'serviceaddresses') {
+                                        // Split by semicolon and create array of address objects
+                                        const addresses = String(value).split(';').map((addr, idx) => ({
+                                            address: addr.trim(),
+                                            isPrimary: idx === 0
+                                        })).filter(a => a.address.length > 0);
+                                        // Preserve the selected field name (camelCase) on the document
+                                        doc[fieldKey] = addresses;
+                                    } else {
+                                        // Field-specific normalization (e.g., strip Excel leading apostrophe on phone)
+                                        doc[fieldKey] = this.normalizeForField(fieldKey, value);
                                     }
                                 }
-                            }
-                        } catch (_) { /* noop */ }
-                        
-                        // Skip if no data
-                        if (Object.keys(doc).length === 0) return;
-                        
-                        // Check for existing record if update is enabled
-                        let existingRecord = null;
-                        let mergeAction = 'create'; // 'create', 'merge', 'skip'
-                        
-                        if (updateExisting && modal._importType === 'contacts') {
-                            // For contacts, use intelligent duplicate detection with pre-fetched contacts
-                            if (window.ContactMerger && existingContacts.length > 0) {
-                                const duplicates = await window.ContactMerger.findDuplicates(doc, existingContacts);
-                                
-                                if (duplicates.length > 0) {
-                                    const bestMatch = duplicates[0];
-                                    if (bestMatch.similarity.score >= 0.8) {
-                                        // Queue merge; defer user decision to end-of-import summary
-                                            existingRecord = { 
+                            });
+
+                            // Derive domain from website fields post-mapping (accounts import)
+                            try {
+                                if (modal._importType === 'accounts') {
+                                    if (doc.website && !doc.domain) {
+                                        const src = String(doc.website).trim();
+                                        try {
+                                            const u = new URL(src.startsWith('http') ? src : `https://${src}`);
+                                            doc.domain = (u.hostname || '').replace(/^www\./i, '');
+                                        } catch (_) {
+                                            doc.domain = src.replace(/^https?:\/\//i, '').split('/')[0].replace(/^www\./i, '');
+                                        }
+                                    }
+                                }
+                            } catch (_) { /* noop */ }
+
+                            // Skip if no data
+                            if (Object.keys(doc).length === 0) return;
+
+                            // Check for existing record if update is enabled
+                            let existingRecord = null;
+                            let mergeAction = 'create'; // 'create', 'merge', 'skip'
+
+                            if (updateExisting && modal._importType === 'contacts') {
+                                // For contacts, use intelligent duplicate detection with pre-fetched contacts
+                                if (window.ContactMerger && existingContacts.length > 0) {
+                                    const duplicates = await window.ContactMerger.findDuplicates(doc, existingContacts);
+
+                                    if (duplicates.length > 0) {
+                                        const bestMatch = duplicates[0];
+                                        if (bestMatch.similarity.score >= 0.8) {
+                                            // Queue merge; defer user decision to end-of-import summary
+                                            existingRecord = {
                                                 ref: db.collection('contacts').doc(bestMatch.contact.id),
                                                 data: () => bestMatch.contact
                                             };
-                                        queuedContactMerges.push({ existingRecord, incoming: doc, similarity: bestMatch.similarity });
-                                        // Skip immediate update for this row
+                                            queuedContactMerges.push({ existingRecord, incoming: doc, similarity: bestMatch.similarity });
+                                            // Skip immediate update for this row
                                             return;
+                                        }
+                                    }
+                                }
+                            } else if (updateExisting && modal._importType === 'accounts') {
+                                // For accounts, use simple email/name matching
+                                const matchField = 'accountName';
+                                if (doc[matchField]) {
+                                    const query = await db.collection(collection)
+                                        .where(matchField, '==', doc[matchField])
+                                        .limit(1)
+                                        .get();
+
+                                    if (!query.empty) {
+                                        existingRecord = query.docs[0];
+                                        // Queue merge for end-of-import confirmation instead of immediate update
+                                        queuedAccountMerges.push({ existingRecord, incoming: doc });
+                                        // Skip immediate update for this row
+                                        return;
                                     }
                                 }
                             }
-                        } else if (updateExisting && modal._importType === 'accounts') {
-                            // For accounts, use simple email/name matching
-                            const matchField = 'accountName';
-                            if (doc[matchField]) {
-                                const query = await db.collection(collection)
-                                    .where(matchField, '==', doc[matchField])
-                                    .limit(1)
-                                    .get();
-                                
-                                if (!query.empty) {
-                                    existingRecord = query.docs[0];
-                                    // Queue merge for end-of-import confirmation instead of immediate update
-                                    queuedAccountMerges.push({ existingRecord, incoming: doc });
-                                    // Skip immediate update for this row
-                                    return;
+
+                            const now = fv?.serverTimestamp?.() || Date.now();
+
+                            if (existingRecord) {
+                                // Update existing record
+                                let updateData = doc;
+
+                                if (mergeAction === 'merge' && window.ContactMerger) {
+                                    // Use intelligent merging
+                                    const existingData = existingRecord.data();
+                                    updateData = window.ContactMerger.mergeContacts(existingData, doc);
                                 }
+                                // Always stamp updated/enriched times for DB
+                                updateData.updatedAt = now;
+                                updateData.enrichedAt = now;
+
+                                await existingRecord.ref.update(updateData);
+                                enriched++;
+
+                                // Collect for batch list assignment
+                                if (modal.dataset.selectedListId) {
+                                    listAssignments.push({
+                                        listId: modal.dataset.selectedListId,
+                                        recordId: existingRecord.id,
+                                        targetType: modal._importType === 'accounts' ? 'accounts' : 'people'
+                                    });
+                                }
+
+                                // Live update tables (use UI-friendly timestamps)
+                                try {
+                                    if (modal._importType === 'accounts') {
+                                        // Accounts module listens to pc:account-created; send merged full doc so row renders correctly
+                                        const prev = (typeof existingRecord.data === 'function') ? existingRecord.data() : {};
+                                        const merged = Object.assign({}, prev, doc);
+                                        document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: existingRecord.id, doc: merged } }));
+                                    } else {
+                                        // People module listens to pc:contact-updated with { changes }
+                                        const uiChanges = Object.assign({}, doc, { updatedAt: new Date() });
+                                        document.dispatchEvent(new CustomEvent('pc:contact-updated', { detail: { id: existingRecord.id, changes: uiChanges } }));
+                                    }
+                                } catch (_) { /* noop */ }
+                            } else {
+                                // Create new record
+                                // Get user email for ownership fields
+                                const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+                                    ? window.DataManager.getCurrentUserEmail()
+                                    : ((window.currentUserEmail || '').toLowerCase());
+
+                                doc.createdAt = now;
+                                doc.updatedAt = now;
+                                doc.importedAt = now;
+
+                                // Add ownership fields (required for Firestore rules)
+                                doc.ownerId = userEmail || '';
+                                doc.assignedTo = userEmail || '';
+                                doc.createdBy = userEmail || '';
+
+                                // For contacts, check if we need to create/update an account
+                                if (modal._importType === 'contacts' && doc.companyName) {
+                                    await this.handleAccountCreationForContact(db, doc, now);
+                                }
+
+                                // Use DataManager.addOwnership if available for server timestamps
+                                const finalDoc = (window.DataManager && typeof window.DataManager.addOwnership === 'function')
+                                    ? window.DataManager.addOwnership(doc)
+                                    : doc;
+
+                                const ref = await db.collection(collection).add(finalDoc);
+                                imported++;
+
+                                // Collect for batch list assignment
+                                if (modal.dataset.selectedListId) {
+                                    listAssignments.push({
+                                        listId: modal.dataset.selectedListId,
+                                        recordId: ref.id,
+                                        targetType: modal._importType === 'accounts' ? 'accounts' : 'people'
+                                    });
+                                }
+
+                                // Live update tables (use UI-friendly timestamps so lists don't show N/A)
+                                try {
+                                    if (modal._importType === 'accounts') {
+                                        // Use finalDoc instead of doc to include serviceAddresses and all other fields
+                                        const uiDoc = Object.assign({}, finalDoc, { createdAt: new Date(), updatedAt: new Date() });
+                                        document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: ref.id, doc: uiDoc } }));
+                                    } else {
+                                        const uiDoc = Object.assign({}, doc, { createdAt: new Date(), updatedAt: new Date() });
+                                        document.dispatchEvent(new CustomEvent('pc:contact-created', { detail: { id: ref.id, doc: uiDoc } }));
+                                    }
+                                } catch (_) { /* noop */ }
                             }
+                        } catch (error) {
+                            console.error('Error importing row:', error);
+                            failed++;
                         }
-                        
-                        const now = fv?.serverTimestamp?.() || Date.now();
-                        
-                        if (existingRecord) {
-                            // Update existing record
-                            let updateData = doc;
-                            
-                            if (mergeAction === 'merge' && window.ContactMerger) {
-                                // Use intelligent merging
-                                const existingData = existingRecord.data();
-                                updateData = window.ContactMerger.mergeContacts(existingData, doc);
-                            }
-                            // Always stamp updated/enriched times for DB
-                            updateData.updatedAt = now;
-                            updateData.enrichedAt = now;
-                            
-                            await existingRecord.ref.update(updateData);
-                            enriched++;
-
-                            // Collect for batch list assignment
-                            if (modal.dataset.selectedListId) {
-                                listAssignments.push({
-                                    listId: modal.dataset.selectedListId,
-                                    recordId: existingRecord.id,
-                                    targetType: modal._importType === 'accounts' ? 'accounts' : 'people'
-                                });
-                            }
-
-                            // Live update tables (use UI-friendly timestamps)
-                            try {
-                                if (modal._importType === 'accounts') {
-                                    // Accounts module listens to pc:account-created; send merged full doc so row renders correctly
-                                    const prev = (typeof existingRecord.data === 'function') ? existingRecord.data() : {};
-                                    const merged = Object.assign({}, prev, doc);
-                                    document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: existingRecord.id, doc: merged } }));
-                                } else {
-                                    // People module listens to pc:contact-updated with { changes }
-                                    const uiChanges = Object.assign({}, doc, { updatedAt: new Date() });
-                                    document.dispatchEvent(new CustomEvent('pc:contact-updated', { detail: { id: existingRecord.id, changes: uiChanges } }));
-                                }
-                            } catch (_) { /* noop */ }
-                        } else {
-                            // Create new record
-                            // Get user email for ownership fields
-                            const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
-                              ? window.DataManager.getCurrentUserEmail()
-                              : ((window.currentUserEmail || '').toLowerCase());
-                            
-                            doc.createdAt = now;
-                            doc.updatedAt = now;
-                            doc.importedAt = now;
-                            
-                            // Add ownership fields (required for Firestore rules)
-                            doc.ownerId = userEmail || '';
-                            doc.assignedTo = userEmail || '';
-                            doc.createdBy = userEmail || '';
-                            
-                            // For contacts, check if we need to create/update an account
-                            if (modal._importType === 'contacts' && doc.companyName) {
-                                await this.handleAccountCreationForContact(db, doc, now);
-                            }
-                            
-                            // Use DataManager.addOwnership if available for server timestamps
-                            const finalDoc = (window.DataManager && typeof window.DataManager.addOwnership === 'function')
-                              ? window.DataManager.addOwnership(doc)
-                              : doc;
-                            
-                            const ref = await db.collection(collection).add(finalDoc);
-                            imported++;
-
-                            // Collect for batch list assignment
-                            if (modal.dataset.selectedListId) {
-                                listAssignments.push({
-                                    listId: modal.dataset.selectedListId,
-                                    recordId: ref.id,
-                                    targetType: modal._importType === 'accounts' ? 'accounts' : 'people'
-                                });
-                            }
-
-                            // Live update tables (use UI-friendly timestamps so lists don't show N/A)
-                            try {
-                                if (modal._importType === 'accounts') {
-                                    // Use finalDoc instead of doc to include serviceAddresses and all other fields
-                                    const uiDoc = Object.assign({}, finalDoc, { createdAt: new Date(), updatedAt: new Date() });
-                                    document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: ref.id, doc: uiDoc } }));
-                                } else {
-                                    const uiDoc = Object.assign({}, doc, { createdAt: new Date(), updatedAt: new Date() });
-                                    document.dispatchEvent(new CustomEvent('pc:contact-created', { detail: { id: ref.id, doc: uiDoc } }));
-                                }
-                            } catch (_) { /* noop */ }
-                        }
-                    } catch (error) {
-                        console.error('Error importing row:', error);
-                        failed++;
-                    }
                     })();
-                    
+
                     try {
                         await Promise.race([rowPromise, timeoutPromise]);
                     } catch (error) {
@@ -4243,28 +4242,28 @@ class PowerChoosersCRM {
                         failed++;
                     }
                 });
-                
+
                 await Promise.all(batchPromises);
-                
+
                 // Update progress
                 const processed = Math.min(i + batchSize, total);
                 const percentage = (processed / total) * 100;
-                
+
                 if (progressFill) progressFill.style.width = `${percentage}%`;
                 if (progressStats) {
                     progressStats.textContent = `${processed} of ${total} processed`;
                 }
-                
+
                 // Small delay to show progress
                 await new Promise(resolve => setTimeout(resolve, 50));
             }
-            
+
             // Process batch list assignments (much more efficient than individual assignments)
             if (listAssignments.length > 0) {
                 console.log(`Processing batch list assignments for ${listAssignments.length} records...`);
                 await this.batchAssignToList(db, listAssignments);
             }
-            
+
             // If we queued merges, present a summary and ask once to proceed
             let userApprovedQueuedMerges = true;
             try {
@@ -4274,13 +4273,13 @@ class PowerChoosersCRM {
                 console.log('Queued merges - Contacts:', queuedContactMerges.length, 'Accounts:', queuedAccountMerges.length);
                 console.log('List assignments pending:', listAssignments.length);
                 console.log('Total queued merges:', totalQueued);
-                
+
                 if (totalQueued > 0) {
                     console.log('About to show merge confirmation modal...');
-                    
+
                     // TEMPORARY: Skip modal for testing - uncomment the next line to bypass modal
                     // userApprovedQueuedMerges = true; console.log('Modal bypassed for testing');
-                    
+
                     userApprovedQueuedMerges = await this.showQueuedMergeSummaryModal({
                         contacts: queuedContactMerges,
                         accounts: queuedAccountMerges,
@@ -4290,7 +4289,7 @@ class PowerChoosersCRM {
                 } else {
                     console.log('No queued merges, proceeding to results...');
                 }
-            } catch(error) {
+            } catch (error) {
                 console.error('Error in queued merge processing:', error);
             }
 
@@ -4309,7 +4308,7 @@ class PowerChoosersCRM {
                         updateData.enrichedAt = updateData.updatedAt;
                         await item.existingRecord.ref.update(updateData);
                         enriched++;
-                        
+
                         // Collect for batch list assignment
                         if (modal.dataset.selectedListId) {
                             queuedMergeAssignments.push({
@@ -4318,12 +4317,12 @@ class PowerChoosersCRM {
                                 targetType: 'accounts'
                             });
                         }
-                        
+
                         // Notify UI
                         try {
                             document.dispatchEvent(new CustomEvent('pc:account-created', { detail: { id: item.existingRecord.id, doc: Object.assign({}, updateData) } }));
-                        } catch(_) {}
-                    } catch(e) { failed++; }
+                        } catch (_) { }
+                    } catch (e) { failed++; }
                 }
                 for (const item of queuedContactMerges) {
                     try {
@@ -4333,7 +4332,7 @@ class PowerChoosersCRM {
                         updateData.enrichedAt = updateData.updatedAt;
                         await item.existingRecord.ref.update(updateData);
                         enriched++;
-                        
+
                         // Collect for batch list assignment
                         if (modal.dataset.selectedListId) {
                             queuedMergeAssignments.push({
@@ -4342,22 +4341,22 @@ class PowerChoosersCRM {
                                 targetType: 'people'
                             });
                         }
-                        
+
                         // Notify UI
                         try {
                             const uiChanges = Object.assign({}, updateData, { updatedAt: new Date() });
                             document.dispatchEvent(new CustomEvent('pc:contact-updated', { detail: { id: item.existingRecord.id, changes: uiChanges } }));
-                        } catch(_) {}
-                    } catch(e) { failed++; }
+                        } catch (_) { }
+                    } catch (e) { failed++; }
                 }
             }
-            
+
             // Process queued merge list assignments
             if (queuedMergeAssignments.length > 0) {
                 console.log(`Processing queued merge list assignments for ${queuedMergeAssignments.length} records...`);
                 await this.batchAssignToList(db, queuedMergeAssignments);
             }
-            
+
             // CRITICAL FIX: Recalculate actual counts for all affected lists after bulk import
             // This ensures counts match actual members in listMembers collection
             const affectedLists = new Set([...listAssignments, ...queuedMergeAssignments].map(a => a.listId));
@@ -4366,33 +4365,33 @@ class PowerChoosersCRM {
                     // Get the list to determine its kind
                     const listDoc = await db.collection('lists').doc(listId).get();
                     if (!listDoc.exists) continue;
-                    
+
                     const listData = listDoc.data();
                     const listKind = listData.kind || listData.targetType || modal._importType || 'people';
                     const targetType = listKind === 'accounts' ? 'accounts' : 'people';
-                    
+
                     // Calculate ACTUAL count from listMembers collection
                     const actualCountQuery = await db.collection('listMembers')
                         .where('listId', '==', listId)
                         .where('targetType', '==', targetType)
                         .get();
-                    
+
                     const actualCount = actualCountQuery.size;
-                    
+
                     // Update list document with actual count
                     await db.collection('lists').doc(listId).update({
                         count: actualCount,
                         recordCount: actualCount,
                         updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
                     });
-                    
+
                     console.log(`✓ Updated list ${listId} with actual count: ${actualCount} ${targetType}`);
-                    
+
                     // Update BackgroundListsLoader cache (cost-effective: no Firestore read)
                     if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
                         window.BackgroundListsLoader.updateListCountLocally(listId, actualCount);
                     }
-                    
+
                     // Update CacheManager cache (cost-effective: IndexedDB write only)
                     if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
                         window.CacheManager.updateRecord('lists', listId, {
@@ -4401,7 +4400,7 @@ class PowerChoosersCRM {
                             updatedAt: new Date()
                         }).catch(err => console.warn('[Main] CacheManager update failed:', err));
                     }
-                    
+
                     // Dispatch count update event for lists-overview
                     try {
                         document.dispatchEvent(new CustomEvent('pc:list-count-updated', {
@@ -4411,17 +4410,17 @@ class PowerChoosersCRM {
                                 kind: targetType
                             }
                         }));
-                    } catch (_) {}
+                    } catch (_) { }
                 } catch (countError) {
                     console.warn(`Failed to recalculate count for list ${listId}:`, countError);
                 }
-                
+
                 // Clear in-memory cache (most important - IndexedDB can lag)
                 if (window.listMembersCache && window.listMembersCache[listId]) {
                     delete window.listMembersCache[listId];
                     console.log(`✓ Cleared in-memory cache for list ${listId}`);
                 }
-                
+
                 // Also clear IndexedDB cache
                 if (window.CacheManager && typeof window.CacheManager.invalidateListCache === 'function') {
                     try {
@@ -4431,7 +4430,7 @@ class PowerChoosersCRM {
                         console.warn('Cache invalidation failed for list', listId, ':', cacheError);
                     }
                 }
-                
+
                 // CRITICAL FIX: Dispatch event to notify pages to reload
                 try {
                     document.dispatchEvent(new CustomEvent('pc:bulk-import-complete', {
@@ -4442,16 +4441,16 @@ class PowerChoosersCRM {
                     console.warn('Failed to dispatch bulk import event:', e);
                 }
             }
-            
+
             // Show results
             console.log('=== SHOWING RESULTS ===');
             console.log('About to show results. Imported:', imported, 'Enriched:', enriched, 'Failed:', failed);
-            
+
             if (progressDiv) {
                 console.log('Hiding progress div');
                 progressDiv.hidden = true;
             }
-            
+
             if (resultsDiv) {
                 console.log('Showing results div');
                 resultsDiv.hidden = false;
@@ -4461,13 +4460,13 @@ class PowerChoosersCRM {
                 resultsDiv.style.position = 'relative';
                 resultsDiv.style.zIndex = '10';
                 console.log('Results div shown, imported:', imported, 'enriched:', enriched, 'failed:', failed);
-                
+
                 const summaryDiv = modal.querySelector('#csv-results-summary');
                 console.log('Summary div found:', summaryDiv);
                 if (summaryDiv) {
                     const recordType = modal._importType === 'accounts' ? 'accounts' : 'contacts';
                     let resultMessage = '<strong>Import Complete!</strong><br>';
-                    
+
                     if (imported > 0) {
                         resultMessage += `New ${recordType} created: ${imported}<br>`;
                     }
@@ -4478,10 +4477,10 @@ class PowerChoosersCRM {
                         resultMessage += `Failed: ${failed} records<br>`;
                     }
                     resultMessage += 'You can now close this dialog.';
-                    
+
                     summaryDiv.innerHTML = resultMessage;
                     console.log('Results message set:', resultMessage);
-                    
+
                     // Force a reflow to ensure the results are visible
                     setTimeout(() => {
                         resultsDiv.style.display = 'block';
@@ -4500,11 +4499,11 @@ class PowerChoosersCRM {
                 }
             }
             if (finishBtn) finishBtn.hidden = false;
-            
+
             // Show appropriate notification
             const recordType = modal._importType === 'accounts' ? 'accounts' : 'contacts';
             let toastMessage = '';
-            
+
             if (imported > 0 && enriched > 0) {
                 toastMessage = `Import complete! ${imported} new ${recordType} added, ${enriched} existing ${recordType} enriched.`;
             } else if (imported > 0) {
@@ -4514,9 +4513,9 @@ class PowerChoosersCRM {
             } else {
                 toastMessage = `Import complete, but no ${recordType} were processed. Please check your data and mapping.`;
             }
-            
+
             this.showToast(toastMessage);
-            
+
             // Refresh list detail page if we're viewing a list and records were added to lists
             if ((imported > 0 || enriched > 0) && modal.dataset.selectedListId) {
                 console.log('Refreshing list views after import. Selected list:', modal.dataset.selectedListId);
@@ -4524,7 +4523,7 @@ class PowerChoosersCRM {
                 if (window.ListDetail && window.ListDetail.refreshListMembership) {
                     window.ListDetail.refreshListMembership();
                 }
-                
+
                 // Refresh list overview counts  
                 if (window.ListsOverview && window.ListsOverview.refreshCounts) {
                     window.ListsOverview.refreshCounts();
@@ -4532,11 +4531,11 @@ class PowerChoosersCRM {
             } else {
                 console.log('No list refresh needed. Imported:', imported, 'Enriched:', enriched, 'Selected list:', modal.dataset.selectedListId);
             }
-            
+
         } catch (error) {
             console.error('Import error:', error);
             this.showToast('Import failed. Please try again.');
-            
+
             // Reset UI and show error results
             if (progressDiv) progressDiv.hidden = true;
             if (startBtn) startBtn.hidden = false;
@@ -4585,18 +4584,18 @@ class PowerChoosersCRM {
                       <p>${total} existing records look similar and can be enriched instead of creating duplicates.</p>
                       ${accounts.length ? `<h4>Accounts (${accounts.length})</h4>` : ''}
                       ${accounts.slice(0, 10).map(it => {
-                        const prev = (typeof it.existingRecord.data === 'function') ? it.existingRecord.data() : {};
-                        const fields = Object.keys(it.incoming||{}).filter(k => (it.incoming[k] != null && String(it.incoming[k]).trim() !== '' && String(it.incoming[k]) !== String(prev[k]||''))).slice(0,6);
-                        return `<div class="merge-row"><strong>${this.escapeHtml(prev.accountName || '')}</strong> → enrich fields: ${fields.map(f=>`<code>${this.escapeHtml(f)}</code>`).join(', ') || '—'}</div>`;
-                      }).join('')}
+                    const prev = (typeof it.existingRecord.data === 'function') ? it.existingRecord.data() : {};
+                    const fields = Object.keys(it.incoming || {}).filter(k => (it.incoming[k] != null && String(it.incoming[k]).trim() !== '' && String(it.incoming[k]) !== String(prev[k] || ''))).slice(0, 6);
+                    return `<div class="merge-row"><strong>${this.escapeHtml(prev.accountName || '')}</strong> → enrich fields: ${fields.map(f => `<code>${this.escapeHtml(f)}</code>`).join(', ') || '—'}</div>`;
+                }).join('')}
                       ${contacts.length ? `<h4 style="margin-top:12px;">Contacts (${contacts.length})</h4>` : ''}
                       ${contacts.slice(0, 10).map(it => {
-                        const prev = (typeof it.existingRecord.data === 'function') ? it.existingRecord.data() : {};
-                        const fields = Object.keys(it.incoming||{}).filter(k => (it.incoming[k] != null && String(it.incoming[k]).trim() !== '' && String(it.incoming[k]) !== String(prev[k]||''))).slice(0,6);
-                        const name = `${prev.firstName||''} ${prev.lastName||''}`.trim();
-                        return `<div class="merge-row"><strong>${this.escapeHtml(name||prev.email||'Existing contact')}</strong> → enrich fields: ${fields.map(f=>`<code>${this.escapeHtml(f)}</code>`).join(', ') || '—'}</div>`;
-                      }).join('')}
-                      ${total>10?`<div style="margin-top:8px;color:var(--text-secondary)">(+${total-10} more hidden)</div>`:''}
+                    const prev = (typeof it.existingRecord.data === 'function') ? it.existingRecord.data() : {};
+                    const fields = Object.keys(it.incoming || {}).filter(k => (it.incoming[k] != null && String(it.incoming[k]).trim() !== '' && String(it.incoming[k]) !== String(prev[k] || ''))).slice(0, 6);
+                    const name = `${prev.firstName || ''} ${prev.lastName || ''}`.trim();
+                    return `<div class="merge-row"><strong>${this.escapeHtml(name || prev.email || 'Existing contact')}</strong> → enrich fields: ${fields.map(f => `<code>${this.escapeHtml(f)}</code>`).join(', ') || '—'}</div>`;
+                }).join('')}
+                      ${total > 10 ? `<div style="margin-top:8px;color:var(--text-secondary)">(+${total - 10} more hidden)</div>` : ''}
                     </div>
                     <div class="pc-modal__footer" style="display:flex;gap:8px;justify-content:flex-end;">
                       <button type="button" class="btn-secondary" data-action="cancel">Cancel</button>
@@ -4606,25 +4605,25 @@ class PowerChoosersCRM {
                 console.log('Modal HTML generated, appending to DOM...');
                 document.body.appendChild(overlay);
                 console.log('Modal appended to DOM, should be visible now');
-                
-                const close = (val) => { 
+
+                const close = (val) => {
                     console.log('Modal closing with value:', val);
-                    try { overlay.parentNode && overlay.parentNode.removeChild(overlay); } catch(_) {}; 
-                    resolve(val); 
+                    try { overlay.parentNode && overlay.parentNode.removeChild(overlay); } catch (_) { };
+                    resolve(val);
                 };
-                
+
                 console.log('Setting up modal event handlers...');
                 overlay.querySelectorAll('[data-close="queued-merge"]').forEach(btn => btn.addEventListener('click', () => close(false)));
                 overlay.querySelector('[data-action="cancel"]').addEventListener('click', () => close(false));
                 overlay.querySelector('[data-action="enrich"]').addEventListener('click', () => close(true));
                 console.log('Modal event handlers set up, waiting for user interaction...');
-                
+
                 // Fallback timeout to prevent infinite hanging (30 seconds)
                 setTimeout(() => {
                     console.log('Modal timeout reached, auto-approving merges');
                     close(true);
                 }, 30000);
-            } catch(_) { resolve(true); }
+            } catch (_) { resolve(true); }
         });
     }
 
@@ -4640,18 +4639,18 @@ class PowerChoosersCRM {
         try {
             const header = String(headerText || '').toLowerCase();
             let v = String(value == null ? '' : value);
-            
+
             // Always remove leading apostrophe if present (common CSV issue)
             if (v.startsWith("'")) {
                 v = v.slice(1);
             }
-            
+
             // Remove Excel formula wrappers
             v = v.replace(/^=\s*["']?(.+?)["']?$/u, '$1');
-            
+
             // Remove invisible characters
             v = v.replace(/[\u200B-\u200D\uFEFF]/g, '');
-            
+
             return v;
         } catch (_) {
             return value;
@@ -4706,7 +4705,7 @@ class PowerChoosersCRM {
                 // Account exists, update it with any new company fields
                 const existingAccount = existingAccountQuery.docs[0];
                 accountId = existingAccount.id;
-                
+
                 const updateData = {};
                 if (contactDoc.companyIndustry && !existingAccount.data().industry) {
                     updateData.industry = contactDoc.companyIndustry;
@@ -4784,7 +4783,7 @@ class PowerChoosersCRM {
     parsePhoneWithExtension(input) {
         if (!input) return { number: '', extension: '' };
         let str = String(input).trim();
-        
+
         // Match extension patterns: ext, ext., extension, x
         const extMatch = str.match(/\b(?:ext\.?|extension|x)\s*(\d+)\s*$/i);
         let extension = '';
@@ -4792,10 +4791,10 @@ class PowerChoosersCRM {
             extension = extMatch[1];
             str = str.slice(0, extMatch.index).trim();
         }
-        
+
         // Extract digits from the main number
         const digits = str.replace(/[^\d]/g, '');
-        
+
         return { number: digits, extension };
     }
 
@@ -4814,16 +4813,16 @@ class PowerChoosersCRM {
             // Remove zero-width spaces and BOM
             v = v.replace(/[\u200B-\u200D\uFEFF]/g, '');
             v = v.trim();
-            
+
             if (!v) return '';
-            
+
             // Parse number and extension
             const parsed = this.parsePhoneWithExtension(v);
             const digits = parsed.number;
             const ext = parsed.extension;
-            
+
             if (!digits) return '';
-            
+
             // Format US numbers as +1 (XXX) XXX-XXXX
             let formatted = '';
             if (digits.length === 11 && digits.startsWith('1')) {
@@ -4836,12 +4835,12 @@ class PowerChoosersCRM {
                 // Non-US or other format - return with + prefix
                 formatted = '+' + digits;
             }
-            
+
             // Append extension if present
             if (ext) {
                 formatted += ` ext. ${ext}`;
             }
-            
+
             return formatted;
         } catch (_) {
             return value;
@@ -4858,7 +4857,7 @@ class PowerChoosersCRM {
         ]).then(() => {
             console.log('[CRM] Tasks and News loaded together');
         });
-        
+
         // Update live price every 5 minutes
         setInterval(() => {
             this.updateLivePrice();
@@ -4869,36 +4868,36 @@ class PowerChoosersCRM {
         this.newsRefreshTimer = setInterval(() => {
             this.loadEnergyNews();
         }, 3 * 60 * 60 * 1000);
-        
+
         // Start email automation monitor
         // Client-side email automation is now handled by Cloud Scheduler cron jobs
         // this.startEmailAutomation();
     }
-    
+
     // Email Automation Monitor - checks for emails that need generation/sending
     startEmailAutomation() {
         if (this.emailAutomationInterval) return; // Already running
-        
+
         console.log('[CRM] Starting email automation monitor...');
-        
+
         // Check every 2 minutes
         this.emailAutomationInterval = setInterval(async () => {
             await this.checkScheduledEmails();
         }, 2 * 60 * 1000); // 2 minutes
-        
+
         // Run immediately on start (after a 5 second delay to let things initialize)
         setTimeout(() => {
             this.checkScheduledEmails();
         }, 5000);
     }
-    
+
     async checkScheduledEmails() {
         if (!window.firebaseDB) return;
-        
+
         try {
             const now = Date.now();
             const db = window.firebaseDB;
-            
+
             // 1. Check for emails that need content generation
             const needsGenerationQuery = db.collection('emails')
                 .where('type', '==', 'scheduled')
@@ -4906,12 +4905,12 @@ class PowerChoosersCRM {
                 .where('scheduledSendTime', '>=', now - (60 * 1000)) // 1 min buffer
                 .where('scheduledSendTime', '<=', now + (24 * 60 * 60 * 1000)) // Next 24 hours
                 .limit(10);
-            
+
             const needsGenerationSnapshot = await needsGenerationQuery.get();
-            
+
             if (!needsGenerationSnapshot.empty) {
                 console.log(`[CRM Automation] Found ${needsGenerationSnapshot.size} emails needing generation`);
-                
+
                 // Trigger generation
                 try {
                     const baseUrl = window.API_BASE_URL || window.location.origin || '';
@@ -4920,16 +4919,16 @@ class PowerChoosersCRM {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ immediate: true })
                     });
-                    
+
                     if (response.ok) {
                         const result = await response.json();
                         console.log(`[CRM Automation] Generated ${result.count} emails`);
-                        
+
                         // Optional: Show toast notification
                         if (result.count > 0 && this.showToast) {
                             this.showToast(`✓ Generated ${result.count} scheduled email${result.count !== 1 ? 's' : ''}`, 'success');
                         }
-                        
+
                         // Refresh emails page if user is viewing it
                         if (this.currentPage === 'emails' && window.EmailsPage && typeof window.EmailsPage.refresh === 'function') {
                             window.EmailsPage.refresh();
@@ -4939,19 +4938,19 @@ class PowerChoosersCRM {
                     console.warn('[CRM Automation] Generation failed:', error);
                 }
             }
-            
+
             // 2. Check for approved emails ready to send
             const readyToSendQuery = db.collection('emails')
                 .where('type', '==', 'scheduled')
                 .where('status', '==', 'approved')
                 .where('scheduledSendTime', '<=', now)
                 .limit(10);
-            
+
             const readyToSendSnapshot = await readyToSendQuery.get();
-            
+
             if (!readyToSendSnapshot.empty) {
                 console.log(`[CRM Automation] Found ${readyToSendSnapshot.size} emails ready to send`);
-                
+
                 // Trigger sending
                 try {
                     const baseUrl = window.API_BASE_URL || window.location.origin || '';
@@ -4959,16 +4958,16 @@ class PowerChoosersCRM {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' }
                     });
-                    
+
                     if (response.ok) {
                         const result = await response.json();
                         console.log(`[CRM Automation] Sent ${result.count} emails`);
-                        
+
                         // Optional: Show toast notification
                         if (result.count > 0 && this.showToast) {
                             this.showToast(`✓ Sent ${result.count} scheduled email${result.count !== 1 ? 's' : ''}`, 'success');
                         }
-                        
+
                         // Refresh emails page if user is viewing it
                         if (this.currentPage === 'emails' && window.EmailsPage && typeof window.EmailsPage.refresh === 'function') {
                             window.EmailsPage.refresh();
@@ -4978,12 +4977,12 @@ class PowerChoosersCRM {
                     console.warn('[CRM Automation] Sending failed:', error);
                 }
             }
-            
+
         } catch (error) {
             console.error('[CRM Automation] Check failed:', error);
         }
     }
-    
+
     // Add cleanup method
     stopEmailAutomation() {
         if (this.emailAutomationInterval) {
@@ -4997,13 +4996,13 @@ class PowerChoosersCRM {
         // Simulate live price updates
         const priceElement = document.querySelector('.current-price');
         const changeElement = document.querySelector('.price-change');
-        
+
         if (priceElement && changeElement) {
             const basePrice = 0.089;
             const variation = (Math.random() - 0.5) * 0.01;
             const newPrice = (basePrice + variation).toFixed(3);
             const change = (variation / basePrice * 100).toFixed(1);
-            
+
             priceElement.textContent = `$${newPrice}`;
             changeElement.textContent = `${change > 0 ? '+' : ''}${change}%`;
             changeElement.className = `price-change ${change > 0 ? 'positive' : 'negative'}`;
@@ -5013,11 +5012,11 @@ class PowerChoosersCRM {
     getPriorityBackground(priority) {
         console.log('🎨 BACKGROUND called with:', priority);
         const p = (priority || '').toLowerCase().trim();
-        switch(p) {
+        switch (p) {
             case 'low': return '#495057';
             case 'medium': return 'rgba(255, 193, 7, 0.15)';
             case 'high': return 'rgba(220, 53, 69, 0.15)';
-            default: 
+            default:
                 console.log('⚠️ DEFAULT background for priority:', priority);
                 return '#495057';
         }
@@ -5026,11 +5025,11 @@ class PowerChoosersCRM {
     getPriorityColor(priority) {
         console.log('🎨 COLOR called with:', priority);
         const p = (priority || '').toLowerCase().trim();
-        switch(p) {
+        switch (p) {
             case 'low': return '#e9ecef';
             case 'medium': return '#ffc107';
             case 'high': return '#dc3545';
-            default: 
+            default:
                 console.log('⚠️ DEFAULT color for priority:', priority);
                 return '#e9ecef';
         }
@@ -5039,7 +5038,7 @@ class PowerChoosersCRM {
     async loadTodaysTasks(skipFirebase = false) {
         const taskLists = Array.from(document.querySelectorAll('.tasks-list'));
         if (!taskLists.length) return;
-        
+
         // Prevent double-rendering - only skip if currently loading
         if (this._tasksLoading) {
             console.log('[CRM] Tasks already loading, skipping duplicate call');
@@ -5078,7 +5077,7 @@ class PowerChoosersCRM {
         // Today's local midnight
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        
+
         // Helper functions for ownership filtering
         const getUserEmail = () => {
             try {
@@ -5086,7 +5085,7 @@ class PowerChoosersCRM {
                     return window.DataManager.getCurrentUserEmail();
                 }
                 return (window.currentUserEmail || '').toLowerCase();
-            } catch(_) {
+            } catch (_) {
                 return (window.currentUserEmail || '').toLowerCase();
             }
         };
@@ -5096,11 +5095,11 @@ class PowerChoosersCRM {
                     return window.DataManager.isCurrentUserAdmin();
                 }
                 return window.currentUserRole === 'admin';
-            } catch(_) {
+            } catch (_) {
                 return window.currentUserRole === 'admin';
             }
         };
-        
+
         // Load localStorage tasks first for immediate rendering
         // CRITICAL FIX: Use namespaced key to match task-detail.js and avoid stale data
         let localTasks = [];
@@ -5109,16 +5108,16 @@ class PowerChoosersCRM {
             const email = getUserEmail();
             const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
             const namespacedTasks = JSON.parse(localStorage.getItem(namespacedKey) || '[]');
-            
+
             // Also check legacy key for cross-browser compatibility
             const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
-            
+
             // Merge both sources, preferring namespaced key
             const tasksMap = new Map();
             namespacedTasks.forEach(t => { if (t && t.id) tasksMap.set(t.id, t); });
             legacyTasks.forEach(t => { if (t && t.id && !tasksMap.has(t.id)) tasksMap.set(t.id, t); });
             localTasks = Array.from(tasksMap.values());
-            
+
             // CRITICAL: Filter by ownership for non-admin users (localStorage bypasses Firestore rules)
             if (!isAdmin() && localTasks.length > 0) {
                 localTasks = localTasks.filter(t => {
@@ -5139,7 +5138,7 @@ class PowerChoosersCRM {
             try {
                 if (window.firebaseDB) {
                     let query = window.firebaseDB.collection('tasks');
-                    
+
                     // CRITICAL: Add ownership filters for non-admin users
                     if (!isAdmin()) {
                         const email = getUserEmail();
@@ -5151,9 +5150,19 @@ class PowerChoosersCRM {
                             // Firebase tasks override any stale local copies with the same ID
                             const mergedTasksMap = new Map();
                             firebaseTasks.forEach(t => { if (t && t.id) mergedTasksMap.set(t.id, t); });
-                            localTasks.forEach(t => { if (t && t.id && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t); });
+                            // CRITICAL FIX: Only merge local tasks if they are recent (< 5 mins) to avoid resurrecting deleted tasks
+                            const nowMs = Date.now();
+                            localTasks.forEach(t => {
+                                if (t && t.id && !mergedTasksMap.has(t.id)) {
+                                    const created = t.createdAt || (t.timestamp && typeof t.timestamp.toMillis === 'function' ? t.timestamp.toMillis() : t.timestamp) || 0;
+                                    // If we are online (firebaseTasks fetched), assume missing old tasks are deleted
+                                    if (nowMs - created < 300000) {
+                                        mergedTasksMap.set(t.id, t);
+                                    }
+                                }
+                            });
                             const mergedTasks = Array.from(mergedTasksMap.values());
-                            
+
                             // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
                             try {
                                 const email = getUserEmail();
@@ -5190,9 +5199,18 @@ class PowerChoosersCRM {
                             // CRITICAL FIX: Always prefer Firebase as the source of truth
                             const mergedTasksMap = new Map();
                             firebaseTasks.forEach(t => { if (t && t.id) mergedTasksMap.set(t.id, t); });
-                            localTasks.forEach(t => { if (t && t.id && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t); });
+                            // CRITICAL FIX: Only merge local tasks if they are recent (< 5 mins) to avoid resurrecting deleted tasks
+                            const nowMs = Date.now();
+                            localTasks.forEach(t => {
+                                if (t && t.id && !mergedTasksMap.has(t.id)) {
+                                    const created = t.createdAt || (t.timestamp && typeof t.timestamp.toMillis === 'function' ? t.timestamp.toMillis() : t.timestamp) || 0;
+                                    if (nowMs - created < 300000) {
+                                        mergedTasksMap.set(t.id, t);
+                                    }
+                                }
+                            });
                             const mergedTasks = Array.from(mergedTasksMap.values());
-                            
+
                             // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
                             try {
                                 const email = getUserEmail();
@@ -5207,7 +5225,7 @@ class PowerChoosersCRM {
                             return;
                         }
                     }
-                    
+
                     // Admin path: unrestricted query
                     const snapshot = await query
                         .orderBy('timestamp', 'desc')
@@ -5218,24 +5236,33 @@ class PowerChoosersCRM {
                         const createdAt = data.createdAt || (data.timestamp && typeof data.timestamp.toDate === 'function' ? data.timestamp.toDate().getTime() : data.timestamp) || Date.now();
                         return { ...data, id: (data.id || doc.id), createdAt, status: data.status || 'pending' };
                     });
-                    
+
                     // CRITICAL FIX: Always prefer Firebase as the source of truth
                     // Firebase tasks override any stale local copies with the same ID
                     const allTasksMap = new Map();
                     firebaseTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
-                    localTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+                    // CRITICAL FIX: Only merge local tasks if they are recent (< 5 mins) to avoid resurrecting deleted tasks
+                    const nowMs = Date.now();
+                    localTasks.forEach(t => {
+                        if (t && t.id && !allTasksMap.has(t.id)) {
+                            const created = t.createdAt || (t.timestamp && typeof t.timestamp.toMillis === 'function' ? t.timestamp.toMillis() : t.timestamp) || 0;
+                            if (nowMs - created < 300000) {
+                                allTasksMap.set(t.id, t);
+                            }
+                        }
+                    });
                     const mergedTasks = Array.from(allTasksMap.values());
-                    
+
                     // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
                     try {
                         const email = getUserEmail();
                         const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
                         localStorage.setItem(namespacedKey, JSON.stringify(mergedTasks));
                         localStorage.setItem('userTasks', JSON.stringify(mergedTasks)); // Legacy key for compatibility
-        } catch (e) {
+                    } catch (e) {
                         console.warn('Could not save merged tasks to localStorage cache:', e);
                     }
-                    
+
                     // Re-render with complete merged data
                     this.renderTodaysTasks(mergedTasks, parseDateStrict, parseTimeToMinutes, today);
                 }
@@ -5244,7 +5271,7 @@ class PowerChoosersCRM {
             }
         }
     }
-    
+
     renderTodaysTasks(allTasks, parseDateStrict, parseTimeToMinutes, today) {
         const tasksList = document.querySelector('.tasks-list');
         if (!tasksList) return;
@@ -5357,151 +5384,151 @@ class PowerChoosersCRM {
 
         // Attach task click event listeners
         document.querySelectorAll('.tasks-list').forEach(list => {
-          list.querySelectorAll('.task-item[data-task-id]').forEach(taskItem => {
-            taskItem.addEventListener('click', (e) => {
-                e.preventDefault();
-                const taskId = taskItem.getAttribute('data-task-id');
-                if (taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
-                    // Capture comprehensive dashboard state before opening task detail
-                    const current = (window.crm && window.crm.currentPage) ? window.crm.currentPage : (document.querySelector('.page.active')?.getAttribute('data-page') || 'dashboard');
-                    
-                    // Capture full dashboard state for proper back navigation
-                    if (current === 'dashboard') {
-                        try {
-                            window._dashboardReturn = {
-                                page: 'dashboard',
-                                scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
-                                timestamp: Date.now(),
-                                // Capture any dashboard-specific state (widget filters, etc.)
-                                dashboardState: {
-                                    todaysTasksPage: this.todaysTasksPagination?.currentPage || 1,
-                                    todaysTasksScroll: document.querySelector('.tasks-list')?.scrollTop || 0
+            list.querySelectorAll('.task-item[data-task-id]').forEach(taskItem => {
+                taskItem.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const taskId = taskItem.getAttribute('data-task-id');
+                    if (taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
+                        // Capture comprehensive dashboard state before opening task detail
+                        const current = (window.crm && window.crm.currentPage) ? window.crm.currentPage : (document.querySelector('.page.active')?.getAttribute('data-page') || 'dashboard');
+
+                        // Capture full dashboard state for proper back navigation
+                        if (current === 'dashboard') {
+                            try {
+                                window._dashboardReturn = {
+                                    page: 'dashboard',
+                                    scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+                                    timestamp: Date.now(),
+                                    // Capture any dashboard-specific state (widget filters, etc.)
+                                    dashboardState: {
+                                        todaysTasksPage: this.todaysTasksPagination?.currentPage || 1,
+                                        todaysTasksScroll: document.querySelector('.tasks-list')?.scrollTop || 0
+                                    }
+                                };
+                                console.log('[Dashboard] Captured state for task detail navigation:', window._dashboardReturn);
+                            } catch (_) { /* noop */ }
+                        } else if (current === 'accounts') {
+                            // Capture accounts state for proper back navigation
+                            try {
+                                // Use the same comprehensive state capture pattern as accounts.js
+                                const accountsState = {
+                                    page: 'accounts',
+                                    currentPage: 1, // Default, will be overridden by module state if available
+                                    scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+                                    searchTerm: '',
+                                    sortColumn: '',
+                                    sortDirection: '',
+                                    filters: {},
+                                    selectedItems: [],
+                                    timestamp: Date.now()
+                                };
+
+                                // Try to get current accounts page state if available
+                                if (window.accountsModule && typeof window.accountsModule.getCurrentState === 'function') {
+                                    const moduleState = window.accountsModule.getCurrentState();
+                                    Object.assign(accountsState, moduleState);
                                 }
-                            };
-                            console.log('[Dashboard] Captured state for task detail navigation:', window._dashboardReturn);
-                        } catch (_) { /* noop */ }
-                    } else if (current === 'accounts') {
-                        // Capture accounts state for proper back navigation
-                        try {
-                            // Use the same comprehensive state capture pattern as accounts.js
-                            const accountsState = {
-                                page: 'accounts',
-                                currentPage: 1, // Default, will be overridden by module state if available
-                                scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
-                                searchTerm: '',
-                                sortColumn: '',
-                                sortDirection: '',
-                                filters: {},
-                                selectedItems: [],
-                                timestamp: Date.now()
-                            };
-                            
-                            // Try to get current accounts page state if available
-                            if (window.accountsModule && typeof window.accountsModule.getCurrentState === 'function') {
-                                const moduleState = window.accountsModule.getCurrentState();
-                                Object.assign(accountsState, moduleState);
-                            }
-                            
-                            // Also try to get search term from DOM
-                            const quickSearch = document.getElementById('accounts-quick-search');
-                            if (quickSearch) {
-                                accountsState.searchTerm = quickSearch.value || '';
-                            }
-                            
-                            window._accountsReturn = accountsState;
-                            console.log('[Accounts] Captured state for task detail navigation:', window._accountsReturn);
-                        } catch (_) { /* noop */ }
-                    } else if (current === 'people') {
-                        // Capture people state for proper back navigation
-                        try {
-                            const peopleState = {
-                                page: 'people',
-                                currentPage: 1,
-                                scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
-                                searchTerm: '',
-                                sortColumn: '',
-                                sortDirection: '',
-                                filters: {},
-                                selectedItems: [],
-                                timestamp: Date.now()
-                            };
-                            
-                            // Try to get current people page state if available
-                            if (window.peopleModule && typeof window.peopleModule.getCurrentState === 'function') {
-                                const moduleState = window.peopleModule.getCurrentState();
-                                Object.assign(peopleState, moduleState);
-                            }
-                            
-                            // Also try to get search term from DOM
-                            const quickSearch = document.getElementById('people-quick-search');
-                            if (quickSearch) {
-                                peopleState.searchTerm = quickSearch.value || '';
-                            }
-                            
-                            window._peopleReturn = peopleState;
-                            console.log('[People] Captured state for task detail navigation:', window._peopleReturn);
-                        } catch (_) { /* noop */ }
-                    } else if (current === 'tasks') {
-                        // Capture tasks state for proper back navigation
-                        try {
-                            const tasksState = {
-                                page: 'tasks',
-                                currentPage: 1,
-                                scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
-                                filterMode: 'all',
-                                selectedItems: [],
-                                timestamp: Date.now()
-                            };
-                            
-                            // Try to get current tasks page state if available
-                            if (window.tasksModule && typeof window.tasksModule.getCurrentState === 'function') {
-                                const moduleState = window.tasksModule.getCurrentState();
-                                Object.assign(tasksState, moduleState);
-                            }
-                            
-                            window._tasksReturn = tasksState;
-                            console.log('[Tasks] Captured state for task detail navigation:', window._tasksReturn);
-                        } catch (_) { /* noop */ }
+
+                                // Also try to get search term from DOM
+                                const quickSearch = document.getElementById('accounts-quick-search');
+                                if (quickSearch) {
+                                    accountsState.searchTerm = quickSearch.value || '';
+                                }
+
+                                window._accountsReturn = accountsState;
+                                console.log('[Accounts] Captured state for task detail navigation:', window._accountsReturn);
+                            } catch (_) { /* noop */ }
+                        } else if (current === 'people') {
+                            // Capture people state for proper back navigation
+                            try {
+                                const peopleState = {
+                                    page: 'people',
+                                    currentPage: 1,
+                                    scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+                                    searchTerm: '',
+                                    sortColumn: '',
+                                    sortDirection: '',
+                                    filters: {},
+                                    selectedItems: [],
+                                    timestamp: Date.now()
+                                };
+
+                                // Try to get current people page state if available
+                                if (window.peopleModule && typeof window.peopleModule.getCurrentState === 'function') {
+                                    const moduleState = window.peopleModule.getCurrentState();
+                                    Object.assign(peopleState, moduleState);
+                                }
+
+                                // Also try to get search term from DOM
+                                const quickSearch = document.getElementById('people-quick-search');
+                                if (quickSearch) {
+                                    peopleState.searchTerm = quickSearch.value || '';
+                                }
+
+                                window._peopleReturn = peopleState;
+                                console.log('[People] Captured state for task detail navigation:', window._peopleReturn);
+                            } catch (_) { /* noop */ }
+                        } else if (current === 'tasks') {
+                            // Capture tasks state for proper back navigation
+                            try {
+                                const tasksState = {
+                                    page: 'tasks',
+                                    currentPage: 1,
+                                    scroll: window.scrollY || (document.documentElement && document.documentElement.scrollTop) || 0,
+                                    filterMode: 'all',
+                                    selectedItems: [],
+                                    timestamp: Date.now()
+                                };
+
+                                // Try to get current tasks page state if available
+                                if (window.tasksModule && typeof window.tasksModule.getCurrentState === 'function') {
+                                    const moduleState = window.tasksModule.getCurrentState();
+                                    Object.assign(tasksState, moduleState);
+                                }
+
+                                window._tasksReturn = tasksState;
+                                console.log('[Tasks] Captured state for task detail navigation:', window._tasksReturn);
+                            } catch (_) { /* noop */ }
+                        }
+
+                        window.TaskDetail.open(taskId, current);
                     }
-                    
-                    window.TaskDetail.open(taskId, current);
+                });
+
+                // Add hover effects
+                const taskName = taskItem.querySelector('.task-name');
+                if (taskName) {
+                    taskItem.addEventListener('mouseenter', () => {
+                        taskName.style.color = 'var(--text-inverse)';
+                    });
+                    taskItem.addEventListener('mouseleave', () => {
+                        taskName.style.color = 'var(--grey-400)';
+                    });
                 }
             });
-            
-            // Add hover effects
-            const taskName = taskItem.querySelector('.task-name');
-            if (taskName) {
-                taskItem.addEventListener('mouseenter', () => {
-                    taskName.style.color = 'var(--text-inverse)';
-                });
-                taskItem.addEventListener('mouseleave', () => {
-                    taskName.style.color = 'var(--grey-400)';
-                });
-            }
-          });
         });
 
         // Attach pagination event listeners
         document.querySelectorAll('.tasks-list').forEach(list => {
-          list.querySelectorAll('.pagination-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const action = btn.getAttribute('data-action');
-                const totalPages = Math.ceil(this.todaysTasksPagination.totalTasks / this.todaysTasksPagination.pageSize);
-                
-                if (action === 'prev' && this.todaysTasksPagination.currentPage > 1) {
-                    this.todaysTasksPagination.currentPage--;
-                    this._tasksLoading = false; // Reset flag before pagination reload
-                    this.loadTodaysTasks();
-                } else if (action === 'next' && this.todaysTasksPagination.currentPage < totalPages) {
-                    this.todaysTasksPagination.currentPage++;
-                    this._tasksLoading = false; // Reset flag before pagination reload
-                    this.loadTodaysTasks();
-                }
-            });
+            list.querySelectorAll('.pagination-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const action = btn.getAttribute('data-action');
+                    const totalPages = Math.ceil(this.todaysTasksPagination.totalTasks / this.todaysTasksPagination.pageSize);
+
+                    if (action === 'prev' && this.todaysTasksPagination.currentPage > 1) {
+                        this.todaysTasksPagination.currentPage--;
+                        this._tasksLoading = false; // Reset flag before pagination reload
+                        this.loadTodaysTasks();
+                    } else if (action === 'next' && this.todaysTasksPagination.currentPage < totalPages) {
+                        this.todaysTasksPagination.currentPage++;
+                        this._tasksLoading = false; // Reset flag before pagination reload
+                        this.loadTodaysTasks();
+                    }
+                });
             });
         });
-        
+
         // Reset loading flag after rendering completes
         this._tasksLoading = false;
     }
@@ -5546,7 +5573,7 @@ class PowerChoosersCRM {
     // Shared task title builder with descriptive format
     buildTaskTitle(type, contactName, accountName = '') {
         const name = contactName || accountName || 'contact';
-        
+
         const typeMap = {
             'phone-call': 'Call',
             'manual-email': 'Email',
@@ -5559,7 +5586,7 @@ class PowerChoosersCRM {
             'follow-up': 'Follow-up with',
             'demo': 'Demo for'
         };
-        
+
         const action = typeMap[type] || 'Task for';
         return `${action} ${name}`;
     }
@@ -5568,7 +5595,7 @@ class PowerChoosersCRM {
     updateTaskTitle(task) {
         // Normalize task type first
         const normalizedType = this.normalizeTaskType(task.type);
-        
+
         // Always update titles to use proper action-oriented format based on task type
         if (normalizedType && (task.contact || task.account)) {
             return this.buildTaskTitle(normalizedType, task.contact || '', task.account || '');
@@ -5595,7 +5622,7 @@ class PowerChoosersCRM {
     async loadEnergyNews() {
         const newsList = document.querySelector('.news-list');
         const lastRef = document.getElementById('news-last-refreshed');
-        
+
         // Prevent double-rendering - only skip if currently loading
         if (this._newsLoading) {
             console.log('[CRM] News already loading, skipping duplicate call');
@@ -5606,11 +5633,11 @@ class PowerChoosersCRM {
         const escapeHtml = (str) => {
             if (window.escapeHtml) return window.escapeHtml(str);
             return String(str)
-              .replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;')
-              .replace(/"/g, '&quot;')
-              .replace(/'/g, '&#039;');
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
         };
 
         try {
@@ -5648,7 +5675,7 @@ class PowerChoosersCRM {
                     const when = it.publishedAt ? this.formatTimeAgo(it.publishedAt) : '';
                     const time = when || (it.publishedAt ? new Date(it.publishedAt).toLocaleString() : '');
                     const safeHref = escapeHtml(url);
-                    
+
                     return `
                         <a class="news-item" href="${safeHref}" target="_blank" rel="noopener noreferrer">
                             <div class="news-title">${title}</div>
@@ -5657,7 +5684,7 @@ class PowerChoosersCRM {
                     `;
                 }).join('');
             }
-            
+
             // Reset loading flag after successful load
             this._newsLoading = false;
         } catch (err) {
@@ -5672,15 +5699,15 @@ class PowerChoosersCRM {
                 `;
             }
             this.showToast('Failed to refresh Energy News');
-            
+
             // Reset loading flag after error
             this._newsLoading = false;
         }
     }
-    
+
     loadHomeActivities(forceRefresh = false) {
         if (!window.ActivityManager) return;
-        
+
         // Check if we already have activities loaded and don't need to refresh
         const container = document.getElementById('home-activity-timeline');
         if (!forceRefresh && container?.children.length > 0 && !container.querySelector('.loading-spinner')) {
@@ -5689,7 +5716,7 @@ class PowerChoosersCRM {
             this.setupHomeActivityPagination();
             return;
         }
-        
+
         // Load global activities for home page
         if (forceRefresh) {
             // Clear cache and force refresh
@@ -5698,32 +5725,32 @@ class PowerChoosersCRM {
         } else {
             window.ActivityManager.renderActivities('home-activity-timeline', 'global');
         }
-        
+
         // Setup pagination
         this.setupHomeActivityPagination();
     }
 
-    
+
     setupHomeActivityPagination() {
         const paginationEl = document.getElementById('home-activity-pagination');
-        
+
         if (!paginationEl) return;
-        
+
         // Show pagination if there are more than 4 activities
         const updatePagination = async () => {
             if (!window.ActivityManager) return;
-            
+
             const activities = await window.ActivityManager.getActivities('global');
             const totalPages = Math.ceil(activities.length / window.ActivityManager.maxActivitiesPerPage);
-            
+
             if (totalPages > 1) {
                 paginationEl.style.display = 'flex';
-                
+
                 // Setup pagination buttons
                 const prevBtn = document.getElementById('home-activity-prev');
                 const nextBtn = document.getElementById('home-activity-next');
                 const infoEl = document.getElementById('home-activity-info');
-                
+
                 if (prevBtn) {
                     prevBtn.disabled = window.ActivityManager.currentPage === 0;
                     prevBtn.onclick = () => {
@@ -5731,7 +5758,7 @@ class PowerChoosersCRM {
                         updatePagination();
                     };
                 }
-                
+
                 if (nextBtn) {
                     nextBtn.disabled = window.ActivityManager.currentPage >= totalPages - 1;
                     nextBtn.onclick = () => {
@@ -5739,7 +5766,7 @@ class PowerChoosersCRM {
                         updatePagination();
                     };
                 }
-                
+
                 // Update page button
                 const pageButton = document.getElementById('home-activity-page');
                 if (pageButton) {
@@ -5750,7 +5777,7 @@ class PowerChoosersCRM {
                 paginationEl.style.display = 'none';
             }
         };
-        
+
         updatePagination();
     }
 }
@@ -5767,29 +5794,29 @@ window.__pcAccountsIcon = () => {
 // Enhanced favicon system with multiple fallback sources
 window.__pcFaviconHelper = {
     // Prefer explicit account/company logo URL; fallback to computed favicon chain
-    generateCompanyIconHTML: function(opts){
+    generateCompanyIconHTML: function (opts) {
         try {
             const size = parseInt((opts && opts.size) || 64, 10) || 64;
             const logoUrl = (opts && opts.logoUrl) ? String(opts.logoUrl).trim() : '';
-            const domain = (opts && opts.domain) ? String(opts.domain).trim().replace(/^https?:\/\//,'').replace(/\/$/,'') : '';
-            
-            
+            const domain = (opts && opts.domain) ? String(opts.domain).trim().replace(/^https?:\/\//, '').replace(/\/$/, '') : '';
+
+
             if (logoUrl) {
                 // Only treat as domain if it's clearly a bare domain (no protocol, no path)
                 const looksLikeBareDomain = /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(logoUrl) && !/\s/.test(logoUrl) && !logoUrl.includes('/');
                 let parsed = null;
-                try { parsed = /^https?:\/\//i.test(logoUrl) ? new URL(logoUrl) : null; } catch(_) { parsed = null; }
+                try { parsed = /^https?:\/\//i.test(logoUrl) ? new URL(logoUrl) : null; } catch (_) { parsed = null; }
                 const path = parsed ? (parsed.pathname || '') : '';
                 const looksLikeImagePath = /\.(png|jpe?g|gif|webp|svg|ico)(\?.*)?$/i.test(path);
-                
+
                 // Only use favicon fallback for bare domains, not for URLs
                 if (looksLikeBareDomain) {
-                    const clean = String(logoUrl).replace(/^www\./i,'');
+                    const clean = String(logoUrl).replace(/^www\./i, '');
                     if (clean) return this.generateFaviconHTML(clean, size);
                 }
                 // Otherwise treat as a direct image URL; fallback to favicon on error
-                const cleanDomain = domain || (parsed ? parsed.hostname.replace(/^www\./i,'') : '');
-                const containerId = `logo-${(cleanDomain||'x').replace(/[^a-z0-9]/gi,'')}-${Date.now()}`;
+                const cleanDomain = domain || (parsed ? parsed.hostname.replace(/^www\./i, '') : '');
+                const containerId = `logo-${(cleanDomain || 'x').replace(/[^a-z0-9]/gi, '')}-${Date.now()}`;
                 return `<img class="company-favicon" 
                              id="${containerId}"
                              src="${logoUrl}" 
@@ -5803,35 +5830,35 @@ window.__pcFaviconHelper = {
                 return this.generateFaviconHTML(domain, size);
             }
             return window.__pcAccountsIcon();
-        } catch(_) { return window.__pcAccountsIcon(); }
+        } catch (_) { return window.__pcAccountsIcon(); }
     },
-    onLogoError: function(containerId, domain, size){
+    onLogoError: function (containerId, domain, size) {
         try {
             const img = document.getElementById(containerId);
             if (!img) return;
             const parent = img.parentNode;
             const doReplace = () => {
-            const html = this.generateFaviconHTML(domain, size);
-            const div = document.createElement('div');
-            div.innerHTML = html;
-            const replacement = div.firstElementChild;
-            if (parent && replacement) parent.replaceChild(replacement, img);
-            else if (img) img.src = `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`;
+                const html = this.generateFaviconHTML(domain, size);
+                const div = document.createElement('div');
+                div.innerHTML = html;
+                const replacement = div.firstElementChild;
+                if (parent && replacement) parent.replaceChild(replacement, img);
+                else if (img) img.src = `https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(domain)}`;
             };
             // Fade out before replacement for smoother UX
-            try { img.classList.add('icon-unloading'); } catch(_) {}
+            try { img.classList.add('icon-unloading'); } catch (_) { }
             setTimeout(doReplace, 120);
-        } catch(_) {}
+        } catch (_) { }
     },
     // Generate favicon HTML with multiple fallback sources
-    generateFaviconHTML: function(domain, size = 64) {
+    generateFaviconHTML: function (domain, size = 64) {
         if (!domain) {
             return window.__pcAccountsIcon();
         }
 
         const cleanDomain = domain.replace(/^www\./i, '');
         const fallbackIcon = window.__pcAccountsIcon();
-        
+
         // Multiple favicon sources to try - ordered by quality and reliability
         const faviconSources = [
             `https://logo.clearbit.com/${encodeURIComponent(cleanDomain)}`, // Best for company logos
@@ -5845,7 +5872,7 @@ window.__pcFaviconHelper = {
 
         // Create a unique ID for this favicon container
         const containerId = `favicon-${cleanDomain.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}`;
-        
+
         return `
             <img class="company-favicon" 
                  id="${containerId}"
@@ -5860,7 +5887,7 @@ window.__pcFaviconHelper = {
     },
 
     // Handle successful favicon load
-    onFaviconLoad: function(containerId) {
+    onFaviconLoad: function (containerId) {
         const img = document.getElementById(containerId);
         if (img) {
             // Use requestAnimationFrame to ensure smooth animation
@@ -5871,7 +5898,7 @@ window.__pcFaviconHelper = {
     },
 
     // Handle favicon load error and try next source
-    onFaviconError: function(containerId, domain, size) {
+    onFaviconError: function (containerId, domain, size) {
         const img = document.getElementById(containerId);
         if (!img) return;
 
@@ -5893,20 +5920,20 @@ window.__pcFaviconHelper = {
 
         if (currentIndex < faviconSources.length) {
             // Fade out then try next source for smoother transition
-            try { img.classList.add('icon-unloading'); } catch(_) {}
+            try { img.classList.add('icon-unloading'); } catch (_) { }
             setTimeout(() => {
-            img.dataset.sourceIndex = currentIndex.toString();
-            img.src = faviconSources[currentIndex];
-                try { img.classList.remove('icon-unloading'); } catch(_) {}
+                img.dataset.sourceIndex = currentIndex.toString();
+                img.src = faviconSources[currentIndex];
+                try { img.classList.remove('icon-unloading'); } catch (_) { }
             }, 120);
         } else {
             // All sources failed, show fallback icon with a graceful fade-out
-            try { img.classList.add('icon-unloading'); } catch(_) {}
+            try { img.classList.add('icon-unloading'); } catch (_) { }
             setTimeout(() => {
-            img.classList.add('favicon-failed');
-            img.style.display = 'none';
-            const fallbackIcon = window.__pcAccountsIcon();
-            img.insertAdjacentHTML('afterend', fallbackIcon);
+                img.classList.add('favicon-failed');
+                img.style.display = 'none';
+                const fallbackIcon = window.__pcAccountsIcon();
+                img.insertAdjacentHTML('afterend', fallbackIcon);
             }, 120);
         }
     }
@@ -5914,7 +5941,7 @@ window.__pcFaviconHelper = {
 
 // Global icon animation system - adds 'icon-loaded' class for smooth fade-in
 window.__pcIconAnimator = {
-    init: function() {
+    init: function () {
         // Observe all images (favicons, logos) and add loaded class
         this.observeImages();
         // Observe all SVG icons and add loaded class
@@ -5922,20 +5949,20 @@ window.__pcIconAnimator = {
         // Observe all avatar circles
         this.observeAvatars();
     },
-    
-    observeImages: function() {
+
+    observeImages: function () {
         // Get all favicon images currently in DOM
         const loadImage = (img) => {
             // Prevent duplicate processing
             if (img.dataset.iconObserved) return;
             img.dataset.iconObserved = 'true';
-            
+
             // Ensure image starts hidden for animation
             if (!img.classList.contains('icon-loaded')) {
                 img.style.opacity = '0';
                 img.style.transform = 'scale(0.95)';
             }
-            
+
             // Check if already loaded (cached images)
             const checkAndLoad = () => {
                 if (img.complete && img.naturalWidth > 0) {
@@ -5949,10 +5976,10 @@ window.__pcIconAnimator = {
                 }
                 return false;
             };
-            
+
             // Immediate check for cached images
             if (checkAndLoad()) return;
-            
+
             // If not cached, wait for load event
             img.addEventListener('load', () => {
                 requestAnimationFrame(() => {
@@ -5961,7 +5988,7 @@ window.__pcIconAnimator = {
                     });
                 });
             }, { once: true });
-            
+
             // Handle error - still show with animation
             img.addEventListener('error', () => {
                 requestAnimationFrame(() => {
@@ -5971,10 +5998,10 @@ window.__pcIconAnimator = {
                 });
             }, { once: true });
         };
-        
+
         // Load existing images
         document.querySelectorAll('.company-favicon, .logo').forEach(loadImage);
-        
+
         // Watch for new images with MutationObserver
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
@@ -5991,21 +6018,21 @@ window.__pcIconAnimator = {
                 });
             });
         });
-        
+
         observer.observe(document.body, { childList: true, subtree: true });
     },
-    
-    observeSVGs: function() {
+
+    observeSVGs: function () {
         // Add loaded class to SVGs after a frame
         const loadSVG = (svg) => {
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => svg.classList.add('icon-loaded'));
             });
         };
-        
+
         // Load existing SVGs
         document.querySelectorAll('button svg, .qa-btn svg, .action-btn svg, .toolbar-btn svg, .search-btn svg, .call-btn svg, .pc-modal__close svg, .nav-item svg, .toast-icon svg').forEach(loadSVG);
-        
+
         // Watch for new SVGs
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
@@ -6021,21 +6048,21 @@ window.__pcIconAnimator = {
                 });
             });
         });
-        
+
         observer.observe(document.body, { childList: true, subtree: true });
     },
-    
-    observeAvatars: function() {
+
+    observeAvatars: function () {
         // Add loaded class to avatar circles and task detail avatars/favicons
         const loadAvatar = (avatar) => {
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => avatar.classList.add('icon-loaded'));
             });
         };
-        
+
         // Load existing avatars (including task detail page icons)
         document.querySelectorAll('.avatar-circle, .activity-entity-avatar-circle, .avatar-initials, .company-favicon-header').forEach(loadAvatar);
-        
+
         // Watch for new avatars
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
@@ -6051,7 +6078,7 @@ window.__pcIconAnimator = {
                 });
             });
         });
-        
+
         observer.observe(document.body, { childList: true, subtree: true });
     }
 };
@@ -6071,7 +6098,7 @@ if (document.readyState === 'loading') {
                 `;
                 document.head.appendChild(style);
             }
-        } catch(_) {}
+        } catch (_) { }
         window.__pcIconAnimator.init();
     });
 } else {
@@ -6087,16 +6114,16 @@ if (document.readyState === 'loading') {
             `;
             document.head.appendChild(style);
         }
-    } catch(_) {}
+    } catch (_) { }
     window.__pcIconAnimator.init();
 }
 
 // Global email signature helper function
-window.getEmailSignature = function() {
+window.getEmailSignature = function () {
     if (window.SettingsPage && window.SettingsPage.getEmailSignature) {
         return window.SettingsPage.getEmailSignature();
     }
-    
+
     // Fallback: try to get from localStorage
     try {
         const savedSettings = localStorage.getItem('crm-settings');
@@ -6105,19 +6132,19 @@ window.getEmailSignature = function() {
             const signature = settings.emailSignature;
             if (signature && (signature.text || signature.image)) {
                 let signatureHtml = '<div contenteditable="false" data-signature="true" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
-                
+
                 if (signature.text) {
                     const textHtml = signature.text.replace(/\n/g, '<br>');
                     signatureHtml += `<div style="font-family: inherit; font-size: 14px; color: #333; line-height: 1.4;">${textHtml}</div>`;
                 }
-                
+
                 if (signature.image) {
                     // Use imageSize from settings, with defaults if not set
                     const width = signature.imageSize?.width || 200;
                     const height = signature.imageSize?.height || 100;
                     signatureHtml += `<div style="margin-top: 10px;"><img src="${signature.image}" alt="Signature" style="max-width: ${width}px; max-height: ${height}px; border-radius: 4px;" /></div>`;
                 }
-                
+
                 signatureHtml += '</div>';
                 return signatureHtml;
             }
@@ -6125,16 +6152,16 @@ window.getEmailSignature = function() {
     } catch (error) {
         console.error('Error getting email signature from localStorage:', error);
     }
-    
+
     return '';
 };
 
 // Global email signature text helper function
-window.getEmailSignatureText = function() {
+window.getEmailSignatureText = function () {
     if (window.SettingsPage && window.SettingsPage.getEmailSignatureText) {
         return window.SettingsPage.getEmailSignatureText();
     }
-    
+
     // Fallback: try to get from localStorage
     try {
         const savedSettings = localStorage.getItem('crm-settings');
@@ -6148,7 +6175,7 @@ window.getEmailSignatureText = function() {
     } catch (error) {
         console.error('Error getting email signature text from localStorage:', error);
     }
-    
+
     return '';
 };
 
@@ -6156,13 +6183,13 @@ window.getEmailSignatureText = function() {
 function injectEmailSignature() {
     const bodyInput = document.querySelector('.body-input');
     if (!bodyInput) return;
-    
+
     // Check if signature is already in the body (prevent duplication)
     const currentContent = bodyInput.innerHTML;
     if (currentContent.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;')) {
         return; // Signature already present
     }
-    
+
     // Get signature and add to body if it exists
     const signature = window.getEmailSignature ? window.getEmailSignature() : '';
     if (signature) {
@@ -6238,12 +6265,12 @@ function addSignatureToAIContent(content, isHtmlMode = false) {
     if (isHtmlMode) {
         return content;
     }
-    
+
     // Check if signature is already present
     if (content.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;')) {
         return content;
     }
-    
+
     // Add signature to AI-generated content
     const signature = window.getEmailSignature ? window.getEmailSignature() : '';
     return content + signature;
@@ -6256,11 +6283,11 @@ function initializeCRM() {
         console.log('[Main] PowerChoosersCRM already initialized, skipping...');
         return;
     }
-    
+
     console.log('[Main] Initializing PowerChoosersCRM...');
     window.crm = new PowerChoosersCRM();
     console.log('[Main] ✓ PowerChoosersCRM initialized');
-    
+
     // Add compose button listener for signature injection (with guard)
     const composeBtn = document.getElementById('compose-email-btn');
     if (composeBtn && !composeBtn._composeBound) {
@@ -6272,7 +6299,7 @@ function initializeCRM() {
         });
         composeBtn._composeBound = true;
     }
-    
+
     // Watch for compose window visibility changes
     const composeWindow = document.getElementById('compose-window');
     if (composeWindow) {
@@ -6287,7 +6314,7 @@ function initializeCRM() {
                         composeWindow.style.right = '20px';
                         composeWindow.style.top = 'auto';
                         composeWindow.style.left = 'auto';
-                        
+
                         // Compose window is now visible, inject signature
                         setTimeout(() => {
                             injectEmailSignature();
@@ -6296,7 +6323,7 @@ function initializeCRM() {
                 }
             });
         });
-        
+
         observer.observe(composeWindow, {
             attributes: true,
             attributeFilter: ['style']
@@ -6307,12 +6334,32 @@ function initializeCRM() {
     } else if (window.initGlobalSearch) {
         window.initGlobalSearch();
     }
-    
+
     // Load sequence debugging tools
     const debugScript = document.createElement('script');
     debugScript.src = 'scripts/debug-sequence-flow.js';
     debugScript.async = true;
     document.head.appendChild(debugScript);
+}
+
+// Call immediately if DOM is already loaded, otherwise wait
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeCRM);
+} else {
+    // DOM already loaded (lazy loaded scripts case)
+    initializeCRM();
+}
+
+// Export for potential module use
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = PowerChoosersCRM;
+}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+// Load sequence debugging tools
+const debugScript = document.createElement('script');
+debugScript.src = 'scripts/debug-sequence-flow.js';
+debugScript.async = true;
+document.head.appendChild(debugScript);
 }
 
 // Call immediately if DOM is already loaded, otherwise wait

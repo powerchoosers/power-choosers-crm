@@ -360,7 +360,16 @@
     // Firebase tasks override any stale local copies with the same ID
     const allTasksMap = new Map();
     firebaseTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
-    userTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+    // CRITICAL FIX: Only merge local tasks if they are recent (< 5 mins) to avoid resurrecting deleted tasks
+    const nowMs = Date.now();
+    userTasks.forEach(t => {
+      if (t && t.id && !allTasksMap.has(t.id)) {
+        const created = t.createdAt || (t.timestamp && typeof t.timestamp.toMillis === 'function' ? t.timestamp.toMillis() : t.timestamp) || 0;
+        if (nowMs - created < 300000) {
+          allTasksMap.set(t.id, t);
+        }
+      }
+    });
     const allTasks = Array.from(allTasksMap.values());
 
     // Add LinkedIn tasks that aren't duplicates
@@ -425,7 +434,7 @@
         .get();
 
       const tasksSnapshot = await tasksQuery;
-      
+
       if (tasksSnapshot.empty) {
         return linkedInTasks;
       }
@@ -444,7 +453,7 @@
 
       tasksSnapshot.forEach(doc => {
         const taskData = doc.data();
-        
+
         // Only include LinkedIn task types
         const taskType = String(taskData.type || '').toLowerCase();
         if (!taskType.includes('linkedin') && !taskType.includes('li-')) {
@@ -580,6 +589,13 @@
             if (!snap.empty) await batch.commit();
           }
         } catch (e) { console.warn('Could not remove task from Firebase:', e); }
+
+        // CRITICAL FIX: Notify global loader and cache about deletion
+        try {
+          document.dispatchEvent(new CustomEvent('pc:task-deleted', {
+            detail: { taskId: id }
+          }));
+        } catch (_) { }
 
         // If this is a sequence task, trigger next step creation
         if (task && task.isSequenceTask) {
@@ -913,6 +929,13 @@
               await batch.commit();
             }
           }
+
+          // CRITICAL FIX: Notify global loader and cache about deletion
+          try {
+            document.dispatchEvent(new CustomEvent('pc:task-deleted', {
+              detail: { taskId: id }
+            }));
+          } catch (_) { }
 
           // Remove from local state
           const recIdx = state.data.findIndex(x => x.id === id);
@@ -1405,7 +1428,7 @@
   function bindUpdates() {
     window.addEventListener('tasksUpdated', async (event) => {
       const { taskId, deleted } = event.detail || {};
-      
+
       // CRITICAL FIX: If a task was deleted, clean it up from localStorage immediately
       if (deleted && taskId) {
         try {
@@ -1421,23 +1444,23 @@
           };
           const email = getUserEmail();
           const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
-          
+
           // Remove from namespaced key
           const namespacedTasks = JSON.parse(localStorage.getItem(namespacedKey) || '[]');
           const filteredNamespaced = namespacedTasks.filter(t => t && t.id !== taskId);
           localStorage.setItem(namespacedKey, JSON.stringify(filteredNamespaced));
-          
+
           // Also remove from legacy key
           const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
           const filteredLegacy = legacyTasks.filter(t => t && t.id !== taskId);
           localStorage.setItem('userTasks', JSON.stringify(filteredLegacy));
-          
+
           console.log('[Tasks] Cleaned up deleted task from localStorage:', taskId);
         } catch (e) {
           console.warn('[Tasks] Could not clean up deleted task from localStorage:', e);
         }
       }
-      
+
       // Rebuild from localStorage + Firebase + LinkedIn tasks
       await loadData();
     });
@@ -1465,19 +1488,19 @@
           };
           const email = getUserEmail();
           const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
-          
+
           // Remove from namespaced key
           const namespacedTasks = JSON.parse(localStorage.getItem(namespacedKey) || '[]');
           const filteredNamespaced = namespacedTasks.filter(t => t && t.id !== taskId);
           localStorage.setItem(namespacedKey, JSON.stringify(filteredNamespaced));
-          
+
           // Also remove from legacy key
           const legacyTasks = JSON.parse(localStorage.getItem('userTasks') || '[]');
           const filteredLegacy = legacyTasks.filter(t => t && t.id !== taskId);
           localStorage.setItem('userTasks', JSON.stringify(filteredLegacy));
-          
+
           console.log('[Tasks] Cleaned up deleted task from localStorage (cross-browser sync):', taskId);
-          
+
           // Refresh the page if we're on the tasks page
           await loadData();
         } catch (e) {
