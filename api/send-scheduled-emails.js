@@ -254,8 +254,7 @@ export default async function handler(req, res) {
           // Apply tracking settings from resolved settings
           trackingSettings: {
             openTracking: {
-              enable: emailSettings.deliverability.openTracking,
-              substitutionTag: '%open-track%'
+              enable: emailSettings.deliverability.openTracking
             },
             clickTracking: {
               enable: emailSettings.deliverability.clickTracking,
