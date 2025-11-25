@@ -1613,23 +1613,81 @@
         // - Dispatches a single pc:account-updated event
         // - Persists to Firestore
         await window.PCSaves.updateAccount(existingId, payload);
+        
+        // CRITICAL: Update global accounts cache to ensure all parts of the app see the update
+        try {
+          // Update getAccountsData() cache
+          if (typeof window.getAccountsData === 'function') {
+            const accounts = window.getAccountsData(true); // Force full data
+            const idx = accounts.findIndex(a => {
+              const aId = a.id || a.accountId || a._id;
+              return aId && String(aId) === String(existingId);
+            });
+            if (idx !== -1) {
+              Object.assign(accounts[idx], payload);
+              accounts[idx].updatedAt = new Date();
+              console.log('[Apollo Widget] Updated global accounts cache for account:', existingId);
+            }
+          }
+          
+          // Update BackgroundAccountsLoader cache if it exists
+          if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+            const bgAccounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+            const bgIdx = bgAccounts.findIndex(a => {
+              const aId = a.id || a.accountId || a._id;
+              return aId && String(aId) === String(existingId);
+            });
+            if (bgIdx !== -1) {
+              Object.assign(bgAccounts[bgIdx], payload);
+              bgAccounts[bgIdx].updatedAt = new Date();
+              console.log('[Apollo Widget] Updated BackgroundAccountsLoader cache for account:', existingId);
+            }
+          }
+        } catch (cacheErr) {
+          console.warn('[Apollo Widget] Failed to update global caches:', cacheErr);
+        }
+        
         window.crm?.showToast && window.crm.showToast('Enriched existing account');
 
-        // If we're currently on this account's detail page, refresh it once
+        // If we're currently on this account's detail page, refresh it immediately
         try {
           if (window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
             const current = window.AccountDetail.state.currentAccount;
+            // Try multiple ID field formats for matching
             const currentId = current.id || current.accountId || current._id;
-            if (currentId && String(currentId) === String(existingId)) {
+            const existingIdStr = String(existingId);
+            const currentIdStr = currentId ? String(currentId) : '';
+            
+            console.log('[Apollo Widget] Checking account match - currentId:', currentIdStr, 'existingId:', existingIdStr);
+            
+            if (currentIdStr && currentIdStr === existingIdStr) {
               // Merge enriched fields into current state so UI updates immediately
-              window.AccountDetail.state.currentAccount = Object.assign({}, current, payload);
-              if (typeof window.AccountDetail.renderAccountDetail === 'function') {
-                window.AccountDetail.renderAccountDetail();
-              }
+              const mergedAccount = Object.assign({}, current, payload);
+              window.AccountDetail.state.currentAccount = mergedAccount;
+              
+              console.log('[Apollo Widget] Merged account state, calling renderAccountDetail');
+              
+              // Use requestAnimationFrame to ensure DOM is ready
+              requestAnimationFrame(() => {
+                try {
+                  if (typeof window.AccountDetail.renderAccountDetail === 'function') {
+                    window.AccountDetail.renderAccountDetail();
+                    console.log('[Apollo Widget] renderAccountDetail called successfully');
+                  } else {
+                    console.warn('[Apollo Widget] renderAccountDetail function not available');
+                  }
+                } catch (renderErr) {
+                  console.error('[Apollo Widget] Error calling renderAccountDetail:', renderErr);
+                }
+              });
+            } else {
+              console.log('[Apollo Widget] Account ID mismatch - not refreshing detail page. Current:', currentIdStr, 'Expected:', existingIdStr);
             }
+          } else {
+            console.log('[Apollo Widget] AccountDetail state not available or no current account');
           }
         } catch (err) {
-          console.warn('[Apollo Widget] Failed to refresh Account Detail after enrichment:', err);
+          console.error('[Apollo Widget] Failed to refresh Account Detail after enrichment:', err);
         }
 
       } else {
