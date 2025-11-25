@@ -745,6 +745,12 @@ export default async function handler(req, res) {
         
         if (!isProduction) {
           console.log(`[GenerateScheduledEmails] Selected angle: ${selectedAngle?.id}, tone: ${toneOpener}, industry: ${recipientIndustry}`);
+          console.log(`[GenerateScheduledEmails] Angle details:`, {
+            id: selectedAngle?.id,
+            openingTemplate: selectedAngle?.openingTemplate,
+            primaryValue: selectedAngle?.primaryValue,
+            primaryMessage: selectedAngle?.primaryMessage
+          });
         }
         
         // Decide AI mode for this email based on sequence configuration.
@@ -826,9 +832,85 @@ export default async function handler(req, res) {
             bodyText = parts.join('\n\n') || raw;
           }
 
-          // For true cold intro steps, override subject with a short,
-          // role-aware variant so we get real variation and best-practice patterns.
-          if (isColdStep) {
+          // For true cold intro steps, use angle-based subject generation
+          // This gives Perplexity creative control while ensuring angle-specific variation
+          if (isColdStep && selectedAngle) {
+            const firstNameForSubject = recipient.firstName || contactData.firstName || emailData.contactName || '';
+            const companyForSubject = recipient.company || emailData.contactCompany || '';
+            
+            // Create angle-based subject variations
+            const angleSubjects = {
+              timing_strategy: [
+                `${firstNameForSubject}, when does your contract expire?`,
+                `${firstNameForSubject}, rate lock timing question`,
+                `${companyForSubject} renewal timing question`,
+                `${firstNameForSubject}, contract renewal window?`
+              ],
+              exemption_recovery: [
+                `${firstNameForSubject}, are you claiming exemptions?`,
+                `${firstNameForSubject}, tax exemption question`,
+                `${companyForSubject} exemption recovery question`,
+                `${firstNameForSubject}, electricity exemptions?`
+              ],
+              consolidation: [
+                `${firstNameForSubject}, how many locations are you managing?`,
+                `${firstNameForSubject}, multi-site energy question`,
+                `${companyForSubject} consolidation opportunity?`,
+                `${firstNameForSubject}, multiple locations?`
+              ],
+              demand_efficiency: [
+                `${firstNameForSubject}, optimizing before renewal?`,
+                `${firstNameForSubject}, consumption efficiency question`,
+                `${companyForSubject} pre-renewal optimization?`,
+                `${firstNameForSubject}, efficiency before renewal?`
+              ],
+              operational_continuity: [
+                `${firstNameForSubject}, peak demand handling?`,
+                `${firstNameForSubject}, uptime vs savings?`,
+                `${companyForSubject} operational continuity question`,
+                `${firstNameForSubject}, demand charge question?`
+              ],
+              mission_funding: [
+                `${firstNameForSubject}, redirecting funds to mission?`,
+                `${companyForSubject} mission funding question`,
+                `${firstNameForSubject}, vendor cost question?`,
+                `${firstNameForSubject}, program funding?`
+              ],
+              budget_stability: [
+                `${firstNameForSubject}, locking in energy costs?`,
+                `${companyForSubject} budget stability question`,
+                `${firstNameForSubject}, cost predictability?`,
+                `${firstNameForSubject}, budget volatility?`
+              ],
+              operational_simplicity: [
+                `${firstNameForSubject}, managing multiple suppliers?`,
+                `${companyForSubject} vendor consolidation question`,
+                `${firstNameForSubject}, unified billing?`,
+                `${firstNameForSubject}, supplier management?`
+              ],
+              cost_control: [
+                `${firstNameForSubject}, energy cost predictability?`,
+                `${companyForSubject} budget planning question`,
+                `${firstNameForSubject}, rate volatility?`,
+                `${firstNameForSubject}, cost control?`
+              ],
+              operational_efficiency: [
+                `${firstNameForSubject}, energy costs impacting efficiency?`,
+                `${companyForSubject} operational efficiency question`,
+                `${firstNameForSubject}, cost reduction opportunity?`
+              ],
+              data_governance: [
+                `${firstNameForSubject}, visibility into energy usage?`,
+                `${companyForSubject} energy reporting question`,
+                `${firstNameForSubject}, centralized metering?`
+              ]
+            };
+            
+            const angleId = selectedAngle.id || 'timing_strategy';
+            const subjects = angleSubjects[angleId] || angleSubjects.timing_strategy;
+            subject = subjects[Math.floor(Math.random() * subjects.length)];
+          } else if (isColdStep) {
+            // Fallback to role-based if no angle available
             const roleForSubject = recipient.title || '';
             const firstNameForSubject = recipient.firstName || contactData.firstName || emailData.contactName || '';
             const companyForSubject = recipient.company || emailData.contactCompany || '';
@@ -865,6 +947,18 @@ export default async function handler(req, res) {
           angle_used: selectedAngle?.id || null,
           exemption_type: accountData?.taxExemptStatus || null
         };
+        
+        // Enhanced debug logging
+        if (!isProduction) {
+          const ctaType = perplexityResult.output?.cta_type || perplexityResult.metadata?.cta_type || 'unknown';
+          console.log(`[GenerateScheduledEmails] Generated email details:`, {
+            subject: generatedContent.subject,
+            angleUsed: generatedContent.angle_used,
+            toneOpener: toneOpener,
+            ctaType: ctaType,
+            aiMode: aiMode
+          });
+        }
         
         // Update email with generated content
         // Ensure ownership fields are preserved/set

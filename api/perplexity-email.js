@@ -58,6 +58,87 @@ function getRandomSubjectLine(type = 'cold-email', role = 'default', firstName =
     .replace(/\[company\]/g, company || 'your company');
 }
 
+// ========== ANGLE-BASED CTAs ==========
+// CTAs based on angle opening questions from ANGLES-DOCUMENTATION.md and cta-mastery-guide.md
+// Structure: [Opening Question] + [Value/Statistic] + [Low-friction closing question]
+const angleCtaMap = {
+  'timing_strategy': {
+    opening: 'When does your current electricity contract expire?',
+    value: '10-20% better rates when locking in 6 months early',
+    full: 'When does your current electricity contract expire?\n\nWorth a 10-minute look?'
+  },
+  'exemption_recovery': {
+    opening: 'Are you currently claiming electricity exemptions on your production facilities?',
+    value: '$75K-$500K in unclaimed exemptions over 4 years',
+    full: 'Are you currently claiming electricity exemptions on your production facilities?\n\nMost manufacturers leave $75K-$500K on the table. Worth exploring?'
+  },
+  'consolidation': {
+    opening: 'How many locations are you managing energy for?',
+    value: '15-25% savings by consolidating all locations',
+    full: 'How many locations are you managing energy for?\n\nConsolidating contracts typically means 15-25% savings. Worth a look?'
+  },
+  'demand_efficiency': {
+    opening: 'Are you optimizing consumption before you renew your contract?',
+    value: '12-20% consumption reduction before rate shopping',
+    full: 'Are you optimizing consumption before you renew your contract?\n\n12-20% reduction before rate shopping can mean massive savings. Worth a conversation?'
+  },
+  'operational_continuity': {
+    opening: 'How do you currently handle energy during peak demand periods?',
+    value: 'Demand charges are often 40-60% of the bill',
+    full: 'How do you currently handle energy during peak demand periods?\n\nDemand charges are often 40-60% of the bill. Worth addressing?'
+  },
+  'mission_funding': {
+    opening: 'How are you making sure more funding goes to your mission, not vendors?',
+    value: '10-20% savings redirected to programs',
+    full: 'How are you making sure more funding goes to your mission, not vendors?\n\n10-20% savings redirected to programs. Worth exploring?'
+  },
+  'budget_stability': {
+    opening: 'When budgeting for energy, are you locking in costs or dealing with volatility?',
+    value: 'Fixed costs for better program planning',
+    full: 'When budgeting for energy, are you locking in costs or dealing with volatility?\n\nFixed costs for better program planning. Worth a conversation?'
+  },
+  'operational_simplicity': {
+    opening: 'Are you managing multiple energy suppliers or contracts?',
+    value: 'Single vendor, unified billing',
+    full: 'Are you managing multiple energy suppliers or contracts?\n\nSingle vendor, unified billing. Worth a look?'
+  },
+  'cost_control': {
+    opening: 'Does energy cost predictability matter for your budget planning?',
+    value: '10-20% savings with predictable costs',
+    full: 'Does energy cost predictability matter for your budget planning?\n\n10-20% savings with predictable costs. Worth exploring?'
+  },
+  'operational_efficiency': {
+    opening: 'Are energy costs impacting your operational efficiency?',
+    value: '10-18% cost reduction',
+    full: 'Are energy costs impacting your operational efficiency?\n\n10-18% cost reduction. Worth a conversation?'
+  },
+  'data_governance': {
+    opening: 'Do you have visibility into energy usage across your facilities?',
+    value: 'Centralized metering and reporting',
+    full: 'Do you have visibility into energy usage across your facilities?\n\nCentralized metering and reporting. Worth exploring?'
+  }
+};
+
+// Get CTA for selected angle (with creative control for Perplexity)
+function getAngleCta(selectedAngle) {
+  if (!selectedAngle || !selectedAngle.id) return null;
+  
+  // Use angle's own openingTemplate and primaryValue if available (from angle object)
+  // Otherwise fall back to angleCtaMap
+  const angleId = selectedAngle.id;
+  const ctaData = angleCtaMap[angleId];
+  
+  if (!ctaData) return null;
+  
+  // Return the full CTA structure for Perplexity to use as foundation
+  return {
+    opening: selectedAngle.openingTemplate || ctaData.opening,
+    value: selectedAngle.primaryValue || ctaData.value,
+    full: ctaData.full,
+    angleId: angleId
+  };
+}
+
 // ========== EMAIL GENERATION MODES ==========
 // Different email tones to reduce template-like appearance
 const EMAIL_GENERATION_MODES = {
@@ -2073,11 +2154,16 @@ You MUST structure the entire email around this primary angle. Do NOT switch to 
     const toneOpenerRule = (templateType === 'cold_email' && toneOpener)
       ? `
 
-TONE OPENER (FIRST LINE AFTER GREETING - CRITICAL):
-- The opening_hook MUST start with this exact phrase: "${toneOpener}"
-- Example: "${toneOpener} with ${company || '[company]'} running [operations], timing on your energy contracts really matters."
-- Do NOT put any text before this opener.
-- Use this opener ONLY ONCE at the very start of the body, then continue naturally.`
+TONE OPENER (CRITICAL - FIRST LINE AFTER GREETING - MANDATORY):
+- The opening_hook MUST start with this EXACT phrase: "${toneOpener}"
+- This is NOT optional - it MUST be the first words after the greeting
+- Example structure:
+  greeting: "Hi ${firstName},"
+  opening_hook: "${toneOpener} [continue with angle-specific content]"
+- DO NOT put any text before this opener
+- DO NOT rephrase or change the opener
+- Use this opener ONLY ONCE at the very start of the body, then continue naturally
+- If you don't use this exact opener, the email will be rejected`
       : '';
 
     const basePrompt = `${whoWeAre || 'You are generating TEXT CONTENT ONLY for Power Choosers email templates.'}
@@ -2155,13 +2241,33 @@ IMPORTANT:
   * Operations Managers: Cost control, efficiency improvements
 Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs while reducing procurement complexity." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK. Statistics ARE allowed here (value prop only), just not in opening_hook.
 - social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional). Use specific outcomes: "We recently helped [similar company] reduce energy costs by 18%", "Our clients in [industry] typically save $X annually", "Companies like [company] have achieved 15-20% savings". Be specific and credible. NEVER use vague phrases like "similar companies" or "many businesses".
-${ctaPattern ? `
+${(() => {
+  const angleCta = getAngleCta(selectedAngle);
+  if (angleCta && templateType === 'cold_email') {
+    return `
+- cta_text: Use this angle-specific CTA as your foundation: "${angleCta.full}"
+  * You have CREATIVE CONTROL to rephrase it naturally, but MUST include:
+    1. The core opening question: "${angleCta.opening}"
+    2. A value/statistic: "${angleCta.value}" (you may rephrase this)
+    3. A low-friction closing question like "Worth a 10-minute look?" or "Worth exploring?"
+  * Keep total length under 25 words
+  * MUST be a complete sentence with proper ending punctuation
+  * MUST end with a question mark (?)
+  * Structure: [Opening Question] + [Value/Statistic] + [Low-friction question]
+- cta_type: Return "angle_question"
+`;
+  } else if (ctaPattern) {
+    return `
 - cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
 - cta_type: Return "${ctaPattern.type}"
-` : `
+`;
+  } else {
+    return `
 - cta_text: Create a professional call-to-action question (under 12 words, ending with proper punctuation).
 - cta_type: Return "qualifying"
-`}
+`;
+  }
+})()}
 
 HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Write like a knowledgeable energy expert who researched their company deeply
@@ -2302,32 +2408,68 @@ ${generationMode === 'balanced' ? `
   * Example CTA: "Question for you—what's your renewal timeline?"` : ''}
 ` : ''}
 
-SUBJECT LINE RULES (CRITICAL - MUST BE SPECIFIC, NOT VAGUE):
-${suggestedSubject ? `- SUGGESTED SUBJECT (use this pattern or similar): "${suggestedSubject}"` : ''}
-- Target: 4-6 words (specific questions get 30% higher open rates than vague statements)
-- Maximum: 50 characters (ensures full display on mobile)
-- MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
-- REQUIRED PATTERNS (use these, customize naturally):
+SUBJECT LINE RULES (CRITICAL - PERPLEXITY HAS CREATIVE CONTROL):
+- You MUST create a unique, angle-specific subject line for each email
+- DO NOT use the same subject line pattern repeatedly
+- Base your subject on the selected angle, but be creative:
+${selectedAngle?.id === 'timing_strategy' ? `
+  * Angle: Timing Strategy
+  * Core question: "When does your contract expire?"
+  * Creative variations: "${firstName}, when does your contract expire?", "${company} renewal timing question", "${firstName}, rate lock timing?", "${firstName}, contract renewal window?"
+` : ''}
+${selectedAngle?.id === 'exemption_recovery' ? `
+  * Angle: Exemption Recovery
+  * Core question: "Are you claiming exemptions?"
+  * Creative variations: "${firstName}, are you claiming exemptions?", "${company} tax exemption question", "${firstName}, unclaimed exemptions?", "${firstName}, electricity exemptions?"
+` : ''}
+${selectedAngle?.id === 'consolidation' ? `
+  * Angle: Consolidation
+  * Core question: "How many locations?"
+  * Creative variations: "${firstName}, how many locations are you managing?", "${company} multi-site energy question", "${firstName}, consolidation opportunity?", "${firstName}, multiple locations?"
+` : ''}
+${selectedAngle?.id === 'demand_efficiency' ? `
+  * Angle: Demand Efficiency
+  * Core question: "Optimizing before renewal?"
+  * Creative variations: "${firstName}, optimizing before renewal?", "${company} consumption efficiency question", "${firstName}, pre-renewal optimization?", "${firstName}, efficiency before renewal?"
+` : ''}
+${selectedAngle?.id === 'operational_continuity' ? `
+  * Angle: Operational Continuity
+  * Core question: "Peak demand handling?"
+  * Creative variations: "${firstName}, peak demand handling?", "${company} operational continuity question", "${firstName}, uptime vs savings?", "${firstName}, demand charge question?"
+` : ''}
+${selectedAngle?.id === 'mission_funding' ? `
+  * Angle: Mission Funding
+  * Core question: "More funding to mission?"
+  * Creative variations: "${firstName}, redirecting funds to mission?", "${company} mission funding question", "${firstName}, vendor cost question?", "${firstName}, program funding?"
+` : ''}
+${selectedAngle?.id === 'budget_stability' ? `
+  * Angle: Budget Stability
+  * Core question: "Locking in costs?"
+  * Creative variations: "${firstName}, locking in energy costs?", "${company} budget stability question", "${firstName}, cost predictability?", "${firstName}, budget volatility?"
+` : ''}
+${selectedAngle?.id === 'operational_simplicity' ? `
+  * Angle: Operational Simplicity
+  * Core question: "Multiple suppliers?"
+  * Creative variations: "${firstName}, managing multiple suppliers?", "${company} vendor consolidation question", "${firstName}, unified billing?", "${firstName}, supplier management?"
+` : ''}
+${selectedAngle?.id === 'cost_control' ? `
+  * Angle: Cost Control
+  * Core question: "Cost predictability?"
+  * Creative variations: "${firstName}, energy cost predictability?", "${company} budget planning question", "${firstName}, rate volatility?", "${firstName}, cost control?"
+` : ''}
+${!selectedAngle || !selectedAngle.id ? `
+  * No specific angle - use role-based variations:
   * "${firstName}, contract timing question" (specific, role-agnostic)
   * "${firstName}, rate lock timing question" (specific to rate procurement)
-  * "${firstName}, budget question about energy renewal" (for Controllers/CFO)
-  * "${firstName}, facility renewal timing question" (for Operations/Facilities)
   * "${company} contract renewal question" (company-specific)
-  * "${company} energy renewal timing" (specific and actionable)
-- FORBIDDEN VAGUE PATTERNS (DO NOT USE):
-  * "thoughts on energy planning" (too vague)
-  * "insight to ease costs" (too vague)
-  * "thoughts on energy strategy" (too vague)
-  * "${firstName}, thoughts on..." (permission-based, weak)
-- Role-specific variations:
-  * Controllers/CFO: "${firstName}, budget question about energy renewal timing"
-  * Operations/Facilities: "${firstName}, facility renewal timing question"
-  * CEOs/Owners: "${firstName}, contract timing question" or "${company} energy renewal timing"
-- Focus on: contract renewal, rate lock timing, budget cycle, facility renewal
+` : ''}
+- Target: 4-6 words, 50 characters max
+- MUST vary from email to email - never repeat the same subject
 - Use question format when possible (increases curiosity)
 - Include firstName or company name for personalization
 - NO statistics or percentages in subject lines
 - NO generic "thoughts on" or "insights" language
+- FORBIDDEN VAGUE PATTERNS: "thoughts on energy planning", "insight to ease costs", "thoughts on energy strategy"
 - Return the style you chose in subject_style field
 
 EMAIL STRUCTURE FRAMEWORKS (Choose ONE):
