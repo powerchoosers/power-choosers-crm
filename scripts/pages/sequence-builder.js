@@ -3353,19 +3353,22 @@ class FreeSequenceAutomation {
    - YES: Ask specific questions that assume conversation is happening
 
 6. CALL TO ACTION (ASSERTIVE, NOT PERMISSION-BASED)
-   - Use THIS specific CTA (don't change it, use exactly as written):
-   "${cta}"
+   - The system will automatically select an angle-specific CTA based on the contact's industry
+   - Each angle has a built-in opening question (e.g., "When does your current contract expire?")
+   - Structure your CTA as: [Opening Question] + [Value/Statistic] + [Low-friction closing question]
    - MUST: Assume the conversation is happening - don't ask for permission to talk
    - NO: "Would you be open to a conversation?" or "Let's schedule a call"
    - YES: Ask specific question about their contract, timing, or process
+   - The system will use angle-specific CTAs automatically (you don't need to specify one here)
 
-7. SUBJECT LINE (SPECIFIC, NOT VAGUE)
-   - MUST be specific to their role and timing aspect (contract renewal, rate lock timing, budget cycle)
-   - Examples: "[FirstName], contract timing question" or "[FirstName], rate lock timing question"
+7. SUBJECT LINE (SPECIFIC, NOT VAGUE - PERPLEXITY HAS CREATIVE CONTROL)
+   - The system will automatically generate angle-specific subject lines
+   - Each angle inspires unique subject variations (e.g., timing_strategy → "when does your contract expire?")
+   - MUST be specific to their role and the selected angle
+   - Examples: "[FirstName], when does your contract expire?" or "[FirstName], are you claiming exemptions?"
    - NOT generic: "thoughts on energy planning" or "insight to ease costs" or "thoughts on energy strategy"
-   - Focus on: contract renewal, rate lock timing, budget cycle, facility renewal
-   - Role-specific: For Controllers/CFO: "budget question about energy renewal timing"
-   - For Operations/Facilities: "facility renewal timing question"
+   - Focus on: contract renewal, rate lock timing, budget cycle, facility renewal, exemptions, consolidation
+   - The system will create unique, angle-specific subjects automatically
 
 8. FORMAT
    - 100-130 words max (scannable, not overwhelming)
