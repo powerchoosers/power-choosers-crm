@@ -549,45 +549,98 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { immediate = false } = req.body || {};
+    const { immediate = false, emailId = null } = req.body || {};
     
     if (!isProduction) {
-    console.log('[GenerateScheduledEmails] Starting generation process, immediate:', immediate);
+    console.log('[GenerateScheduledEmails] Starting generation process, immediate:', immediate, 'emailId:', emailId);
       console.log('[GenerateScheduledEmails] Perplexity API key present:', !!process.env.PERPLEXITY_API_KEY);
     }
     
-    // Calculate time range for emails to generate
-    const now = Date.now();
-    let startTime, endTime;
+    let scheduledEmailsSnapshot;
     
-    if (immediate) {
-      // For immediate generation, get all not_generated emails (including past-due, current, and future)
-      // Look back 30 days to catch any emails that were scheduled in the past but not generated
-      startTime = now - (30 * 24 * 60 * 60 * 1000); // 30 days ago
-      endTime = now + (365 * 24 * 60 * 60 * 1000); // 1 year from now
+    // If specific emailId provided, generate only that email
+    if (emailId) {
+      const emailDoc = await db.collection('emails').doc(emailId).get();
+      if (!emailDoc.exists) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          success: false, 
+          error: 'Email not found',
+          emailId: emailId
+        }));
+        return;
+      }
+      
+      const emailData = emailDoc.data();
+      // Check if email is eligible for generation
+      // Allow regeneration for emails that are pending_approval, generating, or not_generated
+      const allowedStatuses = ['not_generated', 'generating', 'pending_approval'];
+      if (emailData.type !== 'scheduled' || !allowedStatuses.includes(emailData.status)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          success: false, 
+          error: `Email is not eligible for generation. Type: ${emailData.type}, Status: ${emailData.status}`,
+          emailId: emailId
+        }));
+        return;
+      }
+      
+      // If regenerating (status is not 'not_generated'), reset to 'not_generated' first
+      if (emailData.status !== 'not_generated') {
+        await db.collection('emails').doc(emailId).update({
+          status: 'not_generated',
+          updatedAt: new Date().toISOString()
+        });
+        // Reload the document to get updated data
+        const updatedDoc = await db.collection('emails').doc(emailId).get();
+        emailDoc = updatedDoc;
+        emailData = updatedDoc.data();
+      }
+      
+      // Create a snapshot-like structure with just this one email
+      scheduledEmailsSnapshot = {
+        docs: [emailDoc],
+        empty: false,
+        size: 1
+      };
+      
+      if (!isProduction) {
+        console.log('[GenerateScheduledEmails] Generating specific email:', emailId);
+      }
     } else {
-      // For daily 8 AM job, get emails scheduled for today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      startTime = today.getTime();
-      endTime = startTime + (24 * 60 * 60 * 1000); // 24 hours
+      // Calculate time range for emails to generate
+      const now = Date.now();
+      let startTime, endTime;
+      
+      if (immediate) {
+        // For immediate generation, get all not_generated emails (including past-due, current, and future)
+        // Look back 30 days to catch any emails that were scheduled in the past but not generated
+        startTime = now - (30 * 24 * 60 * 60 * 1000); // 30 days ago
+        endTime = now + (365 * 24 * 60 * 60 * 1000); // 1 year from now
+      } else {
+        // For daily 8 AM job, get emails scheduled for today
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        startTime = today.getTime();
+        endTime = startTime + (24 * 60 * 60 * 1000); // 24 hours
+      }
+      
+      if (!isProduction) {
+        console.log('[GenerateScheduledEmails] Time range:', { startTime, endTime, immediate, now });
+      }
+      
+      // Query for scheduled emails that need generation
+      // Use >= and <= to include boundary times
+      // Limit to 40 emails per run to stay under 50 RPM rate limit (Tier 0)
+      const scheduledEmailsQuery = db.collection('emails')
+        .where('type', '==', 'scheduled')
+        .where('status', '==', 'not_generated')
+        .where('scheduledSendTime', '>=', startTime)
+        .where('scheduledSendTime', '<=', endTime)
+        .limit(40);
+      
+      scheduledEmailsSnapshot = await scheduledEmailsQuery.get();
     }
-    
-    if (!isProduction) {
-      console.log('[GenerateScheduledEmails] Time range:', { startTime, endTime, immediate, now });
-    }
-    
-    // Query for scheduled emails that need generation
-    // Use >= and <= to include boundary times
-    // Limit to 40 emails per run to stay under 50 RPM rate limit (Tier 0)
-    const scheduledEmailsQuery = db.collection('emails')
-      .where('type', '==', 'scheduled')
-      .where('status', '==', 'not_generated')
-      .where('scheduledSendTime', '>=', startTime)
-      .where('scheduledSendTime', '<=', endTime)
-      .limit(40);
-    
-    const scheduledEmailsSnapshot = await scheduledEmailsQuery.get();
     
     if (scheduledEmailsSnapshot.empty) {
       if (!isProduction) {
