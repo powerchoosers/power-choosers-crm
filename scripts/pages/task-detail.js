@@ -866,7 +866,7 @@
 
         if (result.success) {
           console.log('[TaskDetail] Next step created:', result.nextStepType, result);
-          
+
           // CRITICAL FIX: If next step is a task, refresh BackgroundTasksLoader to pick it up
           if (result.nextStepType && (result.nextStepType.includes('linkedin') || result.nextStepType.includes('phone') || result.nextStepType.includes('task'))) {
             // Force refresh BackgroundTasksLoader to get the newly created task
@@ -879,7 +879,7 @@
                 console.warn('[TaskDetail] Failed to refresh BackgroundTasksLoader:', reloadError);
               }
             }
-            
+
             // Invalidate cache to ensure fresh data
             if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
               try {
@@ -889,24 +889,24 @@
                 console.warn('[TaskDetail] Failed to invalidate cache:', cacheError);
               }
             }
-            
+
             // Dispatch event to notify tasks page that a new task was created
             window.dispatchEvent(new CustomEvent('tasksUpdated', {
-              detail: { 
-                source: 'sequenceTaskCompletion', 
-                taskId: state.currentTask.id, 
+              detail: {
+                source: 'sequenceTaskCompletion',
+                taskId: state.currentTask.id,
                 deleted: true,
                 newTaskCreated: true,
                 nextStepType: result.nextStepType
               }
             }));
-            
+
             // Also dispatch to document for cross-browser sync
             document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
               detail: { source: 'sequenceTaskCompletion', newTaskCreated: true }
             }));
           }
-          
+
           // If next step is a task, it will appear in tasks list after reload
           // If next step is an email, user can see it in Emails page
         } else {
@@ -1532,10 +1532,10 @@
         try {
           const allTasks = window.BackgroundTasksLoader.getTasksData() || [];
           const filteredTasks = filterTasksByOwnership(allTasks);
-          
+
           // Try exact match first
           task = filteredTasks.find(t => t && (t.id === taskId || String(t.id) === String(taskId)));
-          
+
           // If still not found, try document ID match (some tasks might have id field different from doc ID)
           if (!task) {
             task = filteredTasks.find(t => {
@@ -1543,7 +1543,7 @@
               return docId === taskId || String(docId) === String(taskId);
             });
           }
-          
+
           if (task) {
             console.log('[TaskDetail] Using BackgroundTasksLoader cached data');
           } else {
@@ -1689,14 +1689,14 @@
                   return { ...data, id: data.id || doc.id };
                 });
               }
-              
+
               // Find task by matching id field or document ID
               task = allTasks.find(t => {
                 const tId = t.id || '';
                 const docId = t._docId || '';
                 return String(tId) === String(taskId) || String(docId) === String(taskId);
               });
-              
+
               if (task) {
                 console.log('[TaskDetail] Found task via fallback search through all tasks');
               }
@@ -1736,12 +1736,12 @@
           if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
             console.log('[TaskDetail] Task not found in cache, forcing cache reload...');
             await window.BackgroundTasksLoader.forceReload();
-            
+
             // Try one more time after reload
             const reloadedTasks = window.BackgroundTasksLoader.getTasksData() || [];
             const filteredReloaded = filterTasksByOwnership(reloadedTasks);
             task = filteredReloaded.find(t => t && (t.id === taskId || String(t.id) === String(taskId)));
-            
+
             if (task) {
               console.log('[TaskDetail] Found task after force reload');
             } else {
@@ -1753,14 +1753,14 @@
         }
 
         if (!task) {
-        // CRITICAL FIX: Treat this as a stale/ghost task and clean it up locally
-        try {
-          cleanupStaleTask(taskId);
-        } catch (_) { }
+          // CRITICAL FIX: Treat this as a stale/ghost task and clean it up locally
+          try {
+            cleanupStaleTask(taskId);
+          } catch (_) { }
 
-        showTaskError('Task not found or you do not have access to this task. Please refresh the page.');
-        state.loadingTask = false;
-        return;
+          showTaskError('Task not found or you do not have access to this task. Please refresh the page.');
+          state.loadingTask = false;
+          return;
         }
       }
 
@@ -1783,7 +1783,7 @@
       task.account = task.account || '';
       task.contactId = task.contactId || '';
       task.accountId = task.accountId || '';
-      
+
       console.log('[TaskDetail] Task validated and normalized:', {
         id: task.id,
         type: task.type,
@@ -2054,8 +2054,8 @@
 
     const tryRender = () => {
       // CRITICAL FIX: Scope selector to task-detail-page if not already scoped
-      const scopedSelector = elementSelector.includes('#task-detail-page') 
-        ? elementSelector 
+      const scopedSelector = elementSelector.includes('#task-detail-page')
+        ? elementSelector
         : `#task-detail-page ${elementSelector}`;
       const titleSection = document.querySelector(scopedSelector);
       if (titleSection) {
@@ -2284,10 +2284,10 @@
         const contactName = state.currentTask.contact || '';
         const accountName = state.currentTask.account || '';
         const contactId = state.currentTask.contactId || '';
-        
+
         // CRITICAL FIX: Try multiple sources to find contact
         let person = null;
-        
+
         // Method 1: Try by contactId first (most reliable)
         if (contactId) {
           if (typeof window.getPeopleData === 'function') {
@@ -2299,7 +2299,7 @@
             person = contacts.find(c => c.id === contactId);
           }
         }
-        
+
         // Method 2: Try by name if not found by ID
         if (!person && contactName) {
           if (typeof window.getPeopleData === 'function') {
@@ -2317,7 +2317,7 @@
             });
           }
         }
-        
+
         // Use found person or empty object
         person = person || {};
         const title = person.title || '';
@@ -2337,30 +2337,78 @@
 
         // Update the main title to include clickable contact name
         if (els.title && contactName) {
-          // CRITICAL FIX: Use person.id if found, otherwise use task contactId, otherwise try to find it
-          let finalContactId = person.id || contactId || '';
-          if (!finalContactId && person && person._id) {
-            finalContactId = person._id;
+          // CRITICAL FIX: Use multiple sources to resolve contactId (priority order)
+          let finalContactId = '';
+
+          // Priority 1: Use state.contact if available (most reliable)
+          if (state.contact && state.contact.id) {
+            finalContactId = state.contact.id;
+            console.log('[TaskDetail] Using contactId from state.contact:', finalContactId);
           }
-          
-          console.log('[TaskDetail] Rendering contact link:', { contactName, contactId: finalContactId, hasPerson: !!person, personId: person.id });
-          const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(finalContactId)}" data-contact-name="${escapeHtml(contactName)}">${escapeHtml(contactName)}</a>`;
+          // Priority 2: Use person.id if found from lookup
+          else if (person && person.id) {
+            finalContactId = person.id;
+            console.log('[TaskDetail] Using contactId from person lookup:', finalContactId);
+          }
+          // Priority 3: Use task contactId
+          else if (contactId) {
+            finalContactId = contactId;
+            console.log('[TaskDetail] Using contactId from task:', finalContactId);
+          }
+          // Priority 4: Check person._id as fallback
+          else if (person && person._id) {
+            finalContactId = person._id;
+            console.log('[TaskDetail] Using contactId from person._id:', finalContactId);
+          }
+          // Priority 5: Last resort - try to find contact by name in BackgroundContactsLoader
+          else if (contactName && window.BackgroundContactsLoader) {
+            try {
+              const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+              const foundContact = contacts.find(c => {
+                const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || c.name || '';
+                return fullName && fullName.toLowerCase() === contactName.toLowerCase();
+              });
+              if (foundContact && foundContact.id) {
+                finalContactId = foundContact.id;
+                console.log('[TaskDetail] Found contactId from BackgroundContactsLoader:', finalContactId);
+              }
+            } catch (e) {
+              console.warn('[TaskDetail] Error finding contact in BackgroundContactsLoader:', e);
+            }
+          }
+
+          console.log('[TaskDetail] Rendering contact link:', {
+            contactName,
+            contactId: finalContactId,
+            hasPerson: !!person,
+            personId: person?.id,
+            hasStateContact: !!state.contact,
+            stateContactId: state.contact?.id
+          });
+
+          // CRITICAL FIX: Always render the link, even without ID (handler will try to resolve it)
+          const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(finalContactId || '')}" data-contact-name="${escapeHtml(contactName)}" style="cursor: pointer;">${escapeHtml(contactName)}</a>`;
           els.title.innerHTML = `Call ${contactLinkHTML}`;
-          
-          // CRITICAL FIX: Ensure contact link handler is attached and verify it exists
-          setTimeout(() => {
+
+          // CRITICAL FIX: Test click immediately after render
+          requestAnimationFrame(() => {
             const contactLink = els.title.querySelector('.contact-link');
             if (contactLink) {
-              console.log('[TaskDetail] Contact link rendered and ready:', contactLink.getAttribute('data-contact-id'));
+              console.log('[TaskDetail] ✓ Contact link rendered successfully:', {
+                contactId: contactLink.getAttribute('data-contact-id'),
+                contactName: contactLink.getAttribute('data-contact-name'),
+                hasHandler: !!document._taskDetailContactHandlersBound
+              });
+
               // Verify event handler is set up
               if (!document._taskDetailContactHandlersBound) {
                 console.warn('[TaskDetail] Contact handlers not bound, setting up now...');
                 setupContactLinkHandlers();
               }
             } else {
-              console.error('[TaskDetail] Contact link not found after rendering!');
+              console.error('[TaskDetail] ✗ Contact link not found after rendering!');
             }
-          }, 100);
+          });
         }
 
         // Create or update contact info element (no avatar here)
@@ -2405,7 +2453,7 @@
         // Ensure we have valid initials
         const finalInitials = initials && initials !== '?' ? initials : (contactName ? contactName.charAt(0).toUpperCase() : 'C');
         console.log('Contact task - Rendering avatar with initials:', finalInitials);
-        
+
         // Render avatar with retry - ensure it's inside .contact-header-text
         // CRITICAL FIX: Use scoped selector within task-detail-page
         const titleSection = document.querySelector('#task-detail-page .contact-header-text');
@@ -2413,7 +2461,7 @@
           // Clean up any existing avatars first
           const existingAvatars = titleSection.querySelectorAll('.avatar-initials, .avatar-absolute');
           existingAvatars.forEach(el => el.remove());
-          
+
           // Create avatar element
           const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true" style="position: absolute; left: -50px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: var(--orange-subtle); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; letter-spacing: 0.5px;">${escapeHtml(finalInitials)}</span>`;
           titleSection.insertAdjacentHTML('beforeend', avatarHTML);
@@ -2424,16 +2472,16 @@
           renderAvatarOrIcon('#task-detail-page .contact-header-text', escapeHtml(finalInitials), true);
         }
       }
-    } else if (state.taskType === 'li-connect' || state.taskType === 'li-message' || state.taskType === 'li-view-profile' || state.taskType === 'li-interact-post' || 
-               state.taskType === 'linkedin-connect' || state.taskType === 'linkedin-message' || state.taskType === 'linkedin-view' || state.taskType === 'linkedin-interact') {
+    } else if (state.taskType === 'li-connect' || state.taskType === 'li-message' || state.taskType === 'li-view-profile' || state.taskType === 'li-interact-post' ||
+      state.taskType === 'linkedin-connect' || state.taskType === 'linkedin-message' || state.taskType === 'linkedin-view' || state.taskType === 'linkedin-interact') {
       // LinkedIn task header (same styling as call tasks)
       const contactName = state.currentTask.contact || '';
       const accountName = state.currentTask.account || '';
       const contactId = state.currentTask.contactId || '';
-      
+
       // CRITICAL FIX: Try multiple sources to find contact (same as phone-call tasks)
       let person = null;
-      
+
       // Method 1: Try by contactId first (most reliable)
       if (contactId) {
         if (typeof window.getPeopleData === 'function') {
@@ -2445,7 +2493,7 @@
           person = contacts.find(c => c.id === contactId);
         }
       }
-      
+
       // Method 2: Try by name if not found by ID
       if (!person && contactName) {
         if (typeof window.getPeopleData === 'function') {
@@ -2463,7 +2511,7 @@
           });
         }
       }
-      
+
       // Use found person or empty object
       person = person || {};
       const title = person.title || '';
@@ -2483,15 +2531,57 @@
 
       // Update the main title to include clickable contact name
       if (els.title && contactName) {
-        // CRITICAL FIX: Use person.id if found, otherwise use task contactId
-        const taskContactId = state.currentTask.contactId || '';
-        let finalContactId = person.id || taskContactId || '';
-        if (!finalContactId && person && person._id) {
-          finalContactId = person._id;
+        // CRITICAL FIX: Use multiple sources to resolve contactId (priority order)
+        let finalContactId = '';
+        const taskContactId = state.currentTask.contactId || ''; // Define taskContactId here
+
+        // Priority 1: Use state.contact if available (most reliable)
+        if (state.contact && state.contact.id) {
+          finalContactId = state.contact.id;
+          console.log('[TaskDetail] LinkedIn: Using contactId from state.contact:', finalContactId);
         }
-        console.log('[TaskDetail] Rendering LinkedIn contact link:', { contactName, contactId: finalContactId, hasPerson: !!person, personId: person.id });
-        const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(finalContactId)}" data-contact-name="${escapeHtml(contactName)}">${escapeHtml(contactName)}</a>`;
-        
+        // Priority 2: Use person.id if found from lookup
+        else if (person && person.id) {
+          finalContactId = person.id;
+          console.log('[TaskDetail] LinkedIn: Using contactId from person lookup:', finalContactId);
+        }
+        // Priority 3: Use task contactId
+        else if (taskContactId) {
+          finalContactId = taskContactId;
+          console.log('[TaskDetail] LinkedIn: Using contactId from task:', finalContactId);
+        }
+        // Priority 4: Check person._id as fallback
+        else if (person && person._id) {
+          finalContactId = person._id;
+          console.log('[TaskDetail] LinkedIn: Using contactId from person._id:', finalContactId);
+        }
+        // Priority 5: Last resort - try to find contact by name in BackgroundContactsLoader
+        else if (contactName && window.BackgroundContactsLoader) {
+          try {
+            const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+            const foundContact = contacts.find(c => {
+              const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || c.name || '';
+              return fullName && fullName.toLowerCase() === contactName.toLowerCase();
+            });
+            if (foundContact && foundContact.id) {
+              finalContactId = foundContact.id;
+              console.log('[TaskDetail] LinkedIn: Found contactId from BackgroundContactsLoader:', finalContactId);
+            }
+          } catch (e) {
+            console.warn('[TaskDetail] LinkedIn: Error finding contact in BackgroundContactsLoader:', e);
+          }
+        }
+
+        console.log('[TaskDetail] Rendering LinkedIn contact link:', {
+          contactName,
+          contactId: finalContactId,
+          hasPerson: !!person,
+          personId: person?.id,
+          hasStateContact: !!state.contact,
+          stateContactId: state.contact?.id
+        });
+
+        const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(finalContactId || '')}" data-contact-name="${escapeHtml(contactName)}" style="cursor: pointer;">${escapeHtml(contactName)}</a>`;
         // Determine action text based on task type (contact name goes in the middle)
         let actionPrefix = '';
         let actionSuffix = '';
@@ -2520,14 +2610,14 @@
             actionPrefix = 'LinkedIn Task for';
             actionSuffix = '';
         }
-        
+
         // Format: "Add [contact name] on LinkedIn"
         if (actionSuffix) {
           els.title.innerHTML = `${escapeHtml(actionPrefix)} ${contactLinkHTML} ${escapeHtml(actionSuffix)}`;
         } else {
           els.title.innerHTML = `${escapeHtml(actionPrefix)} ${contactLinkHTML}`;
         }
-        
+
         // CRITICAL FIX: Ensure contact link handler is attached and verify it exists
         setTimeout(() => {
           const contactLink = els.title.querySelector('.contact-link');
@@ -2584,7 +2674,7 @@
       // Add absolutely positioned avatar to the main title container
       const finalInitials = initials && initials !== '?' ? initials : (contactName ? contactName.charAt(0).toUpperCase() : 'C');
       console.log('LinkedIn task - Rendering avatar with initials:', finalInitials);
-      
+
       // Render avatar with retry - ensure it's inside .contact-header-text
       // CRITICAL FIX: Use scoped selector within task-detail-page
       const titleSection = document.querySelector('#task-detail-page .contact-header-text');
@@ -2592,7 +2682,7 @@
         // Clean up any existing avatars first
         const existingAvatars = titleSection.querySelectorAll('.avatar-initials, .avatar-absolute');
         existingAvatars.forEach(el => el.remove());
-        
+
         // Create avatar element
         const avatarHTML = `<span class="avatar-initials avatar-absolute" aria-hidden="true" style="position: absolute; left: -50px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: var(--orange-subtle); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; letter-spacing: 0.5px;">${escapeHtml(finalInitials)}</span>`;
         titleSection.insertAdjacentHTML('beforeend', avatarHTML);
@@ -2634,7 +2724,7 @@
     if (!document._taskDetailContactHandlersBound) {
       setupContactLinkHandlers();
     }
-    
+
     // CRITICAL FIX: Also ensure phone click handlers are set up
     if (!document._taskDetailPhoneHandlersBound) {
       setupPhoneClickHandlers();
@@ -2795,25 +2885,25 @@
     }
 
     els.content.innerHTML = contentHtml;
-    
+
     // Attach event handlers for task-specific buttons after rendering
     setTimeout(() => {
       attachTaskSpecificHandlers();
     }, 50);
   }
-  
+
   function attachTaskSpecificHandlers() {
     // LinkedIn task handlers
     const accessLinkedInBtn = document.getElementById('access-linkedin-btn');
     const markCompleteLinkedInBtn = document.getElementById('mark-complete-linkedin-btn');
-    
+
     if (accessLinkedInBtn) {
       // Remove existing listener if any
       accessLinkedInBtn.replaceWith(accessLinkedInBtn.cloneNode(true));
       const newBtn = document.getElementById('access-linkedin-btn');
       newBtn.addEventListener('click', handleAccessLinkedIn);
     }
-    
+
     if (markCompleteLinkedInBtn) {
       // Remove existing listener if any
       markCompleteLinkedInBtn.replaceWith(markCompleteLinkedInBtn.cloneNode(true));
@@ -2822,7 +2912,7 @@
         // Get notes from textarea
         const notesEl = document.getElementById('linkedin-notes');
         const notes = notesEl ? notesEl.value.trim() : '';
-        
+
         // Save notes if provided
         if (notes && state.currentTask) {
           try {
@@ -2831,19 +2921,19 @@
             console.warn('Could not save LinkedIn task notes to recent activity:', e);
           }
         }
-        
+
         // Complete the task
         await handleTaskComplete();
       });
     }
   }
-  
+
   function handleAccessLinkedIn() {
     if (!state.currentTask) return;
-    
+
     const contactName = state.currentTask.contact || '';
     const contactId = state.currentTask.contactId || '';
-    
+
     // Try to find the contact in the people data
     let person = null;
     if (typeof window.getPeopleData === 'function') {
@@ -2858,7 +2948,7 @@
         });
       }
     }
-    
+
     // Use the same LinkedIn logic as contact-detail.js
     if (person && person.linkedin) {
       console.log('[TaskDetail] Using contact personal LinkedIn:', person.linkedin);
@@ -3986,20 +4076,20 @@
       // CRITICAL FIX: Check if click is within task-detail-page first
       const taskPage = e.target.closest('#task-detail-page');
       if (!taskPage) return;
-      
+
       // CRITICAL FIX: Try multiple ways to find the contact link
       let contactLink = null;
-      
+
       // Method 1: Check if target itself is the link
       if (e.target.classList && e.target.classList.contains('contact-link')) {
         contactLink = e.target;
       }
-      
+
       // Method 2: Check if target is inside a contact-link
       if (!contactLink) {
         contactLink = e.target.closest('.contact-link');
       }
-      
+
       // Method 3: Check if we're inside the title element which contains the link
       if (!contactLink) {
         const titleEl = e.target.closest('#task-detail-title');
@@ -4007,7 +4097,7 @@
           contactLink = titleEl.querySelector('.contact-link');
         }
       }
-      
+
       if (!contactLink) return;
 
       e.preventDefault();
@@ -4052,10 +4142,10 @@
         console.warn('[TaskDetail] Contact link has no ID or name');
         return;
       }
-      
+
       // Final contactId to use
       let finalContactId = contactId;
-      
+
       // If no contactId but we have a name, try to find it
       if (!finalContactId && contactName) {
         console.log('[TaskDetail] No contactId, searching by name:', contactName);
@@ -4072,7 +4162,7 @@
               console.log('[TaskDetail] Found contact by name via getPeopleData:', finalContactId);
             }
           }
-          
+
           // Try BackgroundContactsLoader if still not found
           if (!finalContactId && window.BackgroundContactsLoader) {
             const contacts = window.BackgroundContactsLoader.getContactsData() || [];
@@ -4089,7 +4179,7 @@
           console.error('[TaskDetail] Error finding contact by name:', error);
         }
       }
-      
+
       if (!finalContactId) {
         console.warn('[TaskDetail] Could not find contact ID for:', contactName);
         if (window.crm && typeof window.crm.showToast === 'function') {
@@ -4097,7 +4187,7 @@
         }
         return;
       }
-      
+
       if (window.ContactDetail) {
         // Capture task detail state for back navigation
         window.__taskDetailRestoreData = {
