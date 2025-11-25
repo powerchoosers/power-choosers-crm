@@ -14,6 +14,7 @@
 (function() {
   let emailsData = [];
   let _unsubscribe = null;
+  let _sentEmailsUnsubscribe = null; // Separate listener for sent email tracking updates
   let _cacheWritePending = false;
   let lastLoadedDoc = null; // For pagination
   let hasMoreData = true; // For pagination
@@ -540,6 +541,68 @@
         });
 
       console.log('[BackgroundEmailsLoader] Realtime listener started');
+      
+      // ADDITIONAL LISTENER: Watch for updates to sent emails (for tracking badges)
+      // This catches webhook updates to emails that might not be in the top 100 by createdAt
+      // We watch by sentAt (desc) to catch recently sent emails that get tracking updates
+      // Note: This requires a Firestore composite index on (type, status, sentAt)
+      // Firestore will automatically prompt to create it if missing
+      if (!_sentEmailsUnsubscribe) {
+        try {
+          _sentEmailsUnsubscribe = window.firebaseDB
+            .collection('emails')
+            .where('type', '==', 'sent')
+            .where('status', '==', 'sent')
+            .orderBy('sentAt', 'desc')
+            .limit(200) // Watch more sent emails for tracking updates
+            .onSnapshot(async (snapshot) => {
+              const updated = [];
+              snapshot.forEach(doc => {
+                const data = doc.data();
+                const createdAt = tsToIso(data.createdAt);
+                const updatedAt = tsToIso(data.updatedAt);
+                const sentAt = tsToIso(data.sentAt);
+                const receivedAt = tsToIso(data.receivedAt);
+                const scheduledSendTime = tsToMs(data.scheduledSendTime);
+                const generatedAt = tsToIso(data.generatedAt);
+                const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
+                updated.push({
+                  id: doc.id,
+                  ...data,
+                  createdAt,
+                  updatedAt,
+                  sentAt,
+                  receivedAt,
+                  scheduledSendTime,
+                  generatedAt,
+                  timestamp,
+                  emailType: data.type || 'sent'
+                });
+              });
+
+              // Merge updates into existing data by ID (same as main listener)
+              const map = new Map(emailsData.map(e => [e.id, e]));
+              updated.forEach(e => map.set(e.id, e));
+              emailsData = Array.from(map.values())
+                .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+              // Dispatch update event so emails-redesigned.js refreshes
+              document.dispatchEvent(new CustomEvent('pc:emails-updated', { detail: { count: emailsData.length } }));
+              
+              console.log('[BackgroundEmailsLoader] Sent emails listener updated', updated.length, 'emails');
+            }, (error) => {
+              console.error('[BackgroundEmailsLoader] Sent emails listener error:', error);
+              // If index is missing, log a helpful message
+              if (error.code === 'failed-precondition') {
+                console.warn('[BackgroundEmailsLoader] Firestore index required. Check error message for index creation link.');
+              }
+            });
+          
+          console.log('[BackgroundEmailsLoader] Sent emails tracking listener started');
+        } catch (e) {
+          console.warn('[BackgroundEmailsLoader] Failed to start sent emails listener:', e);
+        }
+      }
     } catch (e) {
       console.warn('[BackgroundEmailsLoader] Failed to start realtime listener:', e);
     }
@@ -852,7 +915,12 @@
     getEmailsData: () => emailsData,
     reload: loadFromFirestore,
     loadMore: loadMoreEmails,
-    unsubscribe: () => { try { if (_unsubscribe) { _unsubscribe(); _unsubscribe = null; } } catch(_) {} },
+    unsubscribe: () => { 
+      try { 
+        if (_unsubscribe) { _unsubscribe(); _unsubscribe = null; } 
+        if (_sentEmailsUnsubscribe) { _sentEmailsUnsubscribe(); _sentEmailsUnsubscribe = null; } 
+      } catch(_) {} 
+    },
     getCount: () => emailsData.length,
     hasMore: () => hasMoreData,
     getTotalCount: getTotalCount,
