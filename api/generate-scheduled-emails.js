@@ -812,10 +812,14 @@ export default async function handler(req, res) {
         const aiMode = (emailData.aiMode || '').toLowerCase() === 'html' ? 'html' : 'standard';
 
         // Determine if this step should use the strict cold-email template
+        // CRITICAL: All scheduled emails in sequences are cold emails, so default to cold_email template
+        // This ensures angle-based CTAs, tone openers, and subject lines are always applied
         const isColdStep = (
           emailData.stepType === 'intro' ||
           emailData.template === 'first-email-intro' ||
-          String(emailData.aiMode || '').toLowerCase() === 'cold-email'
+          String(emailData.aiMode || '').toLowerCase() === 'cold-email' ||
+          emailData.stepIndex === 0 || // First step in sequence is always a cold email
+          emailData.stepIndex === undefined // If no stepIndex, assume it's a cold email
         );
 
         // Generate email content using /api/perplexity-email endpoint (which has full angle system)
@@ -829,9 +833,10 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             prompt: emailData.aiPrompt || 'Write a professional follow-up email',
             mode: aiMode,
-            // Force cold-email template type for intro-style steps so the backend
-            // can apply strict cold-email schema, subject variants, and CTA logic.
-            ...(isColdStep ? { templateType: 'cold_email' } : (aiMode === 'html' ? { templateType: 'cold_email' } : {})),
+            // CRITICAL: Always use cold_email template type for scheduled emails to ensure
+            // angle-based CTAs, tone openers, and subject lines are applied
+            // This ensures all sequence emails use the new angle-based system
+            templateType: 'cold_email',
             recipient: recipient,
             selectedAngle: selectedAngle,
             toneOpener: toneOpener,
