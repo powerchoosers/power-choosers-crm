@@ -827,6 +827,9 @@ export default async function handler(req, res) {
         const baseUrl = (process.env.PUBLIC_BASE_URL && process.env.PUBLIC_BASE_URL.replace(/\/$/, '')) 
           || 'http://localhost:3000';
 
+        // Calculate email position (1-based) for CTA escalation and subject progression
+        const emailPosition = typeof emailData.stepIndex === 'number' ? emailData.stepIndex + 1 : 1;
+        
         const perplexityResponse = await fetch(`${baseUrl}/api/perplexity-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -840,7 +843,9 @@ export default async function handler(req, res) {
             recipient: recipient,
             selectedAngle: selectedAngle,
             toneOpener: toneOpener,
-            senderName: 'Lewis Patterson'
+            senderName: 'Lewis Patterson',
+            emailPosition: emailPosition, // 1, 2, or 3 for CTA escalation and subject progression
+            previousAngles: usedAngles // Pass used angles for context
           })
         });
         
