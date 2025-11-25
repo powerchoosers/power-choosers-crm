@@ -1827,7 +1827,9 @@ async function buildSystemPrompt({
   meetingPreferences, 
   industrySegmentation,
   selectedAngle,
-  toneOpener
+  toneOpener,
+  emailPosition = 1, // 1, 2, or 3 for CTA escalation and subject progression
+  previousAngles = [] // Array of angle IDs used in previous emails
 }) {
   // Analyze manual prompt for enhanced context understanding
   const promptAnalysis = analyzeManualPrompt(prompt);
@@ -2244,16 +2246,56 @@ Example: "We help manufacturing companies secure better rates before contracts e
 ${(() => {
   const angleCta = getAngleCta(selectedAngle);
   if (angleCta && templateType === 'cold_email') {
+    // CTA Escalation based on email position
+    let ctaEscalation = '';
+    let closingQuestion = '';
+    
+    if (emailPosition === 1) {
+      // Email 1: Soft discovery question
+      closingQuestion = 'Worth a 10-minute look?';
+      ctaEscalation = `
+  * EMAIL POSITION: This is Email #1 (first contact)
+  * CTA STRENGTH: SOFT - Discovery question
+  * Structure: [Opening Question] + [Value/Statistic] + [Low-friction closing question]
+  * Example: "${angleCta.opening}\n\n${angleCta.value}.\n\n${closingQuestion}"`;
+    } else if (emailPosition === 2) {
+      // Email 2: Medium-strength ask
+      closingQuestion = 'Can I pull a quick analysis for you?';
+      ctaEscalation = `
+  * EMAIL POSITION: This is Email #2 (follow-up)
+  * CTA STRENGTH: MEDIUM - Reference previous + Value ask
+  * MUST reference Email #1 naturally: "On that ${angleCta.opening.toLowerCase()} question..."
+  * Structure: [Reference Email 1] + [New Angle Insight] + [Medium-strength ask]
+  * Example: "On that ${angleCta.opening.toLowerCase()}—${angleCta.value}.\n\n${closingQuestion}"`;
+    } else if (emailPosition >= 3) {
+      // Email 3+: Hard ask with time options
+      closingQuestion = 'Can you do Thursday 2-3pm or Friday 10-11am? If not, when works better?';
+      ctaEscalation = `
+  * EMAIL POSITION: This is Email #${emailPosition} (final attempt)
+  * CTA STRENGTH: HARD - Specific time options
+  * MUST create urgency: "Rate lock windows are tightening..."
+  * Structure: [Urgency] + [Time Options] + [Alternative close]
+  * Example: "Rate lock windows are tightening. ${closingQuestion}"`;
+    }
+    
     return `
-- cta_text: Use this angle-specific CTA as your foundation: "${angleCta.full}"
+- cta_text: CRITICAL - You MUST use this angle-specific CTA as your foundation: "${angleCta.full}"
+  * This is MANDATORY - you cannot use any other CTA
   * You have CREATIVE CONTROL to rephrase it naturally, but MUST include:
     1. The core opening question: "${angleCta.opening}"
     2. A value/statistic: "${angleCta.value}" (you may rephrase this)
-    3. A low-friction closing question like "Worth a 10-minute look?" or "Worth exploring?"
-  * Keep total length under 25 words
+    3. A closing based on email position (see below)
+${ctaEscalation}
+  * Keep total length under 30 words for Email 1-2, 40 words for Email 3+
   * MUST be a complete sentence with proper ending punctuation
   * MUST end with a question mark (?)
-  * Structure: [Opening Question] + [Value/Statistic] + [Low-friction question]
+  * FORBIDDEN CTAs - DO NOT use these phrases:
+    - "If you ever want a second opinion on your setup"
+    - "I can spend 10 minutes looking at your situation"
+    - "Would you be open to a conversation"
+    - "Let's schedule a call"
+    - Any meeting request or permission-based language (except Email 3+)
+  * If you don't use the angle-based CTA, the email will be rejected
 - cta_type: Return "angle_question"
 `;
   } else if (ctaPattern) {
@@ -2368,6 +2410,19 @@ TIER 2 - VALUE PROPOSITION (Statistics ENCOURAGED):
 - "Would Tuesday [time] or Thursday [time] work"
 - Any meeting time suggestions (Tuesday, Thursday, etc.)
 
+FORBIDDEN CTAs (CRITICAL - DO NOT USE THESE):
+- "If you ever want a second opinion on your setup"
+- "I can spend 10 minutes looking at your situation"
+- "If you ever want a second opinion"
+- "second opinion on your setup"
+- "10 minutes looking at your situation"
+- "spend 10 minutes looking"
+- "Would you be open to a conversation"
+- "Let's schedule a call"
+- Any permission-based language ("Would you be open to...", "If you want...")
+- Any meeting request language
+These old CTAs are FORBIDDEN. You MUST use the angle-based CTA provided above.
+
 PREFERRED LANGUAGE:
 - "Companies in [industry] are facing rising electricity costs..."
 - "[Company] likely sees energy as a significant operational expense..."
@@ -2411,6 +2466,24 @@ ${generationMode === 'balanced' ? `
 SUBJECT LINE RULES (CRITICAL - PERPLEXITY HAS CREATIVE CONTROL):
 - You MUST create a unique, angle-specific subject line for each email
 - DO NOT use the same subject line pattern repeatedly
+- SUBJECT LINE PROGRESSION (based on email position):
+${emailPosition === 1 ? `
+  * EMAIL #1: Question format with angle
+  * Pattern: "[FirstName], [angle question]?"
+  * Examples: "${firstName}, when does your contract expire?", "${firstName}, are you claiming exemptions?"
+  * Focus: Discovery question specific to the angle` : ''}
+${emailPosition === 2 ? `
+  * EMAIL #2: Reference format with "re:" prefix
+  * Pattern: "re: [previous angle keyword]—[new angle keyword]"
+  * Examples: "re: contract timing—consolidation question", "re: exemptions—timing question"
+  * Focus: Show continuation, reference previous email naturally
+  * MUST use "re:" prefix to indicate follow-up` : ''}
+${emailPosition >= 3 ? `
+  * EMAIL #${emailPosition}: Urgency format
+  * Pattern: "Last attempt—[urgency message]" or "Final note—[angle keyword]"
+  * Examples: "Last attempt—rate lock window closing", "Final note—renewal timing", "One last thought—rate timing"
+  * Focus: Create urgency without being pushy, acknowledge final attempt
+  * MUST be different from Emails 1-2` : ''}
 - Base your subject on the selected angle, but be creative:
 ${selectedAngle?.id === 'timing_strategy' ? `
   * Angle: Timing Strategy
@@ -2932,7 +3005,9 @@ export default async function handler(req, res) {
       meetingPreferences, 
       industrySegmentation,
       selectedAngle,
-      toneOpener
+      toneOpener,
+      emailPosition = 1, // 1, 2, or 3 for CTA escalation and subject progression
+      previousAngles = [] // Array of angle IDs used in previous emails
     } = req.body || {};
     
     // Detect template type for both HTML and standard modes
@@ -2984,7 +3059,9 @@ CRITICAL: Use these EXACT meeting times in your CTA.
       meetingPreferences, 
       industrySegmentation,
       selectedAngle,
-      toneOpener
+      toneOpener,
+      emailPosition,
+      previousAngles
     });
     const fullSystemPrompt = dateContext + systemPrompt;
     
@@ -3031,7 +3108,9 @@ CRITICAL: Use these EXACT meeting times in your CTA.
                 meetingPreferences, 
                 industrySegmentation,
                 selectedAngle,
-                toneOpener
+                toneOpener,
+                emailPosition,
+                previousAngles
               })).prompt 
             },
             { role: 'user', content: prompt || 'Draft a professional email' }
@@ -3101,16 +3180,57 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           jsonData.opening_hook = `${company} are likely facing rising electricity costs with contracts renewing in 2025.`;
         }
         
-        // Validate for duplicate CTAs in cold emails
+        // Validate for duplicate CTAs and old CTAs in cold emails
         if (templateType === 'cold_email' && jsonData.cta_text) {
           // Check if the CTA contains multiple questions or meeting requests
           const hasMultipleQuestions = (jsonData.cta_text.match(/\?/g) || []).length > 1;
           const hasMeetingRequest = /does.*work.*call|tuesday|thursday|monday|wednesday|friday|15-minute|brief.*call|quick.*call|meeting|schedule|calendar/i.test(jsonData.cta_text);
           const hasTimeSlot = /\d{1,2}(:\d{2})?\s*(am|pm|AM|PM)/i.test(jsonData.cta_text);
           
-          if (hasMultipleQuestions || hasMeetingRequest || hasTimeSlot) {
-            console.warn('[Validation] Meeting request or duplicate CTA detected in cold email, replacing with qualifying question...');
-            jsonData.cta_text = 'When does your current energy contract expire?';
+          // Check for old "second opinion" CTA
+          const hasOldCta = /second opinion|10 minutes looking|spend.*minutes.*looking|ever want.*second/i.test(jsonData.cta_text);
+          
+          // If angle-based CTA should be used, check if it's missing or wrong
+          const shouldUseAngleCta = selectedAngle && getAngleCta(selectedAngle);
+          let hasAngleCta = false;
+          
+          if (shouldUseAngleCta) {
+            const angleCta = getAngleCta(selectedAngle);
+            const ctaLower = jsonData.cta_text.toLowerCase();
+            // Check if CTA contains the angle's opening question (first 15-20 chars)
+            const openingKey = angleCta.opening?.toLowerCase().substring(0, 20) || '';
+            const angleId = selectedAngle.id || '';
+            
+            // Check for angle-specific keywords
+            hasAngleCta = openingKey && ctaLower.includes(openingKey) ||
+                         (angleId === 'timing_strategy' && (ctaLower.includes('contract expire') || ctaLower.includes('renewal'))) ||
+                         (angleId === 'exemption_recovery' && (ctaLower.includes('exemption') || ctaLower.includes('claiming'))) ||
+                         (angleId === 'consolidation' && (ctaLower.includes('location') || ctaLower.includes('facilit'))) ||
+                         (angleId === 'demand_efficiency' && (ctaLower.includes('optimiz') || ctaLower.includes('consumption'))) ||
+                         (angleId === 'operational_continuity' && (ctaLower.includes('peak') || ctaLower.includes('demand'))) ||
+                         (angleId === 'mission_funding' && (ctaLower.includes('mission') || ctaLower.includes('funding'))) ||
+                         (angleId === 'budget_stability' && (ctaLower.includes('budget') || ctaLower.includes('volatil'))) ||
+                         (angleId === 'operational_simplicity' && (ctaLower.includes('supplier') || ctaLower.includes('vendor'))) ||
+                         (angleId === 'cost_control' && (ctaLower.includes('predictab') || ctaLower.includes('cost'))) ||
+                         (angleId === 'operational_efficiency' && (ctaLower.includes('efficien') || ctaLower.includes('operational'))) ||
+                         (angleId === 'data_governance' && (ctaLower.includes('metering') || ctaLower.includes('reporting')));
+          }
+          
+          if (hasMultipleQuestions || hasMeetingRequest || hasTimeSlot || hasOldCta || (shouldUseAngleCta && !hasAngleCta)) {
+            console.warn('[Validation] Invalid or missing angle-based CTA detected, replacing...', {
+              hasOldCta,
+              hasAngleCta,
+              shouldUseAngleCta: !!shouldUseAngleCta,
+              currentCta: jsonData.cta_text
+            });
+            // Use angle-based CTA if available
+            if (shouldUseAngleCta) {
+              const angleCta = getAngleCta(selectedAngle);
+              jsonData.cta_text = angleCta.full;
+              console.log('[Validation] Replaced with angle-based CTA:', angleCta.full);
+            } else {
+              jsonData.cta_text = 'When does your current energy contract expire?';
+            }
           }
         }
         
