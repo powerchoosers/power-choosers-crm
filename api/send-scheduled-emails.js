@@ -298,13 +298,27 @@ export default async function handler(req, res) {
         }
 
         // Update email record (preserve subject, html, text fields)
+        // CRITICAL: Initialize tracking fields to match manual emails (sendgrid-service.js structure)
+        // This ensures tracking pixels display correctly in emails-redesigned.js sent tab
         await emailDoc.ref.update({
           type: 'sent',
           status: 'sent',
+          emailType: 'sent',           // Required for emails-redesigned.js filter
+          isSentEmail: true,           // Required for emails-redesigned.js filter
           sentAt: Date.now(),
+          date: new Date().toISOString(),      // Required for emails page sorting
+          timestamp: new Date().toISOString(), // Required for emails page fallback
           sendgridMessageId: sendResult[0].headers['x-message-id'],
+          messageId: sendResult[0].headers['x-message-id'], // Alias for consistency
           sentBy: 'scheduled_job',
-          provider: 'sendgrid' // Ensure consistent provider marking
+          provider: 'sendgrid',        // Ensure consistent provider marking
+          // Initialize tracking arrays for SendGrid webhook updates
+          opens: emailData.opens || [],
+          clicks: emailData.clicks || [],
+          replies: emailData.replies || [],
+          openCount: emailData.openCount || 0,
+          clickCount: emailData.clickCount || 0,
+          updatedAt: new Date().toISOString()
           // Note: subject, html, text are preserved automatically by Firestore update()
         });
 
