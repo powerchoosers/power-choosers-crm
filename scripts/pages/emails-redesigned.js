@@ -1,5 +1,5 @@
 'use strict';
-(function(){
+(function () {
   const state = {
     data: [],
     filtered: [],
@@ -24,32 +24,32 @@
         const d = (ev && ev.detail) || {};
         if (d.currentFolder) state.currentFolder = d.currentFolder;
         if (d.currentPage) {
-          const n = parseInt(d.currentPage, 10); 
+          const n = parseInt(d.currentPage, 10);
           if (!isNaN(n) && n > 0) state.currentPage = n;
         }
         if (d.searchTerm) {
           if (els.searchInput) els.searchInput.value = d.searchTerm;
         }
         if (Array.isArray(d.selectedItems)) state.selected = new Set(d.selectedItems);
-        
+
         // Update active tab
         els.filterTabs.forEach(tab => {
           tab.classList.toggle('active', tab.dataset.folder === state.currentFolder);
         });
-        
+
         // Show/hide Generate Now button
         updateGenerateButtonVisibility();
-        
+
         applyFilters();
         render();
-        
+
         if (typeof d.scroll === 'number') {
-          setTimeout(() => { 
-            try { window.scrollTo(0, d.scroll); } catch(_) {} 
+          setTimeout(() => {
+            try { window.scrollTo(0, d.scroll); } catch (_) { }
           }, 80);
         }
-      } catch (e) { 
-        console.warn('[Emails] Restore failed', e); 
+      } catch (e) {
+        console.warn('[Emails] Restore failed', e);
       }
     });
     document._emailsRestoreBound = true;
@@ -62,7 +62,7 @@
       const debouncedLoadData = () => {
         clearTimeout(updateTimeout);
         updateTimeout = setTimeout(() => {
-          try { 
+          try {
             // Only reload if we're on the emails page
             if (els.page && els.page.style.display !== 'none') {
               // IMPORTANT: use showImmediately=true so realtime updates actually
@@ -71,24 +71,24 @@
               // in-memory data but didn't call applyFilters()/render(), forcing
               // a manual refresh or tab toggle for users to see changes.
               console.log('[EmailsPage] Real-time update detected, refreshing...');
-              loadData(true); 
+              loadData(true);
             }
-          } catch(_) {}
+          } catch (_) { }
         }, 500); // Reduced to 500ms for faster updates when emails are sent
       };
-      
+
       document.addEventListener('pc:emails-loaded', () => {
-        try { 
+        try {
           // Only do a full load on first event to avoid double-renders/flicker
           if (!state.data || state.data.length === 0) {
-            loadData(true); 
+            loadData(true);
           }
-        } catch(_) {}
+        } catch (_) { }
       });
       document.addEventListener('pc:emails-updated', debouncedLoadData);
       document._emailsRealtimeBound = true;
       console.log('[EmailsPage] Real-time listeners bound');
-    } catch(_) {}
+    } catch (_) { }
   }
 
   // Initialize DOM references
@@ -105,7 +105,7 @@
     els.count = document.getElementById('emails-count');
     els.pagination = document.getElementById('emails-pagination');
     els.container = els.page ? els.page.querySelector('.table-container') : null;
-    
+
     return els.page && els.tbody;
   }
 
@@ -124,10 +124,10 @@
           state.currentFolder = tab.dataset.folder;
           state.currentPage = 1;
           console.log('[EmailsPage] Current folder set to:', state.currentFolder);
-          
+
           // Show/hide Generate Now button
           updateGenerateButtonVisibility();
-          
+
           applyFilters();
         });
         tab._emailTabBound = true;
@@ -183,7 +183,7 @@
           openBulkSelectModal();
         } else {
           state.selected.clear();
-        render();
+          render();
           closeBulkSelectModal();
           hideBulkBar();
         }
@@ -197,19 +197,19 @@
       console.log('[EmailsPage] Already loading, skipping duplicate request');
       return;
     }
-    
+
     try {
       state.isLoading = true;
       console.log('[EmailsPage] Loading emails from BackgroundEmailsLoader...');
-      
+
       let emailsData = [];
-      
+
       // Priority 1: Get data from background loader (already loaded on app init)
       if (window.BackgroundEmailsLoader) {
         emailsData = window.BackgroundEmailsLoader.getEmailsData() || [];
         state.hasMore = window.BackgroundEmailsLoader.hasMore ? window.BackgroundEmailsLoader.hasMore() : false;
         console.log('[EmailsPage] Got', emailsData.length, 'emails from BackgroundEmailsLoader', state.hasMore ? '(more available)' : '(all loaded)');
-        
+
         // OPTIMIZATION: If we have data, process and show immediately (don't wait for cache/Firestore)
         if (emailsData.length > 0) {
           processAndSetData(emailsData);
@@ -221,21 +221,21 @@
             console.log('[EmailsPage] Refreshed display (showImmediately=true)');
           }
         }
-        
+
         // Get total count (non-blocking) for reference, but we'll use filtered count for display
         state.totalCount = emailsData.length;
         if (typeof window.BackgroundEmailsLoader.getTotalCount === 'function') {
           window.BackgroundEmailsLoader.getTotalCount()
-            .then((cnt) => { 
+            .then((cnt) => {
               state.totalCount = cnt;
               // Note: We keep totalCount for reference but display filtered count per folder
             })
-            .catch((error) => { 
-              console.warn('[EmailsPage] Failed to get total count, keeping loaded count:', error); 
+            .catch((error) => {
+              console.warn('[EmailsPage] Failed to get total count, keeping loaded count:', error);
             });
         }
       }
-      
+
       // Priority 2: Fallback to CacheManager if background loader empty (non-blocking for UI)
       if (emailsData.length === 0 && window.CacheManager && typeof window.CacheManager.get === 'function') {
         console.log('[EmailsPage] Background loader empty, falling back to CacheManager...');
@@ -246,9 +246,9 @@
             applyFilters();
             render();
           }
-        }).catch(() => {});
+        }).catch(() => { });
       }
-      
+
       // Priority 3: Load from Firebase if cache is empty (only if no data at all)
       if (emailsData.length === 0 && state.data.length === 0) {
         console.log('[EmailsPage] Cache empty, loading from Firebase...');
@@ -267,30 +267,30 @@
                 emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
               };
             });
-            
+
             if (firestoreData.length > 0) {
               processAndSetData(firestoreData);
               applyFilters();
               render();
             }
-            
+
             // Cache for future visits
             if (window.CacheManager && typeof window.CacheManager.set === 'function') {
-              window.CacheManager.set('emails', firestoreData).catch(() => {});
+              window.CacheManager.set('emails', firestoreData).catch(() => { });
             }
           })
           .catch(error => {
             console.error('[EmailsPage] Failed to load from Firestore:', error);
           });
       }
-      
+
       // If we didn't show immediately, apply filters now
       // CRITICAL: Always apply filters when showImmediately is false to ensure data is filtered
       if (!showImmediately && state.data.length > 0) {
         applyFilters();
         render(); // Also render to ensure UI is updated
       }
-      
+
       // CRITICAL: If showImmediately was true but we didn't have data initially,
       // make sure we still refresh once data is loaded
       if (showImmediately && state.data.length > 0) {
@@ -306,7 +306,7 @@
       state.isLoading = false;
     }
   }
-  
+
   // Helper function to process and set email data (extracted for reuse)
   function processAndSetData(emailsData) {
     // Ensure all emails have required fields and preserve content fields
@@ -321,7 +321,7 @@
         } else {
           normalizedTo = email.to || '';
         }
-        
+
         emailMap.set(email.id, {
           ...email,
           type: email.type || 'received',
@@ -346,15 +346,15 @@
         });
       }
     });
-    
+
     state.data = Array.from(emailMap.values());
-    
+
     // OPTIMIZATION: Lazy sort - only sort when needed (not on every data load)
     // Sorting will happen in getPageItems() or applyFilters() when actually displaying
     // This saves ~10-20ms on cold start
-    
+
     console.log('[EmailsPage] Processed', state.data.length, 'emails');
-    
+
     // Log sample types for debugging
     if (state.data.length > 0) {
       const typeCounts = {};
@@ -379,11 +379,11 @@
         state.data.sort((a, b) => new Date(b.date) - new Date(a.date));
       }
     }
-    
+
     let filtered = [...state.data];
-    
+
     console.log('[EmailsPage] Filtering emails. Total:', state.data.length, 'Current folder:', state.currentFolder);
-    
+
     // Log sample email types for debugging
     if (state.data.length > 0) {
       const typeCounts = {};
@@ -392,17 +392,17 @@
       });
       console.log('[EmailsPage] Email types:', typeCounts);
     }
-    
+
     // Filter by folder
     if (state.currentFolder === 'inbox') {
       filtered = filtered.filter(email => {
         // Multiple ways to identify received emails (catch everything)
-        return (email.type === 'received' || 
-                email.emailType === 'received' || 
-                email.provider === 'sendgrid_inbound' ||
-                // If no type field, assume it's received (old emails)
-                (!email.type && !email.emailType && !email.isSentEmail)) && 
-               !email.deleted;
+        return (email.type === 'received' ||
+          email.emailType === 'received' ||
+          email.provider === 'sendgrid_inbound' ||
+          // If no type field, assume it's received (old emails)
+          (!email.type && !email.emailType && !email.isSentEmail)) &&
+          !email.deleted;
       });
       console.log('[EmailsPage] Inbox filter applied. Filtered count:', filtered.length);
     } else if (state.currentFolder === 'sent') {
@@ -422,7 +422,7 @@
       // OPTIMIZATION: Pre-compute Date.now() once instead of calling it for each email
       const now = Date.now();
       const oneMinuteAgo = now - 60000;
-      
+
       // OPTIMIZATION: Simplified filter logic - fewer variable assignments
       filtered = filtered.filter(email => {
         // CRITICAL: Exclude sent emails immediately (multiple checks for robustness)
@@ -430,19 +430,19 @@
         if (email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail === true) {
           return false;
         }
-        
+
         // Exclude deleted emails
         if (email.deleted) return false;
-        
+
         // Only show emails that are actually scheduled
         if (email.type !== 'scheduled') return false;
-        
+
         const status = email.status || '';
-        
+
         // Fast path: exclude already sent emails (multiple status indicators)
         // CRITICAL: Check status to catch emails that were sent but type wasn't updated
         if (status === 'sent' || status === 'delivered' || status === 'error') return false;
-        
+
         // Exclude emails stuck in 'sending' state if send time has passed (likely already sent)
         if (status === 'sending') {
           const sendTime = email.scheduledSendTime;
@@ -451,30 +451,30 @@
             return false;
           }
         }
-        
+
         // Show if pending or generating (most common cases)
         if (status === 'not_generated' || status === 'pending_approval' || status === 'generating') {
           return true;
         }
-        
+
         // Show approved emails with valid future send time
         if (status === 'approved') {
           const sendTime = email.scheduledSendTime;
           return sendTime && typeof sendTime === 'number' && sendTime >= oneMinuteAgo;
         }
-        
+
         // Exclude emails with missing/null status and no scheduledSendTime (orphaned records)
         if (!status && !email.scheduledSendTime) return false;
-        
+
         // Exclude emails with past send times and no valid status (likely already sent)
         const sendTime = email.scheduledSendTime;
         if (sendTime && typeof sendTime === 'number' && sendTime < oneMinuteAgo && !status) {
           return false;
         }
-        
+
         return false;
       });
-      
+
       // OPTIMIZATION: Lazy sort - only sort when rendering (moved to getPageItems)
       // Don't sort here on every filter - saves ~10-20ms for large datasets
       state.scheduledNeedsSort = true;
@@ -490,7 +490,7 @@
     // Filter by search
     const searchTerm = els.searchInput?.value?.toLowerCase() || '';
     if (searchTerm) {
-      filtered = filtered.filter(email => 
+      filtered = filtered.filter(email =>
         email.subject?.toLowerCase().includes(searchTerm) ||
         email.from?.toLowerCase().includes(searchTerm) ||
         email.to?.toLowerCase().includes(searchTerm)
@@ -498,14 +498,14 @@
     }
 
     state.filtered = filtered;
-    
+
     // Check if we need to load more data to fill the current page
     const neededForPage = state.currentPage * state.pageSize;
     console.log('[EmailsPage] Filter check - filtered:', state.filtered.length, 'needed:', neededForPage, 'hasMore:', state.hasMore, 'loader available:', !!window.BackgroundEmailsLoader);
-    
+
     // Update folder total count asynchronously (do not block UI)
-    updateFolderCount().catch(() => {});
-    
+    updateFolderCount().catch(() => { });
+
     // OPTIMIZATION: Skip loading more for the scheduled tab
     // All scheduled emails (up to ~200) are ensured to be in memory by BackgroundEmailsLoader,
     // so we never need to paginate for this folder.
@@ -517,7 +517,7 @@
       window.BackgroundEmailsLoader &&
       typeof window.BackgroundEmailsLoader.loadMore === 'function'
     );
-    
+
     if (shouldLoadMore) {
       console.log('[EmailsPage] Not enough filtered results, loading more...');
       // Load more data until we have enough filtered results
@@ -535,7 +535,7 @@
       render();
     }
   }
-  
+
   // Update total count for the current folder without loading all records
   async function updateFolderCount() {
     try {
@@ -545,14 +545,14 @@
       // OPTIMIZATION: Always use the already-filtered count (no double filtering!)
       // state.filtered is already accurate after applyFilters() runs
       state.folderCount = state.filtered.length;
-      
+
       // Cache this count for instant display on next tab switch
       if (!searchTerm) {
         state.folderCountsByFolder[currentFolder] = state.filtered.length;
       }
-      
+
       renderPagination();
-      
+
       // No need to call getTotalCountByFolder() - it would just re-filter the same data
       // The in-memory count from applyFilters() is already accurate and fast
     } catch (e) {
@@ -568,7 +568,7 @@
       console.log('[EmailsPage] Already loading more, skipping duplicate request');
       return;
     }
-    
+
     state.isLoadingMore = true;
     try {
       const neededForPage = state.currentPage * state.pageSize;
@@ -576,167 +576,167 @@
       const targetCount = neededForPage;
       let attempts = 0;
       const maxAttempts = 10; // Reduced from 20/50 for faster response
-      
+
       console.log('[EmailsPage] loadMoreUntilEnough started - filtered:', state.filtered.length, 'needed:', neededForPage, 'target:', targetCount);
-      
+
       while (state.filtered.length < targetCount && state.hasMore && attempts < maxAttempts) {
-      attempts++;
-      console.log(`[EmailsPage] Loading more emails (attempt ${attempts}/${maxAttempts})...`);
-      const result = await window.BackgroundEmailsLoader.loadMore();
-      if (!result || result.loaded === 0) {
-        console.log('[EmailsPage] No more emails to load');
-        break;
-      }
-      console.log(`[EmailsPage] Loaded ${result.loaded} more emails, total now: ${state.data.length}`);
-      
-      // Reload data from background loader with deduplication
-      const updatedData = window.BackgroundEmailsLoader.getEmailsData() || [];
-      const emailMap = new Map();
-      
-      // Deduplicate by email ID
-      updatedData.forEach(email => {
-        if (!emailMap.has(email.id)) {
-          let normalizedTo = '';
-          if (Array.isArray(email.to)) {
-            normalizedTo = email.to.length > 0 ? email.to[0] : '';
-          } else {
-            normalizedTo = email.to || '';
-          }
-          
-          emailMap.set(email.id, {
-            ...email,
-            type: email.type || 'received',
-            from: email.from || 'Unknown',
-            to: normalizedTo,
-            subject: email.subject || '(No Subject)',
-            date: email.date || email.timestamp || email.createdAt || new Date(),
-            html: email.html || '',
-            text: email.text || '',
-            content: email.content || '',
-            originalContent: email.originalContent || '',
-            openCount: email.openCount || 0,
-            clickCount: email.clickCount || 0,
-            lastOpened: email.lastOpened,
-            lastClicked: email.lastClicked,
-            isSentEmail: email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail,
-            starred: email.starred || false,
-            deleted: email.deleted || false,
-            unread: email.unread !== false
-          });
+        attempts++;
+        console.log(`[EmailsPage] Loading more emails (attempt ${attempts}/${maxAttempts})...`);
+        const result = await window.BackgroundEmailsLoader.loadMore();
+        if (!result || result.loaded === 0) {
+          console.log('[EmailsPage] No more emails to load');
+          break;
         }
-      });
-      
-      state.data = Array.from(emailMap.values());
-      state.data.sort((a, b) => new Date(b.date) - new Date(a.date));
-      state.hasMore = result.hasMore || false;
-      
-      // Re-apply filters to update filtered array
-      let filtered = [...state.data];
-      
-      // Filter by folder
-      if (state.currentFolder === 'inbox') {
-        filtered = filtered.filter(email => {
-          return (email.type === 'received' || 
-                  email.emailType === 'received' || 
-                  email.provider === 'sendgrid_inbound' ||
-                  (!email.type && !email.emailType && !email.isSentEmail)) && 
-                 !email.deleted;
-        });
-      } else if (state.currentFolder === 'sent') {
-        filtered = filtered.filter(email => {
-          const isSent = (
-            email.type === 'sent' ||
-            email.emailType === 'sent' ||
-            email.isSentEmail === true ||
-            email.status === 'sent' ||
-            email.provider === 'sendgrid'
-          );
-          return isSent && !email.deleted;
-        });
-      } else if (state.currentFolder === 'scheduled') {
-        // OPTIMIZATION: Match the optimized filter from applyFilters()
-        const now = Date.now();
-        const oneMinuteAgo = now - 60000;
-        filtered = filtered.filter(email => {
-          // CRITICAL: Exclude sent emails immediately (multiple checks for robustness)
-          // Check type first (most reliable indicator)
-          if (email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail === true) {
-            return false;
+        console.log(`[EmailsPage] Loaded ${result.loaded} more emails, total now: ${state.data.length}`);
+
+        // Reload data from background loader with deduplication
+        const updatedData = window.BackgroundEmailsLoader.getEmailsData() || [];
+        const emailMap = new Map();
+
+        // Deduplicate by email ID
+        updatedData.forEach(email => {
+          if (!emailMap.has(email.id)) {
+            let normalizedTo = '';
+            if (Array.isArray(email.to)) {
+              normalizedTo = email.to.length > 0 ? email.to[0] : '';
+            } else {
+              normalizedTo = email.to || '';
+            }
+
+            emailMap.set(email.id, {
+              ...email,
+              type: email.type || 'received',
+              from: email.from || 'Unknown',
+              to: normalizedTo,
+              subject: email.subject || '(No Subject)',
+              date: email.date || email.timestamp || email.createdAt || new Date(),
+              html: email.html || '',
+              text: email.text || '',
+              content: email.content || '',
+              originalContent: email.originalContent || '',
+              openCount: email.openCount || 0,
+              clickCount: email.clickCount || 0,
+              lastOpened: email.lastOpened,
+              lastClicked: email.lastClicked,
+              isSentEmail: email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail,
+              starred: email.starred || false,
+              deleted: email.deleted || false,
+              unread: email.unread !== false
+            });
           }
-          
-          // Exclude deleted emails
-          if (email.deleted) return false;
-          
-          // Only show emails that are actually scheduled
-          if (email.type !== 'scheduled') return false;
-          
-          const status = email.status || '';
-          
-          // Fast path: exclude already sent emails (multiple status indicators)
-          // CRITICAL: Check status to catch emails that were sent but type wasn't updated
-          if (status === 'sent' || status === 'delivered' || status === 'error') return false;
-          
-          // Exclude emails stuck in 'sending' state if send time has passed (likely already sent)
-          if (status === 'sending') {
-            const sendTime = email.scheduledSendTime;
-            if (sendTime && typeof sendTime === 'number' && sendTime < (now - 5 * 60 * 1000)) {
+        });
+
+        state.data = Array.from(emailMap.values());
+        state.data.sort((a, b) => new Date(b.date) - new Date(a.date));
+        state.hasMore = result.hasMore || false;
+
+        // Re-apply filters to update filtered array
+        let filtered = [...state.data];
+
+        // Filter by folder
+        if (state.currentFolder === 'inbox') {
+          filtered = filtered.filter(email => {
+            return (email.type === 'received' ||
+              email.emailType === 'received' ||
+              email.provider === 'sendgrid_inbound' ||
+              (!email.type && !email.emailType && !email.isSentEmail)) &&
+              !email.deleted;
+          });
+        } else if (state.currentFolder === 'sent') {
+          filtered = filtered.filter(email => {
+            const isSent = (
+              email.type === 'sent' ||
+              email.emailType === 'sent' ||
+              email.isSentEmail === true ||
+              email.status === 'sent' ||
+              email.provider === 'sendgrid'
+            );
+            return isSent && !email.deleted;
+          });
+        } else if (state.currentFolder === 'scheduled') {
+          // OPTIMIZATION: Match the optimized filter from applyFilters()
+          const now = Date.now();
+          const oneMinuteAgo = now - 60000;
+          filtered = filtered.filter(email => {
+            // CRITICAL: Exclude sent emails immediately (multiple checks for robustness)
+            // Check type first (most reliable indicator)
+            if (email.type === 'sent' || email.emailType === 'sent' || email.isSentEmail === true) {
               return false;
             }
-          }
-          
-          if (status === 'not_generated' || status === 'pending_approval' || status === 'generating') return true;
-          if (status === 'approved') {
+
+            // Exclude deleted emails
+            if (email.deleted) return false;
+
+            // Only show emails that are actually scheduled
+            if (email.type !== 'scheduled') return false;
+
+            const status = email.status || '';
+
+            // Fast path: exclude already sent emails (multiple status indicators)
+            // CRITICAL: Check status to catch emails that were sent but type wasn't updated
+            if (status === 'sent' || status === 'delivered' || status === 'error') return false;
+
+            // Exclude emails stuck in 'sending' state if send time has passed (likely already sent)
+            if (status === 'sending') {
+              const sendTime = email.scheduledSendTime;
+              if (sendTime && typeof sendTime === 'number' && sendTime < (now - 5 * 60 * 1000)) {
+                return false;
+              }
+            }
+
+            if (status === 'not_generated' || status === 'pending_approval' || status === 'generating') return true;
+            if (status === 'approved') {
+              const sendTime = email.scheduledSendTime;
+              return sendTime && typeof sendTime === 'number' && sendTime >= oneMinuteAgo;
+            }
+
+            // Exclude emails with missing/null status and no scheduledSendTime (orphaned records)
+            if (!status && !email.scheduledSendTime) return false;
+
+            // Exclude emails with past send times and no valid status (likely already sent)
             const sendTime = email.scheduledSendTime;
-            return sendTime && typeof sendTime === 'number' && sendTime >= oneMinuteAgo;
-          }
-          
-          // Exclude emails with missing/null status and no scheduledSendTime (orphaned records)
-          if (!status && !email.scheduledSendTime) return false;
-          
-          // Exclude emails with past send times and no valid status (likely already sent)
-          const sendTime = email.scheduledSendTime;
-          if (sendTime && typeof sendTime === 'number' && sendTime < oneMinuteAgo && !status) {
+            if (sendTime && typeof sendTime === 'number' && sendTime < oneMinuteAgo && !status) {
+              return false;
+            }
+
             return false;
-          }
-          
-          return false;
-        });
-        // Lazy sort - will happen in getPageItems()
-        filtered.sort((a, b) => {
-          const aTime = a.scheduledSendTime || Number.MAX_SAFE_INTEGER;
-          const bTime = b.scheduledSendTime || Number.MAX_SAFE_INTEGER;
-          return aTime - bTime;
-        });
-      } else if (state.currentFolder === 'starred') {
-        filtered = filtered.filter(email => email.starred && !email.deleted);
-      } else if (state.currentFolder === 'trash') {
-        filtered = filtered.filter(email => email.deleted);
+          });
+          // Lazy sort - will happen in getPageItems()
+          filtered.sort((a, b) => {
+            const aTime = a.scheduledSendTime || Number.MAX_SAFE_INTEGER;
+            const bTime = b.scheduledSendTime || Number.MAX_SAFE_INTEGER;
+            return aTime - bTime;
+          });
+        } else if (state.currentFolder === 'starred') {
+          filtered = filtered.filter(email => email.starred && !email.deleted);
+        } else if (state.currentFolder === 'trash') {
+          filtered = filtered.filter(email => email.deleted);
+        }
+
+        // Filter by search
+        const searchTerm = els.searchInput?.value?.toLowerCase() || '';
+        if (searchTerm) {
+          filtered = filtered.filter(email =>
+            email.subject?.toLowerCase().includes(searchTerm) ||
+            email.from?.toLowerCase().includes(searchTerm) ||
+            email.to?.toLowerCase().includes(searchTerm)
+          );
+        }
+
+        state.filtered = filtered;
+
+        // If we have enough now, break
+        if (state.filtered.length >= targetCount || !state.hasMore) {
+          console.log(`[EmailsPage] Stopping load - filtered: ${state.filtered.length}, needed: ${neededForPage}, hasMore: ${state.hasMore}`);
+          break;
+        }
       }
-      
-      // Filter by search
-      const searchTerm = els.searchInput?.value?.toLowerCase() || '';
-      if (searchTerm) {
-        filtered = filtered.filter(email => 
-          email.subject?.toLowerCase().includes(searchTerm) ||
-          email.from?.toLowerCase().includes(searchTerm) ||
-          email.to?.toLowerCase().includes(searchTerm)
-        );
-      }
-      
-      state.filtered = filtered;
-      
-      // If we have enough now, break
-      if (state.filtered.length >= targetCount || !state.hasMore) {
-        console.log(`[EmailsPage] Stopping load - filtered: ${state.filtered.length}, needed: ${neededForPage}, hasMore: ${state.hasMore}`);
-        break;
-      }
-      }
-      
+
       console.log(`[EmailsPage] loadMoreUntilEnough complete - filtered: ${state.filtered.length}, needed: ${neededForPage}`);
-      
+
       // Update folder count after loading more (especially important for scheduled)
-      updateFolderCount().catch(() => {});
-      
+      updateFolderCount().catch(() => { });
+
       render();
     } finally {
       state.isLoadingMore = false;
@@ -754,13 +754,13 @@
       });
       state.scheduledNeedsSort = false;
     }
-    
+
     const start = (state.currentPage - 1) * state.pageSize;
     const end = start + state.pageSize;
-    
+
     // Check if we need to load more data for this page
     const neededForPage = state.currentPage * state.pageSize;
-    
+
     // Only trigger loading if:
     // 1. We don't have enough filtered results
     // 2. More data is available (hasMore)
@@ -769,26 +769,26 @@
     // 5. We're not on the first page (avoid extra cold-start flicker)
     // 5. Folder is NOT 'scheduled' (scheduled already fully loaded)
     if (state.currentFolder !== 'scheduled' &&
-        state.currentPage > 1 &&
-        state.filtered.length < neededForPage && 
-        state.hasMore && 
-        !state.isLoadingMore && 
-        window.BackgroundEmailsLoader && 
-        typeof window.BackgroundEmailsLoader.loadMore === 'function') {
+      state.currentPage > 1 &&
+      state.filtered.length < neededForPage &&
+      state.hasMore &&
+      !state.isLoadingMore &&
+      window.BackgroundEmailsLoader &&
+      typeof window.BackgroundEmailsLoader.loadMore === 'function') {
       console.log(`[EmailsPage] getPageItems: Not enough filtered results (${state.filtered.length}) for page ${state.currentPage} (need ${neededForPage}), loading more...`);
       // Trigger async loading (non-blocking)
       loadMoreUntilEnough().catch(error => {
         console.error('[EmailsPage] Failed to load more in getPageItems:', error);
       });
     }
-    
+
     return state.filtered.slice(start, end);
   }
 
   // Render email table
   function render() {
     if (!els.tbody) return;
-    
+
     // Update table header to show "To" for sent emails, "From" for others
     const table = document.getElementById('emails-table');
     if (table) {
@@ -797,24 +797,24 @@
         headerCell.textContent = state.currentFolder === 'sent' ? 'To' : 'From';
       }
     }
-    
+
     const rows = getPageItems();
     els.tbody.innerHTML = rows.map(email => rowHtml(email)).join('');
-    
+
     // Update summary and count
-  // Use folder total count (queried from Firestore), fallback to filtered length in search mode
-  const searchTermNow = els.searchInput?.value?.trim() || '';
-  const totalToShow = searchTermNow ? state.filtered.length : (state.folderCount || state.filtered.length);
+    // Use folder total count (queried from Firestore), fallback to filtered length in search mode
+    const searchTermNow = els.searchInput?.value?.trim() || '';
+    const totalToShow = searchTermNow ? state.filtered.length : (state.folderCount || state.filtered.length);
     if (els.summary) {
-    const start = totalToShow === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1;
-    const end = Math.min(state.currentPage * state.pageSize, totalToShow);
+      const start = totalToShow === 0 ? 0 : (state.currentPage - 1) * state.pageSize + 1;
+      const end = Math.min(state.currentPage * state.pageSize, totalToShow);
       els.summary.textContent = `${start}-${end} of ${totalToShow} emails`;
     }
-    
+
     if (els.count) {
       els.count.textContent = `${totalToShow} emails`;
     }
-    
+
     // Update select all checkbox
     if (els.selectAll) {
       const pageItems = getPageItems();
@@ -822,13 +822,13 @@
       els.selectAll.checked = allSelected;
       els.selectAll.indeterminate = !allSelected && pageItems.some(email => state.selected.has(email.id));
     }
-    
+
     // Update pagination
     renderPagination();
-    
+
     // Update bulk actions bar
     updateBulkBar();
-    
+
     // Bind row events
     bindRowEvents();
   }
@@ -839,11 +839,11 @@
   // Helper function to get account logoUrl from recipient email
   function getRecipientAccountInfo(recipientEmail) {
     if (!recipientEmail) return { logoUrl: null, domain: null };
-    
+
     try {
       const recipientDomain = extractDomain(recipientEmail);
       if (!recipientDomain) return { logoUrl: null, domain: null };
-      
+
       // Try to find account by domain
       const accounts = window.getAccountsData ? window.getAccountsData() : [];
       const account = accounts.find(a => {
@@ -852,12 +852,12 @@
         const domainLower = recipientDomain.toLowerCase();
         return accountDomain === domainLower || accountWebsite === domainLower;
       });
-      
+
       if (account) {
         const logoUrl = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon;
         return { logoUrl: logoUrl || null, domain: account.domain || account.website || recipientDomain };
       }
-      
+
       return { logoUrl: null, domain: recipientDomain };
     } catch (_) {
       return { logoUrl: null, domain: extractDomain(recipientEmail) };
@@ -867,11 +867,11 @@
   // Generate email row HTML with favicon integration and snippet
   function rowHtml(email) {
     const isSentEmail = email.isSentEmail || email.type === 'sent' || email.type === 'scheduled';
-    
+
     // For sent/scheduled emails, show recipient info with logo; otherwise show sender info
     let avatarHtml = '';
     let displayName = '';
-    
+
     if (isSentEmail) {
       // For sent/scheduled emails, show recipient with account logo
       // Handle both string and array formats for email.to
@@ -881,14 +881,14 @@
       } else {
         recipientEmail = email.to || '';
       }
-      
+
       const recipientName = extractName(recipientEmail);
       displayName = recipientName || 'Unknown Recipient';
-      
+
       // Get account info for recipient
       const accountInfo = getRecipientAccountInfo(recipientEmail);
       const cacheKey = `favicon-${accountInfo.logoUrl || accountInfo.domain || recipientEmail}-28`;
-      
+
       // Use cached favicon HTML if available
       if (faviconCache.has(cacheKey)) {
         avatarHtml = faviconCache.get(cacheKey);
@@ -905,7 +905,7 @@
       const senderDomain = extractDomain(email.from);
       displayName = extractName(email.from) || 'Unknown';
       const cacheKey = `favicon-${senderDomain}-28`;
-      
+
       // Use cached favicon HTML if available
       if (faviconCache.has(cacheKey)) {
         avatarHtml = faviconCache.get(cacheKey);
@@ -922,8 +922,10 @@
     const emailPreview = getEmailPreview(email);
 
     // Get tracking counts for sent emails
-    const openCount = (email.isSentEmail || email.type === 'sent') ? (email.openCount || 0) : 0;
-    const clickCount = (email.isSentEmail || email.type === 'sent') ? (email.clickCount || 0) : 0;
+    // CRITICAL FIX: Include 'scheduled' type because sequence emails might still be 
+    // classified as scheduled in the UI state but have tracking data
+    const openCount = (isSentEmail) ? (email.openCount || 0) : 0;
+    const clickCount = (isSentEmail) ? (email.clickCount || 0) : 0;
     const hasOpens = openCount > 0;
     const hasClicks = clickCount > 0;
     const isStarred = email.starred || false;
@@ -1030,7 +1032,7 @@
         e.stopPropagation();
         const action = btn.dataset.action;
         const emailId = btn.dataset.emailId;
-        
+
         if (action === 'star') {
           toggleStar(emailId);
         } else if (action === 'clicks') {
@@ -1070,7 +1072,7 @@
 
     try {
       const newStarred = !email.starred;
-      
+
       // Update in Firebase
       await firebase.firestore().collection('emails').doc(emailId).update({
         starred: newStarred
@@ -1078,7 +1080,7 @@
 
       // Update local state
       email.starred = newStarred;
-      
+
       // Update the email in state.data
       const emailIndex = state.data.findIndex(e => e.id === emailId);
       if (emailIndex !== -1) {
@@ -1275,19 +1277,19 @@
       console.warn('[EmailsPage] Email not found for click details:', emailId);
       return;
     }
-    
+
     const clicks = Array.isArray(email.clicks) ? email.clicks : [];
     if (clicks.length === 0) {
       window.crm?.showToast && window.crm.showToast('No clicks recorded for this email yet.');
       return;
     }
-    
+
     // Create modal content
     const clickItems = clicks.map(click => {
       const timestamp = click.timestamp ? new Date(click.timestamp).toLocaleString() : 'Unknown time';
       const url = click.url || 'Unknown URL';
       const userAgent = click.user_agent || 'Unknown browser';
-      
+
       return `
         <div class="click-item" style="padding: 12px; border-bottom: 1px solid var(--border-color);">
           <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
@@ -1302,7 +1304,7 @@
         </div>
       `;
     }).join('');
-    
+
     const modalContent = `
       <div class="modal-header" style="padding: 20px 20px 0 20px; border-bottom: 1px solid var(--border-color);">
         <h3 style="margin: 0; color: var(--text-primary);">Email Click Activity</h3>
@@ -1314,7 +1316,7 @@
         ${clickItems}
       </div>
     `;
-    
+
     // Show modal using CRM's modal system
     if (window.crm && typeof window.crm.showModal === 'function') {
       window.crm.showModal('Email Clicks', modalContent, {
@@ -1330,7 +1332,7 @@
         background: rgba(0,0,0,0.5); z-index: 10000;
         display: flex; align-items: center; justify-content: center;
       `;
-      
+
       const modalBox = document.createElement('div');
       modalBox.style.cssText = `
         background: var(--bg-primary); border-radius: 8px;
@@ -1338,17 +1340,17 @@
         box-shadow: 0 10px 30px rgba(0,0,0,0.3);
       `;
       modalBox.innerHTML = modalContent;
-      
+
       modal.appendChild(modalBox);
       document.body.appendChild(modal);
-      
+
       // Close on click outside
       modal.addEventListener('click', (e) => {
         if (e.target === modal) {
           document.body.removeChild(modal);
         }
       });
-      
+
       // Add close button
       const closeBtn = document.createElement('button');
       closeBtn.innerHTML = '×';
@@ -1366,38 +1368,38 @@
   // Open compose modal
   function openComposeModal(replyEmail = null) {
     const composeWindow = document.getElementById('compose-window');
-    
+
     if (!composeWindow) {
       console.warn('[EmailsPage] Compose window not found in DOM');
       window.crm?.showToast && window.crm.showToast('Email compose not available');
       return;
     }
-    
+
     // Reset compose window first
     resetComposeWindow();
-    
+
     // Show the window and add open class for CSS animation
     composeWindow.style.display = 'flex';
     setTimeout(() => {
       composeWindow.classList.add('open');
     }, 10);
-    
+
     // If replying to an email, prefill the fields
     if (replyEmail) {
       setTimeout(() => {
         const toInput = document.getElementById('compose-to');
         const subjectInput = document.getElementById('compose-subject');
-        
+
         if (toInput) {
           toInput.value = replyEmail.from || '';
         }
-        
+
         if (subjectInput) {
           const originalSubject = replyEmail.subject || '';
           const replyPrefix = originalSubject.startsWith('Re: ') ? '' : 'Re: ';
           subjectInput.value = `${replyPrefix}${originalSubject}`;
         }
-        
+
         // Focus the To input
         if (toInput) {
           toInput.focus();
@@ -1418,14 +1420,14 @@
   function resetComposeWindow() {
     const composeWindow = document.getElementById('compose-window');
     if (!composeWindow) return;
-    
+
     // Clear all inputs
     const toInput = document.getElementById('compose-to');
     const subjectInput = document.getElementById('compose-subject');
     const ccInput = document.getElementById('compose-cc');
     const bccInput = document.getElementById('compose-bcc');
     const bodyInput = document.querySelector('.body-input');
-    
+
     if (toInput) toInput.value = '';
     if (subjectInput) subjectInput.value = '';
     if (ccInput) ccInput.value = '';
@@ -1436,12 +1438,12 @@
   // Close compose modal
   function closeComposeModal() {
     const composeWindow = document.getElementById('compose-window');
-    
+
     if (!composeWindow) return;
-    
+
     // Remove open class to trigger slide-down animation
     composeWindow.classList.remove('open');
-    
+
     // Hide after animation completes
     setTimeout(() => {
       composeWindow.style.display = 'none';
@@ -1451,18 +1453,18 @@
   // Render pagination
   function renderPagination() {
     if (!els.pagination) return;
-    
+
     // Use folder total count (queried, not fully loaded) unless search is active
     const searchTermNow = els.searchInput?.value?.trim() || '';
     const totalRecords = searchTermNow ? state.filtered.length : (state.folderCount || state.filtered.length);
     const totalPages = Math.max(1, Math.ceil(totalRecords / state.pageSize));
     const currentPage = Math.min(state.currentPage, totalPages);
-    
+
     // Use unified pagination component
     if (window.crm && window.crm.createPagination) {
       window.crm.createPagination(currentPage, totalPages, async (page) => {
         state.currentPage = page;
-        
+
         // Check if we need to load more data for this page
         const neededIndex = (page - 1) * state.pageSize + state.pageSize - 1;
         if (neededIndex >= state.data.length && state.hasMore && window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.loadMore === 'function') {
@@ -1470,7 +1472,7 @@
           if (els.tbody) {
             els.tbody.innerHTML = '<tr><td colspan="20" style="text-align: center; padding: 40px; color: var(--grey-400);">Loading more emails...</td></tr>';
           }
-          
+
           // Load more data
           const result = await window.BackgroundEmailsLoader.loadMore();
           if (result && result.loaded > 0) {
@@ -1509,7 +1511,7 @@
             applyFilters(); // Re-apply filters with new data
           }
         }
-        
+
         render();
       }, els.pagination.id);
     }
@@ -1518,7 +1520,7 @@
   // Utility functions
   function extractDomain(email) {
     if (!email || typeof email !== 'string') return '';
-    
+
     // Handle format: "Name" <email@domain.com> or Name <email@domain.com>
     const angleMatch = email.match(/<(.+)>/);
     if (angleMatch) {
@@ -1526,7 +1528,7 @@
       const domainMatch = emailPart.match(/@(.+)$/);
       return domainMatch ? domainMatch[1] : '';
     }
-    
+
     // Handle format: email@domain.com
     const match = email.match(/@(.+)$/);
     return match ? match[1] : '';
@@ -1569,12 +1571,12 @@
       if (snap && !snap.empty) {
         const doc = snap.docs[0];
         const contact = doc.data();
-        
+
         // Build full name from contact
         const firstName = contact.firstName || '';
         const lastName = contact.lastName || '';
         const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
-        
+
         if (fullName) {
           contactNameCache.set(normalizedEmail, fullName);
           // Trigger a re-render if we're on the emails page
@@ -1583,7 +1585,7 @@
           }
           return fullName;
         }
-        
+
         // Fallback to contact name field
         if (contact.name) {
           contactNameCache.set(normalizedEmail, contact.name);
@@ -1603,10 +1605,10 @@
   // Helper function to format email username as "First Last"
   function formatEmailAsName(emailUsername) {
     if (!emailUsername || typeof emailUsername !== 'string') return emailUsername;
-    
+
     // Remove common prefixes/suffixes
     let cleaned = emailUsername.toLowerCase().trim();
-    
+
     // Handle common separators: aaron.rodriguez, aaron_rodriguez, aaron-rodriguez
     let parts = [];
     if (cleaned.includes('.')) {
@@ -1620,46 +1622,46 @@
       // For now, just return capitalized single word
       return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
     }
-    
+
     // Capitalize each part and join
     parts = parts
       .filter(p => p.length > 0) // Remove empty parts
       .map(p => p.charAt(0).toUpperCase() + p.slice(1)); // Capitalize first letter
-    
+
     if (parts.length >= 2) {
       return parts.join(' ');
     } else if (parts.length === 1) {
       return parts[0];
     }
-    
+
     return emailUsername; // Fallback
   }
 
   function extractName(email) {
     // Handle null, undefined, or empty values
     if (!email) return 'Unknown';
-    
+
     // Convert to string if it's not already
     if (typeof email !== 'string') {
       email = String(email);
     }
-    
+
     // If it's still empty after conversion, return Unknown
     if (!email.trim()) return 'Unknown';
-    
+
     // Extract email address from various formats
     let emailAddress = '';
     let extractedName = '';
-    
+
     // Handle format: "Name" <email@domain.com>
     const quotedMatch = email.match(/^"([^"]+)"\s*<(.+)>$/);
     if (quotedMatch) {
       extractedName = quotedMatch[1];
       emailAddress = quotedMatch[2].toLowerCase().trim();
     } else {
-    // Handle format: Name <email@domain.com>
-    const angleMatch = email.match(/^([^<]+)\s*<(.+)>$/);
-    if (angleMatch) {
+      // Handle format: Name <email@domain.com>
+      const angleMatch = email.match(/^([^<]+)\s*<(.+)>$/);
+      if (angleMatch) {
         extractedName = angleMatch[1].trim();
         emailAddress = angleMatch[2].toLowerCase().trim();
       } else {
@@ -1667,21 +1669,21 @@
         emailAddress = email.toLowerCase().trim();
       }
     }
-    
+
     // If we already have a name from the email string, use it
     if (extractedName && extractedName.length > 0) {
       return extractedName;
     }
-    
+
     // Otherwise, try to look up contact by email address
     if (emailAddress && emailAddress.includes('@')) {
       const normalizedEmail = emailAddress.toLowerCase().trim();
-      
+
       // Priority 1: Check cache (populated by Firebase lookups)
       if (contactNameCache.has(normalizedEmail)) {
         return contactNameCache.get(normalizedEmail);
-    }
-    
+      }
+
       // Priority 2: Use cached people data - no API calls needed
       try {
         const people = window.getPeopleData ? window.getPeopleData() : [];
@@ -1689,7 +1691,7 @@
           const contactEmail = (p.email || '').toLowerCase().trim();
           return contactEmail === normalizedEmail;
         });
-        
+
         if (contact) {
           // Build full name from contact
           const firstName = contact.firstName || '';
@@ -1709,7 +1711,7 @@
       } catch (_) {
         // Silently fail and continue to fallback
       }
-      
+
       // Priority 3: If cache is empty, trigger async Firebase lookup (non-blocking)
       // This will update the cache and trigger a re-render when complete
       if (window.firebaseDB && !pendingLookups.has(normalizedEmail)) {
@@ -1718,17 +1720,17 @@
         });
       }
     }
-    
+
     // If no contact found, format email username as "First Last"
     if (emailAddress && emailAddress.includes('@')) {
       const emailMatch = emailAddress.match(/^(.+)@/);
-    if (emailMatch) {
+      if (emailMatch) {
         const emailUsername = emailMatch[1];
         const formattedName = formatEmailAsName(emailUsername);
         return formattedName;
       }
     }
-    
+
     return email; // Final fallback to full string
   }
 
@@ -1764,7 +1766,7 @@
 
   // SVG icon helper
   function svgIcon(name) {
-    switch(name) {
+    switch (name) {
       case 'clear': return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l14 14M19 5L5 19"/></svg>';
       case 'delete': return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
       case 'read': return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -1779,17 +1781,17 @@
   function openBulkSelectModal() {
     if (!els.page) return;
     closeBulkSelectModal();
-    
+
     const total = state.filtered.length;
     const page = getPageItems().length;
-    
+
     const modal = document.createElement('div');
     modal.id = 'emails-bulk-select-modal';
     modal.className = 'pc-modal';
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-labelledby', 'emails-bulk-modal-title');
-    
+
     modal.innerHTML = `
       <div class="pc-modal__backdrop"></div>
       <div class="pc-modal__dialog">
@@ -1808,7 +1810,7 @@
                 <input type="radio" name="bulk-mode" value="custom" checked style="accent-color: var(--orange-subtle);">
                 <span>Select</span>
               </label>
-              <input type="number" id="bulk-custom-count" min="1" max="${total}" value="${Math.min(50,total)}" style="width: 120px; height: 40px; padding: 0 14px; background: var(--bg-item); color: var(--text-primary); border: 2px solid var(--border-light); border-radius: 8px; transition: all 0.3s ease;">
+              <input type="number" id="bulk-custom-count" min="1" max="${total}" value="${Math.min(50, total)}" style="width: 120px; height: 40px; padding: 0 14px; background: var(--bg-item); color: var(--text-primary); border: 2px solid var(--border-light); border-radius: 8px; transition: all 0.3s ease;">
               <span class="hint" style="color: var(--text-secondary); font-size: 0.85rem;">emails from current filters</span>
             </div>
             <div class="option" style="display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: var(--spacing-md);">
@@ -1833,14 +1835,14 @@
         </div>
       </div>
     `;
-    
+
     document.body.appendChild(modal);
-    
+
     // Show modal with animation
     requestAnimationFrame(() => {
       modal.classList.add('show');
     });
-    
+
     // Enable/disable custom count input
     const customInput = modal.querySelector('#bulk-custom-count');
     const radios = Array.from(modal.querySelectorAll('input[name="bulk-mode"]'));
@@ -1857,7 +1859,7 @@
       if (r.value === 'custom' && customInput && !customInput.disabled) customInput.focus();
     }));
     updateCustomEnabled();
-    
+
     // Event handlers
     const close = () => {
       modal.classList.remove('show');
@@ -1866,14 +1868,14 @@
       }, 300);
       if (els.selectAll) els.selectAll.checked = state.selected.size > 0;
     };
-    
+
     modal.querySelector('.pc-modal__backdrop').addEventListener('click', close);
     modal.querySelector('.pc-modal__close').addEventListener('click', close);
     modal.querySelector('#bulk-cancel').addEventListener('click', () => {
       if (els.selectAll) els.selectAll.checked = false;
       close();
     });
-    
+
     modal.querySelector('#bulk-apply').addEventListener('click', () => {
       const mode = (modal.querySelector('input[name="bulk-mode"]:checked') || {}).value;
       let selectedIds = [];
@@ -1892,7 +1894,7 @@
       updateBulkBar();
       showBulkBar();
     });
-    
+
     // Keyboard support
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
@@ -1902,7 +1904,7 @@
     };
     document.addEventListener('keydown', handleKeyDown);
     modal._keydownHandler = handleKeyDown;
-    
+
     // Focus first input
     setTimeout(() => {
       const firstInput = customInput || modal.querySelector('input, button');
@@ -1942,34 +1944,34 @@
   async function deleteSelectedEmails() {
     const ids = Array.from(state.selected || []);
     if (!ids.length) return;
-    
+
     // Check if any are scheduled emails
     const scheduledEmails = state.data.filter(e => ids.includes(e.id) && e.type === 'scheduled');
     const hasScheduled = scheduledEmails.length > 0;
-    
-    const confirmMessage = hasScheduled 
+
+    const confirmMessage = hasScheduled
       ? `Are you sure you want to delete ${ids.length} email(s)? ${scheduledEmails.length} scheduled email(s) will be rejected and contacts moved to the next stage.`
       : `Are you sure you want to delete ${ids.length} email(s)?`;
-    
+
     if (!confirm(confirmMessage)) return;
-    
+
     // Store current page before deletion to preserve pagination
     const currentPageBeforeDeletion = state.currentPage;
-    
+
     // Show progress toast
-    const progressToast = window.crm?.showProgressToast ? 
+    const progressToast = window.crm?.showProgressToast ?
       window.crm.showProgressToast(`Deleting ${ids.length} ${ids.length === 1 ? 'email' : 'emails'}...`, ids.length, 0) : null;
-    
+
     let failed = 0;
     let completed = 0;
-    
+
     try {
       if (window.firebaseDB && typeof window.firebaseDB.collection === 'function') {
         // Process deletions sequentially to show progress
         for (const id of ids) {
           try {
             const email = state.data.find(e => e.id === id);
-            
+
             // For scheduled emails, reject and advance to next stage
             if (email && email.type === 'scheduled') {
               await rejectAndAdvanceScheduledEmail(id);
@@ -1977,13 +1979,13 @@
               // For other emails, normal delete
               await window.firebaseDB.collection('emails').doc(id).delete();
             }
-            
+
             // Remove from local state
             const emailIndex = state.data.findIndex(e => e.id === id);
             if (emailIndex !== -1) {
               state.data.splice(emailIndex, 1);
             }
-            
+
             completed++;
             if (progressToast && typeof progressToast.update === 'function') {
               progressToast.update(completed, ids.length);
@@ -1996,7 +1998,7 @@
               progressToast.update(completed, ids.length);
             }
           }
-          
+
           // Small delay to prevent UI blocking
           await new Promise(resolve => setTimeout(resolve, 10));
         }
@@ -2018,25 +2020,25 @@
       // Update filtered data
       const idSet = new Set(ids);
       state.filtered = Array.isArray(state.filtered) ? state.filtered.filter(e => !idSet.has(e.id)) : [];
-      
+
       // Calculate new total pages after deletion
       const newTotalPages = Math.max(1, Math.ceil(state.filtered.length / state.pageSize));
-      
+
       // Only adjust page if current page is beyond the new total
       if (currentPageBeforeDeletion > newTotalPages) {
         state.currentPage = newTotalPages;
       }
-      
+
       state.selected.clear();
       applyFilters();
       hideBulkBar();
-      if (els.selectAll) { 
-        els.selectAll.checked = false; 
-        els.selectAll.indeterminate = false; 
+      if (els.selectAll) {
+        els.selectAll.checked = false;
+        els.selectAll.indeterminate = false;
       }
-      
+
       const successCount = Math.max(0, ids.length - failed);
-      
+
       if (progressToast) {
         if (failed === 0) {
           progressToast.complete(`Successfully deleted ${successCount} ${successCount === 1 ? 'email' : 'emails'}`);
@@ -2062,7 +2064,7 @@
     const count = state.selected.size;
     const shouldShow = force || count > 0;
     const container = els.page.querySelector('#emails-bulk-actions');
-    
+
     if (!shouldShow) {
       if (container) {
         container.classList.remove('--show');
@@ -2072,12 +2074,12 @@
       }
       return;
     }
-    
+
     // Get selected emails to check their states
     const selectedEmails = state.data.filter(e => state.selected.has(e.id));
     const allRead = selectedEmails.length > 0 && selectedEmails.every(e => !e.unread);
     const allStarred = selectedEmails.length > 0 && selectedEmails.every(e => e.starred);
-    
+
     const html = `
       <div class="bar">
         <button class="action-btn-sm" id="bulk-clear">${svgIcon('clear')}<span>Clear ${count} selected</span></button>
@@ -2087,7 +2089,7 @@
         <button class="action-btn-sm" id="bulk-export">${svgIcon('export')}<span>Export</span></button>
         <button class="action-btn-sm danger" id="bulk-delete">${svgIcon('delete')}<span>Delete</span></button>
       </div>`;
-    
+
     let barContainer = container;
     if (!barContainer) {
       barContainer = document.createElement('div');
@@ -2101,12 +2103,12 @@
       }
     }
     barContainer.innerHTML = html;
-    
+
     // Show with animation
     requestAnimationFrame(() => {
       barContainer.classList.add('--show');
     });
-    
+
     // Event handlers
     barContainer.querySelector('#bulk-clear').addEventListener('click', () => {
       state.selected.clear();
@@ -2117,11 +2119,11 @@
         els.selectAll.indeterminate = false;
       }
     });
-    
+
     barContainer.querySelector('#bulk-mark-read').addEventListener('click', async () => {
       const selectedIds = Array.from(state.selected);
       const newUnreadState = !allRead;
-      
+
       for (const id of selectedIds) {
         const email = state.data.find(e => e.id === id);
         if (email) {
@@ -2140,11 +2142,11 @@
       state.selected.clear();
       applyFilters();
     });
-    
+
     barContainer.querySelector('#bulk-star').addEventListener('click', async () => {
       const selectedIds = Array.from(state.selected);
       const newStarredState = !allStarred;
-      
+
       for (const id of selectedIds) {
         const email = state.data.find(e => e.id === id);
         if (email) {
@@ -2163,11 +2165,11 @@
       state.selected.clear();
       applyFilters();
     });
-    
+
     barContainer.querySelector('#bulk-export').addEventListener('click', () => {
       const selectedIds = Array.from(state.selected);
       const selectedEmails = state.data.filter(e => selectedIds.includes(e.id));
-      
+
       // Convert to CSV
       const headers = ['From', 'To', 'Subject', 'Date', 'Unread', 'Starred'];
       const rows = selectedEmails.map(e => [
@@ -2178,12 +2180,12 @@
         e.unread ? 'Yes' : 'No',
         e.starred ? 'Yes' : 'No'
       ]);
-      
+
       const csv = [
         headers.join(','),
         ...rows.map(r => r.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
       ].join('\n');
-      
+
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -2194,7 +2196,7 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     });
-    
+
     barContainer.querySelector('#bulk-delete').addEventListener('click', async () => {
       await deleteSelectedEmails();
     });
@@ -2215,23 +2217,23 @@
   // Strip HTML tags to get plain text (improved to remove style/script tags)
   function stripHtml(html) {
     if (!html) return '';
-    
+
     // First, remove style and script tags completely (they contain CSS/JS, not email content)
     let cleaned = html
       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
       .replace(/<!--[\s\S]*?-->/g, ''); // Remove HTML comments
-    
+
     // Then extract text content from remaining HTML
     const tmp = document.createElement('div');
     tmp.innerHTML = cleaned;
     let text = tmp.textContent || tmp.innerText || '';
-    
+
     // Clean up the extracted text
     text = text
       .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
-    
+
     return text;
   }
 
@@ -2239,7 +2241,7 @@
   function getEmailPreview(email) {
     // Try to get preview from various content fields
     let preview = '';
-    
+
     // Priority order: snippet, text, html (stripped), content
     if (email.snippet && email.snippet.trim()) {
       preview = email.snippet;
@@ -2252,14 +2254,14 @@
     } else if (email.originalContent && email.originalContent.trim()) {
       preview = stripHtml(email.originalContent);
     }
-    
+
     // Clean up the preview
     if (preview) {
       // Remove legacy tracking pixels to avoid 404s and errors (like email-detail.js does)
       preview = preview
         .replace(/<img[^>]*src=["'][^"']*\/api\/email\/track\/[^"']+["'][^>]*>/gi, '')
         .replace(/<img[^>]*src=["'][^"']*vercel\.app\/api\/email\/track\/[^"']+["'][^>]*>/gi, '');
-      
+
       // Remove extra whitespace and newlines
       preview = preview.replace(/\s+/g, ' ').trim();
       // Limit length to reasonable preview size
@@ -2267,7 +2269,7 @@
         preview = preview.substring(0, 100) + '...';
       }
     }
-    
+
     return preview || 'No preview available';
   }
 
@@ -2282,11 +2284,11 @@
   // Generate scheduled emails manually
   async function generateScheduledEmails() {
     if (!els.generateBtn) return;
-    
+
     // Disable button and show loading state
     els.generateBtn.disabled = true;
     els.generateBtn.textContent = 'Generating...';
-    
+
     try {
       const baseUrl = window.API_BASE_URL || window.location.origin || '';
       const response = await fetch(`${baseUrl}/api/generate-scheduled-emails`, {
@@ -2296,22 +2298,22 @@
         },
         body: JSON.stringify({ immediate: true })
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log('[EmailsPage] Generated scheduled emails:', result);
-      
+
       // Show success message
       if (window.crm && window.crm.showToast) {
         window.crm.showToast(`Generated ${result.count || 0} scheduled emails`);
       }
-      
+
       // Reload data to show new emails
       await loadData();
-      
+
     } catch (error) {
       console.error('[EmailsPage] Failed to generate scheduled emails:', error);
       if (window.crm && window.crm.showToast) {
@@ -2334,7 +2336,7 @@
     console.log('[EmailsPage] DOM references initialized');
     attachEvents();
     console.log('[EmailsPage] Events attached');
-    
+
     // If BackgroundEmailsLoader already has data (from cache), use it immediately
     if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.getEmailsData === 'function') {
       const preload = window.BackgroundEmailsLoader.getEmailsData() || [];
@@ -2342,11 +2344,11 @@
         processAndSetData(preload);
       }
     }
-    
+
     // Render whatever we have (may be empty on very first cold start)
     applyFilters();
     render();
-    
+
     console.log('[EmailsPage] Initialization complete (non-blocking)');
   }
 
@@ -2368,7 +2370,7 @@
       const settings = window.SettingsPage.instance.getSettings();
       return settings.aiTemplates || {};
     }
-    
+
     // Fallback to localStorage
     try {
       const savedSettings = localStorage.getItem('crm-settings');
@@ -2379,7 +2381,7 @@
     } catch (error) {
       console.warn('[AI] Failed to load settings:', error);
     }
-    
+
     // Return empty object with fallback prompts
     return {
       warm_intro: 'Write a warm introduction email after speaking with the prospect on the phone',
@@ -2400,44 +2402,44 @@
   // AI helper functions moved to email-compose-global.js
 
   // Remaining AI functions moved to email-compose-global.js
-  
+
   // Debug helper function to check scheduled emails in Firebase
   async function debugScheduledEmails() {
     if (!window.firebaseDB) {
       console.error('[EmailsDebug] Firebase not available');
       return;
     }
-    
+
     try {
       const db = window.firebaseDB;
       const now = Date.now();
-      
+
       // Query all scheduled emails
       const allScheduledQuery = await db.collection('emails')
         .where('type', '==', 'scheduled')
         .get();
-      
+
       console.log('=== SCHEDULED EMAILS DEBUG ===');
       console.log(`Total scheduled emails in Firebase: ${allScheduledQuery.size}`);
-      
+
       if (allScheduledQuery.size > 0) {
         const byStatus = {};
         const details = [];
-        
+
         let missingOwnership = 0;
-        
+
         allScheduledQuery.forEach(doc => {
           const data = doc.data();
           const status = data.status || 'unknown';
           byStatus[status] = (byStatus[status] || 0) + 1;
-          
+
           const scheduledTime = data.scheduledSendTime || 0;
           const timeUntilSend = scheduledTime - now;
           const minutesUntilSend = Math.round(timeUntilSend / (60 * 1000));
-          
+
           const hasOwnership = !!(data.ownerId && data.assignedTo && data.createdBy);
           if (!hasOwnership) missingOwnership++;
-          
+
           details.push({
             id: doc.id,
             status: status,
@@ -2452,17 +2454,17 @@
             createdAt: data.createdAt
           });
         });
-        
+
         console.log('Breakdown by status:', byStatus);
         console.table(details);
         console.log(`\n⚠️ CRITICAL: ${missingOwnership} emails are missing ownership fields!`);
         console.log(`✅ ${allScheduledQuery.size - missingOwnership} emails have proper ownership`);
-        
+
         // Show user-friendly summary
         const summary = Object.entries(byStatus)
           .map(([status, count]) => `${count} ${status}`)
           .join(', ');
-        
+
         if (window.crm && window.crm.showToast) {
           if (missingOwnership > 0) {
             window.crm.showToast(`⚠️ Found ${allScheduledQuery.size} scheduled emails but ${missingOwnership} are MISSING ownership fields! See MIGRATION_FIX_EMAILS.md`, 'warning');
@@ -2476,7 +2478,7 @@
           window.crm.showToast('⚠️ No scheduled emails found in Firebase. Sequence may not have created emails.', 'warning');
         }
       }
-      
+
       console.log('==============================');
     } catch (error) {
       console.error('[EmailsDebug] Error checking scheduled emails:', error);

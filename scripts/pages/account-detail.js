@@ -4,20 +4,20 @@
 // Silence verbose logs from this module unless explicitly enabled via localStorage CRM_DEBUG_ACCOUNT_DETAIL=1
 // This shadowed console only affects this file, not the whole app
 var __ACCOUNT_DETAIL_ORIG_CONSOLE__ = window.console || {};
-function __accountDetailDebugEnabled__(){
+function __accountDetailDebugEnabled__() {
   try {
     const v = localStorage.getItem('CRM_DEBUG_ACCOUNT_DETAIL');
     if (v != null) return v === '1' || v === 'true';
-  } catch(_) {}
+  } catch (_) { }
   return !!window.CRM_DEBUG_ACCOUNT_DETAIL;
 }
 // eslint-disable-next-line no-redeclare
 var console = {
-  log: function() { if (__accountDetailDebugEnabled__()) __ACCOUNT_DETAIL_ORIG_CONSOLE__.log.apply(__ACCOUNT_DETAIL_ORIG_CONSOLE__, arguments); },
-  warn: __ACCOUNT_DETAIL_ORIG_CONSOLE__.warn || function(){},
-  error: __ACCOUNT_DETAIL_ORIG_CONSOLE__.error || function(){},
-  info: function() { if (__accountDetailDebugEnabled__()) __ACCOUNT_DETAIL_ORIG_CONSOLE__.info.apply(__ACCOUNT_DETAIL_ORIG_CONSOLE__, arguments); },
-  debug: function() { if (__accountDetailDebugEnabled__()) __ACCOUNT_DETAIL_ORIG_CONSOLE__.debug.apply(__ACCOUNT_DETAIL_ORIG_CONSOLE__, arguments); }
+  log: function () { if (__accountDetailDebugEnabled__()) __ACCOUNT_DETAIL_ORIG_CONSOLE__.log.apply(__ACCOUNT_DETAIL_ORIG_CONSOLE__, arguments); },
+  warn: __ACCOUNT_DETAIL_ORIG_CONSOLE__.warn || function () { },
+  error: __ACCOUNT_DETAIL_ORIG_CONSOLE__.error || function () { },
+  info: function () { if (__accountDetailDebugEnabled__()) __ACCOUNT_DETAIL_ORIG_CONSOLE__.info.apply(__ACCOUNT_DETAIL_ORIG_CONSOLE__, arguments); },
+  debug: function () { if (__accountDetailDebugEnabled__()) __ACCOUNT_DETAIL_ORIG_CONSOLE__.debug.apply(__ACCOUNT_DETAIL_ORIG_CONSOLE__, arguments); }
 };
 
 // Account Detail page module
@@ -43,13 +43,14 @@ var console = {
   }
 
   const els = {};
-  
+
   // Track event listeners for cleanup
   const eventListeners = [];
 
   // Export API immediately so other modules can reference it
   window.AccountDetail = {
     show: null,  // Will be set when functions are defined
+    renderAccountDetail: null, // Will be set when functions are defined
     setupEnergyUpdateListener: null,
     setupParentCompanyAutocomplete: null,
     state: state  // Expose state for debugging and other modules
@@ -59,7 +60,7 @@ var console = {
   // Forward declarations for functions used in event delegation
   let handleQuickAction, openEditAccountModal;
 
-  handleQuickAction = function(action) {
+  handleQuickAction = function (action) {
     const a = state.currentAccount;
     switch (action) {
       case 'call': {
@@ -111,9 +112,9 @@ var console = {
   function setupEventDelegation() {
     // Only set up once
     if (document._pcAccountDetailDelegated) return;
-    
+
     console.log('[AccountDetail] Setting up event delegation on document');
-    
+
     const delegatedClickHandler = (e) => {
       // Check if click is on "Add to list" button
       const addToListBtn = e.target.closest('#add-account-to-list');
@@ -121,7 +122,7 @@ var console = {
         e.preventDefault();
         e.stopPropagation();
         console.log('[AccountDetail] Add to list clicked via delegation');
-        
+
         // Toggle behavior: close if already open
         if (document.getElementById('account-lists-panel')) {
           closeAccountListsPanel();
@@ -130,7 +131,7 @@ var console = {
         }
         return;
       }
-      
+
       // Check if click is on website header button (only on account detail page)
       const websiteBtn = e.target.closest('.website-header-btn');
       if (websiteBtn && document.getElementById('account-details-page')) {
@@ -140,7 +141,7 @@ var console = {
         handleQuickAction('website');
         return;
       }
-      
+
       // Check if click is on LinkedIn header button (only on account detail page)
       const linkedInBtn = e.target.closest('.linkedin-header-btn');
       if (linkedInBtn && document.getElementById('account-details-page')) {
@@ -150,7 +151,7 @@ var console = {
         handleQuickAction('linkedin');
         return;
       }
-      
+
       // Check if click is on edit account button (only on account detail page)
       const editBtn = e.target.closest('.title-edit');
       if (editBtn && document.getElementById('account-details-page') && !document.getElementById('contact-detail-header')) {
@@ -161,15 +162,15 @@ var console = {
         return;
       }
     };
-    
+
     // Attach to document with capture phase to catch events early
     document.addEventListener('click', delegatedClickHandler, true);
     eventListeners.push({ type: 'click', handler: delegatedClickHandler, target: document });
-    
+
     document._pcAccountDetailDelegated = true;
     console.log('[AccountDetail] Event delegation set up successfully');
   }
-  
+
   // Initialize event delegation immediately
   setupEventDelegation();
 
@@ -177,7 +178,7 @@ var console = {
   if (!document._accountDetailContactsListenerBound) {
     document.addEventListener('pc:contacts-loaded', async (e) => {
       console.log('[AccountDetail] Contacts loaded event received, count:', e.detail?.count);
-      
+
       // Update the contacts cache - prioritize BackgroundContactsLoader
       if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
         window._accountDetailPeopleCache = window.BackgroundContactsLoader.getContactsData() || [];
@@ -186,7 +187,7 @@ var console = {
         window._accountDetailPeopleCache = window.getPeopleData() || [];
         console.log('[AccountDetail] Updated people cache from getPeopleData:', window._accountDetailPeopleCache.length);
       }
-      
+
       // Re-render just the contacts section if we're showing an account
       if (state.currentAccount && window._accountDetailPeopleCache && window._accountDetailPeopleCache.length > 0) {
         const contactsList = document.getElementById('account-contacts-list');
@@ -211,7 +212,7 @@ var console = {
   }
 
   // ==== Date helpers for Energy & Contract fields ====
-  function parseDateFlexible(s){
+  function parseDateFlexible(s) {
     if (!s) return null;
     const str = String(s).trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
@@ -221,30 +222,30 @@ var console = {
       return isNaN(d.getTime()) ? null : d;
     }
     const mdy = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
-    if (mdy){ 
+    if (mdy) {
       // Parse MM/DD/YYYY format directly to avoid timezone issues
-      const d = new Date(parseInt(mdy[3],10), parseInt(mdy[1],10)-1, parseInt(mdy[2],10)); 
-      return isNaN(d.getTime()) ? null : d; 
+      const d = new Date(parseInt(mdy[3], 10), parseInt(mdy[1], 10) - 1, parseInt(mdy[2], 10));
+      return isNaN(d.getTime()) ? null : d;
     }
     // Fallback Date parse - use local timezone to avoid offset issues
     const d = new Date(str + 'T00:00:00'); return isNaN(d.getTime()) ? null : d;
   }
-  function toISODate(v){ const d=parseDateFlexible(v); if(!d) return ''; const yyyy=d.getFullYear(); const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); return `${yyyy}-${mm}-${dd}`; }
-  function toMDY(v){ 
-    const d=parseDateFlexible(v); 
-    if(!d) return v?String(v):''; 
-    const mm=String(d.getMonth()+1).padStart(2,'0'); 
-    const dd=String(d.getDate()).padStart(2,'0'); 
-    const yyyy=d.getFullYear(); 
+  function toISODate(v) { const d = parseDateFlexible(v); if (!d) return ''; const yyyy = d.getFullYear(); const mm = String(d.getMonth() + 1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0'); return `${yyyy}-${mm}-${dd}`; }
+  function toMDY(v) {
+    const d = parseDateFlexible(v);
+    if (!d) return v ? String(v) : '';
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
     const result = `${mm}/${dd}/${yyyy}`;
     return result;
   }
-  function formatDateInputAsMDY(raw){
-    const digits = String(raw||'').replace(/[^0-9]/g,'').slice(0,8);
+  function formatDateInputAsMDY(raw) {
+    const digits = String(raw || '').replace(/[^0-9]/g, '').slice(0, 8);
     let out = '';
-    if (digits.length >= 1) out = digits.slice(0,2);
-    if (digits.length >= 3) out = digits.slice(0,2) + '/' + digits.slice(2,4);
-    if (digits.length >= 5) out = digits.slice(0,2) + '/' + digits.slice(2,4) + '/' + digits.slice(4,8);
+    if (digits.length >= 1) out = digits.slice(0, 2);
+    if (digits.length >= 3) out = digits.slice(0, 2) + '/' + digits.slice(2, 4);
+    if (digits.length >= 5) out = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4, 8);
     return out;
   }
 
@@ -296,7 +297,7 @@ var console = {
     }
 
     state.currentAccount = account;
-    
+
     // Load contacts data upfront for renderAccountContacts
     let contactsLoaded = false;
     try {
@@ -321,9 +322,9 @@ var console = {
       window._accountDetailPeopleCache = [];
       contactsLoaded = false;
     }
-    
+
     console.log('[AccountDetail] Contacts loaded:', contactsLoaded, 'Count:', window._accountDetailPeopleCache.length);
-    
+
     // Render account detail immediately (no animations)
     try {
       if (!account) {
@@ -334,18 +335,18 @@ var console = {
         console.error('[AccountDetail] Cannot render: els.mainContent is null');
         return;
       }
-      
+
       console.log('[AccountDetail] Rendering account:', account.accountName || account.name);
-    renderAccountDetail();
+      renderAccountDetail();
       console.log('[AccountDetail] Render complete');
     } catch (error) {
       console.error('[AccountDetail] Error during render:', error);
     }
-    
+
     // If no contacts loaded and account is rendering, set up retry
     if (!contactsLoaded && state.currentAccount) {
       console.log('[AccountDetail] No contacts available yet, will retry when event fires');
-      
+
       // Add a one-time retry with timeout in case event doesn't fire
       setTimeout(async () => {
         if (window._accountDetailPeopleCache && window._accountDetailPeopleCache.length === 0) {
@@ -353,7 +354,7 @@ var console = {
           if (typeof window.getPeopleData === 'function') {
             window._accountDetailPeopleCache = window.getPeopleData() || [];
             console.log('[AccountDetail] Retry: Got', window._accountDetailPeopleCache.length, 'contacts');
-            
+
             // Update contacts section
             if (window._accountDetailPeopleCache.length > 0) {
               const contactsList = document.getElementById('account-contacts-list');
@@ -367,7 +368,7 @@ var console = {
         }
       }, 1000); // Retry after 1 second
     }
-    
+
     // Setup energy update listener for real-time sync with Health Widget (ONCE)
     if (!window._accountDetailEnergyListenerBound) {
       try {
@@ -376,7 +377,7 @@ var console = {
           window._accountDetailEnergyListenerBound = true;
           console.log('[AccountDetail] Energy listener initialized (one-time)');
         }
-      } catch (_) {}
+      } catch (_) { }
     }
   }
 
@@ -390,7 +391,7 @@ var console = {
         window._prefetchedAccountForDetail = null; // consume
         return a;
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // Check BackgroundAccountsLoader first (cache-first)
     if (window.BackgroundAccountsLoader) {
@@ -409,7 +410,7 @@ var console = {
       const found = accounts.find(a => a.id === accountId);
       if (found) return found;
     }
-    
+
     // FALLBACK: If not in cache (e.g., after clearing cache), load from Firebase
     console.log('[AccountDetail] Account not in cache, loading from Firebase:', accountId);
     if (window.firebaseDB) {
@@ -424,7 +425,7 @@ var console = {
         console.error('[AccountDetail] Error loading account from Firebase:', error);
       }
     }
-    
+
     return null;
   }
 
@@ -805,7 +806,7 @@ var console = {
   // Helper to safely get people data - now simplified with background loader
   async function getPeopleDataSafe() {
     const log = window.console.log.bind(window.console); // Bypass log silencing
-    
+
     // Priority 1: Background loader (always available, loads on app init)
     if (window.BackgroundContactsLoader) {
       const data = window.BackgroundContactsLoader.getContactsData();
@@ -814,7 +815,7 @@ var console = {
         return data;
       }
     }
-    
+
     // Priority 2: window.getPeopleData (if people.js is loaded)
     if (typeof window.getPeopleData === 'function') {
       const data = window.getPeopleData() || [];
@@ -823,7 +824,7 @@ var console = {
         return data;
       }
     }
-    
+
     // Priority 3: Fallback to CacheManager (shouldn't happen with background loader)
     if (window.CacheManager && typeof window.CacheManager.get === 'function') {
       try {
@@ -836,95 +837,95 @@ var console = {
         window.console.warn('[AccountDetail] Cache read failed:', err);
       }
     }
-    
+
     window.console.warn('[AccountDetail] No contacts data available');
     return [];
   }
 
   async function renderAccountContacts(account, page = 1, pageSize = 4) {
     const log = window.console.log.bind(window.console); // Bypass log silencing
-    
+
     // OPTIMIZED: Query only this account's contacts from Firestore
     // This fixes the issue where contacts not in "first 100" won't show up
     // and dramatically reduces reads (5 reads instead of 2,300)
     let allContacts = [];
-    
+
     if (!account) {
       log('[AccountDetail] ERROR: No account provided to renderAccountContacts');
       return '<div class="contacts-placeholder">No contacts found</div>';
     }
-    
-      const accountName = account.accountName || account.name || account.companyName;
+
+    const accountName = account.accountName || account.name || account.companyName;
     const accountId = account.id;
-    
+
     // Try to query Firestore directly for this account's contacts
     if (window.firebaseDB) {
       try {
         log('[AccountDetail] Querying Firestore for contacts of account:', accountName);
-        
+
         // Query by accountId first (most reliable)
         let snapshot = await window.firebaseDB.collection('contacts')
           .where('accountId', '==', accountId)
           .get();
-        
+
         allContacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         log('[AccountDetail] Found', allContacts.length, 'contacts by accountId');
-        
+
         // If no results, try by company name (fallback)
         if (allContacts.length === 0 && accountName) {
           log('[AccountDetail] No contacts found by accountId, trying companyName:', accountName);
           snapshot = await window.firebaseDB.collection('contacts')
             .where('companyName', '==', accountName)
             .get();
-          
+
           allContacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           log('[AccountDetail] Found', allContacts.length, 'contacts by companyName');
         }
-        
+
         // Cache the results for this account
         if (!window._accountContactsCache) window._accountContactsCache = {};
         window._accountContactsCache[accountId] = allContacts;
-        
+
       } catch (error) {
         log('[AccountDetail] Error querying contacts:', error);
-        
+
         // FALLBACK: Try background loader if Firestore query fails
         if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
           const allCachedContacts = window.BackgroundContactsLoader.getContactsData() || [];
           log('[AccountDetail] Fallback: Got', allCachedContacts.length, 'contacts from BackgroundContactsLoader');
-          
+
           // Filter client-side as fallback
-      const norm = (s) => String(s || '').toLowerCase()
+          const norm = (s) => String(s || '').toLowerCase()
             .replace(/\(usa\)|\(u\.s\.a\.\)|\(us\)/g, '')
             .replace(/\b(inc|llc|ltd|corp|corporation|company|co|incorporated)\b/g, '')
-        .replace(/[^a-z0-9]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      
-      const normalizedAccountName = norm(accountName);
+            .replace(/[^a-z0-9]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          const normalizedAccountName = norm(accountName);
           allContacts = allCachedContacts.filter(contact => {
             if (contact.accountId === accountId || contact.account_id === accountId) return true;
-        const contactCompany = contact.companyName || contact.accountName || '';
-        return norm(contactCompany) === normalizedAccountName;
-      });
+            const contactCompany = contact.companyName || contact.accountName || '';
+            return norm(contactCompany) === normalizedAccountName;
+          });
           log('[AccountDetail] Fallback: Filtered to', allContacts.length, 'contacts');
         }
       }
     } else {
       log('[AccountDetail] ERROR: firebaseDB not available');
     }
-    
+
     log('[AccountDetail] renderAccountContacts: account=', accountName, 'contacts found=', allContacts.length);
-    
+
     if (allContacts.length === 0) {
       log('[AccountDetail] No contacts found for this account');
-        return '<div class="contacts-placeholder">No contacts found for this account</div>';
-      }
+      return '<div class="contacts-placeholder">No contacts found for this account</div>';
+    }
 
     try {
       // Contacts are already filtered by account, no need to filter again
       const associatedContacts = allContacts;
-      
+
       log('[AccountDetail] Rendering', associatedContacts.length, 'contacts');
 
       // Store all contacts in state for pagination
@@ -946,7 +947,7 @@ var console = {
         const title = contact.title || '';
         const email = contact.email || '';
         const phone = contact.workDirectPhone || contact.mobile || contact.otherPhone || '';
-        
+
         return `
           <div class="contact-item" data-contact-id="${contact.id}">
             <div class="contact-avatar">
@@ -956,19 +957,19 @@ var console = {
               <div class="contact-name">${escapeHtml(fullName)}</div>
               <div class="contact-details">
                 ${title ? `<div class="contact-title">${escapeHtml(title)}</div>` : ''}
-                ${email && phone ? 
-                  `<div class="contact-contact-info"><span class="contact-email">${escapeHtml(email)}</span><span class="contact-separator"> • </span><span class="contact-phone" 
+                ${email && phone ?
+            `<div class="contact-contact-info"><span class="contact-email">${escapeHtml(email)}</span><span class="contact-separator"> • </span><span class="contact-phone" 
                                  data-contact-id="${contact.id}" 
                                  data-account-id="${state.currentAccount?.id || ''}" 
                                  data-contact-name="${escapeHtml(fullName)}" 
                                  data-company-name="${escapeHtml(state.currentAccount?.name || state.currentAccount?.accountName || '')}">${escapeHtml(phone)}</span></div>` :
-                  email ? `<div class="contact-contact-info"><span class="contact-email">${escapeHtml(email)}</span></div>` :
-                  phone ? `<div class="contact-contact-info"><span class="contact-phone" 
+            email ? `<div class="contact-contact-info"><span class="contact-email">${escapeHtml(email)}</span></div>` :
+              phone ? `<div class="contact-contact-info"><span class="contact-phone" 
                                  data-contact-id="${contact.id}" 
                                  data-account-id="${state.currentAccount?.id || ''}" 
                                  data-contact-name="${escapeHtml(fullName)}" 
                                  data-company-name="${escapeHtml(state.currentAccount?.name || state.currentAccount?.accountName || '')}">${escapeHtml(phone)}</span></div>` : ''
-                }
+          }
               </div>
             </div>
           </div>
@@ -1045,31 +1046,31 @@ var console = {
 
   function findMostRelevantContactForAccount(accountId) {
     if (!accountId || typeof window.getPeopleData !== 'function') return null;
-    
+
     try {
       const people = window.getPeopleData() || [];
-      const accountContacts = people.filter(p => 
-        p.accountId === accountId || 
-        p.account_id === accountId || 
+      const accountContacts = people.filter(p =>
+        p.accountId === accountId ||
+        p.account_id === accountId ||
         p.companyId === accountId ||
         p.company_id === accountId
       );
-      
+
       if (accountContacts.length === 0) return null;
-      
+
       // Sort by most recent activity (if available) or by name
       accountContacts.sort((a, b) => {
         // Prefer contacts with recent activity
         const aActivity = a.lastActivity || a.updatedAt || a.createdAt || 0;
         const bActivity = b.lastActivity || b.updatedAt || b.createdAt || 0;
         if (aActivity !== bActivity) return bActivity - aActivity;
-        
+
         // Fallback to alphabetical by name
         const aName = [a.firstName, a.lastName].filter(Boolean).join(' ') || a.name || '';
         const bName = [b.firstName, b.lastName].filter(Boolean).join(' ') || b.name || '';
         return aName.localeCompare(bName);
       });
-      
+
       return accountContacts[0];
     } catch (error) {
       console.warn('[Account Detail] Error finding most relevant contact:', error);
@@ -1079,10 +1080,10 @@ var console = {
 
   function renderAccountDetail() {
     if (!state.currentAccount || !els.mainContent) return;
-    
+
     // Inject header styles for divider and button layout
     injectAccountHeaderStyles();
-    
+
     // Inject section header styles if not already present
     injectSectionHeaderStyles();
 
@@ -1091,7 +1092,7 @@ var console = {
     // (including click-to-call) always find what they need without relying on optional fallbacks
     try {
       if (a && !a.logoUrl && a.iconUrl) a.logoUrl = a.iconUrl;
-    } catch (_) {}
+    } catch (_) { }
     try {
       if (a && !a.domain) {
         const src = a.website || a.site || '';
@@ -1104,8 +1105,8 @@ var console = {
           }
         }
       }
-    } catch (_) {}
-    
+    } catch (_) { }
+
     // Find the most relevant contact for this account (for company phone context)
     const mostRelevantContact = findMostRelevantContactForAccount(a.id || a.accountId || a._id);
     const name = a.accountName || a.name || a.companyName || 'Unknown Account';
@@ -1127,7 +1128,7 @@ var console = {
     const shortDesc = a.shortDescription || a.short_desc || a.descriptionShort || '';
 
     // Derive a clean domain for favicon usage
-    const favDomain = (function(d) {
+    const favDomain = (function (d) {
       if (!d) return '';
       let s = String(d).trim();
       try {
@@ -1149,7 +1150,7 @@ var console = {
               </svg>
             </button>
             <div class="contact-header-profile">
-              ${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: a.logoUrl, domain: favDomain, size: 64 }) : (favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : '') : '')}
+              ${(window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') ? window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: a.logoUrl, domain: favDomain, size: 64 }) : (favDomain ? (window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(favDomain, 64) : '') : '')}
               <div class="avatar-circle-small" style="${favDomain ? 'display:none;' : ''}">${escapeHtml(getInitials(name))}</div>
               <div class="contact-header-text">
                 <div class="contact-title-row">
@@ -1344,23 +1345,23 @@ var console = {
         </div>
 
         ${(() => {
-          // Check for parent company
-          if (a.parentCompanyId) {
-            const parentAccount = getParentCompany(a.parentCompanyId);
-            if (parentAccount) {
-              return renderParentCompanySection(parentAccount);
-            }
+        // Check for parent company
+        if (a.parentCompanyId) {
+          const parentAccount = getParentCompany(a.parentCompanyId);
+          if (parentAccount) {
+            return renderParentCompanySection(parentAccount);
           }
-          
-          // Check for subsidiaries
-          const subsidiaries = getSubsidiaries(a.id);
-          if (subsidiaries && subsidiaries.length > 0) {
-            return renderSubsidiariesSection(subsidiaries);
-          }
-          
-          // No parent or subsidiaries
-          return '';
-        })()}
+        }
+
+        // Check for subsidiaries
+        const subsidiaries = getSubsidiaries(a.id);
+        if (subsidiaries && subsidiaries.length > 0) {
+          return renderSubsidiariesSection(subsidiaries);
+        }
+
+        // No parent or subsidiaries
+        return '';
+      })()}
 
         <div class="contact-activity-section">
           <div class="activity-header">
@@ -1422,7 +1423,7 @@ var console = {
 
     attachAccountDetailEvents();
     startAccountRecentCallsLiveHooks();
-    
+
     // Render contacts list now that DOM is ready (async)
     (async () => {
       const contactsList = document.getElementById('account-contacts-list');
@@ -1430,40 +1431,40 @@ var console = {
         try {
           contactsList.innerHTML = await renderAccountContacts(state.currentAccount);
           bindContactItemEvents();
-    
-    // Update contacts pagination after DOM is inserted
-    if (state._allContacts && state._allContacts.length > 4) {
-      const totalPages = Math.ceil(state._allContacts.length / state._contactsPageSize);
-      updateContactsPagination(state._contactsPage, totalPages);
-    }
+
+          // Update contacts pagination after DOM is inserted
+          if (state._allContacts && state._allContacts.length > 4) {
+            const totalPages = Math.ceil(state._allContacts.length / state._contactsPageSize);
+            updateContactsPagination(state._contactsPage, totalPages);
+          }
         } catch (error) {
           console.error('[AccountDetail] Error rendering contacts:', error);
           contactsList.innerHTML = '<div class="contacts-placeholder">Error loading contacts</div>';
         }
       }
     })();
-    
-          // Add periodic refresh to ensure eye icons update when recordings are ready
-          let refreshInterval = null;
-          let lastRefreshTime = 0;
-          const startPeriodicRefresh = () => {
-            if (refreshInterval) clearInterval(refreshInterval);
-            refreshInterval = setInterval(() => {
-              // Only refresh if we're not already refreshing, not scrolling, no insights are open, and enough time has passed
-              const hasOpenInsights = state._arcOpenIds && state._arcOpenIds.size > 0;
-              const now = Date.now();
-              const timeSinceLastRefresh = now - lastRefreshTime;
-              
-              if (!state._arcReloadInFlight && !state._isScrolling && !hasOpenInsights && timeSinceLastRefresh >= 60000) {
-                lastRefreshTime = now;
-                loadRecentCallsForAccount();
-              }
-            }, 60000); // Check every 60 seconds
-          };
-    
+
+    // Add periodic refresh to ensure eye icons update when recordings are ready
+    let refreshInterval = null;
+    let lastRefreshTime = 0;
+    const startPeriodicRefresh = () => {
+      if (refreshInterval) clearInterval(refreshInterval);
+      refreshInterval = setInterval(() => {
+        // Only refresh if we're not already refreshing, not scrolling, no insights are open, and enough time has passed
+        const hasOpenInsights = state._arcOpenIds && state._arcOpenIds.size > 0;
+        const now = Date.now();
+        const timeSinceLastRefresh = now - lastRefreshTime;
+
+        if (!state._arcReloadInFlight && !state._isScrolling && !hasOpenInsights && timeSinceLastRefresh >= 60000) {
+          lastRefreshTime = now;
+          loadRecentCallsForAccount();
+        }
+      }, 60000); // Check every 60 seconds
+    };
+
     // Start periodic refresh
     startPeriodicRefresh();
-    
+
     // Cleanup interval when page is unloaded
     window.addEventListener('beforeunload', async () => {
       if (refreshInterval) {
@@ -1473,16 +1474,16 @@ var console = {
       // Force save any pending batch updates before page unloads
       await forceSaveBatch();
     });
-    
+
     try { window.ClickToCall && window.ClickToCall.processSpecificPhoneElements && window.ClickToCall.processSpecificPhoneElements(); } catch (_) { /* noop */ }
-    
+
     // Load activities
     loadAccountActivities();
     // Load account recent calls and styles
     try { injectRecentCallsStyles(); loadRecentCallsForAccount(); } catch (_) { /* noop */ }
-    
+
     // DEBUG: Add test function to manually trigger Conversational Intelligence
-    window.testConversationalIntelligence = async function(callSid) {
+    window.testConversationalIntelligence = async function (callSid) {
       try {
         const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
         const response = await fetch(base + '/api/twilio/conversational-intelligence', {
@@ -1500,7 +1501,7 @@ var console = {
   }
 
   // ===== Recent Calls (Account) =====
-  function injectRecentCallsStyles(){
+  function injectRecentCallsStyles() {
     if (document.getElementById('recent-calls-styles')) return;
     const style = document.createElement('style');
     style.id = 'recent-calls-styles';
@@ -1610,30 +1611,30 @@ var console = {
 
   // Live refresh: refresh Account Recent Calls on call start/end
   let _arcRetryTimer = null;
-  function startAccountRecentCallsLiveHooks(){
+  function startAccountRecentCallsLiveHooks() {
     try {
       if (document._arcLiveHooksBound) return;
-      
+
       // Only listen for call completion - no more frequent refreshes during live calls
       document.addEventListener('callEnded', onAnyAccountCallActivity, false);
-      
+
       // Listen for new calls (only when call is actually logged/completed)
       document.addEventListener('pc:call-logged', (event) => {
         const callData = event.detail;
-        if (callData && (callData.accountId === state.currentAccount?.id || 
-                          callData.call?.accountId === state.currentAccount?.id)) {
+        if (callData && (callData.accountId === state.currentAccount?.id ||
+          callData.call?.accountId === state.currentAccount?.id)) {
           console.log('[AccountDetail] Call logged for this account, refreshing activities');
-          
+
           // Immediately refresh recent calls section
           if (window.ActivityManager && typeof window.ActivityManager.renderActivities === 'function') {
             window.ActivityManager.renderActivities(
-              'account-activity-timeline', 
-              'account', 
+              'account-activity-timeline',
+              'account',
               state.currentAccount.id,
               true // force refresh
             );
           }
-          
+
           // Also use debounced refresh as backup
           onAnyAccountCallActivity();
         }
@@ -1653,18 +1654,18 @@ var console = {
                 if (state._arcPendingRefresh) {
                   state._arcPendingRefresh = false;
                   // Run a single deferred refresh
-                  try { safeReloadAccountRecentCallsWithRetries(); } catch(_) {}
+                  try { safeReloadAccountRecentCallsWithRetries(); } catch (_) { }
                 }
               }, 180);
             });
           }, { passive: true });
           els.mainContent._scrollBound = '1';
         }
-      } catch(_) {}
+      } catch (_) { }
       document._arcLiveHooksBound = true;
-    } catch(_) {}
+    } catch (_) { }
   }
-  function onAnyAccountCallActivity(){
+  function onAnyAccountCallActivity() {
     // Optimized cleanup: only clean up if we have many entries to reduce overhead
     try {
       if (state._liveCallDurations && state._liveCallDurations.size > 10) {
@@ -1678,30 +1679,30 @@ var console = {
         // Batch delete to reduce Map operations
         toDelete.forEach(sid => state._liveCallDurations.delete(sid));
       }
-    } catch(_) {}
-    
+    } catch (_) { }
+
     // [OPTIMIZATION] Debounce refresh to prevent freeze on hangup
     // Cancel any pending refresh and schedule a new one
     if (state._arcRefreshDebounceTimer) {
       clearTimeout(state._arcRefreshDebounceTimer);
     }
-    
+
     // [OPTIMIZATION] Only refresh if this page is visible
     const accountPage = document.getElementById('account-details-page');
     const isVisible = accountPage && accountPage.style.display !== 'none' && !accountPage.hidden;
-    
+
     if (!isVisible) {
       console.debug('[Account Detail] Page not visible, skipping refresh to prevent freeze');
       return;
     }
-    
+
     // If user is viewing any details panels, avoid showing loading overlay; refresh silently
     try {
       const list = document.getElementById('account-recent-calls-list');
       const hasOpen = (state._arcOpenIds && state._arcOpenIds.size > 0);
       if (list && !hasOpen) arcSetLoading(list);
-    } catch(_) {}
-    
+    } catch (_) { }
+
     // Debounce refresh by 1.5 seconds to allow:
     // 1. User to continue working without UI freeze
     // 2. Webhooks to update call data
@@ -1711,16 +1712,16 @@ var console = {
       state._arcRefreshDebounceTimer = null;
     }, 1500); // 1.5 second debounce (increased from 1s to prevent freeze)
   }
-  
+
   // onLiveCallDurationUpdate function removed - live duration updates no longer needed
-  function safeReloadAccountRecentCallsWithRetries(){
-    try { if (_arcRetryTimer) { clearTimeout(_arcRetryTimer); _arcRetryTimer = null; } } catch(_) {}
+  function safeReloadAccountRecentCallsWithRetries() {
+    try { if (_arcRetryTimer) { clearTimeout(_arcRetryTimer); _arcRetryTimer = null; } } catch (_) { }
     if (state._arcReloadInFlight) { return; }
     state._arcReloadInFlight = true;
     let attempts = 0;
     const run = () => {
       attempts++;
-      try { loadRecentCallsForAccount(); } catch(_) {}
+      try { loadRecentCallsForAccount(); } catch (_) { }
       if (attempts < 3) { _arcRetryTimer = setTimeout(run, 1500); } // Reduced from 10 to 3 attempts, increased interval
       else { state._arcReloadInFlight = false; }
     };
@@ -1728,35 +1729,35 @@ var console = {
   }
 
   // Avatar helpers (reuse calls page patterns)
-  function ad_getAgentAvatar(){ return `<div class=\"transcript-avatar-circle agent-avatar\" aria-hidden=\"true\">Y</div>`; }
-  function ad_getContactAvatar(contactName, call){
+  function ad_getAgentAvatar() { return `<div class=\"transcript-avatar-circle agent-avatar\" aria-hidden=\"true\">Y</div>`; }
+  function ad_getContactAvatar(contactName, call) {
     const domain = ad_extractDomainFromAccount(call && (call.accountName || ''));
-    if (domain){
+    if (domain) {
       const fb = (typeof window.__pcAccountsIcon === 'function') ? window.__pcAccountsIcon() : '<span class=\"company-favicon\" aria-hidden=\"true\" style=\"display:inline-block;width:16px;height:16px;\"></span>';
       return `<div class=\"transcript-avatar-circle company-avatar\" aria-hidden=\"true\">${window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 64) : fb}</div>`;
     }
-    const initial = (String(contactName||'C').charAt(0) || 'C').toUpperCase();
+    const initial = (String(contactName || 'C').charAt(0) || 'C').toUpperCase();
     return `<div class=\"transcript-avatar-circle contact-avatar\" aria-hidden=\"true\">${initial}</div>`;
   }
-  function ad_extractDomainFromAccount(name){ if(!name) return ''; try{ const key=String(name).trim().toLowerCase(); if(typeof window.getAccountsData==='function'){ const accounts=window.getAccountsData()||[]; const hit=accounts.find(a=>String(a.name||a.accountName||'').trim().toLowerCase()===key); const dom=hit&&(hit.domain||hit.website||''); if(dom) return String(dom).replace(/^https?:\/\//,'').replace(/\/$/,''); } }catch(_){} return ''; }
-  function ad_normalizeSupplierTokens(s){ try{ if(!s) return ''; let out=String(s); out=out.replace(/\bT\s*X\s*U\b/gi,'TXU'); out=out.replace(/\bN\s*R\s*G\b/gi,'NRG'); out=out.replace(/\breliant\b/gi,'Reliant'); return out; }catch(_){ return s||''; } }
+  function ad_extractDomainFromAccount(name) { if (!name) return ''; try { const key = String(name).trim().toLowerCase(); if (typeof window.getAccountsData === 'function') { const accounts = window.getAccountsData() || []; const hit = accounts.find(a => String(a.name || a.accountName || '').trim().toLowerCase() === key); const dom = hit && (hit.domain || hit.website || ''); if (dom) return String(dom).replace(/^https?:\/\//, '').replace(/\/$/, ''); } } catch (_) { } return ''; }
+  function ad_normalizeSupplierTokens(s) { try { if (!s) return ''; let out = String(s); out = out.replace(/\bT\s*X\s*U\b/gi, 'TXU'); out = out.replace(/\bN\s*R\s*G\b/gi, 'NRG'); out = out.replace(/\breliant\b/gi, 'Reliant'); return out; } catch (_) { return s || ''; } }
 
-  async function loadRecentCallsForAccount(){
+  async function loadRecentCallsForAccount() {
     const list = document.getElementById('account-recent-calls-list');
     if (!list || !state.currentAccount) return;
     // Show spinner and animate container while loading
-    try { arcSetLoading(list); } catch(_) {}
+    try { arcSetLoading(list); } catch (_) { }
     const accountId = state.currentAccount.id;
-    const accountPhone10 = String(state.currentAccount.companyPhone || state.currentAccount.phone || state.currentAccount.primaryPhone || state.currentAccount.mainPhone || '').replace(/\D/g,'').slice(-10);
+    const accountPhone10 = String(state.currentAccount.companyPhone || state.currentAccount.phone || state.currentAccount.primaryPhone || state.currentAccount.mainPhone || '').replace(/\D/g, '').slice(-10);
     const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
-    
+
     // Loading calls for account
     // If user is actively scrolling, defer refresh to avoid jank
     if (state._isScrolling) {
-      try { state._arcPendingRefresh = true; } catch(_) {}
+      try { state._arcPendingRefresh = true; } catch (_) { }
       return;
     }
-    
+
     try {
       // Use new targeted API endpoint for much better performance
       const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser)
@@ -1765,29 +1766,29 @@ var console = {
       const r = await fetch(`${base}/api/calls/account/${accountId}?limit=50`, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
-      const j = await r.json().catch(()=>({}));
+      const j = await r.json().catch(() => ({}));
       const calls = (j && j.ok && Array.isArray(j.calls)) ? j.calls : [];
-      
+
       console.log(`[Account Detail] Loaded ${calls.length} targeted calls for account ${accountId}`);
-      
+
       // Calls are already filtered and sorted by the API
       const filtered = calls;
-      
-      if (!filtered.length){ arcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); return; }
+
+      if (!filtered.length) { arcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); return; }
 
       // Enrich for direction/number like Calls page for consistent UI
-      const bizList = Array.isArray(window.CRM_BUSINESS_NUMBERS) ? window.CRM_BUSINESS_NUMBERS.map(n=>String(n||'').replace(/\D/g,'').slice(-10)).filter(Boolean) : [];
-      const isBiz = (p)=> bizList.includes(p);
-      const norm = (s)=> String(s||'').replace(/\D/g,'').slice(-10);
+      const bizList = Array.isArray(window.CRM_BUSINESS_NUMBERS) ? window.CRM_BUSINESS_NUMBERS.map(n => String(n || '').replace(/\D/g, '').slice(-10)).filter(Boolean) : [];
+      const isBiz = (p) => bizList.includes(p);
+      const norm = (s) => String(s || '').replace(/\D/g, '').slice(-10);
       filtered.forEach(c => {
-        if (!c.id) c.id = c.twilioSid || c.callSid || c.sid || `${c.to||''}_${c.from||''}_${c.timestamp||c.callTime||''}`;
+        if (!c.id) c.id = c.twilioSid || c.callSid || c.sid || `${c.to || ''}_${c.from || ''}_${c.timestamp || c.callTime || ''}`;
         const to10 = norm(c.to);
         const from10 = norm(c.from);
         let direction = 'unknown';
-        if (String(c.from||'').startsWith('client:') || isBiz(from10)) direction = 'outbound';
-        else if (String(c.to||'').startsWith('client:') || isBiz(to10)) direction = 'inbound';
+        if (String(c.from || '').startsWith('client:') || isBiz(from10)) direction = 'outbound';
+        else if (String(c.to || '').startsWith('client:') || isBiz(to10)) direction = 'inbound';
         const counter10 = direction === 'outbound' ? to10 : (direction === 'inbound' ? from10 : (to10 || from10));
-        const pretty = counter10 ? `+1 (${counter10.slice(0,3)}) ${counter10.slice(3,6)}-${counter10.slice(6)}` : '';
+        const pretty = counter10 ? `+1 (${counter10.slice(0, 3)}) ${counter10.slice(3, 6)}-${counter10.slice(6)}` : '';
         c.direction = c.direction || direction;
         c.counterpartyPretty = c.counterpartyPretty || pretty;
         // Fill missing account name from current account only; do not guess contact
@@ -1797,14 +1798,14 @@ var console = {
             const acctName = a.accountName || a.name || a.companyName || '';
             if (acctName) c.accountName = acctName;
           }
-        } catch(_) {}
+        } catch (_) { }
       });
       // Save to state and render first page
-      try { state._arcCalls = filtered; } catch(_) {}
-      try { if (typeof state._arcPage !== 'number' || !state._arcPage) state._arcPage = 1; } catch(_) {}
+      try { state._arcCalls = filtered; } catch (_) { }
+      try { if (typeof state._arcPage !== 'number' || !state._arcPage) state._arcPage = 1; } catch (_) { }
       arcRenderPage();
       // Clear the reload flag after successful load
-      try { state._arcReloadInFlight = false; } catch(_) {}
+      try { state._arcReloadInFlight = false; } catch (_) { }
       // Delegate once for reliability across rerenders
       if (!list._delegated) {
         list.addEventListener('click', (e) => {
@@ -1812,9 +1813,9 @@ var console = {
           if (!btn) return;
           e.preventDefault(); e.stopPropagation();
           const id = btn.getAttribute('data-id');
-          const call = (state._arcCalls||[]).find(x=>String(x.id||x.twilioSid||x.callSid||'')===String(id));
+          const call = (state._arcCalls || []).find(x => String(x.id || x.twilioSid || x.callSid || '') === String(id));
           if (!call) return;
-          
+
           // Check if this is a not-processed call that needs CI processing
           if (btn.classList.contains('not-processed')) {
             // Use the correct property names from the call object
@@ -1824,14 +1825,14 @@ var console = {
             triggerAccountCI(callSid, recordingSid, btn);
             return;
           }
-          
+
           // Otherwise, toggle the details as usual
           toggleRcDetails(btn, call);
         });
         list._delegated = '1';
       }
       arcBindPager();
-      try { window.ClickToCall?.processSpecificPhoneElements?.(); } catch(_) {}
+      try { window.ClickToCall?.processSpecificPhoneElements?.(); } catch (_) { }
     } catch (e) {
       console.warn('[RecentCalls][Account] load failed', e);
       arcUpdateListAnimated(list, '<div class="rc-empty">Failed to load recent calls</div>');
@@ -1839,14 +1840,14 @@ var console = {
   }
 
   const ARC_PAGE_SIZE = 5;
-  function arcGetSlice(){ const a = Array.isArray(state._arcCalls)?state._arcCalls:[]; const p=Math.max(1, parseInt(state._arcPage||1,10)); const s=(p-1)*ARC_PAGE_SIZE; return a.slice(s, s+ARC_PAGE_SIZE); }
-  function arcRenderPage(){
-    const list = document.getElementById('account-recent-calls-list'); if(!list) return;
-    const total = Array.isArray(state._arcCalls)?state._arcCalls.length:0; 
-    if(!total){ 
-      arcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>'); 
-      arcUpdatePager(0,0); 
-      return; 
+  function arcGetSlice() { const a = Array.isArray(state._arcCalls) ? state._arcCalls : []; const p = Math.max(1, parseInt(state._arcPage || 1, 10)); const s = (p - 1) * ARC_PAGE_SIZE; return a.slice(s, s + ARC_PAGE_SIZE); }
+  function arcRenderPage() {
+    const list = document.getElementById('account-recent-calls-list'); if (!list) return;
+    const total = Array.isArray(state._arcCalls) ? state._arcCalls.length : 0;
+    if (!total) {
+      arcUpdateListAnimated(list, '<div class="rc-empty">No recent calls</div>');
+      arcUpdatePager(0, 0);
+      return;
     }
     const slice = arcGetSlice();
     arcUpdateListAnimated(list, slice.map(call => rcItemHtml(call)).join(''));
@@ -1856,9 +1857,9 @@ var console = {
         btn.addEventListener('click', (e) => {
           e.preventDefault(); e.stopPropagation();
           const id = btn.getAttribute('data-id');
-          const call = (state._arcCalls||[]).find(x=>String(x.id||x.twilioSid||x.callSid||'')===String(id));
+          const call = (state._arcCalls || []).find(x => String(x.id || x.twilioSid || x.callSid || '') === String(id));
           if (!call) return;
-          
+
           // Check if this is a not-processed call that needs CI processing
           if (btn.classList.contains('not-processed')) {
             // Use the correct property names from the call object
@@ -1867,28 +1868,28 @@ var console = {
             triggerAccountCI(callSid, recordingSid, btn);
             return;
           }
-          
+
           // Otherwise, toggle the details as usual
           toggleRcDetails(btn, call);
         });
         btn._insightsListenerBound = true;
       }
     });
-    const totalPages = Math.max(1, Math.ceil(total/ARC_PAGE_SIZE));
-    arcUpdatePager(state._arcPage||1, totalPages);
+    const totalPages = Math.max(1, Math.ceil(total / ARC_PAGE_SIZE));
+    arcUpdatePager(state._arcPage || 1, totalPages);
   }
-  function arcBindPager(){ const pager=document.getElementById('account-rc-pager'); if(!pager||pager._bound) return; const prev=document.getElementById('arc-prev'); const next=document.getElementById('arc-next'); prev?.addEventListener('click', (e)=>{ e.preventDefault(); const total=Math.ceil((state._arcCalls||[]).length/ARC_PAGE_SIZE)||1; state._arcPage=Math.max(1,(state._arcPage||1)-1); arcRenderPage(); arcUpdatePager(state._arcPage,total); }); next?.addEventListener('click', (e)=>{ e.preventDefault(); const total=Math.ceil((state._arcCalls||[]).length/ARC_PAGE_SIZE)||1; state._arcPage=Math.min(total,(state._arcPage||1)+1); arcRenderPage(); arcUpdatePager(state._arcPage,total); }); pager._bound='1'; }
-  function arcUpdatePager(current, total){ const pager=document.getElementById('account-rc-pager'); const info=document.getElementById('arc-info'); const prev=document.getElementById('arc-prev'); const next=document.getElementById('arc-next'); if(!pager||!info||!prev||!next) return; const show=total>1; pager.style.display=show?'flex':'none'; info.textContent=`${Math.max(1,parseInt(current||1,10))} of ${Math.max(1,parseInt(total||1,10))}`; prev.disabled=(current<=1); next.disabled=(current>=total); }
-  function arcSpinnerHtml(){ return '<div class="rc-loading"><div class="rc-spinner" aria-hidden="true"></div></div>'; }
-  function arcSetLoading(list){ try { let ov=list.querySelector('.rc-loading-overlay'); if(!ov){ ov=document.createElement('div'); ov.className='rc-loading-overlay'; ov.innerHTML=arcSpinnerHtml(); ov.style.position='absolute'; ov.style.inset='0'; ov.style.display='flex'; ov.style.alignItems='center'; ov.style.justifyContent='center'; ov.style.pointerEvents='none'; list.appendChild(ov);} ov.style.display='flex'; } catch(_) {} }
-  function arcUpdateListAnimated(list, html){
+  function arcBindPager() { const pager = document.getElementById('account-rc-pager'); if (!pager || pager._bound) return; const prev = document.getElementById('arc-prev'); const next = document.getElementById('arc-next'); prev?.addEventListener('click', (e) => { e.preventDefault(); const total = Math.ceil((state._arcCalls || []).length / ARC_PAGE_SIZE) || 1; state._arcPage = Math.max(1, (state._arcPage || 1) - 1); arcRenderPage(); arcUpdatePager(state._arcPage, total); }); next?.addEventListener('click', (e) => { e.preventDefault(); const total = Math.ceil((state._arcCalls || []).length / ARC_PAGE_SIZE) || 1; state._arcPage = Math.min(total, (state._arcPage || 1) + 1); arcRenderPage(); arcUpdatePager(state._arcPage, total); }); pager._bound = '1'; }
+  function arcUpdatePager(current, total) { const pager = document.getElementById('account-rc-pager'); const info = document.getElementById('arc-info'); const prev = document.getElementById('arc-prev'); const next = document.getElementById('arc-next'); if (!pager || !info || !prev || !next) return; const show = total > 1; pager.style.display = show ? 'flex' : 'none'; info.textContent = `${Math.max(1, parseInt(current || 1, 10))} of ${Math.max(1, parseInt(total || 1, 10))}`; prev.disabled = (current <= 1); next.disabled = (current >= total); }
+  function arcSpinnerHtml() { return '<div class="rc-loading"><div class="rc-spinner" aria-hidden="true"></div></div>'; }
+  function arcSetLoading(list) { try { let ov = list.querySelector('.rc-loading-overlay'); if (!ov) { ov = document.createElement('div'); ov.className = 'rc-loading-overlay'; ov.innerHTML = arcSpinnerHtml(); ov.style.position = 'absolute'; ov.style.inset = '0'; ov.style.display = 'flex'; ov.style.alignItems = 'center'; ov.style.justifyContent = 'center'; ov.style.pointerEvents = 'none'; list.appendChild(ov); } ov.style.display = 'flex'; } catch (_) { } }
+  function arcUpdateListAnimated(list, html) {
     try {
       const avoidAnim = !!(state._isScrolling || (state._arcOpenIds && state._arcOpenIds.size > 0));
-      if (avoidAnim) { 
-        list.innerHTML = html; 
+      if (avoidAnim) {
+        list.innerHTML = html;
         // Remove any lingering loading overlay after content update
-        try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch(_) {}
-        return; 
+        try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch (_) { }
+        return;
       }
       const h0 = list.offsetHeight;
       list.style.height = h0 + 'px';
@@ -1896,7 +1897,7 @@ var console = {
       requestAnimationFrame(() => {
         list.innerHTML = html;
         // Remove any lingering loading overlay after content update
-        try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch(_) {}
+        try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch (_) { }
         const h1 = list.scrollHeight;
         list.style.transition = 'height 220ms ease, opacity 220ms ease';
         list.style.opacity = '1';
@@ -1906,14 +1907,14 @@ var console = {
           setTimeout(() => { list.style.height = ''; list.style.transition = ''; list.style.overflow = ''; }, 260);
         });
       });
-    } catch(_) { 
-      list.innerHTML = html; 
+    } catch (_) {
+      list.innerHTML = html;
       // Remove any lingering loading overlay after content update
-      try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch(_) {}
+      try { const ov = list.querySelector('.rc-loading-overlay'); if (ov) ov.remove(); } catch (_) { }
     }
   }
 
-  function rcItemHtml(c){
+  function rcItemHtml(c) {
     // Prefer contact name; if absent and this is a company call, show company instead of "Unknown"
     const hasContact = !!(c.contactId && c.contactName);
     const displayName = hasContact ? (c.contactName) : (c.accountName || c.company || 'Unknown');
@@ -1922,8 +1923,8 @@ var console = {
     const outcome = escapeHtml(c.outcome || c.status || '');
     const ts = c.callTime || c.timestamp || new Date().toISOString();
     const when = new Date(ts).toLocaleString();
-    const idAttr = escapeHtml(String(c.id||c.twilioSid||c.callSid||''));
-    
+    const idAttr = escapeHtml(String(c.id || c.twilioSid || c.callSid || ''));
+
     // Check for live duration first, fallback to database duration
     let durStr = '';
     if (state._liveCallDurations && state._liveCallDurations.has(idAttr)) {
@@ -1933,18 +1934,18 @@ var console = {
         durStr = liveData.durationFormatted;
       }
     }
-    
+
     // Fallback to database duration if no live duration
     if (!durStr) {
-      const dur = Math.max(0, parseInt(c.durationSec||c.duration||0,10));
-      durStr = `${Math.floor(dur/60)}m ${dur%60}s`;
+      const dur = Math.max(0, parseInt(c.durationSec || c.duration || 0, 10));
+      durStr = `${Math.floor(dur / 60)}m ${dur % 60}s`;
     }
-    
+
     // Use the actual phone number from the call, not the formatted counterparty
     const phone = escapeHtml(String(c.targetPhone || c.to || c.from || c.counterpartyPretty || ''));
     const direction = escapeHtml((c.direction || '').charAt(0).toUpperCase() + (c.direction || '').slice(1));
-    const sig = `${idAttr}|${c.status||c.outcome||''}|${c.durationSec||c.duration||0}|${c.transcript?1:0}|${c.aiInsights?1:0}`;
-    
+    const sig = `${idAttr}|${c.status || c.outcome || ''}|${c.durationSec || c.duration || 0}|${c.transcript ? 1 : 0}|${c.aiInsights ? 1 : 0}`;
+
     return `
       <div class=\"rc-item\" data-id=\"${idAttr}\" data-sig=\"${sig}\">
         <div class="rc-meta">
@@ -1953,11 +1954,11 @@ var console = {
                                  data-contact-id="" 
                                  data-account-id="${c.accountId || state.currentAccount?.id || ''}" 
                                  data-contact-name="" 
-                                 data-company-name="${escapeHtml(company)}">${phone}</span>${direction?` • ${direction}`:''}</div>
+                                 data-company-name="${escapeHtml(company)}">${phone}</span>${direction ? ` • ${direction}` : ''}</div>
         </div>
         <div class="rc-actions">
           <span class="rc-outcome">${outcome}</span>
-          <button type="button" class="rc-icon-btn rc-insights ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'not-processed' : ''}" data-id="${escapeHtml(String(c.id||''))}" aria-label="View insights" title="${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'Process Call' : 'View AI insights'}">${svgEye()}</button>
+          <button type="button" class="rc-icon-btn rc-insights ${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'not-processed' : ''}" data-id="${escapeHtml(String(c.id || ''))}" aria-label="View insights" title="${(!c.transcript || !c.aiInsights || Object.keys(c.aiInsights || {}).length === 0) ? 'Process Call' : 'View AI insights'}">${svgEye()}</button>
         </div>
       </div>`;
   }
@@ -1967,14 +1968,14 @@ var console = {
       console.warn('[AccountDetail] Missing callSid for CI processing:', { callSid, recordingSid });
       return;
     }
-    
+
     // Use shared CI processor for consistent functionality
     if (window.SharedCIProcessor) {
       const success = await window.SharedCIProcessor.processCall(callSid, recordingSid, btn, {
         context: 'account-detail',
         onSuccess: (call) => {
           console.log('[AccountDetail] CI processing completed:', call);
-          
+
           // Update state cache so future renders show full insights
           try {
             if (Array.isArray(state._arcCalls)) {
@@ -1982,27 +1983,27 @@ var console = {
               state._arcCalls = state._arcCalls.map(x => {
                 const xid = String(x.id || x.twilioSid || x.callSid || '');
                 if (xid === idMatch) {
-                  return { 
-                    ...x, 
-                    transcript: call.transcript || x.transcript, 
-                    formattedTranscript: call.formattedTranscript || x.formattedTranscript, 
-                    aiInsights: call.aiInsights || x.aiInsights, 
-                    conversationalIntelligence: call.conversationalIntelligence || x.conversationalIntelligence 
+                  return {
+                    ...x,
+                    transcript: call.transcript || x.transcript,
+                    formattedTranscript: call.formattedTranscript || x.formattedTranscript,
+                    aiInsights: call.aiInsights || x.aiInsights,
+                    conversationalIntelligence: call.conversationalIntelligence || x.conversationalIntelligence
                   };
                 }
                 return x;
               });
             }
-          } catch(_) {}
+          } catch (_) { }
         },
         onError: (error) => {
           console.error('[AccountDetail] CI processing failed:', error);
         }
       });
-      
+
       return;
     }
-    
+
     // If no recordingSid provided, the API will look it up by callSid
     if (!recordingSid) {
       console.log('[AccountDetail] No recordingSid provided, API will look up recording for callSid:', callSid);
@@ -2042,14 +2043,14 @@ var console = {
 
       if (!response.ok) {
         try {
-          const err = await response.json().catch(()=>({}));
+          const err = await response.json().catch(() => ({}));
           console.error('[AccountDetail] CI request error response:', response.status, err);
           const msg = (err && (err.error || err.details)) ? String(err.error || err.details) : `CI request failed: ${response.status} ${response.statusText}`;
           if (window.ToastManager) { window.ToastManager.showToast(msg, 'error'); }
-        } catch(_) {
-          try { if (window.ToastManager) { window.ToastManager.showToast('Failed to start call processing', 'error'); } } catch(__) {}
+        } catch (_) {
+          try { if (window.ToastManager) { window.ToastManager.showToast('Failed to start call processing', 'error'); } } catch (__) { }
         }
-        try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch(_) {}
+        try { btn.innerHTML = svgEye(); btn.classList.remove('processing'); btn.classList.add('not-processed'); btn.disabled = false; btn.title = 'Process Call'; } catch (_) { }
         return;
       }
 
@@ -2063,19 +2064,19 @@ var console = {
       btn.classList.add('processing');
 
       // Store transcript SID for status checking
-      try { if (result && result.transcriptSid) { btn.setAttribute('data-transcript-sid', result.transcriptSid); } } catch(_) {}
+      try { if (result && result.transcriptSid) { btn.setAttribute('data-transcript-sid', result.transcriptSid); } } catch (_) { }
 
       // Poll for insights becoming available and enable the button when ready
-      try { arcPollInsightsUntilReady(callSid, btn); } catch(_) {}
+      try { arcPollInsightsUntilReady(callSid, btn); } catch (_) { }
 
     } catch (error) {
       console.error('[AccountDetail] Failed to trigger CI processing:', error);
-      
+
       // Reset button state on error
       btn.innerHTML = svgEye();
       btn.classList.remove('processing');
       btn.disabled = false;
-      
+
       // Show error toast
       if (window.ToastManager) {
         window.ToastManager.showToast({
@@ -2088,7 +2089,7 @@ var console = {
   }
 
   // Firebase real-time listener for call insights (replaces API polling)
-  function arcPollInsightsUntilReady(callSid, btn){
+  function arcPollInsightsUntilReady(callSid, btn) {
     if (!window.firebaseDB) {
       console.warn('[AccountDetail] Firebase not available for real-time insights');
       return;
@@ -2111,7 +2112,7 @@ var console = {
       // Consider it ready if we have a transcript and either insights are present or CI status is completed
       return (hasTranscript && hasInsights) || (hasTranscript && ciCompleted);
     };
-    
+
     const finalizeReady = (call) => {
       try {
         // Update state cache so future renders show full insights
@@ -2125,9 +2126,9 @@ var console = {
             return x;
           });
         }
-      } catch(_) {}
-      try { btn.innerHTML = svgEye(); btn.classList.remove('processing', 'not-processed'); btn.disabled = false; btn.title = 'View AI insights'; } catch(_) {}
-      try { if (window.ToastManager) { window.ToastManager.showToast({ type: 'success', title: 'Insights Ready', message: 'Click the eye icon to view call insights.' }); } } catch(_) {}
+      } catch (_) { }
+      try { btn.innerHTML = svgEye(); btn.classList.remove('processing', 'not-processed'); btn.disabled = false; btn.title = 'View AI insights'; } catch (_) { }
+      try { if (window.ToastManager) { window.ToastManager.showToast({ type: 'success', title: 'Insights Ready', message: 'Click the eye icon to view call insights.' }); } } catch (_) { }
     };
 
     // Firebase real-time listener
@@ -2157,19 +2158,19 @@ var console = {
   }
 
   // Inline expanding details
-  function toggleRcDetails(btn, call){
+  function toggleRcDetails(btn, call) {
     const item = btn.closest('.rc-item');
     if (!item) return;
     const existing = item.nextElementSibling && item.nextElementSibling.classList && item.nextElementSibling.classList.contains('rc-details') ? item.nextElementSibling : null;
     const idStr = String(call.id || call.twilioSid || call.callSid || '');
     if (existing) {
       // User explicitly closed - remove from open tracker
-      try { if (state._arcOpenIds && state._arcOpenIds instanceof Set) state._arcOpenIds.delete(idStr); } catch(_) {}
+      try { if (state._arcOpenIds && state._arcOpenIds instanceof Set) state._arcOpenIds.delete(idStr); } catch (_) { }
       animateCollapse(existing, () => existing.remove());
       return;
     }
     // Ensure open tracker exists and add current id
-    try { if (!state._arcOpenIds || !(state._arcOpenIds instanceof Set)) state._arcOpenIds = new Set(); state._arcOpenIds.add(idStr); } catch(_) {}
+    try { if (!state._arcOpenIds || !(state._arcOpenIds instanceof Set)) state._arcOpenIds = new Set(); state._arcOpenIds.add(idStr); } catch (_) { }
     const panel = document.createElement('div');
     panel.className = 'rc-details';
     panel.innerHTML = `<div class="rc-details-inner">${insightsInlineHtml(call)}</div>`;
@@ -2178,54 +2179,54 @@ var console = {
 
     // Background transcript fetch if missing
     try {
-      if ((!call.transcript || String(call.transcript).trim()==='') && call.twilioSid) {
+      if ((!call.transcript || String(call.transcript).trim() === '') && call.twilioSid) {
         const base = (window.API_BASE_URL || '').replace(/\/$/, '');
         const url = base ? `${base}/api/twilio/ai-insights` : '/api/twilio/ai-insights';
         fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ callSid: call.twilioSid })
-        }).then(res=>res.json()).then(data=>{
+        }).then(res => res.json()).then(data => {
           if (data && data.transcript) {
             call.transcript = data.transcript;
             const tEl = panel.querySelector('.pc-transcript');
             if (tEl) tEl.textContent = data.transcript;
           }
-        }).catch(()=>{});
+        }).catch(() => { });
       }
-    } catch(_) {}
+    } catch (_) { }
   }
-  function animateExpand(el){ 
-    el.style.height='0px'; 
-    el.style.opacity='0'; 
-    const h=el.scrollHeight; 
-    requestAnimationFrame(()=>{ 
-      el.classList.add('expanding'); 
-      el.style.transition='height 180ms ease, opacity 180ms ease'; 
-      el.style.height=h+'px'; 
-      el.style.opacity='1'; 
+  function animateExpand(el) {
+    el.style.height = '0px';
+    el.style.opacity = '0';
+    const h = el.scrollHeight;
+    requestAnimationFrame(() => {
+      el.classList.add('expanding');
+      el.style.transition = 'height 180ms ease, opacity 180ms ease';
+      el.style.height = h + 'px';
+      el.style.opacity = '1';
       // Use requestAnimationFrame for smoother cleanup
       requestAnimationFrame(() => {
-        setTimeout(()=>{ el.style.height=''; el.style.transition=''; el.classList.remove('expanding'); },200); 
+        setTimeout(() => { el.style.height = ''; el.style.transition = ''; el.classList.remove('expanding'); }, 200);
       });
-    }); 
+    });
   }
-  function animateCollapse(el, done){ 
-    const h=el.scrollHeight; 
-    el.style.height=h+'px'; 
-    el.style.opacity='1'; 
-    requestAnimationFrame(()=>{ 
-      el.classList.add('collapsing'); 
-      el.style.transition='height 140ms ease, opacity 140ms ease'; 
-      el.style.height='0px'; 
-      el.style.opacity='0'; 
+  function animateCollapse(el, done) {
+    const h = el.scrollHeight;
+    el.style.height = h + 'px';
+    el.style.opacity = '1';
+    requestAnimationFrame(() => {
+      el.classList.add('collapsing');
+      el.style.transition = 'height 140ms ease, opacity 140ms ease';
+      el.style.height = '0px';
+      el.style.opacity = '0';
       // Use requestAnimationFrame for smoother cleanup
       requestAnimationFrame(() => {
-        setTimeout(()=>{ el.classList.remove('collapsing'); done&&done(); },160); 
+        setTimeout(() => { el.classList.remove('collapsing'); done && done(); }, 160);
       });
-    }); 
+    });
   }
-  function insightsInlineHtml(r){
+  function insightsInlineHtml(r) {
     const AI = r.aiInsights || {};
     // Build summary: prefer Twilio Operator summary, then fallback to constructed paragraph
     let paragraph = '';
@@ -2233,7 +2234,7 @@ var console = {
     const rawTwilioSummary = (AI && typeof AI.summary === 'string') ? AI.summary.trim() : '';
     if (rawTwilioSummary) {
       // Twilio format: "Paragraph. • Bullet 1 • Bullet 2 ..."
-      const parts = rawTwilioSummary.split(' • ').map(s=>s.trim()).filter(Boolean);
+      const parts = rawTwilioSummary.split(' • ').map(s => s.trim()).filter(Boolean);
       paragraph = parts.shift() || '';
       bulletItems = parts;
     } else if (r.aiSummary && String(r.aiSummary).trim()) {
@@ -2241,7 +2242,7 @@ var console = {
     } else if (AI && Object.keys(AI).length) {
       const sentiment = AI.sentiment || 'Unknown';
       const disposition = AI.disposition || '';
-      const topics = Array.isArray(AI.keyTopics) ? AI.keyTopics.slice(0,3).join(', ') : '';
+      const topics = Array.isArray(AI.keyTopics) ? AI.keyTopics.slice(0, 3).join(', ') : '';
       const who = r.contactName ? `Call with ${r.contactName}` : 'Call';
       let p = `${who}`;
       if (disposition) p += ` — ${disposition.toLowerCase()} disposition`;
@@ -2253,7 +2254,7 @@ var console = {
     }
     // Filter bullets to avoid redundancy with right-hand sections (energy, topics, steps, pain, entities, budget, timeline)
     const redundant = /(current rate|rate type|supplier|utility|contract|usage|term|budget|timeline|topic|next step|pain point|entities?)/i;
-    const filteredBullets = (bulletItems||[]).filter(b => b && !redundant.test(b)).slice(0,6);
+    const filteredBullets = (bulletItems || []).filter(b => b && !redundant.test(b)).slice(0, 6);
     const sentiment = AI.sentiment || 'Unknown';
     const disposition = AI.disposition || '';
     const keyTopics = Array.isArray(AI.keyTopics) ? AI.keyTopics : [];
@@ -2261,7 +2262,7 @@ var console = {
     const pain = Array.isArray(AI.painPoints) ? AI.painPoints : [];
     const flags = AI.flags || {};
     const chips = [
-      `<span class=\"pc-chip ${sentiment==='Positive'?'ok':sentiment==='Negative'?'danger':'info'}\">Sentiment: ${escapeHtml(sentiment)}</span>`,
+      `<span class=\"pc-chip ${sentiment === 'Positive' ? 'ok' : sentiment === 'Negative' ? 'danger' : 'info'}\">Sentiment: ${escapeHtml(sentiment)}</span>`,
       disposition ? `<span class=\"pc-chip info\">Disposition: ${escapeHtml(disposition)}</span>` : '',
       flags.nonEnglish ? '<span class="pc-chip warn">Non‑English</span>' : '',
       flags.voicemailDetected ? '<span class="pc-chip warn">Voicemail</span>' : '',
@@ -2269,58 +2270,58 @@ var console = {
       flags.doNotContact ? '<span class="pc-chip danger">Do Not Contact</span>' : '',
       flags.recordingDisclosure ? '<span class="pc-chip ok">Recording Disclosure</span>' : ''
     ].filter(Boolean).join('');
-    const topicsHtml = keyTopics.length ? keyTopics.map(t=>`<span class=\"pc-chip\">${escapeHtml(t)}</span>`).join('') : '<span class="pc-chip">None</span>';
-    const nextHtml = nextSteps.length ? nextSteps.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None</div>';
-    const painHtml = pain.length ? pain.map(t=>`<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None mentioned</div>';
-    function toMMSS(s){ const m=Math.floor((s||0)/60), ss=(s||0)%60; return `${String(m)}:${String(ss).padStart(2,'0')}`; }
-  // Expose CI trigger for the eye button (Account Details)
-  if (!window.__triggerAccountCI){
-    window.__triggerAccountCI = async function(callSid, recordingSid){
-      try{
-        const btn = document.querySelector('button.rc-icon-btn[data-ci-btn="1"]');
-        if (btn){ btn.classList.add('is-loading'); btn.disabled = true; }
-        // Show spinner by swapping inner SVG to a small loader
-        if (btn){ btn.innerHTML = '<span class="ci-btn-spinner" aria-hidden="true"></span>'; }
-        const base = (window.crm && typeof window.crm.getApiBaseUrl === 'function')
-          ? window.crm.getApiBaseUrl()
-          : (window.PUBLIC_BASE_URL || window.API_BASE_URL || window.location.origin || '').replace(/\/$/,'');
-        const url = `${base}/api/twilio/ci-request`;
-        const resp = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ callSid, recordingSid }) });
-        const data = await resp.json().catch(()=>({}));
-        if (data && data.transcriptSid){
-          if (window.ToastManager){
-            window.ToastManager.showToast({ type:'save', title:'Processing started', message:`We are processing your call insights now.` });
+    const topicsHtml = keyTopics.length ? keyTopics.map(t => `<span class=\"pc-chip\">${escapeHtml(t)}</span>`).join('') : '<span class="pc-chip">None</span>';
+    const nextHtml = nextSteps.length ? nextSteps.map(t => `<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None</div>';
+    const painHtml = pain.length ? pain.map(t => `<div>• ${escapeHtml(t)}</div>`).join('') : '<div>None mentioned</div>';
+    function toMMSS(s) { const m = Math.floor((s || 0) / 60), ss = (s || 0) % 60; return `${String(m)}:${String(ss).padStart(2, '0')}`; }
+    // Expose CI trigger for the eye button (Account Details)
+    if (!window.__triggerAccountCI) {
+      window.__triggerAccountCI = async function (callSid, recordingSid) {
+        try {
+          const btn = document.querySelector('button.rc-icon-btn[data-ci-btn="1"]');
+          if (btn) { btn.classList.add('is-loading'); btn.disabled = true; }
+          // Show spinner by swapping inner SVG to a small loader
+          if (btn) { btn.innerHTML = '<span class="ci-btn-spinner" aria-hidden="true"></span>'; }
+          const base = (window.crm && typeof window.crm.getApiBaseUrl === 'function')
+            ? window.crm.getApiBaseUrl()
+            : (window.PUBLIC_BASE_URL || window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+          const url = `${base}/api/twilio/ci-request`;
+          const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callSid, recordingSid }) });
+          const data = await resp.json().catch(() => ({}));
+          if (data && data.transcriptSid) {
+            if (window.ToastManager) {
+              window.ToastManager.showToast({ type: 'save', title: 'Processing started', message: `We are processing your call insights now.` });
+            }
+          } else {
+            if (window.ToastManager) { window.ToastManager.showToast({ type: 'warn', title: 'Could not start', message: 'Unable to queue call insights. Try again shortly.' }); }
           }
-        } else {
-          if (window.ToastManager){ window.ToastManager.showToast({ type:'warn', title:'Could not start', message:'Unable to queue call insights. Try again shortly.' }); }
+        } catch (e) {
+          if (window.ToastManager) { window.ToastManager.showToast({ type: 'danger', title: 'Error', message: e?.message || 'Failed to start insights' }); }
         }
-      }catch(e){
-        if (window.ToastManager){ window.ToastManager.showToast({ type:'danger', title:'Error', message:e?.message||'Failed to start insights' }); }
+      };
+      // Loader keyframes (once)
+      const styleId = '__ci_loader_style__';
+      if (!document.getElementById(styleId)) {
+        const st = document.createElement('style');
+        st.id = styleId;
+        st.textContent = '@keyframes spin {from{transform:rotate(0)} to{transform:rotate(360deg)}}';
+        document.head.appendChild(st);
       }
-    };
-    // Loader keyframes (once)
-    const styleId = '__ci_loader_style__';
-    if (!document.getElementById(styleId)){
-      const st = document.createElement('style');
-      st.id = styleId;
-      st.textContent = '@keyframes spin {from{transform:rotate(0)} to{transform:rotate(360deg)}}';
-      document.head.appendChild(st);
     }
-  }
-    function renderTranscriptHtml(A, raw){
+    function renderTranscriptHtml(A, raw) {
       let turns = Array.isArray(A?.speakerTurns) ? A.speakerTurns : [];
-      if (turns.length && !turns.some(t=>t && (t.role==='agent'||t.role==='customer'))){
-        let next='customer';
-        turns = turns.map(t=>({ t:Number(t.t)||0, role: next = (next==='agent'?'customer':'agent'), text: t.text||'' }));
+      if (turns.length && !turns.some(t => t && (t.role === 'agent' || t.role === 'customer'))) {
+        let next = 'customer';
+        turns = turns.map(t => ({ t: Number(t.t) || 0, role: next = (next === 'agent' ? 'customer' : 'agent'), text: t.text || '' }));
       }
-      if (turns.length){
-        const contactFirst = (String(r.contactName||r.accountName||'').trim().split(/\s+/)[0]) || 'Customer';
-        const groups=[]; let current=null;
-        for(const t of turns){ const roleKey=t.role==='agent'?'agent':(t.role==='customer'?'customer':'other'); const text=ad_normalizeSupplierTokens(t.text||''); const ts=Number(t.t)||0; if(current && current.role===roleKey){ current.texts.push(text); current.end=ts; } else { if(current) groups.push(current); current={ role:roleKey, start:ts, texts:[text] }; } }
-        if(current) groups.push(current);
-        return groups.map(g=>{ const label=g.role==='agent'?'You':(g.role==='customer'?contactFirst:'Speaker'); const avatar=g.role==='agent'?ad_getAgentAvatar():ad_getContactAvatar(contactFirst, r); return `<div class=\"transcript-message ${g.role}\"><div class=\"transcript-avatar\">${avatar}</div><div class=\"transcript-content\"><div class=\"transcript-header\"><span class=\"transcript-speaker\">${label}</span><span class=\"transcript-time\">${toMMSS(g.start)}</span></div><div class=\"transcript-text\">${escapeHtml(g.texts.join(' ').trim())}</div></div></div>`; }).join('');
+      if (turns.length) {
+        const contactFirst = (String(r.contactName || r.accountName || '').trim().split(/\s+/)[0]) || 'Customer';
+        const groups = []; let current = null;
+        for (const t of turns) { const roleKey = t.role === 'agent' ? 'agent' : (t.role === 'customer' ? 'customer' : 'other'); const text = ad_normalizeSupplierTokens(t.text || ''); const ts = Number(t.t) || 0; if (current && current.role === roleKey) { current.texts.push(text); current.end = ts; } else { if (current) groups.push(current); current = { role: roleKey, start: ts, texts: [text] }; } }
+        if (current) groups.push(current);
+        return groups.map(g => { const label = g.role === 'agent' ? 'You' : (g.role === 'customer' ? contactFirst : 'Speaker'); const avatar = g.role === 'agent' ? ad_getAgentAvatar() : ad_getContactAvatar(contactFirst, r); return `<div class=\"transcript-message ${g.role}\"><div class=\"transcript-avatar\">${avatar}</div><div class=\"transcript-content\"><div class=\"transcript-header\"><span class=\"transcript-speaker\">${label}</span><span class=\"transcript-time\">${toMMSS(g.start)}</span></div><div class=\"transcript-text\">${escapeHtml(g.texts.join(' ').trim())}</div></div></div>`; }).join('');
       }
-      const rawText = String(raw||'').trim();
+      const rawText = String(raw || '').trim();
       if (rawText) return `<div class=\"transcript-message\"><div class=\"transcript-content\"><div class=\"transcript-text\">${escapeHtml(rawText)}</div></div></div>`;
       return 'Transcript not available';
     }
@@ -2331,8 +2332,8 @@ var console = {
       const ci = r.conversationalIntelligence || {};
       const sentences = Array.isArray(ci.sentences) ? ci.sentences : [];
       const channelMap = ci.channelRoleMap || {};
-      const normalizeChannel = (c)=>{ const s=(c==null?'':String(c)).trim(); if(s==='0') return '1'; if(/^[Aa]$/.test(s)) return '1'; if(/^[Bb]$/.test(s)) return '2'; return s; };
-      const resolveRole = (ch)=>{
+      const normalizeChannel = (c) => { const s = (c == null ? '' : String(c)).trim(); if (s === '0') return '1'; if (/^[Aa]$/.test(s)) return '1'; if (/^[Bb]$/.test(s)) return '2'; return s; };
+      const resolveRole = (ch) => {
         const n = normalizeChannel(ch);
         const mapped = channelMap[n];
         if (mapped === 'agent' || mapped === 'customer') return mapped;
@@ -2341,10 +2342,10 @@ var console = {
         if (agentCh) return 'customer';
         return '';
       };
-      if (sentences.length && (Object.keys(channelMap).length || ci.agentChannel!=null || channelMap.agentChannel!=null)){
-        const turns = sentences.map(s=>{
+      if (sentences.length && (Object.keys(channelMap).length || ci.agentChannel != null || channelMap.agentChannel != null)) {
+        const turns = sentences.map(s => {
           const role = resolveRole(s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex) || 'other';
-          const t = Math.max(0, Number(s.startTime||0));
+          const t = Math.max(0, Number(s.startTime || 0));
           const text = (s.text || s.transcript || '').trim();
           return { t, role, text };
         });
@@ -2352,10 +2353,10 @@ var console = {
       } else {
         transcriptHtml = renderTranscriptHtml(AI, r.formattedTranscript || r.transcript);
       }
-    } catch(_){
-      try { transcriptHtml = renderTranscriptHtml(AI, r.formattedTranscript || r.transcript); } catch(__){ transcriptHtml = 'Transcript not available'; }
+    } catch (_) {
+      try { transcriptHtml = renderTranscriptHtml(AI, r.formattedTranscript || r.transcript); } catch (__) { transcriptHtml = 'Transcript not available'; }
     }
-    
+
     // DEBUG: Log transcript data for debugging
     console.log('[Account Detail] Call transcript debug:', {
       callId: r.id,
@@ -2365,7 +2366,7 @@ var console = {
       transcriptPreview: r.transcript ? r.transcript.substring(0, 100) : 'N/A',
       hasAI: !!AI,
       aiKeys: AI ? Object.keys(AI) : [],
-      finalTranscriptRenderedPreview: (function(){ try{ return (transcriptHtml || '').slice(0, 100); }catch(_){ return 'N/A'; } })()
+      finalTranscriptRenderedPreview: (function () { try { return (transcriptHtml || '').slice(0, 100); } catch (_) { return 'N/A'; } })()
     });
     const rec = r.audioUrl || r.recordingUrl || '';
     let proxied = '';
@@ -2385,13 +2386,13 @@ var console = {
     const rate = contract.currentRate || contract.rate || 'Unknown';
     const supplier = contract.supplier || contract.utility || 'Unknown';
     const contractEnd = contract.contractEnd || contract.endDate || 'Not discussed';
-    const usage = (contract.usageKWh || contract.usage || 'Not provided')+'';
+    const usage = (contract.usageKWh || contract.usage || 'Not provided') + '';
     const rateType = contract.rateType || 'Unknown';
-    const contractLength = (contract.contractLength || 'Unknown')+'';
+    const contractLength = (contract.contractLength || 'Unknown') + '';
     const budget = AI.budget || 'Unclear';
     const timeline = AI.timeline || 'Not specified';
     const entities = Array.isArray(AI.entities) ? AI.entities : [];
-    const entitiesHtml = entities.length ? entities.slice(0,20).map(e=>`<span class=\"pc-chip\">${escapeHtml(e.type||'Entity')}: ${escapeHtml(e.text||'')}</span>`).join('') : '<span class=\"pc-chip\">None</span>';
+    const entitiesHtml = entities.length ? entities.slice(0, 20).map(e => `<span class=\"pc-chip\">${escapeHtml(e.type || 'Entity')}: ${escapeHtml(e.text || '')}</span>`).join('') : '<span class=\"pc-chip\">None</span>';
     return `
       <div class=\"insights-grid\"> 
         <div>
@@ -2402,7 +2403,7 @@ var console = {
             </h4>
             <div class=\"pc-chips\" style=\"margin:6px 0 10px 0;\">${chips}</div>
             <div style=\"color:var(--text-secondary); line-height:1.5; margin-bottom:8px;\">${escapeHtml(paragraph)}</div>
-            ${filteredBullets.length ? `<ul class=\"summary-bullets\" style=\"margin:0; padding-left:18px; color:var(--text-secondary);\">${filteredBullets.map(b=>`<li>${escapeHtml(b)}</li>`).join('')}</ul>` : ''}
+            ${filteredBullets.length ? `<ul class=\"summary-bullets\" style=\"margin:0; padding-left:18px; color:var(--text-secondary);\">${filteredBullets.map(b => `<li>${escapeHtml(b)}</li>`).join('')}</ul>` : ''}
           </div>
           <div class=\"ip-card\" style=\"margin-top:12px;\">
             <h4>
@@ -2443,12 +2444,12 @@ var console = {
           <div class=\"ip-card\" style=\"margin-top:12px;\"><h4><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><polyline points=\"9 18 15 12 9 6\"></polyline></svg> Next Steps</h4><div style=\"color:var(--text-secondary); font-size:12px;\">${nextHtml}</div></div>
           <div class=\"ip-card\" style=\"margin-top:12px;\"><h4><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z\"></path><line x1=\"12\" y1=\"9\" x2=\"12\" y2=\"13\"></line><line x1=\"12\" y1=\"17\" x2=\"12.01\" y2=\"17\"></line></svg> Pain Points</h4><div style=\"color:var(--text-secondary); font-size:12px;\">${painHtml}</div></div>
           <div class=\"ip-card\" style=\"margin-top:12px;\"><h4><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"></circle></svg> Entities</h4><div class=\"pc-chips\">${entitiesHtml}</div></div>
-          <div class=\"ip-card\" style=\"margin-top:12px; text-align:right;\"><button class=\"rc-icon-btn\" data-ci-btn=\"1\" onclick=\"(function(){ try{ (window.__triggerAccountCI||function(){})('${String(r.callSid||r.id||'')}','${String(r.recordingSid||'')}'); }catch(_){}})()\" aria-label=\"Process call insights\" title=\"Process call insights\">${svgEye()}</button></div>
+          <div class=\"ip-card\" style=\"margin-top:12px; text-align:right;\"><button class=\"rc-icon-btn\" data-ci-btn=\"1\" onclick=\"(function(){ try{ (window.__triggerAccountCI||function(){})('${String(r.callSid || r.id || '')}','${String(r.recordingSid || '')}'); }catch(_){}})()\" aria-label=\"Process call insights\" title=\"Process call insights\">${svgEye()}</button></div>
         </div>
       </div>`;
   }
 
-  function arcPatchList(list, slice){
+  function arcPatchList(list, slice) {
     // Build map of existing rows by id
     const rows = Array.from(list.querySelectorAll('.rc-item'));
     const byId = new Map();
@@ -2458,11 +2459,11 @@ var console = {
     slice.forEach(call => {
       const id = String(call.id || call.twilioSid || call.callSid || '');
       let row = byId.get(id);
-      const newSig = `${id}|${call.status||call.outcome||''}|${call.durationSec||call.duration||0}|${call.transcript?1:0}|${call.aiInsights?1:0}`;
-      if (row){
+      const newSig = `${id}|${call.status || call.outcome || ''}|${call.durationSec || call.duration || 0}|${call.transcript ? 1 : 0}|${call.aiInsights ? 1 : 0}`;
+      if (row) {
         // Move row to correct order if needed (keep rc-details sibling with it)
         const needMove = !anchor ? (list.firstElementChild !== row) : (anchor.nextSibling !== row);
-        if (needMove){
+        if (needMove) {
           const details = (row.nextElementSibling && row.nextElementSibling.classList.contains('rc-details')) ? row.nextElementSibling : null;
           if (!anchor) list.insertBefore(row, list.firstChild);
           else list.insertBefore(row, anchor.nextSibling);
@@ -2470,14 +2471,14 @@ var console = {
         }
         // Update content only if signature changed
         const oldSig = row.getAttribute('data-sig') || '';
-        if (oldSig !== newSig){
+        if (oldSig !== newSig) {
           row.setAttribute('data-sig', newSig);
           // Replace inner of row meta/actions only, keep row element and potential details sibling intact
           const html = rcItemHtml(call);
           const tmp = document.createElement('div');
           tmp.innerHTML = html.trim();
           const fresh = tmp.firstElementChild;
-          if (fresh){
+          if (fresh) {
             // Swap inner structure of row (children) without replacing row node
             row.innerHTML = fresh.innerHTML;
           }
@@ -2492,11 +2493,11 @@ var console = {
         else list.insertBefore(row, anchor.nextSibling);
         // Auto-open if this id was previously open
         try {
-          if (state._arcOpenIds && state._arcOpenIds.has(id)){
+          if (state._arcOpenIds && state._arcOpenIds.has(id)) {
             const btn = row.querySelector('.rc-icon-btn.rc-insights');
             if (btn) toggleRcDetails(btn, call);
           }
-        } catch(_) {}
+        } catch (_) { }
       }
       anchor = row;
       byId.delete(id);
@@ -2509,7 +2510,7 @@ var console = {
     });
   }
 
-  function svgEye(){
+  function svgEye() {
     return '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
   }
 
@@ -2530,9 +2531,9 @@ var console = {
         try {
           window._contactNavigationSource = 'account-details';
           window._contactNavigationAccountId = state.currentAccount?.id || null;
-        } catch (_) {}
+        } catch (_) { }
       }
-      
+
       // Open the modal using the proper function
       window.crm.createAddContactModal();
     } else {
@@ -2552,7 +2553,7 @@ var console = {
     // Handle input with debounce
     inputElement.addEventListener('input', (e) => {
       const searchTerm = e.target.value.trim();
-      
+
       // Clear debounce timer
       if (autocompleteDebounceTimer) {
         clearTimeout(autocompleteDebounceTimer);
@@ -2582,7 +2583,7 @@ var console = {
   function performParentCompanySearch(searchTerm, inputElement, dropdownElement, hiddenIdElement) {
     const accounts = window.getAccountsData ? window.getAccountsData() : [];
     const currentAccountId = state.currentAccount?.id || '';
-    
+
     // Filter accounts (exclude current account to prevent circular relationships)
     const lowerSearch = searchTerm.toLowerCase();
     const results = accounts.filter(account => {
@@ -2591,11 +2592,11 @@ var console = {
       const city = (account.city || account.locationCity || '').toLowerCase();
       const stateVal = (account.state || account.locationState || '').toLowerCase();
       const industry = (account.industry || '').toLowerCase();
-      
-      return name.includes(lowerSearch) || 
-             city.includes(lowerSearch) || 
-             stateVal.includes(lowerSearch) ||
-             industry.includes(lowerSearch);
+
+      return name.includes(lowerSearch) ||
+        city.includes(lowerSearch) ||
+        stateVal.includes(lowerSearch) ||
+        industry.includes(lowerSearch);
     }).slice(0, 10); // Limit to 10 results
 
     renderParentCompanyDropdown(results, inputElement, dropdownElement, hiddenIdElement);
@@ -2613,13 +2614,13 @@ var console = {
       const city = account.city || account.locationCity || '';
       const stateVal = account.state || account.locationState || '';
       const industry = account.industry || '';
-      
+
       // Build location/industry string
       const locationParts = [];
       if (city && stateVal) locationParts.push(`${city}, ${stateVal}`);
       else if (city) locationParts.push(city);
       else if (stateVal) locationParts.push(stateVal);
-      
+
       if (industry) locationParts.push(industry);
       const details = locationParts.join(' • ');
 
@@ -2631,18 +2632,18 @@ var console = {
           if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
           if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
           return '';
-        } catch(_) { return ''; }
+        } catch (_) { return ''; }
       };
-      const domain = account.domain ? String(account.domain).replace(/^https?:\/\//,'').replace(/\/$/,'').replace(/^www\./i,'') : deriveDomain(account.website || '');
+      const domain = account.domain ? String(account.domain).replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./i, '') : deriveDomain(account.website || '');
       const logoUrl = account.logoUrl || '';
-      
+
       let iconHTML = '';
       try {
         if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
           iconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
         }
-      } catch(_) {}
-      
+      } catch (_) { }
+
       if (!iconHTML) {
         const fallbackLetter = accountName ? accountName.charAt(0).toUpperCase() : 'C';
         iconHTML = `<div style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: var(--bg-item); border-radius: 6px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">${fallbackLetter}</div>`;
@@ -2680,7 +2681,7 @@ var console = {
 
   // Edit Account modal (reuse Add Account modal styles)
   // Assign to variable declared at top for event delegation scope
-  openEditAccountModal = function() {
+  openEditAccountModal = function () {
     const a = state.currentAccount || {};
     const overlay = document.createElement('div');
     overlay.className = 'pc-modal';
@@ -2709,20 +2710,20 @@ var console = {
             <div class="form-row" style="grid-template-columns: 1fr;">
               <label>Service Addresses
                 <div id="edit-service-addresses-container" style="display: flex; flex-direction: column; gap: 8px;">
-                  ${(a.serviceAddresses && Array.isArray(a.serviceAddresses) && a.serviceAddresses.length > 0) ? 
-                    a.serviceAddresses.map((sa, idx) => `
+                  ${(a.serviceAddresses && Array.isArray(a.serviceAddresses) && a.serviceAddresses.length > 0) ?
+        a.serviceAddresses.map((sa, idx) => `
                       <div class="service-address-input-row" style="display: flex; gap: 8px; align-items: center;">
                         <input type="text" name="serviceAddress_${idx}" class="input-dark" placeholder="123 Main St, City, State" style="flex: 1;" value="${escapeHtml(sa.address || '')}" />
                         <button type="button" class="remove-service-address-btn" style="background: var(--grey-600); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Remove this service address">-</button>
                         <button type="button" class="add-service-address-btn" style="background: var(--orange-primary); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Add another service address">+</button>
                       </div>
-                    `).join('') : 
-                    `<div class="service-address-input-row" style="display: flex; gap: 8px; align-items: center;">
+                    `).join('') :
+        `<div class="service-address-input-row" style="display: flex; gap: 8px; align-items: center;">
                       <input type="text" name="serviceAddress_0" class="input-dark" placeholder="123 Main St, City, State" style="flex: 1;" />
                       <button type="button" class="remove-service-address-btn" style="background: var(--grey-600); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Remove this service address">-</button>
                       <button type="button" class="add-service-address-btn" style="background: var(--orange-primary); color: white; border: none; border-radius: 4px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;" title="Add another service address">+</button>
                     </div>`
-                  }
+      }
                 </div>
               </label>
             </div>
@@ -2769,10 +2770,10 @@ var console = {
     const dialog = overlay.querySelector('.pc-modal__dialog');
     const backdrop = overlay.querySelector('.pc-modal__backdrop');
     const form = overlay.querySelector('#form-edit-account');
-    
+
     // Open modal with animation (same as add modals)
     overlay.removeAttribute('hidden');
-    
+
     // Double requestAnimationFrame ensures browser is ready for smooth animation
     // This prevents choppy first render by giving browser time to create compositor layers
     requestAnimationFrame(() => {
@@ -2780,20 +2781,20 @@ var console = {
         overlay.classList.add('show');
       });
     });
-    
-    const close = () => { 
-      try { 
+
+    const close = () => {
+      try {
         // Close with animation
         overlay.classList.remove('show');
         setTimeout(() => {
           overlay.remove();
         }, 200); // Match animation duration
-      } catch(_) {} 
+      } catch (_) { }
     };
-    
+
     backdrop?.addEventListener('click', close);
     overlay.querySelectorAll('[data-close="edit-account"]').forEach(btn => btn.addEventListener('click', close));
-    
+
     // Focus management: move focus to Close button if present, else first input
     setTimeout(() => {
       const closeBtn = overlay.querySelector('.pc-modal__close');
@@ -2829,7 +2830,7 @@ var console = {
       editServiceAddressesContainer.addEventListener('click', (e) => {
         const plusBtn = e.target.closest('.add-service-address-btn');
         const minusBtn = e.target.closest('.remove-service-address-btn');
-        
+
         if (plusBtn) {
           e.preventDefault();
           const container = overlay.querySelector('#edit-service-addresses-container');
@@ -2862,7 +2863,7 @@ var console = {
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const fd = new FormData(form);
-      
+
       // Collect service addresses
       const serviceAddresses = [];
       form.querySelectorAll('[name^="serviceAddress_"]').forEach((input, idx) => {
@@ -2873,7 +2874,7 @@ var console = {
           });
         }
       });
-      
+
       const updates = {
         accountName: (fd.get('accountName') || '').toString().trim(),
         industry: (fd.get('industry') || '').toString().trim(),
@@ -2902,9 +2903,9 @@ var console = {
       if (db && id) {
         try { await db.collection('accounts').doc(id).update(updates); } catch (err) { console.warn('Failed to save account', err); }
       }
-      try { Object.assign(state.currentAccount, updates); } catch (_) {}
-      try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) {}
-      try { renderAccountDetail(); } catch (_) {}
+      try { Object.assign(state.currentAccount, updates); } catch (_) { }
+      try { window.crm?.showToast && window.crm.showToast('Saved'); } catch (_) { }
+      try { renderAccountDetail(); } catch (_) { }
       close();
     });
   };  // End of openEditAccountModal assignment
@@ -2929,14 +2930,14 @@ var console = {
     document.addEventListener('pc:account-created', (e) => {
       if (state.currentAccount && e.detail) {
         const { id, doc } = e.detail;
-        
+
         // Only update if this is the current account being viewed
         if (id === state.currentAccount.id) {
           console.log('[AccountDetail] Account updated via pc:account-created, refreshing display');
-          
+
           // Update the current account data with new fields
           state.currentAccount = { ...state.currentAccount, ...doc };
-          
+
           // Re-render the account detail to show updated fields
           renderAccountDetail();
         }
@@ -2947,7 +2948,7 @@ var console = {
     document.addEventListener('pc:contact-created', async (e) => {
       if (state.currentAccount && e.detail) {
         const newContact = e.detail.contact || e.detail.doc;
-        
+
         // Inject into essential data if not already there
         if (newContact && window._essentialContactsData) {
           const exists = window._essentialContactsData.find(c => c.id === newContact.id);
@@ -2956,7 +2957,7 @@ var console = {
             console.log('[AccountDetail] Added new contact to essential data');
           }
         }
-        
+
         // Update ALL contact caches to include the new contact
         if (newContact) {
           // Update account detail people cache
@@ -2968,7 +2969,7 @@ var console = {
             window._accountDetailPeopleCache.push(newContact);
             console.log('[AccountDetail] Added new contact to _accountDetailPeopleCache');
           }
-          
+
           // Update BackgroundContactsLoader if available
           if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
             const contactsData = window.BackgroundContactsLoader.getContactsData() || [];
@@ -2978,7 +2979,7 @@ var console = {
               console.log('[AccountDetail] Added new contact to BackgroundContactsLoader');
             }
           }
-          
+
           // Update CacheManager contacts asynchronously
           if (window.CacheManager && typeof window.CacheManager.get === 'function') {
             window.CacheManager.get('contacts').then(contacts => {
@@ -2994,13 +2995,13 @@ var console = {
               console.warn('[AccountDetail] Failed to update cache:', err);
             });
           }
-          
+
           // Dispatch event to notify other modules
           try {
             const event = new CustomEvent('pc:contacts-loaded', {
-              detail: { 
+              detail: {
                 count: window._accountDetailPeopleCache.length,
-                newContact: true 
+                newContact: true
               }
             });
             document.dispatchEvent(event);
@@ -3009,7 +3010,7 @@ var console = {
             console.warn('[AccountDetail] Failed to dispatch event:', err);
           }
         }
-        
+
         // Refresh the contacts list
         const contactsList = document.getElementById('account-contacts-list');
         if (contactsList) {
@@ -3025,7 +3026,7 @@ var console = {
       if (state.currentAccount && e.detail) {
         const contactId = e.detail.id;
         const changes = e.detail.changes || {};
-        
+
         // Update the contact in essential data
         if (window._essentialContactsData) {
           const idx = window._essentialContactsData.findIndex(c => c.id === contactId);
@@ -3037,7 +3038,7 @@ var console = {
             console.log('[AccountDetail] Updated contact in essential data');
           }
         }
-        
+
         // Update account detail people cache
         if (window._accountDetailPeopleCache && Array.isArray(window._accountDetailPeopleCache)) {
           const idx = window._accountDetailPeopleCache.findIndex(c => c.id === contactId);
@@ -3049,7 +3050,7 @@ var console = {
             console.log('[AccountDetail] Updated contact in _accountDetailPeopleCache');
           }
         }
-        
+
         // Update BackgroundContactsLoader if available
         if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
           const contactsData = window.BackgroundContactsLoader.getContactsData() || [];
@@ -3062,7 +3063,7 @@ var console = {
             console.log('[AccountDetail] Updated contact in BackgroundContactsLoader');
           }
         }
-        
+
         // Update CacheManager
         if (window.CacheManager && typeof window.CacheManager.get === 'function') {
           window.CacheManager.get('contacts').then(contacts => {
@@ -3075,9 +3076,9 @@ var console = {
             }
           }).then(() => {
             console.log('[AccountDetail] Updated contact in CacheManager and persisted');
-          }).catch(() => {});
+          }).catch(() => { });
         }
-        
+
         // Refresh contacts list display
         const contactsList = document.getElementById('account-contacts-list');
         if (contactsList) {
@@ -3092,7 +3093,7 @@ var console = {
       backBtn.addEventListener('click', async () => {
         // Force save any pending batch updates before navigating away
         await forceSaveBatch();
-        
+
         // Check if we came from health widget (call scripts page)
         const healthReturnPage = sessionStorage.getItem('health-widget-return-page');
         if (healthReturnPage) {
@@ -3102,14 +3103,14 @@ var console = {
           }
           return;
         }
-        
-        
+
+
         // Check if we came from dashboard activities
         if (window._dashboardNavigationSource === 'activities') {
           // Navigate back to dashboard and restore pagination state
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             window.crm.navigateToPage('dashboard');
-            
+
             // Restore dashboard pagination state
             setTimeout(() => {
               try {
@@ -3117,13 +3118,13 @@ var console = {
                 if (window.ActivityManager && restore.page !== undefined) {
                   // Restore the specific page
                   window.ActivityManager.goToPage('home-activity-timeline', 'global', restore.page);
-                  
+
                   // Restore scroll position
                   if (restore.scroll !== undefined) {
                     window.scrollTo(0, restore.scroll);
                   }
                 }
-                
+
                 // Clear navigation markers AFTER successful navigation and restore
                 window._dashboardNavigationSource = null;
                 window._dashboardReturn = null;
@@ -3134,7 +3135,7 @@ var console = {
           }
           return;
         }
-        
+
         // Check if we came from Calls page
         if (window._accountNavigationSource === 'calls') {
           try {
@@ -3144,15 +3145,17 @@ var console = {
               // Restore Calls state
               setTimeout(() => {
                 try {
-                  const ev = new CustomEvent('pc:calls-restore', { detail: {
-                    page: restore.page,
-                    scroll: restore.scroll,
-                    filters: restore.filters,
-                    selectedItems: restore.selectedItems,
-                    searchTerm: restore.searchTerm
-                  }});
+                  const ev = new CustomEvent('pc:calls-restore', {
+                    detail: {
+                      page: restore.page,
+                      scroll: restore.scroll,
+                      filters: restore.filters,
+                      selectedItems: restore.selectedItems,
+                      searchTerm: restore.searchTerm
+                    }
+                  });
                   document.dispatchEvent(ev);
-                } catch(_) {}
+                } catch (_) { }
               }, 60);
             }
             // Clear navigation markers after successful navigation
@@ -3161,7 +3164,7 @@ var console = {
           } catch (_) { /* noop */ }
           return;
         }
-        
+
         // Special case: if we arrived here from Contact Detail's company link,
         // return back to that contact detail view.
         if (window._contactNavigationSource === 'contact-detail' && window._contactNavigationContactId) {
@@ -3206,15 +3209,15 @@ var console = {
               try {
                 window.__restoringPeople = true;
                 window.__restoringPeopleUntil = Date.now() + 15000; // 15 seconds
-              } catch (_) {}
-              
+              } catch (_) { }
+
               window.crm.navigateToPage('people');
               // Dispatch an event for People page to restore pagination and scroll
               setTimeout(() => {
                 try {
                   const ev = new CustomEvent('pc:people-restore', { detail: { page: restore.page, scroll: restore.scroll, currentPage: restore.currentPage || restore.page } });
                   document.dispatchEvent(ev);
-                } catch(_) {}
+                } catch (_) { }
               }, 40);
             }
             // Clear navigation markers after successful navigation
@@ -3236,7 +3239,7 @@ var console = {
                   if (restore.taskId && window.TaskDetail && typeof window.TaskDetail.open === 'function') {
                     window.TaskDetail.open(restore.taskId, restore.source || 'dashboard');
                   }
-                } catch(_) {}
+                } catch (_) { }
               }, 80);
             }
             // Clear navigation markers after successful navigation
@@ -3251,15 +3254,15 @@ var console = {
           try {
             const restore = window._accountDetailsReturnData || {};
             const returnAccountId = restore.accountId;
-            
+
             if (returnAccountId && window.AccountDetail && typeof window.AccountDetail.show === 'function') {
               // Clear navigation markers first to prevent loops
               window._accountNavigationSource = null;
               window._accountDetailsReturnData = null;
-              
+
               // Navigate back to the previous account detail page
               window.AccountDetail.show(returnAccountId);
-              
+
               // Restore scroll position after the account detail renders
               setTimeout(() => {
                 try {
@@ -3267,7 +3270,7 @@ var console = {
                   if (scrollY > 0) {
                     window.scrollTo(0, scrollY);
                   }
-                } catch(_) {}
+                } catch (_) { }
               }, 100);
             } else {
               // Fallback: if no valid return account ID, go to accounts list
@@ -3295,54 +3298,58 @@ var console = {
             console.log('[Account Detail] Back button: Returning to accounts page with restore data:', restore);
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               // Set robust restoration flags with longer timeout
-              try { 
-                window.__restoringAccounts = true; 
+              try {
+                window.__restoringAccounts = true;
                 window.__restoringAccountsUntil = Date.now() + 10000; // Increased to 10 seconds
                 // Store restore data globally for fallback
                 window.__accountsRestoreData = restore;
-              } catch (_) {}
-              
+              } catch (_) { }
+
               window.crm.navigateToPage('accounts');
-              
+
               // Dispatch an event for Accounts page to restore UI state when ready
               const start = Date.now();
               const deadline = start + 8000; // Increased to 8 seconds
               let attempts = 0;
-              (function tryRestore(){
+              (function tryRestore() {
                 attempts++;
                 if (Date.now() > deadline) {
                   console.warn('[Account Detail] Back button: Accounts page not ready after 8 seconds, using fallback');
                   // Fallback: try to restore anyway
-                try {
-                  const ev = new CustomEvent('pc:accounts-restore', { detail: {
-                      page: restore.page, scroll: restore.scroll, filters: restore.filters, selectedItems: restore.selectedItems, searchTerm: restore.searchTerm,
-                      sortColumn: restore.sortColumn, sortDirection: restore.sortDirection, currentPage: restore.currentPage || restore.page,
-                      timestamp: Date.now(), fallback: true
-                    } });
-                  document.dispatchEvent(ev);
+                  try {
+                    const ev = new CustomEvent('pc:accounts-restore', {
+                      detail: {
+                        page: restore.page, scroll: restore.scroll, filters: restore.filters, selectedItems: restore.selectedItems, searchTerm: restore.searchTerm,
+                        sortColumn: restore.sortColumn, sortDirection: restore.sortDirection, currentPage: restore.currentPage || restore.page,
+                        timestamp: Date.now(), fallback: true
+                      }
+                    });
+                    document.dispatchEvent(ev);
                     console.log('[Account Detail] Back button: Dispatched fallback pc:accounts-restore event');
-                } catch(_) {}
+                  } catch (_) { }
                   return;
                 }
-                
+
                 try {
                   const page = document.getElementById('accounts-page');
                   const accountsModule = window.accountsModule;
                   if (page && page.offsetParent !== null && accountsModule) {
-                    const ev = new CustomEvent('pc:accounts-restore', { detail: {
-                      page: restore.page, scroll: restore.scroll, filters: restore.filters, selectedItems: restore.selectedItems, searchTerm: restore.searchTerm,
-                      sortColumn: restore.sortColumn, sortDirection: restore.sortDirection, currentPage: restore.currentPage || restore.page,
-                      timestamp: Date.now()
-                    } });
+                    const ev = new CustomEvent('pc:accounts-restore', {
+                      detail: {
+                        page: restore.page, scroll: restore.scroll, filters: restore.filters, selectedItems: restore.selectedItems, searchTerm: restore.searchTerm,
+                        sortColumn: restore.sortColumn, sortDirection: restore.sortDirection, currentPage: restore.currentPage || restore.page,
+                        timestamp: Date.now()
+                      }
+                    });
                     document.dispatchEvent(ev);
                     console.log('[Account Detail] Back button: Dispatched pc:accounts-restore event (ready) after', attempts, 'attempts');
-                    
+
                     // Clear global restore data after successful dispatch
-                    try { window.__accountsRestoreData = null; } catch(_) {}
+                    try { window.__accountsRestoreData = null; } catch (_) { }
                     return;
                   }
-                } catch(_) {}
-                
+                } catch (_) { }
+
                 // Use setTimeout instead of requestAnimationFrame for more reliable timing
                 setTimeout(tryRestore, 100);
               })();
@@ -3353,7 +3360,7 @@ var console = {
           } catch (_) { /* noop */ }
           return;
         }
-        
+
         // Check if we came from list detail page
         if (window._accountNavigationSource === 'list-detail' && window._accountNavigationListId) {
           console.log('Returning to list detail page:', window._accountNavigationListId);
@@ -3367,28 +3374,28 @@ var console = {
                 listName: window._accountNavigationListName || 'List',
                 listKind: (window._accountNavigationListView === 'people') ? 'people' : 'accounts'
               };
-            } catch (_) {}
+            } catch (_) { }
             // Set restoration flag BEFORE navigation
             try {
               window.__restoringListDetail = true;
               window.__restoringListDetailUntil = Date.now() + 10000; // 10 seconds
-            } catch (_) {}
-            
+            } catch (_) { }
+
             window.crm.navigateToPage('list-detail');
-            
+
             // Dispatch restore event with retry mechanism
             setTimeout(() => {
               const restore = window._listDetailReturn || {};
               const deadline = Date.now() + 8000; // 8 second timeout
               let attempts = 0;
-              
+
               const tryRestore = () => {
                 attempts++;
                 if (Date.now() > deadline) {
                   console.warn('[Account Detail] List detail page not ready after 8 seconds');
                   return;
                 }
-                
+
                 try {
                   const page = document.getElementById('list-detail-page');
                   const listDetailModule = window.ListDetail;
@@ -3408,12 +3415,12 @@ var console = {
                     console.log('[AccountDetail] Dispatched pc:list-detail-restore event (ready) after', attempts, 'attempts');
                     return;
                   }
-                } catch (_) {}
-                
+                } catch (_) { }
+
                 // Retry after 80ms
                 setTimeout(tryRestore, 80);
               };
-              
+
               tryRestore();
             }, 60);
           }
@@ -3425,7 +3432,7 @@ var console = {
           window._listDetailReturn = null;
           return;
         }
-        
+
         // Check if we came from adding an account
         if (window._accountNavigationSource === 'add-account') {
           try {
@@ -3435,22 +3442,24 @@ var console = {
               // Navigate back to the page where the user was before adding the account
               const targetPage = restore.page || 'accounts';
               window.crm.navigateToPage(targetPage);
-              
+
               // Restore state if we're going back to accounts page
               if (targetPage === 'accounts') {
                 setTimeout(() => {
                   try {
-                    const ev = new CustomEvent('pc:accounts-restore', { detail: {
-                      page: restore.page,
-                      scroll: restore.scroll,
-                      searchTerm: restore.searchTerm,
-                      sortColumn: restore.sortColumn,
-                      sortDirection: restore.sortDirection,
-                      selectedItems: restore.selectedItems
-                    }});
+                    const ev = new CustomEvent('pc:accounts-restore', {
+                      detail: {
+                        page: restore.page,
+                        scroll: restore.scroll,
+                        searchTerm: restore.searchTerm,
+                        sortColumn: restore.sortColumn,
+                        sortDirection: restore.sortDirection,
+                        selectedItems: restore.selectedItems
+                      }
+                    });
                     document.dispatchEvent(ev);
                     console.log('[Account Detail] Back button: Dispatched pc:accounts-restore event for add-account flow');
-                  } catch(_) {}
+                  } catch (_) { }
                 }, 60);
               }
             }
@@ -3460,7 +3469,7 @@ var console = {
           } catch (_) { /* noop */ }
           return;
         }
-        
+
         // Default behavior: return to accounts page
         try { window.crm && window.crm.navigateToPage('accounts'); } catch (e) { /* noop */ }
         // Rebind accounts page dynamic handlers
@@ -3548,8 +3557,8 @@ var console = {
         const copyBtn = e.target.closest?.('.title-copy');
         if (copyBtn) {
           const txt = (nameEl?.textContent || '').trim();
-          try { await navigator.clipboard?.writeText(txt); } catch (_) {}
-          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) {}
+          try { await navigator.clipboard?.writeText(txt); } catch (_) { }
+          try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) { }
           return;
         }
 
@@ -3581,7 +3590,7 @@ var console = {
         e.preventDefault();
         e.stopPropagation();
         if (document.querySelector('.task-popover')) {
-          try { document.querySelector('.task-popover')?.remove(); } catch(_) {}
+          try { document.querySelector('.task-popover')?.remove(); } catch (_) { }
         } else {
           openAccountTaskPopover(taskBtn);
         }
@@ -3606,16 +3615,16 @@ var console = {
             beginEditField(wrap, field);
             return;
           }
-          
+
           // Copy button
           const copyBtn = e.target.closest('.info-copy');
           if (copyBtn) {
             const txt = wrap.querySelector('.info-value-text')?.textContent?.trim() || '';
-            try { await navigator.clipboard?.writeText(txt); } catch (_) {}
-            try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) {}
+            try { await navigator.clipboard?.writeText(txt); } catch (_) { }
+            try { window.crm?.showToast && window.crm.showToast('Copied'); } catch (_) { }
             return;
           }
-          
+
           // Delete button
           const delBtn = e.target.closest('.info-delete');
           if (delBtn) {
@@ -3653,7 +3662,7 @@ var console = {
         e.stopPropagation(); // Prevent triggering the contact container click
         const action = btn.getAttribute('data-action');
         const contactId = btn.getAttribute('data-contact-id');
-        
+
         if (contactId && window.getPeopleData) {
           try {
             const contacts = window.getPeopleData() || [];
@@ -3670,13 +3679,13 @@ var console = {
 
     // Bind contact item events
     bindContactItemEvents();
-    
+
     // Bind contacts pagination
     bindContactsPagination();
-    
+
     // Bind parent company / subsidiaries navigation
     bindParentSubsidiariesNavigation();
-    
+
     // Bind subsidiaries pagination
     bindSubsidiariesPagination();
 
@@ -3687,20 +3696,20 @@ var console = {
         e.preventDefault();
         const a = state.currentAccount;
         if (!a) return;
-        
+
         // Get current service addresses
         const currentAddresses = (a.serviceAddresses && Array.isArray(a.serviceAddresses)) ? a.serviceAddresses : [];
-        
+
         // Add a new empty address
         const newAddress = { address: '', isPrimary: currentAddresses.length === 0 };
         const updatedAddresses = [...currentAddresses, newAddress];
-        
+
         // Save to Firestore
         await saveServiceAddresses(updatedAddresses);
-        
+
         // Re-render the page to show the new address in edit mode
         renderAccountDetail();
-        
+
         // Find the newly added address field and start editing it
         setTimeout(() => {
           const newIndex = updatedAddresses.length - 1;
@@ -3751,20 +3760,20 @@ var console = {
         contactName.style.fontWeight = '600';
         console.log('Applied font size to contact name:', contactName.textContent);
       }
-      
+
       item.addEventListener('click', (e) => {
         // Don't trigger if clicking on quick action buttons
         if (e.target.closest('.contact-quick-action-btn')) return;
-        
+
         const contactId = item.getAttribute('data-contact-id');
         console.log('Contact clicked:', contactId, 'ContactDetail available:', !!window.ContactDetail);
-        
+
         if (contactId) {
           // Store the source page for back button navigation
           window._contactNavigationSource = 'account-details';
           window._contactNavigationAccountId = state.currentAccount?.id;
           window._contactNavigationAccount = state.currentAccount; // Store full object for prefetch
-          
+
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             // Pre-hide the people page table to prevent flicker before contact detail loads
             const peoplePage = document.getElementById('people-page');
@@ -3772,10 +3781,10 @@ var console = {
             if (tableContainer) {
               tableContainer.classList.add('hidden');
             }
-            
+
             // Navigate to people page and immediately show contact in one smooth motion
             window.crm.navigateToPage('people');
-            
+
             // Use requestAnimationFrame for smoother transition - show contact immediately on next frame
             requestAnimationFrame(() => {
               let attempts = 0;
@@ -3852,7 +3861,7 @@ var console = {
             } else {
               // Fallback: click compose button and prefill the To field
               document.getElementById('compose-email-btn')?.click();
-              setTimeout(()=>{ const to = document.getElementById('compose-to'); if (to) to.value = email; }, 120);
+              setTimeout(() => { const to = document.getElementById('compose-to'); if (to) to.value = email; }, 120);
             }
           } catch (e) { /* noop */ }
         }
@@ -3863,38 +3872,38 @@ var console = {
 
   function loadAccountActivities() {
     if (!window.ActivityManager || !state.currentAccount) return;
-    
+
     const accountId = state.currentAccount.id;
     window.ActivityManager.renderActivities('account-activity-timeline', 'account', accountId);
-    
+
     // Setup pagination
     setupActivityPagination('account', accountId);
   }
 
   function setupActivityPagination(entityType, entityId) {
     const paginationEl = document.getElementById(`${entityType}-activity-pagination`);
-    
+
     if (!paginationEl) return;
-    
+
     // Show pagination if there are more than 4 activities
     const updatePagination = async () => {
       if (!window.ActivityManager) return;
-      
+
       const activities = await window.ActivityManager.getActivities(entityType, entityId);
       const totalPages = Math.ceil(activities.length / window.ActivityManager.maxActivitiesPerPage);
-      
+
       if (totalPages > 1) {
         paginationEl.style.display = 'flex';
-        
+
         // Use unified pagination component
         if (window.crm && window.crm.createPagination) {
           window.crm.createPagination(
-            window.ActivityManager.currentPage + 1, 
-            totalPages, 
+            window.ActivityManager.currentPage + 1,
+            totalPages,
             (page) => {
               window.ActivityManager.goToPage(page - 1, `${entityType}-activity-timeline`, entityType, entityId);
               updatePagination();
-            }, 
+            },
             paginationEl.id
           );
         }
@@ -3902,7 +3911,7 @@ var console = {
         paginationEl.style.display = 'none';
       }
     };
-    
+
     updatePagination();
   }
 
@@ -3927,7 +3936,7 @@ var console = {
           } catch (_) { /* noop */ }
         }
         console.log('Widget: Notes for account', accountId);
-        try { window.crm?.showToast && window.crm.showToast('Open Notes'); } catch (_) {}
+        try { window.crm?.showToast && window.crm.showToast('Open Notes'); } catch (_) { }
         break;
       }
       case 'health': {
@@ -3946,7 +3955,7 @@ var console = {
           } catch (_) { /* noop */ }
         }
         console.log('Widget: Energy Health Check for account', accountId);
-        try { window.crm?.showToast && window.crm.showToast('Open Energy Health Check'); } catch (_) {}
+        try { window.crm?.showToast && window.crm.showToast('Open Energy Health Check'); } catch (_) { }
         break;
       }
       case 'deal': {
@@ -3965,7 +3974,7 @@ var console = {
           } catch (_) { /* noop */ }
         }
         console.log('Widget: Deal Calculator for account', accountId);
-        try { window.crm?.showToast && window.crm.showToast('Open Deal Calculator'); } catch (_) {}
+        try { window.crm?.showToast && window.crm.showToast('Open Deal Calculator'); } catch (_) { }
         break;
       }
       case 'lusha': {
@@ -3983,7 +3992,7 @@ var console = {
           } catch (_) { /* noop */ }
         }
         console.log('Widget: Prospect for account', accountId);
-        try { window.crm?.showToast && window.crm.showToast('Open Prospect'); } catch (_) {}
+        try { window.crm?.showToast && window.crm.showToast('Open Prospect'); } catch (_) { }
         break;
       }
       case 'maps': {
@@ -4002,7 +4011,7 @@ var console = {
           } catch (_) { /* noop */ }
         }
         console.log('Widget: Google Maps for account', accountId);
-        try { window.crm?.showToast && window.crm.showToast('Open Google Maps'); } catch (_) {}
+        try { window.crm?.showToast && window.crm.showToast('Open Google Maps'); } catch (_) { }
         break;
       }
       default:
@@ -4036,21 +4045,21 @@ var console = {
       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
     </svg>`;
   }
-  
+
   function copyIcon() {
     return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
     </svg>`;
   }
-  
+
   function trashIcon() {
     return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <polyline points="3 6 5 6 21 6"/>
       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
     </svg>`;
   }
-  
+
   function saveIcon() {
     return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -4068,9 +4077,9 @@ var console = {
   function openAccountTaskPopover(anchorEl) {
     if (!anchorEl) return;
     // Close any existing
-    try { document.querySelector('.task-popover')?.remove(); } catch(_) {}
+    try { document.querySelector('.task-popover')?.remove(); } catch (_) { }
     // Ensure styles are present before first render (so it doesn't rely on Contact Detail injection)
-    try { injectAccountTaskPopoverStyles(); } catch(_) {}
+    try { injectAccountTaskPopoverStyles(); } catch (_) { }
 
     const pop = document.createElement('div');
     pop.className = 'task-popover';
@@ -4080,7 +4089,7 @@ var console = {
     const a = state.currentAccount || {};
     const company = a.accountName || a.name || a.companyName || 'this account';
 
-    const nextBiz = (function getNextBusinessDayISO(){ const d=new Date(); let day=d.getDay(); let add=1; if(day===5) add=3; if(day===6) add=2; const nd=new Date(d.getFullYear(), d.getMonth(), d.getDate()+add); const yyyy=nd.getFullYear(); const mm=String(nd.getMonth()+1).padStart(2,'0'); const dd=String(nd.getDate()).padStart(2,'0'); return `${yyyy}-${mm}-${dd}`; })();
+    const nextBiz = (function getNextBusinessDayISO() { const d = new Date(); let day = d.getDay(); let add = 1; if (day === 5) add = 3; if (day === 6) add = 2; const nd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + add); const yyyy = nd.getFullYear(); const mm = String(nd.getMonth() + 1).padStart(2, '0'); const dd = String(nd.getDate()).padStart(2, '0'); return `${yyyy}-${mm}-${dd}`; })();
     const nextBizDate = new Date(nextBiz + 'T00:00:00');
 
     pop.innerHTML = `
@@ -4175,7 +4184,7 @@ var console = {
       const top = Math.round(window.scrollY + rect.bottom + 10);
       pop.style.top = `${top}px`;
       pop.style.left = `${clampedLeft}px`;
-      try { pop.style.setProperty('--arrow-left', `${Math.round(anchorCenter - clampedLeft)}px`); pop.setAttribute('data-placement','bottom'); } catch(_) {}
+      try { pop.style.setProperty('--arrow-left', `${Math.round(anchorCenter - clampedLeft)}px`); pop.setAttribute('data-placement', 'bottom'); } catch (_) { }
       const arrow = pop.querySelector('.arrow');
       if (arrow) {
         const anchorCenterRelativeToPopover = anchorCenter - clampedLeft;
@@ -4188,7 +4197,7 @@ var console = {
     // Bind events similar to ContactDetail
     const form = pop.querySelector('#account-task-form');
     const closeBtn = pop.querySelector('#tp-close');
-    closeBtn?.addEventListener('click', () => { try { pop.remove(); } catch(_) {} });
+    closeBtn?.addEventListener('click', () => { try { pop.remove(); } catch (_) { } });
 
     // Dropdown toggles
     const typeToggle = pop.querySelector('#type-toggle');
@@ -4210,35 +4219,35 @@ var console = {
 
     // Calendar dropdown (mirrors Contact Detail behavior)
     let calDate = new Date();
-    function toMDY(d){ const mm=String(d.getMonth()+1).padStart(2,'0'); const dd=String(d.getDate()).padStart(2,'0'); const yyyy=d.getFullYear(); return `${mm}/${dd}/${yyyy}`; }
-    function renderCalendar(){
+    function toMDY(d) { const mm = String(d.getMonth() + 1).padStart(2, '0'); const dd = String(d.getDate()).padStart(2, '0'); const yyyy = d.getFullYear(); return `${mm}/${dd}/${yyyy}`; }
+    function renderCalendar() {
       if (!calendarToolbar) return;
       const y = calDate.getFullYear(); const m = calDate.getMonth();
-      const first = new Date(y, m, 1); const last = new Date(y, m+1, 0);
+      const first = new Date(y, m, 1); const last = new Date(y, m + 1, 0);
       const start = first.getDay(); const total = last.getDate();
       const todayISO = new Date().toISOString().split('T')[0];
-      const label = first.toLocaleString(undefined, { month:'long', year:'numeric' });
+      const label = first.toLocaleString(undefined, { month: 'long', year: 'numeric' });
       const days = [];
-      for (let i=0;i<start;i++) days.push('<span></span>');
-      for (let d=1; d<=total; d++){
-        const iso = new Date(y,m,d).toISOString().split('T')[0];
+      for (let i = 0; i < start; i++) days.push('<span></span>');
+      for (let d = 1; d <= total; d++) {
+        const iso = new Date(y, m, d).toISOString().split('T')[0];
         const isToday = iso === todayISO ? 'today' : '';
         days.push(`<button type="button" data-iso="${iso}" class="${isToday}">${d}</button>`);
       }
       calendarToolbar.innerHTML = `
         <header><button type="button" id="acct-cal-prev">◀</button><div class="month-label">${label}</div><button type="button" id="acct-cal-next">▶</button></header>
         <div class="calendar-grid">${days.join('')}</div>`;
-      calendarToolbar.querySelector('#acct-cal-prev')?.addEventListener('click', ()=>{ calDate = new Date(y, m-1, 1); renderCalendar(); });
-      calendarToolbar.querySelector('#acct-cal-next')?.addEventListener('click', ()=>{ calDate = new Date(y, m+1, 1); renderCalendar(); });
-      calendarToolbar.querySelectorAll('.calendar-grid button[data-iso]')?.forEach(btn=>{
-        btn.addEventListener('click', ()=>{ try { const sel = new Date(btn.getAttribute('data-iso')); dateInput.value = toMDY(sel); closeCalendar(); } catch(_){} });
+      calendarToolbar.querySelector('#acct-cal-prev')?.addEventListener('click', () => { calDate = new Date(y, m - 1, 1); renderCalendar(); });
+      calendarToolbar.querySelector('#acct-cal-next')?.addEventListener('click', () => { calDate = new Date(y, m + 1, 1); renderCalendar(); });
+      calendarToolbar.querySelectorAll('.calendar-grid button[data-iso]')?.forEach(btn => {
+        btn.addEventListener('click', () => { try { const sel = new Date(btn.getAttribute('data-iso')); dateInput.value = toMDY(sel); closeCalendar(); } catch (_) { } });
       });
     }
-    function openCalendar(){ if (!calendarToolbar) return; renderCalendar(); calendarToolbar.style.display='block'; calendarToolbar.offsetHeight; calendarToolbar.classList.add('calendar-slide-in'); pop.classList.add('calendar-expanded'); }
-    function closeCalendar(){ if (!calendarToolbar) return; calendarToolbar.classList.remove('calendar-slide-in'); calendarToolbar.classList.add('calendar-slide-out'); setTimeout(()=>{ calendarToolbar.style.display='none'; calendarToolbar.classList.remove('calendar-slide-out'); }, 200); pop.classList.remove('calendar-expanded'); }
-    function toggleCalendar(){ const visible = calendarToolbar && calendarToolbar.style.display === 'block'; if (visible) closeCalendar(); else openCalendar(); }
-    calendarToggle?.addEventListener('click', (e)=>{ e.stopPropagation(); toggleCalendar(); });
-    calendarToolbar?.addEventListener('mousedown', (e)=> e.stopPropagation());
+    function openCalendar() { if (!calendarToolbar) return; renderCalendar(); calendarToolbar.style.display = 'block'; calendarToolbar.offsetHeight; calendarToolbar.classList.add('calendar-slide-in'); pop.classList.add('calendar-expanded'); }
+    function closeCalendar() { if (!calendarToolbar) return; calendarToolbar.classList.remove('calendar-slide-in'); calendarToolbar.classList.add('calendar-slide-out'); setTimeout(() => { calendarToolbar.style.display = 'none'; calendarToolbar.classList.remove('calendar-slide-out'); }, 200); pop.classList.remove('calendar-expanded'); }
+    function toggleCalendar() { const visible = calendarToolbar && calendarToolbar.style.display === 'block'; if (visible) closeCalendar(); else openCalendar(); }
+    calendarToggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleCalendar(); });
+    calendarToolbar?.addEventListener('mousedown', (e) => e.stopPropagation());
     pop.addEventListener('click', (e) => {
       const opt = e.target.closest?.('.dropdown-option');
       if (!opt) return;
@@ -4248,7 +4257,7 @@ var console = {
       const value = opt.getAttribute('data-value');
       if (grid.classList.contains('type-grid')) {
         const input = pop.querySelector('input[name="type"]');
-        if (input) input.value = (value === 'phone-call') ? 'Phone Call' : value.replace(/-/g,' ')
+        if (input) input.value = (value === 'phone-call') ? 'Phone Call' : value.replace(/-/g, ' ')
           .replace(/\b\w/g, c => c.toUpperCase());
       } else {
         const input = pop.querySelector('input[name="priority"]');
@@ -4318,31 +4327,31 @@ var console = {
       } catch (err) {
         console.warn('Failed to save task to Firebase:', err);
       }
-      try { window.crm?.showToast && window.crm.showToast('Task created'); } catch (_) {}
-      try { window.crm && typeof window.crm.loadTodaysTasks === 'function' && window.crm.loadTodaysTasks(); } catch(_) {}
-      try { window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'account-detail', task: newTask } })); } catch(_) {}
-      try { pop.remove(); } catch(_) {}
+      try { window.crm?.showToast && window.crm.showToast('Task created'); } catch (_) { }
+      try { window.crm && typeof window.crm.loadTodaysTasks === 'function' && window.crm.loadTodaysTasks(); } catch (_) { }
+      try { window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'account-detail', task: newTask } })); } catch (_) { }
+      try { pop.remove(); } catch (_) { }
     });
 
     // Outside click and Escape close (and close toolbars)
     const onOutside = (ev) => { if (!pop.contains(ev.target) && ev.target !== anchorEl) { cleanup(); } };
     const onEsc = (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); cleanup(); } };
-    function cleanup(){ try { document.removeEventListener('mousedown', onOutside, true); document.removeEventListener('keydown', onEsc, true); } catch(_) {} try { pop.remove(); } catch(_) {} }
-    setTimeout(()=>{ document.addEventListener('mousedown', onOutside, true); document.addEventListener('keydown', onEsc, true); }, 0);
+    function cleanup() { try { document.removeEventListener('mousedown', onOutside, true); document.removeEventListener('keydown', onEsc, true); } catch (_) { } try { pop.remove(); } catch (_) { } }
+    setTimeout(() => { document.addEventListener('mousedown', onOutside, true); document.addEventListener('keydown', onEsc, true); }, 0);
   }
   // Begin inline editing for a field
   function beginEditField(wrap, field) {
     const textEl = wrap.querySelector('.info-value-text');
     if (!textEl) return;
-    
+
     const currentText = textEl.textContent || '';
-    
+
     const isMultiline = field === 'shortDescription';
     const inputControl = isMultiline
       ? `<textarea class="textarea-dark info-edit-textarea" rows="4">${escapeHtml(currentText === '--' ? '' : currentText)}</textarea>`
-    : (field === 'contractEndDate' 
-      ? `<input type="date" class="info-edit-input" value="${escapeHtml(toISODate(currentText))}">`
-      : `<input type="text" class="info-edit-input" value="${escapeHtml(currentText === '--' ? '' : currentText)}">`);
+      : (field === 'contractEndDate'
+        ? `<input type="date" class="info-edit-input" value="${escapeHtml(toISODate(currentText))}">`
+        : `<input type="text" class="info-edit-input" value="${escapeHtml(currentText === '--' ? '' : currentText)}">`);
     const inputHtml = `
       ${inputControl}
       <div class="info-actions">
@@ -4356,27 +4365,27 @@ var console = {
           </svg>
         </button>
       </div>`;
-    
+
     wrap.classList.add('editing');
     textEl.style.display = 'none';
-    
+
     const actionsEl = wrap.querySelector('.info-actions');
     if (actionsEl) {
       actionsEl.remove();
     }
-    
+
     const inputWrap = document.createElement('div');
     inputWrap.className = 'info-input-wrap' + (isMultiline ? ' info-input-wrap--multiline' : '');
     inputWrap.innerHTML = inputHtml;
-    
+
     const input = inputWrap.querySelector(isMultiline ? 'textarea' : 'input');
     const saveBtn = inputWrap.querySelector('.info-save');
     const cancelBtn = inputWrap.querySelector('.info-cancel');
-    
+
     if (input && saveBtn && cancelBtn) {
       wrap.appendChild(inputWrap);
       input.focus();
-      
+
       // Live comma formatting for annual usage (mirror contact details UX)
       if (field === 'annualUsage') {
         // Seed input with digits only (strip commas)
@@ -4393,10 +4402,10 @@ var console = {
           const afterLen = formatted.length;
           const delta = afterLen - beforeLen;
           const nextCaret = Math.max(0, Math.min(afterLen, caret + delta));
-          try { el.setSelectionRange(nextCaret, nextCaret); } catch (_) {}
+          try { el.setSelectionRange(nextCaret, nextCaret); } catch (_) { }
         });
       }
-      
+
       // Add supplier suggestions for electricity supplier field
       if (field === 'electricitySupplier') {
         console.log('[Account Detail] Adding supplier suggestions for field:', field);
@@ -4409,19 +4418,19 @@ var console = {
           console.warn('[Account Detail] window.addSupplierSuggestions not available');
         }
       }
-      
+
       // Save handler
       saveBtn.addEventListener('click', async (e) => {
         e.preventDefault();
         await commitEdit(wrap, field, input.value);
       });
-      
+
       // Cancel handler
       cancelBtn.addEventListener('click', (e) => {
         e.preventDefault();
         cancelEdit(wrap, field, currentText);
       });
-      
+
       // Enter/Escape key handler (Ctrl+Enter to save for multiline)
       input.addEventListener('keydown', async (e) => {
         if (!isMultiline && e.key === 'Enter') {
@@ -4442,7 +4451,7 @@ var console = {
           const caret = input.selectionStart;
           const formatted = formatDateInputAsMDY(input.value);
           input.value = formatted;
-          try { input.selectionStart = input.selectionEnd = Math.min(formatted.length, (caret||formatted.length)); } catch(_) {}
+          try { input.selectionStart = input.selectionEnd = Math.min(formatted.length, (caret || formatted.length)); } catch (_) { }
         });
       }
     }
@@ -4452,7 +4461,7 @@ var console = {
   function parsePhoneWithExtension(input) {
     const raw = (input || '').toString().trim();
     if (!raw) return { number: '', extension: '' };
-    
+
     // Common extension patterns
     const extensionPatterns = [
       /ext\.?\s*(\d+)/i,
@@ -4461,10 +4470,10 @@ var console = {
       /#\s*(\d+)/i,
       /\s+(\d{3,6})\s*$/  // 3-6 digits at the end (common extension length)
     ];
-    
+
     let number = raw;
     let extension = '';
-    
+
     // Try to find extension using various patterns
     for (const pattern of extensionPatterns) {
       const match = number.match(pattern);
@@ -4474,7 +4483,7 @@ var console = {
         break;
       }
     }
-    
+
     return { number, extension };
   }
 
@@ -4483,20 +4492,20 @@ var console = {
   function normalizePhone(input) {
     const raw = (input || '').toString().trim();
     if (!raw) return '';
-    
+
     // Parse phone number and extension
     const parsed = parsePhoneWithExtension(raw);
     if (!parsed.number) return '';
-    
+
     // Format the main number
     let formattedNumber = '';
     const cleaned = parsed.number.replace(/\D/g, '');
-    
+
     // Always display US numbers with +1 prefix and formatting
     if (cleaned.length === 11 && cleaned.startsWith('1')) {
-      formattedNumber = `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+      formattedNumber = `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
     } else if (cleaned.length === 10) {
-      formattedNumber = `+1 (${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+      formattedNumber = `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
     } else if (/^\+/.test(String(parsed.number))) {
       // International number - keep as-is
       formattedNumber = parsed.number;
@@ -4507,19 +4516,19 @@ var console = {
       // Fallback: return original if we can't format
       return raw;
     }
-    
+
     // Add extension if present
     if (parsed.extension) {
       return `${formattedNumber} ext. ${parsed.extension}`;
     }
-    
+
     return formattedNumber;
   }
 
   // Commit the edit to Firestore and update UI
   async function commitEdit(wrap, field, value) {
     console.log('[Account Detail] commitEdit called:', { field, value, type: typeof value });
-    
+
     // Special handling for service addresses
     if (field.startsWith('serviceAddress_')) {
       const addressIndex = parseInt(wrap.getAttribute('data-address-index'), 10);
@@ -4539,7 +4548,7 @@ var console = {
         }
       }
     }
-    
+
     // Convert contractEndDate to ISO for storage, display as MM/DD/YYYY via updateFieldText
     let toSave = value;
     if (field === 'contractEndDate') {
@@ -4602,7 +4611,7 @@ var console = {
     console.log('[Account Detail] Saving to Firebase:', { field, toSave });
     await saveField(field, toSave);
     updateFieldText(wrap, toSave);
-    
+
     // If phone field was updated, refresh all click-to-call bindings with the new number
     if (field === 'phone' || field === 'companyPhone' || field === 'primaryPhone' || field === 'mainPhone') {
       try {
@@ -4615,7 +4624,7 @@ var console = {
         }, 100);
       } catch (_) { /* noop */ }
     }
-    
+
     // Notify other pages (e.g., Accounts list) about immediate account changes
     try {
       const id = state.currentAccount?.id;
@@ -4624,7 +4633,7 @@ var console = {
       document.dispatchEvent(ev);
     } catch (_) { /* noop */ }
     // Notify widgets/pages to refresh energy fields
-    try { document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: state.currentAccount?.id, field, value: toSave } })); } catch(_) {}
+    try { document.dispatchEvent(new CustomEvent('pc:energy-updated', { detail: { entity: 'account', id: state.currentAccount?.id, field, value: toSave } })); } catch (_) { }
     cancelEdit(wrap, field, toSave);
   }
 
@@ -4634,23 +4643,23 @@ var console = {
     if (inputWrap) {
       inputWrap.remove();
     }
-    
+
     const textEl = wrap.querySelector('.info-value-text');
     if (textEl) {
       textEl.style.display = '';
     }
-    
+
     wrap.classList.remove('editing');
     ensureDefaultActions(wrap);
   }
-  
+
   // Batch update function for efficient Firebase writes
   async function processBatchUpdate() {
     if (Object.keys(updateBatch).length === 0) return;
-    
+
     const accountId = state.currentAccount?.id;
     if (!accountId) return;
-    
+
     try {
       const db = window.firebaseDB;
       if (db && typeof db.collection === 'function') {
@@ -4659,12 +4668,12 @@ var console = {
           ...updateBatch,
           updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp?.() || new Date()
         });
-        
+
         // Update local state for all batched fields
         if (state.currentAccount) {
           Object.assign(state.currentAccount, updateBatch);
         }
-        
+
         // Update global accounts cache for all batched fields
         try {
           if (typeof window.getAccountsData === 'function' && accountId) {
@@ -4677,21 +4686,21 @@ var console = {
             }
           }
         } catch (_) { /* noop */ }
-        
+
         // Notify other pages about the batch update
         try {
-          const ev = new CustomEvent('pc:account-updated', { 
-            detail: { 
-              id: accountId, 
-              changes: { ...updateBatch, updatedAt: new Date() } 
-            } 
+          const ev = new CustomEvent('pc:account-updated', {
+            detail: {
+              id: accountId,
+              changes: { ...updateBatch, updatedAt: new Date() }
+            }
           });
           document.dispatchEvent(ev);
         } catch (_) { /* noop */ }
-        
+
         // Show success message
         window.crm?.showToast && window.crm.showToast('Saved');
-        
+
         // Clear the batch
         updateBatch = {};
       }
@@ -4705,23 +4714,23 @@ var console = {
   async function saveField(field, value) {
     const accountId = state.currentAccount?.id;
     if (!accountId) return;
-    
+
     // Add to batch instead of immediate write
     updateBatch[field] = value;
-    
+
     // Update local state immediately for instant UI feedback
     if (state.currentAccount) {
       state.currentAccount[field] = value;
     }
-    
+
     // Clear existing timeout
     if (updateTimeout) clearTimeout(updateTimeout);
-    
+
     // Set new timeout for batch update (2 seconds after last edit)
     updateTimeout = setTimeout(async () => {
       await processBatchUpdate();
     }, 2000);
-    
+
     // Show immediate feedback
     window.crm?.showToast && window.crm.showToast('Saving...');
   }
@@ -4730,27 +4739,27 @@ var console = {
   async function saveServiceAddresses(addresses) {
     const accountId = state.currentAccount?.id;
     if (!accountId) return;
-    
+
     // Add to batch instead of immediate write
     updateBatch.serviceAddresses = addresses;
-    
+
     // Update local state immediately for instant UI feedback
     if (state.currentAccount) {
       state.currentAccount.serviceAddresses = addresses;
     }
-    
+
     // Clear existing timeout
     if (updateTimeout) clearTimeout(updateTimeout);
-    
+
     // Set new timeout for batch update (2 seconds after last edit)
     updateTimeout = setTimeout(async () => {
       await processBatchUpdate();
     }, 2000);
-    
+
     // Show immediate feedback
     window.crm?.showToast && window.crm.showToast('Saving...');
   }
-  
+
   // Update field text in UI
   function updateFieldText(wrap, value) {
     const textEl = wrap.querySelector('.info-value-text');
@@ -4775,7 +4784,7 @@ var console = {
       // For phone fields, display in human-friendly format and bind click-to-call immediately
       const display = formatPhoneForDisplayLocal(val);
       textEl.textContent = display || '--';
-      try { bindAccountDetailPhoneClick(textEl, val); } catch(_) {}
+      try { bindAccountDetailPhoneClick(textEl, val); } catch (_) { }
     } else {
       textEl.textContent = val || '--';
     }
@@ -4787,10 +4796,10 @@ var console = {
     const raw = String(phone);
     const digits = raw.replace(/[^\d]/g, '');
     if (digits.length === 11 && digits.startsWith('1')) {
-      return `+1 (${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`;
+      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
     }
     if (digits.length === 10) {
-      return `+1 (${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+      return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
     }
     if (/^\+/.test(raw)) return raw; // already E.164 with country code
     return raw; // fallback
@@ -4804,7 +4813,7 @@ var console = {
     // Require at least 10 digits
     const digitsOnly = cleaned.replace(/\D/g, '');
     if (digitsOnly.length < 10) return;
-    
+
     // Remove ALL existing click handlers by cloning the element (most reliable way)
     const clone = el.cloneNode(true);
     if (el.parentNode) {
@@ -4812,7 +4821,7 @@ var console = {
     }
     // Update our reference to point to the new cloned element
     el = clone;
-    
+
     // Set pointer and tooltip
     try {
       el.style.cursor = 'pointer';
@@ -4828,28 +4837,28 @@ var console = {
       // Explicitly remove contact attributes to prevent contact lookup
       el.removeAttribute('data-contact-id');
       el.removeAttribute('data-contact-name');
-      
+
       console.log('[Account Detail] Phone click binding updated with new number:', displayPhone);
-    } catch(_) {}
-    
+    } catch (_) { }
+
     // Create new click handler (using closure to capture current phone number)
     const callNum = digitsOnly.length === 10 ? `+1${digitsOnly}` : (cleaned.startsWith('+') ? cleaned : `+${digitsOnly}`);
     console.log('[Account Detail] Creating click handler with phone number:', callNum);
-    
-    el._pcClickHandler = function(e){
-      try { 
-        e.preventDefault(); 
+
+    el._pcClickHandler = function (e) {
+      try {
+        e.preventDefault();
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-        else e.stopPropagation(); 
-      } catch(_) {}
-      
+        else e.stopPropagation();
+      } catch (_) { }
+
       console.log('[Account Detail] Phone clicked, calling:', callNum);
       // Set call context explicitly to company mode
       try {
         if (window.Widgets && typeof window.Widgets.setCallContext === 'function') {
           // Use the current account from state directly (most reliable)
           const account = state.currentAccount || {};
-          
+
           // Extract domain from website if needed
           let domain = account.domain || '';
           if (!domain && account.website) {
@@ -4857,13 +4866,13 @@ var console = {
               const url = account.website.startsWith('http') ? account.website : `https://${account.website}`;
               const u = new URL(url);
               domain = u.hostname.replace(/^www\./i, '');
-            } catch(_) {
+            } catch (_) {
               domain = String(account.website).replace(/^https?:\/\//i, '').split('/')[0].replace(/^www\./i, '');
             }
           }
-          
+
           // Compute logoUrl with robust fallbacks (account fields -> DOM -> text link)
-          const logoUrlComputed = (function(){
+          const logoUrlComputed = (function () {
             try {
               const fromAccount = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon || account.imageUrl || account.companyImage;
               if (fromAccount) return String(fromAccount);
@@ -4890,9 +4899,9 @@ var console = {
               const rawText = textEl && textEl.textContent ? textEl.textContent.trim() : '';
               if (rawText && /^https?:\/\//i.test(rawText)) return rawText;
               return '';
-            } catch(_) { return ''; }
+            } catch (_) { return ''; }
           })();
-          
+
           const callContext = {
             accountId: account.id || null,
             accountName: account.accountName || account.name || account.companyName || null,
@@ -4906,33 +4915,33 @@ var console = {
             logoUrl: logoUrlComputed || '',
             isCompanyPhone: true
           };
-          
+
           console.log('[Account Detail] Setting call context with phone:', callNum);
           window.Widgets.setCallContext(callContext);
-          
+
           // Mark that we've set a specific context to prevent generic click-to-call from overriding
           try {
             window._pcPhoneContextSetByPage = true;
             // Clear the flag after a short delay to allow the click event to use it
             setTimeout(() => { window._pcPhoneContextSetByPage = false; }, 100);
-          } catch(_) {}
+          } catch (_) { }
         }
-      } catch(_) {}
+      } catch (_) { }
       try {
         if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
           // Mark the exact time of the user click to prove a fresh gesture
-          try { window.Widgets._lastClickToCallAt = Date.now(); } catch(_) {}
-          
+          try { window.Widgets._lastClickToCallAt = Date.now(); } catch (_) { }
+
           console.log('[Account Detail] Calling Widgets.callNumber with:', callNum);
           // Use 'click-to-call' source to ensure auto-trigger works
-          window.Widgets.callNumber(callNum.replace(/\D/g,''), '', true, 'click-to-call');
+          window.Widgets.callNumber(callNum.replace(/\D/g, ''), '', true, 'click-to-call');
         } else {
           console.log('[Account Detail] Falling back to tel: link');
           window.open(`tel:${encodeURIComponent(callNum)}`);
         }
-      } catch(_) {}
+      } catch (_) { }
     };
-    
+
     // Bind the new click handler
     el.addEventListener('click', el._pcClickHandler);
     el._pcClickBound = true;
@@ -4951,7 +4960,7 @@ var console = {
       <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>`;
     wrap.appendChild(actions);
   }
-  
+
   // Listen for energy updates from Health Widget to update Energy & Contract section
   function setupEnergyUpdateListener() {
     const onEnergyUpdated = (e) => {
@@ -4962,7 +4971,7 @@ var console = {
         if (d.entity === 'account' && d.id === state.currentAccount?.id) {
           const field = d.field;
           const value = d.value;
-          
+
           // Update the Energy & Contract section display
           const energyGrid = document.getElementById('account-energy-grid');
           if (energyGrid) {
@@ -4970,7 +4979,7 @@ var console = {
             if (fieldWrap) {
               // Check if field is in editing mode
               const isEditing = fieldWrap.classList.contains('editing');
-              
+
               if (isEditing) {
                 // Update the input field value when in editing mode
                 const inputEl = fieldWrap.querySelector('.info-edit-input');
@@ -5003,11 +5012,11 @@ var console = {
             }
           }
         }
-      } catch(_) {}
+      } catch (_) { }
     };
-    
+
     document.addEventListener('pc:energy-updated', onEnergyUpdated);
-    
+
     // Return cleanup function
     return () => {
       document.removeEventListener('pc:energy-updated', onEnergyUpdated);
@@ -5114,7 +5123,7 @@ var console = {
     const panel = document.getElementById('account-lists-panel');
     const cleanup = () => {
       if (panel && panel.parentElement) panel.parentElement.removeChild(panel);
-      try { document.removeEventListener('mousedown', _onAccountListsOutside, true); } catch(_) {}
+      try { document.removeEventListener('mousedown', _onAccountListsOutside, true); } catch (_) { }
       // Reset trigger state and restore focus
       try {
         const trigger = document.getElementById('add-account-to-list');
@@ -5125,36 +5134,36 @@ var console = {
             trigger.focus();
           }
         }
-      } catch(_) {}
+      } catch (_) { }
     };
     if (panel) panel.classList.remove('--show');
     setTimeout(cleanup, 120);
 
-    try { document.removeEventListener('keydown', _onAccountListsKeydown, true); } catch(_) {}
-    try { window.removeEventListener('resize', _positionAccountListsPanel, true); } catch(_) {}
-    try { window.removeEventListener('scroll', _positionAccountListsPanel, true); } catch(_) {}
+    try { document.removeEventListener('keydown', _onAccountListsKeydown, true); } catch (_) { }
+    try { window.removeEventListener('resize', _positionAccountListsPanel, true); } catch (_) { }
+    try { window.removeEventListener('scroll', _positionAccountListsPanel, true); } catch (_) { }
     _onAccountListsKeydown = null; _positionAccountListsPanel = null; _onAccountListsOutside = null;
   }
 
   function openAccountListsPanel() {
     if (document.getElementById('account-lists-panel')) return;
-    
+
     // Comprehensive validation: ensure account detail page is fully ready
     const isAccountDetailReady = () => {
       // Check if critical DOM elements exist
       const header = document.getElementById('account-detail-header');
       const view = document.getElementById('account-detail-view');
       const addToListBtn = document.getElementById('add-account-to-list');
-      
+
       if (!header || !view || !addToListBtn) return false;
-      
+
       // Check if state has account ID
       if (!state.currentAccount?.id) return false;
-      
+
       // All validations passed
       return true;
     };
-    
+
     // If not ready, show loading state and retry
     if (!isAccountDetailReady()) {
       console.log('[AccountDetail] Account detail not fully ready, showing loading state');
@@ -5162,7 +5171,7 @@ var console = {
       if (window.crm && typeof window.crm.showToast === 'function') {
         window.crm.showToast('Loading account information...');
       }
-      
+
       // Retry after a short delay
       setTimeout(() => {
         if (isAccountDetailReady()) {
@@ -5175,7 +5184,7 @@ var console = {
       }, 200);
       return;
     }
-    
+
     injectAccountListsStyles();
     const panel = document.createElement('div');
     panel.id = 'account-lists-panel';
@@ -5248,11 +5257,11 @@ var console = {
     requestAnimationFrame(() => { panel.classList.add('--show'); });
 
     // Mark trigger expanded
-    try { document.getElementById('add-account-to-list')?.setAttribute('aria-expanded', 'true'); } catch(_) {}
+    try { document.getElementById('add-account-to-list')?.setAttribute('aria-expanded', 'true'); } catch (_) { }
 
     // Load lists and memberships
     Promise.resolve(populateAccountListsPanel(panel.querySelector('#account-lists-body')))
-      .then(() => { try { _positionAccountListsPanel && _positionAccountListsPanel(); } catch(_) {} });
+      .then(() => { try { _positionAccountListsPanel && _positionAccountListsPanel(); } catch (_) { } });
 
     // Close button
     panel.querySelector('#account-lists-close')?.addEventListener('click', closeAccountListsPanel);
@@ -5277,7 +5286,7 @@ var console = {
 
   async function populateAccountListsPanel(body) {
     if (!body) return;
-    
+
     try {
       const db = window.firebaseDB;
       if (!db) {
@@ -5291,12 +5300,12 @@ var console = {
         // Primary query: filter by kind on server
         const email = window.currentUserEmail || '';
         let query = db.collection('lists');
-        
+
         // CRITICAL: Add ownership filter FIRST for non-admin users (required by Firestore rules)
         if (window.currentUserRole !== 'admin' && email) {
           query = query.where('ownerId', '==', email);
         }
-        
+
         // Then add kind filter
         if (query.where) query = query.where('kind', '==', 'accounts');
         listsSnapshot = await (query.limit ? query.limit(200).get() : query.get());
@@ -5349,7 +5358,7 @@ var console = {
           e.preventDefault();
           const action = item.getAttribute('data-action');
           const listId = item.getAttribute('data-list-id');
-          
+
           if (action === 'create') {
             const name = prompt('Enter list name:');
             if (name && name.trim()) {
@@ -5386,23 +5395,23 @@ var console = {
         doc.updatedAt = new Date();
       }
       await db.collection('listMembers').add(doc);
-      
+
       // Increment list member count (using 'recordCount' field for consistency)
       try {
-        const increment = window.firebase?.firestore?.FieldValue?.increment ? 
-          window.firebase.firestore.FieldValue.increment(1) : 
+        const increment = window.firebase?.firestore?.FieldValue?.increment ?
+          window.firebase.firestore.FieldValue.increment(1) :
           (await db.collection('lists').doc(listId).get()).data()?.recordCount + 1 || 1;
-        
+
         await db.collection('lists').doc(listId).update({
           recordCount: increment,
           updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp || new Date()
         });
-        
+
         console.log('[AccountDetail] Updated list recordCount for', listId);
       } catch (countError) {
         console.warn('[AccountDetail] Failed to update list count:', countError);
       }
-      
+
       window.crm?.showToast && window.crm.showToast('Added to list');
     } catch (err) {
       console.warn('Add to list failed', err);
@@ -5424,9 +5433,9 @@ var console = {
         const memberDoc = await db.collection('listMembers').doc(memberDocId).get();
         const memberData = memberDoc.data();
         const listId = memberData?.listId;
-        
+
         await db.collection('listMembers').doc(memberDocId).delete();
-        
+
         // Decrement list member count if we have the listId (using 'count' field like lists-overview.js)
         if (listId && window.firebase?.firestore?.FieldValue) {
           await db.collection('lists').doc(listId).update({
@@ -5452,9 +5461,9 @@ var console = {
       const db = window.firebaseDB;
       let newId = null;
       if (db && typeof db.collection === 'function') {
-        const payload = { 
-          name, 
-          kind: 'accounts', 
+        const payload = {
+          name,
+          kind: 'accounts',
           count: 1,
           recordCount: 1,
           ownerId: window.currentUserEmail || '',
@@ -5470,15 +5479,15 @@ var console = {
         }
         const ref = await db.collection('lists').add(payload);
         newId = ref.id;
-        
+
         // Notify lists overview page of new list creation
         try {
-          document.dispatchEvent(new CustomEvent('pc:list-created', { 
-            detail: { 
-              id: newId, 
+          document.dispatchEvent(new CustomEvent('pc:list-created', {
+            detail: {
+              id: newId,
               list: { id: newId, ...payload },
               kind: 'accounts'
-            } 
+            }
           }));
         } catch (_) { /* noop */ }
       }
@@ -5596,7 +5605,7 @@ var console = {
   function openAccountTaskPopover(anchorEl) {
     if (!anchorEl) return;
     // Close any existing
-    try { document.querySelector('.task-popover')?.remove(); } catch(_) {}
+    try { document.querySelector('.task-popover')?.remove(); } catch (_) { }
 
     // Ensure styles are injected FIRST
     injectAccountTaskPopoverStyles();
@@ -5822,7 +5831,7 @@ var console = {
       if (!calendarToolbar) return;
       calendarToolbar.classList.remove('calendar-slide-in');
       calendarToolbar.classList.add('calendar-slide-out');
-      
+
       const handleEnd = (ev) => {
         if (ev.target !== calendarToolbar) return;
         calendarToolbar.removeEventListener('transitionend', handleEnd);
@@ -5833,7 +5842,7 @@ var console = {
       };
       calendarToolbar.addEventListener('transitionend', handleEnd);
       setTimeout(() => {
-        try { calendarToolbar.removeEventListener('transitionend', handleEnd); } catch (_) {}
+        try { calendarToolbar.removeEventListener('transitionend', handleEnd); } catch (_) { }
         calendarToolbar.style.display = 'none';
         calendarToolbar.classList.remove('calendar-slide-out');
         pop.classList.remove('calendar-expanded');
@@ -5850,7 +5859,7 @@ var console = {
         x.classList.add('dropdown-slide-out'); // Ensure slide-out animation
         setTimeout(() => { x.style.display = 'none'; x.classList.remove('dropdown-slide-out'); }, 160);
       });
-      
+
       if (isOpen) {
         el.classList.remove('dropdown-slide-in', 'calendar-slide-in');
         el.classList.add('dropdown-slide-out');
@@ -5870,7 +5879,7 @@ var console = {
     closeBtn?.addEventListener('click', () => {
       closeAccountTaskPopover();
       // Restore focus to the trigger button
-      try { anchorEl?.focus(); } catch(_) {}
+      try { anchorEl?.focus(); } catch (_) { }
     });
 
     typeToggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleToolbar(typeToolbar, 'dropdown'); });
@@ -5949,9 +5958,9 @@ var console = {
       } catch (err) {
         console.warn('Failed to save task to Firebase:', err);
       }
-      try { window.crm?.showToast && window.crm.showToast('Task created'); } catch (_) {}
-      try { window.crm && typeof window.crm.loadTodaysTasks === 'function' && window.crm.loadTodaysTasks(); } catch(_) {}
-      try { window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'account-detail', task: newTask } })); } catch(_) {}
+      try { window.crm?.showToast && window.crm.showToast('Task created'); } catch (_) { }
+      try { window.crm && typeof window.crm.loadTodaysTasks === 'function' && window.crm.loadTodaysTasks(); } catch (_) { }
+      try { window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { source: 'account-detail', task: newTask } })); } catch (_) { }
       closeAccountTaskPopover();
     });
 
@@ -6013,7 +6022,7 @@ var console = {
     const accountName = parentAccount.accountName || parentAccount.name || parentAccount.companyName || '';
     const city = parentAccount.city || parentAccount.locationCity || '';
     const stateVal = parentAccount.state || parentAccount.locationState || '';
-    
+
     const location = city && stateVal ? `${city}, ${stateVal}` : (city || stateVal || '');
 
     // Get company icon/favicon
@@ -6024,18 +6033,18 @@ var console = {
         if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
         if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
         return '';
-      } catch(_) { return ''; }
+      } catch (_) { return ''; }
     };
-    const domain = parentAccount.domain ? String(parentAccount.domain).replace(/^https?:\/\//,'').replace(/\/$/,'').replace(/^www\./i,'') : deriveDomain(parentAccount.website || '');
+    const domain = parentAccount.domain ? String(parentAccount.domain).replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./i, '') : deriveDomain(parentAccount.website || '');
     const logoUrl = parentAccount.logoUrl || '';
-    
+
     let iconHTML = '';
     try {
       if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
         iconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
       }
-    } catch(_) {}
-    
+    } catch (_) { }
+
     if (!iconHTML) {
       const fallbackLetter = accountName ? accountName.charAt(0).toUpperCase() : 'C';
       iconHTML = `<div style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: var(--bg-item); border-radius: 6px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">${fallbackLetter}</div>`;
@@ -6069,7 +6078,7 @@ var console = {
       const accountName = subsidiary.accountName || subsidiary.name || subsidiary.companyName || '';
       const city = subsidiary.city || subsidiary.locationCity || '';
       const stateVal = subsidiary.state || subsidiary.locationState || '';
-      
+
       const location = city && stateVal ? `${city}, ${stateVal}` : (city || stateVal || '');
 
       // Get company icon/favicon
@@ -6080,18 +6089,18 @@ var console = {
           if (/^https?:\/\//i.test(s)) { const u = new URL(s); return (u.hostname || '').replace(/^www\./i, ''); }
           if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s)) { return s.replace(/^www\./i, ''); }
           return '';
-        } catch(_) { return ''; }
+        } catch (_) { return ''; }
       };
-      const domain = subsidiary.domain ? String(subsidiary.domain).replace(/^https?:\/\//,'').replace(/\/$/,'').replace(/^www\./i,'') : deriveDomain(subsidiary.website || '');
+      const domain = subsidiary.domain ? String(subsidiary.domain).replace(/^https?:\/\//, '').replace(/\/$/, '').replace(/^www\./i, '') : deriveDomain(subsidiary.website || '');
       const logoUrl = subsidiary.logoUrl || '';
-      
+
       let iconHTML = '';
       try {
         if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
           iconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 32 });
         }
-      } catch(_) {}
-      
+      } catch (_) { }
+
       if (!iconHTML) {
         const fallbackLetter = accountName ? accountName.charAt(0).toUpperCase() : 'C';
         iconHTML = `<div style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: var(--bg-item); border-radius: 6px; font-weight: 600; font-size: 14px; color: var(--text-secondary);">${fallbackLetter}</div>`;
@@ -6146,7 +6155,7 @@ var console = {
     info.textContent = currentPage;
     prevBtn.disabled = currentPage === 1;
     nextBtn.disabled = currentPage === totalPages;
-    
+
     if (totalPages <= 1) {
       pager.style.display = 'none';
     } else {
@@ -6192,7 +6201,7 @@ var console = {
             accountId: state.currentAccount?.id,
             scroll: window.scrollY || 0
           };
-          
+
           // Navigate to parent account
           window.AccountDetail.show(accountId);
         }
@@ -6211,7 +6220,7 @@ var console = {
             accountId: state.currentAccount?.id,
             scroll: window.scrollY || 0
           };
-          
+
           // Navigate to subsidiary account
           window.AccountDetail.show(accountId);
         }
@@ -6221,11 +6230,12 @@ var console = {
 
   // Set actual function references (object already created at module top)
   window.AccountDetail.show = showAccountDetail;
+  window.AccountDetail.renderAccountDetail = renderAccountDetail;
   window.AccountDetail.setupEnergyUpdateListener = setupEnergyUpdateListener;
   window.AccountDetail.setupParentCompanyAutocomplete = setupParentCompanyAutocomplete;
-  
+
   // Backward-compat global alias used by some modules
-  try { window.showAccountDetail = showAccountDetail; } catch (_) {}
+  try { window.showAccountDetail = showAccountDetail; } catch (_) { }
 })();
 
 

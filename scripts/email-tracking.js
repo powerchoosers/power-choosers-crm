@@ -17,10 +17,10 @@ class EmailTrackingManager {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
         this.db = window.firebaseDB;
-        
+
         // Start polling for tracking events
         this.startTrackingEventPolling();
-        
+
         // Start real-time listeners for email opens/clicks
         this.startEmailTrackingListeners();
     }
@@ -47,7 +47,7 @@ class EmailTrackingManager {
                         return window.DataManager.getCurrentUserEmail();
                     }
                     return (window.currentUserEmail || '').toLowerCase();
-                } catch(_) {
+                } catch (_) {
                     return (window.currentUserEmail || '').toLowerCase();
                 }
             };
@@ -72,21 +72,21 @@ class EmailTrackingManager {
                             const emailId = change.doc.id;
                             const currentOpenCount = emailData.openCount || 0;
                             const currentClickCount = emailData.clickCount || 0;
-                            
+
                             const prev = previousCounts.get(emailId) || { openCount: 0, clickCount: 0 };
-                            
+
                             // Check for new opens
                             if (currentOpenCount > prev.openCount) {
                                 const newOpens = currentOpenCount - prev.openCount;
                                 this.showEmailOpenNotification(emailData, newOpens);
                             }
-                            
+
                             // Check for new clicks
                             if (currentClickCount > prev.clickCount) {
                                 const newClicks = currentClickCount - prev.clickCount;
                                 this.showEmailClickNotification(emailData, newClicks);
                             }
-                            
+
                             // Update previous counts
                             previousCounts.set(emailId, {
                                 openCount: currentOpenCount,
@@ -111,7 +111,7 @@ class EmailTrackingManager {
                 this._unsubscribers = [];
             }
             this._unsubscribers.push(unsubscribe);
-            
+
             console.log('[EmailTracking] Started real-time listeners for email opens/clicks');
         } catch (error) {
             console.error('[EmailTracking] Error starting email tracking listeners:', error);
@@ -129,9 +129,16 @@ class EmailTrackingManager {
             }
 
             const subject = emailData.subject || 'Email';
-            const to = Array.isArray(emailData.to) ? emailData.to[0] : emailData.to;
-            const recipient = to ? (to.includes('<') ? to.match(/<(.+)>/)?.[1] || to : to) : 'recipient';
-            
+
+            // Prioritize contactName if available (e.g. from sequences)
+            // Otherwise parse the 'to' field
+            let recipient = emailData.contactName;
+
+            if (!recipient) {
+                const to = Array.isArray(emailData.to) ? emailData.to[0] : emailData.to;
+                recipient = to ? (to.includes('<') ? to.match(/<(.+)>/)?.[1] || to : to) : 'recipient';
+            }
+
             const title = count === 1 ? 'Email Opened' : `${count} Email Opens`;
             const message = `${recipient} opened "${subject}"`;
 
@@ -167,9 +174,15 @@ class EmailTrackingManager {
             }
 
             const subject = emailData.subject || 'Email';
-            const to = Array.isArray(emailData.to) ? emailData.to[0] : emailData.to;
-            const recipient = to ? (to.includes('<') ? to.match(/<(.+)>/)?.[1] || to : to) : 'recipient';
-            
+
+            // Prioritize contactName if available
+            let recipient = emailData.contactName;
+
+            if (!recipient) {
+                const to = Array.isArray(emailData.to) ? emailData.to[0] : emailData.to;
+                recipient = to ? (to.includes('<') ? to.match(/<(.+)>/)?.[1] || to : to) : 'recipient';
+            }
+
             const title = count === 1 ? 'Email Link Clicked' : `${count} Link Clicks`;
             const message = `${recipient} clicked a link in "${subject}"`;
 
@@ -214,7 +227,7 @@ class EmailTrackingManager {
             }
 
             const emailRef = this.db.collection('emails').doc(trackingId);
-            
+
             // Check if document exists before trying to update
             const doc = await emailRef.get();
             if (!doc.exists) {
@@ -224,18 +237,18 @@ class EmailTrackingManager {
 
             const emailData = doc.data();
             const existingOpens = emailData.opens || [];
-            
+
             // Check if this user/IP combination has opened the email very recently (within 5 seconds)
             // This prevents immediate duplicate fires but allows genuine re-opens within 1 minute to be counted
             const userKey = `${openData.userAgent}_${openData.ip}`;
             const now = new Date();
             const fiveSecondsAgo = new Date(now.getTime() - 5000); // 5 seconds ago
-            
+
             const recentOpen = existingOpens.find(open => {
                 const openTime = new Date(open.openedAt);
                 return `${open.userAgent}_${open.ip}` === userKey && openTime > fiveSecondsAgo;
             });
-            
+
             if (recentOpen) {
                 return;
             }
@@ -262,14 +275,14 @@ class EmailTrackingManager {
         try {
             const { to, subject, content, from } = emailData;
             const deliver = emailData?._deliverability || {};
-            
+
             if (!to || !subject || !content) {
                 throw new Error('Missing required fields: to, subject, content');
             }
 
             // Generate unique tracking ID
             const trackingId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            
+
             // Use SendGrid native tracking - no custom pixel injection
             const emailContent = content;
 
@@ -297,7 +310,7 @@ class EmailTrackingManager {
             // Send the email via SendGrid API
             const apiBase = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
             const apiUrl = `${apiBase}/api/email/sendgrid-send`;
-                
+
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
@@ -422,7 +435,7 @@ class EmailTrackingManager {
             }
 
             const emailDoc = await this.db.collection('emails').doc(trackingId).get();
-            
+
             if (!emailDoc.exists) {
                 return null;
             }
@@ -467,24 +480,24 @@ class EmailTrackingManager {
                         .limit(100)
                         .onSnapshot((snapshot) => {
                             const emails = [];
-                            
+
                             // Dispatch events for new emails (real-time updates)
                             snapshot.docChanges().forEach(change => {
                                 if (change.type === 'added') {
                                     const emailData = { id: change.doc.id, ...change.doc.data() };
                                     // Determine if sent or received email
                                     if (emailData.emailType === 'sent' || emailData.isSentEmail || emailData.type === 'sent') {
-                                        document.dispatchEvent(new CustomEvent('pc:email-sent', { 
-                                            detail: emailData 
+                                        document.dispatchEvent(new CustomEvent('pc:email-sent', {
+                                            detail: emailData
                                         }));
                                     } else {
-                                        document.dispatchEvent(new CustomEvent('pc:email-received', { 
-                                            detail: emailData 
+                                        document.dispatchEvent(new CustomEvent('pc:email-received', {
+                                            detail: emailData
                                         }));
                                     }
                                 }
                             });
-                            
+
                             snapshot.forEach(doc => {
                                 const data = doc.data();
                                 emails.push({
@@ -503,7 +516,7 @@ class EmailTrackingManager {
                             console.error('[EmailTracking] Real-time listener error:', error);
                             callback(this.getDemoSentEmails());
                         });
-                    
+
                 }
                 return this._emailsUnsubscriber;
             }
@@ -563,8 +576,8 @@ class EmailTrackingManager {
                     // Add email type for UI display
                     emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
                 };
-                
-                
+
+
                 emails.push(email);
             });
 
@@ -625,13 +638,13 @@ class EmailTrackingManager {
     async getConversationThreads() {
         try {
             const allEmails = await this.getAllEmails();
-            
+
             // Group emails by thread
             const threads = {};
-            
+
             allEmails.forEach(email => {
                 const threadId = email.threadId || email.conversationId || email.id;
-                
+
                 if (!threads[threadId]) {
                     threads[threadId] = {
                         threadId,
@@ -640,18 +653,18 @@ class EmailTrackingManager {
                         participants: new Set()
                     };
                 }
-                
+
                 threads[threadId].emails.push(email);
                 threads[threadId].lastActivity = new Date(Math.max(
                     new Date(threads[threadId].lastActivity),
                     new Date(email.timestamp)
                 ));
-                
+
                 // Add participants
                 if (email.from) threads[threadId].participants.add(email.from);
                 if (email.to) threads[threadId].participants.add(email.to);
             });
-            
+
             // Convert to array and sort by last activity
             const threadArray = Object.values(threads).map(thread => ({
                 ...thread,
@@ -660,7 +673,7 @@ class EmailTrackingManager {
                 // Sort emails within thread by timestamp
                 emails: thread.emails.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
             }));
-            
+
             return threadArray.sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
 
         } catch (error) {
@@ -813,10 +826,10 @@ class EmailTrackingManager {
                 }, (error) => {
                     console.error('[EmailTracking] Subscription error:', error);
                 });
-            
+
             // Track unsubscriber
             this._unsubscribers.push(unsubscribe);
-            
+
             return unsubscribe; // Allow caller to unsubscribe
 
         } catch (error) {
@@ -861,8 +874,8 @@ class EmailTrackingManager {
                 }
 
                 // Dispatch custom event for other components to listen
-                document.dispatchEvent(new CustomEvent('email-opened', { 
-                    detail: notification 
+                document.dispatchEvent(new CustomEvent('email-opened', {
+                    detail: notification
                 }));
             }
         });
@@ -904,8 +917,8 @@ class EmailTrackingManager {
                 }
 
                 // Dispatch custom event for other components to listen
-                document.dispatchEvent(new CustomEvent('email-replied', { 
-                    detail: notification 
+                document.dispatchEvent(new CustomEvent('email-replied', {
+                    detail: notification
                 }));
             }
         });
@@ -929,7 +942,7 @@ class EmailTrackingManager {
         try {
             // Generate a test tracking ID
             const trackingId = `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            
+
             // Create a test email record
             const testEmail = {
                 id: trackingId,
@@ -987,7 +1000,7 @@ class EmailTrackingManager {
      * Simulate email reply for testing
      */
     simulateEmailReply(trackingId) {
-        
+
         // Create a mock reply event
         const replyEvent = {
             repliedAt: new Date().toISOString(),
@@ -998,7 +1011,7 @@ class EmailTrackingManager {
 
         // Trigger notification
         this.notifyEmailReplied(trackingId, replyEvent);
-        
+
         // Update demo data if available
         this.updateDemoEmailReplyCount(trackingId);
     }
@@ -1023,13 +1036,13 @@ class EmailTrackingManager {
     async saveEmailRecord(emailData) {
         try {
             const { id, to, subject, content, from, sendgridMessageId, gmailMessageId, sentAt, sentVia, provider, userEmail } = emailData;
-            
+
             // Determine provider (default to sendgrid)
             const emailProvider = provider || sentVia || 'sendgrid';
-            
+
             // Use the provided tracking ID or generate a new one based on provider
             const trackingId = id || `${emailProvider === 'gmail' || emailProvider === 'gmail_api' ? 'gmail' : 'sendgrid'}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            
+
             // Get user email for ownership (required by Firestore rules)
             let ownerEmail = null;
             if (userEmail) {
@@ -1045,9 +1058,9 @@ class EmailTrackingManager {
                             ownerEmail = (window.currentUserEmail || '').toLowerCase();
                         }
                     }
-                } catch (_) {}
+                } catch (_) { }
             }
-            
+
             // Create email record with provider-specific fields
             const emailRecord = {
                 id: trackingId,
@@ -1074,7 +1087,7 @@ class EmailTrackingManager {
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
-            
+
             // Add provider-specific message IDs (only if they exist)
             if (sendgridMessageId) {
                 emailRecord.sendgridMessageId = sendgridMessageId;
@@ -1085,7 +1098,7 @@ class EmailTrackingManager {
 
             // Save to Firebase
             await this.db.collection('emails').doc(trackingId).set(emailRecord);
-            
+
             return { success: true, trackingId };
         } catch (error) {
             console.error('[EmailTracking] Failed to save email record:', error);
@@ -1136,10 +1149,10 @@ function initEmailTracking() {
     if (!emailTrackingManager) {
         emailTrackingManager = new EmailTrackingManager();
         window.emailTrackingManager = emailTrackingManager;
-        
+
         // Request notification permission
         emailTrackingManager.requestNotificationPermission();
-        
+
     }
     return emailTrackingManager;
 }
