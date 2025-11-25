@@ -3973,20 +3973,50 @@
   // Setup contact link handlers
   function setupContactLinkHandlers() {
     // CRITICAL FIX: Use document-level guard like fix-duplicate-listeners.js pattern
-    if (document._taskDetailContactHandlersBound) return;
+    if (document._taskDetailContactHandlersBound) {
+      console.log('[TaskDetail] Contact handlers already bound, skipping');
+      return;
+    }
     document._taskDetailContactHandlersBound = true;
+    console.log('[TaskDetail] Setting up contact link handlers');
 
     // Handle contact link clicks in header (scoped to task-detail-page)
+    // CRITICAL FIX: Use capture phase to catch clicks early, before other handlers
     document.addEventListener('click', (e) => {
-      const contactLink = e.target.closest('#task-detail-page .contact-link');
+      // CRITICAL FIX: Check if click is within task-detail-page first
+      const taskPage = e.target.closest('#task-detail-page');
+      if (!taskPage) return;
+      
+      // CRITICAL FIX: Try multiple ways to find the contact link
+      let contactLink = null;
+      
+      // Method 1: Check if target itself is the link
+      if (e.target.classList && e.target.classList.contains('contact-link')) {
+        contactLink = e.target;
+      }
+      
+      // Method 2: Check if target is inside a contact-link
+      if (!contactLink) {
+        contactLink = e.target.closest('.contact-link');
+      }
+      
+      // Method 3: Check if we're inside the title element which contains the link
+      if (!contactLink) {
+        const titleEl = e.target.closest('#task-detail-title');
+        if (titleEl) {
+          contactLink = titleEl.querySelector('.contact-link');
+        }
+      }
+      
       if (!contactLink) return;
 
       e.preventDefault();
+      e.stopPropagation(); // Prevent any other handlers from interfering
 
       const contactId = contactLink.getAttribute('data-contact-id');
       const contactName = contactLink.getAttribute('data-contact-name');
 
-      console.log('[TaskDetail] Contact link clicked:', { contactId, contactName });
+      console.log('[TaskDetail] Contact link clicked:', { contactId, contactName, target: e.target, link: contactLink });
 
       // If no contactId, try to find the contact by name
       if (!contactId && contactName) {
@@ -4017,7 +4047,58 @@
         }
       }
 
-      if (contactId && window.ContactDetail) {
+      // CRITICAL FIX: Handle both cases - with contactId and without
+      if (!contactId && !contactName) {
+        console.warn('[TaskDetail] Contact link has no ID or name');
+        return;
+      }
+      
+      // Final contactId to use
+      let finalContactId = contactId;
+      
+      // If no contactId but we have a name, try to find it
+      if (!finalContactId && contactName) {
+        console.log('[TaskDetail] No contactId, searching by name:', contactName);
+        try {
+          // Try getPeopleData first
+          if (typeof window.getPeopleData === 'function') {
+            const people = window.getPeopleData() || [];
+            const contact = people.find(p => {
+              const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+              return fullName && contactName && fullName.toLowerCase() === contactName.toLowerCase();
+            });
+            if (contact && contact.id) {
+              finalContactId = contact.id;
+              console.log('[TaskDetail] Found contact by name via getPeopleData:', finalContactId);
+            }
+          }
+          
+          // Try BackgroundContactsLoader if still not found
+          if (!finalContactId && window.BackgroundContactsLoader) {
+            const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+            const contact = contacts.find(c => {
+              const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || c.name || '';
+              return fullName && contactName && fullName.toLowerCase() === contactName.toLowerCase();
+            });
+            if (contact && contact.id) {
+              finalContactId = contact.id;
+              console.log('[TaskDetail] Found contact by name via BackgroundContactsLoader:', finalContactId);
+            }
+          }
+        } catch (error) {
+          console.error('[TaskDetail] Error finding contact by name:', error);
+        }
+      }
+      
+      if (!finalContactId) {
+        console.warn('[TaskDetail] Could not find contact ID for:', contactName);
+        if (window.crm && typeof window.crm.showToast === 'function') {
+          window.crm.showToast('Contact not found in system. Please check People page.', 'error');
+        }
+        return;
+      }
+      
+      if (window.ContactDetail) {
         // Capture task detail state for back navigation
         window.__taskDetailRestoreData = {
           taskId: state.currentTask?.id,
@@ -4030,7 +4111,7 @@
 
         // Set navigation source for back button
         window._contactNavigationSource = 'task-detail';
-        window._contactNavigationContactId = contactId;
+        window._contactNavigationContactId = finalContactId;
 
         // Navigate to contact detail
         if (window.crm && typeof window.crm.navigateToPage === 'function') {
@@ -4044,7 +4125,8 @@
             const tryShowContact = () => {
               if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
                 try {
-                  window.ContactDetail.show(contactId);
+                  console.log('[TaskDetail] Opening contact detail for ID:', finalContactId);
+                  window.ContactDetail.show(finalContactId);
                 } catch (error) {
                   console.error('[TaskDetail] Error showing contact:', error);
                   if (window.crm && typeof window.crm.showToast === 'function') {
@@ -4064,9 +4146,13 @@
 
             tryShowContact();
           });
+        } else {
+          console.error('[TaskDetail] CRM navigateToPage function not available');
         }
+      } else {
+        console.error('[TaskDetail] ContactDetail module not available');
       }
-    });
+    }, true); // Use capture phase to catch clicks early
 
     // Handle add contact button clicks
     document.addEventListener('click', (e) => {
