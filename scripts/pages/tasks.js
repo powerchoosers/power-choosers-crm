@@ -1417,8 +1417,9 @@
     }
 
     // Also trigger a custom event for other components that might need to know about task updates
+    // CRITICAL FIX: Include task data so BackgroundTasksLoader can update cache in place
     window.dispatchEvent(new CustomEvent('tasksUpdated', {
-      detail: { source: 'taskCreation' }
+      detail: { source: 'taskCreation', taskData: newTask }
     }));
   }
 

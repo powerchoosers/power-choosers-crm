@@ -788,7 +788,10 @@
       // CRITICAL FIX: Also clean up from BackgroundTasksLoader cache if available
       if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.removeTask === 'function') {
         try {
-          window.BackgroundTasksLoader.removeTask(state.currentTask.id);
+          const removed = window.BackgroundTasksLoader.removeTask(state.currentTask.id);
+          if (removed) {
+            console.log('[TaskDetail] Removed task from BackgroundTasksLoader cache');
+          }
         } catch (e) {
           console.warn('[TaskDetail] Could not remove task from BackgroundTasksLoader:', e);
         }
@@ -893,6 +896,15 @@
     document.dispatchEvent(new CustomEvent('pc:task-deleted', {
       detail: { taskId: state.currentTask.id, source: 'task-detail' }
     }));
+
+    // CRITICAL FIX: Ensure BackgroundTasksLoader cache is updated immediately
+    if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.removeTask === 'function') {
+      try {
+        window.BackgroundTasksLoader.removeTask(state.currentTask.id);
+      } catch (e) {
+        console.warn('[TaskDetail] Could not remove task from BackgroundTasksLoader:', e);
+      }
+    }
 
     // Navigate to next task instead of going back
     try {
@@ -1407,29 +1419,35 @@
     state.loadingTask = true;
 
     try {
+      // CRITICAL FIX: Show loading state immediately
+      if (els.content) {
+        els.content.innerHTML = '<div class="empty" style="padding: 2rem; text-align: center; color: var(--text-secondary);">Loading task...</div>';
+      }
       // CRITICAL: Re-initialize DOM refs to ensure els.content exists
       if (!initDomRefs()) {
         console.warn('[TaskDetail] DOM not ready, retrying...');
         // CRITICAL FIX: Reset loading flag before retry to prevent deadlock
         state.loadingTask = false;
 
-        // Retry after a short delay (max 5 attempts)
+        // Retry after a short delay (max 10 attempts with exponential backoff)
         let retryCount = 0;
-        const maxRetries = 5;
+        const maxRetries = 10;
         const retry = () => {
           if (retryCount >= maxRetries) {
             console.error('[TaskDetail] Failed to initialize DOM refs after', maxRetries, 'attempts');
             showTaskError('Page not ready. Please refresh.');
+            state.loadingTask = false; // Ensure flag is reset
             return;
           }
           retryCount++;
+          const delay = Math.min(100 * retryCount, 500); // Exponential backoff, max 500ms
           setTimeout(() => {
             if (initDomRefs()) {
               loadTaskData(taskId);
             } else {
               retry();
             }
-          }, 100);
+          }, delay);
         };
         retry();
         return;
@@ -1469,9 +1487,22 @@
         try {
           const allTasks = window.BackgroundTasksLoader.getTasksData() || [];
           const filteredTasks = filterTasksByOwnership(allTasks);
-          task = filteredTasks.find(t => t.id === taskId);
+          
+          // Try exact match first
+          task = filteredTasks.find(t => t && (t.id === taskId || String(t.id) === String(taskId)));
+          
+          // If still not found, try document ID match (some tasks might have id field different from doc ID)
+          if (!task) {
+            task = filteredTasks.find(t => {
+              const docId = t._docId || t._id || '';
+              return docId === taskId || String(docId) === String(taskId);
+            });
+          }
+          
           if (task) {
             console.log('[TaskDetail] Using BackgroundTasksLoader cached data');
+          } else {
+            console.log('[TaskDetail] Task not found in BackgroundTasksLoader cache, will try Firebase');
           }
         } catch (e) {
           console.warn('Could not load task from BackgroundTasksLoader:', e);
@@ -1655,14 +1686,37 @@
           legacyLocalStorageCount: (JSON.parse(localStorage.getItem('userTasks') || '[]')).length
         });
 
-        // CRITICAL FIX: Treat this as a stale/ghost task and clean it up locally
+        // CRITICAL FIX: Try force reloading cache before giving up
         try {
-          cleanupStaleTask(taskId);
-        } catch (_) { }
+          if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
+            console.log('[TaskDetail] Task not found in cache, forcing cache reload...');
+            await window.BackgroundTasksLoader.forceReload();
+            
+            // Try one more time after reload
+            const reloadedTasks = window.BackgroundTasksLoader.getTasksData() || [];
+            const filteredReloaded = filterTasksByOwnership(reloadedTasks);
+            task = filteredReloaded.find(t => t && (t.id === taskId || String(t.id) === String(taskId)));
+            
+            if (task) {
+              console.log('[TaskDetail] Found task after force reload');
+            } else {
+              console.warn('[TaskDetail] Task still not found after force reload');
+            }
+          }
+        } catch (reloadError) {
+          console.warn('[TaskDetail] Error during force reload:', reloadError);
+        }
 
-        showTaskError('Task not found or you do not have access to this task. Please refresh the page.');
-        state.loadingTask = false;
-        return;
+        if (!task) {
+          // CRITICAL FIX: Treat this as a stale/ghost task and clean it up locally
+          try {
+            cleanupStaleTask(taskId);
+          } catch (_) { }
+
+          showTaskError('Task not found or you do not have access to this task. Please refresh the page.');
+          state.loadingTask = false;
+          return;
+        }
       }
 
       // CRITICAL FIX: Validate task data before normalization
@@ -1752,8 +1806,17 @@
       }
     } catch (error) {
       console.error('[TaskDetail] Error loading task data:', error);
-      showTaskError('Failed to load task. Please try again.');
+      console.error('[TaskDetail] Error details:', {
+        taskId,
+        error: error.message,
+        stack: error.stack,
+        hasFirebase: !!window.firebaseDB,
+        hasBackgroundLoader: !!window.BackgroundTasksLoader,
+        backgroundLoaderCount: window.BackgroundTasksLoader ? (window.BackgroundTasksLoader.getTasksData() || []).length : 0
+      });
+      showTaskError('Failed to load task. Please try again or refresh the page.');
     } finally {
+      // CRITICAL FIX: Always reset loading flag, even on error
       state.loadingTask = false;
     }
   }
