@@ -2887,19 +2887,20 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       }
 
       const emailData = emailDoc.data();
+      const previousStatus = emailData.status; // Save for error recovery
 
       // Show loading state
       if (window.crm && window.crm.showToast) {
         window.crm.showToast('Regenerating email content...');
       }
 
-      // Update status to generating
+      // Update status to generating (API will handle resetting to not_generated and regenerating)
       await db.collection('emails').doc(emailId).update({
         status: 'generating',
         updatedAt: new Date().toISOString()
       });
 
-      // Generate email using the same logic as generate-scheduled-emails.js
+      // Generate email using centralized API (handles angle selection, tone openers, CTAs automatically)
       await generateEmailContentForScheduledEmail(emailId, emailData);
 
       // Show success message
@@ -2907,7 +2908,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         window.crm.showToast('Email regenerated successfully');
       }
 
-      // Reload email detail
+      // Reload email detail to show new content
       await show(emailId);
     } catch (error) {
       console.error('[EmailDetail] Failed to regenerate email:', error);
@@ -2916,12 +2917,11 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       try {
         const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
         if (db) {
-          const emailDoc = await db.collection('emails').doc(emailId).get();
-          const emailData = emailDoc.data();
-          const previousStatus = emailData.status === 'generating' ? 'pending_approval' : emailData.status;
+          // Restore previous status (or pending_approval if it was generating)
+          const restoreStatus = previousStatus || 'pending_approval';
           
           await db.collection('emails').doc(emailId).update({
-            status: previousStatus,
+            status: restoreStatus,
             errorMessage: error.message,
             updatedAt: new Date().toISOString()
           });
@@ -2936,128 +2936,44 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     }
   }
 
-  // Helper: Generate email content for a scheduled email (uses perplexity-email endpoint)
+  // Helper: Generate email content for a scheduled email (uses generate-scheduled-emails API)
   async function generateEmailContentForScheduledEmail(emailId, emailData) {
-    const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+    const baseUrl = window.API_BASE_URL || window.location.origin || '';
+    const generateUrl = `${baseUrl}/api/generate-scheduled-emails`;
     
-    // Lookup contact data if contactId exists
-    let recipient = null;
-    if (emailData.contactId) {
-      try {
-        const contactDoc = await db.collection('people').doc(emailData.contactId).get();
-        if (contactDoc.exists) {
-          const contact = contactDoc.data();
-          
-          // Try to get account data
-          let account = null;
-          if (contact.accountId || contact.account_id) {
-            const accountId = contact.accountId || contact.account_id;
-            const accountDoc = await db.collection('accounts').doc(accountId).get();
-            if (accountDoc.exists) {
-              account = { id: accountDoc.id, ...accountDoc.data() };
-            }
-          }
-          
-          recipient = {
-            id: contactDoc.id,
-            email: emailData.to || contact.email || '',
-            name: contact.name || contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
-            firstName: contact.firstName || '',
-            lastName: contact.lastName || '',
-            fullName: contact.fullName || contact.name || '',
-            company: contact.company || account?.accountName || account?.name || '',
-            title: contact.title || contact.job || contact.role || '',
-            phone: contact.phone || contact.mobile || '',
-            account: account ? {
-              id: account.id,
-              name: account.accountName || account.name || '',
-              industry: account.industry || '',
-              domain: account.domain || account.website || '',
-              annualUsage: account.annualUsage || ''
-            } : null
-          };
-        }
-      } catch (error) {
-        console.warn('[EmailDetail] Failed to lookup contact:', error);
-      }
-    }
-    
-    // Build recipient from email data if contact lookup failed
-    if (!recipient) {
-      recipient = {
-        email: emailData.to || '',
-        name: emailData.contactName || '',
-        firstName: (emailData.contactName || '').split(' ')[0] || '',
-        company: emailData.contactCompany || ''
-      };
-    }
-    
-    // Get settings for AI generation
-    const settings = (window.SettingsPage?.getSettings?.()) || {};
-    const g = settings?.general || {};
-    const senderName = (g.firstName && g.lastName) 
-      ? `${g.firstName} ${g.lastName}`.trim()
-      : (g.agentName || 'Power Choosers Team');
-    
-    const aiTemplates = settings?.aiTemplates || {};
-    const whoWeAre = aiTemplates.who_we_are || 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.';
-    const industrySegmentation = settings?.industrySegmentation || null;
-    
-    // Call Perplexity API (same as email-compose-global.js)
-      const baseUrl = window.API_BASE_URL || window.location.origin || '';
-    const genUrl = `${baseUrl}/api/perplexity-email`;
-    
-    const response = await fetch(genUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: emailData.aiPrompt || 'Write a professional follow-up email',
-        recipient: recipient,
-        mode: 'standard', // Use standard mode for scheduled emails
-        senderName: senderName,
-        whoWeAre: whoWeAre,
-        marketContext: aiTemplates.marketContext,
-        meetingPreferences: aiTemplates.meetingPreferences,
-        industrySegmentation: industrySegmentation
-        })
-      });
+    // Call the centralized generate-scheduled-emails API
+    // This ensures all improvements to angle selection, tone openers, and CTAs automatically apply
+    const response = await fetch(generateUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        immediate: true,
+        emailId: emailId  // Generate this specific email
+      })
+    });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || `API error: ${response.status}`);
     }
 
-        const result = await response.json();
-        
-    // Format the output (similar to email-compose-global.js formatGeneratedEmail)
-    let subject = '';
-    let html = '';
-    let text = '';
+    const result = await response.json();
     
-    if (result.templateType) {
-      // HTML template mode
-      const formatted = formatTemplatedEmailForScheduled(result.output, recipient, result.templateType);
-      subject = formatted.subject;
-      html = formatted.html;
-      text = stripHtml(html);
-    } else {
-      // Standard mode
-      const formatted = formatStandardEmailForScheduled(result.output, recipient);
-      subject = formatted.subject;
-      html = formatted.html;
-      text = formatted.text || stripHtml(html);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to generate email');
     }
     
-    // Update email with generated content
-        await db.collection('emails').doc(emailId).update({
-      subject: subject,
-      html: html,
-      text: text,
-          status: 'pending_approval',
-          generatedAt: Date.now(),
-      generatedBy: 'manual',
-          updatedAt: new Date().toISOString()
-        });
+    // Email has been generated by the API with all the angle-based improvements
+    // The API handles:
+    // - Industry detection
+    // - Angle selection
+    // - Tone opener selection
+    // - Angle-based CTAs
+    // - Angle-based subject lines
+    // - Content sanitization
+    // - Template building (HTML or standard mode)
+    
+    return result;
   }
 
   // Helper: Format templated email for scheduled emails
@@ -3070,7 +2986,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     return { subject, html };
         }
 
-  // Helper: Format standard email for scheduled emails
+  // Helper: Format standard email for scheduled emails (preserves line breaks)
   function formatStandardEmailForScheduled(output, recipient) {
     // Parse JSON if needed
     let jsonData = null;
@@ -3103,16 +3019,23 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       const senderFirstName = (window.SettingsPage?.getSettings?.()?.general?.firstName || 'Power Choosers Team').split(' ')[0];
       const closing = `Best regards,\n${senderFirstName}`;
       
-      const html = paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('') + `<p>${escapeHtml(closing)}</p>`;
+      // Fix line breaks: preserve paragraph structure with proper spacing (matches generate-scheduled-emails.js)
+      const html = paragraphs.map(p => `<p style="margin:0 0 16px 0; color:#222;">${escapeHtml(p)}</p>`).join('') + `<p style="margin:16px 0 0 0; color:#222;">${escapeHtml(closing)}</p>`;
       const text = paragraphs.join('\n\n') + '\n\n' + closing;
       
       return { subject, html, text };
     } else {
-      // Plain text fallback
+      // Plain text fallback - preserve line breaks properly
       const subject = 'Energy Solutions';
       const text = typeof output === 'string' ? output : JSON.stringify(output);
-      const html = text.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
-      return { subject, html: `<p>${html}</p>`, text };
+      // Convert double line breaks to paragraphs, single line breaks to <br>
+      const html = text
+        .split(/\n\n+/)
+        .map(para => para.trim())
+        .filter(Boolean)
+        .map(para => `<p style="margin:0 0 16px 0; color:#222;">${escapeHtml(para.replace(/\n/g, '<br>'))}</p>`)
+        .join('');
+      return { subject, html: html || '<p>No content</p>', text };
     }
   }
 
