@@ -1428,7 +1428,7 @@
   // Listen for cross-page task updates and refresh immediately
   function bindUpdates() {
     window.addEventListener('tasksUpdated', async (event) => {
-      const { taskId, deleted } = event.detail || {};
+      const { taskId, deleted, newTaskCreated, nextStepType } = event.detail || {};
 
       // CRITICAL FIX: If a task was deleted, clean it up from localStorage immediately
       if (deleted && taskId) {
@@ -1462,13 +1462,48 @@
         }
       }
 
+      // CRITICAL FIX: If a new task was created (e.g., next step in sequence), refresh BackgroundTasksLoader
+      if (newTaskCreated) {
+        console.log('[Tasks] New task created from sequence, refreshing BackgroundTasksLoader...', { nextStepType });
+        if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
+          try {
+            await window.BackgroundTasksLoader.forceReload();
+            console.log('[Tasks] BackgroundTasksLoader refreshed after new task creation');
+          } catch (e) {
+            console.warn('[Tasks] Failed to refresh BackgroundTasksLoader:', e);
+          }
+        }
+        
+        // Invalidate cache to ensure fresh data
+        if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+          try {
+            await window.CacheManager.invalidate('tasks');
+            console.log('[Tasks] Invalidated tasks cache after new task creation');
+          } catch (e) {
+            console.warn('[Tasks] Failed to invalidate cache:', e);
+          }
+        }
+      }
+
       // Rebuild from localStorage + Firebase + LinkedIn tasks
       await loadData();
     });
 
     // Listen for background tasks loader events
-    document.addEventListener('pc:tasks-loaded', async () => {
-      console.log('[Tasks] Background tasks loaded, refreshing data...');
+    document.addEventListener('pc:tasks-loaded', async (event) => {
+      const { newTaskCreated } = event.detail || {};
+      console.log('[Tasks] Background tasks loaded, refreshing data...', { newTaskCreated });
+      
+      // If a new task was created, force reload BackgroundTasksLoader first
+      if (newTaskCreated && window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
+        try {
+          console.log('[Tasks] New task created, forcing BackgroundTasksLoader refresh...');
+          await window.BackgroundTasksLoader.forceReload();
+        } catch (e) {
+          console.warn('[Tasks] Failed to force reload BackgroundTasksLoader:', e);
+        }
+      }
+      
       await loadData();
     });
 

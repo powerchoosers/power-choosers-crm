@@ -865,7 +865,48 @@
         const result = await response.json();
 
         if (result.success) {
-          console.log('[TaskDetail] Next step created:', result.nextStepType);
+          console.log('[TaskDetail] Next step created:', result.nextStepType, result);
+          
+          // CRITICAL FIX: If next step is a task, refresh BackgroundTasksLoader to pick it up
+          if (result.nextStepType && (result.nextStepType.includes('linkedin') || result.nextStepType.includes('phone') || result.nextStepType.includes('task'))) {
+            // Force refresh BackgroundTasksLoader to get the newly created task
+            if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
+              try {
+                console.log('[TaskDetail] Forcing BackgroundTasksLoader refresh to pick up new task...');
+                await window.BackgroundTasksLoader.forceReload();
+                console.log('[TaskDetail] BackgroundTasksLoader refreshed successfully');
+              } catch (reloadError) {
+                console.warn('[TaskDetail] Failed to refresh BackgroundTasksLoader:', reloadError);
+              }
+            }
+            
+            // Invalidate cache to ensure fresh data
+            if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+              try {
+                await window.CacheManager.invalidate('tasks');
+                console.log('[TaskDetail] Invalidated tasks cache after next step creation');
+              } catch (cacheError) {
+                console.warn('[TaskDetail] Failed to invalidate cache:', cacheError);
+              }
+            }
+            
+            // Dispatch event to notify tasks page that a new task was created
+            window.dispatchEvent(new CustomEvent('tasksUpdated', {
+              detail: { 
+                source: 'sequenceTaskCompletion', 
+                taskId: state.currentTask.id, 
+                deleted: true,
+                newTaskCreated: true,
+                nextStepType: result.nextStepType
+              }
+            }));
+            
+            // Also dispatch to document for cross-browser sync
+            document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
+              detail: { source: 'sequenceTaskCompletion', newTaskCreated: true }
+            }));
+          }
+          
           // If next step is a task, it will appear in tasks list after reload
           // If next step is an email, user can see it in Emails page
         } else {
@@ -1423,6 +1464,10 @@
       if (els.content) {
         els.content.innerHTML = '<div class="empty" style="padding: 2rem; text-align: center; color: var(--text-secondary);">Loading task...</div>';
       }
+      // CRITICAL FIX: Also ensure subtitle shows loading state
+      if (els.subtitle) {
+        els.subtitle.textContent = 'Loading task...';
+      }
       // CRITICAL: Re-initialize DOM refs to ensure els.content exists
       if (!initDomRefs()) {
         console.warn('[TaskDetail] DOM not ready, retrying...');
@@ -1708,14 +1753,14 @@
         }
 
         if (!task) {
-          // CRITICAL FIX: Treat this as a stale/ghost task and clean it up locally
-          try {
-            cleanupStaleTask(taskId);
-          } catch (_) { }
+        // CRITICAL FIX: Treat this as a stale/ghost task and clean it up locally
+        try {
+          cleanupStaleTask(taskId);
+        } catch (_) { }
 
-          showTaskError('Task not found or you do not have access to this task. Please refresh the page.');
-          state.loadingTask = false;
-          return;
+        showTaskError('Task not found or you do not have access to this task. Please refresh the page.');
+        state.loadingTask = false;
+        return;
         }
       }
 
@@ -2008,7 +2053,11 @@
     let retries = 0;
 
     const tryRender = () => {
-      const titleSection = document.querySelector(elementSelector);
+      // CRITICAL FIX: Scope selector to task-detail-page if not already scoped
+      const scopedSelector = elementSelector.includes('#task-detail-page') 
+        ? elementSelector 
+        : `#task-detail-page ${elementSelector}`;
+      const titleSection = document.querySelector(scopedSelector);
       if (titleSection) {
         // Cleanup existing elements
         const existingElements = titleSection.querySelectorAll('.avatar-initials, .company-favicon-header, .avatar-absolute, [class*="avatar"], [class*="favicon"]');
@@ -2064,7 +2113,8 @@
 
   // Robust cleanup function to remove all existing avatars/icons
   function cleanupExistingAvatarsAndIcons() {
-    const titleSection = document.querySelector('.contact-header-text');
+    // CRITICAL FIX: Scope selector to task-detail-page
+    const titleSection = document.querySelector('#task-detail-page .contact-header-text');
     if (!titleSection) return;
 
     // Remove all possible avatar/icon elements
@@ -2138,6 +2188,19 @@
 
     injectTaskDetailStyles();
 
+    // CRITICAL FIX: Always update subtitle first to clear "Loading task..." message
+    if (els.subtitle) {
+      const dueDate = state.currentTask.dueDate || '';
+      const dueTime = state.currentTask.dueTime || '';
+      if (dueDate && dueTime) {
+        els.subtitle.textContent = `Due: ${dueDate} at ${dueTime}`;
+      } else if (dueDate) {
+        els.subtitle.textContent = `Due: ${dueDate}`;
+      } else {
+        els.subtitle.textContent = '';
+      }
+    }
+
     // For phone tasks, add header info based on task type
     if (state.taskType === 'phone-call') {
       // Check if this is an account task or contact task
@@ -2180,13 +2243,19 @@
         }
 
         // Add company icon/favicon to header using retry helper
-        renderAvatarOrIcon('.contact-header-text', companyIconHTML, false);
+        renderAvatarOrIcon('#task-detail-page .contact-header-text', companyIconHTML, false);
 
-        // Update subtitle
+        // CRITICAL FIX: Subtitle is already updated above, but ensure it's set here too
         if (els.subtitle) {
-          const dueDate = state.currentTask.dueDate;
-          const dueTime = state.currentTask.dueTime;
-          els.subtitle.textContent = `Due: ${dueDate} at ${dueTime}`;
+          const dueDate = state.currentTask.dueDate || '';
+          const dueTime = state.currentTask.dueTime || '';
+          if (dueDate && dueTime) {
+            els.subtitle.textContent = `Due: ${dueDate} at ${dueTime}`;
+          } else if (dueDate) {
+            els.subtitle.textContent = `Due: ${dueDate}`;
+          } else {
+            els.subtitle.textContent = '';
+          }
         }
 
         // Add location info under title
@@ -2197,7 +2266,8 @@
           contactInfoEl.className = 'task-contact-info';
           contactInfoEl.style.cssText = 'margin-top: 0px; color: var(--text-secondary); font-size: 14px;';
 
-          const titleSection = document.querySelector('.contact-header-text');
+          // CRITICAL FIX: Scope selector to task-detail-page
+          const titleSection = document.querySelector('#task-detail-page .contact-header-text');
           const subtitle = document.getElementById('task-detail-subtitle');
           if (titleSection && subtitle) {
             subtitle.insertAdjacentElement('beforebegin', contactInfoEl);
@@ -2213,10 +2283,43 @@
         // Contact task header (existing logic)
         const contactName = state.currentTask.contact || '';
         const accountName = state.currentTask.account || '';
-        const person = (typeof window.getPeopleData === 'function' ? (window.getPeopleData() || []).find(p => {
-          const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
-          return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
-        }) : null) || {};
+        const contactId = state.currentTask.contactId || '';
+        
+        // CRITICAL FIX: Try multiple sources to find contact
+        let person = null;
+        
+        // Method 1: Try by contactId first (most reliable)
+        if (contactId) {
+          if (typeof window.getPeopleData === 'function') {
+            const people = window.getPeopleData() || [];
+            person = people.find(p => p.id === contactId);
+          }
+          if (!person && window.BackgroundContactsLoader) {
+            const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+            person = contacts.find(c => c.id === contactId);
+          }
+        }
+        
+        // Method 2: Try by name if not found by ID
+        if (!person && contactName) {
+          if (typeof window.getPeopleData === 'function') {
+            const people = window.getPeopleData() || [];
+            person = people.find(p => {
+              const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+              return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+            });
+          }
+          if (!person && window.BackgroundContactsLoader) {
+            const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+            person = contacts.find(c => {
+              const full = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || c.name || '';
+              return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+            });
+          }
+        }
+        
+        // Use found person or empty object
+        person = person || {};
         const title = person.title || '';
         const company = person.companyName || accountName;
 
@@ -2234,16 +2337,28 @@
 
         // Update the main title to include clickable contact name
         if (els.title && contactName) {
-          const contactId = person.id || '';
-          console.log('[TaskDetail] Rendering contact link:', { contactName, contactId, hasPerson: !!person });
-          const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(contactId)}" data-contact-name="${escapeHtml(contactName)}" style="color: var(--grey-400); text-decoration: none; font-weight: 400; transition: var(--transition-fast);" onmouseover="this.style.color='var(--text-inverse)'" onmouseout="this.style.color='var(--grey-400)'">${escapeHtml(contactName)}</a>`;
+          // CRITICAL FIX: Use person.id if found, otherwise use task contactId, otherwise try to find it
+          let finalContactId = person.id || contactId || '';
+          if (!finalContactId && person && person._id) {
+            finalContactId = person._id;
+          }
+          
+          console.log('[TaskDetail] Rendering contact link:', { contactName, contactId: finalContactId, hasPerson: !!person, personId: person.id });
+          const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(finalContactId)}" data-contact-name="${escapeHtml(contactName)}">${escapeHtml(contactName)}</a>`;
           els.title.innerHTML = `Call ${contactLinkHTML}`;
           
-          // Ensure contact link handler is attached (event delegation should handle it, but ensure it's set up)
+          // CRITICAL FIX: Ensure contact link handler is attached and verify it exists
           setTimeout(() => {
             const contactLink = els.title.querySelector('.contact-link');
             if (contactLink) {
               console.log('[TaskDetail] Contact link rendered and ready:', contactLink.getAttribute('data-contact-id'));
+              // Verify event handler is set up
+              if (!document._taskDetailContactHandlersBound) {
+                console.warn('[TaskDetail] Contact handlers not bound, setting up now...');
+                setupContactLinkHandlers();
+              }
+            } else {
+              console.error('[TaskDetail] Contact link not found after rendering!');
             }
           }, 100);
         }
@@ -2257,7 +2372,8 @@
           contactInfoEl.style.cssText = 'margin-top: 0px; color: var(--text-secondary); font-size: 14px;';
 
           // Insert between title and subtitle
-          const titleSection = document.querySelector('.contact-header-text');
+          // CRITICAL FIX: Scope selector to task-detail-page
+          const titleSection = document.querySelector('#task-detail-page .contact-header-text');
           const subtitle = document.getElementById('task-detail-subtitle');
           if (titleSection && subtitle) {
             // Insert the contact info element before the subtitle
@@ -2291,7 +2407,8 @@
         console.log('Contact task - Rendering avatar with initials:', finalInitials);
         
         // Render avatar with retry - ensure it's inside .contact-header-text
-        const titleSection = document.querySelector('.contact-header-text');
+        // CRITICAL FIX: Use scoped selector within task-detail-page
+        const titleSection = document.querySelector('#task-detail-page .contact-header-text');
         if (titleSection) {
           // Clean up any existing avatars first
           const existingAvatars = titleSection.querySelectorAll('.avatar-initials, .avatar-absolute');
@@ -2304,7 +2421,7 @@
         } else {
           // Fallback to retry helper if element not found
           console.warn('[TaskDetail] .contact-header-text not found, using retry helper');
-          renderAvatarOrIcon('.contact-header-text', escapeHtml(finalInitials), true);
+          renderAvatarOrIcon('#task-detail-page .contact-header-text', escapeHtml(finalInitials), true);
         }
       }
     } else if (state.taskType === 'li-connect' || state.taskType === 'li-message' || state.taskType === 'li-view-profile' || state.taskType === 'li-interact-post' || 
@@ -2312,10 +2429,43 @@
       // LinkedIn task header (same styling as call tasks)
       const contactName = state.currentTask.contact || '';
       const accountName = state.currentTask.account || '';
-      const person = (typeof window.getPeopleData === 'function' ? (window.getPeopleData() || []).find(p => {
-        const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
-        return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
-      }) : null) || {};
+      const contactId = state.currentTask.contactId || '';
+      
+      // CRITICAL FIX: Try multiple sources to find contact (same as phone-call tasks)
+      let person = null;
+      
+      // Method 1: Try by contactId first (most reliable)
+      if (contactId) {
+        if (typeof window.getPeopleData === 'function') {
+          const people = window.getPeopleData() || [];
+          person = people.find(p => p.id === contactId);
+        }
+        if (!person && window.BackgroundContactsLoader) {
+          const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+          person = contacts.find(c => c.id === contactId);
+        }
+      }
+      
+      // Method 2: Try by name if not found by ID
+      if (!person && contactName) {
+        if (typeof window.getPeopleData === 'function') {
+          const people = window.getPeopleData() || [];
+          person = people.find(p => {
+            const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+            return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+          });
+        }
+        if (!person && window.BackgroundContactsLoader) {
+          const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+          person = contacts.find(c => {
+            const full = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || c.name || '';
+            return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+          });
+        }
+      }
+      
+      // Use found person or empty object
+      person = person || {};
       const title = person.title || '';
       const company = person.companyName || accountName;
 
@@ -2333,9 +2483,14 @@
 
       // Update the main title to include clickable contact name
       if (els.title && contactName) {
-        const contactId = person.id || '';
-        console.log('[TaskDetail] Rendering LinkedIn contact link:', { contactName, contactId, hasPerson: !!person });
-        const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(contactId)}" data-contact-name="${escapeHtml(contactName)}" style="color: var(--grey-400); text-decoration: none; font-weight: 400; transition: var(--transition-fast);" onmouseover="this.style.color='var(--text-inverse)'" onmouseout="this.style.color='var(--grey-400)'">${escapeHtml(contactName)}</a>`;
+        // CRITICAL FIX: Use person.id if found, otherwise use task contactId
+        const taskContactId = state.currentTask.contactId || '';
+        let finalContactId = person.id || taskContactId || '';
+        if (!finalContactId && person && person._id) {
+          finalContactId = person._id;
+        }
+        console.log('[TaskDetail] Rendering LinkedIn contact link:', { contactName, contactId: finalContactId, hasPerson: !!person, personId: person.id });
+        const contactLinkHTML = `<a href="#contact-details" class="contact-link" data-contact-id="${escapeHtml(finalContactId)}" data-contact-name="${escapeHtml(contactName)}">${escapeHtml(contactName)}</a>`;
         
         // Determine action text based on task type (contact name goes in the middle)
         let actionPrefix = '';
@@ -2373,11 +2528,18 @@
           els.title.innerHTML = `${escapeHtml(actionPrefix)} ${contactLinkHTML}`;
         }
         
-        // Ensure contact link handler is attached
+        // CRITICAL FIX: Ensure contact link handler is attached and verify it exists
         setTimeout(() => {
           const contactLink = els.title.querySelector('.contact-link');
           if (contactLink) {
             console.log('[TaskDetail] LinkedIn contact link rendered and ready:', contactLink.getAttribute('data-contact-id'));
+            // Verify event handler is set up
+            if (!document._taskDetailContactHandlersBound) {
+              console.warn('[TaskDetail] Contact handlers not bound, setting up now...');
+              setupContactLinkHandlers();
+            }
+          } else {
+            console.error('[TaskDetail] Contact link not found after rendering!');
           }
         }, 100);
       }
@@ -2391,7 +2553,8 @@
         contactInfoEl.style.cssText = 'margin-top: 0px; color: var(--text-secondary); font-size: 14px;';
 
         // Insert between title and subtitle
-        const titleSection = document.querySelector('.contact-header-text');
+        // CRITICAL FIX: Scope selector to task-detail-page
+        const titleSection = document.querySelector('#task-detail-page .contact-header-text');
         const subtitle = document.getElementById('task-detail-subtitle');
         if (titleSection && subtitle) {
           subtitle.insertAdjacentElement('beforebegin', contactInfoEl);
@@ -2423,7 +2586,8 @@
       console.log('LinkedIn task - Rendering avatar with initials:', finalInitials);
       
       // Render avatar with retry - ensure it's inside .contact-header-text
-      const titleSection = document.querySelector('.contact-header-text');
+      // CRITICAL FIX: Use scoped selector within task-detail-page
+      const titleSection = document.querySelector('#task-detail-page .contact-header-text');
       if (titleSection) {
         // Clean up any existing avatars first
         const existingAvatars = titleSection.querySelectorAll('.avatar-initials, .avatar-absolute');
@@ -2436,7 +2600,7 @@
       } else {
         // Fallback to retry helper if element not found
         console.warn('[TaskDetail] .contact-header-text not found, using retry helper');
-        renderAvatarOrIcon('.contact-header-text', escapeHtml(finalInitials), true);
+        renderAvatarOrIcon('#task-detail-page .contact-header-text', escapeHtml(finalInitials), true);
       }
     } else {
       // For other non-phone-call tasks, set title and subtitle normally
@@ -2444,10 +2608,17 @@
         els.title.textContent = state.currentTask.title;
       }
 
+      // CRITICAL FIX: Subtitle is already updated above, but ensure it's set here too
       if (els.subtitle) {
-        const dueDate = state.currentTask.dueDate;
-        const dueTime = state.currentTask.dueTime;
-        els.subtitle.textContent = `Due: ${dueDate} at ${dueTime}`;
+        const dueDate = state.currentTask.dueDate || '';
+        const dueTime = state.currentTask.dueTime || '';
+        if (dueDate && dueTime) {
+          els.subtitle.textContent = `Due: ${dueDate} at ${dueTime}`;
+        } else if (dueDate) {
+          els.subtitle.textContent = `Due: ${dueDate}`;
+        } else {
+          els.subtitle.textContent = '';
+        }
       }
     }
 
@@ -2462,6 +2633,11 @@
     }
     if (!document._taskDetailContactHandlersBound) {
       setupContactLinkHandlers();
+    }
+    
+    // CRITICAL FIX: Also ensure phone click handlers are set up
+    if (!document._taskDetailPhoneHandlersBound) {
+      setupPhoneClickHandlers();
     }
 
     // Verify links exist (for debugging)

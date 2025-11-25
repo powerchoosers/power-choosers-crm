@@ -231,60 +231,38 @@
 
   // Listen for task updates and reload data
   window.addEventListener('tasksUpdated', async (event) => {
-    const { source, taskId, deleted, taskData, task } = event.detail || {};
-    // Support both 'task' and 'taskData' field names for backward compatibility
-    const newTaskData = taskData || task;
-    console.log('[BackgroundTasksLoader] Tasks updated from:', source, deleted ? '(deleted)' : newTaskData ? '(added/updated)' : '');
+    const { source, taskId, deleted } = event.detail || {};
+    console.log('[BackgroundTasksLoader] Tasks updated from:', source, deleted ? '(deleted)' : '');
 
     // CRITICAL FIX: If a task was deleted, remove it from local cache immediately
     if (deleted && taskId) {
       try {
-        removeTask(taskId);
+        tasksData = tasksData.filter(t => t && t.id !== taskId);
+        console.log('[BackgroundTasksLoader] Removed deleted task from cache:', taskId);
         
-        // Trigger Today's Tasks widget to refresh
-        if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
-          window.crm.loadTodaysTasks();
+        // Also update cache
+        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+          await window.CacheManager.set('tasks', tasksData);
         }
-        return; // Don't reload from Firestore if we just removed in place
       } catch (e) {
         console.warn('[BackgroundTasksLoader] Could not remove deleted task from cache:', e);
       }
     }
 
-    // CRITICAL FIX: If a task was added/updated, update cache in place (cost-effective)
-    if (newTaskData && newTaskData.id && !deleted) {
-      try {
-        addOrUpdateTask(newTaskData);
-        console.log('[BackgroundTasksLoader] Updated task in cache:', newTaskData.id);
-        
-        // Trigger Today's Tasks widget to refresh
-        if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
-          window.crm.loadTodaysTasks();
-        }
-        return; // Don't reload from Firestore if we just updated in place
-      } catch (e) {
-        console.warn('[BackgroundTasksLoader] Could not update task in cache:', e);
+    // Invalidate cache and reload from Firestore
+    try {
+      if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+        await window.CacheManager.invalidate('tasks');
+        console.log('[BackgroundTasksLoader] Cache invalidated');
       }
-    }
+      await loadFromFirestore();
 
-    // Only invalidate and reload if we don't have the specific task data
-    // This prevents unnecessary Firestore reads when we already have the updated data
-    if (!newTaskData || !newTaskData.id) {
-      try {
-        // For bulk updates or unknown changes, invalidate and reload
-        if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
-          await window.CacheManager.invalidate('tasks');
-          console.log('[BackgroundTasksLoader] Cache invalidated');
-        }
-        await loadFromFirestore();
-
-        // Trigger Today's Tasks widget to refresh
-        if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
-          window.crm.loadTodaysTasks();
-        }
-      } catch (error) {
-        console.error('[BackgroundTasksLoader] Error handling tasksUpdated event:', error);
+      // Trigger Today's Tasks widget to refresh
+      if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
+        window.crm.loadTodaysTasks();
       }
+    } catch (error) {
+      console.error('[BackgroundTasksLoader] Error handling tasksUpdated event:', error);
     }
   });
 
@@ -345,54 +323,6 @@
     }
   });
 
-  // Remove task from cache (cost-effective: avoids Firestore read)
-  function removeTask(taskId) {
-    if (!taskId) return false;
-    const index = tasksData.findIndex(t => t && t.id === taskId);
-    if (index >= 0) {
-      tasksData.splice(index, 1);
-      console.log('[BackgroundTasksLoader] ✓ Removed task from cache:', taskId);
-      
-      // Update cache storage
-      if (window.CacheManager && typeof window.CacheManager.set === 'function') {
-        window.CacheManager.set('tasks', tasksData).catch(err => 
-          console.warn('[BackgroundTasksLoader] Cache save failed:', err)
-        );
-      }
-      
-      return true;
-    }
-    return false;
-  }
-
-  // Add or update task in cache (cost-effective: avoids Firestore read)
-  function addOrUpdateTask(taskData) {
-    if (!taskData || !taskData.id) {
-      console.warn('[BackgroundTasksLoader] Invalid task data provided');
-      return false;
-    }
-    
-    const index = tasksData.findIndex(t => t && t.id === taskData.id);
-    if (index >= 0) {
-      // Update existing task
-      tasksData[index] = { ...tasksData[index], ...taskData };
-      console.log('[BackgroundTasksLoader] ✓ Updated task in cache:', taskData.id);
-    } else {
-      // Add new task to the beginning (most recent first)
-      tasksData.unshift(taskData);
-      console.log('[BackgroundTasksLoader] ✓ Added task to cache:', taskData.id);
-    }
-    
-    // Update cache storage
-    if (window.CacheManager && typeof window.CacheManager.set === 'function') {
-      window.CacheManager.set('tasks', tasksData).catch(err => 
-        console.warn('[BackgroundTasksLoader] Cache save failed:', err)
-      );
-    }
-    
-    return true;
-  }
-
   // Export public API
   window.BackgroundTasksLoader = {
     getTasksData: () => tasksData,
@@ -414,9 +344,7 @@
     loadMore: loadMoreTasks,
     hasMore: () => hasMoreData,
     getCount: () => tasksData.length,
-    getTotalCount: getTotalCount,
-    removeTask: removeTask,
-    addOrUpdateTask: addOrUpdateTask
+    getTotalCount: getTotalCount
   };
 
   console.log('[BackgroundTasksLoader] Module initialized');
