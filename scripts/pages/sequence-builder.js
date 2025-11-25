@@ -2879,7 +2879,7 @@ class FreeSequenceAutomation {
             : escapeHtml((step.data?.aiStatus || 'draft').toUpperCase())}
                     </div>
                     <div>
-                      <button class="btn-primary ai-save-to-step" ${step.data?.aiStatus === 'generated' || step.data?.aiStatus === 'draft' ? '' : 'disabled'}>Save to step</button>
+                      <button class="btn-primary ai-save-to-step" ${(step.data?.aiStatus === 'generated' || step.data?.aiStatus === 'draft' || step.data?.aiOutput) ? '' : 'disabled'}>Save to step</button>
                     </div>
                   </div>
                 </div>
@@ -7478,6 +7478,13 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                 step.data.aiOutput = { subject, html };
                 step.data.aiStatus = 'generated';
                 try { scheduleStepSave(step.id); } catch (_) { }
+                
+                // Enable the save button by updating its disabled state
+                const saveBtn = card?.querySelector('.ai-save-to-step');
+                if (saveBtn) {
+                  saveBtn.disabled = false;
+                  saveBtn.removeAttribute('disabled');
+                }
               }
 
               if (status) status.textContent = 'Preview generated!';
@@ -7534,14 +7541,69 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       setTimeout(updateAIBarStatus, 100);
     });
 
-    // AI Save to step / revert handlers
-    container.querySelectorAll('.step-card .ai-save-to-step').forEach(btn => {
-      btn.addEventListener('click', () => {
+    // AI Save to step / revert handlers - Use event delegation for reliability
+    if (!container.dataset.aiSaveDelegated) {
+      container.addEventListener('click', (e) => {
+        const btn = e.target.closest('.ai-save-to-step');
+        if (!btn || btn.disabled) return;
+        
         const card = btn.closest('.step-card');
-        const id = card?.getAttribute('data-id');
-        const step = state.currentSequence.steps.find(s => s.id === id);
-        if (!step || !step.data?.aiOutput) return;
+        if (!card) return;
+        
+        const id = card.getAttribute('data-id');
+        if (!id) return;
+        
+        const step = state.currentSequence?.steps?.find(s => s.id === id);
+        if (!step) {
+          console.warn('[SequenceBuilder] Save to step: Step not found for ID:', id);
+          return;
+        }
+        
         if (!step.data) step.data = {};
+        
+        // Extract AI output from step data OR from DOM preview as fallback
+        let aiSubject = '';
+        let aiBody = '';
+        
+        if (step.data.aiOutput) {
+          // Use stored aiOutput if available
+          aiSubject = step.data.aiOutput.subject || '';
+          aiBody = step.data.aiOutput.html || '';
+        } else {
+          // Fallback: Extract from DOM preview if aiOutput is missing
+          const previewSubjectEl = card.querySelector('.preview-subject');
+          const previewBodyEl = card.querySelector('.preview-body');
+          
+          if (previewSubjectEl) {
+            aiSubject = previewSubjectEl.textContent?.trim() || previewSubjectEl.innerText?.trim() || '';
+          }
+          
+          if (previewBodyEl) {
+            // Get HTML content, but remove signature if present
+            let bodyHtml = previewBodyEl.innerHTML || '';
+            // Remove signature (it's added for preview but shouldn't be saved)
+            const signature = getSignatureForPreview(step, step.type === 'auto-email');
+            if (signature && bodyHtml.includes(signature)) {
+              bodyHtml = bodyHtml.replace(signature, '');
+            }
+            aiBody = bodyHtml.trim();
+          }
+          
+          // If we extracted from DOM, store it in aiOutput for future reference
+          if (aiSubject || aiBody) {
+            step.data.aiOutput = { subject: aiSubject, html: aiBody };
+            console.log('[SequenceBuilder] Extracted AI output from DOM preview');
+          }
+        }
+        
+        // Validate we have content to save
+        if (!aiSubject && !aiBody) {
+          console.warn('[SequenceBuilder] Save to step: No AI output found to save');
+          if (window.crm?.showToast) {
+            window.crm.showToast('No generated content to save. Please generate first.', 'error');
+          }
+          return;
+        }
 
         // Preserve the AI prompt text from the textarea
         const promptTextarea = card.querySelector('.ai-prompt');
@@ -7549,11 +7611,25 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           step.data.aiPrompt = promptTextarea.value.trim();
         }
 
-        step.data.subject = step.data.aiOutput.subject || step.data.subject || '';
-        step.data.body = step.data.aiOutput.html || step.data.body || '';
+        // Save the generated content to step data
+        step.data.subject = aiSubject || step.data.subject || '';
+        step.data.body = aiBody || step.data.body || '';
         step.data.aiStatus = 'saved';
         step.data.savedAt = Date.now(); // Store timestamp
-        try { scheduleStepSave(step.id, true); } catch (_) { }
+        
+        console.log('[SequenceBuilder] Saving AI output to step:', {
+          stepId: step.id,
+          hasSubject: !!step.data.subject,
+          hasBody: !!step.data.body,
+          subjectLength: step.data.subject?.length || 0,
+          bodyLength: step.data.body?.length || 0
+        });
+        
+        try { 
+          scheduleStepSave(step.id, true); 
+        } catch (saveErr) {
+          console.error('[SequenceBuilder] Error scheduling step save:', saveErr);
+        }
 
         // Show toast notification
         if (window.crm && typeof window.crm.showToast === 'function') {
@@ -7565,9 +7641,15 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
           window.crm.showToast(`AI prompt saved at ${timeStr}`);
         }
 
-        render();
+        // Re-render to update UI state
+        try {
+          render();
+        } catch (renderErr) {
+          console.error('[SequenceBuilder] Error during render after save:', renderErr);
+        }
       });
-    });
+      container.dataset.aiSaveDelegated = '1';
+    }
     container.querySelectorAll('.step-card .switch-to-manual').forEach(btn => {
       btn.addEventListener('click', () => {
         const card = btn.closest('.step-card');
