@@ -126,58 +126,10 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
     ${featuredImage ? `<meta name="twitter:image" content="${escapeHtml(featuredImage)}">` : ''}
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../styles/public.css">
     <style>
-      :root{
-        --brand-blue:#0b1b45;
-        --brand-orange:#f59e0b;
-        --text:#0f172a;
-        --muted:#475569;
-        --card:#ffffff;
-        --border:#e5e7eb;
-        --shadow:0 10px 24px rgba(0,0,0,.08);
-        --radius:14px;
-        --container:900px;
-      }
-      *{box-sizing:border-box;margin:0;padding:0}
-      html,body{height:100%;scroll-behavior:smooth}
-      body{margin:0;font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:#ffffff;line-height:1.6}
-      a{color:var(--brand-orange);text-decoration:none}
-      a:hover{text-decoration:underline}
-      img{max-width:100%;display:block;height:auto}
-      
-      /* Animations */
-      @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(30px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      .animate-on-scroll { opacity: 0; transform: translateY(30px); transition: opacity 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); will-change: opacity, transform; }
-      .animate-on-scroll.visible { opacity: 1; transform: translateY(0); }
-      
-      /* Header */
-      .site-header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.95);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.05)}
-      .nav{max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:16px 24px}
-      .brand{display:flex;align-items:center;gap:14px}
-      .brand img{height:44px;width:44px;border-radius:50%}
-      .brand-name{font-weight:800;letter-spacing:.2px;font-size:20px;color:var(--brand-blue)}
-      .nav-links{display:flex;gap:22px;align-items:center}
-      .menu-toggle{display:none}
-      .btn{display:inline-flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid transparent;padding:10px 14px;font-weight:600;cursor:pointer;transition:.2s ease}
-      .btn-primary{background:linear-gradient(135deg,var(--brand-orange) 0%, #d97706 100%);color:#0a0f1f;box-shadow:0 6px 18px rgba(245,158,11,.35);border:1px solid rgba(255,255,255,.2);transition:all .3s cubic-bezier(.4,.0,.2,1)}
-      .btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 20px rgba(245,158,11,.3),0 12px 24px rgba(245,158,11,.4)}
-      .btn-outline{border-color:#2d3a5c;background:transparent;color:var(--brand-blue);transition:all .3s cubic-bezier(.4,.0,.2,1)}
-      .btn-outline:hover{border-color:var(--brand-orange);background:linear-gradient(135deg,rgba(245,158,11,.05) 0%, rgba(245,158,11,.02) 100%);color:var(--brand-orange)}
-      
-      @media (max-width: 768px){
-        .nav{padding:12px 16px;width:100%;max-width:100%}
-        .menu-toggle{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:#ffffff;border-radius:10px;padding:8px;width:40px;height:40px}
-        .nav{position:relative}
-        .nav-links{position:absolute;top:100%;left:0;right:0;display:none;flex-direction:column;gap:8px;background:rgba(255,255,255,.98);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:12px 16px;width:100%;box-shadow:0 4px 12px rgba(0,0,0,.1)}
-        .nav-links.open{display:flex}
-        .nav-links .btn{width:100%;justify-content:flex-start}
-      }
-      
       /* Article */
-      .article-container{max-width:var(--container);margin:0 auto;padding:60px 24px}
+      .article-container{max-width:900px;margin:0 auto;padding:60px 24px}
       .article-header{margin-bottom:48px}
       .article-meta{display:flex;align-items:center;gap:16px;margin-bottom:16px;color:var(--muted);font-size:14px}
       .article-category{display:inline-block;padding:6px 12px;background:linear-gradient(135deg,rgba(11,27,69,.1),rgba(245,158,11,.1));border-radius:6px;font-size:12px;font-weight:600;color:var(--brand-blue)}
@@ -197,7 +149,7 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
       .article-content a:hover{color:#d97706}
       
       /* Author Bio Section */
-      .author-bio-section{max-width:var(--container);margin:60px auto 0;padding:0 24px}
+      .author-bio-section{max-width:900px;margin:60px auto 0;padding:0 24px}
       .author-bio-container{background:linear-gradient(135deg,#f8fafc 0%, #ffffff 100%);border:1px solid var(--border);border-radius:var(--radius);padding:32px;box-shadow:0 4px 12px rgba(0,0,0,.05)}
       .author-bio-content{display:flex;align-items:center;gap:24px}
       .author-avatar{flex-shrink:0}
@@ -214,6 +166,10 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
         .author-bio-content{flex-direction:column;text-align:center}
         .author-avatar img{width:64px;height:64px}
         .author-name{font-size:20px}
+        .article-title{font-size:32px}
+        .article-content{font-size:16px}
+        .article-content h2{font-size:24px}
+        .article-content h3{font-size:20px}
       }
       
       /* Recent Posts Section */
@@ -235,25 +191,6 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
         .recent-posts-section{padding:60px 16px}
         .recent-posts-section h2{font-size:32px;margin-bottom:32px}
         .recent-posts-grid{grid-template-columns:1fr;gap:24px}
-      }
-      
-      /* Footer */
-      .site-footer{background:linear-gradient(180deg,#f8fafc,#ffffff);border-top:1px solid var(--border);padding:48px 24px;margin-top:80px}
-      .footer-content{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:32px;width:100%;max-width:1400px;margin:0 auto}
-      .footer-brand{display:flex;align-items:center;gap:14px;margin-bottom:16px}
-      .footer-brand img{height:40px;width:40px;border-radius:50%}
-      .footer-brand span{font-weight:800;font-size:18px;color:var(--brand-blue)}
-      .footer h4{font-weight:700;margin-bottom:16px;font-size:16px;color:var(--brand-blue)}
-      .footer-links{display:flex;flex-direction:column;gap:8px}
-      .footer-links a{color:var(--muted);font-size:14px;transition:color .2s;text-decoration:none}
-      .footer-links a:hover{color:var(--brand-orange)}
-      .footer-bottom{text-align:center;padding-top:32px;border-top:1px solid var(--border);margin-top:32px;color:var(--muted);font-size:14px;grid-column:1/-1}
-      
-      @media (max-width: 768px){
-        .article-title{font-size:32px}
-        .article-content{font-size:16px}
-        .article-content h2{font-size:24px}
-        .article-content h3{font-size:20px}
       }
     </style>
     <!-- Apollo Tracking Script -->
@@ -359,7 +296,7 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
     </section>
     ` : ''}
     
-    <footer class="site-footer">
+    <footer class="footer">
         <div class="footer-content">
             <div>
                 <div class="footer-brand">
@@ -398,45 +335,13 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
     </footer>
     
     <script>
-        // Mobile nav toggle
-        const navToggle = document.getElementById('nav-toggle');
-        const navLinks = document.querySelector('.nav-links');
-        if (navToggle && navLinks) {
-            navToggle.addEventListener('click', () => {
-                const isOpen = navLinks.classList.toggle('open');
-                navToggle.setAttribute('aria-expanded', String(isOpen));
-            });
-            navLinks.addEventListener('click', (e) => {
-                const t = e.target;
-                if (t instanceof Element && (t.matches('a') || t.matches('button'))) {
-                    navLinks.classList.remove('open');
-                    navToggle.setAttribute('aria-expanded', 'false');
-                }
-            });
-        }
-
-        // Scroll Animations
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        };
-        
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('visible');
-                    observer.unobserve(entry.target);
-                }
-            });
-        }, observerOptions);
-        
-        // Elements to animate
-        const animatedElements = document.querySelectorAll('.article-header > *, .article-featured-image, .article-content > *, .author-bio-container, .recent-post-card');
-        animatedElements.forEach(el => {
-            el.classList.add('animate-on-scroll');
-            observer.observe(el);
+        // Initialize scroll animations for page-specific elements
+        document.addEventListener('DOMContentLoaded', () => {
+            const elements = document.querySelectorAll('.article-header > *, .article-featured-image, .article-content > *, .author-bio-container, .recent-post-card');
+            elements.forEach(el => el.classList.add('animate-on-scroll'));
         });
     </script>
+    <script src="../scripts/public.js"></script>
 </body>
 </html>`;
 }
