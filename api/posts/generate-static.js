@@ -296,41 +296,42 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
     </section>
     ` : ''}
     
-    <footer class="footer">
-        <div class="footer-content">
+    <footer class="footer" style="background:linear-gradient(180deg,#f8fafc,#ffffff);border-top:1px solid var(--border);padding:48px 24px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:32px;width:100%;max-width:var(--container);margin:0 auto">
             <div>
-                <div class="footer-brand">
-                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" alt="Power Choosers" />
-                    <span>Power Choosers</span>
+                <div class="brand" style="margin-bottom:16px">
+                    <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" alt="Power Choosers" style="height:40px;width:40px" />
+                    <span class="brand-name">Power Choosers</span>
                 </div>
                 <p style="color:var(--muted);font-size:14px;margin-bottom:16px">Your trusted partner in energy procurement and management.</p>
             </div>
             <div>
-                <h4>Company</h4>
-                <div class="footer-links">
-                    <a href="https://powerchoosers.com/about.html">About Us</a>
-                    <a href="https://powerchoosers.com/services.html">Services</a>
-                    <a href="https://powerchoosers.com/resources.html">Resources</a>
-                    <a href="https://powerchoosers.com/index.html#testimonials">Testimonials</a>
+                <h4 style="font-weight:700;margin-bottom:16px;font-size:16px">Company</h4>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                    <a href="https://powerchoosers.com/about.html" style="color:var(--muted);font-size:14px;transition:color .2s">About Us</a>
+                    <a href="https://powerchoosers.com/services.html" style="color:var(--muted);font-size:14px;transition:color .2s">Services</a>
+                    <a href="https://powerchoosers.com/resources.html" style="color:var(--muted);font-size:14px;transition:color .2s">Resources</a>
+                    <a href="https://powerchoosers.com/schedule.html" style="color:var(--muted);font-size:14px;transition:color .2s">Schedule Consultation</a>
+                    <a href="https://powerchoosers.com/index.html#testimonials" style="color:var(--muted);font-size:14px;transition:color .2s">Testimonials</a>
                 </div>
             </div>
             <div>
-                <h4>Legal</h4>
-                <div class="footer-links">
-                    <a href="https://powerchoosers.com/index.html#privacy">Privacy Policy</a>
-                    <a href="https://powerchoosers.com/index.html#terms">Terms of Service</a>
+                <h4 style="font-weight:700;margin-bottom:16px;font-size:16px">Legal</h4>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                    <a href="https://powerchoosers.com/index.html#privacy" style="color:var(--muted);font-size:14px;transition:color .2s">Privacy Policy</a>
+                    <a href="https://powerchoosers.com/index.html#terms" style="color:var(--muted);font-size:14px;transition:color .2s">Terms of Service</a>
                 </div>
             </div>
             <div>
-                <h4>Contact</h4>
-                <div class="footer-links">
-                    <a href="tel:19728342317">(972) 834-2317</a>
-                    <a href="mailto:renewals@powerchoosers.com">renewals@powerchoosers.com</a>
+                <h4 style="font-weight:700;margin-bottom:16px;font-size:16px">Contact</h4>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                    <a href="tel:+18178093367" style="color:var(--muted);font-size:14px">+1 (817) 809-3367</a>
+                    <a href="mailto:info@powerchoosers.com" style="color:var(--muted);font-size:14px">info@powerchoosers.com</a>
                 </div>
             </div>
-            <div class="footer-bottom">
-                © ${new Date().getFullYear()} Power Choosers. All rights reserved.
-            </div>
+        </div>
+        <div style="text-align:center;padding-top:32px;border-top:1px solid var(--border);margin-top:32px;color:var(--muted);font-size:14px;width:100%;max-width:var(--container);margin-left:auto;margin-right:auto">
+            © ${new Date().getFullYear()} Power Choosers. All rights reserved.
         </div>
     </footer>
     
