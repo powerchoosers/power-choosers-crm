@@ -402,6 +402,9 @@
         font-weight: 400;
         vertical-align: baseline;
         display: inline;
+        position: relative;
+        z-index: 10; /* Ensure link is above avatar */
+        pointer-events: auto; /* Ensure link is clickable */
       }
       
       #task-detail-page .contact-link:hover {
@@ -2401,7 +2404,7 @@
               });
 
               // Verify event handler is set up
-              if (!document._taskDetailContactHandlersBound) {
+              if (!document._taskDetailContactHandlersBound_v2) {
                 console.warn('[TaskDetail] Contact handlers not bound, setting up now...');
                 setupContactLinkHandlers();
               }
@@ -2619,19 +2622,19 @@
         }
 
         // CRITICAL FIX: Ensure contact link handler is attached and verify it exists
-        setTimeout(() => {
+        requestAnimationFrame(() => {
           const contactLink = els.title.querySelector('.contact-link');
           if (contactLink) {
             console.log('[TaskDetail] LinkedIn contact link rendered and ready:', contactLink.getAttribute('data-contact-id'));
             // Verify event handler is set up
-            if (!document._taskDetailContactHandlersBound) {
-              console.warn('[TaskDetail] Contact handlers not bound, setting up now...');
+            if (!document._taskDetailContactHandlersBound_v2) {
+              console.warn('[TaskDetail] Contact handlers not bound (v2), setting up now...');
               setupContactLinkHandlers();
             }
           } else {
-            console.error('[TaskDetail] Contact link not found after rendering!');
+            console.error('[TaskDetail] LinkedIn contact link not found after rendering!');
           }
-        }, 100);
+        });
       }
 
       // Create or update contact info element
@@ -4018,9 +4021,9 @@
 
   // Setup phone click handlers for contact phones (capture-phase to win race vs ClickToCall)
   function setupPhoneClickHandlers() {
-    // CRITICAL FIX: Use document-level guard like fix-duplicate-listeners.js pattern
-    if (document._taskDetailPhoneHandlersBound) return;
-    document._taskDetailPhoneHandlersBound = true;
+    // CRITICAL FIX: Use unique guard name to avoid conflict with fix-duplicate-listeners.js
+    if (document._taskDetailPhoneHandlersBound_v2) return;
+    document._taskDetailPhoneHandlersBound_v2 = true;
 
     // Helper: resolve person from current task contact name
     function resolvePerson() {
@@ -4062,13 +4065,13 @@
 
   // Setup contact link handlers
   function setupContactLinkHandlers() {
-    // CRITICAL FIX: Use document-level guard like fix-duplicate-listeners.js pattern
-    if (document._taskDetailContactHandlersBound) {
-      console.log('[TaskDetail] Contact handlers already bound, skipping');
+    // CRITICAL FIX: Use unique guard name to avoid conflict with fix-duplicate-listeners.js
+    if (document._taskDetailContactHandlersBound_v2) {
+      console.log('[TaskDetail] Contact handlers already bound (v2), skipping');
       return;
     }
-    document._taskDetailContactHandlersBound = true;
-    console.log('[TaskDetail] Setting up contact link handlers');
+    document._taskDetailContactHandlersBound_v2 = true;
+    console.log('[TaskDetail] Setting up contact link handlers (v2)');
 
     // Handle contact link clicks in header (scoped to task-detail-page)
     // CRITICAL FIX: Use capture phase to catch clicks early, before other handlers
@@ -4305,9 +4308,9 @@
 
   // Setup contact creation listener to refresh contacts list
   function setupContactCreationListener() {
-    // CRITICAL FIX: Use document-level guard like fix-duplicate-listeners.js pattern
-    if (document._taskDetailContactCreationBound) return;
-    document._taskDetailContactCreationBound = true;
+    // CRITICAL FIX: Use unique guard name to avoid conflict with fix-duplicate-listeners.js
+    if (document._taskDetailContactCreationBound_v2) return;
+    document._taskDetailContactCreationBound_v2 = true;
 
     document.addEventListener('pc:contact-created', (e) => {
       if (state.currentTask && isAccountTask(state.currentTask)) {
