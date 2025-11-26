@@ -200,7 +200,7 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
     <header class="site-header">
         <nav class="nav">
             <a href="https://powerchoosers.com/index.html" class="brand">
-                <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" alt="Power Choosers">
+                <img src="https://cdn.prod.website-files.com/6801ddaf27d1495f8a02fd3f/68645bd391ea20fecb011c85_2656%20Webclip%20PChoosers.png" alt="Power Choosers" />
                 <span class="brand-name">Power Choosers</span>
             </a>
             <button class="menu-toggle" id="nav-toggle" aria-label="Open menu">
@@ -212,7 +212,7 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
                 <a href="https://powerchoosers.com/about.html" class="btn btn-outline">About</a>
                 <a href="https://powerchoosers.com/resources.html" class="btn btn-outline">Resources</a>
                 <a href="https://powerchoosers.com/schedule.html" class="btn btn-outline">Schedule</a>
-                <a href="https://powerchoosers.com/index.html#get-started" class="btn btn-primary">Contact an Expert</a>
+                <button class="btn btn-primary" onclick="window.location.href='https://powerchoosers.com/index.html#get-started'">Contact an Expert</button>
             </div>
         </nav>
     </header>
