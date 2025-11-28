@@ -46,6 +46,40 @@
     return div.innerHTML;
   }
 
+  function getApiBaseUrl() {
+    try {
+      if (window.crm && typeof window.crm.getApiBaseUrl === 'function') {
+        const resolved = window.crm.getApiBaseUrl();
+        if (resolved) return resolved;
+      }
+    } catch (_) { /* noop */ }
+
+    try {
+      const fromWindow = (window.PUBLIC_BASE_URL || window.API_BASE_URL || '').toString().trim();
+      if (fromWindow) return fromWindow.replace(/\/$/, '');
+    } catch (_) { /* noop */ }
+
+    try {
+      if (typeof PUBLIC_BASE_URL !== 'undefined' && PUBLIC_BASE_URL) {
+        return String(PUBLIC_BASE_URL).replace(/\/$/, '');
+      }
+    } catch (_) { /* noop */ }
+
+    try {
+      if (typeof API_BASE_URL !== 'undefined' && API_BASE_URL) {
+        return String(API_BASE_URL).replace(/\/$/, '');
+      }
+    } catch (_) { /* noop */ }
+
+    try {
+      if (window.location && window.location.origin) {
+        return window.location.origin.replace(/\/$/, '');
+      }
+    } catch (_) { /* noop */ }
+
+    return '';
+  }
+
   // Helper functions for ownership filtering and localStorage key management
   function getUserTasksKey() {
     try {
@@ -402,9 +436,6 @@
         font-weight: 400;
         vertical-align: baseline;
         display: inline;
-        position: relative;
-        z-index: 10; /* Ensure link is above avatar */
-        pointer-events: auto; /* Ensure link is clickable */
       }
       
       #task-detail-page .contact-link:hover {
@@ -859,7 +890,7 @@
     if (state.currentTask && (state.currentTask.isSequenceTask || state.currentTask.sequenceId)) {
       try {
         console.log('[TaskDetail] Completed sequence task, creating next step...', state.currentTask.id);
-        const baseUrl = window.API_BASE_URL || window.location.origin;
+        const baseUrl = getApiBaseUrl();
         const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2404,7 +2435,7 @@
               });
 
               // Verify event handler is set up
-              if (!document._taskDetailContactHandlersBound_v2) {
+              if (!document._taskDetailContactHandlersBound) {
                 console.warn('[TaskDetail] Contact handlers not bound, setting up now...');
                 setupContactLinkHandlers();
               }
@@ -2622,19 +2653,19 @@
         }
 
         // CRITICAL FIX: Ensure contact link handler is attached and verify it exists
-        requestAnimationFrame(() => {
+        setTimeout(() => {
           const contactLink = els.title.querySelector('.contact-link');
           if (contactLink) {
             console.log('[TaskDetail] LinkedIn contact link rendered and ready:', contactLink.getAttribute('data-contact-id'));
             // Verify event handler is set up
-            if (!document._taskDetailContactHandlersBound_v2) {
-              console.warn('[TaskDetail] Contact handlers not bound (v2), setting up now...');
+            if (!document._taskDetailContactHandlersBound) {
+              console.warn('[TaskDetail] Contact handlers not bound, setting up now...');
               setupContactLinkHandlers();
             }
           } else {
-            console.error('[TaskDetail] LinkedIn contact link not found after rendering!');
+            console.error('[TaskDetail] Contact link not found after rendering!');
           }
-        });
+        }, 100);
       }
 
       // Create or update contact info element
@@ -4021,9 +4052,16 @@
 
   // Setup phone click handlers for contact phones (capture-phase to win race vs ClickToCall)
   function setupPhoneClickHandlers() {
-    // CRITICAL FIX: Use unique guard name to avoid conflict with fix-duplicate-listeners.js
-    if (document._taskDetailPhoneHandlersBound_v2) return;
-    document._taskDetailPhoneHandlersBound_v2 = true;
+    const hasMouseDownHandler = typeof document._taskDetailPhoneMouseDownHandler === 'function';
+    const hasClickHandler = typeof document._taskDetailPhoneClickHandler === 'function';
+
+    if (document._taskDetailPhoneHandlersBound && hasMouseDownHandler && hasClickHandler) {
+      return;
+    }
+
+    if (document._taskDetailPhoneHandlersBound && (!hasMouseDownHandler || !hasClickHandler)) {
+      console.warn('[TaskDetail] Phone handler guard set but listeners missing. Rebinding.');
+    }
 
     // Helper: resolve person from current task contact name
     function resolvePerson() {
@@ -4040,8 +4078,7 @@
       return evtTarget.closest('#task-detail-page .phone-text[data-phone-type]');
     }
 
-    // Capture-phase mousedown sets the guard before ClickToCall runs
-    document.addEventListener('mousedown', (e) => {
+    const mouseDownHandler = (e) => {
       const phoneElement = findContactPhoneTarget(e.target);
       if (!phoneElement) return;
       try { window._pcPhoneContextSetByPage = true; } catch (_) { }
@@ -4050,32 +4087,44 @@
         // Set context early so ClickToCall sees the guard and skips its own context
         handleContactPhoneClick(phoneElement, person);
       }
-    }, true);
+    };
+    // Capture-phase mousedown sets the guard before ClickToCall runs
+    document.addEventListener('mousedown', mouseDownHandler, true);
+    document._taskDetailPhoneMouseDownHandler = mouseDownHandler;
 
-    // Capture-phase click as a backup to ensure context is set
-    document.addEventListener('click', (e) => {
+    const clickHandler = (e) => {
       const phoneElement = findContactPhoneTarget(e.target);
       if (!phoneElement) return;
       const person = resolvePerson();
       if (person && person.id) {
         handleContactPhoneClick(phoneElement, person);
       }
-    }, true);
+    };
+
+    // Capture-phase click as a backup to ensure context is set
+    document.addEventListener('click', clickHandler, true);
+    document._taskDetailPhoneClickHandler = clickHandler;
+
+    document._taskDetailPhoneHandlersBound = true;
   }
 
   // Setup contact link handlers
   function setupContactLinkHandlers() {
-    // CRITICAL FIX: Use unique guard name to avoid conflict with fix-duplicate-listeners.js
-    if (document._taskDetailContactHandlersBound_v2) {
-      console.log('[TaskDetail] Contact handlers already bound (v2), skipping');
+    const haveLinkHandler = typeof document._taskDetailContactHandler === 'function';
+    const haveAddBtnHandler = typeof document._taskDetailAddContactHandler === 'function';
+
+    if (document._taskDetailContactHandlersBound && haveLinkHandler && haveAddBtnHandler) {
+      console.log('[TaskDetail] Contact handlers already bound, skipping');
       return;
     }
-    document._taskDetailContactHandlersBound_v2 = true;
-    console.log('[TaskDetail] Setting up contact link handlers (v2)');
 
-    // Handle contact link clicks in header (scoped to task-detail-page)
-    // CRITICAL FIX: Use capture phase to catch clicks early, before other handlers
-    document.addEventListener('click', (e) => {
+    if (document._taskDetailContactHandlersBound && (!haveLinkHandler || !haveAddBtnHandler)) {
+      console.warn('[TaskDetail] Contact handler guard was set but listeners were missing. Rebinding now.');
+    }
+
+    console.log('[TaskDetail] Setting up contact link handlers');
+
+    const contactLinkHandler = (e) => {
       // CRITICAL FIX: Check if click is within task-detail-page first
       const taskPage = e.target.closest('#task-detail-page');
       if (!taskPage) return;
@@ -4245,16 +4294,24 @@
       } else {
         console.error('[TaskDetail] ContactDetail module not available');
       }
-    }, true); // Use capture phase to catch clicks early
+    }; // Use capture phase to catch clicks early
 
-    // Handle add contact button clicks
-    document.addEventListener('click', (e) => {
+    // Handle contact link clicks in capture phase so no other listener swallows it
+    document.addEventListener('click', contactLinkHandler, true);
+    document._taskDetailContactHandler = contactLinkHandler;
+
+    const addContactHandler = (e) => {
       const addContactBtn = e.target.closest('#add-contact-btn');
       if (!addContactBtn) return;
 
       e.preventDefault();
       openAddContactModal();
-    });
+    };
+
+    document.addEventListener('click', addContactHandler);
+    document._taskDetailAddContactHandler = addContactHandler;
+
+    document._taskDetailContactHandlersBound = true;
   }
 
   // Open add contact modal with prefilled account information
@@ -4308,11 +4365,18 @@
 
   // Setup contact creation listener to refresh contacts list
   function setupContactCreationListener() {
-    // CRITICAL FIX: Use unique guard name to avoid conflict with fix-duplicate-listeners.js
-    if (document._taskDetailContactCreationBound_v2) return;
-    document._taskDetailContactCreationBound_v2 = true;
+    const hasCreatedHandler = typeof document._taskDetailContactCreatedHandler === 'function';
+    const hasUpdatedHandler = typeof document._taskDetailContactUpdatedHandler === 'function';
 
-    document.addEventListener('pc:contact-created', (e) => {
+    if (document._taskDetailContactCreationBound && hasCreatedHandler && hasUpdatedHandler) {
+      return;
+    }
+
+    if (document._taskDetailContactCreationBound && (!hasCreatedHandler || !hasUpdatedHandler)) {
+      console.warn('[TaskDetail] Contact creation guard set but listeners missing. Rebinding.');
+    }
+
+    const onContactCreated = (e) => {
       if (state.currentTask && isAccountTask(state.currentTask)) {
         // Refresh the contacts list for account tasks
         const contactsList = document.getElementById('account-contacts-list');
@@ -4327,10 +4391,11 @@
           }
         }
       }
-    });
+    };
+    document.addEventListener('pc:contact-created', onContactCreated);
+    document._taskDetailContactCreatedHandler = onContactCreated;
 
-    // Listen for contact updates (e.g., when preferred phone field changes on contact-detail page)
-    document.addEventListener('pc:contact-updated', (e) => {
+    const onContactUpdated = (e) => {
       if (state.currentTask && !isAccountTask(state.currentTask)) {
         // Re-render the task page to reflect updated contact information
         console.log('[Task Detail] Contact updated, refreshing task detail page');
@@ -4341,7 +4406,13 @@
           processClickToCallAndEmail();
         }, 100);
       }
-    });
+    };
+
+    // Listen for contact updates (e.g., when preferred phone field changes on contact-detail page)
+    document.addEventListener('pc:contact-updated', onContactUpdated);
+    document._taskDetailContactUpdatedHandler = onContactUpdated;
+
+    document._taskDetailContactCreationBound = true;
   }
 
   // Public API

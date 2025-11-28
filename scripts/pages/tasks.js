@@ -32,6 +32,40 @@
     }
   }
 
+  function getApiBaseUrl() {
+    try {
+      if (window.crm && typeof window.crm.getApiBaseUrl === 'function') {
+        const resolved = window.crm.getApiBaseUrl();
+        if (resolved) return resolved;
+      }
+    } catch (_) { /* noop */ }
+
+    try {
+      const fromWindow = (window.PUBLIC_BASE_URL || window.API_BASE_URL || '').toString().trim();
+      if (fromWindow) return fromWindow.replace(/\/$/, '');
+    } catch (_) { /* noop */ }
+
+    try {
+      if (typeof PUBLIC_BASE_URL !== 'undefined' && PUBLIC_BASE_URL) {
+        return String(PUBLIC_BASE_URL).replace(/\/$/, '');
+      }
+    } catch (_) { /* noop */ }
+
+    try {
+      if (typeof API_BASE_URL !== 'undefined' && API_BASE_URL) {
+        return String(API_BASE_URL).replace(/\/$/, '');
+      }
+    } catch (_) { /* noop */ }
+
+    try {
+      if (window.location && window.location.origin) {
+        return window.location.origin.replace(/\/$/, '');
+      }
+    } catch (_) { /* noop */ }
+
+    return '';
+  }
+
   // Restore handler for back navigation from Task Detail
   if (!document._tasksRestoreBound) {
     document.addEventListener('pc:tasks-restore', (ev) => {
@@ -601,7 +635,7 @@
         if (task && task.isSequenceTask) {
           try {
             console.log('[Tasks] Completed sequence task, creating next step...', task.id);
-            const baseUrl = window.API_BASE_URL || window.location.origin;
+            const baseUrl = getApiBaseUrl();
             const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },

@@ -138,6 +138,7 @@ class SettingsPage {
                     phone: '',              // Personal/direct line
                     companyName: 'Power Choosers',
                     linkedIn: '',           // LinkedIn profile URL
+                    bio: '',                // Author bio for blog posts
                     
                     // Existing fields
                     agentName: 'Power Choosers',
@@ -526,7 +527,8 @@ class SettingsPage {
             { id: 'user-location', key: 'location' },
             { id: 'user-phone', key: 'phone' },
             { id: 'company-name', key: 'companyName' },
-            { id: 'user-linkedin', key: 'linkedIn' }
+            { id: 'user-linkedin', key: 'linkedIn' },
+            { id: 'user-bio', key: 'bio' }
         ];
 
         profileFields.forEach(({ id, key }) => {
@@ -1369,6 +1371,11 @@ class SettingsPage {
         const userLinkedIn = document.getElementById('user-linkedin');
         if (userLinkedIn) {
             userLinkedIn.value = g.linkedIn || '';
+        }
+        
+        const userBio = document.getElementById('user-bio');
+        if (userBio) {
+            userBio.value = g.bio || '';
         }
         
         // Render avatar preview if available
@@ -2919,6 +2926,11 @@ function injectModernStyles() {
             
             #settings-page .phone-actions {
                 align-self: flex-end;
+            }
+            
+            /* Stack profile fields on mobile */
+            #settings-page .settings-group > div[style*="grid-template-columns"] {
+                grid-template-columns: 1fr !important;
             }
         }
         
