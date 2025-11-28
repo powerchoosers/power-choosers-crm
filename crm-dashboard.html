@@ -2631,60 +2631,65 @@
                                                     </small>
                                                 </div>
                                                 
-                                                <!-- Job Title (Editable) -->
-                                                <div class="settings-field">
-                                                    <label for="user-job-title">Job Title</label>
-                                                    <input 
-                                                        type="text" 
-                                                        id="user-job-title" 
-                                                        class="settings-input" 
-                                                        placeholder="Energy Strategist"
-                                                    >
-                                                    <small style="color: var(--text-secondary); font-size: 12px; margin-top: 4px; display: block;">
-                                                        Appears in all email signatures
-                                                    </small>
+                                                <!-- Profile Fields in 2 Columns -->
+                                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                                                    <!-- Job Title (Editable) -->
+                                                    <div class="settings-field" style="margin-bottom: 0;">
+                                                        <label for="user-job-title">Job Title</label>
+                                                        <input 
+                                                            type="text" 
+                                                            id="user-job-title" 
+                                                            class="settings-input" 
+                                                            placeholder="Energy Strategist"
+                                                        >
+                                                        <small style="color: var(--text-secondary); font-size: 12px; margin-top: 4px; display: block;">
+                                                            Appears in all email signatures
+                                                        </small>
+                                                    </div>
+                                                    
+                                                    <!-- Location (Editable) -->
+                                                    <div class="settings-field" style="margin-bottom: 0;">
+                                                        <label for="user-location">Location</label>
+                                                        <input 
+                                                            type="text" 
+                                                            id="user-location" 
+                                                            class="settings-input" 
+                                                            placeholder="Fort Worth, TX"
+                                                        >
+                                                        <small style="color: var(--text-secondary); font-size: 12px; margin-top: 4px; display: block;">
+                                                            Your city and state
+                                                        </small>
+                                                    </div>
                                                 </div>
                                                 
-                                                <!-- Location (Editable) -->
-                                                <div class="settings-field">
-                                                    <label for="user-location">Location</label>
-                                                    <input 
-                                                        type="text" 
-                                                        id="user-location" 
-                                                        class="settings-input" 
-                                                        placeholder="Fort Worth, TX"
-                                                    >
-                                                    <small style="color: var(--text-secondary); font-size: 12px; margin-top: 4px; display: block;">
-                                                        Your city and state
-                                                    </small>
-                                                </div>
-                                                
-                                                <!-- Phone (Editable) -->
-                                                <div class="settings-field">
-                                                    <label for="user-phone">Direct Phone</label>
-                                                    <input 
-                                                        type="tel" 
-                                                        id="user-phone" 
-                                                        class="settings-input" 
-                                                        placeholder="(817) 555-1234"
-                                                    >
-                                                    <small style="color: var(--text-secondary); font-size: 12px; margin-top: 4px; display: block;">
-                                                        Your direct line (optional - shown in email signatures)
-                                                    </small>
-                                                </div>
-                                                
-                                                <!-- Company Name (Editable) -->
-                                                <div class="settings-field">
-                                                    <label for="company-name">Company Name</label>
-                                                    <input 
-                                                        type="text" 
-                                                        id="company-name" 
-                                                        class="settings-input" 
-                                                        placeholder="Power Choosers"
-                                                    >
-                                                    <small style="color: var(--text-secondary); font-size: 12px; margin-top: 4px; display: block;">
-                                                        Your company name (white-label support)
-                                                    </small>
+                                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                                                    <!-- Phone (Editable) -->
+                                                    <div class="settings-field" style="margin-bottom: 0;">
+                                                        <label for="user-phone">Direct Phone</label>
+                                                        <input 
+                                                            type="tel" 
+                                                            id="user-phone" 
+                                                            class="settings-input" 
+                                                            placeholder="(817) 555-1234"
+                                                        >
+                                                        <small style="color: var(--text-secondary); font-size: 12px; margin-top: 4px; display: block;">
+                                                            Your direct line (optional - shown in email signatures)
+                                                        </small>
+                                                    </div>
+                                                    
+                                                    <!-- Company Name (Editable) -->
+                                                    <div class="settings-field" style="margin-bottom: 0;">
+                                                        <label for="company-name">Company Name</label>
+                                                        <input 
+                                                            type="text" 
+                                                            id="company-name" 
+                                                            class="settings-input" 
+                                                            placeholder="Power Choosers"
+                                                        >
+                                                        <small style="color: var(--text-secondary); font-size: 12px; margin-top: 4px; display: block;">
+                                                            Your company name (white-label support)
+                                                        </small>
+                                                    </div>
                                                 </div>
                                                 
                                                 <!-- LinkedIn Profile (Editable) -->
@@ -2698,6 +2703,20 @@
                                                     >
                                                     <small style="color: var(--text-secondary); font-size: 12px; margin-top: 4px; display: block;">
                                                         Your LinkedIn profile URL (appears in blog post author bio)
+                                                    </small>
+                                                </div>
+                                                
+                                                <!-- Author Bio (Editable) -->
+                                                <div class="settings-field">
+                                                    <label for="user-bio">Author Bio</label>
+                                                    <textarea 
+                                                        id="user-bio" 
+                                                        class="settings-textarea" 
+                                                        placeholder="Write a brief bio about yourself that will appear in blog post author sections..."
+                                                        rows="4"
+                                                    ></textarea>
+                                                    <small style="color: var(--text-secondary); font-size: 12px; margin-top: 4px; display: block;">
+                                                        Your professional bio (appears in blog post author bio section)
                                                     </small>
                                                 </div>
                                             </div>
