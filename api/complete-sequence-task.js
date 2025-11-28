@@ -216,7 +216,7 @@ export default async function handler(req, res) {
                 contactId: contact.id,
                 account: contact.company || contact.companyName || '',
                 type: taskType,
-                priority: nextStep.data?.priority || 'normal',
+                priority: nextStep.data?.priority || 'sequence',
                 dueDate: dueDate.toLocaleDateString(),
                 dueTime: dueDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
                 dueTimestamp: scheduledTime,
