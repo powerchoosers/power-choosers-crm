@@ -249,6 +249,11 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
                 <div class="author-info">
                     <h3 class="author-name">${escapeHtml((authorInfo.firstName || '') + ' ' + (authorInfo.lastName || ''))}</h3>
                     <p class="author-title">${escapeHtml(authorInfo.jobTitle || 'Energy Strategist')}</p>
+                    ${authorInfo.bio ? `
+                    <p class="author-bio-text" style="margin: 12px 0; color: var(--text); line-height: 1.6; font-size: 15px;">
+                        ${escapeHtml(authorInfo.bio).replace(/\n/g, '<br>')}
+                    </p>
+                    ` : ''}
                     ${authorInfo.linkedIn ? `
                     <div class="author-social">
                         <a href="${escapeHtml(authorInfo.linkedIn)}" target="_blank" rel="noopener" class="linkedin-link" aria-label="LinkedIn Profile">
@@ -664,7 +669,8 @@ export default async function handler(req, res) {
             jobTitle: general.jobTitle || '',
             hostedPhotoURL: general.hostedPhotoURL || '',
             photoURL: general.photoURL || '',
-            linkedIn: general.linkedIn || ''
+            linkedIn: general.linkedIn || '',
+            bio: general.bio || ''
           };
         }
       }

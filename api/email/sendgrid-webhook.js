@@ -133,8 +133,10 @@ async function processSendGridEvent(event) {
     sgMessageId: sg_message_id,
     timestamp,
     hasUrl: !!url,
-    trackingId
+    trackingId: trackingId
   });
+
+  console.log(`[SendGrid Webhook] Event: ${eventType}, Email: ${email}, TrackingId: ${trackingId || 'MISSING'}`);
 
   try {
     switch (eventType) {

@@ -245,8 +245,8 @@ export default async function handler(req, res) {
         const msg = {
           to: emailData.to,
           from: {
-            email: process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com',
-            name: process.env.SENDGRID_FROM_NAME || 'Power Choosers'
+            email: process.env.SENDGRID_FROM_EMAIL || 'l.patterson@powerchoosers.com',
+            name: process.env.SENDGRID_FROM_NAME || 'Lewis Patterson'
           },
           subject: emailData.subject,
           html: emailData.html,
