@@ -18,6 +18,7 @@
       case 'low': return '#495057';
       case 'medium': return 'rgba(255, 193, 7, 0.15)';
       case 'high': return 'rgba(220, 53, 69, 0.15)';
+      case 'sequence': return 'rgba(111, 66, 193, 0.18)';
       default: return '#495057';
     }
   }
@@ -28,6 +29,7 @@
       case 'low': return '#e9ecef';
       case 'medium': return '#ffc107';
       case 'high': return '#dc3545';
+      case 'sequence': return '#6f42c1';
       default: return '#e9ecef';
     }
   }
@@ -516,7 +518,7 @@
           contact: taskData.contact || '',
           account: taskData.account || '',
           type: taskData.type || 'linkedin',
-          priority: taskData.priority || 'medium',
+          priority: taskData.priority || 'sequence',
           dueDate: taskData.dueDate || '',
           dueTime: taskData.dueTime || '',
           status: taskData.status || 'pending',
@@ -612,6 +614,42 @@
           const filtered = current.filter(t => t.id !== id);
           localStorage.setItem(key, JSON.stringify(filtered));
         } catch (e) { console.warn('Could not remove task from localStorage:', e); }
+        // If this is a sequence task, trigger next step creation
+        if (task && task.isSequenceTask) {
+          try {
+            console.log('[Tasks] Completed sequence task, creating next step...', task.id);
+            const baseUrl = getApiBaseUrl();
+            const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ taskId: task.id })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+              console.log('[Tasks] Next step created:', result.nextStepType);
+              if (result.nextStepType === 'task') {
+                // Force refresh BackgroundTasksLoader so the new task is available immediately
+                if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
+                  try {
+                    console.log('[Tasks] Forcing BackgroundTasksLoader refresh for new sequence task...');
+                    await window.BackgroundTasksLoader.forceReload();
+                  } catch (reloadError) {
+                    console.warn('[Tasks] Failed to force reload BackgroundTasksLoader:', reloadError);
+                  }
+                }
+                await loadData(); // Reload to show new task
+              }
+              // If next step is an email, user can see it in Emails page
+            } else {
+              console.warn('[Tasks] Failed to create next step:', result.message || result.error);
+            }
+          } catch (error) {
+            console.error('[Tasks] Error creating next sequence step:', error);
+            // Don't block - task was already completed
+          }
+        }
+
         // Remove from Firebase (best-effort)
         try {
           const db = window.firebaseDB;
@@ -630,34 +668,6 @@
             detail: { taskId: id }
           }));
         } catch (_) { }
-
-        // If this is a sequence task, trigger next step creation
-        if (task && task.isSequenceTask) {
-          try {
-            console.log('[Tasks] Completed sequence task, creating next step...', task.id);
-            const baseUrl = getApiBaseUrl();
-            const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ taskId: task.id })
-            });
-            const result = await response.json();
-
-            if (result.success) {
-              console.log('[Tasks] Next step created:', result.nextStepType);
-              // If next step is a task, reload tasks to show it
-              if (result.nextStepType === 'task') {
-                await loadData(); // Reload to show new task
-              }
-              // If next step is an email, user can see it in Emails page
-            } else {
-              console.warn('[Tasks] Failed to create next step:', result.message || result.error);
-            }
-          } catch (error) {
-            console.error('[Tasks] Error creating next sequence step:', error);
-            // Don't block - task was already completed
-          }
-        }
 
         // Update Today's Tasks widget and table
         updateTodaysTasksWidget();
@@ -723,7 +733,9 @@
     const name = escapeHtml(r.contact || '');
     const account = escapeHtml(r.account || '');
     const type = escapeHtml(r.type || '');
-    const pr = escapeHtml(r.priority || '');
+    const isSequenceTask = !!r.isSequenceTask || !!r.isLinkedInTask;
+    const priorityValue = isSequenceTask ? 'sequence' : (r.priority || '');
+    const pr = escapeHtml(priorityValue);
     const due = escapeHtml(r.dueDate || '');
     const time = escapeHtml(r.dueTime || '');
     const status = escapeHtml(r.status || '');
@@ -1094,9 +1106,41 @@
 
     container.querySelector('#bulk-complete').addEventListener('click', async () => {
       const selectedIds = Array.from(state.selected);
+      let needsReloadAfterSequence = false;
+
       for (const id of selectedIds) {
         const task = state.data.find(r => r.id === id);
         if (task) {
+          if (task.isSequenceTask) {
+            try {
+              console.log('[Tasks] (Bulk) Completed sequence task, creating next step...', task.id);
+              const baseUrl = getApiBaseUrl();
+              const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ taskId: task.id })
+              });
+              const result = await response.json();
+
+              if (result.success) {
+                if (result.nextStepType === 'task') {
+                  if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
+                    try {
+                      await window.BackgroundTasksLoader.forceReload();
+                    } catch (reloadError) {
+                      console.warn('[Tasks] Failed to force reload BackgroundTasksLoader (bulk):', reloadError);
+                    }
+                  }
+                  needsReloadAfterSequence = true;
+                }
+              } else {
+                console.warn('[Tasks] (Bulk) Failed to create next step:', result.message || result.error);
+              }
+            } catch (error) {
+              console.error('[Tasks] (Bulk) Error creating next sequence step:', error);
+            }
+          }
+
           task.status = 'completed';
           // Save to localStorage
           try {
@@ -1120,6 +1164,11 @@
           } catch (e) { console.warn('Could not update task in Firebase:', e); }
         }
       }
+
+      if (needsReloadAfterSequence) {
+        await loadData();
+      }
+
       state.selected.clear();
       applyFilters();
       updateTodaysTasksWidget();

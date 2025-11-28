@@ -807,6 +807,63 @@
       }
     }
 
+    // Trigger sequence next step BEFORE deleting the current task so the API can read it
+    if (state.currentTask && (state.currentTask.isSequenceTask || state.currentTask.sequenceId)) {
+      try {
+        console.log('[TaskDetail] Completed sequence task, creating next step...', state.currentTask.id);
+        const baseUrl = getApiBaseUrl();
+        const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId: state.currentTask.id })
+        });
+        const result = await response.json();
+
+        if (result.success) {
+          console.log('[TaskDetail] Next step created:', result.nextStepType, result);
+
+          if (result.nextStepType && (result.nextStepType.includes('linkedin') || result.nextStepType.includes('phone') || result.nextStepType.includes('task'))) {
+            if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
+              try {
+                console.log('[TaskDetail] Forcing BackgroundTasksLoader refresh to pick up new task...');
+                await window.BackgroundTasksLoader.forceReload();
+                console.log('[TaskDetail] BackgroundTasksLoader refreshed successfully');
+              } catch (reloadError) {
+                console.warn('[TaskDetail] Failed to refresh BackgroundTasksLoader:', reloadError);
+              }
+            }
+
+            if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+              try {
+                await window.CacheManager.invalidate('tasks');
+                console.log('[TaskDetail] Invalidated tasks cache after next step creation');
+              } catch (cacheError) {
+                console.warn('[TaskDetail] Failed to invalidate cache:', cacheError);
+              }
+            }
+
+            window.dispatchEvent(new CustomEvent('tasksUpdated', {
+              detail: {
+                source: 'sequenceTaskCompletion',
+                taskId: state.currentTask.id,
+                deleted: true,
+                newTaskCreated: true,
+                nextStepType: result.nextStepType
+              }
+            }));
+
+            document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
+              detail: { source: 'sequenceTaskCompletion', newTaskCreated: true }
+            }));
+          }
+        } else {
+          console.warn('[TaskDetail] Failed to create next step:', result.message || result.error);
+        }
+      } catch (error) {
+        console.error('[TaskDetail] Error creating next sequence step:', error);
+      }
+    }
+
     // Remove from localStorage completely (use namespaced key)
     try {
       const key = getUserTasksKey();
@@ -884,72 +941,6 @@
       }
     } catch (e) {
       console.warn('Could not refresh Today\'s Tasks widget:', e);
-    }
-
-    // CRITICAL FIX: If this is a sequence task, trigger next step creation
-    if (state.currentTask && (state.currentTask.isSequenceTask || state.currentTask.sequenceId)) {
-      try {
-        console.log('[TaskDetail] Completed sequence task, creating next step...', state.currentTask.id);
-        const baseUrl = getApiBaseUrl();
-        const response = await fetch(`${baseUrl}/api/complete-sequence-task`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId: state.currentTask.id })
-        });
-        const result = await response.json();
-
-        if (result.success) {
-          console.log('[TaskDetail] Next step created:', result.nextStepType, result);
-
-          // CRITICAL FIX: If next step is a task, refresh BackgroundTasksLoader to pick it up
-          if (result.nextStepType && (result.nextStepType.includes('linkedin') || result.nextStepType.includes('phone') || result.nextStepType.includes('task'))) {
-            // Force refresh BackgroundTasksLoader to get the newly created task
-            if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
-              try {
-                console.log('[TaskDetail] Forcing BackgroundTasksLoader refresh to pick up new task...');
-                await window.BackgroundTasksLoader.forceReload();
-                console.log('[TaskDetail] BackgroundTasksLoader refreshed successfully');
-              } catch (reloadError) {
-                console.warn('[TaskDetail] Failed to refresh BackgroundTasksLoader:', reloadError);
-              }
-            }
-
-            // Invalidate cache to ensure fresh data
-            if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
-              try {
-                await window.CacheManager.invalidate('tasks');
-                console.log('[TaskDetail] Invalidated tasks cache after next step creation');
-              } catch (cacheError) {
-                console.warn('[TaskDetail] Failed to invalidate cache:', cacheError);
-              }
-            }
-
-            // Dispatch event to notify tasks page that a new task was created
-            window.dispatchEvent(new CustomEvent('tasksUpdated', {
-              detail: {
-                source: 'sequenceTaskCompletion',
-                taskId: state.currentTask.id,
-                deleted: true,
-                newTaskCreated: true,
-                nextStepType: result.nextStepType
-              }
-            }));
-
-            // Also dispatch to document for cross-browser sync
-            document.dispatchEvent(new CustomEvent('pc:tasks-loaded', {
-              detail: { source: 'sequenceTaskCompletion', newTaskCreated: true }
-            }));
-          }
-
-          // If next step is a task, it will appear in tasks list after reload
-          // If next step is an email, user can see it in Emails page
-        } else {
-          console.warn('[TaskDetail] Failed to create next step:', result.message || result.error);
-        }
-      } catch (error) {
-        console.error('[TaskDetail] Error creating next sequence step:', error);
-        // Don't block - task was already completed
-      }
     }
 
     // CRITICAL FIX: Invalidate cache after task completion to prevent stale data
