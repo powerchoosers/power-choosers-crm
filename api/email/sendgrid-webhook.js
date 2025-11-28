@@ -124,13 +124,14 @@ export default async function handler(req, res) {
 }
 
 async function processSendGridEvent(event) {
-  const { event: eventType, email, sg_message_id, timestamp, reason, category, url } = event;
+  const { event: eventType, email, sg_message_id, sg_event_id, timestamp, reason, category, url } = event;
   const trackingId = (event.custom_args && (event.custom_args.trackingId || event.custom_args.trackingID)) || null;
 
   logger.debug('Processing SendGrid event', 'SendGridWebhook', {
     eventType,
     email,
     sgMessageId: sg_message_id,
+    sgEventId: sg_event_id,
     timestamp,
     hasUrl: !!url,
     trackingId: trackingId
@@ -145,11 +146,11 @@ async function processSendGridEvent(event) {
         break;
 
       case 'open':
-        await handleOpen(email, sg_message_id, timestamp, trackingId);
+        await handleOpen(email, sg_message_id, sg_event_id, timestamp, trackingId);
         break;
 
       case 'click':
-        await handleClick(email, sg_message_id, timestamp, event.url, trackingId);
+        await handleClick(email, sg_message_id, sg_event_id, timestamp, event.url, trackingId);
         break;
 
       case 'bounce':
@@ -232,7 +233,7 @@ async function handleDelivered(email, sgMessageId, timestamp, trackingId) {
   }
 }
 
-async function handleOpen(email, sgMessageId, timestamp, trackingId) {
+async function handleOpen(email, sgMessageId, sgEventId, timestamp, trackingId) {
   // Find and update the email record by messageId first, then by email
   // Prefer direct ID mapping via custom_args.trackingId
   if (trackingId) {
@@ -241,9 +242,17 @@ async function handleOpen(email, sgMessageId, timestamp, trackingId) {
       const snap = await ref.get();
       if (snap.exists) {
         const emailData = snap.data();
+
+        // Deduplication: Check if this event ID already exists
+        if (emailData.opens && emailData.opens.some(o => o.sgEventId === sgEventId)) {
+          console.log(`[SendGrid Webhook] Duplicate open event ignored: ${sgEventId}`);
+          return;
+        }
+
         const openData = {
           openedAt: new Date(timestamp * 1000).toISOString(),
           sgMessageId: sgMessageId,
+          sgEventId: sgEventId,
           userAgent: 'SendGrid Webhook',
           ip: 'SendGrid Server'
         };
@@ -298,9 +307,16 @@ async function handleOpen(email, sgMessageId, timestamp, trackingId) {
     const emailDoc = emailQuery.docs[0];
     const emailData = emailDoc.data();
 
+    // Deduplication: Check if this event ID already exists
+    if (emailData.opens && emailData.opens.some(o => o.sgEventId === sgEventId)) {
+      console.log(`[SendGrid Webhook] Duplicate open event ignored (fallback): ${sgEventId}`);
+      return;
+    }
+
     const openData = {
       openedAt: new Date(timestamp * 1000).toISOString(),
       sgMessageId: sgMessageId,
+      sgEventId: sgEventId,
       userAgent: 'SendGrid Webhook',
       ip: 'SendGrid Server'
     };
@@ -318,7 +334,7 @@ async function handleOpen(email, sgMessageId, timestamp, trackingId) {
   }
 }
 
-async function handleClick(email, sgMessageId, timestamp, url, trackingId) {
+async function handleClick(email, sgMessageId, sgEventId, timestamp, url, trackingId) {
   // Find and update the email record by messageId first, then by email
   // Prefer direct ID mapping via custom_args.trackingId
   if (trackingId) {
@@ -327,9 +343,17 @@ async function handleClick(email, sgMessageId, timestamp, url, trackingId) {
       const snap = await ref.get();
       if (snap.exists) {
         const emailData = snap.data();
+
+        // Deduplication: Check if this event ID already exists
+        if (emailData.clicks && emailData.clicks.some(c => c.sgEventId === sgEventId)) {
+          console.log(`[SendGrid Webhook] Duplicate click event ignored: ${sgEventId}`);
+          return;
+        }
+
         const clickData = {
           clickedAt: new Date(timestamp * 1000).toISOString(),
           sgMessageId: sgMessageId,
+          sgEventId: sgEventId,
           url: url,
           userAgent: 'SendGrid Webhook',
           ip: 'SendGrid Server'
@@ -385,9 +409,16 @@ async function handleClick(email, sgMessageId, timestamp, url, trackingId) {
     const emailDoc = emailQuery.docs[0];
     const emailData = emailDoc.data();
 
+    // Deduplication: Check if this event ID already exists
+    if (emailData.clicks && emailData.clicks.some(c => c.sgEventId === sgEventId)) {
+      console.log(`[SendGrid Webhook] Duplicate click event ignored (fallback): ${sgEventId}`);
+      return;
+    }
+
     const clickData = {
       clickedAt: new Date(timestamp * 1000).toISOString(),
       sgMessageId: sgMessageId,
+      sgEventId: sgEventId,
       url: url,
       userAgent: 'SendGrid Webhook',
       ip: 'SendGrid Server'
