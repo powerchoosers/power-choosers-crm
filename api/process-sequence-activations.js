@@ -386,7 +386,7 @@ async function processSingleActivation(activationId, isProduction) {
           contactId: contact.id,
           account: contact.company || contact.companyName || '',
           type: taskType,
-          priority: firstTaskStep.data?.priority || 'normal',
+          priority: firstTaskStep.data?.priority || 'sequence',
           dueDate: dueDate.toLocaleDateString(),
           dueTime: dueDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
           dueTimestamp: dueTimestamp,
