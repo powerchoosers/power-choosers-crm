@@ -595,7 +595,13 @@ class FreeSequenceAutomation {
     tempTitle: '',
     contacts: [], // Store sequence contacts
     currentView: 'builder', // 'builder' or 'steps'
-    sequenceMembersCache: null // Cache for sequence members
+    sequenceMembersCache: null, // Cache for sequence members
+    stepsPage: 1, // Pagination for steps view
+    stepsPageSize: 25, // Items per page in steps view
+    stepsTotalCount: 0, // Total count of sequence members (without loading all)
+    stepsLoadedMembers: [], // Currently loaded members (paginated)
+    stepsLastLoadedDoc: null, // Last document for pagination cursor
+    stepsHasMore: true // Flag to indicate if more members exist
   };
 
   const els = {};
@@ -1077,11 +1083,27 @@ class FreeSequenceAutomation {
     }
   }
 
-  function show(sequence) {
+  function show(sequence, options = {}) {
     if (!sequence || !sequence.id) {
       console.error('SequenceBuilder.show requires a sequence object with an id');
       return;
     }
+    
+    // Check if we're returning to the SAME sequence (preserve state)
+    const isSameSequence = state.currentSequence?.id === sequence.id;
+    const shouldPreserveState = isSameSequence && options.preserveState !== false;
+    
+    // Store previous state if returning to same sequence
+    const previousStepsPage = shouldPreserveState ? state.stepsPage : 1;
+    const previousLoadedMembers = shouldPreserveState ? state.stepsLoadedMembers : [];
+    const previousLastLoadedDoc = shouldPreserveState ? state.stepsLastLoadedDoc : null;
+    const previousHasMore = shouldPreserveState ? state.stepsHasMore : true;
+    const previousTotalCount = shouldPreserveState ? state.stepsTotalCount : 0;
+    const previousView = shouldPreserveState ? state.currentView : 'builder';
+    const previousCache = shouldPreserveState ? state.sequenceMembersCache : null;
+    
+    console.log(`[SequenceBuilder] show() called, isSameSequence=${isSameSequence}, preserveState=${shouldPreserveState}, previousPage=${previousStepsPage}`);
+    
     state.currentSequence = sequence;
 
     // Ensure all steps have position fields (backward compatibility)
@@ -1103,6 +1125,43 @@ class FreeSequenceAutomation {
     try {
       state.contacts = Array.isArray(sequence.contacts) ? [...sequence.contacts] : [];
     } catch (_) { state.contacts = []; }
+
+    // Restore pagination state if returning to same sequence
+    if (shouldPreserveState) {
+      state.stepsPage = previousStepsPage;
+      state.stepsLoadedMembers = previousLoadedMembers;
+      state.stepsLastLoadedDoc = previousLastLoadedDoc;
+      state.stepsHasMore = previousHasMore;
+      state.stepsTotalCount = previousTotalCount;
+      state.currentView = previousView;
+      state.sequenceMembersCache = previousCache;
+      console.log(`[SequenceBuilder] Restored state: page=${state.stepsPage}, loaded=${state.stepsLoadedMembers.length}, view=${state.currentView}`);
+    } else {
+      // Reset pagination state for new sequence
+      state.stepsPage = 1;
+      state.stepsLoadedMembers = [];
+      state.stepsLastLoadedDoc = null;
+      state.stepsHasMore = true;
+      state.sequenceMembersCache = null;
+    }
+
+    // Keep an accurate total count for steps pagination
+    const seqRecordCount = typeof sequence.recordCount === 'number' ? sequence.recordCount : 0;
+    if (seqRecordCount > 0 && !shouldPreserveState) {
+      state.stepsTotalCount = seqRecordCount;
+    } else if (state.contacts.length > 0 && !state.stepsTotalCount) {
+      state.stepsTotalCount = state.contacts.length;
+    } else if (!state.stepsTotalCount) {
+      state.stepsTotalCount = 0;
+    }
+    
+    // Apply options overrides (from back navigation)
+    if (options.view) {
+      state.currentView = options.view;
+    }
+    if (typeof options.page === 'number' && options.page > 0) {
+      state.stepsPage = options.page;
+    }
 
     // Minimize flicker: temporarily hide Sequences page while navigating
     try { document.documentElement.classList.add('pc-hide-sequences'); } catch (_) { }
@@ -1307,6 +1366,11 @@ class FreeSequenceAutomation {
         });
 
         state.contacts = validContacts;
+        state.stepsTotalCount = validContacts.length;
+        // If we've already loaded at least one page of steps, update hasMore flag
+        if (state.stepsLoadedMembers.length > 0) {
+          state.stepsHasMore = state.stepsLoadedMembers.length < state.stepsTotalCount;
+        }
         // Re-render with updated contacts
         render();
       } else {
@@ -1354,36 +1418,149 @@ class FreeSequenceAutomation {
     return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
   }
 
+  // Load sequence members in batches (lazy loading)
+  async function loadSequenceMembersPage(sequenceId, page = 1, reset = false) {
+    const db = window.firebaseDB;
+    if (!db || !sequenceId) return { members: [], hasMore: false };
+
+    try {
+      // If resetting, clear loaded data
+      if (reset) {
+        state.stepsLoadedMembers = [];
+        state.stepsLastLoadedDoc = null;
+        state.stepsHasMore = true;
+        state.stepsPage = 1;
+      }
+
+      // Keep total count in sync with known values (sequence recordCount or contacts list)
+      if (!state.stepsTotalCount || reset) {
+        const knownTotal = state.currentSequence?.recordCount || state.contacts.length || 0;
+        if (knownTotal > 0) {
+          state.stepsTotalCount = knownTotal;
+        } else {
+          try {
+            const countSnapshot = await db.collection('sequenceMembers')
+              .where('sequenceId', '==', sequenceId)
+              .count()
+              .get();
+            state.stepsTotalCount = countSnapshot.data().count || 0;
+          } catch (err) {
+            console.warn('[StepsView] Failed to get count, falling back to loaded size:', err);
+            state.stepsTotalCount = state.stepsLoadedMembers.length;
+          }
+        }
+      }
+
+      // If we already have enough members loaded for this page, skip fetching
+      const membersNeededForPage = page * state.stepsPageSize;
+      if (!reset && state.stepsLoadedMembers.length >= membersNeededForPage) {
+        console.log(`[StepsView] Already have ${state.stepsLoadedMembers.length} members, need ${membersNeededForPage} for page ${page} - skipping fetch`);
+        state.stepsHasMore = state.stepsLoadedMembers.length < state.stepsTotalCount;
+        return {
+          members: state.stepsLoadedMembers,
+          hasMore: state.stepsHasMore,
+          total: state.stepsTotalCount
+        };
+      }
+      
+      console.log(`[StepsView] Loading page ${page}: have ${state.stepsLoadedMembers.length}, need ${membersNeededForPage}`);
+
+      // Load next batch ordered by targetId (deterministic pagination w/out custom index)
+      let query = db.collection('sequenceMembers')
+        .where('sequenceId', '==', sequenceId)
+        .orderBy('targetId', 'asc')
+        .limit(state.stepsPageSize);
+
+      if (state.stepsLastLoadedDoc && !reset) {
+        query = query.startAfter(state.stepsLastLoadedDoc);
+      }
+
+      const snapshot = await query.get();
+      const rawMembers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const existingIds = new Set(state.stepsLoadedMembers.map(m => m.id));
+      const newMembers = rawMembers.filter(member => {
+        if (!member?.id) return false;
+        if (existingIds.has(member.id)) return false;
+        existingIds.add(member.id);
+        return true;
+      });
+
+      // Update pagination state
+      if (snapshot.docs.length > 0) {
+        state.stepsLastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
+        state.stepsHasMore = snapshot.docs.length === state.stepsPageSize;
+        
+        if (reset || page === 1) {
+          state.stepsLoadedMembers = newMembers;
+        } else {
+          // Append for infinite scroll (if we implement that later)
+          state.stepsLoadedMembers = [...state.stepsLoadedMembers, ...newMembers];
+        }
+      }
+      state.stepsHasMore = state.stepsLoadedMembers.length < state.stepsTotalCount;
+
+      // Cache the currently loaded members so we can reuse when toggling views
+      state.sequenceMembersCache = {
+        sequenceId,
+        data: state.stepsLoadedMembers.slice(),
+        timestamp: Date.now()
+      };
+
+      console.log(`[StepsView] Loaded page ${page}: ${newMembers.length} members (total loaded: ${state.stepsLoadedMembers.length}, hasMore: ${state.stepsHasMore})`);
+
+      return {
+        members: state.stepsLoadedMembers,
+        hasMore: state.stepsHasMore,
+        total: state.stepsTotalCount
+      };
+    } catch (err) {
+      console.error('[StepsView] Error loading sequence members:', err);
+      return { members: [], hasMore: false, total: 0 };
+    }
+  }
+
   // Render the steps view showing each contact's progress
   async function renderStepsView() {
     const db = window.firebaseDB;
     if (!db || !state.currentSequence) return '';
 
-    // Load both sequenceMembers AND emails for this sequence
-    let members = [];
-    let emails = [];
+    // Load sequence members in batches (lazy loading)
+    const sequenceId = state.currentSequence.id;
+    
+    // Only reset if switching to a different sequence (not on pagination)
+    const needsReset = !state.sequenceMembersCache || 
+                       state.sequenceMembersCache.sequenceId !== sequenceId;
 
-    // Use cached members if available
-    if (state.sequenceMembersCache && state.sequenceMembersCache.sequenceId === state.currentSequence.id) {
-      members = state.sequenceMembersCache.data;
+    if (needsReset) {
+      // Reset and load first page for new sequence
+      console.log('[StepsView] New sequence detected, resetting and loading first page');
+      await loadSequenceMembersPage(sequenceId, 1, true);
+      state.sequenceMembersCache = {
+        sequenceId: sequenceId,
+        data: state.stepsLoadedMembers,
+        timestamp: Date.now()
+      };
+    } else if (state.stepsLoadedMembers.length === 0) {
+      // Load first page if we don't have any loaded
+      console.log('[StepsView] No members loaded, loading first page');
+      await loadSequenceMembersPage(sequenceId, 1, false);
     } else {
-      try {
-        const membersSnapshot = await db.collection('sequenceMembers')
-          .where('sequenceId', '==', state.currentSequence.id)
-          .get();
-
-        members = membersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        state.sequenceMembersCache = {
-          sequenceId: state.currentSequence.id,
-          data: members,
-          timestamp: Date.now()
-        };
-      } catch (err) {
-        console.error('Error loading sequence members:', err);
-        return `<div class="empty-state"><div class="empty-title">Error loading contacts</div><div class="empty-desc">${err.message}</div></div>`;
+      // Check if we need to load more for the current page
+      const currentPageStart = (state.stepsPage - 1) * state.stepsPageSize;
+      const currentPageEnd = currentPageStart + state.stepsPageSize;
+      
+      if (currentPageStart >= state.stepsLoadedMembers.length && state.stepsHasMore) {
+        // Need to load more pages to display current page
+        console.log(`[StepsView] Need more data for page ${state.stepsPage}: have ${state.stepsLoadedMembers.length}, need at least ${currentPageEnd}`);
+        while (state.stepsLoadedMembers.length < currentPageEnd && state.stepsHasMore) {
+          const pageToLoad = Math.floor(state.stepsLoadedMembers.length / state.stepsPageSize) + 1;
+          await loadSequenceMembersPage(sequenceId, pageToLoad, false);
+        }
       }
     }
+
+    const members = state.stepsLoadedMembers;
+    let emails = [];
 
     // Load emails for this sequence to get actual step progress
     try {
@@ -1503,8 +1680,32 @@ class FreeSequenceAutomation {
 
     console.log('[StepsView] Contact progress mapping:', contactProgressMap.size, 'contacts with progress');
 
+    // Pagination - use total count for accurate pagination
+    const derivedTotal = state.currentSequence?.recordCount || state.contacts.length || 0;
+    const totalMembers = state.stepsTotalCount || derivedTotal || members.length;
+    if (!state.stepsTotalCount && (derivedTotal || members.length)) {
+      state.stepsTotalCount = totalMembers;
+    }
+    const totalPages = Math.max(1, Math.ceil(totalMembers / state.stepsPageSize));
+    const currentPage = Math.min(state.stepsPage, totalPages);
+    state.stepsPage = currentPage;
+    const startIdx = (currentPage - 1) * state.stepsPageSize;
+    const loadedEndIdx = Math.min(startIdx + state.stepsPageSize, members.length);
+    let pageMembers = members.slice(startIdx, loadedEndIdx);
+
+    // If we don't have enough members for current page and there's more, load them
+    if ((pageMembers.length < state.stepsPageSize && state.stepsHasMore) ||
+        (pageMembers.length === 0 && startIdx < totalMembers && state.stepsHasMore)) {
+      const pagesNeeded = Math.ceil((startIdx + state.stepsPageSize) / state.stepsPageSize);
+      const currentLoadedPages = Math.floor(members.length / state.stepsPageSize);
+      for (let p = currentLoadedPages + 1; p <= pagesNeeded && state.stepsHasMore; p++) {
+        await loadSequenceMembersPage(sequenceId, p, false);
+      }
+      pageMembers = state.stepsLoadedMembers.slice(startIdx, Math.min(startIdx + state.stepsPageSize, state.stepsLoadedMembers.length));
+    }
+
     // Generate rows
-    const rows = members.map(member => {
+    const rows = pageMembers.map(member => {
       const contact = contactsMap.get(member.targetId) || {
         firstName: 'Unknown',
         lastName: 'Contact',
@@ -1698,41 +1899,58 @@ class FreeSequenceAutomation {
       }
 
       return `
-        <tr style="border-bottom: 1px solid var(--border-light);">
-          <td style="padding: 12px 16px;">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <div class="avatar" style="width: 32px; height: 32px; background: var(--bg-item); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--text-secondary);">
-                ${initials}
-              </div>
-              <div>
-                <div style="font-weight: 500; color: var(--text-primary);">${escapeHtml(name)}</div>
-                ${company ? `<div style="font-size: 0.8rem; color: var(--text-secondary);">${escapeHtml(company)}</div>` : ''}
-              </div>
+        <tr data-contact-id="${escapeHtml(member.targetId)}">
+          <td class="name-cell" data-contact-id="${escapeHtml(member.targetId)}">
+            <div class="name-cell__wrap">
+              <span class="avatar-initials" aria-hidden="true">${escapeHtml(initials)}</span>
+              <span class="name-text">${escapeHtml(name)}</span>
             </div>
+            ${company ? `<div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;">${escapeHtml(company)}</div>` : ''}
           </td>
-          <td style="padding: 12px 16px;"><a href="mailto:${escapeHtml(email)}" style="color: var(--text-secondary); text-decoration: none;">${escapeHtml(email)}</a></td>
-          <td style="padding: 12px 16px;">${nextStepStr}</td>
-          <td style="padding: 12px 16px; color: var(--text-secondary); font-size: 0.9rem;">${scheduledStr}</td>
+          <td><a href="mailto:${escapeHtml(email)}" style="color: var(--text-secondary); text-decoration: none; transition: var(--transition-fast);" onmouseover="this.style.color='var(--text-inverse)'" onmouseout="this.style.color='var(--text-secondary)'">${escapeHtml(email)}</a></td>
+          <td>${nextStepStr}</td>
+          <td style="color: var(--text-secondary); font-size: 0.9rem;">${scheduledStr}</td>
         </tr>
       `;
     }).join('');
 
+    // Pagination HTML
+    const paginationHtml = totalPages > 1 ? (window.crm && window.crm.createPagination ? 
+      `<div id="sequence-steps-pagination" class="table-pagination" aria-label="Steps pagination"></div>` :
+      `<div class="unified-pagination">
+        <button class="pagination-arrow" ${currentPage <= 1 ? 'disabled' : ''} onclick="if(window.SequenceBuilder && window.SequenceBuilder.state) { window.SequenceBuilder.state.stepsPage = Math.max(1, window.SequenceBuilder.state.stepsPage - 1); if(window.SequenceBuilder.render) window.SequenceBuilder.render(); }">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg>
+        </button>
+        <div class="pagination-current">${currentPage} / ${totalPages}</div>
+        <button class="pagination-arrow" ${currentPage >= totalPages ? 'disabled' : ''} onclick="if(window.SequenceBuilder && window.SequenceBuilder.state) { window.SequenceBuilder.state.stepsPage = Math.min(${totalPages}, window.SequenceBuilder.state.stepsPage + 1); if(window.SequenceBuilder.render) window.SequenceBuilder.render(); }">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,18 15,12 9,6"></polyline></svg>
+        </button>
+      </div>`) : '';
+
+    const start = totalMembers === 0 ? 0 : Math.min(totalMembers, startIdx + 1);
+    const end = totalMembers === 0 ? 0 : Math.min(totalMembers, startIdx + pageMembers.length);
+    const summaryText = `Showing ${start}\u2013${end} of ${totalMembers} ${totalMembers === 1 ? 'contact' : 'contacts'}`;
+
     return `
       <div class="table-container">
         <div class="table-scroll">
-          <table class="crm-table" style="width: 100%; border-collapse: collapse;">
+          <table class="data-table" id="sequence-steps-table" aria-label="Sequence steps progress">
             <thead>
               <tr>
-                <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; background: var(--bg-card); position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 0 var(--border-light);">Contact</th>
-                <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; background: var(--bg-card); position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 0 var(--border-light);">Email</th>
-                <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; background: var(--bg-card); position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 0 var(--border-light);">Current Step</th>
-                <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: var(--text-secondary); font-size: 0.85rem; background: var(--bg-card); position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 0 var(--border-light);">Scheduled</th>
+                <th>Contact</th>
+                <th>Email</th>
+                <th>Current Step</th>
+                <th>Scheduled</th>
               </tr>
             </thead>
             <tbody>
-              ${rows}
+              ${rows || '<tr><td colspan="4" style="text-align: center; padding: 40px; color: var(--grey-400);">No contacts in this sequence yet.</td></tr>'}
             </tbody>
           </table>
+        </div>
+        <div class="table-footer">
+          <div class="pagination-summary" aria-live="polite">${summaryText}</div>
+          ${paginationHtml}
         </div>
       </div>`;
   }
@@ -1804,7 +2022,7 @@ class FreeSequenceAutomation {
     let bodyHtml = '';
     if (state.currentView === 'steps') {
       // Render steps view (contact progress)
-      bodyHtml = `<div class="steps-view-container">${await renderStepsView()}</div>`;
+      bodyHtml = await renderStepsView();
     } else {
       // Render builder view (sequence steps editor)
       const hasSteps = Array.isArray(seq.steps) && seq.steps.length > 0;
@@ -1859,6 +2077,47 @@ class FreeSequenceAutomation {
     attachEvents();
     // Attach builder specific interactions
     attachBuilderEvents();
+    
+    // Initialize pagination for steps view
+    if (state.currentView === 'steps') {
+      const paginationEl = document.getElementById('sequence-steps-pagination');
+      if (paginationEl && window.crm && window.crm.createPagination) {
+        const totalPages = Math.max(1, Math.ceil((state.stepsTotalCount || state.stepsLoadedMembers.length || 0) / state.stepsPageSize));
+        window.crm.createPagination(state.stepsPage, totalPages, async (page) => {
+          console.log(`[StepsView] Pagination: navigating to page ${page}, current loaded: ${state.stepsLoadedMembers.length}, total: ${state.stepsTotalCount}`);
+          
+          // Set the page BEFORE loading/rendering
+          state.stepsPage = page;
+          
+          // Check if we need to load more data for this page
+          const pageStartIdx = (page - 1) * state.stepsPageSize;
+          const pageEndIdx = pageStartIdx + state.stepsPageSize;
+          
+          // Load more if we don't have enough data for this page
+          if (pageStartIdx >= state.stepsLoadedMembers.length && state.stepsHasMore && state.currentSequence) {
+            console.log(`[StepsView] Need to load more data for page ${page}, pageStartIdx=${pageStartIdx}, loaded=${state.stepsLoadedMembers.length}`);
+            // Load pages until we have enough
+            while (state.stepsLoadedMembers.length < pageEndIdx && state.stepsHasMore) {
+              const nextPageToLoad = Math.floor(state.stepsLoadedMembers.length / state.stepsPageSize) + 1;
+              console.log(`[StepsView] Loading page ${nextPageToLoad}...`);
+              await loadSequenceMembersPage(state.currentSequence.id, nextPageToLoad, false);
+            }
+          }
+          
+          // Re-render with the new page
+          await render();
+          
+          // Scroll to top after page change
+          requestAnimationFrame(() => {
+            const scroller = document.querySelector('#sequence-builder-page .table-scroll');
+            if (scroller) scroller.scrollTop = 0;
+            window.scrollTo(0, 0);
+          });
+        }, paginationEl.id);
+      }
+      
+      // Note: Contact name click handler is set up in attachEvents() using document-level delegation
+    }
 
     // Mark all step bodies as initially rendered (no animation on first load)
     setTimeout(() => {
@@ -1939,7 +2198,7 @@ class FreeSequenceAutomation {
 
   function createStepTypeModal(onSelect) {
     const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
+    overlay.className = 'modal-overlay modal-overlay--animated';
     overlay.tabIndex = -1;
     overlay.innerHTML = `
       <div class="step-type-modal" role="dialog" aria-modal="true" aria-labelledby="step-type-title" aria-describedby="step-type-subtitle">
@@ -2013,26 +2272,31 @@ class FreeSequenceAutomation {
         </div>
       </div>`;
 
-    const close = () => { if (overlay.parentElement) overlay.parentElement.removeChild(overlay); };
+    const close = () => {
+      // Start exit animation
+      overlay.classList.remove('show');
+      // Remove after animation completes
+      setTimeout(() => {
+        if (overlay.parentElement) overlay.parentElement.removeChild(overlay);
+      }, 300); // Match CSS transition duration
+    };
+    
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay || (e.target.classList && e.target.classList.contains('close-btn'))) close();
     });
     overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    
     // Attach listeners for options
-    setTimeout(() => {
-      overlay.querySelectorAll('.step-option').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const type = btn.getAttribute('data-type');
-          const labelEl = btn.querySelector('.label');
-          const label = labelEl ? labelEl.textContent.trim() : type;
-          try { onSelect({ type, label }); } catch (_) { /* noop */ }
-          close();
-        });
+    overlay.querySelectorAll('.step-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const type = btn.getAttribute('data-type');
+        const labelEl = btn.querySelector('.label');
+        const label = labelEl ? labelEl.textContent.trim() : type;
+        try { onSelect({ type, label }); } catch (_) { /* noop */ }
+        close();
       });
-      const first = overlay.querySelector('.step-option');
-      if (first) first.focus();
-    }, 0);
-
+    });
+    
     return overlay;
   }
 
@@ -4604,13 +4868,13 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>';
   }
   function svgEdit() {
-    return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>';
+    return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
   }
   function svgTrash() {
-    return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>';
+    return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>';
   }
   function svgSettings() {
-    return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+    return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
   }
   function svgClock() {
     return '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>';
@@ -6184,7 +6448,13 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         // Invalidate cache when switching to steps view to ensure fresh data
         if (newView === 'steps') {
           state.sequenceMembersCache = null;
-          console.log('[SequenceBuilder] Switching to Steps view, cache invalidated');
+          // Reset pagination state for fresh load
+          state.stepsLoadedMembers = [];
+          state.stepsLastLoadedDoc = null;
+          state.stepsHasMore = true;
+          state.stepsTotalCount = 0;
+          state.stepsPage = 1;
+          console.log('[SequenceBuilder] Switching to Steps view, cache and pagination reset');
         }
 
         // Re-render
@@ -6199,6 +6469,12 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         console.log('[SequenceBuilder] Manual refresh triggered');
         // Invalidate cache to force fresh data load
         state.sequenceMembersCache = null;
+        // Reset pagination state for fresh load
+        state.stepsLoadedMembers = [];
+        state.stepsLastLoadedDoc = null;
+        state.stepsHasMore = true;
+        state.stepsTotalCount = 0;
+        state.stepsPage = 1;
         // Re-render
         await render();
         if (window.crm?.showToast) {
@@ -6215,7 +6491,14 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     const onAdd = () => {
       const overlay = createStepTypeModal(({ type, label }) => handleAddStep(type, label));
       document.body.appendChild(overlay);
-      overlay.focus();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          overlay.classList.add('show');
+          const firstOption = overlay.querySelector('.step-option');
+          if (firstOption) firstOption.focus();
+          else overlay.focus();
+        });
+      });
     };
     if (addStepBtn) addStepBtn.addEventListener('click', onAdd);
     if (emptyAddBtn) emptyAddBtn.addEventListener('click', onAdd);
@@ -6381,6 +6664,119 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     }
     saveBtn && saveBtn.addEventListener('click', doSave);
     cancelBtn && cancelBtn.addEventListener('click', doCancel);
+
+    // Setup contact name click handler using document-level delegation (like task-detail.js)
+    // This persists across table re-renders and uses capture phase to catch clicks early
+    if (!document._sequenceBuilderContactHandlersBound) {
+      document._sequenceBuilderContactHandlersBound = true;
+
+      const contactNameClickHandler = (e) => {
+        // CRITICAL: Check if click is within sequence-builder-page first
+        const sequencePage = e.target.closest('#sequence-builder-page');
+        if (!sequencePage) return;
+
+        // Find the name-cell (could be the cell itself or a child element)
+        const nameCell = e.target.closest('.name-cell');
+        if (!nameCell) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const contactId = nameCell.getAttribute('data-contact-id');
+        if (!contactId) {
+          console.warn('[SequenceBuilder] Contact name clicked but no contactId found');
+          return;
+        }
+
+        console.log('[SequenceBuilder] Contact name clicked:', contactId);
+
+        // Store navigation source for back button - include full sequence for instant restore
+        // Capture scroll positions before navigating away
+        const tableScroller = document.querySelector('#sequence-builder-page .table-scroll');
+        const pageScroll = window.scrollY || 0;
+        const tableScroll = tableScroller ? tableScroller.scrollTop : 0;
+        
+        window._contactNavigationSource = 'sequence-builder';
+        window._sequenceBuilderReturn = {
+          sequenceId: state.currentSequence?.id,
+          sequenceName: state.currentSequence?.name,
+          sequence: state.currentSequence, // Full sequence object for instant restore
+          view: 'steps',
+          page: state.stepsPage,
+          // Store pagination state for restoration
+          stepsLoadedMembers: state.stepsLoadedMembers,
+          stepsLastLoadedDoc: state.stepsLastLoadedDoc,
+          stepsHasMore: state.stepsHasMore,
+          stepsTotalCount: state.stepsTotalCount,
+          sequenceMembersCache: state.sequenceMembersCache,
+          // Store scroll positions
+          scrollY: pageScroll,
+          tableScrollTop: tableScroll
+        };
+        console.log(`[SequenceBuilder] Stored return state: page=${state.stepsPage}, loaded=${state.stepsLoadedMembers.length}, scrollY=${pageScroll}, tableScroll=${tableScroll}`);
+
+        // Prefetch from already loaded sequence contacts first (instant)
+        if (Array.isArray(state.contacts) && state.contacts.length > 0) {
+          const contactFromState = state.contacts.find(c => c.id === contactId);
+          if (contactFromState) {
+            window._prefetchedContactForDetail = contactFromState;
+          }
+        }
+
+        // Navigate to people page first, then show contact detail
+        if (window.crm && typeof window.crm.navigateToPage === 'function') {
+          window.crm.navigateToPage('people');
+
+          // Use retry pattern to ensure ContactDetail is ready (same as task-detail.js)
+          requestAnimationFrame(() => {
+            let attempts = 0;
+            const maxAttempts = 25; // 2 seconds at 80ms intervals
+
+            const tryShowContact = () => {
+              if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
+                try {
+                  console.log('[SequenceBuilder] Opening contact detail for ID:', contactId);
+                  window.ContactDetail.show(contactId);
+                } catch (error) {
+                  console.error('[SequenceBuilder] Error showing contact:', error);
+                  if (window.crm && typeof window.crm.showToast === 'function') {
+                    window.crm.showToast('Failed to open contact. Please try again.', 'error');
+                  }
+                }
+              } else if (attempts < maxAttempts) {
+                attempts++;
+                setTimeout(tryShowContact, 80);
+              } else {
+                console.warn('[SequenceBuilder] ContactDetail module not ready after 2 seconds');
+                if (window.crm && typeof window.crm.showToast === 'function') {
+                  window.crm.showToast('Contact page is loading. Please try again in a moment.', 'error');
+                }
+              }
+            };
+
+            tryShowContact();
+          });
+        } else {
+          console.error('[SequenceBuilder] CRM navigateToPage function not available');
+        }
+
+        // Optionally refresh cache in the background (non-blocking)
+        if (window.CacheManager) {
+          window.CacheManager.get('contacts').then((contacts) => {
+            if (Array.isArray(contacts)) {
+              const cachedContact = contacts.find(c => c.id === contactId);
+              if (cachedContact) {
+                window._prefetchedContactForDetail = cachedContact;
+              }
+            }
+          }).catch(() => { /* noop */ });
+        }
+      };
+
+      // Use capture phase to catch clicks early (same as task-detail.js)
+      document.addEventListener('click', contactNameClickHandler, true);
+      document._sequenceBuilderContactHandler = contactNameClickHandler;
+    }
   }
   function attachBuilderEvents() {
     const container = document.getElementById('sequence-builder-view');
@@ -9015,6 +9411,8 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
     show,
     startSequenceForContact,
     createTasksFromSequence,
+    state, // Export state for pagination buttons
+    render, // Export render for pagination buttons
     cleanupOrphanedSequenceMembers: async (sequenceId) => {
       // Cleanup function to remove orphaned sequenceMembers records (contacts that don't exist)
       if (!sequenceId) {

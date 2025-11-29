@@ -202,6 +202,9 @@
     '_sequenceVarsPopoverDocClickBound',
     '_sequenceDelayPopoverDocClickBound',
     '_sequenceDeletePopoverDocClickBound',
+    // NOTE: _sequenceBuilderContactHandlersBound is NOT pre-marked here because the handler
+    // uses document-level delegation and must be attached once on first page load.
+    // The guard in sequence-builder.js itself prevents duplicates on subsequent renders.
     
     // NEW: Task Detail page event listener guards (task-detail.js)
     '_taskDetailContactHandlersBound',

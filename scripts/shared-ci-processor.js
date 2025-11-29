@@ -108,6 +108,24 @@ window.SharedCIProcessor = (function() {
             // Store transcript SID for status checking
             if (result && result.transcriptSid) {
                 btn.setAttribute('data-transcript-sid', result.transcriptSid);
+                
+                // If transcript already existed and is completed, trigger immediate poll to get results
+                if (result.existing && result.status === 'completed') {
+                    console.log(`[SharedCI:${context}] Existing completed transcript found, fetching results immediately`);
+                    
+                    // Immediately trigger poll to get results
+                    try {
+                        const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm-792458658491.us-south1.run.app';
+                        await fetch(`${base}/api/twilio/poll-ci-analysis`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                transcriptSid: result.transcriptSid,
+                                callSid: callSid 
+                            })
+                        }).catch(() => {});
+                    } catch(_) {}
+                }
             }
 
             // Show success toast
@@ -253,17 +271,35 @@ window.SharedCIProcessor = (function() {
             onComplete = null
         } = options;
 
+        // Get transcriptSid from button attribute if available (more reliable than callSid alone)
+        const transcriptSid = btn?.getAttribute('data-transcript-sid') || null;
+        
         // First try to trigger background processing
         try {
             const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm-792458658491.us-south1.run.app';
             
-            await fetch(`${base}/api/twilio/poll-ci-analysis`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ callSid })
-            }).catch(() => {}); // Fire and forget
-            
-            console.log(`[SharedCI:${context}] Background processing triggered for:`, callSid);
+            if (transcriptSid) {
+                // Use transcriptSid for more reliable polling
+                await fetch(`${base}/api/twilio/poll-ci-analysis`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        transcriptSid: transcriptSid,
+                        callSid: callSid 
+                    })
+                }).catch(() => {}); // Fire and forget
+                
+                console.log(`[SharedCI:${context}] Background processing triggered for transcript:`, transcriptSid);
+            } else {
+                // Fallback to callSid only (poll-ci-analysis will need to resolve transcriptSid)
+                await fetch(`${base}/api/twilio/poll-ci-analysis`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ callSid })
+                }).catch(() => {});
+                
+                console.log(`[SharedCI:${context}] Background processing triggered for call:`, callSid);
+            }
         } catch (error) {
             console.warn(`[SharedCI:${context}] Background trigger failed:`, error);
         }
