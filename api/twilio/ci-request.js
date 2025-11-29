@@ -157,6 +157,98 @@ export default async function handler(req, res){
 
     console.log(`[CI Request] Using recording: ${recordingSid} for call: ${callSid}`);
 
+    // CRITICAL FIX: Check if transcript already exists in Twilio for this recording
+    // If it exists, we should use it instead of creating a new one (per Twilio guidance)
+    // This prevents duplicate transcripts and ensures webhooks fire correctly
+    let existingTwilioTranscript = null;
+    if (!ciTranscriptSid) {
+      try {
+        const existingTranscripts = await client.intelligence.v2.transcripts.list({
+          serviceSid: serviceSid,
+          sourceSid: recordingSid,
+          limit: 1
+        });
+        
+        if (existingTranscripts && existingTranscripts.length > 0) {
+          existingTwilioTranscript = existingTranscripts[0];
+          ciTranscriptSid = existingTwilioTranscript.sid;
+          console.log(`[CI Request] Found existing Twilio transcript: ${ciTranscriptSid} for recording: ${recordingSid}, status: ${existingTwilioTranscript.status}`);
+        }
+      } catch (error) {
+        console.warn('[CI Request] Error checking for existing transcripts:', error.message);
+        // Continue to create new transcript if check fails
+      }
+    }
+
+    // If we found an existing transcript, handle it appropriately
+    if (ciTranscriptSid && existingTwilioTranscript) {
+      const transcriptStatus = existingTwilioTranscript.status || 'unknown';
+      
+      // Pre-flag the call so webhook gating sees ciRequested=true
+      try {
+        await fetch(`${base}/api/calls`,{
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ 
+            callSid, 
+            recordingSid, 
+            ciRequested: true, 
+            conversationalIntelligence: { transcriptSid: ciTranscriptSid, status: transcriptStatus },
+            ciTranscriptSid: ciTranscriptSid
+          })
+        }).catch(()=>{});
+      } catch(_) {}
+
+      // If transcript is already completed, trigger immediate processing to fetch results
+      if (transcriptStatus === 'completed') {
+        console.log(`[CI Request] Existing transcript is completed, triggering immediate result fetch: ${ciTranscriptSid}`);
+        
+        // Trigger background processing to fetch results (fire and forget)
+        try {
+          await fetch(`${base}/api/twilio/poll-ci-analysis`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              transcriptSid: ciTranscriptSid, 
+              callSid: callSid 
+            })
+          }).catch(() => {});
+        } catch(_) {}
+        
+        res.statusCode = 202;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ 
+          ok: true, 
+          transcriptSid: ciTranscriptSid, 
+          recordingSid,
+          existing: true,
+          status: 'completed',
+          message: 'Using existing completed transcript. Fetching results in background.',
+          webhookUrl: `${base}/api/twilio/conversational-intelligence-webhook`
+        }));
+        return;
+      } else if (['queued', 'in-progress'].includes(transcriptStatus)) {
+        // Transcript exists but still processing
+        console.log(`[CI Request] Existing transcript still processing: ${ciTranscriptSid}, status: ${transcriptStatus}`);
+        
+        res.statusCode = 202;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ 
+          ok: true, 
+          transcriptSid: ciTranscriptSid, 
+          recordingSid,
+          existing: true,
+          status: transcriptStatus,
+          message: 'Transcript already processing. Results will be available when complete.',
+          webhookUrl: `${base}/api/twilio/conversational-intelligence-webhook`
+        }));
+        return;
+      } else if (transcriptStatus === 'failed') {
+        // Transcript failed, we'll create a new one below
+        console.log(`[CI Request] Existing transcript failed, will create new one: ${ciTranscriptSid}`);
+        ciTranscriptSid = ''; // Reset to allow new transcript creation
+      }
+    }
+
     if (!ciTranscriptSid){
       // Pre-flag the call so webhook gating sees ciRequested=true even if webhook arrives very fast
       try {

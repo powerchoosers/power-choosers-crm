@@ -520,7 +520,7 @@ body {
 
 /* === GLOBAL BUTTON HOVER EFFECTS === */
 /* Apply consistent hover effects to all interactive buttons and icons */
-button:hover:not(:disabled),
+button:hover:not(:disabled):not(.step-option),
 .btn:hover:not(:disabled),
 .icon-btn:hover:not(:disabled),
 .rc-page-btn:hover:not(:disabled),
@@ -1465,7 +1465,7 @@ tbody.animating tr:nth-child(n+11) {
 .vars-popover {
     position: fixed;
     /* positioned via JS near the toolbar button */
-    background: var(--grey-800);
+    background: var(--bg-card);
     color: var(--text-inverse);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
@@ -1489,11 +1489,11 @@ tbody.animating tr:nth-child(n+11) {
 .delay-popover {
     position: fixed;
     /* positioned via JS under the Edit delay button */
-    background: rgba(52, 58, 64, 0.98);
+    background: var(--bg-card);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     color: var(--text-primary);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
     box-shadow: var(--elevation-card);
     min-width: 300px;
@@ -1668,7 +1668,7 @@ tbody.animating tr:nth-child(n+11) {
 .delete-popover {
     position: fixed;
     /* positioned via JS under the trash icon */
-    background: var(--bg-container);
+    background: var(--bg-card);
     color: var(--text-primary);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
@@ -1857,6 +1857,28 @@ tbody.animating tr:nth-child(n+11) {
     z-index: 1100;
 }
 
+.modal-overlay.modal-overlay--animated {
+    opacity: 0;
+    visibility: hidden;
+    backdrop-filter: blur(1.5px);
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.modal-overlay.modal-overlay--animated.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-overlay.modal-overlay--animated .step-type-modal {
+    transform: scale(0.95) translateY(10px);
+    transition: transform 0.3s ease;
+    will-change: transform;
+}
+
+.modal-overlay.modal-overlay--animated.show .step-type-modal {
+    transform: scale(1) translateY(0);
+}
+
 .step-type-modal {
     width: 860px;
     max-width: calc(100% - 48px);
@@ -1939,8 +1961,14 @@ tbody.animating tr:nth-child(n+11) {
     transition: var(--transition-fast);
 }
 
+button.step-option:hover,
 .step-option:hover {
-    background: var(--grey-700);
+    background: var(--bg-secondary) !important;
+    border-color: #ffffff !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    position: relative;
+    z-index: 2;
 }
 
 .step-option:focus-visible {
@@ -1952,6 +1980,15 @@ tbody.animating tr:nth-child(n+11) {
     width: 22px;
     height: 22px;
     color: var(--grey-300);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Make edit icon larger in step-option to match other icons (22px instead of 14px) */
+.step-option .icon svg {
+    width: 22px !important;
+    height: 22px !important;
 }
 
 .step-option .label {
@@ -2447,11 +2484,11 @@ tbody.animating tr:nth-child(n+11) {
 .task-popover {
     position: fixed;
     /* positioned via JS under the tasks button */
-    background: rgba(52, 58, 64, 0.98);
+    background: var(--bg-card);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     color: var(--text-primary);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid var(--border-light);
     border-radius: var(--border-radius);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     z-index: 120;
@@ -3313,13 +3350,20 @@ button.delay-pill {
     box-shadow: var(--elevation-card);
 }
 
-.step-header {
+.step-card .step-header {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
     padding: var(--spacing-md) var(--spacing-base);
+    background: var(--bg-card);
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
     /* Move divider to .step-body to avoid double line when collapsed */
     border-bottom: 0;
+}
+
+/* When step is collapsed, round bottom corners of header */
+.step-card:has(.step-body[hidden]) .step-header {
+    border-radius: var(--border-radius);
 }
 
 .step-header .spacer {
@@ -8009,6 +8053,51 @@ body {
 #people-page .table-container .table-footer {
     margin-top: auto;
     /* push footer to bottom of table container */
+}
+
+/* === SEQUENCE BUILDER TABLE LAYOUT (match People/Accounts) === */
+#sequence-builder-page .page-container {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: var(--spacing-base);
+    overflow: visible;
+}
+
+#sequence-builder-page .page-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding-bottom: 0;
+    overflow: visible;
+}
+
+/* Builder view: make builder-content scrollable */
+#sequence-builder-page .page-content .builder-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+}
+
+#sequence-builder-page .table-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-bottom: 0;
+    overflow: visible;
+}
+
+#sequence-builder-page .table-container .table-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    scroll-behavior: smooth;
+}
+
+#sequence-builder-page .table-container .table-footer {
+    margin-top: auto;
 }
 
 /* === ACCOUNTS PAGE TABLE LAYOUT (pin footer to bottom) === */
@@ -15377,6 +15466,58 @@ input[type="number"]::-webkit-inner-spin-button {
     display: inline-block;
 }
 
+/* Sequence steps table: name cell styles (same as people table) */
+#sequence-steps-table .name-cell {
+    cursor: pointer;
+    color: var(--grey-400);
+    font-weight: 400;
+    text-decoration: none;
+    outline: none;
+    transition: var(--transition-fast);
+}
+
+#sequence-steps-table .name-cell:hover {
+    color: var(--text-inverse);
+    text-decoration: none;
+}
+
+/* Keyboard focus: mirror hover without rectangle */
+#sequence-steps-table .name-cell:focus {
+    outline: none;
+}
+
+#sequence-steps-table .name-cell:focus-visible {
+    color: var(--text-inverse);
+    text-decoration: none;
+}
+
+/* Sequence steps table: name cell layout with initials avatar */
+#sequence-steps-table .name-cell .name-cell__wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#sequence-steps-table .name-cell .avatar-initials {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--orange-subtle);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    /* ensures optical centering for 1–2 letters */
+    line-height: 1;
+    font-weight: 600;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+#sequence-steps-table .name-cell .name-text {
+    display: inline-block;
+}
+
 /* Make phone numbers clickable in people table */
 #people-table .phone-cell {
     cursor: pointer;
@@ -18253,6 +18394,12 @@ input.row-select[type="checkbox"]:focus-visible {
 .step-card svg[width][height] {
     width: 20px !important;
     height: 20px !important;
+}
+
+/* Override for step header icon buttons to keep compact 14px icons */
+.step-card .step-header .icon-btn-sm svg {
+    width: 14px !important;
+    height: 14px !important;
 }
 
 /* Specific override for formatting bar SVGs */
