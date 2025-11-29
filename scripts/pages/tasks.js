@@ -29,7 +29,7 @@
       case 'low': return '#e9ecef';
       case 'medium': return '#ffc107';
       case 'high': return '#dc3545';
-      case 'sequence': return '#6f42c1';
+      case 'sequence': return '#ffffff';
       default: return '#e9ecef';
     }
   }
@@ -750,11 +750,11 @@
             <div class="task-subtitle">${name} • ${account}</div>
           </div>
         </td>
-        <td><span class="type-badge ${type}">${type}</span></td>
-        <td><span class="priority-badge ${pr}" style="background: ${getPriorityBackground(pr)}; color: ${getPriorityColor(pr)};">${pr}</span></td>
+        <td style="text-align: center;"><span class="type-badge ${type}">${type}</span></td>
+        <td style="text-align: center;"><span class="priority-badge ${pr}" style="background: ${getPriorityBackground(pr)}; color: ${getPriorityColor(pr)};">${pr}</span></td>
         <td>${due}</td>
         <td>${time}</td>
-        <td><span class="status-badge ${status}">${status}</span></td>
+        <td style="text-align: center;">${status}</td>
         <td><div class="action-buttons"><button class="btn-success" data-id="${id}">${status === 'completed' ? 'Completed' : 'Complete'}</button><button class="btn-text">Edit</button></div></td>
       </tr>`;
   }

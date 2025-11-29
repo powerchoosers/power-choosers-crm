@@ -3610,7 +3610,7 @@
           if (window.crm && typeof window.crm.navigateToPage === 'function') {
             window.crm.navigateToPage('sequence-builder');
 
-            // Reopen the sequence contacts modal after navigation
+            // Reopen the sequence after navigation
             setTimeout(() => {
               let attempts = 0;
               const maxAttempts = 25;
@@ -3621,29 +3621,85 @@
                 try {
                   // Check if SequenceBuilder module is available
                   if (window.SequenceBuilder && typeof window.SequenceBuilder.show === 'function') {
-                    const sequenceId = window._sequenceBuilderReturn.sequenceId;
-                    const sequenceName = window._sequenceBuilderReturn.sequenceName;
+                    const returnData = window._sequenceBuilderReturn;
+                    const sequenceId = returnData.sequenceId;
+                    const sequenceName = returnData.sequenceName;
+                    const view = returnData.view || 'builder';
+                    const page = returnData.page || 1;
 
-                    // Show the sequence
-                    window.SequenceBuilder.show({ id: sequenceId, name: sequenceName });
+                    // Restore the full sequence and pagination state
+                    const fullSequence = returnData.sequence || { id: sequenceId, name: sequenceName };
+                    
+                    // Restore pagination state BEFORE showing
+                    if (window.SequenceBuilder.state) {
+                      if (returnData.stepsLoadedMembers) {
+                        window.SequenceBuilder.state.stepsLoadedMembers = returnData.stepsLoadedMembers;
+                      }
+                      if (returnData.stepsLastLoadedDoc) {
+                        window.SequenceBuilder.state.stepsLastLoadedDoc = returnData.stepsLastLoadedDoc;
+                      }
+                      if (typeof returnData.stepsHasMore === 'boolean') {
+                        window.SequenceBuilder.state.stepsHasMore = returnData.stepsHasMore;
+                      }
+                      if (returnData.stepsTotalCount) {
+                        window.SequenceBuilder.state.stepsTotalCount = returnData.stepsTotalCount;
+                      }
+                      if (returnData.sequenceMembersCache) {
+                        window.SequenceBuilder.state.sequenceMembersCache = returnData.sequenceMembersCache;
+                      }
+                      console.log(`[ContactDetail] Restored pagination state: page=${page}, loaded=${returnData.stepsLoadedMembers?.length || 0}`);
+                    }
+                    
+                    // Show the sequence with preserved state
+                    window.SequenceBuilder.show(
+                      fullSequence,
+                      { 
+                        preserveState: true, 
+                        view: view || 'builder', 
+                        page: page || 1 
+                      }
+                    );
 
-                    // Wait a bit for the sequence to load, then open the contacts panel
+                    // Wait a bit for the sequence to load, then handle any additional setup
                     setTimeout(() => {
-                      // Find the "Sequence Contacts" button by ID
-                      const contactsBtn = document.getElementById('contacts-btn');
-                      if (contactsBtn) {
-                        contactsBtn.click();
-                      } else {
-                        // Fallback: try to find it by aria-label or title
-                        const allButtons = document.querySelectorAll('button');
-                        for (const btn of allButtons) {
-                          if (btn.getAttribute('aria-label') === 'Sequence Contacts' ||
-                            btn.getAttribute('title') === 'Sequence Contacts') {
-                            btn.click();
-                            break;
+                      // If we came from builder view (not steps), open the contacts panel
+                      if (view !== 'steps') {
+                        const contactsBtn = document.getElementById('contacts-btn');
+                        if (contactsBtn) {
+                          contactsBtn.click();
+                        } else {
+                          // Fallback: try to find it by aria-label or title
+                          const allButtons = document.querySelectorAll('button');
+                          for (const btn of allButtons) {
+                            if (btn.getAttribute('aria-label') === 'Sequence Contacts' ||
+                              btn.getAttribute('title') === 'Sequence Contacts') {
+                              btn.click();
+                              break;
+                            }
                           }
                         }
                       }
+                      
+                      // Restore scroll positions
+                      const savedScrollY = returnData.scrollY || 0;
+                      const savedTableScroll = returnData.tableScrollTop || 0;
+                      
+                      requestAnimationFrame(() => {
+                        // Restore page scroll
+                        if (savedScrollY > 0) {
+                          window.scrollTo(0, savedScrollY);
+                        }
+                        
+                        // Restore table scroll
+                        if (savedTableScroll > 0) {
+                          const tableScroller = document.querySelector('#sequence-builder-page .table-scroll');
+                          if (tableScroller) {
+                            tableScroller.scrollTop = savedTableScroll;
+                          }
+                        }
+                        
+                        console.log(`[ContactDetail] Restored scroll: pageY=${savedScrollY}, tableScroll=${savedTableScroll}`);
+                      });
                     }, 300);
 
                     // Clear navigation variables
