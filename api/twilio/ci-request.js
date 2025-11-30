@@ -64,7 +64,12 @@ export default async function handler(req, res){
 
     if (!serviceSid) {
       res.statusCode = 500; res.setHeader('Content-Type','application/json');
-      res.end(JSON.stringify({ error: 'Conversational Intelligence service not configured. Missing TWILIO_INTELLIGENCE_SERVICE_SID environment variable.' }));
+      const errorMsg = 'Conversational Intelligence service not configured. Missing or empty TWILIO_INTELLIGENCE_SERVICE_SID environment variable. Please set this in your Cloud Run environment variables or local .env file.';
+      console.error('[CI Request] Configuration error:', errorMsg);
+      res.end(JSON.stringify({ 
+        error: errorMsg,
+        details: 'This environment variable is required to create Conversational Intelligence transcripts. Check your Cloud Run service configuration or local environment setup.'
+      }));
       return;
     }
 
