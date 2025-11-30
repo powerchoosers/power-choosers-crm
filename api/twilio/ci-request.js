@@ -1,26 +1,36 @@
 import twilio from 'twilio';
 import { db } from '../_firebase.js';
+import { cors } from '../_cors.js';
 
-function cors(req, res){
-  res.setHeader('Access-Control-Allow-Origin','*');
-  res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers','Content-Type, Authorization');
-  if (req.method === 'OPTIONS'){
-    res.writeHead(200);
-    res.end();
-    return true;
+// Helper to get body - uses pre-parsed req.body from server.js, or reads stream if needed
+async function getBody(req) {
+  // If server.js already parsed the body, use it
+  if (req.body && typeof req.body === 'object') {
+    return req.body;
   }
-  return false;
-}
-
-async function readJson(req){
-  return await new Promise((resolve) =>{
-    try{
-      let b='';
-      req.on('data', c=>{ b += c; });
-      req.on('end', ()=>{ try{ resolve(b ? JSON.parse(b) : {}); }catch(_){ resolve({}); } });
-      req.on('error', ()=> resolve({}));
-    }catch(_){ resolve({}); }
+  
+  // Otherwise, try to read the stream (fallback for direct handler calls)
+  return await new Promise((resolve) => {
+    try {
+      // Check if stream is readable
+      if (!req.readable) {
+        resolve({});
+        return;
+      }
+      
+      let b = '';
+      const timeout = setTimeout(() => resolve({}), 5000); // 5s timeout
+      
+      req.on('data', c => { b += c; });
+      req.on('end', () => { 
+        clearTimeout(timeout);
+        try { resolve(b ? JSON.parse(b) : {}); } catch(_) { resolve({}); } 
+      });
+      req.on('error', () => { 
+        clearTimeout(timeout);
+        resolve({}); 
+      });
+    } catch(_) { resolve({}); }
   });
 }
 
@@ -39,7 +49,7 @@ export default async function handler(req, res){
   const base = envBase || (host ? `${proto}://${host}` : 'https://power-choosers-crm-792458658491.us-south1.run.app');
 
   try{
-    const body = await readJson(req);
+    const body = await getBody(req);
     const callSid = String(body.callSid || '').trim();
     let recordingSid = String(body.recordingSid || '').trim();
     const serviceSid = process.env.TWILIO_INTELLIGENCE_SERVICE_SID || undefined;

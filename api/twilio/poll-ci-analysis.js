@@ -2,7 +2,8 @@ import twilio from 'twilio';
 import { corsMiddleware } from '../_cors.js';
 
 export default async function handler(req, res) {
-    corsMiddleware(req, res, () => {});
+    // Handle CORS preflight
+    if (corsMiddleware(req, res)) return;
     
     if (req.method !== 'POST') {
         res.writeHead(405, { 'Content-Type': 'application/json' });
