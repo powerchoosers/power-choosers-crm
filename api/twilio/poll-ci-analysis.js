@@ -233,10 +233,43 @@ export default async function handler(req, res) {
                 if (!finalCallSid) {
                     console.warn('[Poll CI Analysis] Unable to upsert /api/calls due to missing Call SID', { transcriptSid });
                 } else {
-                    await fetch(`${base}/api/calls`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ callSid: finalCallSid, transcript: transcriptText, formattedTranscript, aiInsights: ai, conversationalIntelligence: ai.conversationalIntelligence })
-                    }).catch(()=>{});
+                    console.log('[Poll CI Analysis] Saving to Firestore:', {
+                        callSid: finalCallSid,
+                        transcriptLength: transcriptText.length,
+                        hasAIInsights: !!(ai && Object.keys(ai).length > 0),
+                        sentenceCount: sentences.length
+                    });
+                    
+                    try {
+                        const updateResp = await fetch(`${base}/api/calls`, {
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                callSid: finalCallSid, 
+                                transcript: transcriptText, 
+                                formattedTranscript, 
+                                aiInsights: ai, 
+                                conversationalIntelligence: ai.conversationalIntelligence 
+                            })
+                        });
+                        
+                        if (!updateResp.ok) {
+                            const errorText = await updateResp.text().catch(() => 'Unknown error');
+                            console.error('[Poll CI Analysis] Firestore update failed:', {
+                                status: updateResp.status,
+                                statusText: updateResp.statusText,
+                                error: errorText
+                            });
+                        } else {
+                            const updateData = await updateResp.json().catch(() => ({}));
+                            console.log('[Poll CI Analysis] Firestore update successful:', {
+                                callSid: finalCallSid,
+                                updated: updateData.updated || false
+                            });
+                        }
+                    } catch (fetchError) {
+                        console.error('[Poll CI Analysis] Firestore update error:', fetchError.message);
+                    }
                 }
             }
         } catch(e) {
