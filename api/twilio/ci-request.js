@@ -59,11 +59,18 @@ export default async function handler(req, res){
     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
     // If we already created a transcript for this call, return it
+    // OPTIMIZED: Add timeout to Firestore read to prevent hanging
     let ciTranscriptSid = '';
     let existingRecordingSid = '';
     try{
       if (db && callSid){
-        const snap = await db.collection('calls').doc(callSid).get();
+        // Add 5-second timeout for Firestore read
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Firestore timeout')), 5000)
+        );
+        const readPromise = db.collection('calls').doc(callSid).get();
+        
+        const snap = await Promise.race([readPromise, timeoutPromise]);
         if (snap.exists){
           const data = snap.data() || {};
           if (data.ciTranscriptSid) ciTranscriptSid = String(data.ciTranscriptSid);
@@ -77,14 +84,17 @@ export default async function handler(req, res){
           }
         }
       }
-    }catch(_){ }
+    }catch(e){ 
+      console.warn('[CI Request] Firestore read failed or timed out:', e.message);
+    }
 
     // Prefer provided recordingSid, then existing one from Firestore
     if (!recordingSid && existingRecordingSid) recordingSid = existingRecordingSid;
 
     // Helper: select preferred recording (dual-channel + completed, most recent)
-    async function selectPreferredRecordingByCall(callSid, maxAttempts = 5){
-      const backoffs = [2000, 4000, 8000, 16000, 0]; // ~30s total
+    // OPTIMIZED: Reduced retries to prevent 30s timeout (max ~10s now)
+    async function selectPreferredRecordingByCall(callSid, maxAttempts = 3){
+      const backoffs = [2000, 4000, 0]; // ~6s total (much faster)
       for (let attempt = 0; attempt < Math.min(maxAttempts, backoffs.length); attempt++){
         try{
           const list = await client.recordings.list({ callSid, limit: 20 });
@@ -144,14 +154,19 @@ export default async function handler(req, res){
     // If still missing, try to resolve via Twilio by Call SID with backoff
     if (!recordingSid && callSid && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN){
       console.log(`[CI Request] Looking up recording for call: ${callSid}`);
-      recordingSid = await selectPreferredRecordingByCall(callSid, 5);
-      console.log(`[CI Request] Found recording: ${recordingSid}`);
+      recordingSid = await selectPreferredRecordingByCall(callSid, 3); // Reduced from 5 to 3 attempts
+      console.log(`[CI Request] Recording lookup result: ${recordingSid || 'NOT FOUND'}`);
     }
 
     if (!recordingSid){
       console.error(`[CI Request] No recording found for call: ${callSid}`);
       res.statusCode = 404; res.setHeader('Content-Type','application/json');
-      res.end(JSON.stringify({ error: 'Recording not found for call', callSid }));
+      res.end(JSON.stringify({ 
+        error: 'Recording not found for call', 
+        callSid,
+        details: 'Recording may not exist yet. Recordings typically appear 30-60 seconds after call completion. Please wait and try again.',
+        suggestion: 'Wait 1-2 minutes after the call ends, then click Process Call again.'
+      }));
       return;
     }
 
