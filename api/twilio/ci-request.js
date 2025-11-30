@@ -78,7 +78,9 @@ export default async function handler(req, res){
           // Try to parse from recordingUrl if present
           if (!existingRecordingSid && data.recordingUrl){
             try{
-              const m = String(data.recordingUrl).match(/Recordings\/([A-Z0-9]+)\.mp3/i);
+              // Match Recording SID from URL - handles both .mp3 and query string formats
+              // Examples: /Recordings/RE123.mp3 or /Recordings/RE123?RequestedChannels=2
+              const m = String(data.recordingUrl).match(/Recordings\/(RE[A-Z0-9]+)/i);
               if (m && m[1]) existingRecordingSid = m[1];
             }catch(_){ }
           }
