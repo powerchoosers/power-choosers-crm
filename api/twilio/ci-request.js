@@ -35,7 +35,9 @@ async function getBody(req) {
 }
 
 export default async function handler(req, res){
-  if (cors(req,res)) return;
+  // Handle CORS preflight - returns true if OPTIONS was handled
+  if (cors(req, res)) return;
+  
   if (req.method !== 'POST'){
     res.statusCode = 405; res.setHeader('Content-Type','application/json');
     res.end(JSON.stringify({ error: 'Method not allowed' }));
