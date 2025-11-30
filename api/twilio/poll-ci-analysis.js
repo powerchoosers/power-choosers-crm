@@ -162,6 +162,17 @@ export default async function handler(req, res) {
                     .transcripts(transcriptSid)
                     .sentences.list();
             
+            // DEBUG: Log first sentence structure to see what fields Twilio returns
+            if (sentencesResponse.length > 0) {
+                console.log('[Poll CI Analysis] Sample sentence structure:', {
+                    keys: Object.keys(sentencesResponse[0]),
+                    text: sentencesResponse[0].text,
+                    transcript: sentencesResponse[0].transcript,
+                    words: sentencesResponse[0].words,
+                    raw: JSON.stringify(sentencesResponse[0]).substring(0, 200)
+                });
+            }
+            
             // Validate sentence segmentation quality
             if (sentencesResponse.length <= 2) {
                 console.warn('[Poll CI Analysis] Very few sentences detected - possible segmentation failure:', {
@@ -186,8 +197,21 @@ export default async function handler(req, res) {
                     channelNum = Number(channel) || 1;
                 }
                 
+                // Extract text from multiple possible fields (Twilio API variations)
+                // Try text first, then transcript, then words array
+                let sentenceText = (s.text || s.transcript || '').toString().trim();
+                
+                // If still empty and words array exists, join words
+                if (!sentenceText && s.words) {
+                    if (Array.isArray(s.words)) {
+                        sentenceText = s.words.map(w => (w.word || w.text || w || '')).filter(Boolean).join(' ').trim();
+                    } else if (typeof s.words === 'string') {
+                        sentenceText = s.words.trim();
+                    }
+                }
+                
                 return {
-                    text: s.text || '',
+                    text: sentenceText.trim(),
                     confidence: s.confidence,
                     startTime: s.startTime,
                     endTime: s.endTime,
@@ -206,11 +230,20 @@ export default async function handler(req, res) {
         
         // Build transcript strings and proactively upsert to /api/calls (fallback if webhook races/fails)
         try {
-            const transcriptText = sentences.map(s => s.text || '').filter(Boolean).join(' ');
+            const transcriptText = sentences.map(s => (s.text || '').trim()).filter(Boolean).join(' ');
             const formattedTranscript = sentences
               .filter(s => s.text && s.text.trim())
               .map(s => `${s.speaker}: ${s.text.trim()}`)
               .join('\n\n');
+            
+            console.log('[Poll CI Analysis] Built transcript:', {
+                transcriptLength: transcriptText.length,
+                sentenceCount: sentences.length,
+                sentencesWithText: sentences.filter(s => s.text && s.text.trim()).length,
+                firstSentenceText: sentences[0]?.text?.substring(0, 50) || 'EMPTY',
+                formattedLength: formattedTranscript.length
+            });
+            
             if (transcriptText || sentences.length > 0) {
                 const base = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
                 const ai = {
