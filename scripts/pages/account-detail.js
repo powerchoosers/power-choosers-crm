@@ -1998,6 +1998,14 @@ var console = {
         },
         onError: (error) => {
           console.error('[AccountDetail] CI processing failed:', error);
+          // Error toast is already shown by SharedCIProcessor, but log details for debugging
+          if (error && typeof error === 'object') {
+            console.error('[AccountDetail] Error details:', {
+              message: error.message || error.error || error.toString(),
+              status: error.status,
+              fullError: error
+            });
+          }
         }
       });
 

@@ -73,15 +73,25 @@ window.SharedCIProcessor = (function() {
                 const err = await response.json().catch(() => ({}));
                 console.error(`[SharedCI:${context}] CI request error:`, response.status, err);
                 
-                const errorMessage = (err && (err.error || err.details)) 
-                    ? String(err.error || err.details) 
+                // Extract error message from multiple possible fields
+                const errorMessage = (err && (err.error || err.details || err.message)) 
+                    ? String(err.error || err.details || err.message) 
                     : `CI request failed: ${response.status} ${response.statusText}`;
+
+                // Log full error details for debugging
+                console.error(`[SharedCI:${context}] Full error details:`, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: err,
+                    message: errorMessage
+                });
 
                 if (window.ToastManager) {
                     window.ToastManager.showToast({
                         type: 'error',
                         title: 'Processing Failed',
-                        message: errorMessage
+                        message: errorMessage,
+                        duration: 8000 // Show longer for important errors
                     });
                 }
 
@@ -150,17 +160,21 @@ window.SharedCIProcessor = (function() {
         } catch (error) {
             console.error(`[SharedCI:${context}] Failed to trigger CI processing:`, error);
 
+            // Extract error message
+            const errorMessage = error?.message || error?.error || error?.toString() || 'Unable to start call analysis. Please try again.';
+
             // Reset button state
             btn.innerHTML = svgEye();
             btn.classList.remove('processing');
             btn.disabled = false;
 
-            // Show error toast
+            // Show error toast with actual error message
             if (window.ToastManager) {
                 window.ToastManager.showToast({
                     type: 'error',
                     title: 'Processing Failed',
-                    message: 'Unable to start call analysis. Please try again.'
+                    message: errorMessage,
+                    duration: 8000 // Show longer for important errors
                 });
             }
 
@@ -273,7 +287,7 @@ window.SharedCIProcessor = (function() {
 
         // Get transcriptSid from button attribute if available (more reliable than callSid alone)
         const transcriptSid = btn?.getAttribute('data-transcript-sid') || null;
-        
+
         // First try to trigger background processing
         try {
             const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '') || 'https://power-choosers-crm-792458658491.us-south1.run.app';
@@ -292,12 +306,12 @@ window.SharedCIProcessor = (function() {
                 console.log(`[SharedCI:${context}] Background processing triggered for transcript:`, transcriptSid);
             } else {
                 // Fallback to callSid only (poll-ci-analysis will need to resolve transcriptSid)
-                await fetch(`${base}/api/twilio/poll-ci-analysis`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ callSid })
+            await fetch(`${base}/api/twilio/poll-ci-analysis`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ callSid })
                 }).catch(() => {});
-                
+            
                 console.log(`[SharedCI:${context}] Background processing triggered for call:`, callSid);
             }
         } catch (error) {
