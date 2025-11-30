@@ -63,8 +63,27 @@ export default async function handler(req, res) {
             processingStatus: transcript.processingStatus
         });
         
+        // CRITICAL FIX: Check if sentences are available - that's the real indicator of completion
+        // Twilio sometimes returns status='completed' but analysisStatus fields are undefined
+        // If sentences exist, analysis is done regardless of status fields
+        let sentencesAvailable = false;
+        let sentencesCheck = [];
+        try {
+            sentencesCheck = await client.intelligence.v2
+                .transcripts(transcriptSid)
+                .sentences.list();
+            sentencesAvailable = Array.isArray(sentencesCheck) && sentencesCheck.length > 0;
+            console.log('[Poll CI Analysis] Sentences check:', {
+                available: sentencesAvailable,
+                count: sentencesCheck.length
+            });
+        } catch (e) {
+            console.warn('[Poll CI Analysis] Could not check sentences yet:', e?.message);
+        }
+        
         // Check if analysis is complete or failed
-        const isAnalysisComplete = transcript.analysisStatus === 'completed' || 
+        const isAnalysisComplete = sentencesAvailable || // If sentences exist, it's done
+                                 transcript.analysisStatus === 'completed' || 
                                  transcript.ciStatus === 'completed' ||
                                  transcript.processingStatus === 'completed';
         
@@ -106,7 +125,7 @@ export default async function handler(req, res) {
                     ciStatus: transcript.ciStatus,
                     processingStatus: transcript.processingStatus
                 },
-                message: 'Analysis still in progress'
+                message: 'Analysis still in progress - sentences not available yet'
             }));
             return;
         }
@@ -133,12 +152,15 @@ export default async function handler(req, res) {
             console.warn('[Poll CI Analysis] Failed to compute channel-role mapping, defaulting:', e?.message);
         }
 
-        // Analysis is complete, fetch sentences
+        // Analysis is complete, fetch sentences (reuse if already fetched)
         let sentences = [];
         try {
-            const sentencesResponse = await client.intelligence.v2
-                .transcripts(transcriptSid)
-                .sentences.list();
+            // Use sentences we already fetched if available, otherwise fetch fresh
+            const sentencesResponse = sentencesCheck.length > 0 
+                ? sentencesCheck 
+                : await client.intelligence.v2
+                    .transcripts(transcriptSid)
+                    .sentences.list();
             
             // Validate sentence segmentation quality
             if (sentencesResponse.length <= 2) {
