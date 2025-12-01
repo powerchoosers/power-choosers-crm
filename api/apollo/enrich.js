@@ -8,6 +8,7 @@
  */
 
 import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation } from './_utils.js';
+import logger from '../_logger.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -69,18 +70,18 @@ export default async function handler(req, res) {
           const webhookUrl = `${protocol}://${host}/api/apollo/phone-webhook`;
           
           matchBody.webhook_url = webhookUrl;
-          console.log('[Apollo Enrich] 📞 Phone reveals enabled with webhook:', webhookUrl);
+          logger.log('[Apollo Enrich] 📞 Phone reveals enabled with webhook:', webhookUrl);
         }
         
         // Strategy 1: Use cached email (BEST - most reliable match)
         if (cachedContact?.email) {
           matchBody.email = cachedContact.email;
-          console.log('[Apollo Enrich] Using email strategy for:', cachedContact.email);
+          logger.log('[Apollo Enrich] Using email strategy for:', cachedContact.email);
         }
         // Strategy 2: Use cached Apollo person ID (GOOD - from previous widget session)
         else if (cachedContact?.apolloId || cachedContact?.personId || cachedContact?.id) {
           matchBody.id = cachedContact.apolloId || cachedContact.personId || cachedContact.id;
-          console.log('[Apollo Enrich] Using Apollo ID strategy for:', matchBody.id);
+          logger.log('[Apollo Enrich] Using Apollo ID strategy for:', matchBody.id);
         }
         // Strategy 3: Use name + domain (ACCEPTABLE - still works)
         // Apollo supports either first_name+last_name OR single name parameter
@@ -90,22 +91,22 @@ export default async function handler(req, res) {
             matchBody.first_name = cachedContact.firstName;
             matchBody.last_name = cachedContact.lastName;
             matchBody.domain = company.domain;
-            console.log('[Apollo Enrich] Using first_name+last_name+domain strategy for:', matchBody.first_name, matchBody.last_name);
+            logger.log('[Apollo Enrich] Using first_name+last_name+domain strategy for:', matchBody.first_name, matchBody.last_name);
           }
           // Fallback to single name parameter if fullName is available
           else if (cachedContact?.fullName || cachedContact?.name) {
             matchBody.name = cachedContact.fullName || cachedContact.name;
             matchBody.domain = company.domain;
-            console.log('[Apollo Enrich] Using name+domain strategy for:', matchBody.name);
+            logger.log('[Apollo Enrich] Using name+domain strategy for:', matchBody.name);
           }
         }
         // Strategy 4: Fallback to contactId as Apollo person ID
         else {
           matchBody.id = contactId;
-          console.log('[Apollo Enrich] Using contactId as Apollo ID:', contactId);
+          logger.log('[Apollo Enrich] Using contactId as Apollo ID:', contactId);
         }
         
-        console.log('[Apollo Enrich] Match request:', JSON.stringify(matchBody, null, 2));
+        logger.log('[Apollo Enrich] Match request:', JSON.stringify(matchBody, null, 2));
 
         const url = `${APOLLO_BASE_URL}/people/match`;
         const resp = await fetchWithRetry(url, {
@@ -120,12 +121,12 @@ export default async function handler(req, res) {
 
         if (!resp.ok) {
           const text = await resp.text();
-          console.error('[Apollo Enrich] API error for contact', contactId, ':', resp.status, text);
+          logger.error('[Apollo Enrich] API error for contact', contactId, ':', resp.status, text);
           continue;
         }
 
         const data = await resp.json();
-        console.log('[Apollo Enrich] Response for', contactId, '- person found:', !!data.person);
+        logger.log('[Apollo Enrich] Response for', contactId, '- person found:', !!data.person);
         
         if (data.person) {
           const mappedContact = mapApolloContactToLushaFormat(data.person);
@@ -137,11 +138,11 @@ export default async function handler(req, res) {
             await saveToApolloContacts(data.person, APOLLO_API_KEY);
           } catch (saveError) {
             // Log but don't fail the enrichment if save fails
-            console.error('[Apollo Enrich] Failed to save contact to Apollo:', saveError.message);
+            logger.error('[Apollo Enrich] Failed to save contact to Apollo:', saveError.message);
           }
         }
       } catch (error) {
-        console.error('[Apollo Enrich] Error enriching contact', contactId, ':', error);
+        logger.error('[Apollo Enrich] Error enriching contact', contactId, ':', error);
         continue;
       }
     }
@@ -151,12 +152,12 @@ export default async function handler(req, res) {
       requestId: requestId || 'apollo_enrich_' + Date.now()
     };
     
-    console.log('[Apollo Enrich] Final response:', enrichedContacts.length, 'contacts enriched');
+    logger.log('[Apollo Enrich] Final response:', enrichedContacts.length, 'contacts enriched');
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(response));
   } catch (e) {
-    console.error('[Apollo Enrich] Error:', e);
+    logger.error('[Apollo Enrich] Error:', e);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Server error', 
@@ -259,7 +260,7 @@ async function saveToApolloContacts(apolloPerson, apiKey) {
       contactData.mobile_phone = mobilePhone.raw_number || mobilePhone.sanitized_number;
     }
     
-    console.log('[Apollo Enrich] Saving to contacts:', apolloPerson.email);
+    logger.log('[Apollo Enrich] Saving to contacts:', apolloPerson.email);
     
     const saveUrl = `${APOLLO_BASE_URL}/contacts`;
     const saveResp = await fetchWithRetry(saveUrl, {
@@ -273,13 +274,13 @@ async function saveToApolloContacts(apolloPerson, apiKey) {
     });
     
     if (saveResp.ok) {
-      console.log('[Apollo Enrich] Successfully saved to contacts - future enrichments FREE!');
+      logger.log('[Apollo Enrich] Successfully saved to contacts - future enrichments FREE!');
     } else {
       const errorText = await saveResp.text();
-      console.warn('[Apollo Enrich] Contact save failed:', saveResp.status, errorText);
+      logger.warn('[Apollo Enrich] Contact save failed:', saveResp.status, errorText);
     }
   } catch (error) {
-    console.error('[Apollo Enrich] Error saving to contacts:', error);
+    logger.error('[Apollo Enrich] Error saving to contacts:', error);
     throw error;
   }
 }

@@ -4,6 +4,7 @@
 
 import { admin, db } from './_firebase.js';
 import { cors } from './_cors.js';
+import logger from './_logger.js';
 
 const ADMIN_EMAIL = 'l.patterson@powerchoosers.com';
 
@@ -37,7 +38,7 @@ export default async function handler(req, res) {
     }
 
     if (!db) {
-      console.error('[Create Booking] Firebase Admin not initialized');
+      logger.error('[Create Booking] Firebase Admin not initialized');
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Database not available' }));
       return;
@@ -143,7 +144,7 @@ export default async function handler(req, res) {
     const taskRef = await db.collection('tasks').add(taskData);
     const taskId = taskRef.id;
 
-    console.log(`[Create Booking] Created task ${taskId} for ${contactNameTrimmed} from ${companyNameTrimmed}`);
+    logger.log(`[Create Booking] Created task ${taskId} for ${contactNameTrimmed} from ${companyNameTrimmed}`);
 
     // Return success
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -155,7 +156,7 @@ export default async function handler(req, res) {
     }));
 
   } catch (error) {
-    console.error('[Create Booking] Error:', error);
+    logger.error('[Create Booking] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       error: 'Failed to create booking',

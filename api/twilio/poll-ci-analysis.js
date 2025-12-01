@@ -1,5 +1,6 @@
 import twilio from 'twilio';
 import { corsMiddleware } from '../_cors.js';
+import logger from '../_logger.js';
 
 export default async function handler(req, res) {
     // Handle CORS preflight
@@ -14,7 +15,7 @@ export default async function handler(req, res) {
     try {
         const _start = Date.now();
         const { transcriptSid, callSid: callSidInput } = req.body;
-        try { console.log('[Poll CI Analysis] Start', { transcriptSid, callSid: callSidInput, ts: new Date().toISOString() }); } catch(_) {}
+        try { logger.log('[Poll CI Analysis] Start', { transcriptSid, callSid: callSidInput, ts: new Date().toISOString() }); } catch(_) {}
         
         if (!transcriptSid) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -22,7 +23,7 @@ export default async function handler(req, res) {
             return;
         }
         
-        console.log('[Poll CI Analysis] Checking analysis status for:', { transcriptSid, callSid: callSidInput });
+        logger.log('[Poll CI Analysis] Checking analysis status for:', { transcriptSid, callSid: callSidInput });
         
         // Create Twilio client
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -49,13 +50,13 @@ export default async function handler(req, res) {
                             resolvedCallSid = String(recCallSid);
                         }
                     } catch (e) {
-                        try { console.warn('[Poll CI Analysis] Failed to fetch recording to resolve Call SID:', e?.message); } catch(_) {}
+                        try { logger.warn('[Poll CI Analysis] Failed to fetch recording to resolve Call SID:', e?.message); } catch(_) {}
                     }
                 }
             }
         } catch(_) {}
         
-        console.log('[Poll CI Analysis] Transcript status:', {
+        logger.log('[Poll CI Analysis] Transcript status:', {
             sid: transcript.sid,
             status: transcript.status,
             analysisStatus: transcript.analysisStatus,
@@ -68,7 +69,7 @@ export default async function handler(req, res) {
             const sourceSid = transcript.sourceSid || transcript.source_sid || transcript.mediaProperties?.source_sid;
             if (sourceSid && /^RE[0-9a-zA-Z]+$/.test(String(sourceSid))) {
                 const recording = await client.recordings(sourceSid).fetch();
-                console.log('[Poll CI Analysis] Recording info (dual-channel check):', {
+                logger.log('[Poll CI Analysis] Recording info (dual-channel check):', {
                     recordingSid: sourceSid,
                     channels: recording.channels,
                     source: recording.source,
@@ -77,14 +78,14 @@ export default async function handler(req, res) {
                 });
                 
                 if (recording.channels !== 2) {
-                    console.warn('[Poll CI Analysis] Recording is NOT dual-channel:', {
+                    logger.warn('[Poll CI Analysis] Recording is NOT dual-channel:', {
                         channels: recording.channels,
                         message: 'Speaker separation may not work correctly'
                     });
                 }
             }
         } catch (recError) {
-            console.warn('[Poll CI Analysis] Could not verify recording channels:', recError?.message);
+            logger.warn('[Poll CI Analysis] Could not verify recording channels:', recError?.message);
         }
         
         // CRITICAL FIX: Check if sentences are available - that's the real indicator of completion
@@ -97,12 +98,12 @@ export default async function handler(req, res) {
                 .transcripts(transcriptSid)
                 .sentences.list();
             sentencesAvailable = Array.isArray(sentencesCheck) && sentencesCheck.length > 0;
-            console.log('[Poll CI Analysis] Sentences check:', {
+            logger.log('[Poll CI Analysis] Sentences check:', {
                 available: sentencesAvailable,
                 count: sentencesCheck.length
             });
         } catch (e) {
-            console.warn('[Poll CI Analysis] Could not check sentences yet:', e?.message);
+            logger.warn('[Poll CI Analysis] Could not check sentences yet:', e?.message);
         }
         
         // Check if analysis is complete or failed
@@ -116,7 +117,7 @@ export default async function handler(req, res) {
                                transcript.processingStatus === 'failed';
         
         if (isAnalysisFailed) {
-            console.error('[Poll CI Analysis] CI analysis failed:', {
+            logger.error('[Poll CI Analysis] CI analysis failed:', {
                 transcriptStatus: transcript.status,
                 analysisStatus: transcript.analysisStatus,
                 ciStatus: transcript.ciStatus,
@@ -171,9 +172,9 @@ export default async function handler(req, res) {
             const fromIsAgent = fromIsClient || isBiz(from10) || (!isBiz(to10) && fromStr && fromStr !== toStr);
             channelRoleMap.agentChannel = fromIsAgent ? '1' : '2';
             channelRoleMap.customerChannel = fromIsAgent ? '2' : '1';
-            console.log('[Poll CI Analysis] Channel-role mapping', channelRoleMap, { from: fromStr, to: toStr, callSid: resolvedCallSid });
+            logger.log('[Poll CI Analysis] Channel-role mapping', channelRoleMap, { from: fromStr, to: toStr, callSid: resolvedCallSid });
         } catch(e) {
-            console.warn('[Poll CI Analysis] Failed to compute channel-role mapping, defaulting:', e?.message);
+            logger.warn('[Poll CI Analysis] Failed to compute channel-role mapping, defaulting:', e?.message);
         }
 
         // Fetch OperatorResults to get the actual Twilio-generated summary
@@ -185,7 +186,7 @@ export default async function handler(req, res) {
                 .operatorResults.list();
             
             operatorResults = opResults;
-            console.log('[Poll CI Analysis] OperatorResults:', {
+            logger.log('[Poll CI Analysis] OperatorResults:', {
                 count: opResults.length,
                 operators: opResults.map(op => ({ 
                     name: op.name, 
@@ -194,14 +195,20 @@ export default async function handler(req, res) {
                 }))
             });
             
-            // Find summary from operator results
+            // Find summary from operator results - check multiple locations
             for (const op of opResults) {
                 // Check for text_generation type with summary-related names
                 if (op.operatorType === 'text_generation' || 
                     ['summary', 'conversation_summary', 'call_summary'].includes(op.name?.toLowerCase())) {
-                    if (op.textGenerationResults) {
-                        twilioSummary = String(op.textGenerationResults).trim();
-                        console.log('[Poll CI Analysis] Found Twilio summary:', {
+                    // Check multiple possible locations for the summary
+                    const possibleSummary = op.textGenerationResults || 
+                                           op.summary || 
+                                           op.extractionResults?.summary ||
+                                           op.result?.summary ||
+                                           (typeof op.result === 'string' ? op.result : null);
+                    if (possibleSummary) {
+                        twilioSummary = String(possibleSummary).trim();
+                        logger.log('[Poll CI Analysis] Found Twilio summary:', {
                             operatorName: op.name,
                             operatorType: op.operatorType,
                             summaryLength: twilioSummary.length,
@@ -210,13 +217,34 @@ export default async function handler(req, res) {
                         break;
                     }
                 }
+                
+                // Also check extraction operators which may contain parsed JSON with summary
+                if (op.operatorType === 'extraction' && op.extractionResults) {
+                    try {
+                        const extracted = typeof op.extractionResults === 'string' 
+                            ? JSON.parse(op.extractionResults) 
+                            : op.extractionResults;
+                        if (extracted.summary) {
+                            twilioSummary = String(extracted.summary).trim();
+                            logger.log('[Poll CI Analysis] Found summary from extraction operator:', {
+                                operatorName: op.name,
+                                summaryLength: twilioSummary.length,
+                                preview: twilioSummary.substring(0, 100)
+                            });
+                            break;
+                        }
+                    } catch (parseErr) {
+                        logger.log('[Poll CI Analysis] Could not parse extraction results:', parseErr?.message);
+                    }
+                }
             }
             
             if (!twilioSummary) {
-                console.log('[Poll CI Analysis] No summary found in OperatorResults');
+                logger.log('[Poll CI Analysis] No summary found in OperatorResults, operators checked:', 
+                    opResults.map(op => ({ name: op.name, type: op.operatorType })));
             }
         } catch (opError) {
-            console.warn('[Poll CI Analysis] Error fetching OperatorResults:', opError?.message);
+            logger.warn('[Poll CI Analysis] Error fetching OperatorResults:', opError?.message);
         }
 
         // Analysis is complete, fetch sentences (reuse if already fetched)
@@ -232,7 +260,7 @@ export default async function handler(req, res) {
             // DEBUG: Log first sentence structure to see what fields Twilio returns
             if (sentencesResponse.length > 0) {
                 const sample = sentencesResponse[0];
-                console.log('[Poll CI Analysis] Sample sentence structure:', {
+                logger.log('[Poll CI Analysis] Sample sentence structure:', {
                     keys: Object.keys(sample),
                     text: sample.text,
                     transcript: sample.transcript,
@@ -251,7 +279,7 @@ export default async function handler(req, res) {
             
             // Validate sentence segmentation quality
             if (sentencesResponse.length <= 2) {
-                console.warn('[Poll CI Analysis] Very few sentences detected - possible segmentation failure:', {
+                logger.warn('[Poll CI Analysis] Very few sentences detected - possible segmentation failure:', {
                     sentenceCount: sentencesResponse.length,
                     message: 'Expected 5-20+ sentences for typical 1-2 minute calls'
                 });
@@ -274,7 +302,7 @@ export default async function handler(req, res) {
                     } else {
                         // Only log first few warnings to avoid spam
                         if (idx < 3) {
-                            console.warn('[Poll CI Analysis] Null/undefined channel detected:', {
+                            logger.warn('[Poll CI Analysis] Null/undefined channel detected:', {
                                 sentenceIndex: idx,
                                 participantRole,
                                 availableFields: Object.keys(s).join(', ')
@@ -332,13 +360,13 @@ export default async function handler(req, res) {
                 withParticipantRole: sentences.filter(s => s.participantRole).length,
                 totalSentences: sentences.length
             };
-            console.log('[Poll CI Analysis] Channel distribution:', channelDistribution);
+            logger.log('[Poll CI Analysis] Channel distribution:', channelDistribution);
             
-            console.log(`[Poll CI Analysis] Retrieved ${sentences.length} sentences`, {
+            logger.log(`[Poll CI Analysis] Retrieved ${sentences.length} sentences`, {
                 segmentationQuality: sentences.length >= 5 ? 'Good' : sentences.length >= 2 ? 'Poor' : 'Failed'
             });
         } catch (error) {
-            console.error('[Poll CI Analysis] Error fetching sentences:', error);
+            logger.error('[Poll CI Analysis] Error fetching sentences:', error);
         }
         
         // Build transcript strings and proactively upsert to /api/calls (fallback if webhook races/fails)
@@ -349,7 +377,7 @@ export default async function handler(req, res) {
               .map(s => `${s.speaker}: ${s.text.trim()}`)
               .join('\n\n');
             
-            console.log('[Poll CI Analysis] Built transcript:', {
+            logger.log('[Poll CI Analysis] Built transcript:', {
                 transcriptLength: transcriptText.length,
                 sentenceCount: sentences.length,
                 sentencesWithText: sentences.filter(s => s.text && s.text.trim()).length,
@@ -366,7 +394,7 @@ export default async function handler(req, res) {
                     ? twilioSummary 
                     : `Analysis of ${wordCount}-word conversation.`;
                 
-                console.log('[Poll CI Analysis] Using summary:', {
+                logger.log('[Poll CI Analysis] Using summary:', {
                     hasTwilioSummary: !!twilioSummary,
                     summaryLength: summaryText.length,
                     preview: summaryText.substring(0, 100)
@@ -403,9 +431,9 @@ export default async function handler(req, res) {
                 };
                 const finalCallSid = resolvedCallSid || callSidInput || '';
                 if (!finalCallSid) {
-                    console.warn('[Poll CI Analysis] Unable to upsert /api/calls due to missing Call SID', { transcriptSid });
+                    logger.warn('[Poll CI Analysis] Unable to upsert /api/calls due to missing Call SID', { transcriptSid });
                 } else {
-                    console.log('[Poll CI Analysis] Saving to Firestore:', {
+                    logger.log('[Poll CI Analysis] Saving to Firestore:', {
                         callSid: finalCallSid,
                         transcriptLength: transcriptText.length,
                         hasAIInsights: !!(ai && Object.keys(ai).length > 0),
@@ -427,29 +455,29 @@ export default async function handler(req, res) {
                         
                         if (!updateResp.ok) {
                             const errorText = await updateResp.text().catch(() => 'Unknown error');
-                            console.error('[Poll CI Analysis] Firestore update failed:', {
+                            logger.error('[Poll CI Analysis] Firestore update failed:', {
                                 status: updateResp.status,
                                 statusText: updateResp.statusText,
                                 error: errorText
                             });
                         } else {
                             const updateData = await updateResp.json().catch(() => ({}));
-                            console.log('[Poll CI Analysis] Firestore update successful:', {
+                            logger.log('[Poll CI Analysis] Firestore update successful:', {
                                 callSid: finalCallSid,
                                 updated: updateData.updated || false
                             });
                         }
                     } catch (fetchError) {
-                        console.error('[Poll CI Analysis] Firestore update error:', fetchError.message);
+                        logger.error('[Poll CI Analysis] Firestore update error:', fetchError.message);
                     }
                 }
             }
         } catch(e) {
-            console.warn('[Poll CI Analysis] Fallback upsert failed:', e?.message || e);
+            logger.warn('[Poll CI Analysis] Fallback upsert failed:', e?.message || e);
         }
 
         const elapsed = Date.now() - _start;
-        try { console.log('[Poll CI Analysis] Done', { transcriptSid, callSid, elapsedMs: elapsed, sentenceCount: sentences.length }); } catch(_) {}
+        try { logger.log('[Poll CI Analysis] Done', { transcriptSid, callSid, elapsedMs: elapsed, sentenceCount: sentences.length }); } catch(_) {}
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             success: true,
@@ -468,7 +496,7 @@ export default async function handler(req, res) {
         }));
         
     } catch (error) {
-        console.error('[Poll CI Analysis] Error:', error);
+        logger.error('[Poll CI Analysis] Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
             error: 'Failed to poll CI analysis',

@@ -1,6 +1,7 @@
 import admin from 'firebase-admin';
 import { db } from './_firebase.js';
 import sgMail from '@sendgrid/mail';
+import logger from './_logger.js';
 
 // Initialize SendGrid
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -91,7 +92,7 @@ export default async function handler(req, res) {
   try {
     // Ensure Firebase Admin is initialized with credentials
     if (!db) {
-      console.error('[SendScheduledEmails] Firestore not initialized. Missing Firebase service account env vars.');
+      logger.error('[SendScheduledEmails] Firestore not initialized. Missing Firebase service account env vars.');
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         success: false,
@@ -100,7 +101,7 @@ export default async function handler(req, res) {
       return;
     }
     if (!isProduction) {
-      console.log('[SendScheduledEmails] Starting send process');
+      logger.log('[SendScheduledEmails] Starting send process');
     }
 
     const now = Date.now();
@@ -122,7 +123,7 @@ export default async function handler(req, res) {
 
     if (readyToSendSnapshot.empty) {
       if (!isProduction) {
-        console.log('[SendScheduledEmails] No emails ready to send');
+        logger.log('[SendScheduledEmails] No emails ready to send');
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
@@ -134,7 +135,7 @@ export default async function handler(req, res) {
     }
 
     if (!isProduction) {
-      console.log('[SendScheduledEmails] Found', readyToSendSnapshot.size, 'emails ready to send');
+      logger.log('[SendScheduledEmails] Found', readyToSendSnapshot.size, 'emails ready to send');
     }
 
     let sentCount = 0;
@@ -167,13 +168,13 @@ export default async function handler(req, res) {
 
         if (!shouldSend) {
           if (!isProduction) {
-            console.log('[SendScheduledEmails] Email', emailDoc.id, 'already claimed or sent');
+            logger.log('[SendScheduledEmails] Email', emailDoc.id, 'already claimed or sent');
           }
           continue;
         }
 
         if (!isProduction) {
-          console.log('[SendScheduledEmails] Sending email:', emailDoc.id);
+          logger.log('[SendScheduledEmails] Sending email:', emailDoc.id);
         }
 
         // Fetch sequence and step settings if this is a sequence email
@@ -220,7 +221,7 @@ export default async function handler(req, res) {
                     }
                   }
                 } catch (err) {
-                  console.warn('[SendScheduledEmails] Failed to fetch global settings:', err);
+                  logger.warn('[SendScheduledEmails] Failed to fetch global settings:', err);
                 }
               }
 
@@ -228,11 +229,11 @@ export default async function handler(req, res) {
               emailSettings = resolveEmailSettings(stepEmailSettings, globalSettings);
 
               if (!isProduction) {
-                console.log('[SendScheduledEmails] Resolved email settings:', emailSettings);
+                logger.log('[SendScheduledEmails] Resolved email settings:', emailSettings);
               }
             }
           } catch (error) {
-            console.error('[SendScheduledEmails] Failed to fetch sequence settings:', error);
+            logger.error('[SendScheduledEmails] Failed to fetch sequence settings:', error);
             // Continue with defaults if settings fetch fails
             emailSettings = resolveEmailSettings(null, null);
           }
@@ -294,7 +295,7 @@ export default async function handler(req, res) {
         // Send email via SendGrid
         const sendResult = await sgMail.send(msg);
         if (!isProduction) {
-          console.log('[SendScheduledEmails] Email sent successfully:', emailDoc.id, sendResult[0].statusCode);
+          logger.log('[SendScheduledEmails] Email sent successfully:', emailDoc.id, sendResult[0].statusCode);
         }
 
         // Update email record (preserve subject, html, text fields)
@@ -381,7 +382,7 @@ export default async function handler(req, res) {
                   });
 
                   if (!isProduction) {
-                    console.log(`[SendScheduledEmails] Created next step email (step ${nextStepIndex}) for contact ${emailData.contactId}`);
+                    logger.log(`[SendScheduledEmails] Created next step email (step ${nextStepIndex}) for contact ${emailData.contactId}`);
                   }
                 }
                 // If next step is a task, create task document
@@ -398,7 +399,7 @@ export default async function handler(req, res) {
                       contactCompany = contactCompany || contactData.company || contactData.companyName || '';
                     }
                   } catch (contactError) {
-                    console.warn('[SendScheduledEmails] Failed to load contact data:', contactError);
+                    logger.warn('[SendScheduledEmails] Failed to load contact data:', contactError);
                   }
 
                   const taskId = `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -454,13 +455,13 @@ export default async function handler(req, res) {
                   });
 
                   if (!isProduction) {
-                    console.log(`[SendScheduledEmails] Created next step task (step ${nextStepIndex}, type: ${taskType}) for contact ${emailData.contactId}`);
+                    logger.log(`[SendScheduledEmails] Created next step task (step ${nextStepIndex}, type: ${taskType}) for contact ${emailData.contactId}`);
                   }
                 }
               }
             }
           } catch (error) {
-            console.error('[SendScheduledEmails] Failed to create next step:', error);
+            logger.error('[SendScheduledEmails] Failed to create next step:', error);
             // Don't fail the whole process if next step creation fails
           }
         }
@@ -469,7 +470,7 @@ export default async function handler(req, res) {
         await new Promise(resolve => setTimeout(resolve, 100));
 
       } catch (error) {
-        console.error('[SendScheduledEmails] Failed to send email:', emailDoc.id, error);
+        logger.error('[SendScheduledEmails] Failed to send email:', emailDoc.id, error);
         errors.push({
           emailId: emailDoc.id,
           error: error.message,
@@ -485,13 +486,13 @@ export default async function handler(req, res) {
             lastAttemptAt: Date.now()
           });
         } catch (updateError) {
-          console.error('[SendScheduledEmails] Failed to update error status:', updateError);
+          logger.error('[SendScheduledEmails] Failed to update error status:', updateError);
         }
       }
     }
 
     if (!isProduction) {
-      console.log('[SendScheduledEmails] Send process complete. Sent:', sentCount, 'Errors:', errors.length);
+      logger.log('[SendScheduledEmails] Send process complete. Sent:', sentCount, 'Errors:', errors.length);
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -503,7 +504,7 @@ export default async function handler(req, res) {
     }));
 
   } catch (error) {
-    console.error('[SendScheduledEmails] Fatal error:', error);
+    logger.error('[SendScheduledEmails] Fatal error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: false,

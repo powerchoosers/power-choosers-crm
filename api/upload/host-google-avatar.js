@@ -4,6 +4,7 @@
  */
 
 import { cors } from '../_cors.js';
+import logger from '../_logger.js';
 
 export const config = {
   api: {
@@ -39,11 +40,11 @@ return;
     }
 
     // Download the image from Google (server-side, no CORS issues)
-    console.log('[GoogleAvatar] Downloading from Google...');
+    logger.log('[GoogleAvatar] Downloading from Google...');
     const googleResponse = await fetch(googlePhotoURL);
     
     if (!googleResponse.ok) {
-      console.error('[GoogleAvatar] Failed to download from Google:', googleResponse.status);
+      logger.error('[GoogleAvatar] Failed to download from Google:', googleResponse.status);
       return res.writeHead(500, { 'Content-Type': 'application/json' });
 res.end(JSON.stringify({ error: 'Failed to download Google photo' }));
 return;
@@ -54,7 +55,7 @@ return;
     const base64Image = Buffer.from(buffer).toString('base64');
 
     // Upload to Imgur
-    console.log('[GoogleAvatar] Uploading to Imgur...');
+    logger.log('[GoogleAvatar] Uploading to Imgur...');
     const imgurResponse = await fetch('https://api.imgur.com/3/image', {
       method: 'POST',
       headers: {
@@ -65,7 +66,7 @@ return;
     });
 
     if (!imgurResponse.ok) {
-      console.error('[GoogleAvatar] Imgur upload failed:', await imgurResponse.text());
+      logger.error('[GoogleAvatar] Imgur upload failed:', await imgurResponse.text());
       return res.writeHead(500, { 'Content-Type': 'application/json' });
 res.end(JSON.stringify({ error: 'Failed to upload to hosting service' }));
 return;
@@ -74,14 +75,14 @@ return;
     const imgurResult = await imgurResponse.json();
     
     if (!imgurResult.success) {
-      console.error('[GoogleAvatar] Imgur API error:', imgurResult.data.error);
+      logger.error('[GoogleAvatar] Imgur API error:', imgurResult.data.error);
       return res.writeHead(500, { 'Content-Type': 'application/json' });
 res.end(JSON.stringify({ error: 'Image hosting service error' }));
 return;
     }
 
     const imageUrl = imgurResult.data.link;
-    console.log('[GoogleAvatar] Avatar hosted successfully:', imageUrl);
+    logger.log('[GoogleAvatar] Avatar hosted successfully:', imageUrl);
 
     return res.writeHead(200, { 'Content-Type': 'application/json' });
 res.end(JSON.stringify({
@@ -92,7 +93,7 @@ res.end(JSON.stringify({
 return;
 
   } catch (error) {
-    console.error('[GoogleAvatar] Error:', error);
+    logger.error('[GoogleAvatar] Error:', error);
     return res.writeHead(500, { 'Content-Type': 'application/json' });
 res.end(JSON.stringify({ 
       error: 'Internal server error', 

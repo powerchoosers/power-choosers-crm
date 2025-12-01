@@ -1,5 +1,6 @@
 import twilio from 'twilio';
 import { cors } from '../_cors.js';
+import logger from '../_logger.js';
 
 const handler = async function handler(req, res) {
     if (cors(req, res)) return; // handle OPTIONS
@@ -13,7 +14,7 @@ const handler = async function handler(req, res) {
     try {
         const { to, from, agent_phone } = req.body;
 
-        console.log('[Call Debug] Incoming call request:', {
+        logger.log('[Call Debug] Incoming call request:', {
           to,
           from,
           agent_phone,
@@ -28,7 +29,7 @@ const handler = async function handler(req, res) {
             return;
         }
         
-        console.log(`[Call API] Server call request: ${to}`);
+        logger.log(`[Call API] Server call request: ${to}`);
         
         // Twilio credentials from environment
         const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -69,7 +70,7 @@ const handler = async function handler(req, res) {
             machineDetection: 'Enable'
         });
         
-        console.log(`[Call API] Call initiated: ${call.sid}`);
+        logger.log(`[Call API] Call initiated: ${call.sid}`);
         
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -80,7 +81,7 @@ const handler = async function handler(req, res) {
         return;
         
     } catch (error) {
-        console.error('Server call error:', error);
+        logger.error('Server call error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             error: 'Failed to initiate call',

@@ -3,6 +3,7 @@
 
 import { cors } from '../../_cors.js';
 import { db, admin } from '../../_firebase.js';
+import logger from '../../_logger.js';
 
 // In-memory fallback store (for local/dev when Firestore isn't configured)
 const memoryStore = new Map();
@@ -256,7 +257,7 @@ export default async function handler(req, res) {
       }));
 
   } catch (error) {
-    console.error('[Contact Calls API] Error:', error);
+    logger.error('[Contact Calls API] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Internal server error' }));
   }

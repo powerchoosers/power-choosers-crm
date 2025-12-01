@@ -1,4 +1,5 @@
 import twilio from 'twilio';
+import logger from '../_logger.js';
 
 // CORS middleware
 function corsMiddleware(req, res, next) {
@@ -32,20 +33,20 @@ async function getTranscriptWithRetry(client, recordingSid, opts = {}) {
                 const t = await client.transcriptions(lastSid).fetch();
                 const status = (t.status || '').toLowerCase();
                 const text = t.transcriptionText || '';
-                console.log(`[Twilio AI] Attempt ${i}/${attempts} transcription status: ${status}, length: ${text.length}`);
+                logger.log(`[Twilio AI] Attempt ${i}/${attempts} transcription status: ${status}, length: ${text.length}`);
                 if (text) return text;
                 if (status === 'failed') {
-                    console.warn('[Twilio AI] Transcription failed');
+                    logger.warn('[Twilio AI] Transcription failed');
                     break;
                 }
             } else if (!created) {
-                console.log('[Twilio AI] No transcription found, creating...');
+                logger.log('[Twilio AI] No transcription found, creating...');
                 const newT = await client.transcriptions.create({ recordingSid, languageCode: 'en-US' });
                 lastSid = newT?.sid || null;
                 created = true;
             }
         } catch (e) {
-            console.warn('[Twilio AI] getTranscriptWithRetry error on attempt', i, e?.message);
+            logger.warn('[Twilio AI] getTranscriptWithRetry error on attempt', i, e?.message);
         }
         if (i < attempts) await delay(delayMs);
     }
@@ -77,7 +78,7 @@ export default async function handler(req, res) {
             return;
         }
         
-        console.log('[Twilio AI] Processing call insights for:', callSid);
+        logger.log('[Twilio AI] Processing call insights for:', callSid);
         
         // Initialize Twilio client
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -93,7 +94,7 @@ export default async function handler(req, res) {
         }
         
         const recording = recordings[0];
-        console.log('[Twilio AI] Found recording:', recording.sid);
+        logger.log('[Twilio AI] Found recording:', recording.sid);
         
         // Try Conversational Intelligence first, then fallback to basic transcription
         let transcript = '';
@@ -105,7 +106,7 @@ export default async function handler(req, res) {
             const serviceSid = process.env.TWILIO_INTELLIGENCE_SERVICE_SID;
             
             if (serviceSid) {
-                console.log('[Twilio AI] Using Conversational Intelligence service');
+                logger.log('[Twilio AI] Using Conversational Intelligence service');
                 
                 // Try to get existing Conversational Intelligence transcript
                 const transcripts = await client.intelligence.v2.transcripts.list({
@@ -132,14 +133,14 @@ export default async function handler(req, res) {
                                 sentences.reduce((acc, s) => acc + (s.confidence || 0), 0) / sentences.length : 0
                         };
                         
-                        console.log(`[Twilio AI] Found Conversational Intelligence transcript with ${sentences.length} sentences`);
+                        logger.log(`[Twilio AI] Found Conversational Intelligence transcript with ${sentences.length} sentences`);
                     }
                 }
             }
             
             // Fallback to basic transcription if Conversational Intelligence not available
             if (!transcript) {
-                console.log('[Twilio AI] Falling back to basic transcription');
+                logger.log('[Twilio AI] Falling back to basic transcription');
                 transcript = await getTranscriptWithRetry(client, recording.sid, { attempts: 6, delayMs: 3000 });
             }
             
@@ -154,7 +155,7 @@ export default async function handler(req, res) {
             }
             
         } catch (transcriptionError) {
-            console.error('[Twilio AI] Transcription error:', transcriptionError);
+            logger.error('[Twilio AI] Transcription error:', transcriptionError);
             // Fallback to basic insights placeholder
             aiInsights = {
                 summary: 'Call transcription processing in progress',
@@ -186,10 +187,10 @@ export default async function handler(req, res) {
                 })
             }).catch(() => {});
         } catch (e) {
-            console.warn('[Twilio AI] Failed posting insights to /api/calls:', e?.message);
+            logger.warn('[Twilio AI] Failed posting insights to /api/calls:', e?.message);
         }
         
-        console.log('[Twilio AI] Processing completed for:', callSid);
+        logger.log('[Twilio AI] Processing completed for:', callSid);
         
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -200,7 +201,7 @@ export default async function handler(req, res) {
         }));
         
     } catch (error) {
-        console.error('[Twilio AI] Error:', error);
+        logger.error('[Twilio AI] Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
             error: 'Failed to process call with Twilio AI',
@@ -284,7 +285,7 @@ async function generateTwilioAIInsights(transcript) {
         };
         
     } catch (error) {
-        console.error('[Twilio AI] Insights generation error:', error);
+        logger.error('[Twilio AI] Insights generation error:', error);
         return {
             summary: 'AI analysis completed using Twilio services',
             sentiment: 'Neutral',

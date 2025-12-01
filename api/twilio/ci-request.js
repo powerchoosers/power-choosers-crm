@@ -1,6 +1,7 @@
 import twilio from 'twilio';
 import { db } from '../_firebase.js';
 import { cors } from '../_cors.js';
+import logger from '../_logger.js';
 
 // Helper to get body - uses pre-parsed req.body from server.js, or reads stream if needed
 async function getBody(req) {
@@ -65,7 +66,7 @@ export default async function handler(req, res){
     if (!serviceSid) {
       res.statusCode = 500; res.setHeader('Content-Type','application/json');
       const errorMsg = 'Conversational Intelligence service not configured. Missing or empty TWILIO_INTELLIGENCE_SERVICE_SID environment variable. Please set this in your Cloud Run environment variables or local .env file.';
-      console.error('[CI Request] Configuration error:', errorMsg);
+      logger.error('[CI Request] Configuration error:', errorMsg);
       res.end(JSON.stringify({ 
         error: errorMsg,
         details: 'This environment variable is required to create Conversational Intelligence transcripts. Check your Cloud Run service configuration or local environment setup.'
@@ -104,7 +105,7 @@ export default async function handler(req, res){
         }
       }
     }catch(e){ 
-      console.warn('[CI Request] Firestore read failed or timed out:', e.message);
+      logger.warn('[CI Request] Firestore read failed or timed out:', e.message);
     }
 
     // Prefer provided recordingSid, then existing one from Firestore
@@ -172,13 +173,13 @@ export default async function handler(req, res){
 
     // If still missing, try to resolve via Twilio by Call SID with backoff
     if (!recordingSid && callSid && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN){
-      console.log(`[CI Request] Looking up recording for call: ${callSid}`);
+      logger.log(`[CI Request] Looking up recording for call: ${callSid}`);
       recordingSid = await selectPreferredRecordingByCall(callSid, 3); // Reduced from 5 to 3 attempts
-      console.log(`[CI Request] Recording lookup result: ${recordingSid || 'NOT FOUND'}`);
+      logger.log(`[CI Request] Recording lookup result: ${recordingSid || 'NOT FOUND'}`);
     }
 
     if (!recordingSid){
-      console.error(`[CI Request] No recording found for call: ${callSid}`);
+      logger.error(`[CI Request] No recording found for call: ${callSid}`);
       res.statusCode = 404; res.setHeader('Content-Type','application/json');
       res.end(JSON.stringify({ 
         error: 'Recording not found for call', 
@@ -189,7 +190,7 @@ export default async function handler(req, res){
       return;
     }
 
-    console.log(`[CI Request] Using recording: ${recordingSid} for call: ${callSid}`);
+    logger.log(`[CI Request] Using recording: ${recordingSid} for call: ${callSid}`);
 
     // CRITICAL FIX: Check if transcript already exists in Twilio for this recording
     // If it exists, we should use it instead of creating a new one (per Twilio guidance)
@@ -206,10 +207,10 @@ export default async function handler(req, res){
         if (existingTranscripts && existingTranscripts.length > 0) {
           existingTwilioTranscript = existingTranscripts[0];
           ciTranscriptSid = existingTwilioTranscript.sid;
-          console.log(`[CI Request] Found existing Twilio transcript: ${ciTranscriptSid} for recording: ${recordingSid}, status: ${existingTwilioTranscript.status}`);
+          logger.log(`[CI Request] Found existing Twilio transcript: ${ciTranscriptSid} for recording: ${recordingSid}, status: ${existingTwilioTranscript.status}`);
         }
       } catch (error) {
-        console.warn('[CI Request] Error checking for existing transcripts:', error.message);
+        logger.warn('[CI Request] Error checking for existing transcripts:', error.message);
         // Continue to create new transcript if check fails
       }
     }
@@ -234,7 +235,7 @@ export default async function handler(req, res){
 
       // If transcript is already completed, trigger immediate processing to fetch results
       if (transcriptStatus === 'completed') {
-        console.log(`[CI Request] Existing transcript is completed, triggering immediate result fetch: ${ciTranscriptSid}`);
+        logger.log(`[CI Request] Existing transcript is completed, triggering immediate result fetch: ${ciTranscriptSid}`);
         
         // Trigger background processing to fetch results (fire and forget)
         try {
@@ -262,7 +263,7 @@ export default async function handler(req, res){
         return;
       } else if (['queued', 'in-progress'].includes(transcriptStatus)) {
         // Transcript exists but still processing
-        console.log(`[CI Request] Existing transcript still processing: ${ciTranscriptSid}, status: ${transcriptStatus}`);
+        logger.log(`[CI Request] Existing transcript still processing: ${ciTranscriptSid}, status: ${transcriptStatus}`);
         
         res.statusCode = 202;
         res.setHeader('Content-Type', 'application/json');
@@ -278,7 +279,7 @@ export default async function handler(req, res){
         return;
       } else if (transcriptStatus === 'failed') {
         // Transcript failed, we'll create a new one below
-        console.log(`[CI Request] Existing transcript failed, will create new one: ${ciTranscriptSid}`);
+        logger.log(`[CI Request] Existing transcript failed, will create new one: ${ciTranscriptSid}`);
         ciTranscriptSid = ''; // Reset to allow new transcript creation
       }
     }
@@ -309,9 +310,9 @@ export default async function handler(req, res){
         // Heuristic: Agent is the "from" leg when from is Voice SDK client or our business number; otherwise agent is the "to" leg
         const fromIsAgent = fromIsClient || isBiz(from10) || (!isBiz(to10) && fromStr && fromStr !== toStr);
         agentChannelNum = fromIsAgent ? 1 : 2;
-        console.log(`[CI Request] Channel-role mapping: agent on channel ${agentChannelNum} (from=${fromStr}, to=${toStr})`);
+        logger.log(`[CI Request] Channel-role mapping: agent on channel ${agentChannelNum} (from=${fromStr}, to=${toStr})`);
       } catch (e) {
-        console.warn('[CI Request] Failed to compute channel-role mapping, defaulting agent to channel 1:', e?.message);
+        logger.warn('[CI Request] Failed to compute channel-role mapping, defaulting agent to channel 1:', e?.message);
       }
 
       // Create CI transcript with proper channel participants for speaker separation
@@ -337,28 +338,29 @@ export default async function handler(req, res){
         : await client.intelligence.v2.transcripts.create(createArgs);
       ciTranscriptSid = created.sid;
       
-      console.log(`[CI Request] Created transcript: ${ciTranscriptSid}, status: ${created.status}`);
+      logger.log(`[CI Request] Created transcript: ${ciTranscriptSid}, status: ${created.status}`);
       
       // Poll transcript status to ensure it's processing
+      // OPTIMIZED: Reduced from 3 to 2 attempts (2s instead of 3s) - minimal impact but reduces Cloud Run costs
       let attempts = 0;
-      const maxAttempts = 3;
+      const maxAttempts = 2; // 2 * 1s = 2s (reduced from 3s)
       while (attempts < maxAttempts) {
         try {
           const transcript = await client.intelligence.v2.transcripts(ciTranscriptSid).fetch();
-          console.log(`[CI Request] Transcript ${ciTranscriptSid} status: ${transcript.status}`);
+          logger.log(`[CI Request] Transcript ${ciTranscriptSid} status: ${transcript.status}`);
           
           if (transcript.status === 'completed') {
-            console.log(`[CI Request] Transcript completed immediately: ${ciTranscriptSid}`);
+            logger.log(`[CI Request] Transcript completed immediately: ${ciTranscriptSid}`);
             break;
           } else if (transcript.status === 'failed') {
-            console.error(`[CI Request] Transcript failed: ${ciTranscriptSid}`, transcript);
+            logger.error(`[CI Request] Transcript failed: ${ciTranscriptSid}`, transcript);
             throw new Error(`Transcript processing failed: ${transcript.status}`);
           } else if (['queued', 'in-progress'].includes(transcript.status)) {
-            console.log(`[CI Request] Transcript processing: ${transcript.status}`);
+            logger.log(`[CI Request] Transcript processing: ${transcript.status}`);
             break;
           }
         } catch (e) {
-          console.warn(`[CI Request] Error checking transcript status (attempt ${attempts + 1}):`, e.message);
+          logger.warn(`[CI Request] Error checking transcript status (attempt ${attempts + 1}):`, e.message);
         }
         attempts++;
         if (attempts < maxAttempts) {
@@ -391,8 +393,8 @@ export default async function handler(req, res){
       webhookUrl: `${base}/api/twilio/conversational-intelligence-webhook`
     }));
   }catch(e){
-    console.error('[ci-request] Error:', e);
-    console.error('[ci-request] Error details:', {
+    logger.error('[ci-request] Error:', e);
+    logger.error('[ci-request] Error details:', {
       message: e?.message,
       code: e?.code,
       status: e?.status,

@@ -1,6 +1,7 @@
 import twilio from 'twilio';
 import { URL } from 'url';
 import { cors } from '../_cors.js';
+import logger from '../_logger.js';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 export default async function handler(req, res) {
@@ -8,7 +9,7 @@ export default async function handler(req, res) {
     if (cors(req, res)) return; // handle OPTIONS
     
     const startTime = Date.now();
-    console.log(`[Bridge] Request started at ${new Date().toISOString()}`);
+    logger.log(`[Bridge] Request started at ${new Date().toISOString()}`);
     
     // Only allow POST requests (but allow OPTIONS for CORS)
     if (req.method !== 'POST') {
@@ -19,8 +20,8 @@ export default async function handler(req, res) {
     
     try {
         // Log raw URL to confirm query parameters are present
-        console.log('[Bridge] Raw Request URL:', req.url);
-        console.log('[Bridge] Request Host:', req.headers.host);
+        logger.log('[Bridge] Raw Request URL:', req.url);
+        logger.log('[Bridge] Request Host:', req.headers.host);
         
         // Get query parameters (server.js should populate req.query, but fallback to manual parsing)
         let target, callerId;
@@ -28,7 +29,7 @@ export default async function handler(req, res) {
             // Use req.query from server.js if available
             target = req.query.target;
             callerId = req.query.callerId;
-            console.log('[Bridge] Using req.query from server.js');
+            logger.log('[Bridge] Using req.query from server.js');
         } else {
             // Fallback: manually parse query parameters from req.url
             try {
@@ -38,9 +39,9 @@ export default async function handler(req, res) {
                 
                 target = requestUrl.searchParams.get('target');
                 callerId = requestUrl.searchParams.get('callerId');
-                console.log('[Bridge] Manually parsed from req.url (fallback)');
+                logger.log('[Bridge] Manually parsed from req.url (fallback)');
             } catch (parseError) {
-                console.error('[Bridge] Error parsing URL query parameters:', parseError.message);
+                logger.error('[Bridge] Error parsing URL query parameters:', parseError.message);
                 res.writeHead(400, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Invalid query parameters', details: parseError.message }));
                 return;
@@ -51,21 +52,21 @@ export default async function handler(req, res) {
         if (target) target = decodeURIComponent(target);
         if (callerId) callerId = decodeURIComponent(callerId);
         
-        console.log('[Bridge] Parsed target:', target);
-        console.log('[Bridge] Parsed callerId:', callerId);
+        logger.log('[Bridge] Parsed target:', target);
+        logger.log('[Bridge] Parsed callerId:', callerId);
         
         // Use req.body that was already parsed by server.js (avoid re-reading stream)
         // If req.body doesn't exist (shouldn't happen with server.js), fallback to empty object
         const parsedBody = req.body || {};
         
-        console.log('[Bridge] Body parameters (from server.js):', parsedBody);
+        logger.log('[Bridge] Body parameters (from server.js):', parsedBody);
         
         const CallSid = parsedBody.CallSid;
         const From = parsedBody.From;
         const To = parsedBody.To;
         
-        console.log(`[Bridge] Decoded params - target: ${target}, callerId: ${callerId || 'none'}`);
-        console.log(`[Bridge] Body - CallSid: ${CallSid}, From: ${From || 'none'}, To: ${To || 'none'}`);
+        logger.log(`[Bridge] Decoded params - target: ${target}, callerId: ${callerId || 'none'}`);
+        logger.log(`[Bridge] Body - CallSid: ${CallSid}, From: ${From || 'none'}, To: ${To || 'none'}`);
         
         // Ensure absolute base URL for Twilio callbacks (prefer headers)
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
@@ -108,7 +109,7 @@ export default async function handler(req, res) {
         
         // Validate callerId format (must be E.164)
         if (!isValidE164(dynamicCallerId)) {
-            console.error(`[Bridge] Invalid callerId format: ${dynamicCallerId} (must be E.164 like +15551234567)`);
+            logger.error(`[Bridge] Invalid callerId format: ${dynamicCallerId} (must be E.164 like +15551234567)`);
             const errorTwiml = new VoiceResponse();
             errorTwiml.say('Sorry, there was an error. Invalid caller ID format.');
             errorTwiml.hangup();
@@ -119,7 +120,7 @@ export default async function handler(req, res) {
             return;
         }
         
-        console.log(`[Bridge] Using callerId: ${dynamicCallerId} (source: ${callerId ? 'query param' : From ? 'body From' : 'env/fallback'})`);
+        logger.log(`[Bridge] Using callerId: ${dynamicCallerId} (source: ${callerId ? 'query param' : From ? 'body From' : 'env/fallback'})`);
         
         // Seed the Calls API with correct phone context for this CallSid
         const apiCallStart = Date.now();
@@ -141,9 +142,9 @@ export default async function handler(req, res) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             }).catch(()=>{});
-            console.log(`[Bridge] API call completed in ${Date.now() - apiCallStart}ms`);
+            logger.log(`[Bridge] API call completed in ${Date.now() - apiCallStart}ms`);
         } catch(_) {
-            console.log(`[Bridge] API call failed in ${Date.now() - apiCallStart}ms`);
+            logger.log(`[Bridge] API call failed in ${Date.now() - apiCallStart}ms`);
         }
 
         // Create TwiML to bridge the call
@@ -171,7 +172,7 @@ export default async function handler(req, res) {
         
         // Validate and normalize target number format before adding to dial
         if (!target || target.trim().length === 0) {
-            console.error('[Bridge] Invalid target number:', target);
+            logger.error('[Bridge] Invalid target number:', target);
             const errorTwiml = new VoiceResponse();
             errorTwiml.say('Sorry, there was an error. Invalid target number.');
             errorTwiml.hangup();
@@ -202,7 +203,7 @@ export default async function handler(req, res) {
         
         // Validate target number is E.164 format
         if (!isValidE164(normalizedTarget)) {
-            console.error(`[Bridge] Invalid target number format: ${normalizedTarget} (from original: ${target})`);
+            logger.error(`[Bridge] Invalid target number format: ${normalizedTarget} (from original: ${target})`);
             const errorTwiml = new VoiceResponse();
             errorTwiml.say('Sorry, there was an error. Invalid phone number format.');
             errorTwiml.hangup();
@@ -214,30 +215,30 @@ export default async function handler(req, res) {
         }
         
         // Log exact values before TwiML generation (per Twilio support recommendation)
-        console.log(`[Bridge] Final values before TwiML generation:`);
-        console.log(`  - callerId: ${dynamicCallerId} (E.164: ${isValidE164(dynamicCallerId) ? 'YES' : 'NO'})`);
-        console.log(`  - target: ${normalizedTarget} (E.164: ${isValidE164(normalizedTarget) ? 'YES' : 'NO'})`);
-        console.log(`  - CallSid: ${CallSid}`);
+        logger.log(`[Bridge] Final values before TwiML generation:`);
+        logger.log(`  - callerId: ${dynamicCallerId} (E.164: ${isValidE164(dynamicCallerId) ? 'YES' : 'NO'})`);
+        logger.log(`  - target: ${normalizedTarget} (E.164: ${isValidE164(normalizedTarget) ? 'YES' : 'NO'})`);
+        logger.log(`  - CallSid: ${CallSid}`);
         
         // Add the target number to dial
         try {
             dial.number(normalizedTarget);
-            console.log(`[Bridge] Successfully added number ${normalizedTarget} to dial with callerId ${dynamicCallerId}`);
+            logger.log(`[Bridge] Successfully added number ${normalizedTarget} to dial with callerId ${dynamicCallerId}`);
         } catch (dialError) {
-            console.error(`[Bridge] Error adding number to dial:`, dialError);
+            logger.error(`[Bridge] Error adding number to dial:`, dialError);
             throw dialError; // Re-throw to be caught by outer catch block
         }
         
         // action already set in Dial options
         
-        console.log(`[Bridge] TwiML generated to connect to ${target} in ${Date.now() - twimlStart}ms`);
+        logger.log(`[Bridge] TwiML generated to connect to ${target} in ${Date.now() - twimlStart}ms`);
         
         // Send TwiML response (log for verification)
         const xml = twiml.toString();
-        try { console.log('[Bridge TwiML]', xml); } catch(_) {}
+        try { logger.log('[Bridge TwiML]', xml); } catch(_) {}
         
         const totalTime = Date.now() - startTime;
-        console.log(`[Bridge] Total processing time: ${totalTime}ms`);
+        logger.log(`[Bridge] Total processing time: ${totalTime}ms`);
         
         res.setHeader('Content-Type', 'text/xml');
         res.writeHead(200);
@@ -246,11 +247,11 @@ export default async function handler(req, res) {
         
     } catch (error) {
         const errorTime = Date.now() - startTime;
-        console.error(`[Bridge] Error after ${errorTime}ms:`, error);
-        console.error(`[Bridge] Error message:`, error.message);
-        console.error(`[Bridge] Error code:`, error.code || 'N/A');
-        console.error(`[Bridge] Error stack:`, error.stack);
-        console.error(`[Bridge] Request details:`, {
+        logger.error(`[Bridge] Error after ${errorTime}ms:`, error);
+        logger.error(`[Bridge] Error message:`, error.message);
+        logger.error(`[Bridge] Error code:`, error.code || 'N/A');
+        logger.error(`[Bridge] Error stack:`, error.stack);
+        logger.error(`[Bridge] Request details:`, {
             method: req.method,
             url: req.url,
             headers: req.headers
@@ -267,13 +268,13 @@ export default async function handler(req, res) {
         // 13248: Invalid callerId format
         if (errorCode === 13214 || errorCode === 13248) {
             errorMessage = 'Sorry, the caller ID number is not valid. Please check your settings.';
-            console.error(`[Bridge] Twilio Error ${errorCode}: Invalid callerId - number must be owned/verified by your Twilio account`);
+            logger.error(`[Bridge] Twilio Error ${errorCode}: Invalid callerId - number must be owned/verified by your Twilio account`);
         } else if (errorCode === 13223) {
             errorMessage = 'Sorry, the phone number format is invalid.';
-            console.error(`[Bridge] Twilio Error ${errorCode}: Invalid phone number format`);
+            logger.error(`[Bridge] Twilio Error ${errorCode}: Invalid phone number format`);
         } else if (errorCode === 13247) {
             errorMessage = 'Sorry, this number cannot be used for calls.';
-            console.error(`[Bridge] Twilio Error ${errorCode}: Number on do-not-originate list`);
+            logger.error(`[Bridge] Twilio Error ${errorCode}: Number on do-not-originate list`);
         }
         
         // Return error TwiML - MUST return 200 status for Twilio to process it
@@ -289,7 +290,7 @@ export default async function handler(req, res) {
             res.end(xml);
             return;
         } catch (twimlError) {
-            console.error('[Bridge] Failed to generate error TwiML:', twimlError);
+            logger.error('[Bridge] Failed to generate error TwiML:', twimlError);
             // Last resort: return minimal valid TwiML
             res.setHeader('Content-Type', 'text/xml');
             res.writeHead(200);

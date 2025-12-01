@@ -6,6 +6,7 @@
 
 import { cors } from '../_cors.js';
 import { db } from '../_firebase.js';
+import logger from '../_logger.js';
 
 // System prompt combining SEO.md guidelines with A+ content optimization
 const SYSTEM_PROMPT = `You are Lewis Patterson, Lead Energy Strategist at Power Choosers, with 15+ years of commercial energy procurement experience. You write like a seasoned broker who just got off the phone with ERCOT and has insider market intelligence.
@@ -461,7 +462,7 @@ function parseAIResponse(responseText) {
       content
     };
   } catch (error) {
-    console.error('[AI Post Generation] Failed to parse response:', error);
+    logger.error('[AI Post Generation] Failed to parse response:', error);
     // Fallback: try to extract fields from text
     return parseFallback(responseText);
   }
@@ -554,9 +555,9 @@ export default async function handler(req, res) {
           };
         });
 
-        console.log(`[AI Post Generation] Loaded ${existingPosts.length} existing posts (published + drafts) for context`);
+        logger.log(`[AI Post Generation] Loaded ${existingPosts.length} existing posts (published + drafts) for context`);
       } catch (firestoreError) {
-        console.warn('[AI Post Generation] Failed to load existing posts:', firestoreError);
+        logger.warn('[AI Post Generation] Failed to load existing posts:', firestoreError);
         // Continue without context if Firestore fails
       }
     }
@@ -570,7 +571,7 @@ export default async function handler(req, res) {
       throw new Error('PERPLEXITY_API_KEY not configured');
     }
 
-    console.log('[AI Post Generation] Calling Perplexity Sonar API...');
+    logger.log('[AI Post Generation] Calling Perplexity Sonar API...');
 
     const perplexityResponse = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
@@ -591,7 +592,7 @@ export default async function handler(req, res) {
 
     if (!perplexityResponse.ok) {
       const errorText = await perplexityResponse.text();
-      console.error('[AI Post Generation] Perplexity API error:', perplexityResponse.status, errorText);
+      logger.error('[AI Post Generation] Perplexity API error:', perplexityResponse.status, errorText);
       throw new Error(`Perplexity API error: ${perplexityResponse.status}`);
     }
 
@@ -605,7 +606,7 @@ export default async function handler(req, res) {
     // Parse response
     const generatedPost = parseAIResponse(responseText);
 
-    console.log('[AI Post Generation] Successfully generated post:', {
+    logger.log('[AI Post Generation] Successfully generated post:', {
       title: generatedPost.title,
       category: generatedPost.category,
       contentLength: generatedPost.content.length
@@ -619,7 +620,7 @@ export default async function handler(req, res) {
     }));
 
   } catch (error) {
-    console.error('[AI Post Generation] Error:', error);
+    logger.error('[AI Post Generation] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       error: 'Failed to generate post',

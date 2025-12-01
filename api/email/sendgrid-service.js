@@ -3,12 +3,13 @@ import sgMail from '@sendgrid/mail';
 import { admin, db } from '../_firebase.js';
 import sanitizeHtml from 'sanitize-html';
 import juice from 'juice';
+import logger from '../_logger.js';
 
 // Initialize SendGrid
 if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.startsWith('SG.')) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 } else {
-  console.log('[SendGrid] Invalid or missing API key - SendGrid functionality disabled');
+  logger.log('[SendGrid] Invalid or missing API key - SendGrid functionality disabled');
 }
 
 export class SendGridService {
@@ -30,13 +31,13 @@ export class SendGridService {
 
       if (suppressionDoc.exists) {
         const data = suppressionDoc.data();
-        console.log(`[SendGrid] Email suppressed: ${email} - ${data.reason}`);
+        logger.log(`[SendGrid] Email suppressed: ${email} - ${data.reason}`);
         return { suppressed: true, reason: data.reason };
       }
 
       return { suppressed: false };
     } catch (error) {
-      console.error(`[SendGrid] Error checking suppression for ${email}:`, error);
+      logger.error(`[SendGrid] Error checking suppression for ${email}:`, error);
       return { suppressed: false };
     }
   }
@@ -90,7 +91,7 @@ export class SendGridService {
         }
       }
     } catch (error) {
-      console.warn(`[SendGrid] Error looking up contact name for ${emailAddress}:`, error);
+      logger.warn(`[SendGrid] Error looking up contact name for ${emailAddress}:`, error);
     }
 
     return null;
@@ -153,7 +154,7 @@ export class SendGridService {
 
       // If all recipients are suppressed, don't send
       if (suppressedEmails.length === recipients.length) {
-        console.log(`[SendGrid] All recipients suppressed, skipping send`);
+        logger.log(`[SendGrid] All recipients suppressed, skipping send`);
         return {
           success: false,
           message: 'All recipients suppressed',
@@ -167,7 +168,7 @@ export class SendGridService {
       );
 
       if (allowedRecipients.length === 0) {
-        console.log(`[SendGrid] No valid recipients after filtering suppressed emails`);
+        logger.log(`[SendGrid] No valid recipients after filtering suppressed emails`);
         return {
           success: false,
           message: 'No valid recipients',
@@ -225,12 +226,12 @@ export class SendGridService {
             }
           });
         } catch (inlineError) {
-          console.error('[SendGrid] CSS inlining failed:', inlineError.message);
+          logger.error('[SendGrid] CSS inlining failed:', inlineError.message);
           // Fallback: remove <style> tags but keep the HTML structure
           htmlContent = htmlContent
             .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
             .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
-          console.warn('[SendGrid] CSS inlining failed, removed <style> tags as fallback');
+          logger.warn('[SendGrid] CSS inlining failed, removed <style> tags as fallback');
         }
       }
 
@@ -242,14 +243,14 @@ export class SendGridService {
           this.generateTextFromHtml(htmlContent) :
           this.stripHtml(htmlContent);
       } catch (textGenError) {
-        console.error('[SendGrid] Error generating text content:', textGenError);
+        logger.error('[SendGrid] Error generating text content:', textGenError);
         // Fallback to basic HTML stripping
         textContent = this.stripHtml(htmlContent) || 'HTML email content';
       }
 
       // Ensure text content is always a valid non-empty string
       if (!textContent || typeof textContent !== 'string' || textContent.trim().length === 0) {
-        console.warn('[SendGrid] Text content is empty, using fallback');
+        logger.warn('[SendGrid] Text content is empty, using fallback');
         textContent = 'HTML email content - please view in HTML format';
       }
 
@@ -262,13 +263,13 @@ export class SendGridService {
         throw new Error('Text content cannot be empty');
       }
 
-      console.log('[SendGrid] Email type:', isHtmlEmail ? 'HTML' : 'Standard', 'Content length:', content.length);
-      console.log('[SendGrid] Text content length:', textContent.length);
+      logger.log('[SendGrid] Email type:', isHtmlEmail ? 'HTML' : 'Standard', 'Content length:', content.length);
+      logger.log('[SendGrid] Text content length:', textContent.length);
 
       // Log sender details for debugging
       const finalFromEmail = from || this.fromEmail;
       const finalFromName = fromName || this.fromName;
-      console.log('[SendGrid] Sending email with from:', {
+      logger.log('[SendGrid] Sending email with from:', {
         email: finalFromEmail,
         name: finalFromName
       });
@@ -387,7 +388,7 @@ export class SendGridService {
       if (msg.headers) {
         for (const [key, value] of Object.entries(msg.headers)) {
           if (typeof value !== 'string') {
-            console.warn(`[SendGrid] Converting header ${key} to string`);
+            logger.warn(`[SendGrid] Converting header ${key} to string`);
             msg.headers[key] = String(value);
           }
         }
@@ -421,14 +422,14 @@ export class SendGridService {
               field: err.field,
               help: err.help
             }));
-            console.error('[SendGrid] SendGrid API Error Details:', errorDetails.sendGridErrors);
+            logger.error('[SendGrid] SendGrid API Error Details:', errorDetails.sendGridErrors);
           }
 
           // Log specific error codes
           if (sendError.response.statusCode === 413) {
-            console.error('[SendGrid] Payload Too Large - content exceeds SendGrid limits');
+            logger.error('[SendGrid] Payload Too Large - content exceeds SendGrid limits');
           } else if (sendError.response.statusCode === 400) {
-            console.error('[SendGrid] Bad Request - check payload structure and headers');
+            logger.error('[SendGrid] Bad Request - check payload structure and headers');
           }
         }
 
@@ -442,11 +443,11 @@ export class SendGridService {
           headerCount: msg.headers ? Object.keys(msg.headers).length : 0
         };
 
-        console.error('[SendGrid] SendGrid API error (full details):', JSON.stringify(errorDetails, null, 2));
+        logger.error('[SendGrid] SendGrid API error (full details):', JSON.stringify(errorDetails, null, 2));
         throw sendError;
       }
 
-      console.log('[SendGrid] Email sent successfully:', {
+      logger.log('[SendGrid] Email sent successfully:', {
         to: to,
         subject: subject,
         messageId: response[0]?.headers?.['x-message-id'] || 'unknown',
@@ -469,19 +470,19 @@ export class SendGridService {
 
     } catch (error) {
       // Enhanced error logging as recommended by Twilio AI
-      console.error('[SendGrid] Email send error:', error);
+      logger.error('[SendGrid] Email send error:', error);
 
       // Log detailed SendGrid API error information
       if (error.response && error.response.body && error.response.body.errors) {
-        console.error('[SendGrid] API Error Details:', error.response.body.errors);
-        console.error('[SendGrid] Status Code:', error.response.status);
-        console.error('[SendGrid] Response Headers:', error.response.headers);
+        logger.error('[SendGrid] API Error Details:', error.response.body.errors);
+        logger.error('[SendGrid] Status Code:', error.response.status);
+        logger.error('[SendGrid] Response Headers:', error.response.headers);
       } else {
-        console.error('[SendGrid] Full Error Object:', JSON.stringify(error, null, 2));
+        logger.error('[SendGrid] Full Error Object:', JSON.stringify(error, null, 2));
       }
 
       // Log the email data that failed (without sensitive content)
-      console.error('[SendGrid] Failed Email Data:', {
+      logger.error('[SendGrid] Failed Email Data:', {
         to: emailData.to,
         subject: emailData.subject,
         from: emailData.from,
@@ -515,7 +516,7 @@ export class SendGridService {
 
       return results;
     } catch (error) {
-      console.error('[SendGrid] Bulk email error:', error);
+      logger.error('[SendGrid] Bulk email error:', error);
       throw error;
     }
   }
@@ -556,9 +557,9 @@ export class SendGridService {
       };
 
       await db.collection('emails').doc(emailData.trackingId).set(emailRecord);
-      console.log('[SendGrid] Email record stored in Firebase:', emailData.trackingId);
+      logger.log('[SendGrid] Email record stored in Firebase:', emailData.trackingId);
     } catch (error) {
-      console.error('[SendGrid] Firebase storage error:', error);
+      logger.error('[SendGrid] Firebase storage error:', error);
       // Don't throw - email was sent successfully
     }
   }
@@ -634,7 +635,7 @@ export class SendGridService {
 
       return cleaned;
     } catch (error) {
-      console.error('[SendGrid] HTML sanitization error:', error);
+      logger.error('[SendGrid] HTML sanitization error:', error);
       // Fallback: just remove dangerous tags, preserve everything else
       return html
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
@@ -656,14 +657,14 @@ export class SendGridService {
    */
   generateTextFromHtml(html) {
     if (!html || typeof html !== 'string') {
-      console.warn('[SendGrid] Invalid HTML input for text generation');
+      logger.warn('[SendGrid] Invalid HTML input for text generation');
       return 'HTML email content';
     }
 
     // Limit processing for very large HTML to prevent memory issues
     const MAX_HTML_LENGTH = 1000000; // 1MB limit
     if (html.length > MAX_HTML_LENGTH) {
-      console.warn('[SendGrid] HTML content too large, using simplified text extraction');
+      logger.warn('[SendGrid] HTML content too large, using simplified text extraction');
       return this.stripHtml(html.substring(0, MAX_HTML_LENGTH)) || 'HTML email content';
     }
 
@@ -730,7 +731,7 @@ export class SendGridService {
 
       // Ensure we always return non-empty content
       if (!result || result.length === 0) {
-        console.warn('[SendGrid] Generated text is empty after processing, using basic strip');
+        logger.warn('[SendGrid] Generated text is empty after processing, using basic strip');
         const basicStrip = this.stripHtml(html);
         return basicStrip && basicStrip.length > 0 ? basicStrip : 'HTML email content - please view in HTML format';
       }
@@ -738,13 +739,13 @@ export class SendGridService {
       // Limit text length to prevent SendGrid issues
       const MAX_TEXT_LENGTH = 100000;
       if (result.length > MAX_TEXT_LENGTH) {
-        console.warn('[SendGrid] Text content too long, truncating');
+        logger.warn('[SendGrid] Text content too long, truncating');
         return result.substring(0, MAX_TEXT_LENGTH) + '... [content truncated]';
       }
 
       return result;
     } catch (e) {
-      console.error('[SendGrid] Failed to generate text from HTML:', e);
+      logger.error('[SendGrid] Failed to generate text from HTML:', e);
       // Multiple fallback strategies
       try {
         const basicStrip = this.stripHtml(html);
@@ -752,7 +753,7 @@ export class SendGridService {
           return basicStrip;
         }
       } catch (stripError) {
-        console.error('[SendGrid] Even basic strip failed:', stripError);
+        logger.error('[SendGrid] Even basic strip failed:', stripError);
       }
 
       // Final fallback
@@ -789,7 +790,7 @@ export class SendGridService {
         sentAt: emailData.sentAt || null
       };
     } catch (error) {
-      console.error('[SendGrid] Stats error:', error);
+      logger.error('[SendGrid] Stats error:', error);
       return null;
     }
   }

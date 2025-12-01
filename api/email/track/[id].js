@@ -2,6 +2,7 @@
 // Returns a 1x1 transparent PNG and (optionally) records an open event
 
 import { db } from '../../_firebase.js';
+import logger from '../../_logger.js';
 
 // 1x1 transparent PNG
 const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
@@ -40,7 +41,7 @@ export default async function handler(req, res) {
       }
     } catch (error) {
       // Log error but don't block pixel - tracking is best-effort
-      console.error('[Email Track] Error recording open event:', error.message || error);
+      logger.error('[Email Track] Error recording open event:', error.message || error);
     }
 
     // For email clients and proxies, allow caching to reduce repeat fetches
@@ -56,7 +57,7 @@ export default async function handler(req, res) {
     res.end(PIXEL);
   } catch (error) {
     // Always return pixel even on error - tracking failures shouldn't break email rendering
-    console.error('[Email Track] Unexpected error:', error.message || error);
+    logger.error('[Email Track] Unexpected error:', error.message || error);
     try {
       const headers = {
         'Content-Type': 'image/png',

@@ -1,5 +1,6 @@
 import twilio from 'twilio';
 import { cors } from '../_cors.js';
+import logger from '../_logger.js';
 
 export default async function handler(req, res) {
     if (cors(req, res)) return;
@@ -19,7 +20,7 @@ export default async function handler(req, res) {
             return;
         }
         
-        console.log('[Conversational Intelligence] Processing for:', { callSid, recordingSid });
+        logger.log('[Conversational Intelligence] Processing for:', { callSid, recordingSid });
         
         // Initialize Twilio client
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -45,7 +46,7 @@ export default async function handler(req, res) {
             return;
         }
         
-        console.log('[Conversational Intelligence] Found recording:', recording.sid);
+        logger.log('[Conversational Intelligence] Found recording:', recording.sid);
         
         // Check if Conversational Intelligence service is configured
         const serviceSid = process.env.TWILIO_INTELLIGENCE_SERVICE_SID;
@@ -69,10 +70,10 @@ export default async function handler(req, res) {
             
             if (transcripts.length > 0) {
                 existingTranscript = transcripts[0];
-                console.log('[Conversational Intelligence] Found existing transcript:', existingTranscript.sid);
+                logger.log('[Conversational Intelligence] Found existing transcript:', existingTranscript.sid);
             }
         } catch (error) {
-            console.warn('[Conversational Intelligence] Error checking existing transcripts:', error.message);
+            logger.warn('[Conversational Intelligence] Error checking existing transcripts:', error.message);
         }
         
         let transcript = null;
@@ -93,17 +94,17 @@ export default async function handler(req, res) {
                 const fromIsClient = /^client:/i.test(fromStr);
                 const fromIsAgent = fromIsClient || isBiz(from10) || (!isBiz(to10) && fromStr && fromStr !== toStr);
                 agentChannelNum = fromIsAgent ? 1 : 2;
-                console.log('[CI Manual] Agent mapped to channel', agentChannelNum, { from: fromStr, to: toStr });
+                logger.log('[CI Manual] Agent mapped to channel', agentChannelNum, { from: fromStr, to: toStr });
             }
         } catch (e) {
-            console.warn('[CI Manual] Could not compute channel participants map, defaulting agent=1:', e?.message);
+            logger.warn('[CI Manual] Could not compute channel participants map, defaulting agent=1:', e?.message);
         }
         
         // Respect on-demand CI: if CI_AUTO_PROCESS is not enabled and no manual trigger param is provided, do not auto-create
         const autoProcess = String(process.env.CI_AUTO_PROCESS || '').toLowerCase();
         const shouldAutoProcess = autoProcess === '1' || autoProcess === 'true' || autoProcess === 'yes';
         if (!shouldAutoProcess && !req.query?.trigger && !req.body?.trigger) {
-            console.log('[CI Manual] CI auto-processing disabled and no trigger flag provided; skipping transcript creation');
+            logger.log('[CI Manual] CI auto-processing disabled and no trigger flag provided; skipping transcript creation');
             res.writeHead(202, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ ok: true, pending: true, reason: 'CI not requested' }));
             return;
@@ -112,10 +113,10 @@ export default async function handler(req, res) {
         if (existingTranscript) {
             // Fetch the existing transcript
             transcript = await client.intelligence.v2.transcripts(existingTranscript.sid).fetch();
-            console.log('[Conversational Intelligence] Using existing transcript:', transcript.sid);
+            logger.log('[Conversational Intelligence] Using existing transcript:', transcript.sid);
         } else {
             // Create new Conversational Intelligence transcript
-            console.log('[Conversational Intelligence] Creating new transcript...');
+            logger.log('[Conversational Intelligence] Creating new transcript...');
             transcript = await client.intelligence.v2.transcripts.create({
                 serviceSid: serviceSid,
                 channel: {
@@ -129,22 +130,40 @@ export default async function handler(req, res) {
                 },
                 customerKey: callSid || recordingSid // Use callSid as customer key for tracking
             });
-            console.log('[Conversational Intelligence] Created new transcript:', transcript.sid);
+            logger.log('[Conversational Intelligence] Created new transcript:', transcript.sid);
         }
         
         // Wait for transcript to be processed (if status is queued or in-progress)
+        // OPTIMIZED: Reduced from 20 to 5 attempts (30s instead of 120s) to reduce Cloud Run costs
+        // Webhook will handle completion if transcript takes longer
         let attempts = 0;
-        const maxAttempts = 20; // Wait up to 2 minutes
+        const maxAttempts = 5; // Wait up to 30 seconds (5 × 6s) instead of 2 minutes
         
         while (attempts < maxAttempts && ['queued', 'in-progress'].includes(transcript.status)) {
-            console.log(`[Conversational Intelligence] Transcript status: ${transcript.status}, waiting...`);
+            logger.log(`[Conversational Intelligence] Transcript status: ${transcript.status}, waiting...`);
             await new Promise(resolve => setTimeout(resolve, 6000)); // Wait 6 seconds
             
             transcript = await client.intelligence.v2.transcripts(transcript.sid).fetch();
             attempts++;
+            
+            // Early exit: Check if sentences are available (indicates completion even if status hasn't updated)
+            if (attempts >= 2) { // After at least 12 seconds, check for sentences
+                try {
+                    const sentencesCheck = await client.intelligence.v2
+                        .transcripts(transcript.sid)
+                        .sentences.list({ limit: 1 });
+                    if (sentencesCheck && sentencesCheck.length > 0) {
+                        logger.log('[Conversational Intelligence] Sentences available, transcript complete');
+                        transcript.status = 'completed';
+                        break;
+                    }
+                } catch (_) {
+                    // Continue polling if sentences check fails
+                }
+            }
         }
         
-        console.log(`[Conversational Intelligence] Final transcript status: ${transcript.status}`);
+        logger.log(`[Conversational Intelligence] Final transcript status: ${transcript.status}`);
         
         // Get transcript sentences if completed
         let transcriptText = '';
@@ -168,7 +187,7 @@ export default async function handler(req, res) {
                 try {
                     const lacksDiarization = Array.isArray(sentences) && sentences.length > 0 && sentences.every(s => (s.channel == null && !s.speaker && !s.role));
                     if (lacksDiarization) {
-                        console.log('[CI Manual] Sentences missing diarization; recreating with participants mapping...');
+                        logger.log('[CI Manual] Sentences missing diarization; recreating with participants mapping...');
                         try { await client.intelligence.v2.transcripts(transcript.sid).remove(); } catch(_) {}
                         const agentChannel = agentChannelNum;
                         const recreated = await client.intelligence.v2.transcripts.create({
@@ -182,12 +201,25 @@ export default async function handler(req, res) {
                             serviceSid: serviceSid,
                             customerKey: callSid || recordingSid
                         });
-                        // Poll until complete
-                        let tries = 0; const maxTries = 10; let status = recreated.status; let tx = recreated;
+                        // Poll until complete (reduced from 10 to 5 attempts for cost optimization)
+                        let tries = 0; const maxTries = 5; let status = recreated.status; let tx = recreated;
                         while (tries < maxTries && ['queued','in-progress'].includes((status||'').toLowerCase())){
                             await new Promise(r=>setTimeout(r,6000));
                             tx = await client.intelligence.v2.transcripts(recreated.sid).fetch();
                             status = tx.status; tries++;
+                            
+                            // Early exit: Check if sentences are available
+                            if (tries >= 2) {
+                                try {
+                                    const sentencesCheck = await client.intelligence.v2
+                                        .transcripts(tx.sid)
+                                        .sentences.list({ limit: 1 });
+                                    if (sentencesCheck && sentencesCheck.length > 0) {
+                                        status = 'completed';
+                                        break;
+                                    }
+                                } catch (_) {}
+                            }
                         }
                         if ((status||'').toLowerCase() === 'completed'){
                             const sentencesResponse2 = await client.intelligence.v2
@@ -223,12 +255,12 @@ export default async function handler(req, res) {
                 } catch(_) {}
 
                 transcriptText = (speakerTurns.length ? speakerTurns.map(x=>x.text).join(' ') : sentences.map(s => s.text || '').filter(text => text.trim()).join(' '));
-                console.log(`[Conversational Intelligence] Retrieved ${sentences.length} sentences, transcript length: ${transcriptText.length}`);
-                console.log(`[Conversational Intelligence] Sample sentences:`, sentences.slice(0, 3).map(s => ({ text: s.text, confidence: s.confidence })));
+                logger.log(`[Conversational Intelligence] Retrieved ${sentences.length} sentences, transcript length: ${transcriptText.length}`);
+                logger.log(`[Conversational Intelligence] Sample sentences:`, sentences.slice(0, 3).map(s => ({ text: s.text, confidence: s.confidence })));
                 
                 // FALLBACK: If Conversational Intelligence transcript is empty, try basic transcription
                 if (!transcriptText && recording) {
-                    console.log('[Conversational Intelligence] No transcript text found, trying basic transcription fallback...');
+                    logger.log('[Conversational Intelligence] No transcript text found, trying basic transcription fallback...');
                     try {
                         const transcriptions = await client.transcriptions.list({ 
                             recordingSid: recording.sid,
@@ -238,10 +270,10 @@ export default async function handler(req, res) {
                         if (transcriptions.length > 0) {
                             const basicTranscription = await client.transcriptions(transcriptions[0].sid).fetch();
                             transcriptText = basicTranscription.transcriptionText || '';
-                            console.log(`[Conversational Intelligence] Basic transcription fallback: ${transcriptText.length} characters`);
+                            logger.log(`[Conversational Intelligence] Basic transcription fallback: ${transcriptText.length} characters`);
                         }
                     } catch (fallbackError) {
-                        console.warn('[Conversational Intelligence] Basic transcription fallback failed:', fallbackError.message);
+                        logger.warn('[Conversational Intelligence] Basic transcription fallback failed:', fallbackError.message);
                     }
                 }
                 // Words fallback when sentences lack diarization
@@ -276,7 +308,7 @@ export default async function handler(req, res) {
                 try { transcript._pcSpeakerTurns = speakerTurns; } catch(_) {}
 
             } catch (error) {
-                console.error('[Conversational Intelligence] Error fetching sentences:', error);
+                logger.error('[Conversational Intelligence] Error fetching sentences:', error);
             }
         }
         
@@ -293,10 +325,10 @@ export default async function handler(req, res) {
                     results: r.results,
                     confidence: r.confidence
                 }));
-                console.log(`[Conversational Intelligence] Retrieved ${resultsResponse.length} operator results`);
+                logger.log(`[Conversational Intelligence] Retrieved ${resultsResponse.length} operator results`);
             }
         } catch (error) {
-            console.warn('[Conversational Intelligence] No operator results available:', error.message);
+            logger.warn('[Conversational Intelligence] No operator results available:', error.message);
         }
         
         // Generate AI insights from the transcript
@@ -330,13 +362,13 @@ export default async function handler(req, res) {
                     }
                 })
             }).catch((error) => {
-                console.warn('[Conversational Intelligence] Failed posting to /api/calls:', error?.message);
+                logger.warn('[Conversational Intelligence] Failed posting to /api/calls:', error?.message);
             });
         } catch (e) {
-            console.warn('[Conversational Intelligence] Failed posting to /api/calls:', e?.message);
+            logger.warn('[Conversational Intelligence] Failed posting to /api/calls:', e?.message);
         }
         
-        console.log('[Conversational Intelligence] Processing completed');
+        logger.log('[Conversational Intelligence] Processing completed');
         
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -351,7 +383,7 @@ export default async function handler(req, res) {
         }));
         
     } catch (error) {
-        console.error('[Conversational Intelligence] Error:', error);
+        logger.error('[Conversational Intelligence] Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
             error: 'Failed to process with Conversational Intelligence',
@@ -430,17 +462,58 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
             decisionMakers.push(...names.slice(0, 3)); // Limit to 3 names
         }
         
-        // Use operator results if available
+        // Use operator results if available - extract Twilio-generated summary
         let enhancedInsights = {};
+        let twilioSummary = '';
         if (operatorResults && operatorResults.length > 0) {
+            // Look for the summary in operator results - check multiple locations
+            for (const op of operatorResults) {
+                // Check for text_generation type or summary-related names
+                if (op.operatorType === 'text_generation' || 
+                    ['summary', 'conversation_summary', 'call_summary'].includes(op.name?.toLowerCase())) {
+                    // Check multiple possible locations for the summary
+                    const summaryText = op.textGenerationResults || 
+                                       op.summary || 
+                                       op.results?.textGenerationResults || 
+                                       op.results?.summary ||
+                                       op.extractionResults?.summary ||
+                                       (typeof op.result === 'string' ? op.result : null);
+                    if (summaryText) {
+                        twilioSummary = String(summaryText).trim();
+                        logger.log('[CI] Found Twilio summary from operator:', op.name, 'length:', twilioSummary.length);
+                        break;
+                    }
+                }
+                
+                // Also check extraction operators which may contain parsed JSON with summary
+                if (op.operatorType === 'extraction' && op.extractionResults) {
+                    try {
+                        const extracted = typeof op.extractionResults === 'string' 
+                            ? JSON.parse(op.extractionResults) 
+                            : op.extractionResults;
+                        if (extracted.summary) {
+                            twilioSummary = String(extracted.summary).trim();
+                            logger.log('[CI] Found summary from extraction operator:', op.name, 'length:', twilioSummary.length);
+                            break;
+                        }
+                    } catch (parseErr) {
+                        logger.log('[CI] Could not parse extraction results:', parseErr?.message);
+                    }
+                }
+            }
+            
             enhancedInsights = {
                 operatorAnalysis: operatorResults,
-                confidence: operatorResults.reduce((acc, r) => acc + (r.confidence || 0), 0) / operatorResults.length
+                confidence: operatorResults.reduce((acc, r) => acc + (r.confidence || 0), 0) / operatorResults.length,
+                hasTwilioSummary: !!twilioSummary
             };
         }
         
+        // Use Twilio-generated summary if available, otherwise generate one
+        const generatedSummary = `Advanced AI analysis of ${wordCount}-word conversation. ${sentiment} sentiment detected (${(sentimentScore * 100).toFixed(1)}% confidence). ${detectedTopics.length > 0 ? 'Key topics: ' + detectedTopics.map(t => t.topic).join(', ') : 'General business discussion.'}`;
+        
         return {
-            summary: `Advanced AI analysis of ${wordCount}-word conversation. ${sentiment} sentiment detected (${(sentimentScore * 100).toFixed(1)}% confidence). ${detectedTopics.length > 0 ? 'Key topics: ' + detectedTopics.map(t => t.topic).join(', ') : 'General business discussion.'}`,
+            summary: twilioSummary || generatedSummary,
             sentiment: sentiment,
             sentimentScore: sentimentScore,
             keyTopics: detectedTopics.length > 0 ? detectedTopics : [{ topic: 'General business discussion', confidence: 0.5, keywords: [] }],
@@ -457,7 +530,7 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
         };
         
     } catch (error) {
-        console.error('[Conversational Intelligence] Insights generation error:', error);
+        logger.error('[Conversational Intelligence] Insights generation error:', error);
         return {
             summary: 'Advanced AI analysis completed using Twilio Conversational Intelligence',
             sentiment: 'Neutral',

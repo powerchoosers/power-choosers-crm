@@ -4,6 +4,7 @@
  */
 
 import { db } from './_firebase.js';
+import logger from './_logger.js';
 
 // Static pages that should always be in the sitemap
 const staticPages = [
@@ -97,7 +98,7 @@ export default async function handler(req, res) {
       });
     } catch (indexError) {
       // If composite index doesn't exist, use simpler query
-      console.warn('[Sitemap] Composite index not found, using fallback query:', indexError.message);
+      logger.warn('[Sitemap] Composite index not found, using fallback query:', indexError.message);
       try {
         const publishedPostsSnapshot = await db.collection('posts')
           .where('status', '==', 'published')
@@ -114,7 +115,7 @@ export default async function handler(req, res) {
           return dateB - dateA; // Descending order
         });
       } catch (fallbackError) {
-        console.error('[Sitemap] Error fetching published posts:', fallbackError);
+        logger.error('[Sitemap] Error fetching published posts:', fallbackError);
         publishedPosts = [];
       }
     }
@@ -131,7 +132,7 @@ export default async function handler(req, res) {
     res.end(sitemapXML);
     
   } catch (error) {
-    console.error('[Sitemap] Error generating sitemap:', error);
+    logger.error('[Sitemap] Error generating sitemap:', error);
     
     // Return a basic sitemap with just static pages if blog posts fail
     const basicSitemap = generateSitemapXML(staticPages, []);

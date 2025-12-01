@@ -2,6 +2,7 @@ import algoliasearch from 'algoliasearch';
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, collection, getDocs } from 'firebase/firestore';
 import { cors } from '../_cors.js';
+import logger from '../_logger.js';
 
 // Firebase configuration
 const firebaseConfig = {
@@ -91,9 +92,9 @@ return;
         const batch = batches[i];
         const response = await index.saveObjects(batch);
         processed += batch.length;
-        console.log(`Batch ${i + 1}/${batches.length} complete: ${response.objectIDs.length} records indexed`);
+        logger.log(`Batch ${i + 1}/${batches.length} complete: ${response.objectIDs.length} records indexed`);
       } catch (batchError) {
-        console.error(`Error processing batch ${i + 1}:`, batchError);
+        logger.error(`Error processing batch ${i + 1}:`, batchError);
         errors += batches[i].length;
       }
     }
@@ -104,7 +105,7 @@ return;
       const searchResponse = await index.search('');
       verificationCount = searchResponse.nbHits;
     } catch (verifyError) {
-      console.warn('Could not verify index count:', verifyError.message);
+      logger.warn('Could not verify index count:', verifyError.message);
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -119,7 +120,7 @@ res.end(JSON.stringify({
 return;
 
   } catch (error) {
-    console.error('Reindex error:', error);
+    logger.error('Reindex error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
 res.end(JSON.stringify({ 
       error: error.message,

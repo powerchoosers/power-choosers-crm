@@ -1,5 +1,10 @@
 // Energy News (Serverless)
 import { cors } from './_cors.js';
+import { db } from './_firebase.js';
+import logger from './_logger.js';
+
+// Cache duration: 6 hours (21600000 ms)
+const CACHE_DURATION = 6 * 60 * 60 * 1000;
 
 export default async function handler(req, res) {
   if (cors(req, res)) return; // handle OPTIONS centrally
@@ -10,6 +15,35 @@ return;
   }
 
   try {
+    // Check cache first
+    let cacheData = null;
+    let cacheValid = false;
+    
+    if (db) {
+      try {
+        const cacheDoc = await db.collection('cache').doc('energy-news').get();
+        if (cacheDoc.exists) {
+          cacheData = cacheDoc.data();
+          const cacheAge = Date.now() - (cacheData.timestamp || 0);
+          cacheValid = cacheAge < CACHE_DURATION;
+          
+          if (cacheValid) {
+            // Return cached data
+            res.writeHead(200, { 
+              'Content-Type': 'application/json',
+              'X-Cache': 'HIT',
+              'X-Cache-Age': Math.floor(cacheAge / 1000) // Age in seconds
+            });
+            return res.end(JSON.stringify(cacheData.data));
+          }
+        }
+      } catch (cacheError) {
+        // If cache read fails, continue with fresh fetch
+        logger.warn('[Energy News] Cache read failed, fetching fresh:', cacheError.message);
+      }
+    }
+
+    // Cache miss or expired - fetch fresh data
     const rssUrl = 'https://news.google.com/rss/search?q=%28Texas+energy%29+OR+ERCOT+OR+%22Texas+electricity%22&hl=en-US&gl=US&ceid=US:en';
     const response = await fetch(rssUrl, { headers: { 'User-Agent': 'PowerChoosersCRM/1.0' } });
     const xml = await response.text();
@@ -59,7 +93,7 @@ return;
               title: reformattedTitle || item.title // Fallback to original if Gemini fails
             };
           } catch (err) {
-            console.error('[Energy News] Gemini reformatting failed for headline:', err);
+            logger.error('[Energy News] Gemini reformatting failed for headline:', err);
             return item; // Fallback to original headline
           }
         }));
@@ -67,20 +101,39 @@ return;
         items.push(...reformattedItems);
       } else {
         // No Gemini key - use original headlines
-        console.warn('[Energy News] GEMINI_API_KEY not set, using original headlines');
+        logger.warn('[Energy News] GEMINI_API_KEY not set, using original headlines');
         items.push(...rawItems);
       }
     } catch (error) {
       // Gemini import or processing failed - use original headlines
-      console.error('[Energy News] Gemini processing failed:', error);
+      logger.error('[Energy News] Gemini processing failed:', error);
       items.push(...rawItems);
     }
 
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({
+    // Prepare response data
+    const responseData = {
       lastRefreshed: new Date().toISOString(),
       items
-    }));
+    };
+
+    // Save to cache for future requests
+    if (db) {
+      try {
+        await db.collection('cache').doc('energy-news').set({
+          timestamp: Date.now(),
+          data: responseData
+        });
+      } catch (cacheError) {
+        // If cache write fails, still return the data
+        logger.warn('[Energy News] Cache write failed:', cacheError.message);
+      }
+    }
+
+    res.writeHead(200, { 
+      'Content-Type': 'application/json',
+      'X-Cache': 'MISS'
+    });
+    return res.end(JSON.stringify(responseData));
   } catch (error) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ error: 'Failed to fetch energy news', message: error.message }));

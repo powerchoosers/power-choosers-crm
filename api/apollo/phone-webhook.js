@@ -6,6 +6,7 @@
  */
 
 import { cors } from './_utils.js';
+import logger from '../_logger.js';
 
 // In-memory store for phone numbers (personId -> phone data)
 // In production, you'd want to use Redis or Firebase
@@ -26,15 +27,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('[Apollo Phone Webhook] 📞 Received webhook request');
-    console.log('[Apollo Phone Webhook] Headers:', JSON.stringify(req.headers, null, 2));
-    console.log('[Apollo Phone Webhook] Body:', JSON.stringify(req.body, null, 2));
+    logger.log('[Apollo Phone Webhook] 📞 Received webhook request');
+    logger.log('[Apollo Phone Webhook] Headers:', JSON.stringify(req.headers, null, 2));
+    logger.log('[Apollo Phone Webhook] Body:', JSON.stringify(req.body, null, 2));
 
     // Apollo sends the phone data in the request body
     const phoneData = req.body;
 
     if (!phoneData || !phoneData.person) {
-      console.warn('[Apollo Phone Webhook] ⚠️ No person data in webhook payload');
+      logger.warn('[Apollo Phone Webhook] ⚠️ No person data in webhook payload');
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid webhook payload - no person data' }));
       return;
@@ -42,7 +43,7 @@ export default async function handler(req, res) {
 
     const personId = phoneData.person.id;
     if (!personId) {
-      console.warn('[Apollo Phone Webhook] ⚠️ No person ID in webhook payload');
+      logger.warn('[Apollo Phone Webhook] ⚠️ No person ID in webhook payload');
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid webhook payload - no person ID' }));
       return;
@@ -51,7 +52,7 @@ export default async function handler(req, res) {
     // Extract phone numbers
     const phones = phoneData.person.phone_numbers || [];
     
-    console.log(`[Apollo Phone Webhook] ✅ Storing ${phones.length} phone(s) for person: ${personId}`);
+    logger.log(`[Apollo Phone Webhook] ✅ Storing ${phones.length} phone(s) for person: ${personId}`);
     
     // Store in memory with timestamp
     phoneStore.set(personId, {
@@ -64,7 +65,7 @@ export default async function handler(req, res) {
     // Schedule cleanup
     setTimeout(() => {
       if (phoneStore.has(personId)) {
-        console.log(`[Apollo Phone Webhook] 🧹 Cleaning up expired phone data for: ${personId}`);
+        logger.log(`[Apollo Phone Webhook] 🧹 Cleaning up expired phone data for: ${personId}`);
         phoneStore.delete(personId);
       }
     }, PHONE_DATA_TTL);
@@ -79,7 +80,7 @@ export default async function handler(req, res) {
     }));
 
   } catch (error) {
-    console.error('[Apollo Phone Webhook] ❌ Error processing webhook:', error);
+    logger.error('[Apollo Phone Webhook] ❌ Error processing webhook:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Internal server error', 

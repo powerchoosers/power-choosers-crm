@@ -1,5 +1,6 @@
 import { admin, db } from './_firebase.js';
 import { cors } from './_cors.js';
+import logger from './_logger.js';
 
 export default async function handler(req, res) {
     if (cors(req, res)) return; // handle OPTIONS centrally
@@ -11,7 +12,7 @@ return;
     }
     
     try {
-        console.log('[Debug Calls] Fetching all calls from Firestore...');
+        logger.log('[Debug Calls] Fetching all calls from Firestore...');
         
         if (!db) {
             return res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -35,7 +36,7 @@ return;
             });
         });
         
-        console.log(`[Debug Calls] Found ${calls.length} calls in Firestore`);
+        logger.log(`[Debug Calls] Found ${calls.length} calls in Firestore`);
         
         // Count calls by source
         const sourceCounts = {};
@@ -44,7 +45,7 @@ return;
             sourceCounts[source] = (sourceCounts[source] || 0) + 1;
         });
         
-        console.log(`[Debug Calls] Source breakdown:`, sourceCounts);
+        logger.log(`[Debug Calls] Source breakdown:`, sourceCounts);
         
         return res.writeHead(200, { 'Content-Type': 'application/json' });
 res.end(JSON.stringify({
@@ -56,7 +57,7 @@ res.end(JSON.stringify({
 return;
         
     } catch (error) {
-        console.error('[Debug Calls] Error:', error);
+        logger.error('[Debug Calls] Error:', error);
         return res.writeHead(500, { 'Content-Type': 'application/json' });
 res.end(JSON.stringify({ 
             error: 'Failed to fetch calls',

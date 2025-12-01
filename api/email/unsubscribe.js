@@ -1,5 +1,6 @@
 import { db } from '../_firebase.js';
 import { cors } from '../_cors.js';
+import logger from '../_logger.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    console.log(`[Unsubscribe] Processing unsubscribe for: ${email}`);
+    logger.log(`[Unsubscribe] Processing unsubscribe for: ${email}`);
 
     // Add to suppressions collection
     await db.collection('suppressions').doc(email).set({
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
         suppressedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
-      console.log(`[Unsubscribe] Updated contact record for: ${email}`);
+      logger.log(`[Unsubscribe] Updated contact record for: ${email}`);
     }
 
     // Pause any active sequences for this contact
@@ -74,7 +75,7 @@ export default async function handler(req, res) {
       pausedSequences++;
     }
 
-    console.log(`[Unsubscribe] Successfully unsubscribed ${email}, paused ${pausedSequences} sequences`);
+    logger.log(`[Unsubscribe] Successfully unsubscribed ${email}, paused ${pausedSequences} sequences`);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -85,7 +86,7 @@ export default async function handler(req, res) {
     }));
 
   } catch (error) {
-    console.error('[Unsubscribe] Error:', error);
+    logger.error('[Unsubscribe] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Failed to process unsubscribe request',

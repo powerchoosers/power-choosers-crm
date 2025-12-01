@@ -1,6 +1,7 @@
 import twilio from 'twilio';
 import { isCallSid } from './_twilio-ids.js';
 import { cors } from './_cors.js';
+import logger from './_logger.js';
 
 export default async function handler(req, res) {
     if (cors(req, res)) return; // handle OPTIONS centrally
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
             return;
         }
         
-        console.log('[Process Call] Starting AI processing for:', callSid);
+        logger.log('[Process Call] Starting AI processing for:', callSid);
         
         // If no recording URL provided, try to get it from Twilio
         let finalRecordingUrl = recordingUrl;
@@ -31,14 +32,14 @@ export default async function handler(req, res) {
                 
                 if (recordings.length > 0) {
                     finalRecordingUrl = recordings[0].uri;
-                    console.log('[Process Call] Found recording URL:', finalRecordingUrl);
+                    logger.log('[Process Call] Found recording URL:', finalRecordingUrl);
                 } else {
                     res.writeHead(404, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'No recording found for this call' }));
                     return;
                 }
             } catch (error) {
-                console.error('[Process Call] Error fetching recording:', error);
+                logger.error('[Process Call] Error fetching recording:', error);
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Failed to fetch recording from Twilio' }));
                 return;
@@ -57,7 +58,7 @@ export default async function handler(req, res) {
         }));
         
     } catch (error) {
-        console.error('[Process Call] Error:', error);
+        logger.error('[Process Call] Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
             error: 'Failed to process call',
@@ -68,7 +69,7 @@ export default async function handler(req, res) {
 
 async function processRecordingWithTwilio(recordingUrl, callSid) {
     try {
-        console.log('[Process Call] Starting Twilio AI processing for:', callSid);
+        logger.log('[Process Call] Starting Twilio AI processing for:', callSid);
         
         // Initialize Twilio client
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -81,7 +82,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid) {
         }
         
         const recording = recordings[0];
-        console.log('[Process Call] Found recording:', recording.sid);
+        logger.log('[Process Call] Found recording:', recording.sid);
         
         // Use Twilio's native transcription service
         let transcript = '';
@@ -97,10 +98,10 @@ async function processRecordingWithTwilio(recordingUrl, callSid) {
             if (transcriptions.length > 0) {
                 const transcription = await client.transcriptions(transcriptions[0].sid).fetch();
                 transcript = transcription.transcriptionText || '';
-                console.log('[Process Call] Existing transcript found:', transcript.substring(0, 100) + '...');
+                logger.log('[Process Call] Existing transcript found:', transcript.substring(0, 100) + '...');
             } else {
                 // Create new transcription using Twilio's service
-                console.log('[Process Call] Creating Twilio transcription...');
+                logger.log('[Process Call] Creating Twilio transcription...');
                 const newTranscription = await client.transcriptions.create({
                     recordingSid: recording.sid,
                     languageCode: 'en-US'
@@ -111,7 +112,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid) {
                 
                 const completedTranscription = await client.transcriptions(newTranscription.sid).fetch();
                 transcript = completedTranscription.transcriptionText || '';
-                console.log('[Process Call] New transcript created:', transcript.substring(0, 100) + '...');
+                logger.log('[Process Call] New transcript created:', transcript.substring(0, 100) + '...');
             }
             
             // Generate AI insights using Twilio-based analysis
@@ -120,7 +121,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid) {
             }
             
         } catch (transcriptionError) {
-            console.error('[Process Call] Twilio transcription error:', transcriptionError);
+            logger.error('[Process Call] Twilio transcription error:', transcriptionError);
             // Fallback to basic insights
             aiInsights = {
                 summary: 'Call transcription processing in progress',
@@ -150,15 +151,15 @@ async function processRecordingWithTwilio(recordingUrl, callSid) {
                 })
             }).catch(() => {});
         } catch (e) {
-            console.warn('[Process Call] Failed posting transcript/insights to /api/calls:', e?.message);
+            logger.warn('[Process Call] Failed posting transcript/insights to /api/calls:', e?.message);
         }
 
-        console.log('[Process Call] Twilio AI processing completed for:', callSid);
+        logger.log('[Process Call] Twilio AI processing completed for:', callSid);
         
         return { transcript, aiInsights };
         
     } catch (error) {
-        console.error('[Process Call] Twilio AI processing failed:', error);
+        logger.error('[Process Call] Twilio AI processing failed:', error);
         throw error;
     }
 }
@@ -212,7 +213,7 @@ async function generateTwilioAIInsights(transcript) {
         };
         
     } catch (error) {
-        console.error('[Twilio AI] Insights generation error:', error);
+        logger.error('[Twilio AI] Insights generation error:', error);
         return {
             summary: 'AI analysis completed using Twilio services',
             sentiment: 'Neutral',

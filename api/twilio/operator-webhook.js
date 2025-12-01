@@ -1,4 +1,5 @@
 import { URLSearchParams } from 'url';
+import logger from '../_logger.js';
 
 function cors(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -130,7 +131,7 @@ export default async function handler(req, res){
     res.end(JSON.stringify({ ok: true }));
     return;
   } catch (e) {
-    console.error('[Operator Webhook] Error:', e);
+    logger.error('[Operator Webhook] Error:', e);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Failed to process operator webhook', details: e?.message }));
     return;

@@ -1,5 +1,6 @@
 import admin from 'firebase-admin';
 import { db } from './_firebase.js';
+import logger from './_logger.js';
 
 /**
  * API endpoint to handle task completion and create next sequence step
@@ -24,11 +25,11 @@ export default async function handler(req, res) {
         return;
     }
 
-    const logAlways = (msg) => console.log(`[CompleteSequenceTask] [${new Date().toISOString()}] ${msg}`);
+    const logAlways = (msg) => logger.log(`[CompleteSequenceTask] [${new Date().toISOString()}] ${msg}`);
 
     try {
         if (!db) {
-            console.error('[CompleteSequenceTask] Firestore not initialized');
+            logger.error('[CompleteSequenceTask] Firestore not initialized');
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 success: false,
@@ -247,7 +248,7 @@ export default async function handler(req, res) {
         }
 
     } catch (error) {
-        console.error('[CompleteSequenceTask] Error:', error);
+        logger.error('[CompleteSequenceTask] Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             success: false,

@@ -1,5 +1,6 @@
 import { db } from './_firebase.js';
 import * as IndustryDetection from './_industry-detection.js';
+import logger from './_logger.js';
 
 // ========== INDUSTRY DETECTION FUNCTIONS ==========
 
@@ -528,7 +529,7 @@ export default async function handler(req, res) {
 
   // Ensure Firebase Admin is initialized with credentials
   if (!db) {
-    console.error('[GenerateScheduledEmails] Firestore not initialized. Missing Firebase service account env vars.');
+    logger.error('[GenerateScheduledEmails] Firestore not initialized. Missing Firebase service account env vars.');
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: false,
@@ -539,7 +540,7 @@ export default async function handler(req, res) {
 
   // Check for Perplexity API key
   if (!process.env.PERPLEXITY_API_KEY) {
-    console.error('[GenerateScheduledEmails] CRITICAL: PERPLEXITY_API_KEY environment variable is not set!');
+    logger.error('[GenerateScheduledEmails] CRITICAL: PERPLEXITY_API_KEY environment variable is not set!');
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: false,
@@ -552,8 +553,8 @@ export default async function handler(req, res) {
     const { immediate = false, emailId = null } = req.body || {};
     
     if (!isProduction) {
-    console.log('[GenerateScheduledEmails] Starting generation process, immediate:', immediate, 'emailId:', emailId);
-      console.log('[GenerateScheduledEmails] Perplexity API key present:', !!process.env.PERPLEXITY_API_KEY);
+    logger.log('[GenerateScheduledEmails] Starting generation process, immediate:', immediate, 'emailId:', emailId);
+      logger.log('[GenerateScheduledEmails] Perplexity API key present:', !!process.env.PERPLEXITY_API_KEY);
     }
     
     let scheduledEmailsSnapshot;
@@ -605,7 +606,7 @@ export default async function handler(req, res) {
       };
       
       if (!isProduction) {
-        console.log('[GenerateScheduledEmails] Generating specific email:', emailId);
+        logger.log('[GenerateScheduledEmails] Generating specific email:', emailId);
       }
     } else {
       // Calculate time range for emails to generate
@@ -626,7 +627,7 @@ export default async function handler(req, res) {
       }
       
       if (!isProduction) {
-        console.log('[GenerateScheduledEmails] Time range:', { startTime, endTime, immediate, now });
+        logger.log('[GenerateScheduledEmails] Time range:', { startTime, endTime, immediate, now });
       }
       
       // Query for scheduled emails that need generation
@@ -644,7 +645,7 @@ export default async function handler(req, res) {
     
     if (scheduledEmailsSnapshot.empty) {
       if (!isProduction) {
-      console.log('[GenerateScheduledEmails] No emails to generate');
+      logger.log('[GenerateScheduledEmails] No emails to generate');
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
@@ -656,8 +657,8 @@ export default async function handler(req, res) {
     }
     
     if (!isProduction) {
-    console.log('[GenerateScheduledEmails] Found', scheduledEmailsSnapshot.size, 'emails to generate');
-      console.log('[GenerateScheduledEmails] Rate limit: 50 RPM (Tier 0) - processing in batches');
+    logger.log('[GenerateScheduledEmails] Found', scheduledEmailsSnapshot.size, 'emails to generate');
+      logger.log('[GenerateScheduledEmails] Rate limit: 50 RPM (Tier 0) - processing in batches');
     }
     
     let generatedCount = 0;
@@ -675,7 +676,7 @@ export default async function handler(req, res) {
       const batch = docs.slice(batchStart, batchEnd);
       
       if (!isProduction) {
-        console.log(`[GenerateScheduledEmails] Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}/${Math.ceil(docs.length / BATCH_SIZE)} (${batch.length} emails)`);
+        logger.log(`[GenerateScheduledEmails] Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}/${Math.ceil(docs.length / BATCH_SIZE)} (${batch.length} emails)`);
       }
       
       // Process batch in parallel (10 at a time)
@@ -683,7 +684,7 @@ export default async function handler(req, res) {
       try {
         const emailData = emailDoc.data();
         if (!isProduction) {
-        console.log('[GenerateScheduledEmails] Processing email:', emailDoc.id);
+        logger.log('[GenerateScheduledEmails] Processing email:', emailDoc.id);
         }
         
         // Get contact data for personalization
@@ -704,12 +705,12 @@ export default async function handler(req, res) {
                     accountData = accountDoc.data();
                   }
                 } catch (error) {
-                  console.warn('[GenerateScheduledEmails] Failed to get account data:', error);
+                  logger.warn('[GenerateScheduledEmails] Failed to get account data:', error);
                 }
               }
             }
           } catch (error) {
-            console.warn('[GenerateScheduledEmails] Failed to get contact data:', error);
+            logger.warn('[GenerateScheduledEmails] Failed to get contact data:', error);
           }
         }
         
@@ -735,7 +736,7 @@ export default async function handler(req, res) {
               };
             });
           } catch (error) {
-            console.warn('[GenerateScheduledEmails] Failed to get previous emails:', error);
+            logger.warn('[GenerateScheduledEmails] Failed to get previous emails:', error);
           }
         }
         
@@ -797,8 +798,8 @@ export default async function handler(req, res) {
         const toneOpener = selectRandomToneOpener(selectedAngle?.id);
         
         if (!isProduction) {
-          console.log(`[GenerateScheduledEmails] Selected angle: ${selectedAngle?.id}, tone: ${toneOpener}, industry: ${recipientIndustry}`);
-          console.log(`[GenerateScheduledEmails] Angle details:`, {
+          logger.log(`[GenerateScheduledEmails] Selected angle: ${selectedAngle?.id}, tone: ${toneOpener}, industry: ${recipientIndustry}`);
+          logger.log(`[GenerateScheduledEmails] Angle details:`, {
             id: selectedAngle?.id,
             openingTemplate: selectedAngle?.openingTemplate,
             primaryValue: selectedAngle?.primaryValue,
@@ -1014,7 +1015,7 @@ export default async function handler(req, res) {
         // Enhanced debug logging
         if (!isProduction) {
           const ctaType = perplexityResult.output?.cta_type || perplexityResult.metadata?.cta_type || 'unknown';
-          console.log(`[GenerateScheduledEmails] Generated email details:`, {
+          logger.log(`[GenerateScheduledEmails] Generated email details:`, {
             subject: generatedContent.subject,
             angleUsed: generatedContent.angle_used,
             toneOpener: toneOpener,
@@ -1051,11 +1052,11 @@ export default async function handler(req, res) {
         
         generatedCount++;
         if (!isProduction) {
-          console.log('[GenerateScheduledEmails] ✓ Generated email:', emailDoc.id);
+          logger.log('[GenerateScheduledEmails] ✓ Generated email:', emailDoc.id);
         }
         
       } catch (error) {
-        console.error('[GenerateScheduledEmails] Failed to generate email:', emailDoc.id, error);
+        logger.error('[GenerateScheduledEmails] Failed to generate email:', emailDoc.id, error);
         errors.push({
           emailId: emailDoc.id,
           error: error.message
@@ -1069,7 +1070,7 @@ export default async function handler(req, res) {
             generatedAt: Date.now()
           });
         } catch (updateError) {
-          console.error('[GenerateScheduledEmails] Failed to update error status:', updateError);
+          logger.error('[GenerateScheduledEmails] Failed to update error status:', updateError);
         }
       }
     })); // End Promise.all
@@ -1077,14 +1078,14 @@ export default async function handler(req, res) {
       // Add delay between batches to respect rate limit (except after last batch)
       if (batchEnd < docs.length) {
         if (!isProduction) {
-          console.log(`[GenerateScheduledEmails] Waiting ${DELAY_BETWEEN_BATCHES/1000}s before next batch to respect rate limit...`);
+          logger.log(`[GenerateScheduledEmails] Waiting ${DELAY_BETWEEN_BATCHES/1000}s before next batch to respect rate limit...`);
         }
         await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
       }
     } // End batch loop
     
     if (!isProduction) {
-    console.log('[GenerateScheduledEmails] Generation complete. Generated:', generatedCount, 'Errors:', errors.length);
+    logger.log('[GenerateScheduledEmails] Generation complete. Generated:', generatedCount, 'Errors:', errors.length);
     }
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1096,7 +1097,7 @@ export default async function handler(req, res) {
     }));
     
   } catch (error) {
-    console.error('[GenerateScheduledEmails] Fatal error:', error);
+    logger.error('[GenerateScheduledEmails] Fatal error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: false,

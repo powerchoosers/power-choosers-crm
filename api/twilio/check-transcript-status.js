@@ -1,4 +1,5 @@
 import twilio from 'twilio';
+import logger from '../_logger.js';
 
 function cors(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -91,7 +92,7 @@ export default async function handler(req, res) {
           // Summary might not be available
         }
       } catch (e) {
-        console.warn('[Check Status] Error fetching transcript details:', e.message);
+        logger.warn('[Check Status] Error fetching transcript details:', e.message);
       }
     }
 
@@ -99,7 +100,7 @@ export default async function handler(req, res) {
     res.end(JSON.stringify(result));
     
   } catch (e) {
-    console.error('[Check Status] Error:', e);
+    logger.error('[Check Status] Error:', e);
     const twilioCode = e && (e.code || e.status || e.statusCode);
     let friendly = 'Failed to check transcript status';
     if (twilioCode === 20404) friendly = 'Transcript not found';

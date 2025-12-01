@@ -3,6 +3,7 @@
 
 import { cors } from '../../_cors.js';
 import { db, admin } from '../../_firebase.js';
+import logger from '../../_logger.js';
 
 // In-memory fallback store (for local/dev when Firestore isn't configured)
 const memoryStore = new Map();
@@ -279,11 +280,11 @@ export default async function handler(req, res) {
       }));
 
   } catch (error) {
-    console.error('[Account Calls API] Caught unhandled error:', error);
+    logger.error('[Account Calls API] Caught unhandled error:', error);
     if (error instanceof Error) { // Ensure it's an Error object
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
+      logger.error('Error name:', error.name);
+      logger.error('Error message:', error.message);
+      logger.error('Error stack:', error.stack);
     }
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Internal server error', details: error.message })); // Expose message to client for debugging
