@@ -222,6 +222,13 @@ window.SharedCIProcessor = (function() {
                 });
             }
 
+            // Dispatch event to notify pages that insights are ready
+            try {
+                document.dispatchEvent(new CustomEvent('pc:call-insights-ready', {
+                    detail: { callSid, call, context }
+                }));
+            } catch (_) { }
+
             if (onSuccess) onSuccess(call);
             if (onComplete) onComplete(call, true);
         };

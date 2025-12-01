@@ -124,12 +124,13 @@ class LiveCallInsights {
     }
 
     startPolling() {
-        // Poll for updates every 3 seconds
+        // OPTIMIZED: Increased from 3 to 5 seconds to reduce Cloud Run costs
+        // Live insights don't need sub-5-second updates for good UX
         this.pollingInterval = setInterval(() => {
             if (this.isActive && this.currentCallSid) {
                 this.fetchLiveInsights();
             }
-        }, 3000);
+        }, 5000); // 5 seconds (increased from 3 seconds)
     }
 
     async fetchLiveInsights() {

@@ -27,10 +27,11 @@ class TaskNotificationManager {
     }
 
     startMonitoring() {
-        // Check for notifications every minute
+        // OPTIMIZED: Increased from 1 to 2 minutes to reduce Firestore query costs
+        // Task notifications don't need minute-by-minute updates
         this.checkInterval = setInterval(() => {
             this.checkNotifications();
-        }, 60000); // 1 minute
+        }, 2 * 60 * 1000); // 2 minutes (increased from 1 minute)
         
         // Initial check
         this.checkNotifications();

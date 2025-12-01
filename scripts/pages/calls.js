@@ -4080,6 +4080,76 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
     });
     document._callsModuleCallLoggedBound = true;
   }
+  
+  // Listen for call insights ready (after transcript processing completes)
+  if (!document._callsModuleInsightsReadyBound) {
+    document.addEventListener('pc:call-insights-ready', async (e) => {
+      try {
+        const { callSid, call } = e.detail || {};
+        console.log('[Calls] Call insights ready event received:', callSid);
+        
+        if (!callSid || !call) return;
+        
+        // Update the call in our local state.data array
+        if (Array.isArray(state.data)) {
+          const idMatch = String(callSid);
+          let found = false;
+          state.data = state.data.map(x => {
+            const xid = String(x.id || x.twilioSid || x.callSid || '');
+            if (xid === idMatch) {
+              found = true;
+              return { 
+                ...x, 
+                transcript: call.transcript || x.transcript, 
+                formattedTranscript: call.formattedTranscript || x.formattedTranscript, 
+                aiInsights: call.aiInsights || x.aiInsights, 
+                conversationalIntelligence: call.conversationalIntelligence || x.conversationalIntelligence 
+              };
+            }
+            return x;
+          });
+          // If call wasn't in the list, add it at the beginning
+          if (!found) {
+            state.data.unshift(call);
+          }
+          
+          // Also update filtered array
+          if (Array.isArray(state.filtered)) {
+            state.filtered = state.filtered.map(x => {
+              const xid = String(x.id || x.twilioSid || x.callSid || '');
+              if (xid === idMatch) {
+                return { 
+                  ...x, 
+                  transcript: call.transcript || x.transcript, 
+                  formattedTranscript: call.formattedTranscript || x.formattedTranscript, 
+                  aiInsights: call.aiInsights || x.aiInsights, 
+                  conversationalIntelligence: call.conversationalIntelligence || x.conversationalIntelligence 
+                };
+              }
+              return x;
+            });
+          }
+          
+          // Re-render the calls list
+          try { render(); } catch (_) { }
+        }
+        
+        // Update background loader cache
+        if (window.BackgroundCallsLoader && call) {
+          const bgData = window.BackgroundCallsLoader.getCallsData();
+          if (bgData && Array.isArray(bgData)) {
+            const idx = bgData.findIndex(x => String(x.id || x.twilioSid || x.callSid || '') === callSid);
+            if (idx >= 0) {
+              bgData[idx] = { ...bgData[idx], ...call };
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Calls] Error handling pc:call-insights-ready event:', err);
+      }
+    });
+    document._callsModuleInsightsReadyBound = true;
+  }
 })();
 
   function parseTimelineToTask(text){

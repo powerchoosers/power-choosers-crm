@@ -2845,6 +2845,38 @@
           onAnyContactCallActivity();
         }
       });
+      
+      // Listen for call insights ready (after transcript processing completes)
+      document.addEventListener('pc:call-insights-ready', (event) => {
+        const { callSid, call } = event.detail || {};
+        console.log('[ContactDetail] Call insights ready:', callSid);
+        
+        // Update the call in our local cache
+        if (Array.isArray(state._rcCalls) && callSid) {
+          const idMatch = String(callSid);
+          let found = false;
+          state._rcCalls = state._rcCalls.map(x => {
+            const xid = String(x.id || x.twilioSid || x.callSid || '');
+            if (xid === idMatch) {
+              found = true;
+              return { 
+                ...x, 
+                transcript: call?.transcript || x.transcript, 
+                formattedTranscript: call?.formattedTranscript || x.formattedTranscript, 
+                aiInsights: call?.aiInsights || x.aiInsights, 
+                conversationalIntelligence: call?.conversationalIntelligence || x.conversationalIntelligence 
+              };
+            }
+            return x;
+          });
+          // If call wasn't in the list, add it at the beginning
+          if (!found && call) {
+            state._rcCalls.unshift(call);
+          }
+          // Re-render the recent calls list
+          try { renderRecentCallsPage(); } catch (_) { }
+        }
+      });
 
       // Track scroll state to defer refresh
       try {
@@ -5512,17 +5544,33 @@
         // Update state cache so future clicks render full insights
         if (Array.isArray(state._rcCalls)) {
           const idMatch = String(callSid);
+          let found = false;
           state._rcCalls = state._rcCalls.map(x => {
             const xid = String(x.id || x.twilioSid || x.callSid || '');
             if (xid === idMatch) {
+              found = true;
               return { ...x, transcript: call.transcript || x.transcript, formattedTranscript: call.formattedTranscript || x.formattedTranscript, aiInsights: call.aiInsights || x.aiInsights, conversationalIntelligence: call.conversationalIntelligence || x.conversationalIntelligence };
             }
             return x;
           });
+          // If call wasn't in the list, add it at the beginning
+          if (!found && call) {
+            state._rcCalls.unshift(call);
+          }
         }
       } catch (_) { }
       try { btn.innerHTML = svgEye(); btn.classList.remove('processing', 'not-processed'); btn.disabled = false; btn.title = 'View AI insights'; } catch (_) { }
       try { if (window.ToastManager) { window.ToastManager.showToast({ type: 'success', title: 'Insights Ready', message: 'Click the eye icon to view call insights.' }); } } catch (_) { }
+      
+      // Re-render the recent calls list to show updated insights
+      try { renderRecentCallsPage(); } catch (_) { }
+      
+      // Also dispatch an event to notify other components
+      try {
+        document.dispatchEvent(new CustomEvent('pc:call-insights-ready', {
+          detail: { callSid, call }
+        }));
+      } catch (_) { }
     };
 
     // Firebase real-time listener
