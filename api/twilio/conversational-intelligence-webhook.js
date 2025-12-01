@@ -416,18 +416,37 @@ export default async function handler(req, res) {
                 }
                 
                 const agentChNum = Number(channelRoleMap.agentChannel || '1');
-                sentences = sentencesResponse.map(s => {
-                    // Handle edge cases for channel values (per Twilio guidance)
-                    let channel = s.channel;
+                const customerChNum = Number(channelRoleMap.customerChannel || '2');
+                let channelWarningsLogged = 0;
+                
+                sentences = sentencesResponse.map((s, idx) => {
+                    // Try multiple possible channel field names (Twilio API variations)
+                    let channel = s.channel ?? s.channelNumber ?? s.channel_id ?? s.channelIndex ?? s.mediaChannel;
                     let channelNum = null;
+                    
+                    // Also check for participant role which may indicate speaker
+                    const participantRole = s.participantRole || s.participant?.role || s.role || '';
                     
                     // Normalize channel values defensively
                     if (channel === null || channel === undefined) {
-                        console.warn('[Conversational Intelligence Webhook] Null/undefined channel detected:', {
-                            sentence: s.text?.substring(0, 50) + '...',
-                            originalChannel: channel
-                        });
-                        channelNum = 1; // Default fallback
+                        // Try to infer from participant role if channel is missing
+                        if (participantRole.toLowerCase() === 'agent') {
+                            channelNum = agentChNum;
+                        } else if (participantRole.toLowerCase() === 'customer') {
+                            channelNum = customerChNum;
+                        } else {
+                            // Only log first few warnings to avoid spam
+                            if (channelWarningsLogged < 3) {
+                                console.warn('[Conversational Intelligence Webhook] Null/undefined channel detected:', {
+                                    sentenceIndex: idx,
+                                    sentence: s.text?.substring(0, 50) + '...',
+                                    participantRole,
+                                    availableFields: Object.keys(s).join(', ')
+                                });
+                                channelWarningsLogged++;
+                            }
+                            channelNum = 1; // Default fallback
+                        }
                     } else if (typeof channel === 'string') {
                         // Handle 'A'/'B' or other string representations
                         if (channel.toLowerCase() === 'a') channelNum = 1;
@@ -437,13 +456,12 @@ export default async function handler(req, res) {
                         channelNum = Number(channel) || 1;
                     }
                     
-                    // Log unexpected channel values for investigation
-                    if (channelNum !== 1 && channelNum !== 2) {
-                        console.warn('[Conversational Intelligence Webhook] Unexpected channel value:', {
-                            originalChannel: channel,
-                            normalizedChannel: channelNum,
-                            sentence: s.text?.substring(0, 50) + '...'
-                        });
+                    // Determine speaker - use participant role if available, otherwise channel mapping
+                    let speaker = 'Agent';
+                    if (participantRole) {
+                        speaker = participantRole.toLowerCase() === 'customer' ? 'Customer' : 'Agent';
+                    } else {
+                        speaker = channelNum === agentChNum ? 'Agent' : 'Customer';
                     }
                     
                     return {
@@ -453,8 +471,8 @@ export default async function handler(req, res) {
                         endTime: s.endTime,
                         channel: channel,
                         channelNum: channelNum,
-                        // Map channel to speaker role using computed per-call mapping
-                        speaker: channelNum === agentChNum ? 'Agent' : 'Customer'
+                        participantRole: participantRole,
+                        speaker: speaker
                     };
                 });
                 
@@ -479,7 +497,7 @@ export default async function handler(req, res) {
                 console.error('[Conversational Intelligence Webhook] Error fetching sentences:', error);
             }
             
-            // Get operator results
+            // Get operator results (includes Twilio-generated summary)
             let operatorResults = null;
             try {
                 const resultsResponse = await client.intelligence.v2
@@ -489,10 +507,18 @@ export default async function handler(req, res) {
                 if (resultsResponse.length > 0) {
                     operatorResults = resultsResponse.map(r => ({
                         name: r.name,
+                        operatorType: r.operatorType,
                         results: r.results,
-                        confidence: r.confidence
+                        confidence: r.confidence,
+                        // Include textGenerationResults for summary extraction
+                        textGenerationResults: r.textGenerationResults
                     }));
-                    console.log(`[Conversational Intelligence Webhook] Retrieved ${resultsResponse.length} operator results`);
+                    console.log(`[Conversational Intelligence Webhook] Retrieved ${resultsResponse.length} operator results:`, 
+                        operatorResults.map(op => ({ 
+                            name: op.name, 
+                            type: op.operatorType,
+                            hasTextGeneration: !!op.textGenerationResults 
+                        })));
                 }
             } catch (error) {
                 console.warn('[Conversational Intelligence Webhook] No operator results available:', error.message);
@@ -522,7 +548,18 @@ export default async function handler(req, res) {
                   transcriptSid: TranscriptSid,
                   status: transcript.status,
                   sentenceCount: Array.isArray(sentences) ? sentences.length : 0,
-                  channelRoleMap
+                  channelRoleMap,
+                  // Include sentences with channel info for frontend speaker mapping
+                  sentences: sentences.map(s => ({
+                      text: s.text || '',
+                      startTime: s.startTime,
+                      endTime: s.endTime,
+                      channel: s.channel,
+                      channelNum: s.channelNum,
+                      speaker: s.speaker,
+                      participantRole: s.participantRole || '',
+                      confidence: s.confidence
+                  }))
                 };
             }
             
@@ -664,17 +701,37 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
             decisionMakers.push(...names.slice(0, 3)); // Limit to 3 names
         }
         
-        // Use operator results if available
+        // Use operator results if available - extract Twilio-generated summary
         let enhancedInsights = {};
+        let twilioSummary = '';
         if (operatorResults && operatorResults.length > 0) {
+            // Look for the summary in operator results
+            for (const op of operatorResults) {
+                // Check for text_generation type or summary-related names
+                if (op.operatorType === 'text_generation' || 
+                    ['summary', 'conversation_summary', 'call_summary'].includes(op.name?.toLowerCase())) {
+                    // Check for textGenerationResults field (where Twilio puts the summary)
+                    const summaryText = op.textGenerationResults || op.results?.textGenerationResults || op.results?.summary;
+                    if (summaryText) {
+                        twilioSummary = String(summaryText).trim();
+                        console.log('[CI Webhook] Found Twilio summary from operator:', op.name, 'length:', twilioSummary.length);
+                        break;
+                    }
+                }
+            }
+            
             enhancedInsights = {
                 operatorAnalysis: operatorResults,
-                confidence: operatorResults.reduce((acc, r) => acc + (r.confidence || 0), 0) / operatorResults.length
+                confidence: operatorResults.reduce((acc, r) => acc + (r.confidence || 0), 0) / operatorResults.length,
+                hasTwilioSummary: !!twilioSummary
             };
         }
         
+        // Use Twilio-generated summary if available, otherwise generate one
+        const generatedSummary = `Advanced AI analysis of ${wordCount}-word conversation. ${sentiment} sentiment detected (${(sentimentScore * 100).toFixed(1)}% confidence). ${detectedTopics.length > 0 ? 'Key topics: ' + detectedTopics.map(t => t.topic).join(', ') : 'General business discussion.'}`;
+        
         return {
-            summary: `Advanced AI analysis of ${wordCount}-word conversation. ${sentiment} sentiment detected (${(sentimentScore * 100).toFixed(1)}% confidence). ${detectedTopics.length > 0 ? 'Key topics: ' + detectedTopics.map(t => t.topic).join(', ') : 'General business discussion.'}`,
+            summary: twilioSummary || generatedSummary,
             sentiment: sentiment,
             sentimentScore: sentimentScore,
             keyTopics: detectedTopics.length > 0 ? detectedTopics : [{ topic: 'General business discussion', confidence: 0.5, keywords: [] }],
