@@ -337,19 +337,22 @@ class CacheManager {
           console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore (scoped)`);
           return data;
         } else {
-          // Admin: use unfiltered query
-          const snapshot = await window.firebaseDB.collection(collection).get();
+          // OPTIMIZED: Admin query with limit to prevent loading entire collection
+          // Background loaders handle pagination, but this provides safety for direct calls
+          // 5000 is reasonable for most collections while keeping costs down
+          const snapshot = await window.firebaseDB.collection(collection).limit(5000).get();
           const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore (admin)`);
+          console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore (admin, limited)`);
           return data;
         }
       }
 
-      // For other collections, use standard query (admin only)
+      // For other collections, use standard query (admin only) with limit
       if (window.currentUserRole === 'admin') {
-        const snapshot = await window.firebaseDB.collection(collection).get();
+        // OPTIMIZED: Add limit to prevent loading entire collection
+        const snapshot = await window.firebaseDB.collection(collection).limit(5000).get();
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore`);
+        console.log(`[CacheManager] Fetched ${data.length} ${collection} from Firestore (admin, limited)`);
         return data;
       } else {
         console.warn(`[CacheManager] Non-admin access denied for collection: ${collection}`);

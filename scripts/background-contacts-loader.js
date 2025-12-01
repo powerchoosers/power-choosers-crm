@@ -202,26 +202,41 @@
     }
   }
   
-  // Get total count from Firestore without loading all records
+  // OPTIMIZED: Get total count using Firestore aggregation (no document loads!)
+  // This reduces Firestore reads from thousands to just 1-2 per count query
   async function getTotalCount() {
-    if (!window.firebaseDB) return 0;
+    if (!window.firebaseDB) return contactsData.length;
     
     try {
       const email = window.currentUserEmail || '';
       if (window.currentUserRole !== 'admin' && email) {
-        // Non-admin: count only owned/assigned contacts
-        const [ownedSnap, assignedSnap] = await Promise.all([
-          window.firebaseDB.collection('contacts').where('ownerId','==',email).get(),
-          window.firebaseDB.collection('contacts').where('assignedTo','==',email).get()
-        ]);
-        const map = new Map();
-        ownedSnap.forEach(d=>map.set(d.id, d.id));
-        assignedSnap.forEach(d=>map.set(d.id, d.id));
-        return map.size;
+        // Non-admin: use aggregation count for owned/assigned contacts
+        // Note: Firestore count() requires SDK v9+ or web modular API
+        try {
+          const [ownedCount, assignedCount] = await Promise.all([
+            window.firebaseDB.collection('contacts').where('ownerId','==',email).count().get(),
+            window.firebaseDB.collection('contacts').where('assignedTo','==',email).count().get()
+          ]);
+          // Aggregation returns { data: () => { count: number } }
+          const owned = ownedCount.data().count || 0;
+          const assigned = assignedCount.data().count || 0;
+          // Note: This may double-count if same contact has both fields, but close enough
+          // For exact count, we'd need to load IDs, but this is much cheaper
+          return Math.max(owned, assigned, contactsData.length);
+        } catch (aggError) {
+          // Fallback to loaded count if aggregation not supported
+          console.warn('[BackgroundContactsLoader] Aggregation not supported, using loaded count');
+          return contactsData.length;
+        }
       } else {
-        // Admin: count all contacts
-        const snapshot = await window.firebaseDB.collection('contacts').get();
-        return snapshot.size;
+        // Admin: use aggregation count for all contacts
+        try {
+          const countSnap = await window.firebaseDB.collection('contacts').count().get();
+          return countSnap.data().count || contactsData.length;
+        } catch (aggError) {
+          console.warn('[BackgroundContactsLoader] Aggregation not supported, using loaded count');
+          return contactsData.length;
+        }
       }
     } catch (error) {
       console.error('[BackgroundContactsLoader] Failed to get total count:', error);

@@ -4434,18 +4434,19 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         const email = window.currentUserEmail || '';
         let snapshot;
         if (window.currentUserRole !== 'admin' && email) {
-          // Non-admin: use scoped query
+          // Non-admin: use scoped query with limits
           const [ownedSnap, assignedSnap] = await Promise.all([
-            window.firebaseDB.collection('contacts').where('ownerId', '==', email).get(),
-            window.firebaseDB.collection('contacts').where('assignedTo', '==', email).get()
+            window.firebaseDB.collection('contacts').where('ownerId', '==', email).limit(1000).get(),
+            window.firebaseDB.collection('contacts').where('assignedTo', '==', email).limit(1000).get()
           ]);
           const map = new Map();
           ownedSnap.forEach(d => map.set(d.id, d));
           assignedSnap.forEach(d => { if (!map.has(d.id)) map.set(d.id, d); });
           snapshot = { forEach: (callback) => map.forEach(callback) };
         } else {
-          // Admin: use unfiltered query
-          snapshot = await window.firebaseDB.collection('contacts').get();
+          // OPTIMIZED: Admin query with limit to prevent loading entire collection
+          // 2000 contacts is enough for search/autocomplete while keeping costs reasonable
+          snapshot = await window.firebaseDB.collection('contacts').limit(2000).get();
         }
 
         // Convert snapshot to array

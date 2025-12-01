@@ -217,20 +217,31 @@
     }
   }
   
-  // Get total count from Firestore without loading all records
+  // OPTIMIZED: Get total count using Firestore aggregation (no document loads!)
+  // This reduces Firestore reads from thousands to just 1-2 per count query
   async function getTotalCount() {
-    if (!window.firebaseDB) return 0;
+    if (!window.firebaseDB) return sequencesData.length;
     
     try {
       const email = window.currentUserEmail || '';
       if (window.currentUserRole !== 'admin' && email) {
-        // Non-admin: count only owned sequences
-        const snapshot = await window.firebaseDB.collection('sequences').where('ownerId','==',email).get();
-        return snapshot.size;
+        // Non-admin: use aggregation count for owned sequences
+        try {
+          const countSnap = await window.firebaseDB.collection('sequences').where('ownerId','==',email).count().get();
+          return countSnap.data().count || sequencesData.length;
+        } catch (aggError) {
+          console.warn('[BackgroundSequencesLoader] Aggregation not supported, using loaded count');
+          return sequencesData.length;
+        }
       } else {
-        // Admin: count all sequences
-        const snapshot = await window.firebaseDB.collection('sequences').get();
-        return snapshot.size;
+        // Admin: use aggregation count for all sequences
+        try {
+          const countSnap = await window.firebaseDB.collection('sequences').count().get();
+          return countSnap.data().count || sequencesData.length;
+        } catch (aggError) {
+          console.warn('[BackgroundSequencesLoader] Aggregation not supported, using loaded count');
+          return sequencesData.length;
+        }
       }
     } catch (error) {
       console.error('[BackgroundSequencesLoader] Failed to get total count:', error);

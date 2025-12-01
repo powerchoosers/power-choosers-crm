@@ -202,26 +202,36 @@
     }
   }
 
-  // Get total count from Firestore without loading all records
+  // OPTIMIZED: Get total count using Firestore aggregation (no document loads!)
+  // This reduces Firestore reads from thousands to just 1-2 per count query
   async function getTotalCount() {
-    if (!window.firebaseDB) return 0;
+    if (!window.firebaseDB) return tasksData.length;
 
     try {
       const email = window.currentUserEmail || '';
       if (window.currentUserRole !== 'admin' && email) {
-        // Non-admin: count only owned/assigned tasks
-        const [ownedSnap, assignedSnap] = await Promise.all([
-          window.firebaseDB.collection('tasks').where('ownerId', '==', email).get(),
-          window.firebaseDB.collection('tasks').where('assignedTo', '==', email).get()
-        ]);
-        const map = new Map();
-        ownedSnap.forEach(d => map.set(d.id, d.id));
-        assignedSnap.forEach(d => map.set(d.id, d.id));
-        return map.size;
+        // Non-admin: use aggregation count for owned/assigned tasks
+        try {
+          const [ownedCount, assignedCount] = await Promise.all([
+            window.firebaseDB.collection('tasks').where('ownerId', '==', email).count().get(),
+            window.firebaseDB.collection('tasks').where('assignedTo', '==', email).count().get()
+          ]);
+          const owned = ownedCount.data().count || 0;
+          const assigned = assignedCount.data().count || 0;
+          return Math.max(owned, assigned, tasksData.length);
+        } catch (aggError) {
+          console.warn('[BackgroundTasksLoader] Aggregation not supported, using loaded count');
+          return tasksData.length;
+        }
       } else {
-        // Admin: count all tasks
-        const snapshot = await window.firebaseDB.collection('tasks').get();
-        return snapshot.size;
+        // Admin: use aggregation count for all tasks
+        try {
+          const countSnap = await window.firebaseDB.collection('tasks').count().get();
+          return countSnap.data().count || tasksData.length;
+        } catch (aggError) {
+          console.warn('[BackgroundTasksLoader] Aggregation not supported, using loaded count');
+          return tasksData.length;
+        }
       }
     } catch (error) {
       console.error('[BackgroundTasksLoader] Failed to get total count:', error);

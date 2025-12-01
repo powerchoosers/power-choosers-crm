@@ -4019,18 +4019,19 @@ class PowerChoosersCRM {
                 console.log('Fetching existing contacts for duplicate detection...');
                 const email = window.currentUserEmail || '';
                 if (window.currentUserRole !== 'admin' && email) {
-                    // Non-admin: use scoped query
+                    // Non-admin: use scoped query with limits
                     const [ownedSnap, assignedSnap] = await Promise.all([
-                        db.collection('contacts').where('ownerId','==',email).get(),
-                        db.collection('contacts').where('assignedTo','==',email).get()
+                        db.collection('contacts').where('ownerId','==',email).limit(2000).get(),
+                        db.collection('contacts').where('assignedTo','==',email).limit(2000).get()
                     ]);
                     const map = new Map();
                     ownedSnap.forEach(d=>map.set(d.id,{ id:d.id, ...d.data() }));
                     assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{ id:d.id, ...d.data() }); });
                     existingContacts = Array.from(map.values());
                 } else {
-                    // Admin: use unfiltered query
-                    const allContactsQuery = await db.collection('contacts').get();
+                    // OPTIMIZED: Admin query with limit to prevent loading entire collection
+                    // 5000 contacts is enough for duplicate detection while keeping costs reasonable
+                    const allContactsQuery = await db.collection('contacts').limit(5000).get();
                     existingContacts = allContactsQuery.docs.map(doc => ({
                         id: doc.id,
                         ...doc.data()
