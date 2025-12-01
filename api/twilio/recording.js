@@ -2,6 +2,8 @@ import twilio from 'twilio';
 import { resolveToCallSid, isCallSid } from '../_twilio-ids.js';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
+import { db } from '../_firebase.js';
+import crypto from 'crypto';
 
 function normalizeBody(req) {
     // Supports: JS object, JSON string, x-www-form-urlencoded string
@@ -1033,7 +1035,31 @@ async function generateTwilioAIInsights(transcript) {
 }
 
 async function generateGeminiAIInsights(transcript) {
-    // Uses @google/generative-ai with GEMINI_API_KEY
+    // OPTIMIZED: Cache Gemini AI insights in Firestore to reduce API costs
+    // Cache key: hash of transcript (same transcript = same insights)
+    const transcriptHash = crypto.createHash('sha256').update(transcript).digest('hex');
+    const cacheKey = `gemini-insights-${transcriptHash}`;
+    const CACHE_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days (transcripts don't change)
+    
+    // Check Firestore cache first
+    if (db) {
+        try {
+            const cacheDoc = await db.collection('aiCache').doc(cacheKey).get();
+            if (cacheDoc.exists) {
+                const cacheData = cacheDoc.data();
+                const cacheAge = Date.now() - (cacheData.cachedAt || 0);
+                
+                if (cacheAge < CACHE_DURATION_MS && cacheData.insights) {
+                    logger.log('[Gemini AI] Using cached insights (age:', Math.round(cacheAge / 1000 / 60), 'minutes)');
+                    return cacheData.insights;
+                }
+            }
+        } catch (cacheError) {
+            logger.warn('[Gemini AI] Cache read error (continuing with API call):', cacheError.message);
+        }
+    }
+    
+    // Cache miss - call Gemini API
     const { GoogleGenerativeAI } = await import('@google/generative-ai');
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error('Missing GEMINI_API_KEY');
@@ -1058,10 +1084,11 @@ Provide a JSON response with:
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
+    let insights;
     try {
-        return JSON.parse(text.replace(/```json|```/g, ''));
+        insights = JSON.parse(text.replace(/```json|```/g, ''));
     } catch {
-        return {
+        insights = {
             summary: text.substring(0, 300),
             sentiment: 'Neutral',
             keyTopics: ['Call analysis'],
@@ -1072,6 +1099,20 @@ Provide a JSON response with:
             decisionMakers: []
         };
     }
+    
+    // Save to Firestore cache (async, don't wait)
+    if (db) {
+        db.collection('aiCache').doc(cacheKey).set({
+            insights,
+            cachedAt: Date.now(),
+            source: 'gemini',
+            transcriptLength: transcript.length
+        }).catch(err => {
+            logger.warn('[Gemini AI] Cache write error (non-critical):', err.message);
+        });
+    }
+    
+    return insights;
 }
 
 // Export call store for API access
