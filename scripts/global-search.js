@@ -450,22 +450,32 @@
 
   async function searchPeople(query) {
     console.log('[Global Search] searchPeople called with query:', query);
-    if (!window.firebaseDB) {
-      console.log('[Global Search] Firebase DB not available');
+    
+    // OPTIMIZED: Use cached data from background loader instead of loading entire collection
+    // This saves thousands of Firestore reads per search
+    let people = [];
+    if (window.BackgroundContactsLoader && typeof window.BackgroundContactsLoader.getContactsData === 'function') {
+      people = window.BackgroundContactsLoader.getContactsData() || [];
+      console.log('[Global Search] Using cached contacts:', people.length);
+    } else if (window.firebaseDB) {
+      // Fallback to Firestore only if background loader not available
+      console.log('[Global Search] Fallback: Fetching contacts from Firebase...');
+      const snapshot = await window.firebaseDB.collection('contacts').limit(500).get();
+      snapshot.forEach(doc => people.push({ id: doc.id, ...doc.data() }));
+    }
+    
+    if (people.length === 0) {
+      console.log('[Global Search] No contacts available');
       return [];
     }
 
     try {
-      console.log('[Global Search] Fetching contacts from Firebase...');
-      const snapshot = await window.firebaseDB.collection('contacts')
-        .get();
       const results = [];
-      console.log('[Global Search] Contacts snapshot size:', snapshot.size);
+      console.log('[Global Search] Searching', people.length, 'contacts');
 
       const qDigits = String(query || '').replace(/\D/g, '');
       const isPhoneSearch = qDigits.length >= 7; // handle most common formats/partials
-      snapshot.forEach(doc => {
-        const person = { id: doc.id, ...doc.data() };
+      for (const person of people) {
         // Build all possible name/title combos for robust matching
         const nameFields = [
           person.firstName || '',
@@ -507,8 +517,9 @@
               : [person.title || person.jobTitle, person.company || person.companyName].filter(Boolean).join(' • '),
             data: person
           });
+          if (results.length >= 5) break; // Early exit once we have enough results
         }
-      });
+      }
 
       return results.slice(0, 5); // Limit results
     } catch (error) {
@@ -518,20 +529,30 @@
   }
 
   async function searchAccounts(query) {
-    if (!window.firebaseDB) {
-      console.log('Firebase DB not available for accounts');
+    // OPTIMIZED: Use cached data from background loader instead of loading entire collection
+    // This saves thousands of Firestore reads per search
+    let accounts = [];
+    if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+      accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+      console.log('[Global Search] Using cached accounts:', accounts.length);
+    } else if (window.firebaseDB) {
+      // Fallback to Firestore only if background loader not available
+      console.log('[Global Search] Fallback: Fetching accounts from Firebase...');
+      const snapshot = await window.firebaseDB.collection('accounts').limit(500).get();
+      snapshot.forEach(doc => accounts.push({ id: doc.id, ...doc.data() }));
+    }
+    
+    if (accounts.length === 0) {
+      console.log('No accounts available for search');
       return [];
     }
 
     try {
-      const snapshot = await window.firebaseDB.collection('accounts')
-        .get();
       const results = [];
 
       const qDigits = String(query || '').replace(/\D/g, '');
       const isPhoneSearch = qDigits.length >= 7;
-      snapshot.forEach(doc => {
-        const account = { id: doc.id, ...doc.data() };
+      for (const account of accounts) {
         
         // Handle special search cases
         const isYearSearch = /^\d{4}$/.test(query);
@@ -598,8 +619,9 @@
             subtitle,
             data: account
           });
+          if (results.length >= 5) break; // Early exit once we have enough results
         }
-      });
+      }
 
       return results.slice(0, 5);
     } catch (error) {
@@ -609,15 +631,23 @@
   }
 
   async function searchSequences(query) {
-    if (!window.firebaseDB) return [];
+    // OPTIMIZED: Use cached data from background loader instead of loading entire collection
+    let sequences = [];
+    if (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function') {
+      sequences = window.BackgroundSequencesLoader.getSequencesData() || [];
+      console.log('[Global Search] Using cached sequences:', sequences.length);
+    } else if (window.firebaseDB) {
+      // Fallback to Firestore only if background loader not available
+      const snapshot = await window.firebaseDB.collection('sequences').limit(200).get();
+      snapshot.forEach(doc => sequences.push({ id: doc.id, ...doc.data() }));
+    }
+    
+    if (sequences.length === 0) return [];
 
     try {
-      const snapshot = await window.firebaseDB.collection('sequences')
-        .get();
       const results = [];
 
-      snapshot.forEach(doc => {
-        const sequence = { id: doc.id, ...doc.data() };
+      for (const sequence of sequences) {
         
         const searchableText = [
           sequence.name || '',
@@ -634,8 +664,9 @@
             subtitle: `Created by ${sequence.createdBy || 'Unknown'} • ${sequence.active || 0} active`,
             data: sequence
           });
+          if (results.length >= 5) break; // Early exit once we have enough results
         }
-      });
+      }
 
       return results.slice(0, 5);
     } catch (error) {
@@ -645,30 +676,40 @@
   }
 
   async function searchDeals(query) {
-    if (!window.firebaseDB) return [];
-
-    try {
-      const email = window.currentUserEmail || '';
-      let snapshot;
-      if (window.currentUserRole !== 'admin' && email) {
-        // Non-admin: use scoped query
-        const [ownedSnap, assignedSnap] = await Promise.all([
-          window.firebaseDB.collection('deals').where('ownerId','==',email).get(),
-          window.firebaseDB.collection('deals').where('assignedTo','==',email).get()
-        ]);
-        const map = new Map();
-        ownedSnap.forEach(d=>map.set(d.id, d));
-        assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, d); });
-        snapshot = { forEach: (callback) => map.forEach(callback) };
-      } else {
-        // Admin: use unfiltered query
-        snapshot = await window.firebaseDB.collection('deals').get();
+    // OPTIMIZED: Use cached data or limited Firestore queries
+    // Note: No background loader for deals yet, so we limit Firestore query
+    let deals = [];
+    
+    if (window.firebaseDB) {
+      try {
+        const email = window.currentUserEmail || '';
+        if (window.currentUserRole !== 'admin' && email) {
+          // Non-admin: use scoped query with limit
+          const [ownedSnap, assignedSnap] = await Promise.all([
+            window.firebaseDB.collection('deals').where('ownerId','==',email).limit(200).get(),
+            window.firebaseDB.collection('deals').where('assignedTo','==',email).limit(200).get()
+          ]);
+          const map = new Map();
+          ownedSnap.forEach(d=>map.set(d.id, { id: d.id, ...d.data() }));
+          assignedSnap.forEach(d=>{ if(!map.has(d.id)) map.set(d.id, { id: d.id, ...d.data() }); });
+          deals = Array.from(map.values());
+        } else {
+          // Admin: use limited query
+          const snapshot = await window.firebaseDB.collection('deals').limit(500).get();
+          snapshot.forEach(doc => deals.push({ id: doc.id, ...doc.data() }));
+        }
+      } catch (error) {
+        console.error('Error fetching deals:', error);
+        return [];
       }
-      
+    }
+    
+    if (deals.length === 0) return [];
+    
+    try {
       const results = [];
 
-      snapshot.forEach(doc => {
-        const deal = { id: doc.id, ...doc.data() };
+      for (const deal of deals) {
         
         const searchableText = [
           deal.title || '',
@@ -687,8 +728,9 @@
             subtitle: `${deal.company || deal.companyName || ''} • ${deal.stage || 'Unknown stage'} • $${(deal.value || 0).toLocaleString()}`,
             data: deal
           });
+          if (results.length >= 5) break; // Early exit once we have enough results
         }
-      });
+      }
 
       return results.slice(0, 5);
     } catch (error) {

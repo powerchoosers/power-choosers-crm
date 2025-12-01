@@ -4174,8 +4174,9 @@
               // Non-admin: use scoped query
               snap = await window.firebaseDB.collection('sequences').where('ownerId','==',email).get();
             } else {
-              // Admin: use unfiltered query
-              snap = await window.firebaseDB.collection('sequences').get();
+              // OPTIMIZED: Admin query with limit to prevent loading entire collection
+              // 500 sequences is enough for dropdown while keeping costs reasonable
+              snap = await window.firebaseDB.collection('sequences').limit(500).get();
             }
             items = [];
             snap.forEach(doc => items.push({ id: doc.id, ...doc.data() }));

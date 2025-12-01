@@ -206,26 +206,36 @@
     }
   }
   
-  // Get total count from Firestore without loading all records
+  // OPTIMIZED: Get total count using Firestore aggregation (no document loads!)
+  // This reduces Firestore reads from thousands to just 1-2 per count query
   async function getTotalCount() {
-    if (!window.firebaseDB) return 0;
+    if (!window.firebaseDB) return accountsData.length;
     
     try {
       const email = window.currentUserEmail || '';
       if (window.currentUserRole !== 'admin' && email) {
-        // Non-admin: count only owned/assigned accounts
-        const [ownedSnap, assignedSnap] = await Promise.all([
-          window.firebaseDB.collection('accounts').where('ownerId','==',email).get(),
-          window.firebaseDB.collection('accounts').where('assignedTo','==',email).get()
-        ]);
-        const map = new Map();
-        ownedSnap.forEach(d=>map.set(d.id, d.id));
-        assignedSnap.forEach(d=>map.set(d.id, d.id));
-        return map.size;
+        // Non-admin: use aggregation count for owned/assigned accounts
+        try {
+          const [ownedCount, assignedCount] = await Promise.all([
+            window.firebaseDB.collection('accounts').where('ownerId','==',email).count().get(),
+            window.firebaseDB.collection('accounts').where('assignedTo','==',email).count().get()
+          ]);
+          const owned = ownedCount.data().count || 0;
+          const assigned = assignedCount.data().count || 0;
+          return Math.max(owned, assigned, accountsData.length);
+        } catch (aggError) {
+          console.warn('[BackgroundAccountsLoader] Aggregation not supported, using loaded count');
+          return accountsData.length;
+        }
       } else {
-        // Admin: count all accounts
-        const snapshot = await window.firebaseDB.collection('accounts').get();
-        return snapshot.size;
+        // Admin: use aggregation count for all accounts
+        try {
+          const countSnap = await window.firebaseDB.collection('accounts').count().get();
+          return countSnap.data().count || accountsData.length;
+        } catch (aggError) {
+          console.warn('[BackgroundAccountsLoader] Aggregation not supported, using loaded count');
+          return accountsData.length;
+        }
       }
     } catch (error) {
       console.error('[BackgroundAccountsLoader] Failed to get total count:', error);

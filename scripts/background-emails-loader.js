@@ -300,27 +300,37 @@
     }
   }
 
-  // Get total count from Firestore without loading all records
+  // OPTIMIZED: Get total count using Firestore aggregation (no document loads!)
+  // This reduces Firestore reads from thousands to just 1-2 per count query
   async function getTotalCount() {
-    if (!window.firebaseDB) return 0;
+    if (!window.firebaseDB) return emailsData.length;
     
     try {
       const email = window.currentUserEmail || '';
       if (window.currentUserRole !== 'admin' && email) {
-        // Non-admin: count only owned/assigned emails
+        // Non-admin: use aggregation count for owned/assigned emails
         const e = String(email).toLowerCase();
-        const [ownedSnap, assignedSnap] = await Promise.all([
-          window.firebaseDB.collection('emails').where('ownerId','==',e).get(),
-          window.firebaseDB.collection('emails').where('assignedTo','==',e).get()
-        ]);
-        const map = new Map();
-        ownedSnap.forEach(d=>map.set(d.id, d.id));
-        assignedSnap.forEach(d=>map.set(d.id, d.id));
-        return map.size;
+        try {
+          const [ownedCount, assignedCount] = await Promise.all([
+            window.firebaseDB.collection('emails').where('ownerId','==',e).count().get(),
+            window.firebaseDB.collection('emails').where('assignedTo','==',e).count().get()
+          ]);
+          const owned = ownedCount.data().count || 0;
+          const assigned = assignedCount.data().count || 0;
+          return Math.max(owned, assigned, emailsData.length);
+        } catch (aggError) {
+          console.warn('[BackgroundEmailsLoader] Aggregation not supported, using loaded count');
+          return emailsData.length;
+        }
       } else {
-        // Admin: count all emails
-        const snapshot = await window.firebaseDB.collection('emails').get();
-        return snapshot.size;
+        // Admin: use aggregation count for all emails
+        try {
+          const countSnap = await window.firebaseDB.collection('emails').count().get();
+          return countSnap.data().count || emailsData.length;
+        } catch (aggError) {
+          console.warn('[BackgroundEmailsLoader] Aggregation not supported, using loaded count');
+          return emailsData.length;
+        }
       }
     } catch (error) {
       console.error('[BackgroundEmailsLoader] Failed to get total count:', error);
