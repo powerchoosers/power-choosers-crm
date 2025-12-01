@@ -1,10 +1,10 @@
 import admin from 'firebase-admin';
 import { db } from './_firebase.js';
-import sgMail from '@sendgrid/mail';
+import { GmailService } from './email/gmail-service.js';
 import logger from './_logger.js';
 
-// Initialize SendGrid
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+// Initialize Gmail service
+const gmailService = new GmailService();
 
 /**
  * Resolve email settings with proper priority:
@@ -242,64 +242,27 @@ export default async function handler(req, res) {
           emailSettings = resolveEmailSettings(null, null);
         }
 
-        // Prepare SendGrid message
-        const msg = {
+        // Prepare Gmail message
+        // The Gmail service will automatically look up sender info from user profile
+        // using ownerId, so each agent's emails send from their own address
+        const sendResult = await gmailService.sendEmail({
           to: emailData.to,
-          from: {
-            email: process.env.SENDGRID_FROM_EMAIL || 'l.patterson@powerchoosers.com',
-            name: process.env.SENDGRID_FROM_NAME || 'Lewis Patterson'
-          },
           subject: emailData.subject,
           html: emailData.html,
           text: emailData.text,
-          // Apply tracking settings from resolved settings
-          trackingSettings: {
-            openTracking: {
-              enable: emailSettings.deliverability.openTracking
-            },
-            clickTracking: {
-              enable: emailSettings.deliverability.clickTracking,
-              enableText: emailSettings.deliverability.clickTracking
-            }
-          },
-          // Add custom args for tracking
-          customArgs: {
-            emailId: emailDoc.id,
-            trackingId: emailDoc.id, // CRITICAL: Required for webhook to match event to email doc
-            sequenceId: emailData.sequenceId || '',
-            contactId: emailData.contactId || '',
-            stepIndex: String(emailData.stepIndex || 0) // Ensure string for SendGrid
-          }
-        };
-
-        // Apply compliance headers based on settings
-        if (emailSettings.deliverability.priorityHeaders) {
-          msg.headers = msg.headers || {};
-          msg.headers['X-Priority'] = '1';
-          msg.headers['Importance'] = 'high';
-        }
-
-        if (emailSettings.deliverability.listUnsubscribe || emailSettings.compliance.unsubscribeLink) {
-          msg.headers = msg.headers || {};
-          // Add list-unsubscribe header (improves deliverability)
-          const unsubscribeUrl = `${process.env.APP_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app'}/unsubscribe?email=${encodeURIComponent(emailData.to)}&id=${emailDoc.id}`;
-          msg.headers['List-Unsubscribe'] = `<${unsubscribeUrl}>`;
-          msg.headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click';
-        }
-
-        if (emailSettings.deliverability.bulkHeaders) {
-          msg.headers = msg.headers || {};
-          msg.headers['Precedence'] = 'bulk';
-        }
-
-        // Send email via SendGrid
-        const sendResult = await sgMail.send(msg);
+          ownerId: emailData.ownerId, // Used to look up sender name/email from Firestore
+          userEmail: emailData.ownerId, // Alias for compatibility
+          threadId: emailData.threadId || undefined,
+          inReplyTo: emailData.inReplyTo || undefined,
+          references: emailData.references || undefined
+        });
+        
         if (!isProduction) {
-          logger.log('[SendScheduledEmails] Email sent successfully:', emailDoc.id, sendResult[0].statusCode);
+          logger.log('[SendScheduledEmails] Email sent successfully via Gmail:', emailDoc.id, sendResult.messageId);
         }
 
         // Update email record (preserve subject, html, text fields)
-        // CRITICAL: Initialize tracking fields to match manual emails (sendgrid-service.js structure)
+        // CRITICAL: Initialize tracking fields to match manual emails structure
         // This ensures tracking pixels display correctly in emails-redesigned.js sent tab
         await emailDoc.ref.update({
           type: 'sent',
@@ -309,11 +272,12 @@ export default async function handler(req, res) {
           sentAt: Date.now(),
           date: new Date().toISOString(),      // Required for emails page sorting
           timestamp: new Date().toISOString(), // Required for emails page fallback
-          sendgridMessageId: sendResult[0].headers['x-message-id'],
-          messageId: sendResult[0].headers['x-message-id'], // Alias for consistency
+          gmailMessageId: sendResult.messageId,
+          messageId: sendResult.messageId, // Alias for consistency
+          threadId: sendResult.threadId || emailData.threadId || null,
           sentBy: 'scheduled_job',
-          provider: 'sendgrid',        // Ensure consistent provider marking
-          // Initialize tracking arrays for SendGrid webhook updates
+          provider: 'gmail',           // Mark as Gmail provider
+          // Initialize tracking arrays (Gmail doesn't have webhook tracking like SendGrid)
           opens: emailData.opens || [],
           clicks: emailData.clicks || [],
           replies: emailData.replies || [],
