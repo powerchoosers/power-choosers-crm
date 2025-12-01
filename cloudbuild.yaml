@@ -96,6 +96,12 @@ steps:
     - 'TWILIO_TWIML_APP_SID=${_TWILIO_TWIML_APP_SID}'
     - '--set-env-vars'
     - 'TWILIO_PHONE_NUMBER=${_TWILIO_PHONE_NUMBER}'
+    - '--set-env-vars'
+    - 'GOOGLE_SERVICE_ACCOUNT_KEY=${_GOOGLE_SERVICE_ACCOUNT_KEY}'
+    - '--set-env-vars'
+    - 'GMAIL_SENDER_EMAIL=${_GMAIL_SENDER_EMAIL}'
+    - '--set-env-vars'
+    - 'GMAIL_SENDER_NAME=${_GMAIL_SENDER_NAME}'
 
 # Store images in Google Container Registry
 images:
