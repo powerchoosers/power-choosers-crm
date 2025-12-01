@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { to, subject, content, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail, emailSettings } = req.body;
+    const { to, subject, content, plainTextContent, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail, emailSettings } = req.body;
 
     if (!to || !subject || !content) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -57,8 +57,11 @@ export default async function handler(req, res) {
 
     // Generate plain text version from HTML if needed
     let textContent = '';
-    if (isHtmlEmailBoolean) {
-      // Simple HTML to text conversion
+    if (plainTextContent) {
+      // Use provided plain text content (pre-generated on client)
+      textContent = plainTextContent;
+    } else if (isHtmlEmailBoolean) {
+      // HTML email: Convert HTML to plain text for the text part
       textContent = content
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
@@ -66,7 +69,13 @@ export default async function handler(req, res) {
         .replace(/\s+/g, ' ')
         .trim();
     } else {
-      textContent = content;
+      // Standard email: Content is HTML, convert to plain text
+      textContent = content
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
     }
 
     // Prepare email data for Gmail
@@ -78,8 +87,8 @@ export default async function handler(req, res) {
     const result = await gmailService.sendEmail({
       to,
       subject,
-      html: isHtmlEmailBoolean ? content : undefined,
-      text: textContent,
+      html: content, // Always send HTML (for both HTML templates and standard emails)
+      text: textContent, // Plain text fallback
       userEmail: userEmail, // Used to look up sender name/email from Firestore
       ownerId: userEmail, // Alias for compatibility
       from: from, // Optional override
