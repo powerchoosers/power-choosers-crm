@@ -264,7 +264,7 @@
                 id: doc.id,
                 ...data,
                 timestamp: data.sentAt || data.receivedAt || data.createdAt,
-                emailType: data.type || (data.provider === 'sendgrid_inbound' ? 'received' : 'sent')
+                emailType: data.type || (data.provider === 'sendgrid_inbound' || data.provider === 'gmail_api' ? 'received' : 'sent')
               };
             });
 
@@ -400,6 +400,7 @@
         return (email.type === 'received' ||
           email.emailType === 'received' ||
           email.provider === 'sendgrid_inbound' ||
+          email.provider === 'gmail_api' ||
           // If no type field, assume it's received (old emails)
           (!email.type && !email.emailType && !email.isSentEmail)) &&
           !email.deleted;
@@ -639,6 +640,7 @@
             return (email.type === 'received' ||
               email.emailType === 'received' ||
               email.provider === 'sendgrid_inbound' ||
+              email.provider === 'gmail_api' ||
               (!email.type && !email.emailType && !email.isSentEmail)) &&
               !email.deleted;
           });

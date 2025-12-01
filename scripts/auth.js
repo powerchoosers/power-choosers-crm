@@ -209,9 +209,17 @@ class AuthManager {
             provider.setCustomParameters({
                 prompt: 'select_account'
             });
+            // Add Gmail readonly scope for inbox sync (client-side, FREE)
+            provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
 
             const result = await this.auth.signInWithPopup(provider);
             console.log('[Auth] Sign-in successful:', result.user.email);
+            
+            // Store Google access token for Gmail API access (client-side sync)
+            if (result.credential && result.credential.accessToken) {
+                window._googleAccessToken = result.credential.accessToken;
+                console.log('[Auth] Stored Google access token for Gmail sync');
+            }
             
             // Show success message
             this.showSuccess('Welcome back!');

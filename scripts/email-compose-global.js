@@ -4602,9 +4602,55 @@
 
   // ========== EMAIL SENDING FUNCTIONS ==========
   
+  /**
+   * Convert HTML content to plain text
+   * Preserves line breaks and formatting where possible
+   */
+  function convertHtmlToPlainText(html) {
+    if (!html) return '';
+    
+    // Create a temporary div to parse HTML
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    
+    // Remove script and style elements
+    const scripts = temp.querySelectorAll('script, style');
+    scripts.forEach(el => el.remove());
+    
+    // Remove signature blocks (they'll be added separately as plain text)
+    const signatureDivs = temp.querySelectorAll('[data-signature="true"]');
+    signatureDivs.forEach(el => el.remove());
+    
+    // Convert <br> and <p> tags to line breaks
+    const brs = temp.querySelectorAll('br');
+    brs.forEach(br => {
+      br.replaceWith(document.createTextNode('\n'));
+    });
+    
+    const paragraphs = temp.querySelectorAll('p');
+    paragraphs.forEach((p, index) => {
+      if (index > 0) {
+        p.insertAdjacentText('beforebegin', '\n\n');
+      }
+    });
+    
+    // Convert common HTML elements to text
+    let text = temp.textContent || temp.innerText || '';
+    
+    // Clean up whitespace
+    text = text
+      .replace(/\r\n/g, '\n')  // Normalize line breaks
+      .replace(/\r/g, '\n')     // Handle old Mac line breaks
+      .replace(/[ \t]+/g, ' ')   // Collapse multiple spaces/tabs
+      .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
+      .trim();
+    
+    return text;
+  }
+  
   async function sendEmailViaGmail(emailData) {
     try {
-      const { to, subject, content, from, fromName, _deliverability, threadId, inReplyTo, references, trackingMetadata, isHtmlEmail } = emailData;
+      const { to, subject, content, plainTextContent, from, fromName, _deliverability, threadId, inReplyTo, references, trackingMetadata, isHtmlEmail } = emailData;
       
       // Generate unique tracking ID for this email
       const trackingId = `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -4625,6 +4671,7 @@
         to: to,
         subject: subject,
         content: content,
+        plainTextContent: plainTextContent, // Plain text fallback version
         from: from,
         fromName: fromName,
         trackingId: trackingId,
@@ -4787,63 +4834,95 @@
       }
 
       // HTML emails: Use content as-is (has hardcoded signature from wrapSonarHtmlWithBranding)
-      // Standard emails: Apply signature settings
+      // Standard emails: Keep as HTML and apply HTML signature from settings (includes image)
       let contentWithSignature = body;
+      let finalContent = body;
+      let plainTextContent = ''; // For plain text fallback
       
       if (isHtmlEmail) {
         // HTML email templates: Don't apply any signature settings
         // They have their own hardcoded signatures via wrapSonarHtmlWithBranding
         console.log('[Signature Debug] HTML email - skipping all signature settings');
         contentWithSignature = body;
+        finalContent = body;
+        // Generate plain text version for fallback
+        plainTextContent = convertHtmlToPlainText(body);
       } else {
-        // Standard email: Apply signature settings
-        console.log('[Signature Debug] Standard email - applying signature settings');
+        // Standard email: Keep as HTML and apply HTML signature from settings
+        console.log('[Signature Debug] Standard email - applying HTML signature from settings');
         
         let preparedBody = body;
         
-        // Optionally remove signature image if disabled (standard emails only)
-        if (deliver.signatureImageEnabled === false) {
-          preparedBody = preparedBody.replace(/<img[^>]*alt=\"Signature\"[\s\S]*?>/gi, '');
-          console.log('[Signature Debug] Removed signature image (disabled in settings)');
-        }
-
-        // Check if signature is already in the body (prevent duplication)
-        const signature = window.getEmailSignature ? window.getEmailSignature() : '';
-        const hasSignature = preparedBody.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;');
-
-        console.log('[Signature Debug] Signature retrieved:', signature ? 'YES' : 'NO', 'Length:', signature.length);
-        console.log('[Signature Debug] hasSignature:', hasSignature);
-
-        // Add signature if not already present
-        if (!hasSignature) {
-          let sig = signature;
-          
-          // If no signature from settings, build basic one
-          if (!sig) {
-            const settings = window.SettingsPage?.getSettings?.() || {};
-            const general = settings.general || {};
-            const name = (general.firstName && general.lastName) 
-              ? `${general.firstName} ${general.lastName}`.trim()
-              : (general.agentName || 'Power Choosers Team');
-            
-            sig = `<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
-              <p style="margin: 0; color: #666;">${name}</p>
-              <p style="margin: 5px 0 0 0; color: #999; font-size: 14px;">Energy Strategist</p>
-            </div>`;
-            
-            console.log('[Signature Debug] Using fallback signature');
-          }
-          
-          if (sig) {
-            console.log('[Signature Debug] Adding signature to email');
-            contentWithSignature = preparedBody + sig;
-          } else {
-            contentWithSignature = preparedBody;
-          }
+        // Remove any existing signature from the body (prevent duplication)
+        const temp = document.createElement('div');
+        temp.innerHTML = preparedBody;
+        const existingSignatures = temp.querySelectorAll('[data-signature="true"]');
+        existingSignatures.forEach(sig => sig.remove());
+        preparedBody = temp.innerHTML;
+        
+        // Get HTML signature from settings (includes image if enabled)
+        let signatureHtml = '';
+        if (window.getEmailSignature && typeof window.getEmailSignature === 'function') {
+          signatureHtml = window.getEmailSignature();
+        } else if (window.SettingsPage && window.SettingsPage.instance && typeof window.SettingsPage.instance.getEmailSignature === 'function') {
+          signatureHtml = window.SettingsPage.instance.getEmailSignature();
         } else {
-          console.log('[Signature Debug] Signature already present, not adding');
+          // Fallback: try to get signature from settings directly
+          const settings = window.SettingsPage?.getSettings?.() || {};
+          const signature = settings?.emailSignature || {};
+          
+          if (signature.text || signature.image) {
+            signatureHtml += '<div contenteditable="false" data-signature="true" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
+            
+            if (signature.text) {
+              const textHtml = signature.text.replace(/\n/g, '<br>');
+              signatureHtml += `<div style="font-family: inherit; font-size: 14px; color: #333; line-height: 1.4;">${textHtml}</div>`;
+            }
+            
+            // Include image if enabled and present
+            if (signature.image && deliver.signatureImageEnabled !== false) {
+              const width = signature.imageSize?.width || 200;
+              const height = signature.imageSize?.height || 100;
+              signatureHtml += `<div style="margin-top: 10px;"><img src="${signature.image}" alt="Signature" style="max-width: ${width}px; max-height: ${height}px; border-radius: 4px;" /></div>`;
+            }
+            
+            signatureHtml += '</div>';
+          }
+        }
+        
+        // If no signature from settings, build basic one
+        if (!signatureHtml) {
+          const settings = window.SettingsPage?.getSettings?.() || {};
+          const general = settings.general || {};
+          const name = (general.firstName && general.lastName) 
+            ? `${general.firstName} ${general.lastName}`.trim()
+            : (general.agentName || 'Power Choosers Team');
+          
+          signatureHtml = `<div contenteditable="false" data-signature="true" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+            <div style="font-family: inherit; font-size: 14px; color: #333; line-height: 1.4;">${name}<br>Energy Strategist</div>
+          </div>`;
+          
+          console.log('[Signature Debug] Using fallback signature');
+        }
+        
+        // Add signature to HTML content
+        if (signatureHtml) {
+          console.log('[Signature Debug] Adding HTML signature to email');
+          finalContent = preparedBody + signatureHtml;
+          contentWithSignature = finalContent;
+        } else {
+          finalContent = preparedBody;
           contentWithSignature = preparedBody;
         }
+        
+        // Generate plain text version for fallback (without image)
+        plainTextContent = convertHtmlToPlainText(preparedBody);
+        const signatureText = window.getEmailSignatureText ? window.getEmailSignatureText() : '';
+        if (signatureText) {
+          plainTextContent += signatureText;
+        }
+        
+        console.log('[Signature Debug] HTML email with signature, length:', finalContent.length);
       }
 
       // Get sender details from settings
@@ -4877,7 +4956,8 @@
       const emailData = {
         to: to.split(',').map(email => email.trim()),
         subject,
-        content: contentWithSignature,
+        content: finalContent, // HTML content (for both HTML templates and standard emails)
+        plainTextContent: plainTextContent || undefined, // Plain text fallback (auto-generated if not provided)
         from: senderEmail,
         fromName: senderName,
         isHtmlEmail: Boolean(isHtmlEmail), // Explicit boolean conversion
