@@ -156,10 +156,33 @@
   }
 
   // Find the associated account for this contact (by id or normalized company name)
+  // CRITICAL FIX: Now checks state.account first, then multiple data sources
   function findAssociatedAccount(contact) {
     try {
-      if (!contact || typeof window.getAccountsData !== 'function') return null;
-      const accounts = window.getAccountsData() || [];
+      if (!contact) return null;
+      
+      // Check state.account first (already loaded by loadContactAccountData)
+      if (state.account) {
+        const accountId = contact.accountId || contact.account_id || '';
+        if (accountId && state.account.id === accountId) return state.account;
+        
+        const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+        const contactCompany = norm(contact.companyName || contact.accountName || '');
+        const stateAccountName = norm(state.account.accountName || state.account.name || state.account.companyName || '');
+        if (contactCompany && stateAccountName && contactCompany === stateAccountName) return state.account;
+      }
+      
+      // Get accounts from multiple sources
+      let accounts = [];
+      if (typeof window.getAccountsData === 'function') {
+        accounts = window.getAccountsData() || [];
+      }
+      if (accounts.length === 0 && window.BackgroundAccountsLoader) {
+        accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+      }
+      
+      if (accounts.length === 0) return null;
+      
       // Prefer explicit accountId
       const accountId = contact.accountId || contact.account_id || '';
       if (accountId) {
@@ -175,10 +198,29 @@
   }
 
   // Find account by ID or name for account tasks
+  // CRITICAL FIX: Now checks state.account first, then multiple data sources
   function findAccountByIdOrName(accountId, accountName) {
     try {
-      if (typeof window.getAccountsData !== 'function') return null;
-      const accounts = window.getAccountsData() || [];
+      // Check state.account first (already loaded by loadContactAccountData)
+      if (state.account) {
+        if (accountId && state.account.id === accountId) return state.account;
+        
+        const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+        const stateAccountName = norm(state.account.accountName || state.account.name || state.account.companyName || '');
+        const searchName = norm(accountName || '');
+        if (searchName && stateAccountName && searchName === stateAccountName) return state.account;
+      }
+      
+      // Get accounts from multiple sources
+      let accounts = [];
+      if (typeof window.getAccountsData === 'function') {
+        accounts = window.getAccountsData() || [];
+      }
+      if (accounts.length === 0 && window.BackgroundAccountsLoader) {
+        accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+      }
+      
+      if (accounts.length === 0) return null;
 
       // Try by ID first
       if (accountId) {
@@ -1852,8 +1894,15 @@
         account: task.account
       });
 
-      // Load contact/account data
-      loadContactAccountData(task);
+      // Load contact/account data - AWAIT to ensure data is loaded before rendering
+      await loadContactAccountData(task);
+      
+      console.log('[TaskDetail] Contact/account data loading complete:', {
+        hasContact: !!state.contact,
+        hasAccount: !!state.account,
+        contactId: state.contact?.id,
+        accountId: state.account?.id
+      });
 
       // CRITICAL FIX: Ensure DOM is ready before rendering
       if (!els.content) {
@@ -1967,54 +2016,131 @@
     }
   }
 
-  function loadContactAccountData(task) {
+  async function loadContactAccountData(task) {
     if (!task) return;
+
+    // CRITICAL FIX: Load data from CacheManager first (most reliable source)
+    // This ensures data is available even if page modules haven't loaded yet
+    let contactsData = [];
+    let accountsData = [];
+
+    // Method 1: Try CacheManager first (most reliable - always available)
+    if (window.CacheManager && typeof window.CacheManager.get === 'function') {
+      try {
+        console.log('[TaskDetail] Loading contacts/accounts from CacheManager...');
+        const [cachedContacts, cachedAccounts] = await Promise.all([
+          window.CacheManager.get('contacts').catch(() => []),
+          window.CacheManager.get('accounts').catch(() => [])
+        ]);
+        contactsData = cachedContacts || [];
+        accountsData = cachedAccounts || [];
+        console.log('[TaskDetail] CacheManager returned', contactsData.length, 'contacts,', accountsData.length, 'accounts');
+      } catch (e) {
+        console.warn('[TaskDetail] CacheManager failed:', e);
+      }
+    }
+
+    // Method 2: Try getPeopleData/getAccountsData (page module data)
+    if (contactsData.length === 0 && typeof window.getPeopleData === 'function') {
+      contactsData = window.getPeopleData() || [];
+      console.log('[TaskDetail] getPeopleData returned', contactsData.length, 'contacts');
+    }
+    if (accountsData.length === 0 && typeof window.getAccountsData === 'function') {
+      accountsData = window.getAccountsData(true) || [];
+      console.log('[TaskDetail] getAccountsData returned', accountsData.length, 'accounts');
+    }
+
+    // Method 3: Try BackgroundContactsLoader/BackgroundAccountsLoader if available
+    if (contactsData.length === 0 && window.BackgroundContactsLoader) {
+      contactsData = window.BackgroundContactsLoader.getContactsData() || [];
+      console.log('[TaskDetail] BackgroundContactsLoader returned', contactsData.length, 'contacts');
+    }
+    if (accountsData.length === 0 && window.BackgroundAccountsLoader) {
+      accountsData = window.BackgroundAccountsLoader.getAccountsData() || [];
+      console.log('[TaskDetail] BackgroundAccountsLoader returned', accountsData.length, 'accounts');
+    }
+
+    // Method 4: If still no data, wait a bit and retry with CacheManager
+    if ((contactsData.length === 0 || accountsData.length === 0) && window.CacheManager) {
+      console.log('[TaskDetail] Waiting for cache to populate...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      try {
+        if (contactsData.length === 0) {
+          contactsData = await window.CacheManager.get('contacts').catch(() => []) || [];
+          console.log('[TaskDetail] Retry: CacheManager returned', contactsData.length, 'contacts');
+        }
+        if (accountsData.length === 0) {
+          accountsData = await window.CacheManager.get('accounts').catch(() => []) || [];
+          console.log('[TaskDetail] Retry: CacheManager returned', accountsData.length, 'accounts');
+        }
+      } catch (e) {
+        console.warn('[TaskDetail] Retry CacheManager failed:', e);
+      }
+    }
 
     // Load contact data if available
     if (task.contactId || task.contact) {
       try {
-        // Try to get contact from global data sources
         let contact = null;
 
-        // Method 1: Try getPeopleData() if available
-        if (typeof window.getPeopleData === 'function') {
-          const people = window.getPeopleData() || [];
-
-          // Try to find by contactId first
-          if (task.contactId) {
-            contact = people.find(p => p.id === task.contactId);
-          }
-
-          // Fallback: try to find by name
-          if (!contact && task.contact) {
-            contact = people.find(p => {
-              const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
-              return fullName && fullName.toLowerCase() === String(task.contact).toLowerCase();
-            });
-          }
+        // Try to find by contactId first
+        if (task.contactId && contactsData.length > 0) {
+          contact = contactsData.find(p => p.id === task.contactId);
+          if (contact) console.log('[TaskDetail] Found contact by ID:', task.contactId);
         }
 
-        // Method 2: Try BackgroundContactsLoader if available
-        if (!contact && window.BackgroundContactsLoader) {
-          const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+        // Fallback: try to find by name
+        if (!contact && task.contact && contactsData.length > 0) {
+          contact = contactsData.find(p => {
+            const fullName = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+            return fullName && fullName.toLowerCase() === String(task.contact).toLowerCase();
+          });
+          if (contact) console.log('[TaskDetail] Found contact by name:', task.contact);
+        }
 
-          if (task.contactId) {
-            contact = contacts.find(c => c.id === task.contactId);
-          }
-
-          if (!contact && task.contact) {
-            contact = contacts.find(c => {
-              const fullName = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || c.name || '';
-              return fullName && fullName.toLowerCase() === String(task.contact).toLowerCase();
-            });
+        // LAST RESORT: Direct Firebase query if cache/loaders failed
+        if (!contact && window.firebaseDB) {
+          console.log('[TaskDetail] Cache miss - querying Firebase directly for contact...');
+          try {
+            // Try by ID first (direct document lookup - most efficient)
+            if (task.contactId) {
+              const doc = await window.firebaseDB.collection('contacts').doc(task.contactId).get();
+              if (doc.exists) {
+                contact = { id: doc.id, ...doc.data() };
+                console.log('[TaskDetail] ✓ Found contact via direct Firebase query by ID');
+              }
+            }
+            
+            // If not found by ID, try by name (requires query)
+            if (!contact && task.contact) {
+              // Query by firstName + lastName combination
+              const nameParts = String(task.contact).trim().split(/\s+/);
+              if (nameParts.length >= 2) {
+                const firstName = nameParts[0];
+                const lastName = nameParts.slice(1).join(' ');
+                const snap = await window.firebaseDB.collection('contacts')
+                  .where('firstName', '==', firstName)
+                  .where('lastName', '==', lastName)
+                  .limit(1)
+                  .get();
+                if (!snap.empty) {
+                  const doc = snap.docs[0];
+                  contact = { id: doc.id, ...doc.data() };
+                  console.log('[TaskDetail] ✓ Found contact via Firebase query by name');
+                }
+              }
+            }
+          } catch (fbError) {
+            console.warn('[TaskDetail] Firebase direct query failed:', fbError);
           }
         }
 
         if (contact) {
           state.contact = contact;
-          console.log('[TaskDetail] Loaded contact data:', contact.id);
+          console.log('[TaskDetail] ✓ Loaded contact data:', contact.id, contact.firstName, contact.lastName);
         } else {
-          console.warn('[TaskDetail] Could not find contact:', task.contactId || task.contact);
+          console.warn('[TaskDetail] ✗ Could not find contact:', task.contactId || task.contact, '(searched', contactsData.length, 'contacts + Firebase)');
         }
       } catch (e) {
         console.warn('[TaskDetail] Error loading contact data:', e);
@@ -2026,45 +2152,70 @@
       try {
         let account = null;
 
-        // Method 1: Try getAccountsData() if available
-        if (typeof window.getAccountsData === 'function') {
-          const accounts = window.getAccountsData(true) || []; // forceFullData = true
-
-          // Try to find by accountId first
-          if (task.accountId) {
-            account = accounts.find(a => a.id === task.accountId);
-          }
-
-          // Fallback: try to find by name
-          if (!account && task.account) {
-            account = accounts.find(a => {
-              const accountName = a.name || a.companyName || '';
-              return accountName && accountName.toLowerCase() === String(task.account).toLowerCase();
-            });
-          }
+        // Try to find by accountId first
+        if (task.accountId && accountsData.length > 0) {
+          account = accountsData.find(a => a.id === task.accountId);
+          if (account) console.log('[TaskDetail] Found account by ID:', task.accountId);
         }
 
-        // Method 2: Try BackgroundAccountsLoader if available
-        if (!account && window.BackgroundAccountsLoader) {
-          const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+        // Fallback: try to find by name
+        if (!account && task.account && accountsData.length > 0) {
+          account = accountsData.find(a => {
+            const accountName = a.accountName || a.name || a.companyName || '';
+            return accountName && accountName.toLowerCase() === String(task.account).toLowerCase();
+          });
+          if (account) console.log('[TaskDetail] Found account by name:', task.account);
+        }
 
-          if (task.accountId) {
-            account = accounts.find(a => a.id === task.accountId);
-          }
-
-          if (!account && task.account) {
-            account = accounts.find(a => {
-              const accountName = a.name || a.companyName || '';
-              return accountName && accountName.toLowerCase() === String(task.account).toLowerCase();
-            });
+        // LAST RESORT: Direct Firebase query if cache/loaders failed
+        if (!account && window.firebaseDB) {
+          console.log('[TaskDetail] Cache miss - querying Firebase directly for account...');
+          try {
+            // Try by ID first (direct document lookup - most efficient)
+            if (task.accountId) {
+              const doc = await window.firebaseDB.collection('accounts').doc(task.accountId).get();
+              if (doc.exists) {
+                account = { id: doc.id, ...doc.data() };
+                console.log('[TaskDetail] ✓ Found account via direct Firebase query by ID');
+              }
+            }
+            
+            // If not found by ID, try by name (requires query)
+            if (!account && task.account) {
+              // Query by accountName field
+              const snap = await window.firebaseDB.collection('accounts')
+                .where('accountName', '==', task.account)
+                .limit(1)
+                .get();
+              if (!snap.empty) {
+                const doc = snap.docs[0];
+                account = { id: doc.id, ...doc.data() };
+                console.log('[TaskDetail] ✓ Found account via Firebase query by accountName');
+              }
+              
+              // Also try 'name' field as fallback
+              if (!account) {
+                const snap2 = await window.firebaseDB.collection('accounts')
+                  .where('name', '==', task.account)
+                  .limit(1)
+                  .get();
+                if (!snap2.empty) {
+                  const doc = snap2.docs[0];
+                  account = { id: doc.id, ...doc.data() };
+                  console.log('[TaskDetail] ✓ Found account via Firebase query by name field');
+                }
+              }
+            }
+          } catch (fbError) {
+            console.warn('[TaskDetail] Firebase direct query failed:', fbError);
           }
         }
 
         if (account) {
           state.account = account;
-          console.log('[TaskDetail] Loaded account data:', account.id);
+          console.log('[TaskDetail] ✓ Loaded account data:', account.id, account.accountName || account.name);
         } else {
-          console.warn('[TaskDetail] Could not find account:', task.accountId || task.account);
+          console.warn('[TaskDetail] ✗ Could not find account:', task.accountId || task.account, '(searched', accountsData.length, 'accounts + Firebase)');
         }
       } catch (e) {
         console.warn('[TaskDetail] Error loading account data:', e);
@@ -3185,13 +3336,48 @@
     // Get contact information
     const contactName = task.contact || '';
     const accountName = task.account || '';
-    const person = (typeof window.getPeopleData === 'function' ? (window.getPeopleData() || []).find(p => {
-      const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
-      return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
-    }) : null) || {};
+    
+    // CRITICAL FIX: Use state.contact if available (already loaded by loadContactAccountData)
+    // Only fall back to name-based lookup if state.contact is not set
+    let person = state.contact || null;
+    
+    if (!person && typeof window.getPeopleData === 'function') {
+      const people = window.getPeopleData() || [];
+      person = people.find(p => {
+        const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+        return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+      });
+    }
+    
+    // Also try BackgroundContactsLoader if still not found
+    if (!person && window.BackgroundContactsLoader) {
+      try {
+        const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+        person = contacts.find(c => {
+          const full = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || c.name || '';
+          return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+        });
+      } catch (_) { /* noop */ }
+    }
+    
+    // Also try by contactId if name match fails
+    if (!person && task.contactId) {
+      if (typeof window.getPeopleData === 'function') {
+        const people = window.getPeopleData() || [];
+        person = people.find(p => p.id === task.contactId);
+      }
+      if (!person && window.BackgroundContactsLoader) {
+        try {
+          const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+          person = contacts.find(c => c.id === task.contactId);
+        } catch (_) { /* noop */ }
+      }
+    }
+    
+    person = person || {};
 
     // Get contact details for the sidebar
-    const contactId = person.id || person.contactId || '';
+    const contactId = person.id || person.contactId || task.contactId || '';
     const email = person.email || '';
     const city = person.city || person.locationCity || '';
     const stateVal = person.state || person.locationState || '';
@@ -3200,8 +3386,9 @@
     const department = person.department || '';
     const companyName = person.companyName || accountName;
 
-    // Get account information if available
-    const linkedAccount = findAssociatedAccount(person) || null;
+    // CRITICAL FIX: Use state.account if available (already loaded by loadContactAccountData)
+    // Only fall back to findAssociatedAccount if state.account is not set
+    const linkedAccount = state.account || findAssociatedAccount(person) || null;
 
     // Get location data from both contact and account
     const finalCity = city || linkedAccount?.city || linkedAccount?.locationCity || '';
@@ -3406,13 +3593,48 @@
     // Get contact information (same as call tasks)
     const contactName = task.contact || '';
     const accountName = task.account || '';
-    const person = (typeof window.getPeopleData === 'function' ? (window.getPeopleData() || []).find(p => {
-      const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
-      return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
-    }) : null) || {};
+    
+    // CRITICAL FIX: Use state.contact if available (already loaded by loadContactAccountData)
+    // Only fall back to name-based lookup if state.contact is not set
+    let person = state.contact || null;
+    
+    if (!person && typeof window.getPeopleData === 'function') {
+      const people = window.getPeopleData() || [];
+      person = people.find(p => {
+        const full = [p.firstName, p.lastName].filter(Boolean).join(' ').trim() || p.name || '';
+        return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+      });
+    }
+    
+    // Also try BackgroundContactsLoader if still not found
+    if (!person && window.BackgroundContactsLoader) {
+      try {
+        const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+        person = contacts.find(c => {
+          const full = [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || c.name || '';
+          return full && contactName && full.toLowerCase() === String(contactName).toLowerCase();
+        });
+      } catch (_) { /* noop */ }
+    }
+    
+    // Also try by contactId if name match fails
+    if (!person && task.contactId) {
+      if (typeof window.getPeopleData === 'function') {
+        const people = window.getPeopleData() || [];
+        person = people.find(p => p.id === task.contactId);
+      }
+      if (!person && window.BackgroundContactsLoader) {
+        try {
+          const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+          person = contacts.find(c => c.id === task.contactId);
+        } catch (_) { /* noop */ }
+      }
+    }
+    
+    person = person || {};
 
     // Get contact details for the sidebar
-    const contactId = person.id || person.contactId || '';
+    const contactId = person.id || person.contactId || task.contactId || '';
     const email = person.email || '';
     const city = person.city || person.locationCity || '';
     const stateVal = person.state || person.locationState || '';
@@ -3422,8 +3644,9 @@
     const companyName = person.companyName || accountName;
     const linkedinUrl = person.linkedin || '';
 
-    // Get account information if available
-    const linkedAccount = findAssociatedAccount(person) || null;
+    // CRITICAL FIX: Use state.account if available (already loaded by loadContactAccountData)
+    // Only fall back to findAssociatedAccount if state.account is not set
+    const linkedAccount = state.account || findAssociatedAccount(person) || null;
 
     // Get location data from both contact and account
     const finalCity = city || linkedAccount?.city || linkedAccount?.locationCity || '';
