@@ -1731,13 +1731,50 @@ var console = {
   // Avatar helpers (reuse calls page patterns)
   function ad_getAgentAvatar() { return `<div class=\"transcript-avatar-circle agent-avatar\" aria-hidden=\"true\">Y</div>`; }
   function ad_getContactAvatar(contactName, call) {
-    const domain = ad_extractDomainFromAccount(call && (call.accountName || ''));
-    if (domain) {
-      const fb = (typeof window.__pcAccountsIcon === 'function') ? window.__pcAccountsIcon() : '<span class=\"company-favicon\" aria-hidden=\"true\" style=\"display:inline-block;width:16px;height:16px;\"></span>';
-      return `<div class=\"transcript-avatar-circle company-avatar\" aria-hidden=\"true\">${window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 64) : fb}</div>`;
+    // Get account info for logo and domain
+    const accountInfo = ad_getAccountInfoForAvatar(call && (call.accountName || ''));
+    const { logoUrl, domain } = accountInfo;
+    
+    // Use favicon helper with logoUrl priority (per workspace rules)
+    if (logoUrl || domain) {
+      if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+        const iconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 28 });
+        return `<div class=\"transcript-avatar-circle company-avatar\" aria-hidden=\"true\">${iconHTML}</div>`;
+      } else if (domain && window.__pcFaviconHelper) {
+        return `<div class=\"transcript-avatar-circle company-avatar\" aria-hidden=\"true\">${window.__pcFaviconHelper.generateFaviconHTML(domain, 28)}</div>`;
+      }
     }
     const initial = (String(contactName || 'C').charAt(0) || 'C').toUpperCase();
     return `<div class=\"transcript-avatar-circle contact-avatar\" aria-hidden=\"true\">${initial}</div>`;
+  }
+  function ad_getAccountInfoForAvatar(name) {
+    const result = { logoUrl: '', domain: '' };
+    if (!name) return result;
+    try {
+      const key = String(name).trim().toLowerCase();
+      if (typeof window.getAccountsData === 'function') {
+        const accounts = window.getAccountsData() || [];
+        const hit = accounts.find(a => String(a.name || a.accountName || '').trim().toLowerCase() === key);
+        if (hit) {
+          // Prioritize logoUrl field (per workspace rules)
+          result.logoUrl = hit.logoUrl || hit.iconUrl || hit.logo || hit.companyLogo || '';
+          const dom = hit.domain || hit.website || '';
+          if (dom) result.domain = String(dom).replace(/^https?:\/\//, '').replace(/\/$/, '');
+        }
+      }
+      // Also check current account state if available
+      if (!result.logoUrl && state && state.currentAccount) {
+        const ca = state.currentAccount;
+        if (String(ca.name || ca.accountName || '').trim().toLowerCase() === key) {
+          result.logoUrl = ca.logoUrl || ca.iconUrl || ca.logo || '';
+          if (!result.domain) {
+            const dom = ca.domain || ca.website || '';
+            if (dom) result.domain = String(dom).replace(/^https?:\/\//, '').replace(/\/$/, '');
+          }
+        }
+      }
+    } catch (_) { }
+    return result;
   }
   function ad_extractDomainFromAccount(name) { if (!name) return ''; try { const key = String(name).trim().toLowerCase(); if (typeof window.getAccountsData === 'function') { const accounts = window.getAccountsData() || []; const hit = accounts.find(a => String(a.name || a.accountName || '').trim().toLowerCase() === key); const dom = hit && (hit.domain || hit.website || ''); if (dom) return String(dom).replace(/^https?:\/\//, '').replace(/\/$/, ''); } } catch (_) { } return ''; }
   function ad_normalizeSupplierTokens(s) { try { if (!s) return ''; let out = String(s); out = out.replace(/\bT\s*X\s*U\b/gi, 'TXU'); out = out.replace(/\bN\s*R\s*G\b/gi, 'NRG'); out = out.replace(/\breliant\b/gi, 'Reliant'); return out; } catch (_) { return s || ''; } }
