@@ -4980,18 +4980,57 @@
   // Avatar + helper utilities for transcript rendering
   function cd_getAgentAvatar() { return `<div class="transcript-avatar-circle agent-avatar" aria-hidden="true">Y</div>`; }
   function cd_getContactAvatar(contactName, call) {
+    // Try to get contact initials first
     const c = (window.getPeopleData && call && call.contactId) ? (getContactById(call.contactId) || null) : null;
     if (c && c.firstName) {
       const initials = (c.firstName.charAt(0) + (c.lastName ? c.lastName.charAt(0) : '')).toUpperCase();
       return `<div class="transcript-avatar-circle contact-avatar" aria-hidden="true">${initials}</div>`;
     }
-    const domain = cd_extractDomainFromAccount(call && (call.accountName || ''));
-    if (domain) {
-      const fb = (typeof window.__pcAccountsIcon === 'function') ? window.__pcAccountsIcon() : '<span class="company-favicon" aria-hidden="true" style="display:inline-block;width:16px;height:16px;"></span>';
-      return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true">${window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 64) : fb}</div>`;
+    
+    // Get account info for logo and domain
+    const accountInfo = cd_getAccountInfoForAvatar(call && (call.accountName || ''));
+    const { logoUrl, domain } = accountInfo;
+    
+    // Use favicon helper with logoUrl priority (per workspace rules)
+    if (logoUrl || domain) {
+      if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+        const iconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 28 });
+        return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true">${iconHTML}</div>`;
+      } else if (domain && window.__pcFaviconHelper) {
+        return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true">${window.__pcFaviconHelper.generateFaviconHTML(domain, 28)}</div>`;
+      }
     }
     const initial = (String(contactName || 'C').charAt(0) || 'C').toUpperCase();
     return `<div class="transcript-avatar-circle contact-avatar" aria-hidden="true">${initial}</div>`;
+  }
+  function cd_getAccountInfoForAvatar(name) {
+    const result = { logoUrl: '', domain: '' };
+    if (!name) return result;
+    try {
+      const key = String(name).trim().toLowerCase();
+      if (typeof window.getAccountsData === 'function') {
+        const accounts = window.getAccountsData() || [];
+        const hit = accounts.find(a => String(a.name || a.accountName || '').trim().toLowerCase() === key);
+        if (hit) {
+          // Prioritize logoUrl field (per workspace rules)
+          result.logoUrl = hit.logoUrl || hit.iconUrl || hit.logo || hit.companyLogo || '';
+          const dom = hit.domain || hit.website || '';
+          if (dom) result.domain = String(dom).replace(/^https?:\/\//, '').replace(/\/$/, '');
+        }
+      }
+      // Also check linked account state if available
+      if (!result.logoUrl && state && state._linkedAccount) {
+        const la = state._linkedAccount;
+        if (String(la.name || la.accountName || '').trim().toLowerCase() === key) {
+          result.logoUrl = la.logoUrl || la.iconUrl || la.logo || '';
+          if (!result.domain) {
+            const dom = la.domain || la.website || '';
+            if (dom) result.domain = String(dom).replace(/^https?:\/\//, '').replace(/\/$/, '');
+          }
+        }
+      }
+    } catch (_) { }
+    return result;
   }
   function cd_extractDomainFromAccount(name) {
     if (!name) return '';

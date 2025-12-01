@@ -2409,24 +2409,69 @@ function dbgCalls(){ try { if (window.CRM_DEBUG_CALLS) console.log.apply(console
       const initials = (contact.firstName.charAt(0) + (contact.lastName ? contact.lastName.charAt(0) : '')).toUpperCase();
       return `<div class="transcript-avatar-circle contact-avatar" aria-hidden="true">${initials}</div>`;
     } else {
-      // Unknown contact - use company favicon
-      const companyName = callData?.companyName || callData?.contactName || contactName;
-      const domain = extractDomainFromCompany(companyName);
-      if (domain) {
-        return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true">
-          ${window.__pcFaviconHelper ? window.__pcFaviconHelper.generateFaviconHTML(domain, 64) : `<div class="company-favicon-fallback">${svgIcon('accounts')}</div>`}
-        </div>`;
-      } else {
-        // Fallback to first letter of contact name
-        const initial = (contactName || 'C').charAt(0).toUpperCase();
-        return `<div class="transcript-avatar-circle contact-avatar" aria-hidden="true">${initial}</div>`;
+      // Unknown contact - use company favicon with logoUrl priority
+      const companyName = callData?.companyName || callData?.accountName || callData?.contactName || contactName;
+      const accountInfo = getAccountInfoForAvatar(companyName, callData);
+      const { logoUrl, domain } = accountInfo;
+      
+      if (logoUrl || domain) {
+        if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+          const iconHTML = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 28 });
+          return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true">${iconHTML}</div>`;
+        } else if (domain && window.__pcFaviconHelper) {
+          return `<div class="transcript-avatar-circle company-avatar" aria-hidden="true">${window.__pcFaviconHelper.generateFaviconHTML(domain, 28)}</div>`;
+        }
+      }
+      
+      // Fallback to first letter of contact name
+      const initial = (contactName || 'C').charAt(0).toUpperCase();
+      return `<div class="transcript-avatar-circle contact-avatar" aria-hidden="true">${initial}</div>`;
+    }
+  }
+  
+  function getAccountInfoForAvatar(companyName, callData) {
+    const result = { logoUrl: '', domain: '' };
+    
+    // First check callData for account info
+    if (callData) {
+      if (callData.accountLogoUrl || callData.logoUrl) {
+        result.logoUrl = callData.accountLogoUrl || callData.logoUrl;
+      }
+      if (callData.accountDomain || callData.domain) {
+        const dom = callData.accountDomain || callData.domain;
+        result.domain = String(dom).replace(/^https?:\/\//, '').replace(/\/$/, '');
       }
     }
+    
+    // Then try to look up in accounts cache
+    if (!result.logoUrl && companyName) {
+      try {
+        const key = String(companyName).trim().toLowerCase();
+        if (typeof window.getAccountsData === 'function') {
+          const accounts = window.getAccountsData() || [];
+          const hit = accounts.find(a => String(a.name || a.accountName || '').trim().toLowerCase() === key);
+          if (hit) {
+            // Prioritize logoUrl field (per workspace rules)
+            result.logoUrl = hit.logoUrl || hit.iconUrl || hit.logo || hit.companyLogo || '';
+            if (!result.domain) {
+              const dom = hit.domain || hit.website || '';
+              if (dom) result.domain = String(dom).replace(/^https?:\/\//, '').replace(/\/$/, '');
+            }
+          }
+        }
+      } catch (_) { }
+    }
+    
+    return result;
   }
   
   function extractDomainFromCompany(companyName) {
     if (!companyName) return null;
-    // Simple domain extraction - could be enhanced
+    // Try to get from accounts cache first
+    const accountInfo = getAccountInfoForAvatar(companyName, null);
+    if (accountInfo.domain) return accountInfo.domain;
+    
+    // Simple domain extraction fallback
     const clean = companyName.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
     const commonDomains = {
       'google': 'google.com',
