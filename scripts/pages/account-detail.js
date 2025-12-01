@@ -3233,6 +3233,11 @@ var console = {
         if (window._accountNavigationSource === 'calls') {
           try {
             const restore = window._callsReturn || {};
+            
+            // Set restoration flag
+            window.__restoringCalls = true;
+            window.__restoringCallsUntil = Date.now() + 15000;
+            
             if (window.crm && typeof window.crm.navigateToPage === 'function') {
               window.crm.navigateToPage('calls');
               // Restore Calls state
@@ -3241,6 +3246,7 @@ var console = {
                   const ev = new CustomEvent('pc:calls-restore', {
                     detail: {
                       page: restore.page,
+                      currentPage: restore.currentPage || restore.page,
                       scroll: restore.scroll,
                       filters: restore.filters,
                       selectedItems: restore.selectedItems,
@@ -3248,6 +3254,9 @@ var console = {
                     }
                   });
                   document.dispatchEvent(ev);
+                  
+                  // Clear restoration data
+                  window._callsReturn = null;
                 } catch (_) { }
               }, 60);
             }

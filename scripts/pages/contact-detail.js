@@ -3589,11 +3589,45 @@
           // Clear phone widget context to prevent contact company info from leaking
           clearPhoneWidgetContext();
 
-          // Navigate back to calls page
-          if (window.crm && typeof window.crm.navigateToPage === 'function') {
-            window.crm.navigateToPage('calls');
+          try {
+            const restore = window._callsReturn || {};
+            
+            // Set restoration flag so Calls page knows to restore state
+            window.__restoringCalls = true;
+            window.__restoringCallsUntil = Date.now() + 15000;
+            
+            // Navigate back to calls page
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('calls');
+              
+              // Dispatch restore event after short delay
+              setTimeout(() => {
+                try {
+                  const ev = new CustomEvent('pc:calls-restore', {
+                    detail: {
+                      page: restore.page,
+                      currentPage: restore.currentPage || restore.page,
+                      scroll: restore.scroll,
+                      filters: restore.filters,
+                      searchTerm: restore.searchTerm,
+                      selectedItems: restore.selectedItems
+                    }
+                  });
+                  document.dispatchEvent(ev);
+                  
+                  // Clear navigation markers
+                  window._contactNavigationSource = null;
+                  window._callsReturn = null;
+                } catch (_) {}
+              }, 60);
+            }
+          } catch (_) {
+            // Fallback: just navigate
+            if (window.crm && typeof window.crm.navigateToPage === 'function') {
+              window.crm.navigateToPage('calls');
+            }
           }
-          // Clear the navigation source after successful navigation
+          
           window._contactNavigationSource = null;
           window._contactNavigationContactId = null;
           return;
