@@ -4859,16 +4859,15 @@ class PowerChoosersCRM {
             console.log('[CRM] Tasks and News loaded together');
         });
         
-        // Update live price every 5 minutes
+        // OPTIMIZED: Increased from 5 to 10 minutes to reduce API calls and Cloud Run costs
+        // Energy prices don't change frequently enough to warrant 5-minute updates
         setInterval(() => {
             this.updateLivePrice();
-        }, 300000);
+        }, 10 * 60 * 1000); // 10 minutes (increased from 5 minutes)
 
-        // Auto-refresh Energy News every 3 hours, starting immediately
-        if (this.newsRefreshTimer) clearInterval(this.newsRefreshTimer);
-        this.newsRefreshTimer = setInterval(() => {
-            this.loadEnergyNews();
-        }, 3 * 60 * 60 * 1000);
+        // Energy News auto-refresh removed for cost optimization
+        // News is cached server-side for 6 hours, users can manually refresh if needed
+        // This eliminates unnecessary API calls and Gemini AI costs
         
         // Start email automation monitor
         // Client-side email automation is now handled by Cloud Scheduler cron jobs
@@ -4881,10 +4880,12 @@ class PowerChoosersCRM {
         
         console.log('[CRM] Starting email automation monitor...');
         
-        // Check every 2 minutes
+        // OPTIMIZED: Increased from 2 to 5 minutes to reduce Cloud Run costs
+        // Note: Cloud Scheduler cron jobs handle email automation in production
+        // This client-side check is a backup and should run less frequently
         this.emailAutomationInterval = setInterval(async () => {
             await this.checkScheduledEmails();
-        }, 2 * 60 * 1000); // 2 minutes
+        }, 5 * 60 * 1000); // 5 minutes (reduced from 2 minutes)
         
         // Run immediately on start (after a 5 second delay to let things initialize)
         setTimeout(() => {
@@ -5615,10 +5616,9 @@ class PowerChoosersCRM {
 
         try {
             const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+            // OPTIMIZED: Removed duplicate Cloud Run API call on localhost to reduce Cloud Run costs
+            // Localhost should use local server, not hit production Cloud Run
             const urls = [`${base}/api/energy-news`];
-            if (!base || base.includes('localhost') || base.includes('127.0.0.1')) {
-                urls.push('https://power-choosers-crm-792458658491.us-south1.run.app/api/energy-news');
-            }
 
             let data = null;
             let lastError = null;
