@@ -1,5 +1,6 @@
 import admin from 'firebase-admin';
 import { db } from './_firebase.js';
+import logger from './_logger.js';
 const BATCH_SIZE = 25;
 const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -23,11 +24,11 @@ export default async function handler(req, res) {
 
   const isProduction = process.env.NODE_ENV === 'production';
   // Always log key events (even in production, but keep detailed logs conditional)
-  const logAlways = (msg) => console.log(`[ProcessSequenceActivations] [${new Date().toISOString()}] ${msg}`);
+  const logAlways = (msg) => logger.log(`[ProcessSequenceActivations] [${new Date().toISOString()}] ${msg}`);
 
   try {
     if (!db) {
-      console.error('[ProcessSequenceActivations] Firestore not initialized. Missing Firebase service account env vars.');
+      logger.error('[ProcessSequenceActivations] Firestore not initialized. Missing Firebase service account env vars.');
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         success: false,
@@ -68,7 +69,7 @@ export default async function handler(req, res) {
     } catch (queryError) {
       // If query fails (e.g., missing index), log and return error
       logAlways(`Query error: ${queryError.message}`);
-      console.error('[ProcessSequenceActivations] Query failed:', queryError);
+      logger.error('[ProcessSequenceActivations] Query failed:', queryError);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         success: false,
@@ -99,7 +100,7 @@ export default async function handler(req, res) {
         await processSingleActivation(activationDoc.id, isProduction);
         processedCount++;
       } catch (error) {
-        console.error('[ProcessSequenceActivations] Failed to process activation:', activationDoc.id, error);
+        logger.error('[ProcessSequenceActivations] Failed to process activation:', activationDoc.id, error);
         errors.push({
           activationId: activationDoc.id,
           error: error.message
@@ -118,7 +119,7 @@ export default async function handler(req, res) {
     }));
 
   } catch (error) {
-    console.error('[ProcessSequenceActivations] Fatal error:', error);
+    logger.error('[ProcessSequenceActivations] Fatal error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: false,
@@ -129,7 +130,7 @@ export default async function handler(req, res) {
 
 async function processSingleActivation(activationId, isProduction) {
   const activationRef = db.collection('sequenceActivations').doc(activationId);
-  const logAlways = (msg) => console.log(`[ProcessSequenceActivations] [${new Date().toISOString()}] ${msg}`);
+  const logAlways = (msg) => logger.log(`[ProcessSequenceActivations] [${new Date().toISOString()}] ${msg}`);
 
   logAlways(`Processing activation: ${activationId}`);
 
@@ -153,18 +154,18 @@ async function processSingleActivation(activationId, isProduction) {
 
         if (processingStartedAt && (now.getTime() - processingStartedAt.getTime() < STALE_THRESHOLD_MS)) {
           if (!isProduction) {
-            console.log(`[ProcessSequenceActivations] Activation ${activationId} already being processed`);
+            logger.log(`[ProcessSequenceActivations] Activation ${activationId} already being processed`);
           }
           // Don't throw error - just return success (idempotent behavior)
           return;
         } else {
           if (!isProduction) {
-            console.warn(`[ProcessSequenceActivations] Activation ${activationId} is stale, re-claiming`);
+            logger.warn(`[ProcessSequenceActivations] Activation ${activationId} is stale, re-claiming`);
           }
         }
       } else if (currentStatus === 'completed') {
         if (!isProduction) {
-          console.log(`[ProcessSequenceActivations] Activation ${activationId} already completed`);
+          logger.log(`[ProcessSequenceActivations] Activation ${activationId} already completed`);
         }
         return;
       }
@@ -205,7 +206,7 @@ async function processSingleActivation(activationId, isProduction) {
     }
 
     if (!isProduction) {
-      console.log(`[ProcessSequenceActivations] Processing ${remainingContacts.length} contacts for activation ${activationId}`);
+      logger.log(`[ProcessSequenceActivations] Processing ${remainingContacts.length} contacts for activation ${activationId}`);
     }
 
     // Load contact data
@@ -223,7 +224,7 @@ async function processSingleActivation(activationId, isProduction) {
           }
           return null;
         } catch (error) {
-          console.error(`[ProcessSequenceActivations] Failed to load contact ${contactId}:`, error);
+          logger.error(`[ProcessSequenceActivations] Failed to load contact ${contactId}:`, error);
           return null;
         }
       })
@@ -438,7 +439,7 @@ async function processSingleActivation(activationId, isProduction) {
     logAlways(`Updated activation ${activationId}: ${newProcessedCount}/${contactIds.length} contacts, ${emailsToCreate.length} emails created, status: ${isDone ? 'completed' : 'processing'}`);
 
   } catch (error) {
-    console.error(`[ProcessSequenceActivations] Error processing activation ${activationId}:`, error);
+    logger.error(`[ProcessSequenceActivations] Error processing activation ${activationId}:`, error);
 
     // Update status to failed
     try {
@@ -449,7 +450,7 @@ async function processSingleActivation(activationId, isProduction) {
         failedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     } catch (updateError) {
-      console.error(`[ProcessSequenceActivations] Failed to update error status:`, updateError);
+      logger.error(`[ProcessSequenceActivations] Failed to update error status:`, updateError);
     }
 
     throw error;

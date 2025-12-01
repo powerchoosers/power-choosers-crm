@@ -1,6 +1,7 @@
 // Vercel API endpoint for email webhooks
 import { cors } from '../_cors.js';
 import { admin, db } from '../_firebase.js';
+import logger from '../_logger.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -14,7 +15,7 @@ export default async function handler(req, res) {
   try {
     const { event, trackingId, data, _deliverability } = req.body;
 
-    console.log('[Email] Webhook received:', { event, trackingId, data });
+    logger.log('[Email] Webhook received:', { event, trackingId, data });
 
     // Get deliverability settings (default to enabled if not provided)
     const deliverabilitySettings = _deliverability || {
@@ -29,7 +30,7 @@ export default async function handler(req, res) {
 
     // If tracking is disabled, don't process webhook events
     if (!deliverabilitySettings.enableTracking) {
-      console.log('[Email] Tracking disabled by settings, ignoring webhook:', trackingId);
+      logger.log('[Email] Tracking disabled by settings, ignoring webhook:', trackingId);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, message: 'Tracking disabled' }));
       return;
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
     // Handle different webhook events
     switch (event) {
       case 'email_opened':
-        console.log('[Email] Email opened:', trackingId);
+        logger.log('[Email] Email opened:', trackingId);
         // Update database with open event if Firebase is available
         if (db) {
           try {
@@ -54,14 +55,14 @@ export default async function handler(req, res) {
               lastOpened: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             });
-            console.log('[Email] Successfully updated Firebase with open event');
+            logger.log('[Email] Successfully updated Firebase with open event');
           } catch (firebaseError) {
-            console.error('[Email] Firebase update error:', firebaseError);
+            logger.error('[Email] Firebase update error:', firebaseError);
           }
         }
         break;
       case 'email_replied':
-        console.log('[Email] Email replied:', trackingId);
+        logger.log('[Email] Email replied:', trackingId);
         // Update database with reply event if Firebase is available
         if (db) {
           try {
@@ -76,14 +77,14 @@ export default async function handler(req, res) {
               lastReplied: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             });
-            console.log('[Email] Successfully updated Firebase with reply event');
+            logger.log('[Email] Successfully updated Firebase with reply event');
           } catch (firebaseError) {
-            console.error('[Email] Firebase update error:', firebaseError);
+            logger.error('[Email] Firebase update error:', firebaseError);
           }
         }
         break;
       case 'email_bounced':
-        console.log('[Email] Email bounced:', trackingId);
+        logger.log('[Email] Email bounced:', trackingId);
         // Update database with bounce event if Firebase is available
         if (db) {
           try {
@@ -94,14 +95,14 @@ export default async function handler(req, res) {
               bouncedAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             });
-            console.log('[Email] Successfully updated Firebase with bounce event');
+            logger.log('[Email] Successfully updated Firebase with bounce event');
           } catch (firebaseError) {
-            console.error('[Email] Firebase update error:', firebaseError);
+            logger.error('[Email] Firebase update error:', firebaseError);
           }
         }
         break;
       default:
-        console.log('[Email] Unknown webhook event:', event);
+        logger.log('[Email] Unknown webhook event:', event);
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -109,7 +110,7 @@ export default async function handler(req, res) {
     return;
 
   } catch (error) {
-    console.error('[Email] Webhook error:', error);
+    logger.error('[Email] Webhook error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Failed to process webhook', message: error.message }));
     return;

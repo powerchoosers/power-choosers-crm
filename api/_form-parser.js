@@ -1,4 +1,5 @@
 import { parse } from 'querystring';
+import logger from './_logger.js';
 
 export async function readFormUrlEncodedBody(req) {
   return new Promise((resolve, reject) => {
@@ -10,12 +11,12 @@ export async function readFormUrlEncodedBody(req) {
       try {
         resolve(parse(body)); // Parse form-urlencoded string
       } catch (e) {
-        console.error('Error parsing form-urlencoded body:', e);
+        logger.error('Error parsing form-urlencoded body:', e);
         reject(new Error('Invalid form-urlencoded data'));
       }
     });
     req.on('error', err => {
-      console.error('Request stream error:', err);
+      logger.error('Request stream error:', err);
       reject(err);
     });
   });

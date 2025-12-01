@@ -1,5 +1,6 @@
 // Track email performance metrics for AI optimization
 // Expects POST { emailId, recipientEmail, subjectStyle, ctaType, openingStyle, timestamp, event }
+import logger from './_logger.js';
 
 function cors(req, res) {
   const origin = req.headers.origin;
@@ -75,7 +76,7 @@ return;
 res.end(JSON.stringify({ ok: true, tracked: true }));
 return;
   } catch (e) {
-    console.error('[Tracking Error]', e);
+    logger.error('[Tracking Error]', e);
     return res.writeHead(500, { 'Content-Type': 'application/json' });
 res.end(JSON.stringify({ error: 'Failed to track event' }));
 return;

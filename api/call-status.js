@@ -3,6 +3,7 @@
 
 import { cors } from './_cors.js';
 import { db, admin } from './_firebase.js';
+import logger from './_logger.js';
 
 // Normalize phone number to last 10 digits
 function normalizePhone(phone) {
@@ -64,11 +65,11 @@ async function hasCallsForPhone(phone, db, userEmail, isAdmin) {
       return false;
     } else {
       // No Firestore available - return false (don't fall back to limited memory store)
-      console.warn('[CallStatus] Firestore not available for phone check:', phone);
+      logger.warn('[CallStatus] Firestore not available for phone check:', phone);
       return false;
     }
   } catch (error) {
-    console.error('[CallStatus] Error checking phone:', phone, error);
+    logger.error('[CallStatus] Error checking phone:', phone, error);
     return false;
   }
 }
@@ -89,11 +90,11 @@ async function hasCallsForAccount(accountId, db, userEmail, isAdmin) {
       return !!hit;
     } else {
       // No Firestore available - return false (don't fall back to limited memory store)
-      console.warn('[CallStatus] Firestore not available for account check:', accountId);
+      logger.warn('[CallStatus] Firestore not available for account check:', accountId);
       return false;
     }
   } catch (error) {
-    console.error('[CallStatus] Error checking account:', accountId, error);
+    logger.error('[CallStatus] Error checking account:', accountId, error);
     return false;
   }
 }
@@ -114,11 +115,11 @@ async function hasCallsForContact(contactId, db, userEmail, isAdmin) {
       return !!hit;
     } else {
       // No Firestore available - return false (don't fall back to limited memory store)
-      console.warn('[CallStatus] Firestore not available for contact check:', contactId);
+      logger.warn('[CallStatus] Firestore not available for contact check:', contactId);
       return false;
     }
   } catch (error) {
-    console.error('[CallStatus] Error checking contact:', contactId, error);
+    logger.error('[CallStatus] Error checking contact:', contactId, error);
     return false;
   }
 }
@@ -213,7 +214,7 @@ export default async function handler(req, res) {
     res.end(JSON.stringify(result));
 
   } catch (error) {
-    console.error('[CallStatus] Error:', error);
+    logger.error('[CallStatus] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Internal server error' }));
   }

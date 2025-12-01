@@ -3,6 +3,7 @@
 import { cors } from './_cors.js';
 import { db } from './_firebase.js';
 import { resolveToCallSid, isCallSid } from './_twilio-ids.js';
+import logger from './_logger.js';
 
 // In-memory fallback store (for local/dev when Firestore isn't configured)
 const memoryStore = new Map();
@@ -417,7 +418,7 @@ export default async function handler(req, res) {
           res.end(JSON.stringify({ ok: true, updated: true }));
           return;
         } catch (error) {
-          console.error('Error updating call in Firestore:', error);
+          logger.error('Error updating call in Firestore:', error);
           res.statusCode = 500;
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify({ error: 'Failed to update call' }));
@@ -449,7 +450,7 @@ export default async function handler(req, res) {
     res.end(JSON.stringify({ error: 'Method not allowed' }));
   } catch (error) {
     try {
-      console.error('[api/calls] Error:', error);
+      logger.error('[api/calls] Error:', error);
     } catch (_) {}
     res.statusCode = 500;
     res.setHeader('Content-Type', 'application/json');

@@ -1,30 +1,6 @@
 import { db } from '../_firebase.js';
 import { createPublicKey, verify as cryptoVerify } from 'crypto';
-
-// Simple logging function for Cloud Run cost optimization
-const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
-const currentLogLevel = logLevels[process.env.LOG_LEVEL || 'info'];
-
-const logger = {
-  info: (message, context, data) => {
-    if (currentLogLevel >= logLevels.info && process.env.VERBOSE_LOGS === 'true') {
-      console.log(`[${context}] ${message}`, data || '');
-    }
-  },
-  error: (message, context, data) => {
-    console.error(`[${context}] ${message}`, data || '');
-  },
-  debug: (message, context, data) => {
-    if (currentLogLevel >= logLevels.debug && process.env.VERBOSE_LOGS === 'true') {
-      console.log(`[${context}] ${message}`, data || '');
-    }
-  },
-  warn: (message, context, data) => {
-    if (currentLogLevel >= logLevels.warn) {
-      console.warn(`[${context}] ${message}`, data || '');
-    }
-  }
-};
+import logger from '../_logger.js';
 
 // Build KeyObject from SendGrid Signed Events public key stored in Cloud Run env
 // Env contains base64-encoded Ed25519 public key (SPKI/DER as shown in SendGrid UI)
@@ -80,7 +56,7 @@ export default async function handler(req, res) {
       // For Ed25519, pass algorithm null
       verified = cryptoVerify(null, msg, key, Buffer.from(sig, 'base64'));
     } catch (e) {
-      console.error('[SendGrid Webhook] Signature verification error:', e);
+      logger.error('[SendGrid Webhook] Signature verification error:', e);
       verified = false;
     }
 
@@ -105,7 +81,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    logger.debug('Processing SendGrid events', 'SendGridWebhook', { eventCount: events.length });
+    logger.debug('[SendGridWebhook] Processing SendGrid events', { eventCount: events.length });
 
     for (const event of events) {
       await processSendGridEvent(event);
@@ -116,7 +92,7 @@ export default async function handler(req, res) {
     return;
 
   } catch (error) {
-    console.error('[SendGrid Webhook] Error:', error);
+    logger.error('[SendGrid Webhook] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Failed to process webhook' }));
     return;
@@ -127,7 +103,7 @@ async function processSendGridEvent(event) {
   const { event: eventType, email, sg_message_id, sg_event_id, timestamp, reason, category, url } = event;
   const trackingId = (event.custom_args && (event.custom_args.trackingId || event.custom_args.trackingID)) || null;
 
-  logger.debug('Processing SendGrid event', 'SendGridWebhook', {
+  logger.debug('[SendGridWebhook] Processing SendGrid event', {
     eventType,
     email,
     sgMessageId: sg_message_id,
@@ -137,7 +113,7 @@ async function processSendGridEvent(event) {
     trackingId: trackingId
   });
 
-  console.log(`[SendGrid Webhook] Event: ${eventType}, Email: ${email}, TrackingId: ${trackingId || 'MISSING'}`);
+  logger.log(`[SendGrid Webhook] Event: ${eventType}, Email: ${email}, TrackingId: ${trackingId || 'MISSING'}`);
 
   try {
     switch (eventType) {
@@ -174,10 +150,10 @@ async function processSendGridEvent(event) {
         break;
 
       default:
-        console.log(`[SendGrid Webhook] Unhandled event type: ${eventType}`);
+        logger.log(`[SendGrid Webhook] Unhandled event type: ${eventType}`);
     }
   } catch (error) {
-    console.error(`[SendGrid Webhook] Error processing ${eventType}:`, error);
+    logger.error(`[SendGrid Webhook] Error processing ${eventType}:`, error);
   }
 }
 
@@ -197,7 +173,7 @@ async function handleDelivered(email, sgMessageId, timestamp, trackingId) {
           sgMessageId: sgMessageId,
           updatedAt: new Date().toISOString()
         });
-        console.log(`[SendGrid Webhook] Marked email as delivered by trackingId: ${trackingId}`);
+        logger.log(`[SendGrid Webhook] Marked email as delivered by trackingId: ${trackingId}`);
         return;
       }
     } catch (_) { /* continue to fallbacks */ }
@@ -229,7 +205,7 @@ async function handleDelivered(email, sgMessageId, timestamp, trackingId) {
       sgMessageId: sgMessageId,
       updatedAt: new Date().toISOString()
     });
-    console.log(`[SendGrid Webhook] Marked email as delivered (fallback): ${email}`);
+    logger.log(`[SendGrid Webhook] Marked email as delivered (fallback): ${email}`);
   }
 }
 
@@ -245,7 +221,7 @@ async function handleOpen(email, sgMessageId, sgEventId, timestamp, trackingId) 
 
         // Deduplication: Check if this event ID already exists
         if (emailData.opens && emailData.opens.some(o => o.sgEventId === sgEventId)) {
-          console.log(`[SendGrid Webhook] Duplicate open event ignored: ${sgEventId}`);
+          logger.log(`[SendGrid Webhook] Duplicate open event ignored: ${sgEventId}`);
           return;
         }
 
@@ -262,7 +238,7 @@ async function handleOpen(email, sgMessageId, sgEventId, timestamp, trackingId) 
           lastOpened: openData.openedAt,
           updatedAt: new Date().toISOString()
         });
-        console.log(`[SendGrid Webhook] Recorded open by trackingId: ${trackingId}`);
+        logger.log(`[SendGrid Webhook] Recorded open by trackingId: ${trackingId}`);
         return;
       }
     } catch (_) { /* continue to fallbacks */ }
@@ -309,7 +285,7 @@ async function handleOpen(email, sgMessageId, sgEventId, timestamp, trackingId) 
 
     // Deduplication: Check if this event ID already exists
     if (emailData.opens && emailData.opens.some(o => o.sgEventId === sgEventId)) {
-      console.log(`[SendGrid Webhook] Duplicate open event ignored (fallback): ${sgEventId}`);
+      logger.log(`[SendGrid Webhook] Duplicate open event ignored (fallback): ${sgEventId}`);
       return;
     }
 
@@ -328,9 +304,9 @@ async function handleOpen(email, sgMessageId, sgEventId, timestamp, trackingId) 
       updatedAt: new Date().toISOString()
     });
 
-    console.log(`[SendGrid Webhook] Recorded open for ${email} (${emailDoc.id})`);
+    logger.log(`[SendGrid Webhook] Recorded open for ${email} (${emailDoc.id})`);
   } else {
-    console.log(`[SendGrid Webhook] Email not found for open event: ${email} (${sgMessageId})`);
+    logger.log(`[SendGrid Webhook] Email not found for open event: ${email} (${sgMessageId})`);
   }
 }
 
@@ -346,7 +322,7 @@ async function handleClick(email, sgMessageId, sgEventId, timestamp, url, tracki
 
         // Deduplication: Check if this event ID already exists
         if (emailData.clicks && emailData.clicks.some(c => c.sgEventId === sgEventId)) {
-          console.log(`[SendGrid Webhook] Duplicate click event ignored: ${sgEventId}`);
+          logger.log(`[SendGrid Webhook] Duplicate click event ignored: ${sgEventId}`);
           return;
         }
 
@@ -364,7 +340,7 @@ async function handleClick(email, sgMessageId, sgEventId, timestamp, url, tracki
           lastClicked: clickData.clickedAt,
           updatedAt: new Date().toISOString()
         });
-        console.log(`[SendGrid Webhook] Recorded click by trackingId: ${trackingId}`);
+        logger.log(`[SendGrid Webhook] Recorded click by trackingId: ${trackingId}`);
         return;
       }
     } catch (_) { /* continue to fallbacks */ }
@@ -411,7 +387,7 @@ async function handleClick(email, sgMessageId, sgEventId, timestamp, url, tracki
 
     // Deduplication: Check if this event ID already exists
     if (emailData.clicks && emailData.clicks.some(c => c.sgEventId === sgEventId)) {
-      console.log(`[SendGrid Webhook] Duplicate click event ignored (fallback): ${sgEventId}`);
+      logger.log(`[SendGrid Webhook] Duplicate click event ignored (fallback): ${sgEventId}`);
       return;
     }
 
@@ -431,9 +407,9 @@ async function handleClick(email, sgMessageId, sgEventId, timestamp, url, tracki
       updatedAt: new Date().toISOString()
     });
 
-    console.log(`[SendGrid Webhook] Recorded click for ${email} (${emailDoc.id}): ${url}`);
+    logger.log(`[SendGrid Webhook] Recorded click for ${email} (${emailDoc.id}): ${url}`);
   } else {
-    console.log(`[SendGrid Webhook] Email not found for click event: ${email} (${sgMessageId})`);
+    logger.log(`[SendGrid Webhook] Email not found for click event: ${email} (${sgMessageId})`);
   }
 }
 
@@ -458,27 +434,27 @@ async function handleBounce(email, sgMessageId, timestamp, reason, category) {
     });
   }
 
-  console.log(`[SendGrid Webhook] Contact bounced: ${email} - ${reason}`);
+  logger.log(`[SendGrid Webhook] Contact bounced: ${email} - ${reason}`);
 }
 
 async function handleBlocked(email, sgMessageId, timestamp, reason) {
   await suppressContact(email, 'blocked', reason);
-  console.log(`[SendGrid Webhook] Contact blocked: ${email} - ${reason}`);
+  logger.log(`[SendGrid Webhook] Contact blocked: ${email} - ${reason}`);
 }
 
 async function handleSpamReport(email, sgMessageId, timestamp) {
   await suppressContact(email, 'spam_reported', 'User marked as spam');
-  console.log(`[SendGrid Webhook] Spam report: ${email}`);
+  logger.log(`[SendGrid Webhook] Spam report: ${email}`);
 }
 
 async function handleUnsubscribe(email, sgMessageId, timestamp) {
   await suppressContact(email, 'unsubscribed', 'User unsubscribed');
-  console.log(`[SendGrid Webhook] Unsubscribe: ${email}`);
+  logger.log(`[SendGrid Webhook] Unsubscribe: ${email}`);
 }
 
 async function handleGroupUnsubscribe(email, sgMessageId, timestamp) {
   await suppressContact(email, 'group_unsubscribed', 'User unsubscribed from group');
-  console.log(`[SendGrid Webhook] Group unsubscribe: ${email}`);
+  logger.log(`[SendGrid Webhook] Group unsubscribe: ${email}`);
 }
 
 async function suppressContact(email, reason, details) {
@@ -525,6 +501,6 @@ async function suppressContact(email, reason, details) {
     }
 
   } catch (error) {
-    console.error(`[SendGrid Webhook] Error suppressing contact ${email}:`, error);
+    logger.error(`[SendGrid Webhook] Error suppressing contact ${email}:`, error);
   }
 }

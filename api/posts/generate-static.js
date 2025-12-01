@@ -6,6 +6,7 @@
 
 import { cors } from '../_cors.js';
 import { admin, db } from '../_firebase.js';
+import logger from '../_logger.js';
 
 export const config = {
   api: {
@@ -40,29 +41,29 @@ function getStorageBucket() {
     storageBucket = `${projectId}.firebasestorage.app`;
   }
 
-  console.log('[GenerateStatic] Attempting to use storage bucket:', storageBucket);
-  console.log('[GenerateStatic] Project ID:', projectId);
-  console.log('[GenerateStatic] Env vars - _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:', process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
-  console.log('[GenerateStatic] Env vars - FIREBASE_STORAGE_BUCKET:', process.env.FIREBASE_STORAGE_BUCKET);
+  logger.log('[GenerateStatic] Attempting to use storage bucket:', storageBucket);
+  logger.log('[GenerateStatic] Project ID:', projectId);
+  logger.log('[GenerateStatic] Env vars - _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:', process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+  logger.log('[GenerateStatic] Env vars - FIREBASE_STORAGE_BUCKET:', process.env.FIREBASE_STORAGE_BUCKET);
 
   // Firebase Admin SDK: Use default bucket (no name) - this automatically uses the project's default bucket
   // The default bucket is created automatically when Firebase Storage is enabled
   // This avoids bucket name format issues between Firebase Storage URLs and GCS bucket names
-  console.log('[GenerateStatic] Using default bucket (no name specified - uses project default)');
+  logger.log('[GenerateStatic] Using default bucket (no name specified - uses project default)');
   try {
     const bucket = admin.storage().bucket(); // No name = uses default bucket
-    console.log('[GenerateStatic] Default bucket retrieved successfully');
+    logger.log('[GenerateStatic] Default bucket retrieved successfully');
     return bucket;
   } catch (error) {
-    console.error('[GenerateStatic] Failed to get default bucket:', error);
+    logger.error('[GenerateStatic] Failed to get default bucket:', error);
 
     // Fallback: Try with explicit bucket name if env var is set
     if (storageBucket) {
-      console.log('[GenerateStatic] Trying explicit bucket name as fallback:', storageBucket);
+      logger.log('[GenerateStatic] Trying explicit bucket name as fallback:', storageBucket);
       try {
         return admin.storage().bucket(storageBucket);
       } catch (fallbackError) {
-        console.error('[GenerateStatic] Fallback bucket also failed:', fallbackError);
+        logger.error('[GenerateStatic] Fallback bucket also failed:', fallbackError);
       }
     }
 
@@ -365,9 +366,9 @@ function escapeHtml(text) {
 // Upload HTML file to Firebase Storage
 async function uploadHTMLToStorage(bucket, filename, htmlContent) {
   try {
-    console.log('[GenerateStatic] Uploading to bucket:', bucket.name);
+    logger.log('[GenerateStatic] Uploading to bucket:', bucket.name);
     const file = bucket.file(`posts/${filename}`);
-    console.log('[GenerateStatic] File path: posts/' + filename);
+    logger.log('[GenerateStatic] File path: posts/' + filename);
 
     // With uniform bucket-level access and domain-restricted sharing, we can't use public IAM
     // Use signed URLs with long expiration instead (10 years = effectively permanent)
@@ -378,7 +379,7 @@ async function uploadHTMLToStorage(bucket, filename, htmlContent) {
       },
     });
 
-    console.log('[GenerateStatic] File saved successfully');
+    logger.log('[GenerateStatic] File saved successfully');
 
     // Generate signed URL with 10-year expiration (effectively permanent for blog posts)
     // This works even with domain-restricted sharing policies
@@ -388,14 +389,14 @@ async function uploadHTMLToStorage(bucket, filename, htmlContent) {
       expires: Date.now() + expiresIn,
     });
 
-    console.log('[GenerateStatic] Signed URL generated (expires in 10 years)');
+    logger.log('[GenerateStatic] Signed URL generated (expires in 10 years)');
 
     return signedUrl;
   } catch (error) {
-    console.error('[GenerateStatic] Error uploading HTML file:', error);
-    console.error('[GenerateStatic] Bucket name:', bucket.name);
-    console.error('[GenerateStatic] Error code:', error.code);
-    console.error('[GenerateStatic] Error message:', error.message);
+    logger.error('[GenerateStatic] Error uploading HTML file:', error);
+    logger.error('[GenerateStatic] Bucket name:', bucket.name);
+    logger.error('[GenerateStatic] Error code:', error.code);
+    logger.error('[GenerateStatic] Error message:', error.message);
 
     // If bucket doesn't exist, provide helpful error
     if (error.code === 404 || error.message.includes('does not exist')) {
@@ -437,7 +438,7 @@ async function updatePostsList(bucket, posts) {
   };
 
   try {
-    console.log('[GenerateStatic] Updating posts-list.json in bucket:', bucket.name);
+    logger.log('[GenerateStatic] Updating posts-list.json in bucket:', bucket.name);
     const file = bucket.file('posts-list.json');
 
     // With uniform bucket-level access and domain-restricted sharing, we can't use public IAM
@@ -449,7 +450,7 @@ async function updatePostsList(bucket, posts) {
       },
     });
 
-    console.log('[GenerateStatic] posts-list.json saved successfully');
+    logger.log('[GenerateStatic] posts-list.json saved successfully');
 
     // Generate signed URL with 10-year expiration (effectively permanent)
     // This works even with domain-restricted sharing policies
@@ -459,15 +460,15 @@ async function updatePostsList(bucket, posts) {
       expires: Date.now() + expiresIn,
     });
 
-    console.log('[GenerateStatic] posts-list.json created/updated with', posts.length, 'posts');
-    console.log('[GenerateStatic] posts-list.json signed URL generated (expires in 10 years)');
+    logger.log('[GenerateStatic] posts-list.json created/updated with', posts.length, 'posts');
+    logger.log('[GenerateStatic] posts-list.json signed URL generated (expires in 10 years)');
 
     return signedUrl;
   } catch (error) {
-    console.error('[GenerateStatic] Error updating posts-list.json:', error);
-    console.error('[GenerateStatic] Bucket name:', bucket.name);
-    console.error('[GenerateStatic] Error code:', error.code);
-    console.error('[GenerateStatic] Error message:', error.message);
+    logger.error('[GenerateStatic] Error updating posts-list.json:', error);
+    logger.error('[GenerateStatic] Bucket name:', bucket.name);
+    logger.error('[GenerateStatic] Error code:', error.code);
+    logger.error('[GenerateStatic] Error message:', error.message);
 
     // If bucket doesn't exist, provide helpful error
     if (error.code === 404 || error.message.includes('does not exist')) {
@@ -479,15 +480,15 @@ async function updatePostsList(bucket, posts) {
 }
 
 export default async function handler(req, res) {
-  console.log('[GenerateStatic] Request received:', req.method);
+  logger.log('[GenerateStatic] Request received:', req.method);
 
   if (cors(req, res)) {
-    console.log('[GenerateStatic] CORS preflight handled');
+    logger.log('[GenerateStatic] CORS preflight handled');
     return;
   }
 
   if (req.method !== 'POST') {
-    console.log('[GenerateStatic] Invalid method:', req.method);
+    logger.log('[GenerateStatic] Invalid method:', req.method);
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
@@ -501,9 +502,9 @@ export default async function handler(req, res) {
       let bucket;
       try {
         bucket = getStorageBucket();
-        console.log('[GenerateStatic] Bucket retrieved successfully for list regeneration');
+        logger.log('[GenerateStatic] Bucket retrieved successfully for list regeneration');
       } catch (bucketError) {
-        console.error('[GenerateStatic] Failed to get storage bucket:', bucketError);
+        logger.error('[GenerateStatic] Failed to get storage bucket:', bucketError);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           error: 'Failed to access Firebase Storage',
@@ -524,7 +525,7 @@ export default async function handler(req, res) {
           publishedPosts.push({ id: doc.id, ...doc.data() });
         });
       } catch (indexError) {
-        console.warn('[GenerateStatic] Composite index not found, using fallback query:', indexError.message);
+        logger.warn('[GenerateStatic] Composite index not found, using fallback query:', indexError.message);
         try {
           const publishedPostsSnapshot = await db.collection('posts')
             .where('status', '==', 'published')
@@ -541,7 +542,7 @@ export default async function handler(req, res) {
             return dateB - dateA;
           });
         } catch (fallbackError) {
-          console.error('[GenerateStatic] Error fetching published posts:', fallbackError);
+          logger.error('[GenerateStatic] Error fetching published posts:', fallbackError);
           publishedPosts = [];
         }
       }
@@ -559,14 +560,14 @@ export default async function handler(req, res) {
     }
 
     if (!postId) {
-      console.log('[GenerateStatic] No postId provided');
+      logger.log('[GenerateStatic] No postId provided');
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'postId is required' }));
       return;
     }
 
     if (!db) {
-      console.error('[GenerateStatic] Firestore not initialized');
+      logger.error('[GenerateStatic] Firestore not initialized');
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Database not available' }));
       return;
@@ -576,7 +577,7 @@ export default async function handler(req, res) {
     const postDoc = await db.collection('posts').doc(postId).get();
 
     if (!postDoc.exists) {
-      console.log('[GenerateStatic] Post not found:', postId);
+      logger.log('[GenerateStatic] Post not found:', postId);
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Post not found' }));
       return;
@@ -586,7 +587,7 @@ export default async function handler(req, res) {
 
     // Only generate static HTML for published posts
     if (post.status !== 'published') {
-      console.log('[GenerateStatic] Post is not published, skipping static generation:', postId);
+      logger.log('[GenerateStatic] Post is not published, skipping static generation:', postId);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         success: true,
@@ -600,9 +601,9 @@ export default async function handler(req, res) {
     let bucket;
     try {
       bucket = getStorageBucket();
-      console.log('[GenerateStatic] Bucket retrieved successfully');
+      logger.log('[GenerateStatic] Bucket retrieved successfully');
     } catch (bucketError) {
-      console.error('[GenerateStatic] Failed to get storage bucket:', bucketError);
+      logger.error('[GenerateStatic] Failed to get storage bucket:', bucketError);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         error: 'Failed to access Firebase Storage',
@@ -645,7 +646,7 @@ export default async function handler(req, res) {
         };
       });
     } catch (error) {
-      console.warn('[GenerateStatic] Error fetching recent posts:', error);
+      logger.warn('[GenerateStatic] Error fetching recent posts:', error);
       // Continue without recent posts if there's an error
       recentPosts = [];
     }
@@ -675,7 +676,7 @@ export default async function handler(req, res) {
         }
       }
     } catch (settingsError) {
-      console.warn('[GenerateStatic] Could not fetch author info from settings:', settingsError.message);
+      logger.warn('[GenerateStatic] Could not fetch author info from settings:', settingsError.message);
       // Continue without author info if settings fetch fails
     }
 
@@ -684,9 +685,9 @@ export default async function handler(req, res) {
     const filename = `${post.slug || post.id}.html`;
 
     // Upload HTML file
-    console.log('[GenerateStatic] Uploading HTML file:', filename);
+    logger.log('[GenerateStatic] Uploading HTML file:', filename);
     const htmlUrl = await uploadHTMLToStorage(bucket, filename, htmlContent);
-    console.log('[GenerateStatic] HTML uploaded:', htmlUrl);
+    logger.log('[GenerateStatic] HTML uploaded:', htmlUrl);
 
     // Get all published posts for index
     // Note: This query requires a Firestore composite index on (status, publishDate)
@@ -703,7 +704,7 @@ export default async function handler(req, res) {
       });
     } catch (indexError) {
       // If composite index doesn't exist, fallback to simpler query
-      console.warn('[GenerateStatic] Composite index not found, using fallback query:', indexError.message);
+      logger.warn('[GenerateStatic] Composite index not found, using fallback query:', indexError.message);
       try {
         const publishedPostsSnapshot = await db.collection('posts')
           .where('status', '==', 'published')
@@ -720,16 +721,16 @@ export default async function handler(req, res) {
           return dateB - dateA; // Descending order
         });
       } catch (fallbackError) {
-        console.error('[GenerateStatic] Error fetching published posts:', fallbackError);
+        logger.error('[GenerateStatic] Error fetching published posts:', fallbackError);
         // Continue with empty array - at least the current post will be in the list
         publishedPosts = [{ id: post.id, ...post }];
       }
     }
 
     // Update posts-list.json
-    console.log('[GenerateStatic] Updating posts-list.json with', publishedPosts.length, 'posts');
+    logger.log('[GenerateStatic] Updating posts-list.json with', publishedPosts.length, 'posts');
     const listUrl = await updatePostsList(bucket, publishedPosts);
-    console.log('[GenerateStatic] posts-list.json updated:', listUrl);
+    logger.log('[GenerateStatic] posts-list.json updated:', listUrl);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -740,7 +741,7 @@ export default async function handler(req, res) {
     }));
 
   } catch (error) {
-    console.error('[GenerateStatic] Error:', error);
+    logger.error('[GenerateStatic] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       error: 'Failed to generate static HTML',

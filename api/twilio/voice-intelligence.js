@@ -1,5 +1,6 @@
 import twilio from 'twilio';
 import { cors } from '../_cors.js';
+import logger from '../_logger.js';
 
 // Generate AI-powered live tips for energy sales calls
 function generateLiveTips(insights) {
@@ -105,8 +106,8 @@ async function handler(req, res) {
     try {
         const { CallSid, VoiceIntelligenceInsights } = req.body;
         
-        console.log(`[Voice Intelligence] Received insights for call: ${CallSid}`);
-        console.log(`[Voice Intelligence] Insights:`, JSON.stringify(VoiceIntelligenceInsights, null, 2));
+        logger.log(`[Voice Intelligence] Received insights for call: ${CallSid}`);
+        logger.log(`[Voice Intelligence] Insights:`, JSON.stringify(VoiceIntelligenceInsights, null, 2));
         
         if (!CallSid || !VoiceIntelligenceInsights) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -153,13 +154,13 @@ async function handler(req, res) {
                     }
                 })
             }).catch((error) => {
-                console.warn('[Voice Intelligence] Failed posting insights to /api/calls:', error?.message);
+                logger.warn('[Voice Intelligence] Failed posting insights to /api/calls:', error?.message);
             });
         } catch (e) {
-            console.warn('[Voice Intelligence] Failed posting insights to /api/calls:', e?.message);
+            logger.warn('[Voice Intelligence] Failed posting insights to /api/calls:', e?.message);
         }
         
-        console.log(`[Voice Intelligence] Processing completed for call: ${CallSid}`);
+        logger.log(`[Voice Intelligence] Processing completed for call: ${CallSid}`);
         
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -169,7 +170,7 @@ async function handler(req, res) {
         }));
         
     } catch (error) {
-        console.error('[Voice Intelligence] Error:', error);
+        logger.error('[Voice Intelligence] Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             error: 'Internal server error',

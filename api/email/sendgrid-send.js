@@ -1,6 +1,7 @@
 // API endpoint for sending emails via SendGrid (replaces Gmail API)
 import { cors } from '../_cors.js';
 import SendGridService from './sendgrid-service.js';
+import logger from '../_logger.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -71,7 +72,7 @@ export default async function handler(req, res) {
       emailSettings: emailSettings || null // Pass through for logging/debugging
     };
 
-    console.log('[SendGrid] Sending email:', { to, subject, trackingId, deliverability });
+    logger.log('[SendGrid] Sending email:', { to, subject, trackingId, deliverability });
 
     const sendGridService = new SendGridService();
     const result = await sendGridService.sendEmail(emailData);
@@ -85,7 +86,7 @@ export default async function handler(req, res) {
     }));
 
   } catch (error) {
-    console.error('[SendGrid] Send error:', error);
+    logger.error('[SendGrid] Send error:', error);
 
     // Extract more detailed error information (per Twilio recommendations)
     let errorMessage = error.message || 'Failed to send email';
@@ -104,7 +105,7 @@ export default async function handler(req, res) {
           help: e.help || null
         }));
         errorMessage = errorDetails.map(e => e.message).join('; ');
-        console.error('[SendGrid] SendGrid API Error Details:', errorDetails);
+        logger.error('[SendGrid] SendGrid API Error Details:', errorDetails);
       } else if (error.response.body.message) {
         errorMessage = error.response.body.message;
       }

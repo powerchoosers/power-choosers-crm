@@ -1,4 +1,5 @@
 import twilio from 'twilio';
+import logger from '../_logger.js';
 
 // CORS middleware
 function corsMiddleware(req, res, next) {
@@ -44,7 +45,7 @@ export default async function handler(req, res) {
             friendlyName: 'Power Choosers CRM Business Line'
         });
         
-        console.log('[Caller ID] Validation request created:', callerIdValidation.sid);
+        logger.log('[Caller ID] Validation request created:', callerIdValidation.sid);
         
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
         }));
         
     } catch (error) {
-        console.error('[Caller ID] Error:', error);
+        logger.error('[Caller ID] Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
             error: 'Failed to initiate caller ID validation',

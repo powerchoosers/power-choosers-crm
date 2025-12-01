@@ -3,6 +3,7 @@
 
 import { admin, db } from '../_firebase.js';
 import crypto from 'crypto';
+import logger from '../_logger.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -80,7 +81,7 @@ export default async function handler(req, res) {
     res.end(JSON.stringify({ success: true, processed: toUpdate.length, lastId: snap.docs[snap.docs.length-1].id }));
     return;
   } catch (err) {
-    console.error('[BackfillThreads] Error:', err);
+    logger.error('[BackfillThreads] Error:', err);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Backfill failed', message: err.message }));
     return;

@@ -1,5 +1,6 @@
 import admin from 'firebase-admin';
 import { db } from './_firebase.js';
+import logger from './_logger.js';
 
 /**
  * Backfill script to create next tasks for existing sequence members
@@ -28,11 +29,11 @@ export default async function handler(req, res) {
         return;
     }
 
-    const logAlways = (msg) => console.log(`[BackfillSequenceTasks] [${new Date().toISOString()}] ${msg}`);
+    const logAlways = (msg) => logger.log(`[BackfillSequenceTasks] [${new Date().toISOString()}] ${msg}`);
 
     try {
         if (!db) {
-            console.error('[BackfillSequenceTasks] Firestore not initialized');
+            logger.error('[BackfillSequenceTasks] Firestore not initialized');
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 success: false,
@@ -352,7 +353,7 @@ export default async function handler(req, res) {
         }));
 
     } catch (error) {
-        console.error('[BackfillSequenceTasks] Error:', error);
+        logger.error('[BackfillSequenceTasks] Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             success: false,

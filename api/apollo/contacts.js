@@ -5,6 +5,7 @@
  */
 
 import { cors, fetchWithRetry, normalizeDomain, getApiKey, APOLLO_BASE_URL, formatLocation } from './_utils.js';
+import logger from '../_logger.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
     
     // Require at least one filter
     if (domains.length === 0 && companyIds.length === 0 && companyNames.length === 0) {
-      console.error('[Apollo Contacts] ERROR: No company filters provided in request');
+      logger.error('[Apollo Contacts] ERROR: No company filters provided in request');
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         error: 'Missing company filter: domains, ids, or names required',
@@ -104,7 +105,7 @@ export default async function handler(req, res) {
     if (companyIds.length > 0) {
       // Priority 1: Company ID filtering (most accurate, requires Apollo company ID)
       searchBody.organization_ids = companyIds;
-      console.log('[Apollo Contacts] Using company ID filter:', companyIds);
+      logger.log('[Apollo Contacts] Using company ID filter:', companyIds);
     } else {
       // Priority 2: Use BOTH company name AND domain together for maximum accuracy
       // This ensures we only get people who match BOTH criteria
@@ -113,18 +114,18 @@ export default async function handler(req, res) {
       if (companyNames.length > 0) {
         searchBody.q_organization_name = companyNames[0];
         filtersApplied++;
-        console.log('[Apollo Contacts] Added company name filter:', companyNames[0]);
+        logger.log('[Apollo Contacts] Added company name filter:', companyNames[0]);
       }
       
       if (domains.length > 0) {
         const normalizedDomains = domains.map(d => normalizeDomain(d));
         searchBody.q_organization_domains_list = normalizedDomains;
         filtersApplied++;
-        console.log('[Apollo Contacts] Added domain filter:', normalizedDomains);
+        logger.log('[Apollo Contacts] Added domain filter:', normalizedDomains);
       }
       
       if (filtersApplied === 0) {
-        console.error('[Apollo Contacts] ERROR: No valid filters after processing');
+        logger.error('[Apollo Contacts] ERROR: No valid filters after processing');
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
           error: 'No valid company filters could be applied',
@@ -135,11 +136,11 @@ export default async function handler(req, res) {
         return;
       }
       
-      console.log('[Apollo Contacts] Using combined filter strategy with', filtersApplied, 'filters');
+      logger.log('[Apollo Contacts] Using combined filter strategy with', filtersApplied, 'filters');
     }
     
-    console.log('[Apollo Contacts] Full search request:', JSON.stringify(searchBody, null, 2));
-    console.log('[Apollo Contacts] Input filters - domains:', domains, 'companyIds:', companyIds, 'companyNames:', companyNames);
+    logger.log('[Apollo Contacts] Full search request:', JSON.stringify(searchBody, null, 2));
+    logger.log('[Apollo Contacts] Input filters - domains:', domains, 'companyIds:', companyIds, 'companyNames:', companyNames);
     
     const searchUrl = `${APOLLO_BASE_URL}/mixed_people/search`;
     const searchResp = await fetchWithRetry(searchUrl, {
@@ -154,7 +155,7 @@ export default async function handler(req, res) {
 
     if (!searchResp.ok) {
       const text = await searchResp.text();
-      console.error('[Apollo Contacts] Search error:', searchResp.status, text);
+      logger.error('[Apollo Contacts] Search error:', searchResp.status, text);
       res.writeHead(searchResp.status, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         error: 'Apollo people search error', 
@@ -165,9 +166,9 @@ export default async function handler(req, res) {
 
     const searchData = await searchResp.json();
     
-    console.log('[Apollo Contacts] Search response:', searchData.people?.length || 0, 'contacts found');
+    logger.log('[Apollo Contacts] Search response:', searchData.people?.length || 0, 'contacts found');
     if (searchData.people && searchData.people.length > 0) {
-      console.log('[Apollo Contacts] First contact company:', searchData.people[0].organization?.name, 'Company ID:', searchData.people[0].organization_id);
+      logger.log('[Apollo Contacts] First contact company:', searchData.people[0].organization?.name, 'Company ID:', searchData.people[0].organization_id);
     }
     
     const apolloPeople = searchData.people || [];
@@ -187,12 +188,12 @@ export default async function handler(req, res) {
       }
     };
     
-    console.log('[Apollo Contacts] Returning', mappedContacts.length, 'mapped contacts');
+    logger.log('[Apollo Contacts] Returning', mappedContacts.length, 'mapped contacts');
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(response));
   } catch (e) {
-    console.error('[Apollo Contacts] Error:', e);
+    logger.error('[Apollo Contacts] Error:', e);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Server error', 

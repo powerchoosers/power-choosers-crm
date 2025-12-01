@@ -6,6 +6,7 @@
  */
 
 import { cors, fetchWithRetry, normalizeDomain, getApiKey, APOLLO_BASE_URL, formatLocation, formatEmployeeRange, formatRevenue } from './_utils.js';
+import logger from '../_logger.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -39,8 +40,8 @@ export default async function handler(req, res) {
       const normalizedDomain = normalizeDomain(domain);
       const enrichUrl = `${APOLLO_BASE_URL}/organizations/enrich?domain=${encodeURIComponent(normalizedDomain)}`;
       
-      console.log('[Apollo Company] 🔍 Enriching by domain (primary method):', normalizedDomain);
-      console.log('[Apollo Company] Request URL:', enrichUrl);
+      logger.log('[Apollo Company] 🔍 Enriching by domain (primary method):', normalizedDomain);
+      logger.log('[Apollo Company] Request URL:', enrichUrl);
       
       const enrichResp = await fetchWithRetry(enrichUrl, {
         method: 'GET',
@@ -53,20 +54,20 @@ export default async function handler(req, res) {
 
       if (enrichResp.ok) {
         const enrichData = await enrichResp.json();
-        console.log('[Apollo Company] ✅ Organization enriched successfully:', enrichData.organization?.name);
-        console.log('[Apollo Company] Description length:', enrichData.organization?.short_description?.length || 0, 'chars');
-        console.log('[Apollo Company] Company phone:', enrichData.organization?.phone || 'none');
+        logger.log('[Apollo Company] ✅ Organization enriched successfully:', enrichData.organization?.name);
+        logger.log('[Apollo Company] Description length:', enrichData.organization?.short_description?.length || 0, 'chars');
+        logger.log('[Apollo Company] Company phone:', enrichData.organization?.phone || 'none');
         
         if (enrichData.organization) {
           const companyData = mapApolloCompanyToLushaFormat(enrichData.organization);
-          console.log('[Apollo Company] 📦 Final enriched company data:', companyData.name, '-', companyData.domain);
+          logger.log('[Apollo Company] 📦 Final enriched company data:', companyData.name, '-', companyData.domain);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(companyData));
           return;
         }
       } else if (enrichResp.status === 404) {
-        console.log('[Apollo Company] ⚠️  Company not found in Apollo DB for domain:', normalizedDomain);
-        console.log('[Apollo Company] Returning minimal data to allow contacts search');
+        logger.log('[Apollo Company] ⚠️  Company not found in Apollo DB for domain:', normalizedDomain);
+        logger.log('[Apollo Company] Returning minimal data to allow contacts search');
         
         // Return minimal company data instead of error
         // This allows contacts search to proceed with domain/name filters
@@ -97,7 +98,7 @@ export default async function handler(req, res) {
         return;
       } else {
         const text = await enrichResp.text();
-        console.error('[Apollo Company] ❌ Enrichment error:', enrichResp.status, text);
+        logger.error('[Apollo Company] ❌ Enrichment error:', enrichResp.status, text);
         
         // Return minimal data on error to allow contacts search
         const minimalCompany = {
@@ -134,12 +135,12 @@ export default async function handler(req, res) {
     // ============================================================================
     
     if (companyId) {
-      console.log('[Apollo Company] 🔍 Enriching by organization ID (fallback method):', companyId);
+      logger.log('[Apollo Company] 🔍 Enriching by organization ID (fallback method):', companyId);
       const enrichUrl = `${APOLLO_BASE_URL}/organizations/enrich?domain=placeholder.com`; // Note: ID enrichment uses GET with query param
       
       // Try GET with ID in query string
       const enrichUrlWithId = `${APOLLO_BASE_URL}/organizations/${companyId}`;
-      console.log('[Apollo Company] Request URL:', enrichUrlWithId);
+      logger.log('[Apollo Company] Request URL:', enrichUrlWithId);
       
       const enrichResp = await fetchWithRetry(enrichUrlWithId, {
         method: 'GET',
@@ -152,18 +153,18 @@ export default async function handler(req, res) {
 
       if (enrichResp.ok) {
         const enrichData = await enrichResp.json();
-        console.log('[Apollo Company] ✅ Organization enriched by ID:', enrichData.organization?.name);
+        logger.log('[Apollo Company] ✅ Organization enriched by ID:', enrichData.organization?.name);
         
         if (enrichData.organization) {
           const companyData = mapApolloCompanyToLushaFormat(enrichData.organization);
-          console.log('[Apollo Company] 📦 Final company data:', companyData.name, '-', companyData.domain);
+          logger.log('[Apollo Company] 📦 Final company data:', companyData.name, '-', companyData.domain);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify(companyData));
           return;
         }
       } else {
         const text = await enrichResp.text();
-        console.error('[Apollo Company] ❌ ID enrichment error:', enrichResp.status, text);
+        logger.error('[Apollo Company] ❌ ID enrichment error:', enrichResp.status, text);
       }
     }
     
@@ -175,7 +176,7 @@ export default async function handler(req, res) {
     }));
     
   } catch (e) {
-    console.error('[Apollo Company] ❌ Server error:', e);
+    logger.error('[Apollo Company] ❌ Server error:', e);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Server error', 

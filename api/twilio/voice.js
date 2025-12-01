@@ -1,4 +1,5 @@
 import twilio from 'twilio';
+import logger from '../_logger.js';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 export default async function handler(req, res) {
@@ -37,7 +38,7 @@ export default async function handler(req, res) {
         const envBase = process.env.PUBLIC_BASE_URL || '';
         const base = host ? `${proto}://${host}` : (envBase || 'https://power-choosers-crm-792458658491.us-south1.run.app');
 
-        console.log(`[Voice Webhook] From: ${From || 'N/A'} To: ${To || 'N/A'} CallSid: ${CallSid || 'N/A'} inbound=${isInboundToBusiness} callerId=${callerIdForDial}`);
+        logger.log(`[Voice Webhook] From: ${From || 'N/A'} To: ${To || 'N/A'} CallSid: ${CallSid || 'N/A'} inbound=${isInboundToBusiness} callerId=${callerIdForDial}`);
 
         // Create TwiML response
         const twiml = new VoiceResponse();
@@ -73,7 +74,7 @@ export default async function handler(req, res) {
                 });
             }
             
-            console.log(`[Voice] Generated TwiML to dial <Client>agent</Client> with callerId: ${From || businessNumber}, originalCaller: ${From}`);
+            logger.log(`[Voice] Generated TwiML to dial <Client>agent</Client> with callerId: ${From || businessNumber}, originalCaller: ${From}`);
         } else if (To) {
             // OUTBOUND CALLBACK SCENARIO: Dial specific number provided
             // Use dynamic caller ID from From parameter (selected Twilio number from settings)
@@ -93,7 +94,7 @@ export default async function handler(req, res) {
                 recordingStatusCallbackMethod: 'POST'
             });
             dial.number(To);
-            console.log(`[Voice] Generated TwiML to dial number: ${To} with callerId: ${callerIdForDial}`);
+            logger.log(`[Voice] Generated TwiML to dial number: ${To} with callerId: ${callerIdForDial}`);
         } else {
             // Fallback: no specific target
             twiml.say('Please hold while we try to connect you.');
@@ -118,14 +119,14 @@ export default async function handler(req, res) {
         
         // Send TwiML response
         const xml = twiml.toString();
-        try { console.log('[Voice TwiML]', xml); } catch(_) {}
+        try { logger.log('[Voice TwiML]', xml); } catch(_) {}
         res.setHeader('Content-Type', 'text/xml');
         res.writeHead(200);
         res.end(xml);
         return;
         
     } catch (error) {
-        console.error('Voice webhook error:', error);
+        logger.error('Voice webhook error:', error);
         
         // Return error TwiML
         const twiml = new VoiceResponse();

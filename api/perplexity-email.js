@@ -4,6 +4,7 @@
 
 import { cors } from './_cors.js';
 import * as IndustryDetection from './_industry-detection.js';
+import logger from './_logger.js';
 
 // ========== SUBJECT LINE VARIANTS ==========
 // Multiple subject line options that randomly select to reduce template-like appearance
@@ -179,7 +180,7 @@ async function researchCompanyInfo(companyName, industry) {
   
   const cacheKey = `${companyName}_${industry}`;
   if (companyResearchCache.has(cacheKey)) {
-    console.log(`[Research] Using cached info for ${companyName}`);
+    logger.log(`[Research] Using cached info for ${companyName}`);
     return companyResearchCache.get(cacheKey);
   }
   
@@ -205,7 +206,7 @@ Keep it factual, specific, and useful for an energy cost discussion.`;
     });
     
     if (!response.ok) {
-      console.error(`[Research] API error: ${response.status}`);
+      logger.error(`[Research] API error: ${response.status}`);
       return null;
     }
     
@@ -213,13 +214,13 @@ Keep it factual, specific, and useful for an energy cost discussion.`;
     const description = data.choices?.[0]?.message?.content || null;
     
     if (description) {
-      console.log(`[Research] Found info for ${companyName}`);
+      logger.log(`[Research] Found info for ${companyName}`);
       companyResearchCache.set(cacheKey, description);
     }
     
     return description;
   } catch (error) {
-    console.error('[Research] Company research failed:', error);
+    logger.error('[Research] Company research failed:', error);
     return null;
   }
 }
@@ -230,7 +231,7 @@ async function saveAccountDescription(accountId, description) {
   try {
     const { db } = await import('./_firebase.js');
     if (!db) {
-      console.warn('[Research] Firestore not available, skipping save');
+      logger.warn('[Research] Firestore not available, skipping save');
       return false;
     }
     
@@ -242,12 +243,12 @@ async function saveAccountDescription(accountId, description) {
     
     await db.collection('accounts').doc(accountId).update(updateData);
     
-    console.log(`[Research] Saved description for account ${accountId}`);
+    logger.log(`[Research] Saved description for account ${accountId}`);
     
     // Return the saved data so we can notify the frontend
     return { id: accountId, description, timestamp: updateData.descriptionUpdatedAt };
   } catch (error) {
-    console.error('[Research] Failed to save description:', error);
+    logger.error('[Research] Failed to save description:', error);
     return false;
   }
 }
@@ -255,13 +256,13 @@ async function saveAccountDescription(accountId, description) {
 async function researchLinkedInCompany(linkedinUrl, companyName) {
   // Graceful handling: return null if no LinkedIn URL
   if (!linkedinUrl) {
-    console.log(`[LinkedIn] No LinkedIn URL for ${companyName}`);
+    logger.log(`[LinkedIn] No LinkedIn URL for ${companyName}`);
     return null;
   }
   
   const cacheKey = linkedinUrl;
   if (linkedinResearchCache.has(cacheKey)) {
-    console.log(`[LinkedIn] Using cached data for ${companyName}`);
+    logger.log(`[LinkedIn] Using cached data for ${companyName}`);
     return linkedinResearchCache.get(cacheKey);
   }
   
@@ -289,7 +290,7 @@ async function researchLinkedInCompany(linkedinUrl, companyName) {
     });
     
     if (!response.ok) {
-      console.error(`[LinkedIn] API error: ${response.status}`);
+      logger.error(`[LinkedIn] API error: ${response.status}`);
       return null;
     }
     
@@ -297,13 +298,13 @@ async function researchLinkedInCompany(linkedinUrl, companyName) {
     const linkedinData = data.choices?.[0]?.message?.content || null;
     
     if (linkedinData) {
-      console.log(`[LinkedIn] Found data for ${companyName}`);
+      logger.log(`[LinkedIn] Found data for ${companyName}`);
       linkedinResearchCache.set(cacheKey, linkedinData);
     }
     
     return linkedinData;
   } catch (error) {
-    console.error('[LinkedIn] Research failed:', error);
+    logger.error('[LinkedIn] Research failed:', error);
     return null; // Graceful failure
   }
 }
@@ -311,7 +312,7 @@ async function researchLinkedInCompany(linkedinUrl, companyName) {
 async function scrapeCompanyWebsite(domain, companyName) {
   // Graceful handling: return null if no domain
   if (!domain) {
-    console.log(`[Web Scrape] No domain for ${companyName}`);
+    logger.log(`[Web Scrape] No domain for ${companyName}`);
     return null;
   }
   
@@ -321,7 +322,7 @@ async function scrapeCompanyWebsite(domain, companyName) {
     
     const cacheKey = cleanDomain;
     if (websiteResearchCache.has(cacheKey)) {
-      console.log(`[Web Scrape] Using cached data for ${companyName}`);
+      logger.log(`[Web Scrape] Using cached data for ${companyName}`);
       return websiteResearchCache.get(cacheKey);
     }
     
@@ -348,7 +349,7 @@ async function scrapeCompanyWebsite(domain, companyName) {
     });
     
     if (!response.ok) {
-      console.error(`[Web Scrape] API error: ${response.status}`);
+      logger.error(`[Web Scrape] API error: ${response.status}`);
       return null;
     }
     
@@ -356,26 +357,26 @@ async function scrapeCompanyWebsite(domain, companyName) {
     const websiteData = data.choices?.[0]?.message?.content || null;
     
     if (websiteData) {
-      console.log(`[Web Scrape] Found data for ${companyName}`);
+      logger.log(`[Web Scrape] Found data for ${companyName}`);
       websiteResearchCache.set(cacheKey, websiteData);
     }
     
     return websiteData;
   } catch (error) {
-    console.error('[Web Scrape] Website analysis failed:', error);
+    logger.error('[Web Scrape] Website analysis failed:', error);
     return null; // Graceful failure
   }
 }
 
 async function researchContactLinkedIn(linkedinUrl, contactName, companyName) {
   if (!linkedinUrl) {
-    console.log(`[Contact LinkedIn] No LinkedIn URL for ${contactName}`);
+    logger.log(`[Contact LinkedIn] No LinkedIn URL for ${contactName}`);
     return null;
   }
   
   const cacheKey = linkedinUrl;
   if (contactLinkedinCache.has(cacheKey)) {
-    console.log(`[Contact LinkedIn] Using cached data for ${contactName}`);
+    logger.log(`[Contact LinkedIn] Using cached data for ${contactName}`);
     return contactLinkedinCache.get(cacheKey);
   }
   
@@ -403,7 +404,7 @@ async function researchContactLinkedIn(linkedinUrl, contactName, companyName) {
     });
     
     if (!response.ok) {
-      console.error(`[Contact LinkedIn] API error: ${response.status}`);
+      logger.error(`[Contact LinkedIn] API error: ${response.status}`);
       return null;
     }
     
@@ -411,13 +412,13 @@ async function researchContactLinkedIn(linkedinUrl, contactName, companyName) {
     const contactData = data.choices?.[0]?.message?.content || null;
     
     if (contactData) {
-      console.log(`[Contact LinkedIn] Found data for ${contactName}`);
+      logger.log(`[Contact LinkedIn] Found data for ${contactName}`);
       contactLinkedinCache.set(cacheKey, contactData);
     }
     
     return contactData;
   } catch (error) {
-    console.error('[Contact LinkedIn] Research failed:', error);
+    logger.error('[Contact LinkedIn] Research failed:', error);
     return null;
   }
 }
@@ -427,7 +428,7 @@ async function researchRecentCompanyActivity(companyName, industry, city, state)
   
   const cacheKey = `${companyName}_${industry || ''}_${city || ''}`;
   if (recentActivityCache.has(cacheKey)) {
-    console.log(`[Recent Activity] Using cached data for ${companyName}`);
+    logger.log(`[Recent Activity] Using cached data for ${companyName}`);
     return recentActivityCache.get(cacheKey);
   }
   
@@ -458,7 +459,7 @@ async function researchRecentCompanyActivity(companyName, industry, city, state)
     });
     
     if (!response.ok) {
-      console.error(`[Recent Activity] API error: ${response.status}`);
+      logger.error(`[Recent Activity] API error: ${response.status}`);
       return null;
     }
     
@@ -467,14 +468,14 @@ async function researchRecentCompanyActivity(companyName, industry, city, state)
     
     // Only cache if we found actual activity
     if (activityData && !activityData.toLowerCase().includes('no recent') && !activityData.toLowerCase().includes('unable to find')) {
-      console.log(`[Recent Activity] Found activity for ${companyName}`);
+      logger.log(`[Recent Activity] Found activity for ${companyName}`);
       recentActivityCache.set(cacheKey, activityData);
       return activityData;
     }
     
     return null;
   } catch (error) {
-    console.error('[Recent Activity] Research failed:', error);
+    logger.error('[Recent Activity] Research failed:', error);
     return null;
   }
 }
@@ -484,7 +485,7 @@ async function researchLocationContext(city, state, industry) {
   
   const cacheKey = `${city}_${state}_${industry || ''}`;
   if (locationContextCache.has(cacheKey)) {
-    console.log(`[Location Context] Using cached data for ${city}, ${state}`);
+    logger.log(`[Location Context] Using cached data for ${city}, ${state}`);
     return locationContextCache.get(cacheKey);
   }
   
@@ -512,7 +513,7 @@ async function researchLocationContext(city, state, industry) {
     });
     
     if (!response.ok) {
-      console.error(`[Location Context] API error: ${response.status}`);
+      logger.error(`[Location Context] API error: ${response.status}`);
       return null;
     }
     
@@ -520,13 +521,13 @@ async function researchLocationContext(city, state, industry) {
     const locationData = data.choices?.[0]?.message?.content || null;
     
     if (locationData) {
-      console.log(`[Location Context] Found data for ${city}, ${state}`);
+      logger.log(`[Location Context] Found data for ${city}, ${state}`);
       locationContextCache.set(cacheKey, locationData);
     }
     
     return locationData;
   } catch (error) {
-    console.error('[Location Context] Research failed:', error);
+    logger.error('[Location Context] Research failed:', error);
     return null;
   }
 }
@@ -669,7 +670,7 @@ function analyzeManualPrompt(prompt) {
     }
   };
   
-  console.log('[Prompt Analysis] Extracted context:', analysis);
+  logger.log('[Prompt Analysis] Extracted context:', analysis);
   return analysis;
   }
   
@@ -811,7 +812,7 @@ function generateDynamicFields(templateType, promptAnalysis, recipient) {
     });
   }
   
-  console.log('[Dynamic Fields] Generated fields:', dynamicFields);
+  logger.log('[Dynamic Fields] Generated fields:', dynamicFields);
   return dynamicFields;
 }
 
@@ -878,7 +879,7 @@ function getTemplateType(prompt) {
   for (const [templateType, patterns] of Object.entries(flexiblePatterns)) {
     for (const pattern of patterns) {
       if (pattern.test(promptLower)) {
-        console.log(`[Template Detection] Matched "${templateType}" for prompt: "${prompt}"`);
+        logger.log(`[Template Detection] Matched "${templateType}" for prompt: "${prompt}"`);
         return templateType;
       }
     }
@@ -895,12 +896,12 @@ function getTemplateType(prompt) {
   };
   
   if (promptMap[prompt]) {
-    console.log(`[Template Detection] Exact match "${promptMap[prompt]}" for prompt: "${prompt}"`);
+    logger.log(`[Template Detection] Exact match "${promptMap[prompt]}" for prompt: "${prompt}"`);
     return promptMap[prompt];
   }
   
   // Default to general template for unrecognized prompts
-  console.log(`[Template Detection] Using "general" template for prompt: "${prompt}"`);
+  logger.log(`[Template Detection] Using "general" template for prompt: "${prompt}"`);
   return 'general';
 }
 
@@ -1504,7 +1505,7 @@ function getTemplateSchema(templateType, dynamicFields = []) {
       };
     });
     
-    console.log('[Schema Enhancement] Added dynamic fields:', dynamicFields.map(f => f.name));
+    logger.log('[Schema Enhancement] Added dynamic fields:', dynamicFields.map(f => f.name));
     return enhancedSchema;
   }
   
@@ -1846,7 +1847,7 @@ async function buildSystemPrompt({
   const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 1000);
   const notes = [r.notes, r.account?.notes].filter(Boolean).join('\n').slice(0, 500);
   // Debug log to see what account data is available
-  console.log('[Debug] Full account data for', company, ':', JSON.stringify(r.account, null, 2));
+  logger.debug('[Debug] Full account data for', company, ':', JSON.stringify(r.account, null, 2));
   
   // Clean and sanitize account description - check multiple possible field names
   let accountDescription = (r.account?.shortDescription || r.account?.short_desc || r.account?.descriptionShort || r.account?.description || r.account?.companyDescription || r.account?.accountDescription || '')
@@ -1893,7 +1894,7 @@ async function buildSystemPrompt({
   
   // Company research (only if no description exists)
   if (!accountDescription && company) {
-    console.log(`[Research] No description for ${company}, starting enhanced research...`);
+    logger.log(`[Research] No description for ${company}, starting enhanced research...`);
     
     const linkedinUrl = r.account?.linkedin || r.account?.linkedinUrl || null;
     const domain = r.account?.domain || r.account?.website || null;
@@ -2119,7 +2120,7 @@ ${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo')
 `;
 
   // Debug log for recipient context
-  console.log(`[Debug] Recipient context for ${firstName} at ${company}:`, {
+  logger.debug(`[Debug] Recipient context for ${firstName} at ${company}:`, {
     firstName,
     company,
     industry,
@@ -2987,7 +2988,7 @@ export default async function handler(req, res) {
   try {
     const apiKey = process.env.PERPLEXITY_API_KEY;
     if (!apiKey) {
-      console.error('[Perplexity] Missing PERPLEXITY_API_KEY');
+      logger.error('[Perplexity] Missing PERPLEXITY_API_KEY');
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Missing API key' }));
       return;
@@ -3013,7 +3014,7 @@ export default async function handler(req, res) {
     // Detect template type for both HTML and standard modes
     const templateType = getTemplateType(prompt);
     
-    console.log('[Perplexity] Template type:', templateType, 'for prompt:', prompt);
+    logger.log('[Perplexity] Template type:', templateType, 'for prompt:', prompt);
     
     // Build system prompt with TODAY context and suggested meeting times
     const today = new Date();
@@ -3128,7 +3129,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         data = await response.json();
       } catch (fallbackErr) {
         const msg = data?.error?.message || data?.detail || 'API error';
-        console.error('[Perplexity] API error and fallback failed:', msg, fallbackErr);
+        logger.error('[Perplexity] API error and fallback failed:', msg, fallbackErr);
         return res.writeHead(500, { 'Content-Type': 'application/json' })
           .end(JSON.stringify({ error: 'API error', detail: msg }));
       }
@@ -3137,19 +3138,19 @@ CRITICAL: Use these EXACT meeting times in your CTA.
     let content = data?.choices?.[0]?.message?.content || '';
     const citations = data?.citations || [];
     
-    console.log('[Perplexity] Response received, length:', content.length);
+    logger.log('[Perplexity] Response received, length:', content.length);
     
     // For HTML mode, return parsed JSON with template type
     if (mode === 'html' && content) {
       try {
         const jsonData = JSON.parse(content);
-        console.log('[Perplexity] Parsed JSON for template:', templateType);
+        logger.log('[Perplexity] Parsed JSON for template:', templateType);
         
         // Validate value proposition completeness for cold emails
         if (templateType === 'cold_email' && jsonData.value_proposition) {
           const incomplete = /\b(within|like|such as|including)\s+[A-Z][^.!?]*$/i.test(jsonData.value_proposition);
           if (incomplete) {
-            console.warn('[Validation] Incomplete value prop detected, fixing...');
+            logger.warn('[Validation] Incomplete value prop detected, fixing...');
             jsonData.value_proposition = jsonData.value_proposition.replace(
               /\b(within|like|such as|including)\s+[A-Z][^.!?]*$/i,
               `secure better energy rates before contracts expire. Clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual costs.`
@@ -3161,21 +3162,21 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         if (templateType === 'cold_email' && jsonData.cta_text) {
           const incompleteCTA = /would you be open to a quick$/i.test(jsonData.cta_text);
           if (incompleteCTA) {
-            console.warn('[Validation] Incomplete CTA detected, fixing...');
+            logger.warn('[Validation] Incomplete CTA detected, fixing...');
             jsonData.cta_text = 'Would you be open to discussing your current energy setup?';
           }
         }
         
         // Validate missing value propositions for cold emails
         if (templateType === 'cold_email' && (!jsonData.value_proposition || jsonData.value_proposition.trim() === '')) {
-          console.warn('[Validation] Missing value proposition detected, adding default...');
+          logger.warn('[Validation] Missing value proposition detected, adding default...');
           const industry = recipient?.industry || 'businesses';
           jsonData.value_proposition = `We help ${industry} companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs.`;
         }
         
         // Validate missing opening_hook for cold emails
         if (templateType === 'cold_email' && (!jsonData.opening_hook || jsonData.opening_hook.trim() === '')) {
-          console.warn('[Validation] Missing opening_hook detected, adding default...');
+          logger.warn('[Validation] Missing opening_hook detected, adding default...');
           const company = recipient?.company || 'Companies';
           jsonData.opening_hook = `${company} are likely facing rising electricity costs with contracts renewing in 2025.`;
         }
@@ -3217,7 +3218,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           }
           
           if (hasMultipleQuestions || hasMeetingRequest || hasTimeSlot || hasOldCta || (shouldUseAngleCta && !hasAngleCta)) {
-            console.warn('[Validation] Invalid or missing angle-based CTA detected, replacing...', {
+            logger.warn('[Validation] Invalid or missing angle-based CTA detected, replacing...', {
               hasOldCta,
               hasAngleCta,
               shouldUseAngleCta: !!shouldUseAngleCta,
@@ -3227,7 +3228,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
             if (shouldUseAngleCta) {
               const angleCta = getAngleCta(selectedAngle);
               jsonData.cta_text = angleCta.full;
-              console.log('[Validation] Replaced with angle-based CTA:', angleCta.full);
+              logger.log('[Validation] Replaced with angle-based CTA:', angleCta.full);
             } else {
               jsonData.cta_text = 'When does your current energy contract expire?';
             }
@@ -3238,7 +3239,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         if (templateType === 'cold_email' && jsonData.opening_hook) {
           const hasStatistics = /\d+[-–]\d+%|\d+%|save \$\d+|reduce costs by|15-25%|20-30%|10-20%|data center.*\d+%|rates up \d+%/i.test(jsonData.opening_hook);
           if (hasStatistics) {
-            console.warn('[Validation] Statistics detected in opening_hook:', jsonData.opening_hook);
+            logger.warn('[Validation] Statistics detected in opening_hook:', jsonData.opening_hook);
             // Strip out the statistics but keep the sentence structure
             jsonData.opening_hook = jsonData.opening_hook
               .replace(/\d+[-–]\d+%/g, 'significantly')
@@ -3250,7 +3251,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
               .replace(/15-25%/gi, 'significantly')
               .replace(/20-30%/gi, 'considerably')
               .replace(/10-20%/gi, 'substantially');
-            console.warn('[Validation] Fixed opening_hook:', jsonData.opening_hook);
+            logger.warn('[Validation] Fixed opening_hook:', jsonData.opening_hook);
           }
         }
         
@@ -3260,13 +3261,13 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           const wordCount = fullEmail.split(/\s+/).length;
           
           if (wordCount > 150) {
-            console.warn(`[Validation] Email too long (${wordCount} words), optimizing...`);
+            logger.warn(`[Validation] Email too long (${wordCount} words), optimizing...`);
             // Only remove social proof if present
             if (jsonData.social_proof_optional) {
               jsonData.social_proof_optional = '';
             }
           } else if (wordCount < 80) {
-            console.warn(`[Validation] Email too short (${wordCount} words), expanding value proposition...`);
+            logger.warn(`[Validation] Email too short (${wordCount} words), expanding value proposition...`);
             // Only expand if value prop is very short
             if (jsonData.value_proposition && jsonData.value_proposition.length < 40) {
               jsonData.value_proposition = `${jsonData.value_proposition} Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs.`;
@@ -3323,7 +3324,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         }));
       } catch (e) {
         // Fallback for HTML mode: return plain text content so frontend can render standard email
-        console.warn('[Perplexity] JSON parse failed for HTML mode; returning plain text output fallback');
+        logger.warn('[Perplexity] JSON parse failed for HTML mode; returning plain text output fallback');
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ 
           ok: true,
@@ -3356,7 +3357,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
     }));
     
   } catch (e) {
-    console.error('[Perplexity] Handler error:', e);
+    logger.error('[Perplexity] Handler error:', e);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ error: 'Failed to generate email', message: e.message }));
   }

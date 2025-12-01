@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import formidable from 'formidable';
 import { simpleParser } from 'mailparser';
 import sanitizeHtml from 'sanitize-html';
+import logger from '../_logger.js';
 import fs from 'fs';
 
 // Optional Basic Auth for Inbound Parse (no-cost hardening)
@@ -43,7 +44,7 @@ function decodeQuotedPrintable(html) {
       .replace(/href="3D%22/gi, 'href="')
       .replace(/src="3D%22/gi, 'src="');
   } catch (error) {
-    console.warn('[InboundEmail] Failed to decode quoted-printable:', error);
+    logger.warn('[InboundEmail] Failed to decode quoted-printable:', error);
     return html
       .replace(/href=3D"/gi, 'href="')
       .replace(/src=3D"/gi, 'src="')
@@ -89,7 +90,7 @@ export default async function handler(req, res) {
     const [fields, files] = await new Promise((resolve, reject) => {
       form.parse(req, (err, fields, files) => {
         if (err) {
-          console.error('[InboundEmail] Form parse error:', err);
+          logger.error('[InboundEmail] Form parse error:', err);
           reject(err);
         } else {
           resolve([fields, files]);
@@ -128,7 +129,7 @@ export default async function handler(req, res) {
           rawMime = buf.toString('utf8');
         }
       } catch (fileErr) {
-        console.warn('[InboundEmail] Failed to read raw MIME file:', fileErr?.message || fileErr);
+        logger.warn('[InboundEmail] Failed to read raw MIME file:', fileErr?.message || fileErr);
       }
     }
 
@@ -137,7 +138,7 @@ export default async function handler(req, res) {
       try {
         parsed = await simpleParser(rawMime);
       } catch (parseErr) {
-        console.warn('[InboundEmail] simpleParser failed, falling back to field-level values:', parseErr?.message || parseErr);
+        logger.warn('[InboundEmail] simpleParser failed, falling back to field-level values:', parseErr?.message || parseErr);
         parsed = null;
       }
 
@@ -234,7 +235,7 @@ export default async function handler(req, res) {
         .limit(1)
         .get();
       if (!snap.empty) {
-        console.log('[InboundEmail] Duplicate messageId detected, skipping save:', emailData.messageId);
+        logger.log('[InboundEmail] Duplicate messageId detected, skipping save:', emailData.messageId);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, deduped: true, message: 'Duplicate Message-ID ignored' }));
         return;
@@ -312,12 +313,12 @@ export default async function handler(req, res) {
         });
       }
     } catch (threadErr) {
-      console.warn('[InboundEmail] Thread upsert warning:', threadErr?.message || threadErr);
+      logger.warn('[InboundEmail] Thread upsert warning:', threadErr?.message || threadErr);
     }
 
     // Validate required fields (relax subject requirement if missing but body present)
     if (!emailData.from || !emailData.to || (!emailData.subject && !emailData.text && !emailData.html)) {
-      console.error('[InboundEmail] Missing required fields:', { from: emailData.from, to: emailData.to, subject: emailData.subject });
+      logger.error('[InboundEmail] Missing required fields:', { from: emailData.from, to: emailData.to, subject: emailData.subject });
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Missing required email fields' }));
       return;
@@ -348,7 +349,7 @@ export default async function handler(req, res) {
       };
       
       const docRef = await db.collection('emails').add(emailDoc);
-      console.log('[InboundEmail] Email saved to Firebase with ID:', docRef.id);
+      logger.log('[InboundEmail] Email saved to Firebase with ID:', docRef.id);
 
       // Log any suspicious URLs for debugging
       const urlPattern = /(href|src)=["']([^"']*?)["']/gi;
@@ -357,7 +358,7 @@ export default async function handler(req, res) {
         m[2].includes('3D') || (m[2].includes('=') && !m[2].startsWith('data:'))
       );
       if (suspiciousUrls.length > 0) {
-        console.warn('[InboundEmail] Detected potentially malformed URLs:', 
+        logger.warn('[InboundEmail] Detected potentially malformed URLs:', 
           suspiciousUrls.map(m => m[2]).slice(0, 5)
         );
       }
@@ -371,7 +372,7 @@ export default async function handler(req, res) {
     }));
     return;
     } catch (firebaseError) {
-      console.error('[InboundEmail] Error saving to Firestore:', firebaseError);
+      logger.error('[InboundEmail] Error saving to Firestore:', firebaseError);
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         success: false, 
@@ -382,7 +383,7 @@ export default async function handler(req, res) {
     }
 
   } catch (error) {
-    console.error('[InboundEmail] Error processing webhook:', error);
+    logger.error('[InboundEmail] Error processing webhook:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Internal server error',

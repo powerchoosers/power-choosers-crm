@@ -3,6 +3,8 @@
  * Provides common functions for Apollo API integration
  */
 
+import logger from '../_logger.js';
+
 export const APOLLO_BASE_URL = 'https://api.apollo.io/api/v1';
 
 /**
@@ -96,7 +98,7 @@ export function getApiKey() {
   const apiKey = process.env.APOLLO_API_KEY;
   
   if (!apiKey) {
-    console.error('[Apollo API] APOLLO_API_KEY environment variable is not set');
+    logger.error('[Apollo API] APOLLO_API_KEY environment variable is not set');
     throw new Error('APOLLO_API_KEY environment variable is not set');
   }
   
@@ -105,7 +107,7 @@ export function getApiKey() {
   
   // Validate API key format (basic check)
   if (trimmedKey.length < 10) {
-    console.error('[Apollo API] API key appears to be too short:', trimmedKey.length, 'characters');
+    logger.error('[Apollo API] API key appears to be too short:', trimmedKey.length, 'characters');
     throw new Error('APOLLO_API_KEY appears to be invalid (too short)');
   }
   
@@ -113,7 +115,7 @@ export function getApiKey() {
   const keyPreview = trimmedKey.length > 8 
     ? `${trimmedKey.substring(0, 4)}...${trimmedKey.substring(trimmedKey.length - 4)}`
     : '****';
-  console.log('[Apollo API] Using API key:', keyPreview, '(length:', trimmedKey.length, 'chars)');
+  logger.log('[Apollo API] Using API key:', keyPreview, '(length:', trimmedKey.length, 'chars)');
   
   return trimmedKey;
 }

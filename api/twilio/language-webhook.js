@@ -1,4 +1,5 @@
 import twilio from 'twilio';
+import logger from '../_logger.js';
 
 function cors(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -54,7 +55,7 @@ async function resolveCallSidFromRecordingSid(recordingSid) {
     const rec = await client.recordings(recordingSid).fetch();
     return rec && rec.callSid ? rec.callSid : null;
   } catch (e) {
-    try { console.warn('[LanguageWebhook] resolve callSid failed:', e?.message); } catch(_) {}
+    try { logger.warn('[LanguageWebhook] resolve callSid failed:', e?.message); } catch(_) {}
     return null;
   }
 }
@@ -74,14 +75,14 @@ export default async function handler(req, res) {
 
   try {
     const body = normalizeBody(req);
-    try { console.log('[LanguageWebhook] incoming body keys:', Object.keys(body || {})); } catch(_) {}
+    try { logger.log('[LanguageWebhook] incoming body keys:', Object.keys(body || {})); } catch(_) {}
 
     // Twilio Language often sends a Results field (JSON string). Parse it if present.
     let resultsObj = null;
     try {
       const raw = body.Results || body.results || null;
       if (raw) {
-        if (typeof raw === 'string') { try { resultsObj = JSON.parse(raw); } catch(e) { console.warn('[LanguageWebhook] Failed to parse Results JSON:', e?.message); } }
+        if (typeof raw === 'string') { try { resultsObj = JSON.parse(raw); } catch(e) { logger.warn('[LanguageWebhook] Failed to parse Results JSON:', e?.message); } }
         else if (typeof raw === 'object') { resultsObj = raw; }
       }
     } catch(_) {}
@@ -130,16 +131,16 @@ export default async function handler(req, res) {
           recordingSid: recordingSid || undefined
         })
       }).catch(()=>{});
-      console.log('[LanguageWebhook] Posted transcript to /api/calls', { base, finalCallSid, recordingSid, gotText: !!transcript, textLen: (transcript||'').length });
+      logger.log('[LanguageWebhook] Posted transcript to /api/calls', { base, finalCallSid, recordingSid, gotText: !!transcript, textLen: (transcript||'').length });
     } catch (e) {
-      console.warn('[LanguageWebhook] Failed to post to /api/calls:', e?.message);
+      logger.warn('[LanguageWebhook] Failed to post to /api/calls:', e?.message);
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true }));
     return;
   } catch (e) {
-    console.error('[LanguageWebhook] error:', e);
+    logger.error('[LanguageWebhook] error:', e);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Failed to handle language webhook', message: e?.message }));
     return;

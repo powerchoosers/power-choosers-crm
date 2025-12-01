@@ -1,5 +1,6 @@
 import twilio from 'twilio';
 import { cors } from '../_cors.js';
+import logger from '../_logger.js';
 
 export default async function handler(req, res) {
     cors(req, res);
@@ -21,7 +22,7 @@ export default async function handler(req, res) {
         
         // Check for Twilio credentials
         if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
-            console.error('[Caller Lookup] Missing Twilio credentials');
+            logger.error('[Caller Lookup] Missing Twilio credentials');
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ 
                 error: 'Twilio credentials not configured',
@@ -35,7 +36,7 @@ export default async function handler(req, res) {
             process.env.TWILIO_AUTH_TOKEN
         );
         
-        console.log('[Caller Lookup] Looking up:', phoneNumber);
+        logger.log('[Caller Lookup] Looking up:', phoneNumber);
         
         // Use Twilio Lookup API to get caller information
         const lookup = await client.lookups.v1.phoneNumbers(phoneNumber)
@@ -43,7 +44,7 @@ export default async function handler(req, res) {
                 type: ['caller-name', 'carrier']
             });
         
-        console.log('[Caller Lookup] Result:', lookup);
+        logger.log('[Caller Lookup] Result:', lookup);
         
         const result = {
             phoneNumber: lookup.phoneNumber,
@@ -61,7 +62,7 @@ export default async function handler(req, res) {
         return;
         
     } catch (error) {
-        console.error('[Caller Lookup] Error:', error);
+        logger.error('[Caller Lookup] Error:', error);
         
         // Handle specific Twilio errors
         if (error.code === 20404) {

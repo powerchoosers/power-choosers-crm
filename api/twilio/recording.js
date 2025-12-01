@@ -1,6 +1,7 @@
 import twilio from 'twilio';
 import { resolveToCallSid, isCallSid } from '../_twilio-ids.js';
 import { cors } from '../_cors.js';
+import logger from '../_logger.js';
 
 function normalizeBody(req) {
     // Supports: JS object, JSON string, x-www-form-urlencoded string
@@ -45,44 +46,21 @@ export default async function handler(req, res) {
             RecordingDuration
         } = body;
         
-        // Simple logging function for Cloud Run cost optimization
-        const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
-        const currentLogLevel = logLevels[process.env.LOG_LEVEL || 'info'];
-        
-        const logger = {
-            info: (message, context, data) => {
-                if (currentLogLevel >= logLevels.info && process.env.VERBOSE_LOGS === 'true') {
-                    console.log(`[${context}] ${message}`, data || '');
-                }
-            },
-            error: (message, context, data) => {
-                console.error(`[${context}] ${message}`, data || '');
-            },
-            debug: (message, context, data) => {
-                if (currentLogLevel >= logLevels.debug && process.env.VERBOSE_LOGS === 'true') {
-                    console.log(`[${context}] ${message}`, data || '');
-                }
-            },
-            warn: (message, context, data) => {
-                if (currentLogLevel >= logLevels.warn) {
-                    console.warn(`[${context}] ${message}`, data || '');
-                }
-            }
-        };
-        logger.debug('Twilio recording webhook received', 'TwilioWebhook', { 
+        // Use shared logger for Cloud Run cost optimization
+        logger.debug('[TwilioWebhook] Twilio recording webhook received', { 
             recordingSid: RecordingSid, 
             callSid: CallSid, 
             status: RecordingStatus,
             duration: RecordingDuration 
         });
         try { 
-            logger.debug('Webhook payload received', 'TwilioWebhook', { 
+            logger.debug('[TwilioWebhook] Webhook payload received', { 
                 payloadSize: JSON.stringify(body).length 
             }); 
         } catch(_) {}
         try { 
             if (body && (body.RecordingChannels || body.RecordingTrack)) {
-                logger.debug('Recording channels/track info', 'TwilioWebhook', { 
+                logger.debug('[TwilioWebhook] Recording channels/track info', { 
                     channels: body.RecordingChannels, 
                     track: body.RecordingTrack 
                 });
@@ -91,7 +69,7 @@ export default async function handler(req, res) {
         
         // Log key recording fields for debugging
         try {
-            logger.debug('Recording fields summary', 'TwilioWebhook', {
+            logger.debug('[TwilioWebhook] Recording fields summary', {
                 source: body.RecordingSource,
                 channels: body.RecordingChannels,
                 track: body.RecordingTrack,
@@ -106,7 +84,7 @@ export default async function handler(req, res) {
             const chNum = Number(body.RecordingChannels || body.Channels || 0);
             const isDual = chRaw === '2' || chRaw === 'dual' || chRaw === 'both' || chNum === 2;
             
-            console.log('[Recording] Channel analysis:', { 
+            logger.log('[Recording] Channel analysis:', { 
                 RecordingChannels: body.RecordingChannels, 
                 chRaw, 
                 chNum, 
@@ -117,7 +95,7 @@ export default async function handler(req, res) {
             
             // Monitor for dual-channel recording failures (alert condition)
             if (RecordingStatus === 'completed' && src === 'dialverb' && !isDual) {
-                console.warn('[Recording] ⚠️ DUAL-CHANNEL FAILURE: DialVerb recording fell back to mono!', {
+                logger.warn('[Recording] ⚠️ DUAL-CHANNEL FAILURE: DialVerb recording fell back to mono!', {
                     CallSid,
                     RecordingSid,
                     RecordingChannels: body.RecordingChannels,
@@ -127,7 +105,7 @@ export default async function handler(req, res) {
             }
             
             if (RecordingStatus === 'completed' && src === 'dialverb' && !isDual) {
-                console.log('[Recording] Ignoring mono DialVerb completion (will rely on REST dual):', { RecordingSid, CallSid, RecordingChannels: body.RecordingChannels, RecordingSource: body.RecordingSource });
+                logger.log('[Recording] Ignoring mono DialVerb completion (will rely on REST dual):', { RecordingSid, CallSid, RecordingChannels: body.RecordingChannels, RecordingSource: body.RecordingSource });
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, ignored: true, reason: 'mono_dialverb' }));
                 return;
@@ -144,12 +122,12 @@ export default async function handler(req, res) {
                 if (recs && recs.length > 0) {
                     effectiveRecordingSid = recs[0].sid;
                     effectiveRecordingUrl = `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_ACCOUNT_SID}/Recordings/${effectiveRecordingSid}.mp3`;
-                    console.log('[Recording] Fetched recording by CallSid:', { effectiveRecordingSid, effectiveRecordingUrl });
+                    logger.log('[Recording] Fetched recording by CallSid:', { effectiveRecordingSid, effectiveRecordingUrl });
                 } else {
-                    console.log('[Recording] No recordings found via API for CallSid:', CallSid);
+                    logger.log('[Recording] No recordings found via API for CallSid:', CallSid);
                 }
             } catch (e) {
-                console.warn('[Recording] Failed to fetch recording by CallSid:', e?.message);
+                logger.warn('[Recording] Failed to fetch recording by CallSid:', e?.message);
             }
         }
 
@@ -178,7 +156,7 @@ export default async function handler(req, res) {
                 ? `${baseMp3}&RequestedChannels=2` 
                 : `${baseMp3}?RequestedChannels=2`;
             
-            console.log('[Recording] Processed URL for dual-channel:', {
+            logger.log('[Recording] Processed URL for dual-channel:', {
                 original: rawUrl,
                 final: recordingMp3Url,
                 recordingSid: effectiveRecordingSid || RecordingSid
@@ -217,7 +195,7 @@ export default async function handler(req, res) {
                         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
                         callResource = await client.calls(finalCallSid).fetch();
                     } catch (fe) {
-                        console.warn('[Recording] Could not fetch Call resource:', fe?.message);
+                        logger.warn('[Recording] Could not fetch Call resource:', fe?.message);
                     }
                 }
 
@@ -255,7 +233,7 @@ export default async function handler(req, res) {
                             businessPhone: businessPhone || undefined
                         })
                     }).catch(() => {});
-                    console.log('[Recording] Posted initial call data to /api/calls for', finalCallSid);
+                    logger.log('[Recording] Posted initial call data to /api/calls for', finalCallSid);
 
                     // If duration is 0 or metadata looked incomplete, schedule a follow-up refresh
                     try {
@@ -281,19 +259,19 @@ export default async function handler(req, res) {
                                                 recordingSource: finalSource
                                             })
                                         }).catch(() => {});
-                                        console.log('[Recording] Refreshed call with final duration/metadata:', { finalDuration, finalChannels, finalTrack, finalSource });
+                                        logger.log('[Recording] Refreshed call with final duration/metadata:', { finalDuration, finalChannels, finalTrack, finalSource });
                                     }
                                 } catch (re) {
-                                    console.warn('[Recording] Follow-up Recording fetch failed:', re?.message);
+                                    logger.warn('[Recording] Follow-up Recording fetch failed:', re?.message);
                                 }
                             }, 6000); // allow processing time
                         }
                     } catch(_) {}
                 } else {
-                    console.warn('[Recording] Skipping initial /api/calls post due to unresolved Call SID', { CallSid, RecordingSid: effectiveRecordingSid || RecordingSid });
+                    logger.warn('[Recording] Skipping initial /api/calls post due to unresolved Call SID', { CallSid, RecordingSid: effectiveRecordingSid || RecordingSid });
                 }
             } catch (e) {
-                console.warn('[Recording] Failed posting initial call data to /api/calls:', e?.message);
+                logger.warn('[Recording] Failed posting initial call data to /api/calls:', e?.message);
             }
 
             // Trigger background processing (non-blocking) - FIXED FREEZE ISSUE
@@ -304,15 +282,15 @@ export default async function handler(req, res) {
                         try {
                             await processRecordingWithTwilio(recordingMp3Url, finalCallSid, effectiveRecordingSid || RecordingSid, baseUrl);
                         } catch (error) {
-                            console.error('[Recording] Background processing error:', error);
+                            logger.error('[Recording] Background processing error:', error);
                         }
                     });
-                    console.log('[Recording] Background processing scheduled for:', finalCallSid);
+                    logger.log('[Recording] Background processing scheduled for:', finalCallSid);
                 } else {
-                    console.warn('[Recording] Skipping processing due to unresolved Call SID', { CallSid, RecordingSid: effectiveRecordingSid || RecordingSid });
+                    logger.warn('[Recording] Skipping processing due to unresolved Call SID', { CallSid, RecordingSid: effectiveRecordingSid || RecordingSid });
                 }
             } catch (error) {
-                console.error('[Recording] Error scheduling background processing:', error);
+                logger.error('[Recording] Error scheduling background processing:', error);
             }
         }
         
@@ -321,7 +299,7 @@ export default async function handler(req, res) {
         return;
         
     } catch (error) {
-        console.error('[Recording] Webhook error:', error);
+        logger.error('[Recording] Webhook error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
             error: 'Failed to process recording webhook',
@@ -333,14 +311,14 @@ export default async function handler(req, res) {
 
 async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, baseUrl) {
     try {
-        console.log('[Recording] Starting Twilio AI processing for:', callSid);
+        logger.log('[Recording] Starting Twilio AI processing for:', callSid);
 
         // Hard gate: On-demand CI only. When disabled, do not auto-transcribe or create CI.
         try {
             const auto = String(process.env.CI_AUTO_PROCESS || '').toLowerCase();
             const shouldAuto = auto === '1' || auto === 'true' || auto === 'yes';
             if (!shouldAuto) {
-                console.log('[Recording] CI auto-processing disabled; skipping transcription/AI until eye button request.');
+                logger.log('[Recording] CI auto-processing disabled; skipping transcription/AI until eye button request.');
                 // Persist minimal metadata so UI knows recording is ready but not processed
                 try {
                     const base = baseUrl || process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
@@ -380,9 +358,9 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
             // Heuristic: Agent is the "from" leg when from is Voice SDK client or our business number; otherwise agent is the "to" leg
             const fromIsAgent = fromIsClient || isBiz(from10) || (!isBiz(to10) && fromStr && fromStr !== toStr);
             agentChannelStr = fromIsAgent ? '1' : '2';
-            console.log(`[Recording] Channel-role mapping: agent on channel ${agentChannelStr} (from=${fromStr}, to=${toStr})`);
+            logger.log(`[Recording] Channel-role mapping: agent on channel ${agentChannelStr} (from=${fromStr}, to=${toStr})`);
         } catch (e) {
-            console.warn('[Recording] Failed to compute channel-role mapping, defaulting agent to channel 1:', e?.message);
+                logger.warn('[Recording] Failed to compute channel-role mapping, defaulting agent to channel 1:', e?.message);
         }
         const normalizeChannel = (c) => {
             const s = (c == null ? '' : String(c)).trim();
@@ -413,7 +391,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
             let speakerTurns = [];
             
             if (serviceSid) {
-                console.log('[Recording] Using Conversational Intelligence service');
+                logger.log('[Recording] Using Conversational Intelligence service');
                 
                 // Try to get existing Conversational Intelligence transcript
                 const transcripts = await client.intelligence.v2.transcripts.list({
@@ -425,17 +403,34 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                 if (transcripts.length > 0) {
                     let ciTranscript = await client.intelligence.v2.transcripts(transcripts[0].sid).fetch();
 
-                    // If transcript exists but isn't completed yet, poll until completion (up to 2 minutes)
+                    // If transcript exists but isn't completed yet, poll until completion
+                    // OPTIMIZED: Reduced from 20 to 10 attempts (60s instead of 120s) to reduce Cloud Run costs
                     if (['queued', 'in-progress'].includes((ciTranscript.status || '').toLowerCase())) {
-                        console.log('[Recording] Existing CI transcript found but not completed — polling...');
+                        logger.log('[Recording] Existing CI transcript found but not completed — polling...');
                         let attempts = 0;
-                        const maxAttempts = 20; // 20 * 6s = 120s
+                        const maxAttempts = 10; // 10 * 6s = 60s (reduced from 120s)
                         let polled = ciTranscript;
                         while (attempts < maxAttempts && ['queued', 'in-progress'].includes((polled.status || '').toLowerCase())) {
                             await new Promise(r => setTimeout(r, 6000));
                             polled = await client.intelligence.v2.transcripts(ciTranscript.sid).fetch();
                             attempts++;
-                            if (attempts % 5 === 0) console.log(`[Recording] Waiting for existing CI transcript... (${attempts*6}s)`);
+                            if (attempts % 5 === 0) logger.log(`[Recording] Waiting for existing CI transcript... (${attempts*6}s)`);
+                            
+                            // Early exit: Check if sentences are available (indicates completion)
+                            if (attempts >= 3) { // After at least 18 seconds, check for sentences
+                                try {
+                                    const sentencesCheck = await client.intelligence.v2
+                                        .transcripts(polled.sid)
+                                        .sentences.list({ limit: 1 });
+                                    if (sentencesCheck && sentencesCheck.length > 0) {
+                                        logger.log('[Recording] Sentences available, transcript complete');
+                                        polled.status = 'completed';
+                                        break;
+                                    }
+                                } catch (_) {
+                                    // Continue polling if sentences check fails
+                                }
+                            }
                         }
                         if ((polled.status || '').toLowerCase() === 'completed') {
                         const sentences = await client.intelligence.v2
@@ -498,17 +493,17 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                     }
                                     if (current) segments.push({ t: current.t, role: current.role, text: current.text });
                                     if (segments.length) {
-                                        console.log('[Recording][CI] Built speaker turns from words due to missing roles in sentences:', segments.length);
+                                        logger.log('[Recording][CI] Built speaker turns from words due to missing roles in sentences:', segments.length);
                                         speakerTurns = segments;
                                         transcript = segments.map(x => x.text).join(' ');
                                     }
                                 }
                             }
-                        } catch (e) { console.warn('[Recording][CI] Words fallback failed:', e?.message); }
+                        } catch (e) { logger.warn('[Recording][CI] Words fallback failed:', e?.message); }
                         if (turns.length) speakerTurns = turns;
                         transcript = turns.map(x => x.text).join(' ');
                         if (!transcript && sentences && sentences.length) {
-                            try { console.log('[Recording][CI] Example sentence keys:', Object.keys(sentences[0]||{})); } catch(_) {}
+                            try { logger.log('[Recording][CI] Example sentence keys:', Object.keys(sentences[0]||{})); } catch(_) {}
                         }
                             conversationalIntelligence = {
                                 transcriptSid: polled.sid,
@@ -519,7 +514,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                 sentences: sentencesSlim,
                                 channelRoleMap: { agentChannel: agentChannelStr, customerChannel: agentChannelStr === '1' ? '2' : '1' }
                             };
-                            console.log(`[Recording] CI transcript (existing) completed with ${sentences.length} sentences, transcript length: ${transcript.length}`);
+                            logger.log(`[Recording] CI transcript (existing) completed with ${sentences.length} sentences, transcript length: ${transcript.length}`);
                         }
                     } else if ((ciTranscript.status || '').toLowerCase() === 'completed') {
                         // Get sentences from Conversational Intelligence
@@ -530,7 +525,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                         try {
                             const lacksDiarization = Array.isArray(sentences) && sentences.length > 0 && sentences.every(s => (s.channel == null && !s.speaker && !s.role));
                             if (lacksDiarization) {
-                                console.log('[Recording] Existing CI transcript has no channel/speaker diarization. Recreating with participants mapping...');
+                                logger.log('[Recording] Existing CI transcript has no channel/speaker diarization. Recreating with participants mapping...');
                                 try { await client.intelligence.v2.transcripts(ciTranscript.sid).remove(); } catch(_) {}
                                 const agentChNum = Number(agentChannelStr === '2' ? 2 : 1);
                                 const custChNum = agentChNum === 1 ? 2 : 1;
@@ -547,12 +542,26 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                 });
                                 ciTranscript = recreated;
                                 // Re-fetch sentences after recreation
-                                const attemptsRe = 10; // up to ~60s
+                                // OPTIMIZED: Reduced from 10 to 5 attempts (30s instead of 60s)
+                                const attemptsRe = 5; // up to ~30s (reduced from 60s)
                                 let tries = 0, status = recreated.status;
                                 while (tries < attemptsRe && ['queued','in-progress'].includes((status||'').toLowerCase())){
                                     await new Promise(r=>setTimeout(r,6000));
                                     const tmp = await client.intelligence.v2.transcripts(recreated.sid).fetch();
                                     status = tmp.status; tries++;
+                                    
+                                    // Early exit: Check if sentences are available
+                                    if (tries >= 2) {
+                                        try {
+                                            const sentencesCheck = await client.intelligence.v2
+                                                .transcripts(tmp.sid)
+                                                .sentences.list({ limit: 1 });
+                                            if (sentencesCheck && sentencesCheck.length > 0) {
+                                                status = 'completed';
+                                                break;
+                                            }
+                                        } catch (_) {}
+                                    }
                                 }
                                 if ((status||'').toLowerCase()==='completed'){
                                     sentences = await client.intelligence.v2
@@ -618,17 +627,17 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                     }
                                     if (current) segments.push({ t: current.t, role: current.role, text: current.text });
                                     if (segments.length) {
-                                        console.log('[Recording][CI] Built speaker turns from words due to missing roles in sentences:', segments.length);
+                                        logger.log('[Recording][CI] Built speaker turns from words due to missing roles in sentences:', segments.length);
                                         speakerTurns = segments;
                                         transcript = segments.map(x => x.text).join(' ');
                                     }
                                 }
                             }
-                        } catch (e) { console.warn('[Recording][CI] Words fallback failed:', e?.message); }
+                        } catch (e) { logger.warn('[Recording][CI] Words fallback failed:', e?.message); }
                         if (turns.length) speakerTurns = turns;
                         transcript = turns.map(x => x.text).join(' ');
                         if (!transcript && sentences && sentences.length) {
-                            try { console.log('[Recording][CI] Example sentence keys:', Object.keys(sentences[0]||{})); } catch(_) {}
+                            try { logger.log('[Recording][CI] Example sentence keys:', Object.keys(sentences[0]||{})); } catch(_) {}
                         }
                         conversationalIntelligence = {
                             transcriptSid: ciTranscript.sid,
@@ -640,23 +649,24 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                             channelRoleMap: { agentChannel: agentChannelStr, customerChannel: agentChannelStr === '1' ? '2' : '1' }
                         };
                         
-                        console.log(`[Recording] Found Conversational Intelligence transcript with ${sentences.length} sentences, transcript length: ${transcript.length}`);
+                        logger.log(`[Recording] Found Conversational Intelligence transcript with ${sentences.length} sentences, transcript length: ${transcript.length}`);
                     }
 
                     // FALLBACK: If Conversational Intelligence transcript is empty, try basic transcription (only if API available)
                     if (!transcript) {
-                        console.log('[Recording] No CI transcript text, trying basic transcription fallback (if supported by SDK)...');
+                        logger.log('[Recording] No CI transcript text, trying basic transcription fallback (if supported by SDK)...');
                         try {
                             if (client.transcriptions && typeof client.transcriptions.list === 'function') {
                                 const transcriptions = await client.transcriptions.list({ recordingSid: recordingSid, limit: 1 });
                                 if (transcriptions.length > 0 && typeof client.transcriptions === 'function') {
                                     const basicTranscription = await client.transcriptions(transcriptions[0].sid).fetch();
                                     transcript = (basicTranscription && basicTranscription.transcriptionText) || '';
-                                    console.log(`[Recording] Basic transcription fallback: ${transcript.length} characters`);
+                                    logger.log(`[Recording] Basic transcription fallback: ${transcript.length} characters`);
                                 } else if (client.transcriptions && typeof client.transcriptions.create === 'function') {
                                     // Some SDK versions support create
+                                    // OPTIMIZED: Reduced from 12 to 6 attempts (30s instead of 60s)
                                     const created = await client.transcriptions.create({ recordingSid: recordingSid, languageCode: 'en-US' });
-                                    let attempts = 0; const maxAttempts = 12;
+                                    let attempts = 0; const maxAttempts = 6; // 6 * 5s = 30s (reduced from 60s)
                                     while (attempts < maxAttempts) {
                                         await new Promise(r => setTimeout(r, 5000));
                                         let t = null;
@@ -664,22 +674,22 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                         const text = t?.transcriptionText || '';
                                         if (text && text.trim().length > 0) { transcript = text; break; }
                                         attempts++;
-                                        if (attempts % 3 === 0) console.log(`[Recording] Waiting for transcription... (${attempts*5}s)`);
+                                        if (attempts % 3 === 0) logger.log(`[Recording] Waiting for transcription... (${attempts*5}s)`);
                                     }
                                 } else {
-                                    console.warn('[Recording] Transcriptions API not available in current Twilio SDK version');
+                                    logger.warn('[Recording] Transcriptions API not available in current Twilio SDK version');
                                 }
                             } else {
-                                console.warn('[Recording] Transcriptions API not present on client');
+                                logger.warn('[Recording] Transcriptions API not present on client');
                             }
                         } catch (fallbackError) {
-                            console.warn('[Recording] Basic transcription fallback failed:', fallbackError.message);
+                            logger.warn('[Recording] Basic transcription fallback failed:', fallbackError.message);
                         }
                     }
                 } else {
                     // Auto-process is enabled at this point; create new CI transcript
                     // Create new Conversational Intelligence transcript
-                    console.log('[Recording] Creating new Conversational Intelligence transcript...');
+                    logger.log('[Recording] Creating new Conversational Intelligence transcript...');
                     const agentChNum = Number(agentChannelStr === '2' ? 2 : 1);
                     const custChNum = agentChNum === 1 ? 2 : 1;
                     const newTranscript = await client.intelligence.v2.transcripts.create({
@@ -696,14 +706,29 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                         customerKey: callSid
                     });
                     
-                    console.log('[Recording] Created Conversational Intelligence transcript:', newTranscript.sid);
+                    logger.log('[Recording] Created Conversational Intelligence transcript:', newTranscript.sid);
                     
-                    // Wait for processing (up to 2 minutes)
+                    // Wait for processing
+                    // OPTIMIZED: Reduced from 20 to 10 attempts (60s instead of 120s) to reduce Cloud Run costs
                     let attempts = 0;
-                    const maxAttempts = 20; // 20 * 6s = 120s
+                    const maxAttempts = 10; // 10 * 6s = 60s (reduced from 120s)
                     while (attempts < maxAttempts && ['queued', 'in-progress'].includes(newTranscript.status)) {
                         await new Promise(r => setTimeout(r, 6000));
                         const updatedTranscript = await client.intelligence.v2.transcripts(newTranscript.sid).fetch();
+                        
+                        // Early exit: Check if sentences are available
+                        if (attempts >= 3) {
+                            try {
+                                const sentencesCheck = await client.intelligence.v2
+                                    .transcripts(updatedTranscript.sid)
+                                    .sentences.list({ limit: 1 });
+                                if (sentencesCheck && sentencesCheck.length > 0) {
+                                    logger.log('[Recording] Sentences available, transcript complete');
+                                    newTranscript.status = 'completed';
+                                    break;
+                                }
+                            } catch (_) {}
+                        }
                         
                         if (updatedTranscript.status === 'completed') {
                             const sentences = await client.intelligence.v2
@@ -766,17 +791,17 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                         }
                                         if (current) segments.push({ t: current.t, role: current.role, text: current.text });
                                         if (segments.length) {
-                                            console.log('[Recording][CI] Built speaker turns from words due to missing roles in sentences:', segments.length);
+                                            logger.log('[Recording][CI] Built speaker turns from words due to missing roles in sentences:', segments.length);
                                             speakerTurns = segments;
                                             transcript = segments.map(x => x.text).join(' ');
                                         }
                                     }
                                 }
-                            } catch (e) { console.warn('[Recording][CI] Words fallback failed:', e?.message); }
+                            } catch (e) { logger.warn('[Recording][CI] Words fallback failed:', e?.message); }
                             if (turns.length) speakerTurns = turns;
                             transcript = turns.map(x => x.text).join(' ');
                             if (!transcript && sentences && sentences.length) {
-                                try { console.log('[Recording][CI] Example sentence keys:', Object.keys(sentences[0]||{})); } catch(_) {}
+                                try { logger.log('[Recording][CI] Example sentence keys:', Object.keys(sentences[0]||{})); } catch(_) {}
                             }
                             conversationalIntelligence = {
                                 transcriptSid: updatedTranscript.sid,
@@ -788,19 +813,19 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                 channelRoleMap: { agentChannel: agentChannelStr, customerChannel: agentChannelStr === '1' ? '2' : '1' }
                             };
                             
-                            console.log(`[Recording] Conversational Intelligence transcript completed with ${sentences.length} sentences, transcript length: ${transcript.length}`);
+                            logger.log(`[Recording] Conversational Intelligence transcript completed with ${sentences.length} sentences, transcript length: ${transcript.length}`);
                             break;
                         }
                         
                         attempts++;
-                        if (attempts % 5 === 0) console.log(`[Recording] Waiting for Conversational Intelligence... (${attempts*6}s)`);
+                        if (attempts % 5 === 0) logger.log(`[Recording] Waiting for Conversational Intelligence... (${attempts*6}s)`);
                     }
                 }
             }
             
             // Fallback to basic transcription if Conversational Intelligence not available or failed
             if (!transcript) {
-                console.log('[Recording] Falling back to basic transcription');
+                logger.log('[Recording] Falling back to basic transcription');
                 try {
                     if (client.transcriptions && typeof client.transcriptions.list === 'function') {
                         // Check if transcription already exists
@@ -808,14 +833,15 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                         if (transcriptions.length > 0 && typeof client.transcriptions === 'function') {
                             const t = await client.transcriptions(transcriptions[0].sid).fetch();
                             transcript = t.transcriptionText || '';
-                            console.log('[Recording] Existing transcript found:', (transcript || '').substring(0, 100) + '...');
+                            logger.log('[Recording] Existing transcript found:', (transcript || '').substring(0, 100) + '...');
                         } else if (client.transcriptions && typeof client.transcriptions.create === 'function') {
                             // Create new transcription using Twilio's service
-                            console.log('[Recording] Creating Twilio transcription via SDK...');
+                            logger.log('[Recording] Creating Twilio transcription via SDK...');
                             const created = await client.transcriptions.create({ recordingSid: recordingSid, languageCode: 'en-US' });
-                            // Poll for completion up to ~60s
+                            // Poll for completion
+                            // OPTIMIZED: Reduced from 12 to 6 attempts (30s instead of 60s)
                             let attempts = 0;
-                            const maxAttempts = 12; // 12 * 5s = 60s
+                            const maxAttempts = 6; // 6 * 5s = 30s (reduced from 60s)
                             while (attempts < maxAttempts) {
                                 await new Promise(r => setTimeout(r, 5000));
                                 let t = null;
@@ -823,18 +849,18 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                                 const text = t?.transcriptionText || '';
                                 if (text && text.trim().length > 0) { transcript = text; break; }
                                 attempts++;
-                                if (attempts % 3 === 0) console.log(`[Recording] Waiting for transcription... (${attempts*5}s)`);
+                                if (attempts % 3 === 0) logger.log(`[Recording] Waiting for transcription... (${attempts*5}s)`);
                             }
-                            if (transcript) console.log('[Recording] Transcription ready:', transcript.substring(0, 100) + '...');
-                            else console.log('[Recording] Transcription not ready within timeout');
+                            if (transcript) logger.log('[Recording] Transcription ready:', transcript.substring(0, 100) + '...');
+                            else logger.log('[Recording] Transcription not ready within timeout');
                         } else {
-                            console.warn('[Recording] Transcriptions API not available in this Twilio SDK runtime');
+                            logger.warn('[Recording] Transcriptions API not available in this Twilio SDK runtime');
                         }
                     } else {
-                        console.warn('[Recording] Transcriptions API not present on client');
+                        logger.warn('[Recording] Transcriptions API not present on client');
                     }
                 } catch (e) {
-                    console.warn('[Recording] Basic transcription fallback failed:', e?.message);
+                    logger.warn('[Recording] Basic transcription fallback failed:', e?.message);
                 }
             }
             
@@ -844,7 +870,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                     try {
                         aiInsights = await generateGeminiAIInsights(transcript);
                     } catch (e) {
-                        console.warn('[Recording] Gemini insights failed, falling back to heuristic:', e?.message);
+                        logger.warn('[Recording] Gemini insights failed, falling back to heuristic:', e?.message);
                         aiInsights = await generateTwilioAIInsights(transcript);
                     }
                 } else {
@@ -871,7 +897,7 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
             }
             
         } catch (transcriptionError) {
-            console.error('[Recording] Twilio transcription error:', transcriptionError);
+            logger.error('[Recording] Twilio transcription error:', transcriptionError);
             // Fallback to basic placeholder insights; Google STT removed
             aiInsights = {
                 summary: 'Call transcription processing in progress',
@@ -921,13 +947,13 @@ async function processRecordingWithTwilio(recordingUrl, callSid, recordingSid, b
                 })
             }).catch(() => {});
         } catch (e) {
-            console.warn('[Recording] Failed posting transcript/insights to /api/calls:', e?.message);
+                logger.warn('[Recording] Failed posting transcript/insights to /api/calls:', e?.message);
         }
         
-        console.log('[Recording] Twilio AI processing completed for:', callSid);
+        logger.log('[Recording] Twilio AI processing completed for:', callSid);
         
     } catch (error) {
-        console.error('[Recording] Twilio AI processing failed:', error);
+        logger.error('[Recording] Twilio AI processing failed:', error);
     }
 }
 
@@ -991,7 +1017,7 @@ async function generateTwilioAIInsights(transcript) {
         };
 
     } catch (error) {
-        console.error('[Twilio AI] Insights generation error:', error);
+        logger.error('[Twilio AI] Insights generation error:', error);
         return {
             summary: 'AI analysis completed using Twilio services',
             sentiment: 'Neutral',

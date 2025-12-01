@@ -2,6 +2,7 @@
 // Handles when a bridged call completes to prevent automatic retry
 
 import twilio from 'twilio';
+import logger from '../_logger.js';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 export default async function handler(req, res) {
@@ -14,7 +15,7 @@ export default async function handler(req, res) {
   try {
     const { CallSid, DialCallStatus, DialCallDuration, DialCallSid } = req.body;
     
-    console.log('[DialComplete] Call completed:', {
+    logger.log('[DialComplete] Call completed:', {
       callSid: CallSid,
       childCallSid: DialCallSid,
       status: DialCallStatus,
@@ -22,7 +23,7 @@ export default async function handler(req, res) {
     });
 
     // Log completion details for debugging
-    console.log('[DialComplete] Dial operation completed:', {
+    logger.log('[DialComplete] Dial operation completed:', {
       parentCallSid: CallSid,
       childCallSid: DialCallSid,
       finalStatus: DialCallStatus,
@@ -38,31 +39,31 @@ export default async function handler(req, res) {
     // Different responses based on dial outcome
     switch (DialCallStatus) {
       case 'completed':
-        console.log('[DialComplete] Call completed normally - ending call');
+        logger.log('[DialComplete] Call completed normally - ending call');
         // Don't say anything, just hang up
         twiml.hangup();
         break;
         
       case 'busy':
-        console.log('[DialComplete] Target was busy - ending call');
+        logger.log('[DialComplete] Target was busy - ending call');
         twiml.say('The number you called is busy.');
         twiml.hangup();
         break;
         
       case 'no-answer':
-        console.log('[DialComplete] No answer - ending call');
+        logger.log('[DialComplete] No answer - ending call');
         twiml.say('No answer.');
         twiml.hangup();
         break;
         
       case 'failed':
-        console.log('[DialComplete] Call failed - ending call');
+        logger.log('[DialComplete] Call failed - ending call');
         twiml.say('Call failed.');
         twiml.hangup();
         break;
         
       default:
-        console.log('[DialComplete] Unknown status:', DialCallStatus, '- ending call');
+        logger.log('[DialComplete] Unknown status:', DialCallStatus, '- ending call');
         twiml.hangup();
         break;
     }
@@ -75,7 +76,7 @@ export default async function handler(req, res) {
     return;
     
   } catch (error) {
-    console.error('[DialComplete] Error:', error);
+    logger.error('[DialComplete] Error:', error);
     
     // Return hangup TwiML on error
     const twiml = new VoiceResponse();

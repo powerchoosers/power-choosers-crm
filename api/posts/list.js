@@ -5,6 +5,7 @@
 
 import { cors } from '../_cors.js';
 import { db } from '../_firebase.js';
+import logger from '../_logger.js';
 
 // Note: No longer need getStorageBucket() since we're using clean URLs
 
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
   
   try {
     if (!db) {
-      console.error('[Posts List] Firestore not initialized');
+      logger.error('[Posts List] Firestore not initialized');
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Database not available' }));
       return;
@@ -39,7 +40,7 @@ export default async function handler(req, res) {
       });
     } catch (indexError) {
       // Fallback if composite index doesn't exist
-      console.warn('[Posts List] Composite index not found, using fallback query');
+      logger.warn('[Posts List] Composite index not found, using fallback query');
       const publishedPostsSnapshot = await db.collection('posts')
         .where('status', '==', 'published')
         .get();
@@ -88,7 +89,7 @@ export default async function handler(req, res) {
     }));
     
   } catch (error) {
-    console.error('[Posts List] Error:', error);
+    logger.error('[Posts List] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Failed to load posts',

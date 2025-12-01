@@ -3,6 +3,7 @@
 
 import { db } from './_firebase.js';
 import { cors } from './_cors.js';
+import logger from './_logger.js';
 
 // Normalize phone to last 10 digits for comparison
 function norm10(v) {
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
     const urlObj = new URL(req.url, `http://${req.headers.host}`);
     const phoneNumber = urlObj.searchParams.get('phone');
     
-    console.log('[Search] Incoming request for phone:', phoneNumber);
+    logger.log('[Search] Incoming request for phone:', phoneNumber);
     
     if (!phoneNumber) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -42,11 +43,11 @@ export default async function handler(req, res) {
       return;
     }
     
-    console.log('[Search] Normalized search digits:', searchDigits);
+    logger.log('[Search] Normalized search digits:', searchDigits);
     
     // Search in Firestore if available
     if (!db) {
-      console.error('[Search] Firestore not initialized - check Firebase credentials');
+      logger.error('[Search] Firestore not initialized - check Firebase credentials');
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         error: 'Database not available',
@@ -61,9 +62,9 @@ export default async function handler(req, res) {
       
       // Search contacts
       try {
-        console.log('[Search] Searching contacts collection...');
+        logger.log('[Search] Searching contacts collection...');
         const contactsSnap = await db.collection('people').get();
-        console.log('[Search] Found', contactsSnap.docs.length, 'contacts to search');
+        logger.log('[Search] Found', contactsSnap.docs.length, 'contacts to search');
         
         for (const doc of contactsSnap.docs) {
           const data = doc.data();
@@ -72,7 +73,7 @@ export default async function handler(req, res) {
           const other = norm10(data.otherPhone || '');
           
           if (mobile === searchDigits || work === searchDigits || other === searchDigits) {
-            console.log('[Search] Found matching contact:', doc.id, data.name);
+            logger.log('[Search] Found matching contact:', doc.id, data.name);
             contactResult = {
               id: doc.id,
               contactId: doc.id,
@@ -95,24 +96,24 @@ export default async function handler(req, res) {
         }
         
         if (!contactResult) {
-          console.log('[Search] No matching contact found');
+          logger.log('[Search] No matching contact found');
         }
       } catch (e) {
-        console.error('[Search] Error searching contacts:', e.message);
+        logger.error('[Search] Error searching contacts:', e.message);
       }
       
       // Search accounts (company phones)
       try {
-        console.log('[Search] Searching accounts collection...');
+        logger.log('[Search] Searching accounts collection...');
         const accountsSnap = await db.collection('accounts').get();
-        console.log('[Search] Found', accountsSnap.docs.length, 'accounts to search');
+        logger.log('[Search] Found', accountsSnap.docs.length, 'accounts to search');
         
         for (const doc of accountsSnap.docs) {
           const data = doc.data();
           const companyPhone = norm10(data.companyPhone || data.phone || '');
           
           if (companyPhone === searchDigits) {
-            console.log('[Search] Found matching account:', doc.id, data.name);
+            logger.log('[Search] Found matching account:', doc.id, data.name);
             accountResult = {
               id: doc.id,
               accountId: doc.id,
@@ -128,15 +129,15 @@ export default async function handler(req, res) {
         }
         
         if (!accountResult) {
-          console.log('[Search] No matching account found');
+          logger.log('[Search] No matching account found');
         }
       } catch (e) {
-        console.error('[Search] Error searching accounts:', e.message);
+        logger.error('[Search] Error searching accounts:', e.message);
       }
       
       // Return results
       if (contactResult) {
-        console.log('[Search] Returning contact result');
+        logger.log('[Search] Returning contact result');
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           success: true,
@@ -147,7 +148,7 @@ export default async function handler(req, res) {
       }
       
       if (accountResult) {
-        console.log('[Search] Returning account result');
+        logger.log('[Search] Returning account result');
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           success: true,
@@ -157,7 +158,7 @@ export default async function handler(req, res) {
         return;
       }
       
-      console.log('[Search] No results found - returning 404');
+      logger.log('[Search] No results found - returning 404');
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         success: false,
@@ -167,7 +168,7 @@ export default async function handler(req, res) {
     }
     
     // No Firestore - return not found
-    console.log('[Search] Firestore not available - returning 404');
+    logger.log('[Search] Firestore not available - returning 404');
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: false,
@@ -176,8 +177,8 @@ export default async function handler(req, res) {
     return;
     
   } catch (error) {
-    console.error('[Search] Error:', error);
-    console.error('[Search] Error stack:', error.stack);
+    logger.error('[Search] Error:', error);
+    logger.error('[Search] Error stack:', error.stack);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Search failed',

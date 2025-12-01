@@ -2,6 +2,7 @@
 // Terminates an active Twilio call by CallSid
 
 import twilio from 'twilio';
+import logger from '../_logger.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
     const authToken = process.env.TWILIO_AUTH_TOKEN;
 
     if (!accountSid || !authToken) {
-      console.error('[Hangup] Missing Twilio credentials');
+      logger.error('[Hangup] Missing Twilio credentials');
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Server configuration error' }));
       return;
@@ -34,7 +35,7 @@ export default async function handler(req, res) {
 
     const twilioClient = twilio(accountSid, authToken);
 
-    console.log('[Hangup] Terminating call(s):', callSidsToTerminate);
+    logger.log('[Hangup] Terminating call(s):', callSidsToTerminate);
 
     // Terminate all related call legs
     const results = [];
@@ -58,7 +59,7 @@ export default async function handler(req, res) {
           direction: call.direction
         });
         
-        console.log('[Hangup] Terminated call:', sid, call.direction);
+        logger.log('[Hangup] Terminated call:', sid, call.direction);
         
         // If this is a parent call, find and terminate all children
         try {
@@ -73,30 +74,30 @@ export default async function handler(req, res) {
                   direction: child.direction,
                   parentSid: sid
                 });
-                console.log('[Hangup] Terminated child call:', child.sid, child.direction);
+                logger.log('[Hangup] Terminated child call:', child.sid, child.direction);
               } catch (childError) {
-                console.error('[Hangup] Error terminating child call:', child.sid, childError.message);
+                logger.error('[Hangup] Error terminating child call:', child.sid, childError.message);
                 errors.push({ callSid: child.sid, error: childError.message });
               }
             }
           }
         } catch (childrenError) {
-          console.warn('[Hangup] Could not fetch children for:', sid, childrenError.message);
+          logger.warn('[Hangup] Could not fetch children for:', sid, childrenError.message);
         }
         
       } catch (error) {
         // Handle specific Twilio errors
         if (error.code === 20404) {
-          console.log('[Hangup] Call not found (may already be completed):', sid);
+          logger.log('[Hangup] Call not found (may already be completed):', sid);
           results.push({ callSid: sid, status: 'not-found', message: 'Call already completed or not found' });
         } else {
-          console.error('[Hangup] Error terminating call:', sid, error.message);
+          logger.error('[Hangup] Error terminating call:', sid, error.message);
           errors.push({ callSid: sid, error: error.message, code: error.code });
         }
       }
     }
 
-    console.log('[Hangup] Termination complete:', {
+    logger.log('[Hangup] Termination complete:', {
       terminated: results.length,
       errors: errors.length,
       results: results.map(r => ({ sid: r.callSid, status: r.status }))
@@ -113,7 +114,7 @@ export default async function handler(req, res) {
     }));
 
   } catch (error) {
-    console.error('[Hangup] Error terminating call:', error);
+    logger.error('[Hangup] Error terminating call:', error);
     
     // Handle specific Twilio errors
     if (error.code === 20404) {

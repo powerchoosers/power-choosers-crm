@@ -1,6 +1,7 @@
 // Vercel API endpoint for email statistics
 import { cors } from '../_cors.js';
 import { admin, db } from '../_firebase.js';
+import logger from '../_logger.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -33,7 +34,7 @@ export default async function handler(req, res) {
 
     // If tracking is disabled, return empty stats
     if (!deliverabilitySettings.enableTracking) {
-      console.log('[Email] Tracking disabled by settings, returning empty stats:', trackingId);
+      logger.log('[Email] Tracking disabled by settings, returning empty stats:', trackingId);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         trackingId,
@@ -77,14 +78,14 @@ export default async function handler(req, res) {
             to: emailData.to || []
           };
         } else {
-          console.log('[Email] Email document not found:', trackingId);
+          logger.log('[Email] Email document not found:', trackingId);
         }
       } catch (firebaseError) {
-        console.error('[Email] Firebase fetch error:', firebaseError);
+        logger.error('[Email] Firebase fetch error:', firebaseError);
         // Return default stats if Firebase fails
       }
     } else {
-      console.warn('[Email] Firebase not available, returning default stats');
+      logger.warn('[Email] Firebase not available, returning default stats');
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -92,7 +93,7 @@ export default async function handler(req, res) {
     return;
 
   } catch (error) {
-    console.error('[Email] Stats error:', error);
+    logger.error('[Email] Stats error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Failed to fetch email stats', message: error.message }));
     return;

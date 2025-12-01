@@ -1,4 +1,5 @@
 import { cors } from './_cors.js';
+import logger from './_logger.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return; // handle OPTIONS
@@ -24,14 +25,14 @@ export default async function handler(req, res) {
       unit: 'kWh'
     };
 
-    console.log(`[TX Price] Returning pricing data${refresh ? ' (refreshed)' : ''}:`, texasPricingData);
+    logger.log(`[TX Price] Returning pricing data${refresh ? ' (refreshed)' : ''}:`, texasPricingData);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(texasPricingData));
     return;
     
   } catch (error) {
-    console.error('[TX Price] Error:', error);
+    logger.error('[TX Price] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Failed to fetch Texas electricity pricing', 

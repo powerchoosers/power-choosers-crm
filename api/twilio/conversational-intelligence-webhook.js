@@ -1,30 +1,6 @@
 import { URLSearchParams } from 'url';
 import { resolveToCallSid, isCallSid } from '../_twilio-ids.js';
-
-// Simple logging function for Cloud Run cost optimization
-const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
-const currentLogLevel = logLevels[process.env.LOG_LEVEL || 'info'];
-
-const logger = {
-    info: (message, context, data) => {
-        if (currentLogLevel >= logLevels.info && process.env.VERBOSE_LOGS === 'true') {
-            console.log(`[${context}] ${message}`, data || '');
-        }
-    },
-    error: (message, context, data) => {
-        console.error(`[${context}] ${message}`, data || '');
-    },
-    debug: (message, context, data) => {
-        if (currentLogLevel >= logLevels.debug && process.env.VERBOSE_LOGS === 'true') {
-            console.log(`[${context}] ${message}`, data || '');
-        }
-    },
-    warn: (message, context, data) => {
-        if (currentLogLevel >= logLevels.warn) {
-            console.warn(`[${context}] ${message}`, data || '');
-        }
-    }
-};
+import logger from '../_logger.js';
 
 // Twilio webhook: no CORS needed (server-to-server)
 
@@ -225,7 +201,7 @@ export default async function handler(req, res) {
                                  EventType === 'ci.analysis.completed';
         
         if (!isAnalysisComplete) {
-            console.log('[Conversational Intelligence Webhook] Not an analysis completion event:', {
+            logger.log('[Conversational Intelligence Webhook] Not an analysis completion event:', {
                 EventType,
                 analysisStatus,
                 message: 'Waiting for analysis_completed event'
@@ -237,7 +213,7 @@ export default async function handler(req, res) {
         
         // Validate analysis status
         if (analysisStatus && analysisStatus !== 'completed') {
-            console.log('[Conversational Intelligence Webhook] Analysis not completed yet:', {
+            logger.log('[Conversational Intelligence Webhook] Analysis not completed yet:', {
                 EventType,
                 analysisStatus,
                 message: 'Analysis still in progress'
@@ -274,7 +250,7 @@ export default async function handler(req, res) {
                     } catch(_) {}
                 }
                 if (!allowed) {
-                    console.log('[CI Webhook] CI auto-process disabled; ignoring transcript not explicitly requested', { TranscriptSid, callSidFromCustomerKey });
+                    logger.log('[CI Webhook] CI auto-process disabled; ignoring transcript not explicitly requested', { TranscriptSid, callSidFromCustomerKey });
                     res.writeHead(202, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ success: true, gated: true }));
                     return;
@@ -288,11 +264,11 @@ export default async function handler(req, res) {
             // Fire-and-forget; do not await
             fetch(`${base}/api/twilio/poll-ci-analysis`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-            }).then(()=>{ try { console.log('[CI Webhook] Queued background poll for', TranscriptSid); } catch(_) {} })
-              .catch((e)=>{ try { console.warn('[CI Webhook] Background poll queue failed:', e?.message||e); } catch(_) {} });
-        } catch (e) { try { console.warn('[CI Webhook] Queue error:', e?.message||e); } catch(_) {} }
+            }).then(()=>{ try { logger.log('[CI Webhook] Queued background poll for', TranscriptSid); } catch(_) {} })
+              .catch((e)=>{ try { logger.warn('[CI Webhook] Background poll queue failed:', e?.message||e); } catch(_) {} });
+        } catch (e) { try { logger.warn('[CI Webhook] Queue error:', e?.message||e); } catch(_) {} }
         const _elapsed = Date.now() - _start;
-        try { console.log('[CI Webhook] ACK 200 queued in', _elapsed + 'ms', 'for', TranscriptSid); } catch(_) {}
+        try { logger.log('[CI Webhook] ACK 200 queued in', _elapsed + 'ms', 'for', TranscriptSid); } catch(_) {}
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, queued: true, transcriptSid: TranscriptSid, elapsedMs: _elapsed }));
         return;
@@ -300,7 +276,7 @@ export default async function handler(req, res) {
         try {
             // Get the transcript details and validate CI analysis status
             const transcript = await client.intelligence.v2.transcripts(TranscriptSid).fetch();
-            console.log('[Conversational Intelligence Webhook] Transcript details:', {
+            logger.log('[Conversational Intelligence Webhook] Transcript details:', {
                 sid: transcript.sid,
                 status: transcript.status,
                 sourceSid: transcript.sourceSid,
@@ -313,7 +289,7 @@ export default async function handler(req, res) {
             // Double-check that CI analysis is actually completed (per Twilio guidance)
             if (transcript.analysisStatus && transcript.analysisStatus !== 'completed') {
                 if (transcript.analysisStatus === 'failed') {
-                    console.error('[Conversational Intelligence Webhook] CI analysis failed:', {
+                    logger.error('[Conversational Intelligence Webhook] CI analysis failed:', {
                         transcriptStatus: transcript.status,
                         analysisStatus: transcript.analysisStatus,
                         ciStatus: transcript.ciStatus,
@@ -325,7 +301,7 @@ export default async function handler(req, res) {
                     return;
                 }
                 
-                console.log('[Conversational Intelligence Webhook] CI analysis not completed yet:', {
+                logger.log('[Conversational Intelligence Webhook] CI analysis not completed yet:', {
                     transcriptStatus: transcript.status,
                     analysisStatus: transcript.analysisStatus,
                     ciStatus: transcript.ciStatus,
@@ -354,9 +330,9 @@ export default async function handler(req, res) {
                 const fromIsAgent = fromIsClient || isBiz(from10) || (!isBiz(to10) && fromStr && fromStr !== toStr);
                 channelRoleMap.agentChannel = fromIsAgent ? '1' : '2';
                 channelRoleMap.customerChannel = fromIsAgent ? '2' : '1';
-                console.log('[CI Webhook] Channel-role mapping', channelRoleMap, { from: fromStr, to: toStr });
+                logger.log('[CI Webhook] Channel-role mapping', channelRoleMap, { from: fromStr, to: toStr });
             } catch(e) {
-                console.warn('[CI Webhook] Failed to compute channel-role mapping, defaulting:', e?.message);
+                logger.warn('[CI Webhook] Failed to compute channel-role mapping, defaulting:', e?.message);
             }
 
             // Get sentences with validation
@@ -371,14 +347,14 @@ export default async function handler(req, res) {
                         .transcripts(TranscriptSid)
                         .sentences.list();
                     const count = Array.isArray(resp) ? resp.length : 0;
-                    console.log(`[Conversational Intelligence Webhook] Sentences fetch: count=${count}, waitedMs=${waited}`);
+                    logger.log(`[Conversational Intelligence Webhook] Sentences fetch: count=${count}, waitedMs=${waited}`);
                     if (count > 0) { sentencesResponse = resp; break; }
                     if (waited >= maxMs) break;
                     await new Promise(r => setTimeout(r, stepMs));
                     waited += stepMs;
                 }
                 
-                console.log(`[Conversational Intelligence Webhook] Raw sentences response:`, {
+                logger.log(`[Conversational Intelligence Webhook] Raw sentences response:`, {
                     count: sentencesResponse.length,
                     sample: sentencesResponse.slice(0, 2).map(s => ({
                         text: s.text?.substring(0, 50) + '...',
@@ -393,7 +369,7 @@ export default async function handler(req, res) {
                 
                 // Validate we have proper sentence segmentation (per Twilio guidance)
                 if (sentencesResponse.length === 0) {
-                    console.warn('[Conversational Intelligence Webhook] No sentences returned - CI analysis may not be complete');
+                    logger.warn('[Conversational Intelligence Webhook] No sentences returned - CI analysis may not be complete');
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ success: true, message: 'No sentences available yet' }));
                     return;
@@ -401,7 +377,7 @@ export default async function handler(req, res) {
                 
                 // Check for segmentation failure indicators (per Twilio guidance: 5-20+ sentences expected for 1-2 min calls)
                 if (sentencesResponse.length <= 2) {
-                    console.warn('[Conversational Intelligence Webhook] Very few sentences detected - possible segmentation failure:', {
+                    logger.warn('[Conversational Intelligence Webhook] Very few sentences detected - possible segmentation failure:', {
                         sentenceCount: sentencesResponse.length,
                         callLength: 'unknown', // We could calculate this from call duration if available
                         message: 'Expected 5-20+ sentences for typical 1-2 minute calls'
@@ -409,7 +385,7 @@ export default async function handler(req, res) {
                 }
                 
                 if (sentencesResponse.length === 1 && sentencesResponse[0].text && sentencesResponse[0].text.length > 500) {
-                    console.warn('[Conversational Intelligence Webhook] Single long sentence detected - CI segmentation likely failed:', {
+                    logger.warn('[Conversational Intelligence Webhook] Single long sentence detected - CI segmentation likely failed:', {
                         sentenceLength: sentencesResponse[0].text.length,
                         message: 'Single sentence over 500 chars suggests segmentation failure'
                     });
@@ -437,7 +413,7 @@ export default async function handler(req, res) {
                         } else {
                             // Only log first few warnings to avoid spam
                             if (channelWarningsLogged < 3) {
-                                console.warn('[Conversational Intelligence Webhook] Null/undefined channel detected:', {
+                                logger.warn('[Conversational Intelligence Webhook] Null/undefined channel detected:', {
                                     sentenceIndex: idx,
                                     sentence: s.text?.substring(0, 50) + '...',
                                     participantRole,
@@ -484,9 +460,9 @@ export default async function handler(req, res) {
                     .map(s => `${s.speaker}: ${s.text.trim()}`)
                     .join('\n\n');
                 
-                console.log(`[Conversational Intelligence Webhook] Retrieved ${sentences.length} sentences, transcript length: ${transcriptText.length}`);
-                console.log(`[Conversational Intelligence Webhook] Formatted transcript with speaker labels: ${formattedTranscript.length} chars`);
-                console.log(`[Conversational Intelligence Webhook] Channel distribution:`, {
+                logger.log(`[Conversational Intelligence Webhook] Retrieved ${sentences.length} sentences, transcript length: ${transcriptText.length}`);
+                logger.log(`[Conversational Intelligence Webhook] Formatted transcript with speaker labels: ${formattedTranscript.length} chars`);
+                logger.log(`[Conversational Intelligence Webhook] Channel distribution:`, {
                     channel1: sentences.filter(s => s.channelNum === 1).length,
                     channel2: sentences.filter(s => s.channelNum === 2).length,
                     other: sentences.filter(s => s.channelNum !== 1 && s.channelNum !== 2).length,
@@ -494,7 +470,7 @@ export default async function handler(req, res) {
                     segmentationQuality: sentences.length >= 5 ? 'Good' : sentences.length >= 2 ? 'Poor' : 'Failed'
                 });
             } catch (error) {
-                console.error('[Conversational Intelligence Webhook] Error fetching sentences:', error);
+                logger.error('[Conversational Intelligence Webhook] Error fetching sentences:', error);
             }
             
             // Get operator results (includes Twilio-generated summary)
@@ -513,7 +489,7 @@ export default async function handler(req, res) {
                         // Include textGenerationResults for summary extraction
                         textGenerationResults: r.textGenerationResults
                     }));
-                    console.log(`[Conversational Intelligence Webhook] Retrieved ${resultsResponse.length} operator results:`, 
+                    logger.log(`[Conversational Intelligence Webhook] Retrieved ${resultsResponse.length} operator results:`, 
                         operatorResults.map(op => ({ 
                             name: op.name, 
                             type: op.operatorType,
@@ -521,7 +497,7 @@ export default async function handler(req, res) {
                         })));
                 }
             } catch (error) {
-                console.warn('[Conversational Intelligence Webhook] No operator results available:', error.message);
+                                logger.warn('[Conversational Intelligence Webhook] No operator results available:', error.message);
             }
             
             // Generate AI insights from the transcript
@@ -569,7 +545,7 @@ export default async function handler(req, res) {
                 const finalCallSid = resolved || (isCallSid(CallSid) ? CallSid : null);
 
                 if (!finalCallSid) {
-                    console.warn('[Conversational Intelligence Webhook] Skipping /api/calls update: unresolved Call SID', { CallSid, RecordingSid, TranscriptSid });
+                    logger.warn('[Conversational Intelligence Webhook] Skipping /api/calls update: unresolved Call SID', { CallSid, RecordingSid, TranscriptSid });
                 } else {
                     const updateResponse = await fetch(`${base}/api/calls`, {
                         method: 'POST',
@@ -599,20 +575,20 @@ export default async function handler(req, res) {
                     });
                     
                     if (updateResponse.ok) {
-                        console.log('[Conversational Intelligence Webhook] Successfully updated call data');
+                        logger.log('[Conversational Intelligence Webhook] Successfully updated call data');
                     } else {
-                        console.error('[Conversational Intelligence Webhook] Failed to update call data:', updateResponse.status);
+                        logger.error('[Conversational Intelligence Webhook] Failed to update call data:', updateResponse.status);
                     }
                 }
             } catch (error) {
-                console.error('[Conversational Intelligence Webhook] Error updating call data:', error);
+                logger.error('[Conversational Intelligence Webhook] Error updating call data:', error);
             }
             
         } catch (error) {
-            console.error('[Conversational Intelligence Webhook] Error processing transcript:', error);
+            logger.error('[Conversational Intelligence Webhook] Error processing transcript:', error);
         }
         
-        console.log('[Conversational Intelligence Webhook] Processing completed');
+        logger.log('[Conversational Intelligence Webhook] Processing completed');
         
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -622,7 +598,7 @@ export default async function handler(req, res) {
         return;
         
     } catch (error) {
-        console.error('[Conversational Intelligence Webhook] Error:', error);
+        logger.error('[Conversational Intelligence Webhook] Error:', error);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
             error: 'Failed to process webhook',
@@ -705,17 +681,38 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
         let enhancedInsights = {};
         let twilioSummary = '';
         if (operatorResults && operatorResults.length > 0) {
-            // Look for the summary in operator results
+            // Look for the summary in operator results - check multiple locations
             for (const op of operatorResults) {
                 // Check for text_generation type or summary-related names
                 if (op.operatorType === 'text_generation' || 
                     ['summary', 'conversation_summary', 'call_summary'].includes(op.name?.toLowerCase())) {
-                    // Check for textGenerationResults field (where Twilio puts the summary)
-                    const summaryText = op.textGenerationResults || op.results?.textGenerationResults || op.results?.summary;
+                    // Check multiple possible locations for the summary
+                    const summaryText = op.textGenerationResults || 
+                                       op.summary || 
+                                       op.results?.textGenerationResults || 
+                                       op.results?.summary ||
+                                       op.extractionResults?.summary ||
+                                       (typeof op.result === 'string' ? op.result : null);
                     if (summaryText) {
                         twilioSummary = String(summaryText).trim();
-                        console.log('[CI Webhook] Found Twilio summary from operator:', op.name, 'length:', twilioSummary.length);
+                        logger.log('[CI Webhook] Found Twilio summary from operator:', op.name, 'length:', twilioSummary.length);
                         break;
+                    }
+                }
+                
+                // Also check extraction operators which may contain parsed JSON with summary
+                if (op.operatorType === 'extraction' && op.extractionResults) {
+                    try {
+                        const extracted = typeof op.extractionResults === 'string' 
+                            ? JSON.parse(op.extractionResults) 
+                            : op.extractionResults;
+                        if (extracted.summary) {
+                            twilioSummary = String(extracted.summary).trim();
+                            logger.log('[CI Webhook] Found summary from extraction operator:', op.name, 'length:', twilioSummary.length);
+                            break;
+                        }
+                    } catch (parseErr) {
+                        logger.log('[CI Webhook] Could not parse extraction results:', parseErr?.message);
                     }
                 }
             }
@@ -748,7 +745,7 @@ async function generateAdvancedAIInsights(transcript, sentences, operatorResults
         };
         
     } catch (error) {
-        console.error('[Conversational Intelligence Webhook] Insights generation error:', error);
+        logger.error('[Conversational Intelligence Webhook] Insights generation error:', error);
         return {
             summary: 'Advanced AI analysis completed using Twilio Conversational Intelligence',
             sentiment: 'Neutral',
