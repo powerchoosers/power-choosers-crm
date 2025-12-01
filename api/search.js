@@ -60,38 +60,57 @@ export default async function handler(req, res) {
       let contactResult = null;
       let accountResult = null;
       
-      // Search contacts
+      // OPTIMIZED: Use direct Firestore queries instead of loading entire collections
+      // This reduces Firestore reads from thousands to ~10-20 per search
+      
+      // Search contacts - query each phone field separately
       try {
-        logger.log('[Search] Searching contacts collection...');
-        const contactsSnap = await db.collection('people').get();
-        logger.log('[Search] Found', contactsSnap.docs.length, 'contacts to search');
+        logger.log('[Search] Querying contacts by phone fields...');
         
-        for (const doc of contactsSnap.docs) {
-          const data = doc.data();
-          const mobile = norm10(data.mobile || data.mobilePhone || '');
-          const work = norm10(data.workDirectPhone || data.workPhone || '');
-          const other = norm10(data.otherPhone || '');
-          
-          if (mobile === searchDigits || work === searchDigits || other === searchDigits) {
-            logger.log('[Search] Found matching contact:', doc.id, data.name);
-            contactResult = {
-              id: doc.id,
-              contactId: doc.id,
-              name: data.name || `${data.firstName || ''} ${data.lastName || ''}`.trim(),
-              firstName: data.firstName || '',
-              lastName: data.lastName || '',
-              title: data.title || data.jobTitle || '',
-              email: data.email || '',
-              mobile: data.mobile || data.mobilePhone || '',
-              workDirectPhone: data.workDirectPhone || data.workPhone || '',
-              otherPhone: data.otherPhone || '',
-              account: data.account || data.accountName || data.companyName || data.company || '',
-              accountId: data.accountId || data.account_id || '',
-              city: data.city || '',
-              state: data.state || '',
-              domain: data.domain || data.website || ''
-            };
-            break;
+        // Query all phone fields in parallel (Firestore doesn't support OR easily)
+        const contactQueries = await Promise.allSettled([
+          // Mobile phone variations
+          db.collection('people').where('mobile', '==', searchDigits).limit(1).get(),
+          db.collection('people').where('mobilePhone', '==', searchDigits).limit(1).get(),
+          // Work phone variations
+          db.collection('people').where('workDirectPhone', '==', searchDigits).limit(1).get(),
+          db.collection('people').where('workPhone', '==', searchDigits).limit(1).get(),
+          // Other phone
+          db.collection('people').where('otherPhone', '==', searchDigits).limit(1).get()
+        ]);
+        
+        // Check each query result and find first match
+        for (const queryResult of contactQueries) {
+          if (queryResult.status === 'fulfilled' && !queryResult.value.empty) {
+            const doc = queryResult.value.docs[0];
+            const data = doc.data();
+            
+            // Double-check with normalization (in case stored format differs)
+            const mobile = norm10(data.mobile || data.mobilePhone || '');
+            const work = norm10(data.workDirectPhone || data.workPhone || '');
+            const other = norm10(data.otherPhone || '');
+            
+            if (mobile === searchDigits || work === searchDigits || other === searchDigits) {
+              logger.log('[Search] Found matching contact:', doc.id, data.name);
+              contactResult = {
+                id: doc.id,
+                contactId: doc.id,
+                name: data.name || `${data.firstName || ''} ${data.lastName || ''}`.trim(),
+                firstName: data.firstName || '',
+                lastName: data.lastName || '',
+                title: data.title || data.jobTitle || '',
+                email: data.email || '',
+                mobile: data.mobile || data.mobilePhone || '',
+                workDirectPhone: data.workDirectPhone || data.workPhone || '',
+                otherPhone: data.otherPhone || '',
+                account: data.account || data.accountName || data.companyName || data.company || '',
+                accountId: data.accountId || data.account_id || '',
+                city: data.city || '',
+                state: data.state || '',
+                domain: data.domain || data.website || ''
+              };
+              break;
+            }
           }
         }
         
@@ -102,29 +121,41 @@ export default async function handler(req, res) {
         logger.error('[Search] Error searching contacts:', e.message);
       }
       
-      // Search accounts (company phones)
+      // Search accounts - query each phone field separately
       try {
-        logger.log('[Search] Searching accounts collection...');
-        const accountsSnap = await db.collection('accounts').get();
-        logger.log('[Search] Found', accountsSnap.docs.length, 'accounts to search');
+        logger.log('[Search] Querying accounts by phone fields...');
         
-        for (const doc of accountsSnap.docs) {
-          const data = doc.data();
-          const companyPhone = norm10(data.companyPhone || data.phone || '');
-          
-          if (companyPhone === searchDigits) {
-            logger.log('[Search] Found matching account:', doc.id, data.name);
-            accountResult = {
-              id: doc.id,
-              accountId: doc.id,
-              name: data.name || data.accountName || data.companyName || '',
-              companyPhone: data.companyPhone || data.phone || '',
-              city: data.city || '',
-              state: data.state || '',
-              domain: data.domain || data.website || '',
-              logoUrl: data.logoUrl || ''
-            };
-            break;
+        // Query all account phone fields in parallel
+        const accountQueries = await Promise.allSettled([
+          db.collection('accounts').where('companyPhone', '==', searchDigits).limit(1).get(),
+          db.collection('accounts').where('phone', '==', searchDigits).limit(1).get(),
+          db.collection('accounts').where('primaryPhone', '==', searchDigits).limit(1).get(),
+          db.collection('accounts').where('mainPhone', '==', searchDigits).limit(1).get()
+        ]);
+        
+        // Check each query result and find first match
+        for (const queryResult of accountQueries) {
+          if (queryResult.status === 'fulfilled' && !queryResult.value.empty) {
+            const doc = queryResult.value.docs[0];
+            const data = doc.data();
+            
+            // Double-check with normalization
+            const companyPhone = norm10(data.companyPhone || data.phone || data.primaryPhone || data.mainPhone || '');
+            
+            if (companyPhone === searchDigits) {
+              logger.log('[Search] Found matching account:', doc.id, data.name);
+              accountResult = {
+                id: doc.id,
+                accountId: doc.id,
+                name: data.name || data.accountName || data.companyName || '',
+                companyPhone: data.companyPhone || data.phone || data.primaryPhone || data.mainPhone || '',
+                city: data.city || '',
+                state: data.state || '',
+                domain: data.domain || data.website || '',
+                logoUrl: data.logoUrl || ''
+              };
+              break;
+            }
           }
         }
         
