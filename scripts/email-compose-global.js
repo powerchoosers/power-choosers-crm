@@ -4602,17 +4602,17 @@
 
   // ========== EMAIL SENDING FUNCTIONS ==========
   
-  async function sendEmailViaSendGrid(emailData) {
+  async function sendEmailViaGmail(emailData) {
     try {
       const { to, subject, content, from, fromName, _deliverability, threadId, inReplyTo, references, trackingMetadata, isHtmlEmail } = emailData;
       
       // Generate unique tracking ID for this email
-      const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const trackingId = `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
       // Explicit boolean conversion - ensure it's always a boolean, never undefined
       const isHtmlEmailBoolean = Boolean(isHtmlEmail);
       
-      console.log('[SendGrid] Email data received:', {
+      console.log('[Gmail] Email data received:', {
         isHtmlEmail: isHtmlEmailBoolean,
         contentLength: content.length,
         contentPreview: content.substring(0, 100) + '...',
@@ -4620,7 +4620,7 @@
         fromName: fromName || 'not set'
       });
       
-      // Prepare email data for SendGrid
+      // Prepare email data for Gmail API
       const emailPayload = {
         to: to,
         subject: subject,
@@ -4632,10 +4632,11 @@
         inReplyTo: inReplyTo,
         references: references,
         isHtmlEmail: isHtmlEmailBoolean, // Use explicit boolean, not || false
-        _deliverability: _deliverability
+        _deliverability: _deliverability,
+        userEmail: window.currentUserEmail || null // Pass user email for domain-wide delegation
       };
       
-      // Send via SendGrid API
+      // Send via Gmail API (still using sendgrid-send endpoint name for backward compatibility)
       const response = await fetch(`${window.API_BASE_URL}/api/email/sendgrid-send`, {
         method: 'POST',
         headers: {
@@ -4646,11 +4647,11 @@
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send email via SendGrid');
+        throw new Error(errorData.error || 'Failed to send email via Gmail');
       }
 
       const result = await response.json();
-      console.log('[SendGrid] Email sent successfully:', result);
+      console.log('[Gmail] Email sent successfully:', result);
       
       // Store email record for tracking
       if (window.emailTrackingManager && result.trackingId) {
@@ -4659,12 +4660,13 @@
           to: emailData.to,
           subject: emailData.subject,
           content: content,
-          from: 'Lewis Patterson <noreply@powerchoosers.com>',
-          provider: 'sendgrid',
-          sentVia: 'sendgrid',
-          sendgridMessageId: result.messageId, // SendGrid's x-message-id
+          from: 'Lewis Patterson <l.patterson@powerchoosers.com>',
+          provider: 'gmail',
+          sentVia: 'gmail',
+          gmailMessageId: result.messageId,
+          messageId: result.messageId,
           sentAt: new Date().toISOString(),
-          threadId: threadId || null,
+          threadId: result.threadId || threadId || null,
           inReplyTo: inReplyTo || null,
           references: Array.isArray(references) ? references : (references ? [references] : []),
           trackingMetadata: trackingMetadata || null
@@ -4672,21 +4674,22 @@
         
         try {
           await window.emailTrackingManager.saveEmailRecord(trackingEmailData);
-          console.log('[SendGrid] Email record saved to tracking system');
+          console.log('[Gmail] Email record saved to tracking system');
         } catch (trackingError) {
-          console.warn('[SendGrid] Failed to save email record:', trackingError);
+          console.warn('[Gmail] Failed to save email record:', trackingError);
         }
       }
       
       return {
         success: true,
         trackingId: result.trackingId,
-        messageId: result.trackingId,
-        message: 'Email sent successfully via SendGrid'
+        messageId: result.messageId,
+        threadId: result.threadId,
+        message: 'Email sent successfully via Gmail'
       };
 
     } catch (error) {
-      console.error('[SendGrid] Send error:', error);
+      console.error('[Gmail] Send error:', error);
       throw error;
     }
   }
@@ -4881,12 +4884,12 @@
         trackingMetadata: window._lastGeneratedMetadata || null
       };
 
-      // Send via SendGrid
+      // Send via Gmail
       let result;
       try {
-        console.log('[EmailCompose] Sending via SendGrid with fromName:', senderName);
-        result = await sendEmailViaSendGrid({ ...emailData, _deliverability: deliver });
-        console.log('[EmailCompose] Email sent via SendGrid');
+        console.log('[EmailCompose] Sending via Gmail with fromName:', senderName);
+        result = await sendEmailViaGmail({ ...emailData, _deliverability: deliver });
+        console.log('[EmailCompose] Email sent via Gmail');
         
         // Track email performance if metadata is available
         if (window._lastGeneratedMetadata) {
