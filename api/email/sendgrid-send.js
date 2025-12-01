@@ -1,6 +1,6 @@
-// API endpoint for sending emails via SendGrid (replaces Gmail API)
+// API endpoint for sending emails via Gmail API
 import { cors } from '../_cors.js';
-import SendGridService from './sendgrid-service.js';
+import { GmailService } from './gmail-service.js';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {
@@ -12,10 +12,10 @@ export default async function handler(req, res) {
     return;
   }
 
-  // API Key validation
-  if (!process.env.SENDGRID_API_KEY) {
+  // Gmail service account validation
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Missing SendGrid API key' }));
+    res.end(JSON.stringify({ error: 'Missing Gmail service account key' }));
     return;
   }
 
@@ -28,8 +28,8 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Generate unique tracking ID (prefix with sendgrid_ for consistency)
-    const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate unique tracking ID (prefix with gmail_ for consistency)
+    const trackingId = `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Explicit boolean conversion - ensure it's always a boolean, never undefined
     const isHtmlEmailBoolean = Boolean(isHtmlEmail);
@@ -55,71 +55,75 @@ export default async function handler(req, res) {
       } : {})
     };
 
-    // Prepare email data
-    const emailData = {
+    // Generate plain text version from HTML if needed
+    let textContent = '';
+    if (isHtmlEmailBoolean) {
+      // Simple HTML to text conversion
+      textContent = content
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    } else {
+      textContent = content;
+    }
+
+    // Prepare email data for Gmail
+    // The Gmail service will automatically look up sender info from user profile
+    const gmailService = new GmailService();
+
+    logger.log('[Gmail] Sending email:', { to, subject, trackingId, userEmail });
+
+    const result = await gmailService.sendEmail({
       to,
       subject,
-      content,
-      from: from || process.env.SENDGRID_FROM_EMAIL || 'l.patterson@powerchoosers.com',
-      fromName: fromName || process.env.SENDGRID_FROM_NAME || 'Lewis Patterson',
-      trackingId,
+      html: isHtmlEmailBoolean ? content : undefined,
+      text: textContent,
+      userEmail: userEmail, // Used to look up sender name/email from Firestore
+      ownerId: userEmail, // Alias for compatibility
+      from: from, // Optional override
+      fromName: fromName, // Optional override
       threadId: threadId || undefined,
       inReplyTo: inReplyTo || undefined,
-      references: Array.isArray(references) ? references : (references ? [references] : undefined),
-      isHtmlEmail: isHtmlEmailBoolean, // Use explicit boolean, not || false
-      userEmail: userEmail || null,
-      _deliverability: deliverability,
-      emailSettings: emailSettings || null // Pass through for logging/debugging
-    };
-
-    logger.log('[SendGrid] Sending email:', { to, subject, trackingId, deliverability });
-
-    const sendGridService = new SendGridService();
-    const result = await sendGridService.sendEmail(emailData);
+      references: Array.isArray(references) ? references : (references ? [references] : undefined)
+    });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: true,
-      trackingId: result.trackingId,
+      trackingId: trackingId,
       messageId: result.messageId,
-      message: 'Email sent successfully via SendGrid'
+      threadId: result.threadId,
+      message: 'Email sent successfully via Gmail'
     }));
 
   } catch (error) {
-    logger.error('[SendGrid] Send error:', error);
+    logger.error('[Gmail] Send error:', error);
 
-    // Extract more detailed error information (per Twilio recommendations)
-    let errorMessage = error.message || 'Failed to send email';
+    // Extract more detailed error information
+    let errorMessage = error.message || 'Failed to send email via Gmail';
     let errorDetails = null;
     let statusCode = 500;
 
-    // If it's a SendGrid API error, extract details (per Twilio recommendation)
-    if (error.response && error.response.body) {
-      statusCode = error.response.statusCode || 500;
-
-      // Extract detailed error messages from SendGrid response
-      if (error.response.body.errors && Array.isArray(error.response.body.errors)) {
-        errorDetails = error.response.body.errors.map(e => ({
-          message: e.message || e,
-          field: e.field || null,
-          help: e.help || null
-        }));
-        errorMessage = errorDetails.map(e => e.message).join('; ');
-        logger.error('[SendGrid] SendGrid API Error Details:', errorDetails);
-      } else if (error.response.body.message) {
-        errorMessage = error.response.body.message;
+    // If it's a Gmail API error, extract details
+    if (error.response && error.response.data) {
+      statusCode = error.response.status || 500;
+      errorDetails = error.response.data.error || null;
+      if (errorDetails && errorDetails.message) {
+        errorMessage = errorDetails.message;
       }
+    }
 
-      // Provide specific guidance based on status code
-      if (statusCode === 413) {
-        errorMessage = 'Payload Too Large: Email content exceeds SendGrid size limits. ' + errorMessage;
-      } else if (statusCode === 400) {
-        errorMessage = 'Bad Request: Check email payload structure and headers. ' + errorMessage;
-      } else if (statusCode === 401) {
-        errorMessage = 'Unauthorized: Check SendGrid API key permissions. ' + errorMessage;
-      } else if (statusCode === 403) {
-        errorMessage = 'Forbidden: API key does not have Mail Send permissions. ' + errorMessage;
-      }
+    // Provide specific guidance based on status code
+    if (statusCode === 413) {
+      errorMessage = 'Payload Too Large: Email content exceeds Gmail size limits. ' + errorMessage;
+    } else if (statusCode === 400) {
+      errorMessage = 'Bad Request: Check email payload structure. ' + errorMessage;
+    } else if (statusCode === 401) {
+      errorMessage = 'Unauthorized: Check Gmail service account permissions. ' + errorMessage;
+    } else if (statusCode === 403) {
+      errorMessage = 'Forbidden: Service account does not have Gmail send permissions. ' + errorMessage;
     }
 
     res.writeHead(statusCode, { 'Content-Type': 'application/json' });
