@@ -16,12 +16,32 @@ async function getUserSignature(ownerId) {
 
   try {
     // Fetch user settings from Firestore
-    const settingsSnap = await db.collection('crm-settings')
+    // Settings are saved with doc ID like 'user-settings' (admin) or 'user-settings-{email}' (employee)
+    // Try by ownerId query first (preferred), then fallback to direct doc lookup
+    let settingsSnap = await db.collection('settings')
       .where('ownerId', '==', ownerId)
       .limit(1)
       .get();
 
+    // Fallback: Try direct document lookup by email-based ID
     if (settingsSnap.empty) {
+      const docId = `user-settings-${ownerId}`;
+      const directDoc = await db.collection('settings').doc(docId).get();
+      if (directDoc.exists) {
+        settingsSnap = { empty: false, docs: [directDoc] };
+      }
+    }
+
+    // Fallback: Try legacy admin settings doc
+    if (settingsSnap.empty) {
+      const adminDoc = await db.collection('settings').doc('user-settings').get();
+      if (adminDoc.exists) {
+        settingsSnap = { empty: false, docs: [adminDoc] };
+      }
+    }
+
+    if (settingsSnap.empty) {
+      logger.warn('[SendScheduledEmails] No settings found for user:', ownerId);
       return { signatureHtml: '', signatureText: '' };
     }
 
