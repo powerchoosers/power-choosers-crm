@@ -209,7 +209,10 @@
     // NEW: Task Detail page event listener guards (task-detail.js)
     '_taskDetailContactHandlersBound',
     '_taskDetailPhoneHandlersBound',
-    '_taskDetailContactCreationBound'
+    '_taskDetailContactCreationBound',
+    
+    // NEW: Email Detail page event listener guards (email-detail.js)
+    '_emailDetailSendNowBound'
   ];
   
   // NOTE: _composeToolbarClickBound removed - it was preventing the listener from being attached at all

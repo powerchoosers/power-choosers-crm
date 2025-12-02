@@ -74,6 +74,13 @@
   async function show(emailId) {
     if (!initDomRefs()) return;
     
+    // CRITICAL: Clean up any existing scheduled email buttons BEFORE loading new email
+    // This prevents duplicate buttons when navigating between emails
+    if (els.actionBar) {
+      const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .generate-btn, .regenerate-btn, .send-now-btn, .qa-btn-send-now');
+      existingBtns.forEach(btn => btn.remove());
+    }
+    
     try {
       // Load email data from Firebase
       const emailDoc = await firebase.firestore().collection('emails').doc(emailId).get();
