@@ -12,7 +12,12 @@ const gmailService = new GmailService();
  * @returns {Object} { signatureHtml, signatureText } or empty strings if not available
  */
 async function getUserSignature(ownerId) {
-  if (!ownerId) return { signatureHtml: '', signatureText: '' };
+  if (!ownerId) {
+    logger.warn('[SendScheduledEmails] getUserSignature called without ownerId');
+    return { signatureHtml: '', signatureText: '' };
+  }
+
+  logger.log('[SendScheduledEmails] Looking up signature for ownerId:', ownerId);
 
   try {
     // Fetch user settings from Firestore
@@ -23,20 +28,26 @@ async function getUserSignature(ownerId) {
       .limit(1)
       .get();
 
+    logger.log('[SendScheduledEmails] Query by ownerId result:', settingsSnap.empty ? 'empty' : 'found');
+
     // Fallback: Try direct document lookup by email-based ID
     if (settingsSnap.empty) {
       const docId = `user-settings-${ownerId}`;
+      logger.log('[SendScheduledEmails] Trying direct doc lookup:', docId);
       const directDoc = await db.collection('settings').doc(docId).get();
       if (directDoc.exists) {
         settingsSnap = { empty: false, docs: [directDoc] };
+        logger.log('[SendScheduledEmails] Found settings via direct doc lookup');
       }
     }
 
     // Fallback: Try legacy admin settings doc
     if (settingsSnap.empty) {
+      logger.log('[SendScheduledEmails] Trying legacy admin doc: user-settings');
       const adminDoc = await db.collection('settings').doc('user-settings').get();
       if (adminDoc.exists) {
         settingsSnap = { empty: false, docs: [adminDoc] };
+        logger.log('[SendScheduledEmails] Found settings via legacy admin doc');
       }
     }
 
@@ -52,23 +63,33 @@ async function getUserSignature(ownerId) {
     const imageSize = signature.imageSize || { width: 200, height: 100 };
     const signatureImageEnabled = data.emailDeliverability?.signatureImageEnabled !== false;
 
+    logger.log('[SendScheduledEmails] Signature data found:', {
+      hasText: !!sigText,
+      textLength: sigText.length,
+      hasImage: !!sigImage,
+      imageEnabled: signatureImageEnabled
+    });
+
     if (!sigText && !sigImage) {
+      logger.log('[SendScheduledEmails] No signature text or image configured');
       return { signatureHtml: '', signatureText: '' };
     }
 
-    // Build HTML signature
-    let signatureHtml = '<div contenteditable="false" data-signature="true" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
+    // Build HTML signature (use email-safe inline styles, NO non-standard attributes)
+    // Avoid contenteditable and data-* attributes as they may be stripped by email clients
+    let signatureHtml = '<div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #cccccc;">';
     
     if (sigText) {
+      // Use explicit font-family for email compatibility
       const textHtml = sigText.replace(/\n/g, '<br>');
-      signatureHtml += `<div style="font-family: inherit; font-size: 14px; color: #333; line-height: 1.4;">${textHtml}</div>`;
+      signatureHtml += `<div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #333333; line-height: 1.5;">${textHtml}</div>`;
     }
     
     // Include image if enabled
     if (sigImage && signatureImageEnabled) {
       const width = imageSize.width || 200;
       const height = imageSize.height || 100;
-      signatureHtml += `<div style="margin-top: 10px;"><img src="${sigImage}" alt="Signature" style="max-width: ${width}px; max-height: ${height}px; border-radius: 4px;" /></div>`;
+      signatureHtml += `<div style="margin-top: 12px;"><img src="${sigImage}" alt="Signature" width="${width}" height="${height}" style="max-width: ${width}px; max-height: ${height}px; border-radius: 4px; display: block;" /></div>`;
     }
     
     signatureHtml += '</div>';
@@ -76,9 +97,11 @@ async function getUserSignature(ownerId) {
     // Build plain text signature
     let signatureText = '\n\n---\n' + sigText;
 
+    logger.log('[SendScheduledEmails] Built signature HTML, length:', signatureHtml.length);
+
     return { signatureHtml, signatureText };
   } catch (error) {
-    logger.warn('[SendScheduledEmails] Failed to fetch user signature:', error);
+    logger.error('[SendScheduledEmails] Failed to fetch user signature:', error);
     return { signatureHtml: '', signatureText: '' };
   }
 }
@@ -384,22 +407,33 @@ export default async function handler(req, res) {
         let finalText = emailData.text || '';
 
         // Add signature if enabled in settings
+        logger.log('[SendScheduledEmails] Signature enabled:', emailSettings.content.includeSignature);
+        logger.log('[SendScheduledEmails] Email ownerId:', emailData.ownerId);
+        
         if (emailSettings.content.includeSignature) {
           const { signatureHtml, signatureText } = await getUserSignature(emailData.ownerId);
           
+          logger.log('[SendScheduledEmails] Signature lookup result:', {
+            hasSignatureHtml: !!signatureHtml,
+            signatureHtmlLength: signatureHtml?.length || 0,
+            hasSignatureText: !!signatureText
+          });
+          
           if (signatureHtml) {
             // Append signature HTML to email body
+            const originalLength = finalHtml.length;
             finalHtml = finalHtml + signatureHtml;
+            logger.log('[SendScheduledEmails] Appended signature HTML. Original length:', originalLength, 'New length:', finalHtml.length);
+          } else {
+            logger.warn('[SendScheduledEmails] No signature HTML returned from getUserSignature');
           }
           
           if (signatureText) {
             // Append plain text signature
             finalText = finalText + signatureText;
           }
-          
-          if (!isProduction && (signatureHtml || signatureText)) {
-            logger.log('[SendScheduledEmails] Added signature to email');
-          }
+        } else {
+          logger.log('[SendScheduledEmails] Signature disabled in settings');
         }
 
         // Prepare Gmail message
@@ -421,7 +455,8 @@ export default async function handler(req, res) {
           logger.log('[SendScheduledEmails] Email sent successfully via Gmail:', emailDoc.id, sendResult.messageId);
         }
 
-        // Update email record (preserve subject, html, text fields)
+        // Update email record with FINAL HTML that includes signature
+        // CRITICAL: Save the actual sent content so CRM display matches what recipient received
         // CRITICAL: Initialize tracking fields to match manual emails structure
         // This ensures tracking pixels display correctly in emails-redesigned.js sent tab
         await emailDoc.ref.update({
@@ -429,6 +464,9 @@ export default async function handler(req, res) {
           status: 'sent',
           emailType: 'sent',           // Required for emails-redesigned.js filter
           isSentEmail: true,           // Required for emails-redesigned.js filter
+          // Save the FINAL HTML/text that was actually sent (includes signature)
+          html: finalHtml,
+          text: finalText,
           sentAt: Date.now(),
           date: new Date().toISOString(),      // Required for emails page sorting
           timestamp: new Date().toISOString(), // Required for emails page fallback
