@@ -122,16 +122,16 @@ export default async function handler(req, res) {
       if (errorDetails && errorDetails.message) {
         errorMessage = errorDetails.message;
       }
-    }
+      }
 
-    // Provide specific guidance based on status code
-    if (statusCode === 413) {
+      // Provide specific guidance based on status code
+      if (statusCode === 413) {
       errorMessage = 'Payload Too Large: Email content exceeds Gmail size limits. ' + errorMessage;
-    } else if (statusCode === 400) {
+      } else if (statusCode === 400) {
       errorMessage = 'Bad Request: Check email payload structure. ' + errorMessage;
-    } else if (statusCode === 401) {
+      } else if (statusCode === 401) {
       errorMessage = 'Unauthorized: Check Gmail service account permissions. ' + errorMessage;
-    } else if (statusCode === 403) {
+      } else if (statusCode === 403) {
       errorMessage = 'Forbidden: Service account does not have Gmail send permissions. ' + errorMessage;
     }
 
