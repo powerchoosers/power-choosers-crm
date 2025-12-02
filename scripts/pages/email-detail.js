@@ -2540,7 +2540,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
 
   function resetScheduledEmailActions() {
     if (!els.actionBar) return;
-    const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .generate-btn, .regenerate-btn');
+    const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .generate-btn, .regenerate-btn, .send-now-btn, .qa-btn-send-now');
     existingBtns.forEach(btn => btn.remove());
     setQuickActionButtonsForSchedule(false);
   }
@@ -2700,7 +2700,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     setQuickActionButtonsForSchedule(true);
 
     // Remove any existing scheduled email buttons
-    const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .generate-btn, .regenerate-btn');
+    const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .generate-btn, .regenerate-btn, .send-now-btn, .qa-btn-send-now');
     existingBtns.forEach(btn => btn.remove());
 
     const emailId = state.currentEmail.id;
@@ -2744,16 +2744,18 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       // Delete button (trash icon) will serve as reject button
       // Regenerate Email button is already shown via configureRegenerateButton()
       const sendNowBtn = document.createElement('button');
-      sendNowBtn.className = 'btn-primary send-now-btn';
+      sendNowBtn.className = 'qa-btn qa-btn-send-now';
+      sendNowBtn.title = 'Send Now';
+      sendNowBtn.setAttribute('aria-label', 'Send Now');
       sendNowBtn.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="22" y1="2" x2="11" y2="13"/>
           <polygon points="22,2 15,22 11,13 2,9 22,2"/>
         </svg>
-        Send Now
       `;
-      sendNowBtn.style.display = 'inline-flex';
-      sendNowBtn.style.alignItems = 'center';
+      sendNowBtn.style.background = 'linear-gradient(135deg, var(--orange-subtle), #e67e22)';
+      sendNowBtn.style.border = 'none';
+      sendNowBtn.style.color = '#ffffff';
       sendNowBtn.addEventListener('click', () => sendNowScheduledEmail(state.currentEmail.id));
       els.actionBar.insertBefore(sendNowBtn, els.deleteBtn);
     }
