@@ -793,11 +793,11 @@ export default async function handler(req, res) {
         
         logger.debug(`[GenerateScheduledEmails] Selected angle: ${selectedAngle?.id}, tone: ${toneOpener}, industry: ${recipientIndustry}`);
         logger.debug(`[GenerateScheduledEmails] Angle details:`, {
-          id: selectedAngle?.id,
-          openingTemplate: selectedAngle?.openingTemplate,
-          primaryValue: selectedAngle?.primaryValue,
-          primaryMessage: selectedAngle?.primaryMessage
-        });
+            id: selectedAngle?.id,
+            openingTemplate: selectedAngle?.openingTemplate,
+            primaryValue: selectedAngle?.primaryValue,
+            primaryMessage: selectedAngle?.primaryMessage
+          });
         
         // Decide AI mode for this email based on sequence configuration.
         // Default to "standard" so the body matches NEPQ-style plain emails
@@ -1052,14 +1052,14 @@ export default async function handler(req, res) {
         };
         
         // Enhanced debug logging
-        const ctaType = perplexityResult.output?.cta_type || perplexityResult.metadata?.cta_type || 'unknown';
+          const ctaType = perplexityResult.output?.cta_type || perplexityResult.metadata?.cta_type || 'unknown';
         logger.debug(`[GenerateScheduledEmails] Generated email details:`, {
-          subject: generatedContent.subject,
-          angleUsed: generatedContent.angle_used,
-          toneOpener: toneOpener,
-          ctaType: ctaType,
-          aiMode: aiMode
-        });
+            subject: generatedContent.subject,
+            angleUsed: generatedContent.angle_used,
+            toneOpener: toneOpener,
+            ctaType: ctaType,
+            aiMode: aiMode
+          });
         
         // Update email with generated content
         // Ensure ownership fields are preserved/set

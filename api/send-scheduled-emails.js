@@ -263,18 +263,18 @@ export default async function handler(req, res) {
 
       logger.debug('[SendScheduledEmails] Processing immediate send for email:', emailId);
     } else {
-      // Query for emails that are ready to send.
-      // IMPORTANT: We now treat both 'approved' and 'pending_approval' as sendable
-      // once their scheduledSendTime has passed. This allows sequences to continue
-      // even if the user doesn't manually approve every email.
-      // Note: This runs server-side with Firebase Admin SDK, which bypasses Firestore rules
-      // The ownership fields were added during email creation to ensure client-side queries work
-      // Limit to 50 emails per run to stay well under SendGrid's 100/sec rate limit
-      const readyToSendQuery = db.collection('emails')
-        .where('type', '==', 'scheduled')
-        .where('status', 'in', ['approved', 'pending_approval'])
-        .where('scheduledSendTime', '<=', now)
-        .limit(50);
+    // Query for emails that are ready to send.
+    // IMPORTANT: We now treat both 'approved' and 'pending_approval' as sendable
+    // once their scheduledSendTime has passed. This allows sequences to continue
+    // even if the user doesn't manually approve every email.
+    // Note: This runs server-side with Firebase Admin SDK, which bypasses Firestore rules
+    // The ownership fields were added during email creation to ensure client-side queries work
+    // Limit to 50 emails per run to stay well under SendGrid's 100/sec rate limit
+    const readyToSendQuery = db.collection('emails')
+      .where('type', '==', 'scheduled')
+      .where('status', 'in', ['approved', 'pending_approval'])
+      .where('scheduledSendTime', '<=', now)
+      .limit(50);
 
       readyToSendSnapshot = await readyToSendQuery.get();
     }
@@ -397,33 +397,32 @@ export default async function handler(req, res) {
         let finalText = emailData.text || '';
 
         // Add signature if enabled in settings
-        logger.debug('[SendScheduledEmails] Signature enabled:', emailSettings.content.includeSignature);
-        logger.debug('[SendScheduledEmails] Email ownerId:', emailData.ownerId);
-        
         if (emailSettings.content.includeSignature) {
           const { signatureHtml, signatureText } = await getUserSignature(emailData.ownerId);
           
-          logger.debug('[SendScheduledEmails] Signature lookup result:', {
-            hasSignatureHtml: !!signatureHtml,
-            signatureHtmlLength: signatureHtml?.length || 0,
-            hasSignatureText: !!signatureText
-          });
-          
           if (signatureHtml) {
-            // Append signature HTML to email body
-            const originalLength = finalHtml.length;
-            finalHtml = finalHtml + signatureHtml;
-            logger.debug('[SendScheduledEmails] Appended signature HTML. Original length:', originalLength, 'New length:', finalHtml.length);
-          } else {
-            logger.warn('[SendScheduledEmails] No signature HTML returned from getUserSignature');
+            // Insert signature before </body> tag if HTML document structure exists
+            // Otherwise append to end of content
+            // Use lastIndexOf to find the last occurrence (most reliable for email HTML)
+            const bodyCloseIndex = finalHtml.lastIndexOf('</body>');
+            const htmlCloseIndex = finalHtml.lastIndexOf('</html>');
+            
+            if (bodyCloseIndex !== -1) {
+              // Full HTML document: insert before </body>
+              finalHtml = finalHtml.slice(0, bodyCloseIndex) + signatureHtml + finalHtml.slice(bodyCloseIndex);
+            } else if (htmlCloseIndex !== -1) {
+              // HTML document without body: insert before </html>
+              finalHtml = finalHtml.slice(0, htmlCloseIndex) + signatureHtml + finalHtml.slice(htmlCloseIndex);
+            } else {
+              // HTML fragment: append to end
+              finalHtml = finalHtml + signatureHtml;
+            }
           }
           
           if (signatureText) {
             // Append plain text signature
             finalText = finalText + signatureText;
           }
-        } else {
-          logger.debug('[SendScheduledEmails] Signature disabled in settings');
         }
 
         // Prepare Gmail message
@@ -447,6 +446,7 @@ export default async function handler(req, res) {
         // CRITICAL: Save the actual sent content so CRM display matches what recipient received
         // CRITICAL: Initialize tracking fields to match manual emails structure
         // This ensures tracking pixels display correctly in emails-redesigned.js sent tab
+        // CRITICAL: Preserve ownership fields for Firestore rules compliance
         await emailDoc.ref.update({
           type: 'sent',
           status: 'sent',
@@ -469,7 +469,11 @@ export default async function handler(req, res) {
           replies: emailData.replies || [],
           openCount: emailData.openCount || 0,
           clickCount: emailData.clickCount || 0,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
+          // Preserve ownership fields (required for Firestore rules - ownerId must not change on update)
+          ownerId: emailData.ownerId,
+          assignedTo: emailData.assignedTo || emailData.ownerId,
+          createdBy: emailData.createdBy || emailData.ownerId
           // Note: subject, html, text are preserved automatically by Firestore update()
         });
 
@@ -624,12 +628,17 @@ export default async function handler(req, res) {
         });
 
         // Update email status to error
+        // Preserve ownership fields for Firestore rules compliance
         try {
           await emailDoc.ref.update({
             status: 'error',
             errorMessage: error.message,
             errorCode: error.code,
-            lastAttemptAt: Date.now()
+            lastAttemptAt: Date.now(),
+            // Preserve ownership fields (required for Firestore rules)
+            ownerId: emailData.ownerId,
+            assignedTo: emailData.assignedTo || emailData.ownerId,
+            createdBy: emailData.createdBy || emailData.ownerId
           });
         } catch (updateError) {
           logger.error('[SendScheduledEmails] Failed to update error status:', updateError);
