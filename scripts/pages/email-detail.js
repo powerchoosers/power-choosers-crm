@@ -2739,6 +2739,23 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     approveBtn.textContent = 'Approve';
     approveBtn.addEventListener('click', () => approveScheduledEmail(state.currentEmail.id));
     els.actionBar.insertBefore(approveBtn, els.deleteBtn);
+    } else if (status === 'approved') {
+      // For approved: Show Send Now button
+      // Delete button (trash icon) will serve as reject button
+      // Regenerate Email button is already shown via configureRegenerateButton()
+      const sendNowBtn = document.createElement('button');
+      sendNowBtn.className = 'btn-primary send-now-btn';
+      sendNowBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22,2 15,22 11,13 2,9 22,2"/>
+        </svg>
+        Send Now
+      `;
+      sendNowBtn.style.display = 'inline-flex';
+      sendNowBtn.style.alignItems = 'center';
+      sendNowBtn.addEventListener('click', () => sendNowScheduledEmail(state.currentEmail.id));
+      els.actionBar.insertBefore(sendNowBtn, els.deleteBtn);
     }
   }
 
@@ -2808,6 +2825,52 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       console.error('[EmailDetail] Failed to reject email:', error);
       if (window.crm && window.crm.showToast) {
         window.crm.showToast('Failed to reject email');
+      }
+    }
+  }
+
+  // Send scheduled email now (immediately)
+  async function sendNowScheduledEmail(emailId) {
+    if (!state.currentEmail || state.currentEmail.type !== 'scheduled' || state.currentEmail.status !== 'approved') {
+      return;
+    }
+
+    if (!confirm('Are you sure you want to send this email now instead of waiting for the scheduled time?')) {
+      return;
+    }
+
+    try {
+      const baseUrl = window.API_BASE_URL || window.location.origin || '';
+      const response = await fetch(`${baseUrl}/api/send-scheduled-emails`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          immediate: true,
+          emailId: emailId  // Send this specific email immediately
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('[EmailDetail] Sent scheduled email immediately:', result);
+
+      // Show success message
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Email sent successfully!');
+      }
+
+      // Go back to emails page
+      goBack();
+    } catch (error) {
+      console.error('[EmailDetail] Failed to send email:', error);
+      if (window.crm && window.crm.showToast) {
+        window.crm.showToast('Failed to send email: ' + error.message);
       }
     }
   }

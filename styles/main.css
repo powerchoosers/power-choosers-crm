@@ -18859,6 +18859,42 @@ input.row-select[type="checkbox"]:focus-visible {
     box-shadow: none;
 }
 
+/* Send Now button for approved scheduled emails in email detail */
+.send-now-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, var(--orange-subtle), #e67e22);
+    color: var(--text-inverse);
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: none;
+}
+
+.send-now-btn:hover {
+    background: linear-gradient(135deg, #e67e22, #d35400);
+    box-shadow: none;
+    transform: translateY(-1px);
+}
+
+.send-now-btn:active {
+    background: linear-gradient(135deg, #d35400, #c0392b);
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.send-now-btn svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+}
+
 
 /* Attachment Badge Styles */
 .attachment-badge {
