@@ -458,10 +458,11 @@
           return true;
         }
 
-        // Show approved emails with valid future send time
+        // Show ALL approved emails (regardless of send time)
+        // This ensures users can see the Send Now button for approved emails
+        // that haven't been sent yet (e.g., outside business hours)
         if (status === 'approved') {
-          const sendTime = email.scheduledSendTime;
-          return sendTime && typeof sendTime === 'number' && sendTime >= oneMinuteAgo;
+          return true;
         }
 
         // Exclude emails with missing/null status and no scheduledSendTime (orphaned records)
