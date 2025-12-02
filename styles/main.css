@@ -7579,6 +7579,18 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+/* Ensure send-now button matches quick-action-btn when used together */
+.quick-action-btn.qa-btn-send-now {
+    background: linear-gradient(135deg, var(--orange-subtle), #e67e22);
+    border-color: transparent;
+    color: #ffffff;
+}
+
+.quick-action-btn.qa-btn-send-now:hover {
+    background: linear-gradient(135deg, #e67e22, #d35400);
+    border-color: transparent;
+}
+
 /* Tracking states for email action buttons */
 .qa-btn.opened {
     background-color: var(--orange-subtle);
