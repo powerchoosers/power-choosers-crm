@@ -163,20 +163,80 @@ export default async function handler(req, res) {
 
     const now = Date.now();
 
-    // Query for emails that are ready to send.
-    // IMPORTANT: We now treat both 'approved' and 'pending_approval' as sendable
-    // once their scheduledSendTime has passed. This allows sequences to continue
-    // even if the user doesn't manually approve every email.
-    // Note: This runs server-side with Firebase Admin SDK, which bypasses Firestore rules
-    // The ownership fields were added during email creation to ensure client-side queries work
-    // Limit to 50 emails per run to stay well under SendGrid's 100/sec rate limit
-    const readyToSendQuery = db.collection('emails')
-      .where('type', '==', 'scheduled')
-      .where('status', 'in', ['approved', 'pending_approval'])
-      .where('scheduledSendTime', '<=', now)
-      .limit(50);
+    // Parse request body for immediate send of specific email
+    let requestBody = {};
+    try {
+      if (typeof req.body === 'string') {
+        requestBody = JSON.parse(req.body);
+      } else if (req.body) {
+        requestBody = req.body;
+      }
+    } catch (e) {
+      // Ignore parse errors, use defaults
+    }
 
-    const readyToSendSnapshot = await readyToSendQuery.get();
+    const { immediate, emailId } = requestBody;
+    let readyToSendSnapshot;
+
+    // If immediate send of specific email is requested
+    if (immediate && emailId) {
+      logger.log('[SendScheduledEmails] Immediate send requested for email:', emailId);
+      const emailDoc = await db.collection('emails').doc(emailId).get();
+      
+      if (!emailDoc.exists) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: 'Email not found'
+        }));
+        return;
+      }
+
+      const emailData = emailDoc.data();
+      
+      // Validate the email can be sent
+      if (emailData.type !== 'scheduled') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: 'Email is not a scheduled email'
+        }));
+        return;
+      }
+
+      if (emailData.status !== 'approved' && emailData.status !== 'pending_approval') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          error: `Email status is '${emailData.status}', expected 'approved' or 'pending_approval'`
+        }));
+        return;
+      }
+
+      // Create a mock snapshot with just this email
+      readyToSendSnapshot = {
+        empty: false,
+        size: 1,
+        docs: [emailDoc]
+      };
+
+      logger.log('[SendScheduledEmails] Processing immediate send for email:', emailId);
+    } else {
+      // Query for emails that are ready to send.
+      // IMPORTANT: We now treat both 'approved' and 'pending_approval' as sendable
+      // once their scheduledSendTime has passed. This allows sequences to continue
+      // even if the user doesn't manually approve every email.
+      // Note: This runs server-side with Firebase Admin SDK, which bypasses Firestore rules
+      // The ownership fields were added during email creation to ensure client-side queries work
+      // Limit to 50 emails per run to stay well under SendGrid's 100/sec rate limit
+      const readyToSendQuery = db.collection('emails')
+        .where('type', '==', 'scheduled')
+        .where('status', 'in', ['approved', 'pending_approval'])
+        .where('scheduledSendTime', '<=', now)
+        .limit(50);
+
+      readyToSendSnapshot = await readyToSendQuery.get();
+    }
 
     if (readyToSendSnapshot.empty) {
       if (!isProduction) {
