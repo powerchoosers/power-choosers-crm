@@ -17,7 +17,7 @@ async function getUserSignature(ownerId) {
     return { signatureHtml: '', signatureText: '' };
   }
 
-  logger.log('[SendScheduledEmails] Looking up signature for ownerId:', ownerId);
+  logger.debug('[SendScheduledEmails] Looking up signature for ownerId:', ownerId);
 
   try {
     // Fetch user settings from Firestore
@@ -28,26 +28,26 @@ async function getUserSignature(ownerId) {
       .limit(1)
       .get();
 
-    logger.log('[SendScheduledEmails] Query by ownerId result:', settingsSnap.empty ? 'empty' : 'found');
+    logger.debug('[SendScheduledEmails] Query by ownerId result:', settingsSnap.empty ? 'empty' : 'found');
 
     // Fallback: Try direct document lookup by email-based ID
     if (settingsSnap.empty) {
       const docId = `user-settings-${ownerId}`;
-      logger.log('[SendScheduledEmails] Trying direct doc lookup:', docId);
+      logger.debug('[SendScheduledEmails] Trying direct doc lookup:', docId);
       const directDoc = await db.collection('settings').doc(docId).get();
       if (directDoc.exists) {
         settingsSnap = { empty: false, docs: [directDoc] };
-        logger.log('[SendScheduledEmails] Found settings via direct doc lookup');
+        logger.debug('[SendScheduledEmails] Found settings via direct doc lookup');
       }
     }
 
     // Fallback: Try legacy admin settings doc
     if (settingsSnap.empty) {
-      logger.log('[SendScheduledEmails] Trying legacy admin doc: user-settings');
+      logger.debug('[SendScheduledEmails] Trying legacy admin doc: user-settings');
       const adminDoc = await db.collection('settings').doc('user-settings').get();
       if (adminDoc.exists) {
         settingsSnap = { empty: false, docs: [adminDoc] };
-        logger.log('[SendScheduledEmails] Found settings via legacy admin doc');
+        logger.debug('[SendScheduledEmails] Found settings via legacy admin doc');
       }
     }
 
@@ -63,7 +63,7 @@ async function getUserSignature(ownerId) {
     const imageSize = signature.imageSize || { width: 200, height: 100 };
     const signatureImageEnabled = data.emailDeliverability?.signatureImageEnabled !== false;
 
-    logger.log('[SendScheduledEmails] Signature data found:', {
+    logger.debug('[SendScheduledEmails] Signature data found:', {
       hasText: !!sigText,
       textLength: sigText.length,
       hasImage: !!sigImage,
@@ -71,7 +71,7 @@ async function getUserSignature(ownerId) {
     });
 
     if (!sigText && !sigImage) {
-      logger.log('[SendScheduledEmails] No signature text or image configured');
+      logger.debug('[SendScheduledEmails] No signature text or image configured');
       return { signatureHtml: '', signatureText: '' };
     }
 
@@ -97,7 +97,7 @@ async function getUserSignature(ownerId) {
     // Build plain text signature
     let signatureText = '\n\n---\n' + sigText;
 
-    logger.log('[SendScheduledEmails] Built signature HTML, length:', signatureHtml.length);
+    logger.debug('[SendScheduledEmails] Built signature HTML, length:', signatureHtml.length);
 
     return { signatureHtml, signatureText };
   } catch (error) {
@@ -200,9 +200,7 @@ export default async function handler(req, res) {
       }));
       return;
     }
-    if (!isProduction) {
-      logger.log('[SendScheduledEmails] Starting send process');
-    }
+    logger.debug('[SendScheduledEmails] Starting send process');
 
     const now = Date.now();
 
@@ -223,7 +221,7 @@ export default async function handler(req, res) {
 
     // If immediate send of specific email is requested
     if (immediate && emailId) {
-      logger.log('[SendScheduledEmails] Immediate send requested for email:', emailId);
+      logger.debug('[SendScheduledEmails] Immediate send requested for email:', emailId);
       const emailDoc = await db.collection('emails').doc(emailId).get();
       
       if (!emailDoc.exists) {
@@ -263,7 +261,7 @@ export default async function handler(req, res) {
         docs: [emailDoc]
       };
 
-      logger.log('[SendScheduledEmails] Processing immediate send for email:', emailId);
+      logger.debug('[SendScheduledEmails] Processing immediate send for email:', emailId);
     } else {
       // Query for emails that are ready to send.
       // IMPORTANT: We now treat both 'approved' and 'pending_approval' as sendable
@@ -282,9 +280,7 @@ export default async function handler(req, res) {
     }
 
     if (readyToSendSnapshot.empty) {
-      if (!isProduction) {
-        logger.log('[SendScheduledEmails] No emails ready to send');
-      }
+      logger.debug('[SendScheduledEmails] No emails ready to send');
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         success: true,
@@ -294,9 +290,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    if (!isProduction) {
-      logger.log('[SendScheduledEmails] Found', readyToSendSnapshot.size, 'emails ready to send');
-    }
+    logger.debug('[SendScheduledEmails] Found', readyToSendSnapshot.size, 'emails ready to send');
 
     let sentCount = 0;
     const errors = [];
@@ -328,14 +322,12 @@ export default async function handler(req, res) {
 
         if (!shouldSend) {
           if (!isProduction) {
-            logger.log('[SendScheduledEmails] Email', emailDoc.id, 'already claimed or sent');
+            logger.debug('[SendScheduledEmails] Email', emailDoc.id, 'already claimed or sent');
           }
           continue;
         }
 
-        if (!isProduction) {
-          logger.log('[SendScheduledEmails] Sending email:', emailDoc.id);
-        }
+        logger.debug('[SendScheduledEmails] Sending email:', emailDoc.id);
 
         // Fetch sequence and step settings if this is a sequence email
         let emailSettings = null;
@@ -388,9 +380,7 @@ export default async function handler(req, res) {
               // Resolve settings: Step > Global > Defaults
               emailSettings = resolveEmailSettings(stepEmailSettings, globalSettings);
 
-              if (!isProduction) {
-                logger.log('[SendScheduledEmails] Resolved email settings:', emailSettings);
-              }
+              logger.debug('[SendScheduledEmails] Resolved email settings:', emailSettings);
             }
           } catch (error) {
             logger.error('[SendScheduledEmails] Failed to fetch sequence settings:', error);
@@ -407,13 +397,13 @@ export default async function handler(req, res) {
         let finalText = emailData.text || '';
 
         // Add signature if enabled in settings
-        logger.log('[SendScheduledEmails] Signature enabled:', emailSettings.content.includeSignature);
-        logger.log('[SendScheduledEmails] Email ownerId:', emailData.ownerId);
+        logger.debug('[SendScheduledEmails] Signature enabled:', emailSettings.content.includeSignature);
+        logger.debug('[SendScheduledEmails] Email ownerId:', emailData.ownerId);
         
         if (emailSettings.content.includeSignature) {
           const { signatureHtml, signatureText } = await getUserSignature(emailData.ownerId);
           
-          logger.log('[SendScheduledEmails] Signature lookup result:', {
+          logger.debug('[SendScheduledEmails] Signature lookup result:', {
             hasSignatureHtml: !!signatureHtml,
             signatureHtmlLength: signatureHtml?.length || 0,
             hasSignatureText: !!signatureText
@@ -423,7 +413,7 @@ export default async function handler(req, res) {
             // Append signature HTML to email body
             const originalLength = finalHtml.length;
             finalHtml = finalHtml + signatureHtml;
-            logger.log('[SendScheduledEmails] Appended signature HTML. Original length:', originalLength, 'New length:', finalHtml.length);
+            logger.debug('[SendScheduledEmails] Appended signature HTML. Original length:', originalLength, 'New length:', finalHtml.length);
           } else {
             logger.warn('[SendScheduledEmails] No signature HTML returned from getUserSignature');
           }
@@ -433,7 +423,7 @@ export default async function handler(req, res) {
             finalText = finalText + signatureText;
           }
         } else {
-          logger.log('[SendScheduledEmails] Signature disabled in settings');
+          logger.debug('[SendScheduledEmails] Signature disabled in settings');
         }
 
         // Prepare Gmail message
@@ -451,9 +441,7 @@ export default async function handler(req, res) {
           references: emailData.references || undefined
         });
         
-        if (!isProduction) {
-          logger.log('[SendScheduledEmails] Email sent successfully via Gmail:', emailDoc.id, sendResult.messageId);
-        }
+        logger.debug('[SendScheduledEmails] Email sent successfully via Gmail:', emailDoc.id, sendResult.messageId);
 
         // Update email record with FINAL HTML that includes signature
         // CRITICAL: Save the actual sent content so CRM display matches what recipient received
@@ -543,9 +531,7 @@ export default async function handler(req, res) {
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                   });
 
-                  if (!isProduction) {
-                    logger.log(`[SendScheduledEmails] Created next step email (step ${nextStepIndex}) for contact ${emailData.contactId}`);
-                  }
+                  logger.debug(`[SendScheduledEmails] Created next step email (step ${nextStepIndex}) for contact ${emailData.contactId}`);
                 }
                 // If next step is a task, create task document
                 else if (['phone-call', 'li-connect', 'li-message', 'li-view-profile', 'li-interact-post', 'task'].includes(nextStep.type)) {
@@ -616,9 +602,7 @@ export default async function handler(req, res) {
                     timestamp: admin.firestore.FieldValue.serverTimestamp()
                   });
 
-                  if (!isProduction) {
-                    logger.log(`[SendScheduledEmails] Created next step task (step ${nextStepIndex}, type: ${taskType}) for contact ${emailData.contactId}`);
-                  }
+                  logger.debug(`[SendScheduledEmails] Created next step task (step ${nextStepIndex}, type: ${taskType}) for contact ${emailData.contactId}`);
                 }
               }
             }
@@ -653,9 +637,7 @@ export default async function handler(req, res) {
       }
     }
 
-    if (!isProduction) {
-      logger.log('[SendScheduledEmails] Send process complete. Sent:', sentCount, 'Errors:', errors.length);
-    }
+    logger.debug('[SendScheduledEmails] Send process complete. Sent:', sentCount, 'Errors:', errors.length);
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({

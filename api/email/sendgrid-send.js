@@ -82,7 +82,7 @@ export default async function handler(req, res) {
     // The Gmail service will automatically look up sender info from user profile
     const gmailService = new GmailService();
 
-    logger.log('[Gmail] Sending email:', { to, subject, trackingId, userEmail });
+    logger.debug('[Gmail] Sending email:', { to, subject, trackingId, userEmail });
 
     const result = await gmailService.sendEmail({
       to,

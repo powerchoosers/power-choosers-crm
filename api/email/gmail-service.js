@@ -82,7 +82,7 @@ export class GmailService {
             });
             
             this.gmail = google.gmail({ version: 'v1', auth });
-            logger.log('[Gmail] Service initialized for:', impersonateEmail || this.fromEmail);
+            logger.debug('[Gmail] Service initialized for:', impersonateEmail || this.fromEmail);
             
         } catch (error) {
             logger.error('[Gmail] Failed to initialize:', error);
@@ -172,7 +172,7 @@ export class GmailService {
                 }
             });
             
-            logger.log('[Gmail] Email sent successfully:', {
+            logger.debug('[Gmail] Email sent successfully:', {
                 to,
                 subject,
                 messageId: response.data.id,
