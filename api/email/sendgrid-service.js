@@ -9,7 +9,7 @@ import logger from '../_logger.js';
 if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY.startsWith('SG.')) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 } else {
-  logger.log('[SendGrid] Invalid or missing API key - SendGrid functionality disabled');
+  logger.warn('[SendGrid] Invalid or missing API key - SendGrid functionality disabled');
 }
 
 export class SendGridService {
@@ -31,7 +31,7 @@ export class SendGridService {
 
       if (suppressionDoc.exists) {
         const data = suppressionDoc.data();
-        logger.log(`[SendGrid] Email suppressed: ${email} - ${data.reason}`);
+        logger.debug(`[SendGrid] Email suppressed: ${email} - ${data.reason}`);
         return { suppressed: true, reason: data.reason };
       }
 
@@ -154,7 +154,7 @@ export class SendGridService {
 
       // If all recipients are suppressed, don't send
       if (suppressedEmails.length === recipients.length) {
-        logger.log(`[SendGrid] All recipients suppressed, skipping send`);
+        logger.warn(`[SendGrid] All recipients suppressed, skipping send`);
         return {
           success: false,
           message: 'All recipients suppressed',
@@ -168,7 +168,7 @@ export class SendGridService {
       );
 
       if (allowedRecipients.length === 0) {
-        logger.log(`[SendGrid] No valid recipients after filtering suppressed emails`);
+        logger.warn(`[SendGrid] No valid recipients after filtering suppressed emails`);
         return {
           success: false,
           message: 'No valid recipients',
@@ -263,13 +263,13 @@ export class SendGridService {
         throw new Error('Text content cannot be empty');
       }
 
-      logger.log('[SendGrid] Email type:', isHtmlEmail ? 'HTML' : 'Standard', 'Content length:', content.length);
-      logger.log('[SendGrid] Text content length:', textContent.length);
+      logger.debug('[SendGrid] Email type:', isHtmlEmail ? 'HTML' : 'Standard', 'Content length:', content.length);
+      logger.debug('[SendGrid] Text content length:', textContent.length);
 
       // Log sender details for debugging
       const finalFromEmail = from || this.fromEmail;
       const finalFromName = fromName || this.fromName;
-      logger.log('[SendGrid] Sending email with from:', {
+      logger.debug('[SendGrid] Sending email with from:', {
         email: finalFromEmail,
         name: finalFromName
       });
@@ -447,7 +447,7 @@ export class SendGridService {
         throw sendError;
       }
 
-      logger.log('[SendGrid] Email sent successfully:', {
+      logger.debug('[SendGrid] Email sent successfully:', {
         to: to,
         subject: subject,
         messageId: response[0]?.headers?.['x-message-id'] || 'unknown',
@@ -557,7 +557,7 @@ export class SendGridService {
       };
 
       await db.collection('emails').doc(emailData.trackingId).set(emailRecord);
-      logger.log('[SendGrid] Email record stored in Firebase:', emailData.trackingId);
+      logger.debug('[SendGrid] Email record stored in Firebase:', emailData.trackingId);
     } catch (error) {
       logger.error('[SendGrid] Firebase storage error:', error);
       // Don't throw - email was sent successfully

@@ -15,32 +15,32 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-  logger.log('[SignatureUpload] Request received:', req.method);
+  logger.debug('[SignatureUpload] Request received:', req.method);
   
   if (cors(req, res)) {
-    logger.log('[SignatureUpload] CORS preflight handled');
+    logger.debug('[SignatureUpload] CORS preflight handled');
     return;
   }
 
   if (req.method !== 'POST') {
-    logger.log('[SignatureUpload] Invalid method:', req.method);
+    logger.debug('[SignatureUpload] Invalid method:', req.method);
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
 
   try {
-    logger.log('[SignatureUpload] Parsing request body...');
+    logger.debug('[SignatureUpload] Parsing request body...');
     // Expect JSON { image: <base64>, type: 'signature' }
     const { image, type } = req.body || {};
-    logger.log('[SignatureUpload] Request body parsed:', {
+    logger.debug('[SignatureUpload] Request body parsed:', {
       hasImage: !!image,
       imageLength: image?.length || 0,
       type: type
     });
 
     if (!image) {
-      logger.log('[SignatureUpload] No image provided');
+      logger.debug('[SignatureUpload] No image provided');
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'No image provided' }));
       return;
@@ -49,17 +49,17 @@ export default async function handler(req, res) {
     // Accept signature, post-image, or featured-image types
     const validTypes = ['signature', 'post-image', 'featured-image'];
     if (!validTypes.includes(type)) {
-      logger.log('[SignatureUpload] Invalid type:', type);
+      logger.debug('[SignatureUpload] Invalid type:', type);
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid upload type. Must be one of: ' + validTypes.join(', ') }));
       return;
     }
 
     // Upload to Imgur with timeout
-    logger.log('[SignatureUpload] Uploading to Imgur...');
+    logger.debug('[SignatureUpload] Uploading to Imgur...');
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      logger.log('[SignatureUpload] Imgur request timed out after 25 seconds');
+      logger.warn('[SignatureUpload] Imgur request timed out after 25 seconds');
       controller.abort();
     }, 25000); // 25 second timeout for Imgur
     
@@ -75,7 +75,7 @@ export default async function handler(req, res) {
         signal: controller.signal
       });
       clearTimeout(timeoutId);
-      logger.log('[SignatureUpload] Imgur response status:', imgurResponse.status);
+      logger.debug('[SignatureUpload] Imgur response status:', imgurResponse.status);
     } catch (fetchError) {
       clearTimeout(timeoutId);
       logger.error('[SignatureUpload] Imgur fetch error:', fetchError.name, fetchError.message);
@@ -96,7 +96,7 @@ export default async function handler(req, res) {
     }
 
     const imgurResult = await imgurResponse.json();
-    logger.log('[SignatureUpload] Imgur result:', {
+    logger.debug('[SignatureUpload] Imgur result:', {
       success: imgurResult.success,
       hasData: !!imgurResult.data,
       hasLink: !!imgurResult.data?.link
@@ -110,7 +110,7 @@ export default async function handler(req, res) {
     }
 
     const imageUrl = imgurResult.data.link;
-    logger.log('[SignatureUpload] Image uploaded successfully:', imageUrl);
+    logger.debug('[SignatureUpload] Image uploaded successfully:', imageUrl);
 
     const responsePayload = {
       success: true,
@@ -118,10 +118,10 @@ export default async function handler(req, res) {
       message: 'Signature image uploaded successfully'
     };
     
-    logger.log('[SignatureUpload] Sending response:', responsePayload);
+    logger.debug('[SignatureUpload] Sending response:', responsePayload);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(responsePayload));
-    logger.log('[SignatureUpload] Response sent successfully');
+    logger.debug('[SignatureUpload] Response sent successfully');
     return;
 
   } catch (error) {
@@ -133,10 +133,10 @@ export default async function handler(req, res) {
       message: error.message 
     };
     
-    logger.log('[SignatureUpload] Sending error response:', errorPayload);
+    logger.debug('[SignatureUpload] Sending error response:', errorPayload);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(errorPayload));
-    logger.log('[SignatureUpload] Error response sent');
+    logger.debug('[SignatureUpload] Error response sent');
     return;
   }
 }
