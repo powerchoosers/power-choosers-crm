@@ -764,12 +764,20 @@ export default async function handler(req, res) {
         }
         
         // Build recipient object used for angle selection + prompt context
+        // Include energy supplier and other energy fields from account
         const recipient = {
           firstName: contactData.firstName || contactData.name || emailData.contactName || 'there',
           company: contactData.company || accountData.companyName || accountData.name || emailData.contactCompany || '',
           title: contactData.role || contactData.title || contactData.job || '',
           industry: recipientIndustry,
-          account: accountData
+          account: accountData,
+          // Build energy object for email personalization context
+          energy: {
+            supplier: accountData.electricitySupplier || accountData.electricity_supplier || '',
+            currentRate: accountData.currentRate || accountData.current_rate || '',
+            contractEnd: accountData.contractEndDate || accountData.contract_end_date || '',
+            annualUsage: accountData.annualUsage || accountData.annual_usage || ''
+          }
         };
         
         // Extract recently used angles for this contact within this sequence (avoid repeats)
@@ -892,7 +900,14 @@ export default async function handler(req, res) {
             if (jsonData.paragraph1) parts.push(jsonData.paragraph1);
             if (jsonData.paragraph2) parts.push(jsonData.paragraph2);
             if (jsonData.paragraph3) parts.push(jsonData.paragraph3);
-            if (jsonData.closing) parts.push(jsonData.closing);
+            // Ensure closing is always added (Best regards, + sender name)
+            if (jsonData.closing) {
+              parts.push(jsonData.closing);
+            } else {
+              // Fallback: add default closing with sender name
+              const senderFirstName = (emailData.senderName || 'Lewis').split(' ')[0];
+              parts.push(`Best regards,\n${senderFirstName}`);
+            }
             bodyText = parts.join('\n\n') || raw;
           }
 

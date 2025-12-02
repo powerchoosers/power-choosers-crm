@@ -7,6 +7,63 @@ import logger from './_logger.js';
 const gmailService = new GmailService();
 
 /**
+ * Fetch and build signature HTML for a user
+ * @param {string} ownerId - User email to fetch signature for
+ * @returns {Object} { signatureHtml, signatureText } or empty strings if not available
+ */
+async function getUserSignature(ownerId) {
+  if (!ownerId) return { signatureHtml: '', signatureText: '' };
+
+  try {
+    // Fetch user settings from Firestore
+    const settingsSnap = await db.collection('crm-settings')
+      .where('ownerId', '==', ownerId)
+      .limit(1)
+      .get();
+
+    if (settingsSnap.empty) {
+      return { signatureHtml: '', signatureText: '' };
+    }
+
+    const data = settingsSnap.docs[0].data();
+    const signature = data.emailSignature || {};
+    const sigText = signature.text || '';
+    const sigImage = signature.image || '';
+    const imageSize = signature.imageSize || { width: 200, height: 100 };
+    const signatureImageEnabled = data.emailDeliverability?.signatureImageEnabled !== false;
+
+    if (!sigText && !sigImage) {
+      return { signatureHtml: '', signatureText: '' };
+    }
+
+    // Build HTML signature
+    let signatureHtml = '<div contenteditable="false" data-signature="true" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
+    
+    if (sigText) {
+      const textHtml = sigText.replace(/\n/g, '<br>');
+      signatureHtml += `<div style="font-family: inherit; font-size: 14px; color: #333; line-height: 1.4;">${textHtml}</div>`;
+    }
+    
+    // Include image if enabled
+    if (sigImage && signatureImageEnabled) {
+      const width = imageSize.width || 200;
+      const height = imageSize.height || 100;
+      signatureHtml += `<div style="margin-top: 10px;"><img src="${sigImage}" alt="Signature" style="max-width: ${width}px; max-height: ${height}px; border-radius: 4px;" /></div>`;
+    }
+    
+    signatureHtml += '</div>';
+
+    // Build plain text signature
+    let signatureText = '\n\n---\n' + sigText;
+
+    return { signatureHtml, signatureText };
+  } catch (error) {
+    logger.warn('[SendScheduledEmails] Failed to fetch user signature:', error);
+    return { signatureHtml: '', signatureText: '' };
+  }
+}
+
+/**
  * Resolve email settings with proper priority:
  * 1. Step-level emailSettings (highest priority)
  * 2. Global user settings (medium priority)
@@ -242,14 +299,37 @@ export default async function handler(req, res) {
           emailSettings = resolveEmailSettings(null, null);
         }
 
+        // Prepare email content with signature if enabled
+        let finalHtml = emailData.html || '';
+        let finalText = emailData.text || '';
+
+        // Add signature if enabled in settings
+        if (emailSettings.content.includeSignature) {
+          const { signatureHtml, signatureText } = await getUserSignature(emailData.ownerId);
+          
+          if (signatureHtml) {
+            // Append signature HTML to email body
+            finalHtml = finalHtml + signatureHtml;
+          }
+          
+          if (signatureText) {
+            // Append plain text signature
+            finalText = finalText + signatureText;
+          }
+          
+          if (!isProduction && (signatureHtml || signatureText)) {
+            logger.log('[SendScheduledEmails] Added signature to email');
+          }
+        }
+
         // Prepare Gmail message
         // The Gmail service will automatically look up sender info from user profile
         // using ownerId, so each agent's emails send from their own address
         const sendResult = await gmailService.sendEmail({
           to: emailData.to,
           subject: emailData.subject,
-          html: emailData.html,
-          text: emailData.text,
+          html: finalHtml,
+          text: finalText,
           ownerId: emailData.ownerId, // Used to look up sender name/email from Firestore
           userEmail: emailData.ownerId, // Alias for compatibility
           threadId: emailData.threadId || undefined,

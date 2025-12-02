@@ -1517,14 +1517,15 @@ const coldEmailSchema = {
           type: "string",
           description: "Style used: quick_question, re_prefix, thoughts, industry_specific, or value_prop"
         },
-        greeting: { type: "string", description: "Hello {firstName}," },
+        greeting: { type: "string", description: "MUST be exactly 'Hello [FIRST NAME ONLY],' - Use ONLY the first name, NEVER the full name. For example: 'Hello Kurt,' NOT 'Hello Kurt Lacoste,'" },
         opening_hook: { type: "string", description: "Problem-aware opening about industry challenge or market condition (1-2 sentences, NO statistics)" },
         value_proposition: { type: "string", description: "How we help with specific measurable value (include percentages or dollar amounts)" },
         social_proof_optional: { type: "string", description: "Brief credibility with real outcomes (optional, 1 sentence)" },
         cta_text: { type: "string", description: "Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation, e.g., 'Schedule Your Free Assessment', 'Book a Consultation', 'Explore Your Savings Potential')" },
-        cta_type: { type: "string", description: "CTA pattern used: qualifying_question, soft_ask_with_context, value_question, timing_question, or direct_meeting" }
+        cta_type: { type: "string", description: "CTA pattern used: qualifying_question, soft_ask_with_context, value_question, timing_question, or direct_meeting" },
+        closing: { type: "string", description: "Closing line like 'Best regards,' or 'Cheers,' followed by sender's first name on new line" }
       },
-      required: ["subject", "subject_style", "greeting", "opening_hook", "value_proposition", "cta_text", "cta_type"],
+      required: ["subject", "subject_style", "greeting", "opening_hook", "value_proposition", "cta_text", "cta_type", "closing"],
       additionalProperties: false
     }
   }
@@ -2319,7 +2320,7 @@ Generate text for these fields:
       cold_email: `
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
-- greeting: "Hello ${firstName},"
+- greeting: MUST be exactly "Hello ${firstName}," - Use ONLY the first name "${firstName}", NEVER use the full name. This is mandatory.
 - opening_hook: Start with SPECIFIC problem awareness or market condition (1-2 sentences). ${accountDescription ? 'Use the saved company description as INTERNAL CONTEXT ONLY (do NOT copy it word-for-word). You may reference ONE short detail from it in natural language, but do NOT open the email by restating their full marketing description or mission statement.' : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
@@ -2407,6 +2408,7 @@ ${ctaEscalation}
 `;
   }
 })()}
+- closing: Sign off with a professional closing. Use "Best regards," or "Cheers," followed by the sender's first name "${senderName ? senderName.split(' ')[0] : 'Lewis'}" on a new line. Example: "Best regards,\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
 
 HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Write like a knowledgeable energy expert who researched their company deeply
