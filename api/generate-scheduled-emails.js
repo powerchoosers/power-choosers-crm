@@ -893,10 +893,50 @@ export default async function handler(req, res) {
           let subject = emailData.subject || 'Energy update';
           let bodyText = raw;
           
+          // Helper: Enforce first name only in greeting (not full name)
+          // Matches real email rules: "Hello Kurt," NOT "Hello Kurt Lacoste,"
+          const enforceFirstNameOnly = (greeting, contactData) => {
+            if (!greeting || typeof greeting !== 'string') return greeting;
+            
+            // Get first name from contact data
+            const firstName = contactData?.firstName || contactData?.first_name || 
+                             (contactData?.name ? contactData.name.split(' ')[0] : '') ||
+                             (emailData.contactName ? emailData.contactName.split(' ')[0] : '');
+            
+            if (!firstName) return greeting;
+            
+            // Pattern: "Hello [Full Name]," or "Hi [Full Name]," etc.
+            // Replace with first name only
+            const greetingPattern = /^(Hi|Hello|Hey|Dear)\s+([^,]+),/i;
+            const match = greeting.match(greetingPattern);
+            
+            if (match) {
+              const salutation = match[1]; // "Hi", "Hello", etc.
+              const namePart = match[2].trim();
+              
+              // If namePart contains more than just the first name, replace with first name only
+              if (namePart !== firstName && namePart.toLowerCase().includes(firstName.toLowerCase())) {
+                return `${salutation} ${firstName},`;
+              }
+              // If it's already just first name, keep it
+              if (namePart === firstName) {
+                return greeting;
+              }
+              // If namePart doesn't match first name, replace with first name
+              return `${salutation} ${firstName},`;
+            }
+            
+            return greeting;
+          };
+          
           if (jsonData && typeof jsonData === 'object') {
             if (jsonData.subject) subject = jsonData.subject;
             const parts = [];
-            if (jsonData.greeting) parts.push(jsonData.greeting);
+            // Enforce first name only in greeting (matches real email rules)
+            if (jsonData.greeting) {
+              const cleanedGreeting = enforceFirstNameOnly(jsonData.greeting, contactData);
+              parts.push(cleanedGreeting);
+            }
             if (jsonData.paragraph1) parts.push(jsonData.paragraph1);
             if (jsonData.paragraph2) parts.push(jsonData.paragraph2);
             if (jsonData.paragraph3) parts.push(jsonData.paragraph3);
@@ -1138,7 +1178,39 @@ function buildColdEmailHtmlTemplate(data, recipient) {
     return String(field).replace(/\[\d+\]/g, '').trim();
   };
   
-  const greeting = cleanField(data.greeting) || `Hi ${firstName},`;
+  // Helper: Enforce first name only in greeting (not full name)
+  const enforceFirstNameOnly = (greeting) => {
+    if (!greeting || typeof greeting !== 'string') return greeting;
+    
+    if (!firstName) return greeting;
+    
+    // Pattern: "Hello [Full Name]," or "Hi [Full Name]," etc.
+    // Replace with first name only
+    const greetingPattern = /^(Hi|Hello|Hey|Dear)\s+([^,]+),/i;
+    const match = greeting.match(greetingPattern);
+    
+    if (match) {
+      const salutation = match[1]; // "Hi", "Hello", etc.
+      const namePart = match[2].trim();
+      
+      // If namePart contains more than just the first name, replace with first name only
+      if (namePart !== firstName && namePart.toLowerCase().includes(firstName.toLowerCase())) {
+        return `${salutation} ${firstName},`;
+      }
+      // If it's already just first name, keep it
+      if (namePart === firstName) {
+        return greeting;
+      }
+      // If namePart doesn't match first name, replace with first name
+      return `${salutation} ${firstName},`;
+    }
+    
+    return greeting;
+  };
+  
+  // Enforce first name only in greeting (matches real email rules)
+  const rawGreeting = cleanField(data.greeting) || `Hi ${firstName},`;
+  const greeting = enforceFirstNameOnly(rawGreeting);
   const openingHook = cleanField(data.opening_hook) || `I tried reaching you earlier but couldn't connect. I wanted to share some important information about energy cost trends that could significantly impact ${company}.`;
   const valueProposition = cleanField(data.value_proposition) || (industry ? `Most ${industry} companies like ${company} see 10-20% savings through competitive procurement. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>` : 'Most businesses see 10-20% savings through competitive procurement and efficiency solutions. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>');
   const socialProof = cleanField(data.social_proof_optional) || '';
