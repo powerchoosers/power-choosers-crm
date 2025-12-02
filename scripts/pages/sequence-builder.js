@@ -7492,6 +7492,41 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         // Resolve sender first name robustly
         const senderFirst = getSenderFirstName();
 
+        // Helper: Enforce first name only in greeting (not full name)
+        // Matches real email rules: "Hello Kurt," NOT "Hello Kurt Lacoste,"
+        const enforceFirstNameOnly = (greeting, recipient) => {
+          if (!greeting || typeof greeting !== 'string') return greeting;
+          
+          // Get first name from recipient
+          const firstName = recipient?.firstName || recipient?.first_name || 
+                           (recipient?.name ? recipient.name.split(' ')[0] : '');
+          
+          if (!firstName) return greeting;
+          
+          // Pattern: "Hello [Full Name]," or "Hi [Full Name]," etc.
+          // Replace with first name only
+          const greetingPattern = /^(Hi|Hello|Hey|Dear)\s+([^,]+),/i;
+          const match = greeting.match(greetingPattern);
+          
+          if (match) {
+            const salutation = match[1]; // "Hi", "Hello", etc.
+            const namePart = match[2].trim();
+            
+            // If namePart contains more than just the first name, replace with first name only
+            if (namePart !== firstName && namePart.toLowerCase().includes(firstName.toLowerCase())) {
+              return `${salutation} ${firstName},`;
+            }
+            // If it's already just first name, keep it
+            if (namePart === firstName) {
+              return greeting;
+            }
+            // If namePart doesn't match first name, replace with first name
+            return `${salutation} ${firstName},`;
+          }
+          
+          return greeting;
+        };
+
         // Handle JSON response format
         let jsonData = null;
         try {
@@ -7526,7 +7561,11 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
             .replace(/\bPower Choosers can help\b/gi, 'We can help')
             .replace(/\bPower Choosers\b/gi, 'We');
           const paragraphs = [];
-          if (jsonData.greeting) paragraphs.push(jsonData.greeting);
+          // Enforce first name only in greeting (matches real email rules)
+          if (jsonData.greeting) {
+            const cleanedGreeting = enforceFirstNameOnly(jsonData.greeting, recipient);
+            paragraphs.push(cleanedGreeting);
+          }
           if (jsonData.paragraph1) paragraphs.push(jsonData.paragraph1);
           if (jsonData.paragraph2) paragraphs.push(jsonData.paragraph2);
           if (jsonData.paragraph3) paragraphs.push(jsonData.paragraph3);
@@ -7558,7 +7597,11 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         } else {
           // Fallback: treat as plain text
           const subject = 'Energy Solutions';
-          const raw = String(result || 'Email content');
+          let raw = String(result || 'Email content');
+          
+          // Clean greeting to use first name only (matches real email rules)
+          raw = enforceFirstNameOnly(raw, recipient) || raw;
+          
           const sanitizedRaw = raw
             .replace(/\bAt Power Choosers,?\s+we\b/gi, 'We')
             .replace(/\bAt Power Choosers,?\s+I\b/gi, 'I')
