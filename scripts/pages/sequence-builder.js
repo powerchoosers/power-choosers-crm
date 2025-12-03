@@ -5397,16 +5397,61 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                     <input type="checkbox" ${settings.content.includeSignature ? 'checked' : ''} data-setting="content.includeSignature">
                     <span class="checkmark"></span>
                     <span class="label-text">Include Signature</span>
+                    ${(() => {
+                      // Check if custom HTML signature is enabled in user settings
+                      try {
+                        const userSettings = window.SettingsPage?.getSettings?.() || {};
+                        const signature = userSettings?.emailSignature || {};
+                        if (signature.useCustomHtml || signature.customHtmlEnabled) {
+                          return '<span class="premium-sig-badge" style="margin-left: 8px; padding: 2px 8px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; font-size: 10px; font-weight: 600; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Premium</span>';
+                        }
+                      } catch (e) {}
+                      return '';
+                    })()}
                   </label>
-                  <div class="setting-description">Add your email signature at the bottom of every email</div>
+                  <div class="setting-description">
+                    Add your email signature at the bottom of every email
+                    ${(() => {
+                      try {
+                        const userSettings = window.SettingsPage?.getSettings?.() || {};
+                        const signature = userSettings?.emailSignature || {};
+                        if (signature.useCustomHtml || signature.customHtmlEnabled) {
+                          return '<br><span style="color: var(--orange-primary); font-weight: 500;">✓ Using custom HTML signature from Settings</span>';
+                        }
+                      } catch (e) {}
+                      return '';
+                    })()}
+                  </div>
                 </div>
-                <div class="setting-item">
+                <div class="setting-item" id="sig-image-setting" ${(() => {
+                  // Hide signature image option if custom HTML is enabled (it includes avatar)
+                  try {
+                    const userSettings = window.SettingsPage?.getSettings?.() || {};
+                    const signature = userSettings?.emailSignature || {};
+                    if (signature.useCustomHtml || signature.customHtmlEnabled) {
+                      return 'style="opacity: 0.5; pointer-events: none;"';
+                    }
+                  } catch (e) {}
+                  return '';
+                })()}>
                   <label class="checkbox-label">
                     <input type="checkbox" ${settings.content.signatureImage ? 'checked' : ''} data-setting="content.signatureImage">
                     <span class="checkmark"></span>
                     <span class="label-text">Include Signature Image</span>
                   </label>
-                  <div class="setting-description">Show your signature image/logo in the email</div>
+                  <div class="setting-description">
+                    Show your signature image/logo in the email
+                    ${(() => {
+                      try {
+                        const userSettings = window.SettingsPage?.getSettings?.() || {};
+                        const signature = userSettings?.emailSignature || {};
+                        if (signature.useCustomHtml || signature.customHtmlEnabled) {
+                          return '<br><span style="color: var(--text-secondary); font-style: italic;">Avatar included in custom signature</span>';
+                        }
+                      } catch (e) {}
+                      return '';
+                    })()}
+                  </div>
                 </div>
                 <div class="setting-item">
                   <label class="checkbox-label">
