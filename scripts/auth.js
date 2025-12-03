@@ -549,15 +549,31 @@ class AuthManager {
                     if (!settingsPage.state.settings.general) {
                         settingsPage.state.settings.general = {};
                     }
+                    // CRITICAL: Save the uploaded photo URL (this takes priority over Google photoURL)
                     settingsPage.state.settings.general.hostedPhotoURL = imageUrl;
+                    // Also update photoURL to prevent Google from overwriting it
+                    if (user && user.photoURL) {
+                        settingsPage.state.settings.general.photoURL = user.photoURL;
+                    }
                     settingsPage.markDirty();
+                    // Save immediately to Firestore
                     await settingsPage.saveSettings();
+                    
+                    // Refresh avatar preview (only the avatar section)
+                    const avatarPreview = document.getElementById('user-avatar-preview');
+                    if (avatarPreview && window.SettingsPage && window.SettingsPage.instance) {
+                        window.SettingsPage.instance.renderSettings();
+                    }
                 } else {
                     // Fallback: try to update settings directly
                     try {
                         const settings = window.SettingsPage?.getSettings?.() || {};
                         if (!settings.general) settings.general = {};
                         settings.general.hostedPhotoURL = imageUrl;
+                        // Also update photoURL to prevent Google from overwriting it
+                        if (user && user.photoURL) {
+                            settings.general.photoURL = user.photoURL;
+                        }
                         localStorage.setItem('crm-settings', JSON.stringify(settings));
                         
                         // Try to save to Firebase
@@ -584,7 +600,7 @@ class AuthManager {
                 this.refreshProfilePhoto();
 
                 if (window.showToast) {
-                    window.showToast('Profile picture updated successfully!', 'success');
+                    window.showToast('Profile picture updated successfully! Click "Save Changes" in Settings to persist.', 'success');
                 }
 
             } catch (error) {
