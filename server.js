@@ -1977,6 +1977,21 @@ async function handleApiEnergyNews(req, res) {
   }
 }
 
+// In-memory cache for tracking deduplication (prevents rapid duplicate opens)
+// Key: trackingId_userKey, Value: timestamp of last open
+const trackingDedupeCache = new Map();
+const TRACKING_DEDUPE_WINDOW_MS = 60000; // 1 minute window for deduplication
+
+// Clean up old entries periodically (every 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamp] of trackingDedupeCache.entries()) {
+    if (now - timestamp > TRACKING_DEDUPE_WINDOW_MS * 2) {
+      trackingDedupeCache.delete(key);
+    }
+  }
+}, 300000);
+
 // Email tracking endpoints
 async function handleApiEmailTrack(req, res, parsedUrl) {
   // 1x1 transparent PNG
@@ -2003,51 +2018,73 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
 
     // Best-effort: record open event in Firestore
     if (trackingId && trackingId.length > 0 && admin) {
-      try {
-        const db = admin.firestore();
-        const ref = db.collection('emails').doc(trackingId);
-        const snap = await ref.get();
+      // CRITICAL FIX: In-memory deduplication to prevent rapid duplicate opens
+      // This is especially important for Gmail threads where opening one email
+      // may load/render all emails in the thread, triggering multiple pixels
+      const userKey = `${userAgent}_${ip}`;
+      const dedupeKey = `${trackingId}_${userKey}`;
+      const now = Date.now();
+      const lastOpen = trackingDedupeCache.get(dedupeKey);
+      
+      if (lastOpen && (now - lastOpen) < TRACKING_DEDUPE_WINDOW_MS) {
+        // Duplicate open within window - skip recording but still return pixel
+        logger.debug('[Email Track] Duplicate open ignored (in-memory cache)', 'Server', {
+          trackingId: trackingId.substring(0, 20) + '...',
+          timeSinceLastOpen: now - lastOpen
+        });
+      } else {
+        // Update in-memory cache first (fast path)
+        trackingDedupeCache.set(dedupeKey, now);
+        
+        try {
+          const db = admin.firestore();
+          const ref = db.collection('emails').doc(trackingId);
+          const snap = await ref.get();
 
-        if (snap.exists) {
-          const openedAt = new Date().toISOString();
-          const currentData = snap.data() || {};
-          const existingOpens = currentData.opens || [];
+          if (snap.exists) {
+            const openedAt = new Date().toISOString();
+            const currentData = snap.data() || {};
+            const existingOpens = currentData.opens || [];
 
-          // Deduplication: Check if same user/IP opened within last 5 seconds
-          const userKey = `${userAgent}_${ip}`;
-          const now = Date.now();
-          const recentOpen = existingOpens.find(open => {
-            const openTime = new Date(open.openedAt).getTime();
-            return `${open.userAgent}_${open.ip}` === userKey && (now - openTime) < 5000;
-          });
-
-          if (!recentOpen) {
-            // Create open event object
-            const openEvent = {
-              openedAt,
-              userAgent,
-              ip: maskIpAddress(ip),
-              deviceType,
-              referer,
-              isBotFlagged: deviceType === 'bot'
-            };
-
-            await ref.update({
-              openCount: (currentData.openCount || 0) + 1,
-              opens: existingOpens.concat([openEvent]),
-              updatedAt: openedAt,
-              lastOpened: openedAt
+            // Secondary deduplication: Check Firestore for recent opens from same user
+            // This catches cases where in-memory cache was cleared (server restart)
+            const recentOpen = existingOpens.find(open => {
+              const openTime = new Date(open.openedAt).getTime();
+              return `${open.userAgent}_${open.ip}` === userKey && (now - openTime) < TRACKING_DEDUPE_WINDOW_MS;
             });
 
-            logger.debug('[Email Track] Recorded open', 'Server', {
-              trackingId: trackingId.substring(0, 20) + '...',
-              deviceType,
-              openCount: (currentData.openCount || 0) + 1
-            });
+            if (!recentOpen) {
+              // Create open event object
+              const openEvent = {
+                openedAt,
+                userAgent,
+                ip: maskIpAddress(ip),
+                deviceType,
+                referer,
+                isBotFlagged: deviceType === 'bot'
+              };
+
+              await ref.update({
+                openCount: (currentData.openCount || 0) + 1,
+                opens: existingOpens.concat([openEvent]),
+                updatedAt: openedAt,
+                lastOpened: openedAt
+              });
+
+              logger.debug('[Email Track] Recorded open', 'Server', {
+                trackingId: trackingId.substring(0, 20) + '...',
+                deviceType,
+                openCount: (currentData.openCount || 0) + 1
+              });
+            } else {
+              logger.debug('[Email Track] Duplicate open ignored (Firestore check)', 'Server', {
+                trackingId: trackingId.substring(0, 20) + '...'
+              });
+            }
           }
+        } catch (dbError) {
+          logger.error('[Email Track] Firestore error', 'Server', { error: dbError.message });
         }
-      } catch (dbError) {
-        logger.error('[Email Track] Firestore error', 'Server', { error: dbError.message });
       }
     }
 

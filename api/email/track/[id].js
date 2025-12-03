@@ -7,8 +7,24 @@ import logger from '../../_logger.js';
 // 1x1 transparent PNG (43 bytes)
 const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 
-// Deduplication window (5 seconds) to prevent rapid duplicate opens
-const DEDUP_WINDOW_MS = 5000;
+// Deduplication window (1 minute) to prevent rapid duplicate opens
+// CRITICAL: Gmail threads load all emails when opening one, causing multiple pixel fires
+// A longer window prevents false positives from threaded email views
+const DEDUP_WINDOW_MS = 60000;
+
+// In-memory cache for fast deduplication (avoids Firestore reads for rapid duplicates)
+// Key: trackingId_userKey, Value: timestamp of last open
+const trackingDedupeCache = new Map();
+
+// Clean up old entries periodically (every 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamp] of trackingDedupeCache.entries()) {
+    if (now - timestamp > DEDUP_WINDOW_MS * 2) {
+      trackingDedupeCache.delete(key);
+    }
+  }
+}, 300000);
 
 export default async function handler(req, res) {
   try {
@@ -79,6 +95,29 @@ export default async function handler(req, res) {
           res.end(PIXEL);
           return;
         }
+        
+        // CRITICAL FIX: In-memory deduplication to prevent rapid duplicate opens
+        // This is especially important for Gmail threads where opening one email
+        // may load/render all emails in the thread, triggering multiple pixels
+        const userKey = `${userAgent}_${ip}`;
+        const dedupeKey = `${trackingId}_${userKey}`;
+        const now = Date.now();
+        const lastOpen = trackingDedupeCache.get(dedupeKey);
+        
+        if (lastOpen && (now - lastOpen) < DEDUP_WINDOW_MS) {
+          // Duplicate open within window - skip recording but still return pixel
+          logger.debug('[Email Track] Duplicate open ignored (in-memory cache):', { 
+            trackingId: trackingId.substring(0, 30),
+            timeSinceLastOpen: now - lastOpen 
+          });
+          setPixelHeaders(res);
+          res.end(PIXEL);
+          return;
+        }
+        
+        // Update in-memory cache first (fast path)
+        trackingDedupeCache.set(dedupeKey, now);
+        
         const ref = db.collection('emails').doc(trackingId);
         const snap = await ref.get();
 
@@ -87,16 +126,15 @@ export default async function handler(req, res) {
           const currentData = snap.data() || {};
           const existingOpens = currentData.opens || [];
 
-          // Deduplication: Check if same user/IP opened within last 5 seconds
-          const userKey = `${userAgent}_${ip}`;
-          const now = Date.now();
+          // Secondary deduplication: Check Firestore for recent opens from same user
+          // This catches cases where in-memory cache was cleared (server restart)
           const recentOpen = existingOpens.find(open => {
             const openTime = new Date(open.openedAt).getTime();
             return `${open.userAgent}_${open.ip}` === userKey && (now - openTime) < DEDUP_WINDOW_MS;
           });
 
           if (recentOpen) {
-            logger.debug('[Email Track] Duplicate open ignored (within 5s window):', { trackingId });
+            logger.debug('[Email Track] Duplicate open ignored (Firestore check):', { trackingId: trackingId.substring(0, 30) });
           } else {
             // Create open event object
             const openEvent = {
@@ -118,13 +156,13 @@ export default async function handler(req, res) {
             });
 
             logger.debug('[Email Track] Recorded open:', {
-              trackingId,
+              trackingId: trackingId.substring(0, 30),
               deviceType,
               openCount: (currentData.openCount || 0) + 1
             });
           }
         } else {
-          logger.debug('[Email Track] Document not found:', { trackingId });
+          logger.debug('[Email Track] Document not found:', { trackingId: trackingId.substring(0, 30) });
         }
       }
     } catch (error) {
