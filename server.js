@@ -75,7 +75,6 @@ import twilioAiInsightsHandler from './api/twilio/ai-insights.js';
 import txPriceHandler from './api/tx-price.js';
 import twilioPollCiAnalysisHandler from './api/twilio/poll-ci-analysis.js';
 import twilioCallerLookupHandler from './api/twilio/caller-lookup.js';
-import sendgridWebhookHandler from './api/email/sendgrid-webhook.js';
 import sendgridSendHandler from './api/email/sendgrid-send.js';
 import inboundEmailHandler from './api/email/inbound-email.js';
 import generateScheduledEmailsHandler from './api/generate-scheduled-emails.js';
@@ -145,7 +144,6 @@ logger.info('Server configuration loaded', 'Server', {
 // Development-only detailed logging
 if (process.env.NODE_ENV !== 'production') {
   console.log('[Server] Environment check:', {
-    hasSendGridApiKey: !!process.env.SENDGRID_API_KEY,
     hasTwilioAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
     hasTwilioAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
     hasPerplexityApiKey: !!process.env.PERPLEXITY_API_KEY,
@@ -716,11 +714,10 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/maps/config' ||
     pathname === '/api/debug/call' ||
     pathname === '/api/debug/health' ||
-    pathname === '/api/email/send' ||
     pathname === '/api/email/sendgrid-send' ||
     pathname.startsWith('/api/email/track/') ||
+    pathname.startsWith('/api/email/click/') ||
     pathname === '/api/email/webhook' ||
-    pathname === '/api/email/sendgrid-webhook' ||
     pathname === '/api/email/inbound-email' ||
     pathname === '/api/email/stats' ||
     pathname === '/api/email/backfill-threads' ||
@@ -801,16 +798,13 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Email tracking routes
-  if (pathname === '/api/email/send') {
-    return handleApiSendEmail(req, res);
-  }
   if (pathname === '/api/email/sendgrid-send') {
     // Parse request body before calling handler (handler expects req.body to be parsed)
     if (req.method === 'POST') {
       try {
         req.body = await parseRequestBody(req);
       } catch (error) {
-        console.error('[Server] SendGrid Send - Body Parse Error:', error.message);
+        console.error('[Server] Gmail Send - Body Parse Error:', error.message);
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Invalid request body' }));
         return;
@@ -819,11 +813,11 @@ const server = http.createServer(async (req, res) => {
     // Route directly to sendgrid-send.js handler (has all proper field extraction and logging)
     return await sendgridSendHandler(req, res);
   }
-  if (pathname === '/api/email/sendgrid-test') {
-    return handleApiSendGridTest(req, res);
-  }
   if (pathname.startsWith('/api/email/track/')) {
     return handleApiEmailTrack(req, res, parsedUrl);
+  }
+  if (pathname.startsWith('/api/email/click/')) {
+    return handleApiEmailClick(req, res, parsedUrl);
   }
   if (pathname === '/api/email/update-tracking') {
     return handleApiEmailUpdateTracking(req, res);
@@ -833,9 +827,6 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/api/email/webhook') {
     return handleApiEmailWebhook(req, res);
-  }
-  if (pathname === '/api/email/sendgrid-webhook') {
-    return handleApiSendGridWebhook(req, res);
   }
   if (pathname === '/api/email/inbound-email') {
     return handleApiInboundEmail(req, res);
@@ -1987,79 +1978,10 @@ async function handleApiEnergyNews(req, res) {
 }
 
 // Email tracking endpoints
-async function handleApiSendEmail(req, res) {
-  if (req.method !== 'POST') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-    return;
-  }
-
-  try {
-    const body = await parseRequestBody(req);
-    const { to, subject, content, from } = body;
-
-    if (!to || !subject || !content) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing required fields: to, subject, content' }));
-      return;
-    }
-
-    // Generate unique tracking ID
-    const trackingId = `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    // Create tracking pixel URL - always use Cloud Run URL
-    const baseUrl = process.env.PUBLIC_BASE_URL || 'https://power-choosers-crm-792458658491.us-south1.run.app';
-    const trackingPixelUrl = `${baseUrl}/api/email/track/${trackingId}`;
-
-    // Inject tracking pixel into email content
-    const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
-    const emailContent = content + trackingPixel;
-
-    // Store email record in database (you'll need to implement this with your database)
-    const emailRecord = {
-      id: trackingId,
-      to: Array.isArray(to) ? to : [to],
-      subject,
-      content: emailContent,
-      from: from || 'noreply@powerchoosers.com',
-      sentAt: new Date().toISOString(),
-      opens: [],
-      replies: [],
-      openCount: 0,
-      replyCount: 0,
-      status: 'queued',  // Start as 'queued' instead of 'sent'
-      type: 'sent',              // Required for email filtering in emails.js
-      emailType: 'sent',         // Alternative field for filtering
-      isSentEmail: true,         // Additional flag for filtering
-      provider: 'sendgrid',      // Identify the email provider
-      sendgridMessageId: null,   // Will be updated when SendGrid responds
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    // Save to Firebase (simulated for now - in production, you'd use Firebase Admin SDK)
-    // In a real implementation, you would use Firebase Admin SDK here:
-    // const admin = require('firebase-admin');
-    // await admin.firestore().collection('emails').doc(trackingId).set(emailRecord);
-
-    // Email sending is now handled by the frontend using Gmail API
-    // This endpoint just stores the email record for tracking purposes
-
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      success: true,
-      trackingId,
-      message: 'Email record stored for tracking (actual sending handled by Gmail API)'
-    }));
-
-  } catch (error) {
-    console.error('[Email] Send error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Failed to send email', message: error.message }));
-  }
-}
-
 async function handleApiEmailTrack(req, res, parsedUrl) {
+  // 1x1 transparent PNG
+  const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+
   if (req.method !== 'GET') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
@@ -2067,19 +1989,220 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
   }
 
   try {
-    const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+    // Extract tracking ID from URL path: /api/email/track/{trackingId}
+    const pathParts = parsedUrl.pathname.split('/');
+    const trackingId = pathParts[pathParts.length - 1] || '';
+
+    // Extract request metadata
+    const userAgent = req.headers['user-agent'] || '';
+    const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || 'unknown';
+    const referer = req.headers.referer || '';
+
+    // Detect device type
+    const deviceType = detectDeviceType(userAgent);
+
+    // Best-effort: record open event in Firestore
+    if (trackingId && trackingId.length > 0 && admin) {
+      try {
+        const db = admin.firestore();
+        const ref = db.collection('emails').doc(trackingId);
+        const snap = await ref.get();
+
+        if (snap.exists) {
+          const openedAt = new Date().toISOString();
+          const currentData = snap.data() || {};
+          const existingOpens = currentData.opens || [];
+
+          // Deduplication: Check if same user/IP opened within last 5 seconds
+          const userKey = `${userAgent}_${ip}`;
+          const now = Date.now();
+          const recentOpen = existingOpens.find(open => {
+            const openTime = new Date(open.openedAt).getTime();
+            return `${open.userAgent}_${open.ip}` === userKey && (now - openTime) < 5000;
+          });
+
+          if (!recentOpen) {
+            // Create open event object
+            const openEvent = {
+              openedAt,
+              userAgent,
+              ip: maskIpAddress(ip),
+              deviceType,
+              referer,
+              isBotFlagged: deviceType === 'bot'
+            };
+
+            await ref.update({
+              openCount: (currentData.openCount || 0) + 1,
+              opens: existingOpens.concat([openEvent]),
+              updatedAt: openedAt,
+              lastOpened: openedAt
+            });
+
+            logger.debug('[Email Track] Recorded open', 'Server', {
+              trackingId: trackingId.substring(0, 20) + '...',
+              deviceType,
+              openCount: (currentData.openCount || 0) + 1
+            });
+          }
+        }
+      } catch (dbError) {
+        logger.error('[Email Track] Firestore error', 'Server', { error: dbError.message });
+      }
+    }
+
+    // Always return pixel with no-cache headers
     res.writeHead(200, {
       'Content-Type': 'image/png',
       'Content-Length': PIXEL.length,
-      'Cache-Control': 'public, max-age=31536000, immutable',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0',
       'X-Content-Type-Options': 'nosniff'
     });
     res.end(PIXEL);
   } catch (error) {
-    console.error('[Email] Track error:', error);
+    logger.error('[Email Track] Error', 'Server', { error: error.message });
     res.writeHead(200, { 'Content-Type': 'image/png' });
-    res.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64'));
+    res.end(PIXEL);
   }
+}
+
+// Click tracking handler
+async function handleApiEmailClick(req, res, parsedUrl) {
+  if (req.method !== 'GET') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  try {
+    // Extract tracking ID from URL path: /api/email/click/{trackingId}
+    const pathParts = parsedUrl.pathname.split('/');
+    const trackingId = pathParts[pathParts.length - 1] || '';
+
+    // Get redirect URL from query params
+    const searchParams = new URLSearchParams(parsedUrl.search || '');
+    const originalUrl = searchParams.get('url') ? decodeURIComponent(searchParams.get('url')) : null;
+    const linkIndex = parseInt(searchParams.get('idx') || '0', 10);
+
+    // Validate redirect URL
+    if (!originalUrl) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' });
+      res.end('Missing redirect URL');
+      return;
+    }
+
+    // Extract request metadata
+    const userAgent = req.headers['user-agent'] || '';
+    const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || 'unknown';
+    const referer = req.headers.referer || '';
+
+    // Detect device type
+    const deviceType = detectDeviceType(userAgent);
+
+    // Best-effort: record click event in Firestore
+    if (trackingId && trackingId.length > 0 && admin) {
+      try {
+        const db = admin.firestore();
+        const ref = db.collection('emails').doc(trackingId);
+        const snap = await ref.get();
+
+        if (snap.exists) {
+          const clickedAt = new Date().toISOString();
+          const currentData = snap.data() || {};
+
+          // Create click event object
+          const clickEvent = {
+            clickedAt,
+            url: originalUrl,
+            linkIndex,
+            userAgent,
+            ip: maskIpAddress(ip),
+            deviceType,
+            referer
+          };
+
+          await ref.update({
+            clickCount: (currentData.clickCount || 0) + 1,
+            clicks: (currentData.clicks || []).concat([clickEvent]),
+            updatedAt: clickedAt,
+            lastClicked: clickedAt
+          });
+
+          logger.debug('[Email Click] Recorded click', 'Server', {
+            trackingId: trackingId.substring(0, 20) + '...',
+            url: originalUrl.substring(0, 50) + '...',
+            deviceType
+          });
+        }
+      } catch (dbError) {
+        logger.error('[Email Click] Firestore error', 'Server', { error: dbError.message });
+      }
+    }
+
+    // Always redirect to original URL (302 for repeat tracking)
+    res.writeHead(302, {
+      'Location': originalUrl,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    res.end();
+  } catch (error) {
+    logger.error('[Email Click] Error', 'Server', { error: error.message });
+    
+    // Try to redirect even on error
+    const searchParams = new URLSearchParams(parsedUrl?.search || '');
+    const fallbackUrl = searchParams.get('url') ? decodeURIComponent(searchParams.get('url')) : null;
+    if (fallbackUrl) {
+      res.writeHead(302, { 'Location': fallbackUrl });
+      res.end();
+    } else {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Internal server error');
+    }
+  }
+}
+
+// Helper function to detect device type from user agent
+function detectDeviceType(userAgent) {
+  if (!userAgent) return 'unknown';
+  const ua = userAgent.toLowerCase();
+  
+  if (/bot|crawler|spider|googleimageproxy|feedfetcher|slurp|yahoo|bing|baidu/i.test(ua)) {
+    return 'bot';
+  }
+  if (/mobile|android|iphone|phone|webos|blackberry|opera mini|iemobile/i.test(ua)) {
+    return 'mobile';
+  }
+  if (/tablet|ipad/i.test(ua)) {
+    return 'tablet';
+  }
+  return 'desktop';
+}
+
+// Helper function to mask IP address for privacy
+function maskIpAddress(ip) {
+  if (!ip || ip === 'unknown') return 'unknown';
+  
+  // IPv4: mask last 2 octets
+  if (ip.includes('.')) {
+    const parts = ip.split('.');
+    if (parts.length === 4) {
+      return `${parts[0]}.${parts[1]}.*.*`;
+    }
+  }
+  
+  // IPv6: mask last half
+  if (ip.includes(':')) {
+    const parts = ip.split(':');
+    if (parts.length > 4) {
+      return parts.slice(0, 4).join(':') + ':****';
+    }
+  }
+  
+  return ip.substring(0, 10) + '***';
 }
 
 async function handleApiEmailUpdateTracking(req, res) {
@@ -2233,149 +2356,6 @@ async function handleApiEmailStats(req, res, parsedUrl) {
   }
 }
 
-// SendGrid email sending handler
-async function handleApiSendGridSend(req, res) {
-  if (req.method !== 'POST') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-    return;
-  }
-
-  // Environment variable validation as recommended by Twilio AI
-  if (!process.env.SENDGRID_API_KEY) {
-    console.error('[SendGrid] Missing SENDGRID_API_KEY environment variable');
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'SendGrid API key not configured' }));
-    return;
-  }
-
-  // Log environment status (masked for security)
-  logger.debug('SendGrid environment check', 'SendGrid', {
-    hasApiKey: !!process.env.SENDGRID_API_KEY,
-    fromEmail: process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com',
-    fromName: process.env.SENDGRID_FROM_NAME || 'Power Choosers CRM'
-  });
-
-  try {
-    const body = await parseRequestBody(req);
-    const { to, subject, content, from, _deliverability } = body;
-
-    if (!to || !subject || !content) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Missing required fields: to, subject, content' }));
-      return;
-    }
-
-    // Generate unique tracking ID for SendGrid
-    const trackingId = `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    // Use SendGrid native tracking - no custom pixel injection
-    const emailContent = content;
-
-    // Prepare email data for SendGrid
-    const emailData = {
-      to,
-      subject,
-      content: emailContent,
-      from: from || process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com',
-      trackingId,
-      _deliverability: _deliverability || {
-        enableTracking: true,
-        includeBulkHeaders: false,
-        includeListUnsubscribe: false,
-        includePriorityHeaders: false,
-        forceGmailOnly: false,
-        useBrandedHtmlTemplate: false,
-        signatureImageEnabled: true
-      }
-    };
-
-    logger.debug('Sending email via SendGrid', 'SendGrid', { to, subject, trackingId });
-
-    // Log payload details as recommended by Twilio AI
-    logger.debug('SendGrid email payload', 'SendGrid', {
-      to: emailData.to,
-      subject: emailData.subject,
-      from: emailData.from,
-      trackingId: emailData.trackingId,
-      contentLength: emailData.content ? emailData.content.length : 0,
-      hasTrackingPixel: emailData.content ? emailData.content.includes('<img') : false,
-      deliverabilitySettings: emailData._deliverability
-    });
-
-    // Import and use SendGrid service
-    const { SendGridService } = await import('./api/email/sendgrid-service.js');
-    const sendGridService = new SendGridService();
-    const result = await sendGridService.sendEmail(emailData);
-
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      success: true,
-      trackingId: result.trackingId,
-      messageId: result.messageId,
-      message: 'Email sent successfully via SendGrid'
-    }));
-
-  } catch (error) {
-    console.error('[SendGrid] Send error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      error: 'Failed to send email',
-      message: error.message
-    }));
-  }
-}
-
-// SendGrid test endpoint for minimal payload testing
-async function handleApiSendGridTest(req, res) {
-  if (req.method !== 'POST') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
-    return;
-  }
-
-  try {
-    // Minimal test payload as recommended by Twilio AI
-    const testEmailData = {
-      to: 'test@example.com', // Replace with a verified test email
-      subject: 'SendGrid Test Email',
-      content: '<p>This is a test email to verify SendGrid integration.</p>',
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@powerchoosers.com',
-      trackingId: `test_${Date.now()}`,
-      _deliverability: {
-        enableTracking: false, // Disable tracking for test
-        includeBulkHeaders: false,
-        includeListUnsubscribe: false,
-        includePriorityHeaders: false,
-        forceGmailOnly: false,
-        useBrandedHtmlTemplate: false,
-        signatureImageEnabled: false
-      }
-    };
-
-    logger.debug('SendGrid test email payload', 'SendGrid', testEmailData);
-
-    const { SendGridService } = await import('./api/email/sendgrid-service.js');
-    const sendGridService = new SendGridService();
-    const result = await sendGridService.sendEmail(testEmailData);
-
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      success: true,
-      message: 'Test email sent successfully',
-      result: result
-    }));
-
-  } catch (error) {
-    console.error('[SendGrid] Test email error:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      error: 'Test email failed',
-      message: error.message
-    }));
-  }
-}
-
 // Proxy Twilio recording audio to the browser
 async function handleApiRecording(req, res, parsedUrl) {
   if (req.method !== 'GET') {
@@ -2442,15 +2422,7 @@ async function handleApiRecording(req, res, parsedUrl) {
   }
 }
 
-// SendGrid webhook handler
-async function handleApiSendGridWebhook(req, res) {
-  if (req.method === 'POST') {
-    req.body = await parseRequestBody(req);
-  }
-  return await sendgridWebhookHandler(req, res);
-}
-
-// SendGrid inbound email handler
+// Inbound email handler (for email parsing webhooks)
 async function handleApiInboundEmail(req, res) {
   // Do NOT pre-parse the body, formidable in the handler needs the raw stream
   return await inboundEmailHandler(req, res);
