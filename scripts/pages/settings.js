@@ -386,6 +386,19 @@ class SettingsPage {
                 this.state.settings.general.email = email;
             }
             
+            // Check if photoURL changed and re-host if needed
+            if (user.photoURL) {
+                const currentPhotoURL = this.state.settings.general.photoURL || '';
+                if (user.photoURL !== currentPhotoURL) {
+                    console.log('[Settings] Google photoURL detected in ensureGoogleUserData, hosting avatar...');
+                    await this.hostGoogleAvatar(user.photoURL);
+                } else if (!this.state.settings.general.hostedPhotoURL) {
+                    // PhotoURL matches but no hosted version exists, host it
+                    console.log('[Settings] PhotoURL exists but no hosted version in ensureGoogleUserData, hosting avatar...');
+                    await this.hostGoogleAvatar(user.photoURL);
+                }
+            }
+            
         } else {
             console.warn('[Settings] No current user found for Google data population after waiting');
         }
@@ -959,18 +972,41 @@ class SettingsPage {
             if (userEmail) {
                 this.state.settings.general.email = userEmail;
             }
-            if (user.photoURL && !this.state.settings.general.photoURL) {
-                this.state.settings.general.photoURL = user.photoURL;
-                // Trigger re-hosting to Imgur
-                await this.hostGoogleAvatar(user.photoURL);
+            // Always check if photoURL changed and re-host if needed
+            if (user.photoURL) {
+                const currentPhotoURL = this.state.settings.general.photoURL || '';
+                if (user.photoURL !== currentPhotoURL) {
+                    console.log('[Settings] Google photoURL detected, hosting avatar...');
+                    await this.hostGoogleAvatar(user.photoURL);
+                } else if (!this.state.settings.general.hostedPhotoURL) {
+                    // PhotoURL matches but no hosted version exists, host it
+                    console.log('[Settings] PhotoURL exists but no hosted version, hosting avatar...');
+                    await this.hostGoogleAvatar(user.photoURL);
+                }
             }
         } else {
             console.warn('[Settings] No current user found, cannot auto-populate profile');
         }
     }
 
-    async hostGoogleAvatar(googlePhotoURL) {
-        if (!googlePhotoURL || this.state.settings.general.hostedPhotoURL) return;
+    async hostGoogleAvatar(googlePhotoURL, forceRefresh = false) {
+        if (!googlePhotoURL) return;
+        
+        // Check if photoURL changed - if it's different from stored photoURL, force re-host
+        const currentPhotoURL = this.state.settings.general.photoURL || '';
+        const photoChanged = googlePhotoURL !== currentPhotoURL;
+        
+        // Only skip if hostedPhotoURL exists AND photo hasn't changed AND not forcing refresh
+        if (this.state.settings.general.hostedPhotoURL && !photoChanged && !forceRefresh) {
+            console.log('[Settings] Avatar already hosted and photoURL unchanged, skipping re-host');
+            return;
+        }
+        
+        // Update stored photoURL to track changes
+        if (photoChanged) {
+            console.log('[Settings] Google photoURL changed, re-hosting avatar...');
+            this.state.settings.general.photoURL = googlePhotoURL;
+        }
         
         try {
             // Send Google URL to server to download and re-host
@@ -987,10 +1023,15 @@ class SettingsPage {
                     this.state.settings.general.hostedPhotoURL = imageUrl;
                     this.markDirty();
                     
+                    // Auto-save to persist the new hosted URL
+                    await this.saveSettings();
+                    
                     // Trigger profile photo refresh in auth system
                     if (window.authManager && typeof window.authManager.refreshProfilePhoto === 'function') {
                         window.authManager.refreshProfilePhoto();
                     }
+                    
+                    console.log('[Settings] Avatar hosted successfully:', imageUrl);
                 }
             } else {
                 console.warn('[Settings] Upload failed, using Google URL directly');
