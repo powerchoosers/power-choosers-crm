@@ -11,7 +11,10 @@ class SettingsPage {
                     imageSize: {
                         width: 200,
                         height: 100
-                    }
+                    },
+                    // Custom HTML signature option
+                    useCustomHtml: false,
+                    customHtmlEnabled: false
                 },
                 aiTemplates: {
                     warm_intro: '',
@@ -444,6 +447,20 @@ class SettingsPage {
                 this.markDirty();
                 // Update preview to reflect new size
                 this.renderSignatureSection();
+            });
+        }
+        
+        // Custom HTML signature toggle
+        const customSigToggle = document.getElementById('use-custom-html-signature');
+        if (customSigToggle) {
+            customSigToggle.addEventListener('change', (e) => {
+                if (!this.state.settings.emailSignature) {
+                    this.state.settings.emailSignature = { text: '', image: null, imageSize: { width: 200, height: 100 } };
+                }
+                this.state.settings.emailSignature.useCustomHtml = e.target.checked;
+                this.state.settings.emailSignature.customHtmlEnabled = e.target.checked;
+                this.markDirty();
+                this.renderCustomSignaturePreview();
             });
         }
 
@@ -1589,6 +1606,34 @@ class SettingsPage {
                 this.removeSignatureImage();
             });
         }
+        
+        // Update custom HTML signature toggle and preview
+        this.renderCustomSignaturePreview();
+    }
+    
+    // Render custom HTML signature preview
+    renderCustomSignaturePreview() {
+        const signature = this.state.settings.emailSignature || {};
+        const toggle = document.getElementById('use-custom-html-signature');
+        const previewContainer = document.getElementById('custom-signature-preview');
+        const previewContent = document.getElementById('custom-signature-preview-content');
+        
+        // Set toggle state
+        if (toggle) {
+            toggle.checked = signature.useCustomHtml === true || signature.customHtmlEnabled === true;
+        }
+        
+        // Show/hide preview based on toggle
+        if (previewContainer && previewContent) {
+            if (toggle && toggle.checked) {
+                previewContainer.style.display = 'block';
+                // Generate and display preview
+                const customHtml = this.getCustomHtmlSignature();
+                previewContent.innerHTML = customHtml;
+            } else {
+                previewContainer.style.display = 'none';
+            }
+        }
     }
 
     renderPhoneNumbers() {
@@ -2165,7 +2210,13 @@ class SettingsPage {
 
     // Public method to get formatted email signature
     getEmailSignature() {
-        const signature = this.state.settings.emailSignature;
+        const signature = this.state.settings.emailSignature || {};
+        
+        // Check if custom HTML signature is enabled
+        if (signature.useCustomHtml || signature.customHtmlEnabled) {
+            return this.getCustomHtmlSignature();
+        }
+        
         let signatureHtml = '';
 
         if (signature.text || signature.image) {
@@ -2192,11 +2243,157 @@ class SettingsPage {
 
     // Public method to get signature text only (for plain text emails)
     getEmailSignatureText() {
-        const signature = this.state.settings.emailSignature;
+        const signature = this.state.settings.emailSignature || {};
+        
+        // For custom HTML signature, build plain text version
+        if (signature.useCustomHtml || signature.customHtmlEnabled) {
+            const g = this.state.settings.general || {};
+            const name = `${g.firstName || ''} ${g.lastName || ''}`.trim();
+            const title = g.jobTitle || 'Energy Strategist';
+            const company = g.companyName || 'Power Choosers';
+            const phone = g.phone || '';
+            const email = g.email || '';
+            const location = g.location || 'Fort Worth, TX';
+            
+            let text = '\n\n---\n';
+            text += `${name}\n`;
+            text += `${title}\n`;
+            text += `${company}\n\n`;
+            if (phone) text += `Phone: ${phone}\n`;
+            if (email) text += `Email: ${email}\n`;
+            if (location) text += `Location: ${location}\n`;
+            text += '\nChoose Wisely. Power Your Savings.\npowerchoosers.com';
+            return text;
+        }
+        
         if (signature.text) {
             return '\n\n' + signature.text;
         }
         return '';
+    }
+    
+    // Generate premium custom HTML signature using profile fields
+    // Email-client compatible (table-based layout, inline styles, no CSS classes)
+    getCustomHtmlSignature() {
+        const g = this.state.settings.general || {};
+        
+        // Get profile data with fallbacks
+        const firstName = g.firstName || '';
+        const lastName = g.lastName || '';
+        const name = `${firstName} ${lastName}`.trim() || 'Your Name';
+        const title = g.jobTitle || 'Energy Strategist';
+        const company = g.companyName || 'Power Choosers';
+        const phone = g.phone || '+1 (817) 809-3367';
+        const email = g.email || '';
+        const location = g.location || 'Fort Worth, TX';
+        const linkedIn = g.linkedIn || 'https://www.linkedin.com/company/power-choosers';
+        const avatar = g.hostedPhotoURL || g.photoURL || '';
+        
+        // Build email-compatible HTML signature (table-based for maximum compatibility)
+        // Based on the premium perplexity signature design
+        return `
+<div contenteditable="false" data-signature="true" style="margin-top: 28px; padding-top: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+    <!-- Orange gradient divider -->
+    <div style="height: 2px; background: linear-gradient(to right, #f59e0b 0%, #f59e0b 40%, transparent 100%); margin-bottom: 24px;"></div>
+    
+    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+        <tr>
+            <!-- Avatar -->
+            <td style="vertical-align: top; padding-right: 20px;">
+                ${avatar ? `
+                <div style="position: relative; width: 72px; height: 72px;">
+                    <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 50%; opacity: 0.1;"></div>
+                    <img src="${avatar}" 
+                         alt="${name}" 
+                         width="72" 
+                         height="72" 
+                         style="position: relative; z-index: 1; border-radius: 50%; border: 2px solid #f59e0b; display: block; object-fit: cover;">
+                </div>
+                ` : `
+                <div style="width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 600;">
+                    ${firstName.charAt(0).toUpperCase()}${lastName.charAt(0).toUpperCase()}
+                </div>
+                `}
+            </td>
+            
+            <!-- Info -->
+            <td style="vertical-align: top;">
+                <!-- Name -->
+                <div style="font-size: 16px; font-weight: 600; color: #0b1b45; margin-bottom: 2px; letter-spacing: -0.3px;">
+                    ${name}
+                </div>
+                
+                <!-- Title -->
+                <div style="font-size: 13px; font-weight: 500; color: #f59e0b; margin-bottom: 8px; letter-spacing: 0.3px;">
+                    ${title}
+                </div>
+                
+                <!-- Company -->
+                <div style="font-size: 12px; font-weight: 500; color: #1e3a8a; letter-spacing: 0.5px; margin-bottom: 14px;">
+                    ${company}
+                </div>
+                
+                <!-- Contact Details -->
+                <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; font-size: 12px; color: #64748b;">
+                    <!-- Phone -->
+                    <tr>
+                        <td style="padding: 3px 12px 3px 0; color: #94a3b8; font-weight: 500; min-width: 50px;">Phone</td>
+                        <td style="padding: 3px 0;">
+                            <a href="tel:${phone.replace(/[^\d+]/g, '')}" style="color: #64748b; text-decoration: none;">${phone}</a>
+                        </td>
+                    </tr>
+                    <!-- Email -->
+                    <tr>
+                        <td style="padding: 3px 12px 3px 0; color: #94a3b8; font-weight: 500;">Email</td>
+                        <td style="padding: 3px 0;">
+                            <a href="mailto:${email}" style="color: #64748b; text-decoration: none;">${email}</a>
+                        </td>
+                    </tr>
+                    <!-- Location -->
+                    <tr>
+                        <td style="padding: 3px 12px 3px 0; color: #94a3b8; font-weight: 500;">Location</td>
+                        <td style="padding: 3px 0; color: #64748b;">${location}</td>
+                    </tr>
+                </table>
+                
+                <!-- Social Links -->
+                <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+                        <tr>
+                            <!-- LinkedIn -->
+                            <td style="padding-right: 16px;">
+                                <a href="${linkedIn}" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/linkedin.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle;">
+                                    LinkedIn
+                                </a>
+                            </td>
+                            <!-- Website -->
+                            <td style="padding-right: 16px;">
+                                <a href="https://powerchoosers.com" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/domain.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle;">
+                                    Website
+                                </a>
+                            </td>
+                            <!-- Schedule -->
+                            <td>
+                                <a href="https://powerchoosers.com/schedule" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/calendar--v1.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle;">
+                                    Schedule
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </td>
+        </tr>
+    </table>
+    
+    <!-- Tagline -->
+    <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #f1f5f9; font-size: 11px; color: #a0aec0; font-weight: 500; letter-spacing: 0.3px;">
+        Power Choosers — Choose Wisely. Power Your Savings. 
+        <a href="https://powerchoosers.com" target="_blank" style="color: #f59e0b; text-decoration: none; font-weight: 600;">powerchoosers.com</a>
+    </div>
+</div>`;
     }
 
     // Algolia reindex methods
