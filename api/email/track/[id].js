@@ -18,8 +18,48 @@ export default async function handler(req, res) {
       return;
     }
 
-    const { id } = req.query || {};
-    const trackingId = String(id || '').trim();
+    // Extract tracking ID from URL path: /api/email/track/{trackingId}
+    // The [id] in the filename means it's a path parameter, not a query parameter
+    let trackingId = '';
+    
+    // Try to get from URL path first (most reliable)
+    if (req.url) {
+      const urlPath = req.url.split('?')[0]; // Remove query string
+      const pathParts = urlPath.split('/');
+      const trackIndex = pathParts.findIndex(part => part === 'track');
+      if (trackIndex >= 0 && pathParts[trackIndex + 1]) {
+        trackingId = String(pathParts[trackIndex + 1]).trim();
+      }
+    }
+    
+    // Fallback to query parameter if path extraction failed (for compatibility)
+    if (!trackingId && req.query?.id) {
+      trackingId = String(req.query.id).trim();
+    }
+    
+    // Final fallback: try to extract from req.url directly
+    if (!trackingId && req.url) {
+      const match = req.url.match(/\/api\/email\/track\/([^/?]+)/);
+      if (match && match[1]) {
+        trackingId = String(match[1]).trim();
+      }
+    }
+    
+    trackingId = trackingId || '';
+
+    // Log tracking ID extraction for debugging
+    if (!trackingId) {
+      logger.warn('[Email Track] Failed to extract tracking ID from URL:', {
+        url: req.url,
+        pathname: req.url?.split('?')[0],
+        query: req.query
+      });
+    } else {
+      logger.debug('[Email Track] Extracted tracking ID:', {
+        trackingId: trackingId.substring(0, 30) + '...',
+        url: req.url?.substring(0, 100)
+      });
+    }
 
     // Extract request metadata
     const userAgent = req.headers['user-agent'] || '';
@@ -32,6 +72,13 @@ export default async function handler(req, res) {
     // Best-effort: record an open event if Firestore is available and id looks valid
     try {
       if (db && trackingId && trackingId.length > 0) {
+        // Validate tracking ID format (should start with 'gmail_' or be a valid Firestore ID)
+        if (!trackingId.match(/^[a-zA-Z0-9_-]+$/)) {
+          logger.warn('[Email Track] Invalid tracking ID format:', { trackingId: trackingId.substring(0, 50) });
+          setPixelHeaders(res);
+          res.end(PIXEL);
+          return;
+        }
         const ref = db.collection('emails').doc(trackingId);
         const snap = await ref.get();
 
