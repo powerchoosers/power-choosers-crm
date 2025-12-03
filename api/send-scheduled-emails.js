@@ -59,17 +59,30 @@ async function getUserSignature(ownerId) {
 
     const data = settingsSnap.docs[0].data();
     const signature = data.emailSignature || {};
+    const general = data.general || {};
     const sigText = signature.text || '';
     const sigImage = signature.image || '';
     const imageSize = signature.imageSize || { width: 200, height: 100 };
     const signatureImageEnabled = data.emailDeliverability?.signatureImageEnabled !== false;
+    
+    // Check if custom HTML signature is enabled
+    const useCustomHtml = signature.useCustomHtml === true || signature.customHtmlEnabled === true;
 
     logger.debug('[SendScheduledEmails] Signature data found:', {
       hasText: !!sigText,
       textLength: sigText.length,
       hasImage: !!sigImage,
-      imageEnabled: signatureImageEnabled
+      imageEnabled: signatureImageEnabled,
+      useCustomHtml: useCustomHtml
     });
+
+    // If custom HTML signature is enabled, build premium signature
+    if (useCustomHtml) {
+      const customSignature = buildCustomHtmlSignature(general);
+      const customSignatureText = buildCustomSignatureText(general);
+      logger.debug('[SendScheduledEmails] Using custom HTML signature');
+      return { signatureHtml: customSignature, signatureText: customSignatureText };
+    }
 
     if (!sigText && !sigImage) {
       logger.debug('[SendScheduledEmails] No signature text or image configured');
@@ -105,6 +118,157 @@ async function getUserSignature(ownerId) {
     logger.error('[SendScheduledEmails] Failed to fetch user signature:', error);
     return { signatureHtml: '', signatureText: '' };
   }
+}
+
+/**
+ * Build custom HTML signature (premium style) using profile data
+ * Email-client compatible: table-based layout, inline styles, no CSS classes
+ */
+function buildCustomHtmlSignature(general) {
+  const g = general || {};
+  
+  // Get profile data with fallbacks
+  const firstName = g.firstName || '';
+  const lastName = g.lastName || '';
+  const name = `${firstName} ${lastName}`.trim() || 'Your Name';
+  const title = g.jobTitle || 'Energy Strategist';
+  const company = g.companyName || 'Power Choosers';
+  const phone = g.phone || '+1 (817) 809-3367';
+  const email = g.email || '';
+  const location = g.location || 'Fort Worth, TX';
+  const linkedIn = g.linkedIn || 'https://www.linkedin.com/company/power-choosers';
+  const avatar = g.hostedPhotoURL || g.photoURL || '';
+  
+  // Clean phone for tel: link
+  const phoneClean = phone.replace(/[^\d+]/g, '');
+  
+  // Build initials fallback
+  const initials = `${firstName.charAt(0).toUpperCase()}${lastName.charAt(0).toUpperCase()}`;
+  
+  // Build email-compatible HTML signature (table-based for maximum compatibility)
+  return `
+<div style="margin-top: 28px; padding-top: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+    <!-- Orange gradient divider -->
+    <div style="height: 2px; background: linear-gradient(to right, #f59e0b 0%, #f59e0b 40%, transparent 100%); margin-bottom: 24px;"></div>
+    
+    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+        <tr>
+            <!-- Avatar -->
+            <td style="vertical-align: top; padding-right: 20px;">
+                ${avatar ? `
+                <img src="${avatar}" 
+                     alt="${name}" 
+                     width="72" 
+                     height="72" 
+                     style="border-radius: 50%; border: 2px solid #f59e0b; display: block; object-fit: cover;">
+                ` : `
+                <div style="width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); text-align: center; line-height: 72px; color: white; font-size: 24px; font-weight: 600;">
+                    ${initials}
+                </div>
+                `}
+            </td>
+            
+            <!-- Info -->
+            <td style="vertical-align: top;">
+                <!-- Name -->
+                <div style="font-size: 16px; font-weight: 600; color: #0b1b45; margin-bottom: 2px; letter-spacing: -0.3px;">
+                    ${name}
+                </div>
+                
+                <!-- Title -->
+                <div style="font-size: 13px; font-weight: 500; color: #f59e0b; margin-bottom: 8px; letter-spacing: 0.3px;">
+                    ${title}
+                </div>
+                
+                <!-- Company -->
+                <div style="font-size: 12px; font-weight: 500; color: #1e3a8a; letter-spacing: 0.5px; margin-bottom: 14px;">
+                    ${company}
+                </div>
+                
+                <!-- Contact Details -->
+                <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; font-size: 12px; color: #64748b;">
+                    <!-- Phone -->
+                    <tr>
+                        <td style="padding: 3px 12px 3px 0; color: #94a3b8; font-weight: 500; min-width: 50px;">Phone</td>
+                        <td style="padding: 3px 0;">
+                            <a href="tel:${phoneClean}" style="color: #64748b; text-decoration: none;">${phone}</a>
+                        </td>
+                    </tr>
+                    <!-- Email -->
+                    <tr>
+                        <td style="padding: 3px 12px 3px 0; color: #94a3b8; font-weight: 500;">Email</td>
+                        <td style="padding: 3px 0;">
+                            <a href="mailto:${email}" style="color: #64748b; text-decoration: none;">${email}</a>
+                        </td>
+                    </tr>
+                    <!-- Location -->
+                    <tr>
+                        <td style="padding: 3px 12px 3px 0; color: #94a3b8; font-weight: 500;">Location</td>
+                        <td style="padding: 3px 0; color: #64748b;">${location}</td>
+                    </tr>
+                </table>
+                
+                <!-- Social Links -->
+                <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+                        <tr>
+                            <!-- LinkedIn -->
+                            <td style="padding-right: 16px;">
+                                <a href="${linkedIn}" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/linkedin.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+                                    LinkedIn
+                                </a>
+                            </td>
+                            <!-- Website -->
+                            <td style="padding-right: 16px;">
+                                <a href="https://powerchoosers.com" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/domain.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+                                    Website
+                                </a>
+                            </td>
+                            <!-- Schedule -->
+                            <td>
+                                <a href="https://powerchoosers.com/schedule" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/calendar--v1.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+                                    Schedule
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </td>
+        </tr>
+    </table>
+    
+    <!-- Tagline -->
+    <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #f1f5f9; font-size: 11px; color: #a0aec0; font-weight: 500; letter-spacing: 0.3px;">
+        Power Choosers — Choose Wisely. Power Your Savings. 
+        <a href="https://powerchoosers.com" target="_blank" style="color: #f59e0b; text-decoration: none; font-weight: 600;">powerchoosers.com</a>
+    </div>
+</div>`;
+}
+
+/**
+ * Build plain text version of custom signature
+ */
+function buildCustomSignatureText(general) {
+  const g = general || {};
+  const name = `${g.firstName || ''} ${g.lastName || ''}`.trim();
+  const title = g.jobTitle || 'Energy Strategist';
+  const company = g.companyName || 'Power Choosers';
+  const phone = g.phone || '';
+  const email = g.email || '';
+  const location = g.location || 'Fort Worth, TX';
+  
+  let text = '\n\n---\n';
+  text += `${name}\n`;
+  text += `${title}\n`;
+  text += `${company}\n\n`;
+  if (phone) text += `Phone: ${phone}\n`;
+  if (email) text += `Email: ${email}\n`;
+  if (location) text += `Location: ${location}\n`;
+  text += '\nChoose Wisely. Power Your Savings.\npowerchoosers.com';
+  return text;
 }
 
 /**
