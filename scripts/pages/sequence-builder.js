@@ -4242,13 +4242,24 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
         return '';
       }
 
-      // Get signature from settings
+      // Get settings
+      const settings = (window.SettingsPage?.getSettings?.()) || {};
+      const emailSig = settings?.emailSignature || {};
+      const deliver = settings?.emailDeliverability || {};
+      
+      // Check if custom HTML signature is enabled
+      if (emailSig.useCustomHtml || emailSig.customHtmlEnabled) {
+        // Use custom HTML signature from SettingsPage
+        if (window.SettingsPage?.instance?.getCustomHtmlSignature) {
+          return window.SettingsPage.instance.getCustomHtmlSignature();
+        }
+        // Fallback: build custom signature inline
+        return buildCustomHtmlSignature(settings);
+      }
+
+      // Get standard signature from settings
       const signature = window.getEmailSignature ? window.getEmailSignature() : '';
       if (!signature) return '';
-
-      // Check if signature image should be included
-      const settings = (window.SettingsPage?.getSettings?.()) || {};
-      const deliver = settings?.emailDeliverability || {};
 
       // If signature image is disabled in settings, remove it from signature
       let signatureHtml = signature;
@@ -4262,6 +4273,128 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
       console.warn('[SequenceBuilder] Error getting signature for preview:', error);
       return '';
     }
+  }
+  
+  // Build custom HTML signature (premium style) - fallback if SettingsPage method not available
+  function buildCustomHtmlSignature(settings) {
+    const g = settings?.general || {};
+    
+    // Get profile data with fallbacks
+    const firstName = g.firstName || '';
+    const lastName = g.lastName || '';
+    const name = `${firstName} ${lastName}`.trim() || 'Your Name';
+    const title = g.jobTitle || 'Energy Strategist';
+    const company = g.companyName || 'Power Choosers';
+    const phone = g.phone || '+1 (817) 809-3367';
+    const email = g.email || '';
+    const location = g.location || 'Fort Worth, TX';
+    const linkedIn = g.linkedIn || 'https://www.linkedin.com/company/power-choosers';
+    const avatar = g.hostedPhotoURL || g.photoURL || '';
+    
+    // Build email-compatible HTML signature (table-based for maximum compatibility)
+    return `
+<div contenteditable="false" data-signature="true" style="margin-top: 28px; padding-top: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+    <!-- Orange gradient divider -->
+    <div style="height: 2px; background: linear-gradient(to right, #f59e0b 0%, #f59e0b 40%, transparent 100%); margin-bottom: 24px;"></div>
+    
+    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+        <tr>
+            <!-- Avatar -->
+            <td style="vertical-align: top; padding-right: 20px;">
+                ${avatar ? `
+                <div style="position: relative; width: 72px; height: 72px;">
+                    <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 50%; opacity: 0.1;"></div>
+                    <img src="${avatar}" 
+                         alt="${name}" 
+                         width="72" 
+                         height="72" 
+                         style="position: relative; z-index: 1; border-radius: 50%; border: 2px solid #f59e0b; display: block; object-fit: cover;">
+                </div>
+                ` : `
+                <div style="width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 600;">
+                    ${firstName.charAt(0).toUpperCase()}${lastName.charAt(0).toUpperCase()}
+                </div>
+                `}
+            </td>
+            
+            <!-- Info -->
+            <td style="vertical-align: top;">
+                <!-- Name -->
+                <div style="font-size: 16px; font-weight: 600; color: #0b1b45; margin-bottom: 2px; letter-spacing: -0.3px;">
+                    ${name}
+                </div>
+                
+                <!-- Title -->
+                <div style="font-size: 13px; font-weight: 500; color: #f59e0b; margin-bottom: 8px; letter-spacing: 0.3px;">
+                    ${title}
+                </div>
+                
+                <!-- Company -->
+                <div style="font-size: 12px; font-weight: 500; color: #1e3a8a; letter-spacing: 0.5px; margin-bottom: 14px;">
+                    ${company}
+                </div>
+                
+                <!-- Contact Details -->
+                <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse; font-size: 12px; color: #64748b;">
+                    <!-- Phone -->
+                    <tr>
+                        <td style="padding: 3px 12px 3px 0; color: #94a3b8; font-weight: 500; min-width: 50px;">Phone</td>
+                        <td style="padding: 3px 0;">
+                            <a href="tel:${phone.replace(/[^\d+]/g, '')}" style="color: #64748b; text-decoration: none;">${phone}</a>
+                        </td>
+                    </tr>
+                    <!-- Email -->
+                    <tr>
+                        <td style="padding: 3px 12px 3px 0; color: #94a3b8; font-weight: 500;">Email</td>
+                        <td style="padding: 3px 0;">
+                            <a href="mailto:${email}" style="color: #64748b; text-decoration: none;">${email}</a>
+                        </td>
+                    </tr>
+                    <!-- Location -->
+                    <tr>
+                        <td style="padding: 3px 12px 3px 0; color: #94a3b8; font-weight: 500;">Location</td>
+                        <td style="padding: 3px 0; color: #64748b;">${location}</td>
+                    </tr>
+                </table>
+                
+                <!-- Social Links -->
+                <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                    <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
+                        <tr>
+                            <!-- LinkedIn -->
+                            <td style="padding-right: 16px;">
+                                <a href="${linkedIn}" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/linkedin.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle;">
+                                    LinkedIn
+                                </a>
+                            </td>
+                            <!-- Website -->
+                            <td style="padding-right: 16px;">
+                                <a href="https://powerchoosers.com" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/domain.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle;">
+                                    Website
+                                </a>
+                            </td>
+                            <!-- Schedule -->
+                            <td>
+                                <a href="https://powerchoosers.com/schedule" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/calendar--v1.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle;">
+                                    Schedule
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </td>
+        </tr>
+    </table>
+    
+    <!-- Tagline -->
+    <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #f1f5f9; font-size: 11px; color: #a0aec0; font-weight: 500; letter-spacing: 0.3px;">
+        Power Choosers — Choose Wisely. Power Your Savings. 
+        <a href="https://powerchoosers.com" target="_blank" style="color: #f59e0b; text-decoration: none; font-weight: 600;">powerchoosers.com</a>
+    </div>
+</div>`;
   }
 
   // Resolve sender first name from multiple sources so it's always available
