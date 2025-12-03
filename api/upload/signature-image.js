@@ -46,8 +46,8 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Accept signature, post-image, or featured-image types
-    const validTypes = ['signature', 'post-image', 'featured-image'];
+    // Accept signature, post-image, featured-image, or profile types
+    const validTypes = ['signature', 'post-image', 'featured-image', 'profile'];
     if (!validTypes.includes(type)) {
       logger.debug('[SignatureUpload] Invalid type:', type);
       res.writeHead(400, { 'Content-Type': 'application/json' });
