@@ -387,15 +387,25 @@ class SettingsPage {
             }
             
             // Check if photoURL changed and re-host if needed
+            // BUT: Don't overwrite manually uploaded photos (hostedPhotoURL takes priority)
             if (user.photoURL) {
                 const currentPhotoURL = this.state.settings.general.photoURL || '';
-                if (user.photoURL !== currentPhotoURL) {
-                    console.log('[Settings] Google photoURL detected in ensureGoogleUserData, hosting avatar...');
+                const hasManualUpload = !!this.state.settings.general.hostedPhotoURL;
+                
+                // Only auto-host if:
+                // 1. PhotoURL changed AND no manual upload exists, OR
+                // 2. PhotoURL matches but no hosted version exists at all
+                if (user.photoURL !== currentPhotoURL && !hasManualUpload) {
+                    console.log('[Settings] Google photoURL changed and no manual upload, hosting avatar...');
                     await this.hostGoogleAvatar(user.photoURL);
-                } else if (!this.state.settings.general.hostedPhotoURL) {
+                } else if (user.photoURL === currentPhotoURL && !this.state.settings.general.hostedPhotoURL) {
                     // PhotoURL matches but no hosted version exists, host it
                     console.log('[Settings] PhotoURL exists but no hosted version in ensureGoogleUserData, hosting avatar...');
                     await this.hostGoogleAvatar(user.photoURL);
+                } else if (hasManualUpload) {
+                    // Manual upload exists - preserve it, just update photoURL for tracking
+                    this.state.settings.general.photoURL = user.photoURL;
+                    console.log('[Settings] Manual upload exists, preserving hostedPhotoURL');
                 }
             }
             
@@ -973,15 +983,25 @@ class SettingsPage {
                 this.state.settings.general.email = userEmail;
             }
             // Always check if photoURL changed and re-host if needed
+            // BUT: Don't overwrite manually uploaded photos (hostedPhotoURL takes priority)
             if (user.photoURL) {
                 const currentPhotoURL = this.state.settings.general.photoURL || '';
-                if (user.photoURL !== currentPhotoURL) {
-                    console.log('[Settings] Google photoURL detected, hosting avatar...');
+                const hasManualUpload = !!this.state.settings.general.hostedPhotoURL;
+                
+                // Only auto-host if:
+                // 1. PhotoURL changed AND no manual upload exists, OR
+                // 2. PhotoURL matches but no hosted version exists at all
+                if (user.photoURL !== currentPhotoURL && !hasManualUpload) {
+                    console.log('[Settings] Google photoURL changed and no manual upload, hosting avatar...');
                     await this.hostGoogleAvatar(user.photoURL);
-                } else if (!this.state.settings.general.hostedPhotoURL) {
+                } else if (user.photoURL === currentPhotoURL && !this.state.settings.general.hostedPhotoURL) {
                     // PhotoURL matches but no hosted version exists, host it
                     console.log('[Settings] PhotoURL exists but no hosted version, hosting avatar...');
                     await this.hostGoogleAvatar(user.photoURL);
+                } else if (hasManualUpload) {
+                    // Manual upload exists - preserve it, just update photoURL for tracking
+                    this.state.settings.general.photoURL = user.photoURL;
+                    console.log('[Settings] Manual upload exists, preserving hostedPhotoURL');
                 }
             }
         } else {
@@ -1139,6 +1159,16 @@ class SettingsPage {
                 
                 // Ensure bridgeToMobile is explicitly saved (boolean, not undefined)
                 settingsToSave.bridgeToMobile = this.state.settings.bridgeToMobile === true;
+                
+                // CRITICAL: Ensure general.hostedPhotoURL is preserved (manually uploaded photos)
+                // This ensures each agent's uploaded photo is saved per-user
+                if (this.state.settings.general && this.state.settings.general.hostedPhotoURL) {
+                    if (!settingsToSave.general) {
+                        settingsToSave.general = {};
+                    }
+                    settingsToSave.general.hostedPhotoURL = this.state.settings.general.hostedPhotoURL;
+                    console.log('[Settings] Preserving hostedPhotoURL in saveSettings:', settingsToSave.general.hostedPhotoURL);
+                }
                 
                 await window.firebaseDB.collection('settings').doc(docId).set(settingsToSave, { merge: false });
                 
@@ -2075,12 +2105,66 @@ class SettingsPage {
                 if (!this.state.settings.general) {
                     this.state.settings.general = {};
                 }
+                // CRITICAL: Save the uploaded photo URL (this takes priority over Google photoURL)
                 this.state.settings.general.hostedPhotoURL = imageUrl;
+                // Also update photoURL to prevent Google from overwriting it
+                const user = firebase.auth().currentUser;
+                if (user && user.photoURL) {
+                    this.state.settings.general.photoURL = user.photoURL;
+                }
                 this.markDirty();
+                
+                // Save to Firestore immediately
                 await this.saveSettings();
 
-                // Refresh avatar preview
-                this.renderSettings();
+                // Refresh avatar preview (only the avatar section, not full render)
+                const avatarPreview = document.getElementById('user-avatar-preview');
+                if (avatarPreview) {
+                    const g = this.state.settings.general || {};
+                    const avatarUrl = g.hostedPhotoURL || g.photoURL || '';
+                    if (avatarUrl) {
+                        avatarPreview.innerHTML = `
+                            <div class="editable-profile-pic-container" style="position: relative; display: inline-block; cursor: pointer;">
+                                <img src="${avatarUrl}" alt="Profile" 
+                                     class="settings-profile-pic"
+                                     style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid var(--orange-primary); display: block;">
+                                <div class="profile-pic-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0); border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s ease; opacity: 0; pointer-events: none;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0; transition: opacity 0.2s ease;">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Re-setup hover effect and click handler
+                        const container = avatarPreview.querySelector('.editable-profile-pic-container');
+                        const overlay = avatarPreview.querySelector('.profile-pic-overlay');
+                        const pencilIcon = overlay?.querySelector('svg');
+                        
+                        if (container && overlay && pencilIcon) {
+                            container.addEventListener('mouseenter', () => {
+                                overlay.style.background = 'rgba(0, 0, 0, 0.5)';
+                                overlay.style.opacity = '1';
+                                overlay.style.pointerEvents = 'auto';
+                                pencilIcon.style.opacity = '1';
+                            });
+                            
+                            container.addEventListener('mouseleave', () => {
+                                overlay.style.background = 'rgba(0, 0, 0, 0)';
+                                overlay.style.opacity = '0';
+                                overlay.style.pointerEvents = 'none';
+                                pencilIcon.style.opacity = '0';
+                            });
+                            
+                            container.addEventListener('click', async (e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                await this.uploadProfilePictureFromSettings();
+                            });
+                        }
+                    }
+                }
 
                 // Refresh header profile picture
                 if (window.authManager && typeof window.authManager.refreshProfilePhoto === 'function') {
@@ -2088,7 +2172,7 @@ class SettingsPage {
                 }
 
                 if (window.showToast) {
-                    window.showToast('Profile picture updated successfully!', 'success');
+                    window.showToast('Profile picture updated successfully! Click "Save Changes" to persist.', 'success');
                 }
 
             } catch (error) {
