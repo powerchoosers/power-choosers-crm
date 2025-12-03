@@ -319,7 +319,8 @@
       'industry': 'industry',
       'city': 'city',
       'state': 'state',
-      'website': 'website'
+      'website': 'website',
+      'title': 'job title'
     }[key] || String(key).replace(/_/g,' ').toLowerCase();
     const token = `{{${scope}.${key}}}`;
     return `<span class="var-chip" data-var="${scope}.${key}" data-token="${token}" contenteditable="false">${friendly}</span>`;
@@ -455,7 +456,8 @@
     } catch(_) { return false; }
   }
 
-  // Improved Call Flow (Based on 2025 Best Practices + Gap Analysis)
+  // PEACE Framework Call Flow (Based on 2025 Research + Broker Audit Strategy)
+  // PEACE = Permission, Empathy, Ask, Consequence, End
   const FLOW = {
     start: {
       stage: 'Ready',
@@ -464,7 +466,7 @@
     },
     pre_call_qualification: {
       stage: 'Pre-Call Prep',
-      text: "<strong>Before we dial... let's qualify this prospect.</strong><br><br><em>Think through these questions:</em><br><br>• Who are you calling? (Decision maker / Gatekeeper / Unknown)<br>• What's their industry?<br>• What research do you have on their situation?<br>• What's your FIRST OBJECTIVE? (Get meeting / Understand situation / Reserve price before rates rise / Build relationship)<br><br><strong>Key Insight:</strong> We work with ALL suppliers. Our value is reserving competitive rates BEFORE market prices increase, and running competitive events across 100+ suppliers.",
+      text: "<strong>Before we dial... qualify this prospect using PEACE framework.</strong><br><br><em>Think through these questions:</em><br><br>• Who are you calling? (Decision maker / Gatekeeper / Unknown)<br>• What's their industry and company size?<br>• What research do you have on their situation?<br>• What's your FIRST OBJECTIVE? (Run a broker audit / Get meeting / Understand situation)<br><br><strong>Remember:</strong> You're a broker competing against other brokers. Position as a \"second opinion\" and \"audit tool\" - not a replacement. We run competitive events across 100+ suppliers.<br><br><strong>Key Stats:</strong> 11-14 discovery questions = 70% higher success. Second opinion positioning = 43% better conversion.",
       responses: [
         { label: 'Ready - I have answers', next: 'dialing' },
         { label: 'I need more time', next: 'start' }
@@ -488,18 +490,141 @@
         { label: 'Gatekeeper', next: 'gatekeeper_intro' }
       ]
     },
+    // ===== PRIMARY OPENER: PEACE-Aligned Permission + Empathy =====
     pattern_interrupt_opening: {
       stage: 'Opening',
-      text: "Hi {{contact.first_name}}, this is (your name) from Power Choosers. <span class=\"pause-indicator\"></span> Real quick though - I'm noticing a pattern with most companies I talk to, they don't have a real strategy around electricity. <span class=\"pause-indicator\"></span> And honestly, they're leaving money on the table. <span class=\"pause-indicator\"></span> Do you feel like you have a solid handle on your electricity costs?",
+      text: "<span class=\"tone-marker confident\">P - Permission (respect their time)</span><br><br>Hey {{contact.first_name}}, this is (your name) from Power Choosers. <span class=\"pause-indicator\"></span> Real quick—did I catch you in the middle of something, or do you have 30 seconds?<br><br><span class=\"pause-indicator\"></span><span class=\"pause-indicator\"></span><span class=\"pause-indicator\"></span> <em>(Wait 3 seconds - let them respond)</em>",
       responses: [
-        { label: "Yeah, we're on top of it", next: 'ack_confident_handle' },
-        { label: "Not really, it's chaotic", next: 'ack_struggling' },
-        { label: "No idea / not sure", next: 'ack_no_idea' },
-        { label: "We have a vendor handling it", next: 'ack_vendor_handling' },
-        { label: "Why do you ask? / What's this for?", next: 'ack_defensive' },
-        { label: "We just renewed/locked in", next: 'ack_just_renewed' }
+        { label: "I've got a minute / Go ahead", next: 'peace_empathy' },
+        { label: "What's this about?", next: 'peace_empathy' },
+        { label: "Actually busy right now", next: 'objection_bad_timing' },
+        { label: "We use a broker", next: 'broker_audit_intro' },
+        { label: "Not interested", next: 'objection_not_interested' }
       ]
     },
+    peace_empathy: {
+      stage: 'Opening',
+      text: "<span class=\"tone-marker understanding\">E - Empathy (show you understand their reality)</span><br><br>Perfect. <span class=\"pause-indicator\"></span> So look, I know energy isn't exactly top of mind for most {{contact.title}}s. <span class=\"pause-indicator\"></span> That's actually the problem I'm calling about.<br><br><span class=\"tone-marker serious\">A - Ask (dig into their situation)</span><br><br>Here's what I see with most {{account.industry}} companies your size: <span class=\"pause-indicator\"></span> they wait until 60-90 days before their contract expires to shop rates. <span class=\"pause-indicator\"></span> By that time, the market's already moved, and they've lost all their negotiating leverage. <span class=\"pause-indicator\"></span> Rates are typically 10-15% higher because of timing alone.<br><br><span class=\"tone-marker concerned\">C - Consequence (quantify the impact)</span><br><br>For a company spending $50K+ monthly, <span class=\"pause-indicator\"></span> that timing gap could easily cost you $60K-$100K annually. <span class=\"pause-indicator\"></span> Real money, you know?<br><br><span class=\"tone-marker confident\">E - End (permission-based qualification)</span><br><br>Have you already locked in your energy agreements past 2026, <span class=\"pause-indicator\"></span> or is that contract renewal window still open for you?",
+      responses: [
+        { label: "Locked in past 2026", next: 'ack_just_renewed' },
+        { label: "Contract expires before 2027", next: 'broker_audit_close' },
+        { label: "Not sure when it expires", next: 'situation_contract_expiry' },
+        { label: "We use a broker", next: 'broker_audit_intro' },
+        { label: "Not interested", next: 'objection_not_interested' }
+      ]
+    },
+    // ===== BROKER AUDIT STRATEGY (Non-Combative Competitive) =====
+    broker_audit_intro: {
+      stage: 'Broker Audit',
+      text: "<span class=\"tone-marker understanding\">Acknowledge (validate their relationship)</span><br><br><span class=\"pause-indicator\"></span><span class=\"pause-indicator\"></span> <em>(Wait 2 seconds, don't jump in immediately)</em><br><br>That's actually really smart. <span class=\"pause-indicator\"></span> A lot of companies use brokers because they don't have the bandwidth to manage this themselves. <span class=\"pause-indicator\"></span> That makes total sense.<br><br><span class=\"pause-indicator\"></span> <em>(Let that land)</em><br><br><span class=\"tone-marker curious\">Ask (dig deeper with strategic questions)</span><br><br>Quick question though— <span class=\"pause-indicator\"></span> when you last renewed, did your broker bring you 5-10 competitive quotes from different suppliers, <span class=\"pause-indicator\"></span> or was it more like 2-3 options?",
+      responses: [
+        { label: "5-10 competitive quotes", next: 'broker_performance_good' },
+        { label: "Just 2-3 options", next: 'broker_performance_limited' },
+        { label: "They mostly just renew what we have", next: 'broker_performance_limited' },
+        { label: "Not sure / Don't remember", next: 'broker_probe_suppliers' }
+      ]
+    },
+    broker_probe_suppliers: {
+      stage: 'Broker Audit',
+      text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> And roughly, how many different suppliers do you think your broker has relationships with? <span class=\"pause-indicator\"></span> Like, are we talking 50+ or more like 10-20?",
+      responses: [
+        { label: "50+ suppliers", next: 'broker_performance_good' },
+        { label: "10-30 suppliers", next: 'broker_performance_limited' },
+        { label: "Not sure", next: 'broker_rate_check' }
+      ]
+    },
+    broker_rate_check: {
+      stage: 'Broker Audit',
+      text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Do you know what rate you're currently paying per kWh?",
+      responses: [
+        { label: "Know the rate", next: 'broker_audit_reframe' },
+        { label: "Don't know it", next: 'broker_audit_reframe' }
+      ]
+    },
+    broker_performance_limited: {
+      stage: 'Broker Audit',
+      text: "<span class=\"tone-marker understanding\">empathetic, not attacking</span> <span class=\"pause-indicator\"></span> That's actually really common. <span class=\"pause-indicator\"></span> A lot of brokers focus on administration and renewals rather than true competitive shopping. <span class=\"pause-indicator\"></span> They've got their preferred suppliers, and it's easier to just go back to them.<br><br><span class=\"tone-marker confident\">Here's the thing though</span>— <span class=\"pause-indicator\"></span> when you run a REAL competitive event where 100+ suppliers are actually bidding against each other, <span class=\"pause-indicator\"></span> the quotes are typically 15-20% lower than renewal quotes from the same suppliers. <span class=\"pause-indicator\"></span> That's just how the market works.<br><br>Your broker probably doesn't have access to that full network. <span class=\"pause-indicator\"></span> Not their fault, that's just their model. <span class=\"pause-indicator\"></span> But that gap? <span class=\"pause-indicator\"></span> That's real money you might be leaving on the table.",
+      responses: [
+        { label: "That sounds like us", next: 'broker_audit_close' },
+        { label: "How much money are we talking?", next: 'broker_audit_quantify' },
+        { label: "We're happy with our broker", next: 'broker_performance_good' }
+      ]
+    },
+    broker_performance_good: {
+      stage: 'Broker Audit',
+      text: "<span class=\"tone-marker confident\">respectful tone</span> <span class=\"pause-indicator\"></span> That's awesome, and I respect that. <span class=\"pause-indicator\"></span> Real talk though—even the best brokers work with a limited supplier network. <span class=\"pause-indicator\"></span> They probably have relationships with maybe 30-50 suppliers, which is solid. <span class=\"pause-indicator\"></span> But there are 100+ in the actual market.<br><br><span class=\"tone-marker curious\">What if there's supply out there at better rates that your broker doesn't have access to?</span> <span class=\"pause-indicator\"></span> Not because they're bad at their job, but just because their network is finite.",
+      responses: [
+        { label: "That's possible", next: 'broker_audit_reframe' },
+        { label: "They shop everything", next: 'broker_audit_reframe' },
+        { label: "Not interested in switching", next: 'broker_audit_no_switch' }
+      ]
+    },
+    broker_audit_no_switch: {
+      stage: 'Broker Audit',
+      text: "<span class=\"tone-marker understanding\">understanding tone</span> <span class=\"pause-indicator\"></span> I hear you—and just to be clear, I'm not asking you to switch brokers. <span class=\"pause-indicator\"></span><br><br>Think of this like getting a second medical opinion before major surgery. <span class=\"pause-indicator\"></span> Your current broker might be doing a solid job, <span class=\"pause-indicator\"></span> but wouldn't you want to KNOW if you're leaving $50K-$100K on the table just because you've only seen one side of the market?<br><br>We're not saying your broker is bad. <span class=\"pause-indicator\"></span> We're saying you probably don't have all the information you need to make the best decision.",
+      responses: [
+        { label: "That makes sense", next: 'broker_audit_close' },
+        { label: "What would this look like?", next: 'broker_audit_close' },
+        { label: "Still not interested", next: 'respect_decision' }
+      ]
+    },
+    broker_audit_reframe: {
+      stage: 'Broker Audit',
+      text: "<span class=\"tone-marker confident\">Reframe (position as Second Opinion)</span><br><br>Here's why I'm asking: <span class=\"pause-indicator\"></span> Most brokers work with a handful of preferred suppliers—maybe 10-20. <span class=\"pause-indicator\"></span> That's fine for administrative purposes, but it means you're only seeing 10-20% of what's actually available in the market.<br><br><span class=\"tone-marker understanding\">We call this a 'broker audit.'</span> <span class=\"pause-indicator\"></span> Here's what it is: <span class=\"pause-indicator\"></span> We pull quotes from our network of 100+ suppliers—completely different ones than your broker probably works with—and show you what that OTHER 80% of the market is quoting.<br><br>Think of it like getting a second medical opinion before major surgery. <span class=\"pause-indicator\"></span> Your current broker might be doing a solid job, <span class=\"pause-indicator\"></span> but wouldn't you want to KNOW if you're leaving $50K-$100K on the table just because you've only seen one side of the market?<br><br>We're not saying your broker is bad. <span class=\"pause-indicator\"></span> We're saying you probably don't have all the information you need to make the best decision.",
+      responses: [
+        { label: "That makes sense", next: 'broker_audit_close' },
+        { label: "What would this cost?", next: 'broker_audit_cost' },
+        { label: "We're happy with our broker", next: 'broker_strong_relationship' }
+      ]
+    },
+    broker_audit_quantify: {
+      stage: 'Broker Audit',
+      text: "<span class=\"tone-marker confident\">Let me put some numbers to it.</span> <span class=\"pause-indicator\"></span><br><br>If you're spending {{monthly_spend}} monthly, that's about {{annual_spend}} annually. <span class=\"pause-indicator\"></span><br><br>Competitive market rate from 100+ suppliers bidding is typically 15-20% lower than what most brokers can access. <span class=\"pause-indicator\"></span> That gap is about {{potential_savings}} per year. <span class=\"pause-indicator\"></span><br><br>Over 3 years? <span class=\"pause-indicator\"></span> That could be triple that amount you're overpaying—just because you've only seen one side of the market.<br><br>Your current broker might already be getting you those rates. <span class=\"pause-indicator\"></span> Or there might be a gap. <span class=\"pause-indicator\"></span> The only way to KNOW is to run an audit and see what the market actually quotes for your situation.<br><br>Wouldn't it be worth 15 minutes to find out?",
+      responses: [
+        { label: "Yes, that's worth knowing", next: 'broker_audit_close' },
+        { label: "That's significant", next: 'broker_audit_close' },
+        { label: "We're locked in anyway", next: 'broker_strong_relationship' }
+      ]
+    },
+    broker_audit_cost: {
+      stage: 'Broker Audit',
+      text: "<span class=\"tone-marker confident\">straightforward tone</span> <span class=\"pause-indicator\"></span> It's free. <span class=\"pause-indicator\"></span><br><br>We get paid by suppliers when you sign with them. <span class=\"pause-indicator\"></span> Just like your current broker does. <span class=\"pause-indicator\"></span><br><br>But here's the key—you pay the same rate whether you go direct or through any broker. <span class=\"pause-indicator\"></span> The supplier already builds in broker commission. <span class=\"pause-indicator\"></span> So you're not paying extra. <span class=\"pause-indicator\"></span> We just handle the shopping so you don't have to.<br><br>And honestly, if we're pulling better rates from 100+ suppliers, <span class=\"pause-indicator\"></span> you might save more than our commission anyway. <span class=\"pause-indicator\"></span> That's why the audit matters—you get to see the numbers.",
+      responses: [
+        { label: "That makes sense", next: 'broker_audit_close' },
+        { label: "Let's do the audit", next: 'broker_audit_close' },
+        { label: "I need to think about it", next: 'email_first' }
+      ]
+    },
+    broker_strong_relationship: {
+      stage: 'Broker Audit',
+      text: "<span class=\"tone-marker understanding\">understanding, not pushy</span> <span class=\"pause-indicator\"></span> I totally respect that. <span class=\"pause-indicator\"></span> Long-term relationships are valuable.<br><br>Here's what I'd suggest though: <span class=\"pause-indicator\"></span> When you're about 6 months out from your next renewal, that's when timing actually becomes your leverage.<br><br>Why don't we do this— <span class=\"pause-indicator\"></span> I'll run an audit 6 months before your contract expires. <span class=\"pause-indicator\"></span> That way you'll see what competitive rates look like when you actually have negotiating power. <span class=\"pause-indicator\"></span> Your broker might find better terms with their suppliers, <span class=\"pause-indicator\"></span> or you might have options to explore. <span class=\"pause-indicator\"></span> Either way, you go into that renewal armed with market intelligence.<br><br>When does your current contract expire?",
+      responses: [
+        { label: "I know the date", next: 'schedule_followup' },
+        { label: "Not sure exactly", next: 'email_first' },
+        { label: "Just contact me when it's time", next: 'followup_scheduled' }
+      ]
+    },
+    broker_audit_close: {
+      stage: 'Broker Audit',
+      text: "<span class=\"tone-marker confident\">Audit Close (Low-Pressure)</span><br><br>\"So here's what makes sense: <span class=\"pause-indicator\"></span> Let me run a quick audit. <span class=\"pause-indicator\"></span> Takes me 2-3 days. <span class=\"pause-indicator\"></span> I'll pull quotes from suppliers your broker probably isn't working with. <span class=\"pause-indicator\"></span><br><br>Then we hop on a 15-minute call and I show you what I found. <span class=\"pause-indicator\"></span><br><br>If your broker's rates are actually competitive, <span class=\"pause-indicator\"></span> I'll tell you that. <span class=\"pause-indicator\"></span> If there's a gap, at least you KNOW. <span class=\"pause-indicator\"></span><br><br>No obligation, no pressure. <span class=\"pause-indicator\"></span> Just data so you can make an informed decision. <span class=\"pause-indicator\"></span> Fair?\"",
+      responses: [
+        { label: "Fair - let's do it", next: 'close_step4_calendar' },
+        { label: "What do you need from me?", next: 'audit_info_needed' },
+        { label: "Send me information first", next: 'objection_send_something' },
+        { label: "I need to think about it", next: 'close_think_about_it' },
+        { label: "I'll talk to my broker first", next: 'objection_talk_to_broker' }
+      ]
+    },
+    audit_info_needed: {
+      stage: 'Broker Audit',
+      text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Really just a few things:<br><br>1. <span class=\"pause-indicator\"></span> Roughly what you're spending monthly (even a ballpark)<br>2. <span class=\"pause-indicator\"></span> When your contract expires<br>3. <span class=\"pause-indicator\"></span> Your current rate per kWh if you know it<br><br>That's it. <span class=\"pause-indicator\"></span> We handle everything else. <span class=\"pause-indicator\"></span> I'll pull the quotes, standardize them so you can compare apples to apples, <span class=\"pause-indicator\"></span> and then walk you through what the market is actually offering.<br><br>What's a good time for a 15-minute call later this week to review what I found?",
+      responses: [
+        { label: "Thursday works", next: 'close_meeting_scheduled' },
+        { label: "Friday works", next: 'close_meeting_scheduled' },
+        { label: "Let me check my calendar", next: 'close_meeting' }
+      ]
+    },
+    // ===== STANDARD DISCOVERY TRANSITIONS =====
     ack_confident_handle: {
       stage: 'Discovery - Transition',
       text: "<span class=\"tone-marker confident\">positive, respecting tone</span> <span class=\"pause-indicator\"></span> Okay, perfect. So you're on top of it - that's good to hear. <span class=\"pause-indicator\"></span> Let me ask though, roughly how much are you spending monthly on electricity? <span class=\"pause-indicator\"></span> Just want to see if there's any opportunity we might be missing.",
@@ -517,8 +642,12 @@
     },
     ack_vendor_handling: {
       stage: 'Discovery - Transition',
-      text: "<span class=\"tone-marker curious\">respectful, curious tone</span> <span class=\"pause-indicator\"></span> Okay, so you've got someone handling it - that's actually pretty smart. <span class=\"pause-indicator\"></span> Let me ask though, do you know roughly how much you're spending monthly? <span class=\"pause-indicator\"></span> Just want to see if there's any opportunity we might be missing.",
-      responses: [] // Special handling - will render input field in render() function
+      text: "<span class=\"tone-marker curious\">respectful, curious tone</span> <span class=\"pause-indicator\"></span> Okay, so you've got someone handling it— <span class=\"pause-indicator\"></span> is that a broker or an internal team?",
+      responses: [
+        { label: "We use a broker", next: 'broker_audit_intro' },
+        { label: "Internal team handles it", next: 'situation_discovery' },
+        { label: "Not sure exactly", next: 'situation_discovery' }
+      ]
     },
     ack_defensive: {
       stage: 'Discovery - Transition',
@@ -527,16 +656,17 @@
         { label: "Fair enough, go ahead", next: 'situation_discovery' },
         { label: "I hear you, but what exactly?", next: 'value_proposition' },
         { label: "Now's not a good time", next: 'objection_bad_timing' },
+        { label: "We use a broker", next: 'broker_audit_intro' },
         { label: "We're not interested", next: 'objection_not_interested' }
       ]
     },
     ack_just_renewed: {
       stage: 'Discovery - Transition',
-      text: "<span class=\"tone-marker curious\">curious, informative tone</span> <span class=\"pause-indicator\"></span> Okay, so you're locked in - when did you guys renew? <span class=\"pause-indicator\"></span> And just out of curiosity, roughly how much are you paying? <span class=\"pause-indicator\"></span> Might be worth knowing what the market is offering, just for reference down the road.",
+      text: "<span class=\"tone-marker understanding\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> That's actually good—you won't be paying out-of-contract rates. <span class=\"pause-indicator\"></span> That locks in certainty for now.<br><br><span class=\"tone-marker confident\">Reframe</span> <span class=\"pause-indicator\"></span> Here's what I'd suggest though: <span class=\"pause-indicator\"></span> 6 months before your NEXT renewal, that's when you actually have leverage. <span class=\"pause-indicator\"></span><br><br>Why don't we do this— <span class=\"pause-indicator\"></span> I'll put a calendar reminder for then? <span class=\"pause-indicator\"></span> When that 6-month window hits, I'll run an audit so you know what competitive rates look like when you have negotiating power.<br><br><span class=\"tone-marker curious\">Close</span> <span class=\"pause-indicator\"></span> So when does your current contract expire?",
       responses: [
-        { label: "Renewed 3 months ago / amount known", next: 'future_opportunity' },
-        { label: "Just locked in / locked until 2027+", next: 'future_opportunity' },
+        { label: "I know the date", next: 'schedule_followup' },
         { label: "Not sure exactly when", next: 'future_opportunity' },
+        { label: "We use a broker to handle that", next: 'broker_audit_intro' },
         { label: "Don't want to discuss now", next: 'objection_locked_in' }
       ]
     },
@@ -551,20 +681,21 @@
     },
     value_proposition: {
       stage: 'Value - Explanation',
-      text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Sure, happy to explain. <span class=\"pause-indicator\"></span> Most companies I talk to don't have a strategy around electricity renewals - they wait until 60-90 days before contract expiry to start shopping. <span class=\"pause-indicator\"></span><br><br>The problem is that's peak season when suppliers are busy, rates are less negotiable, and you've got limited time. <span class=\"pause-indicator\"></span><br><br>What we do is help you shop 6-12 months ahead when suppliers are competing for business, so you lock in the best rates available. <span class=\"pause-indicator\"></span> Does that make sense?",
+      text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Sure, happy to explain. <span class=\"pause-indicator\"></span> Most companies I talk to don't have a strategy around electricity renewals - they wait until 60-90 days before contract expiry to start shopping. <span class=\"pause-indicator\"></span><br><br>The problem is that's peak season when suppliers are busy, rates are less negotiable, and you've got limited time. <span class=\"pause-indicator\"></span><br><br>What we do is run what we call a \"broker audit\"— <span class=\"pause-indicator\"></span> we pull quotes from 100+ suppliers and show you what the full market is actually quoting. <span class=\"pause-indicator\"></span> Think of it like getting a second opinion. <span class=\"pause-indicator\"></span> Does that make sense?",
       responses: [
-        { label: 'Yes, that makes sense', next: 'situation_discovery' },
+        { label: 'Yes, that makes sense', next: 'broker_audit_close' },
         { label: 'Tell me more about the process', next: 'solution_faq_process' },
-        { label: "Still not sure what this is about", next: 'value_justification' },
+        { label: "We use a broker already", next: 'broker_audit_intro' },
         { label: "Not interested", next: 'objection_not_interested' }
       ]
     },
+    // ===== OBJECTION HANDLING (ARC Framework) =====
     objection_bad_timing: {
       stage: 'Objection Handling',
-      text: "<span class=\"tone-marker understanding\">understanding tone</span> Totally get it. <span class=\"pause-indicator\"></span> When would be a better time to chat? <span class=\"pause-indicator\"></span> Or would you prefer I just send you some information first so you can look it over when it's convenient?",
+      text: "<span class=\"tone-marker understanding\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> Makes sense. <span class=\"pause-indicator\"></span> You've got a ton on your plate.<br><br><span class=\"tone-marker confident\">Reframe</span> <span class=\"pause-indicator\"></span> Here's the thing though—while it's not a priority, rates are actually going UP right now. <span class=\"pause-indicator\"></span> So the longer you wait, the worse the deal you'll get when you renew. <span class=\"pause-indicator\"></span> Shopping 6-12 months early is how you actually get leverage.<br><br><span class=\"tone-marker curious\">Close</span> <span class=\"pause-indicator\"></span> How long until your contract expires? <span class=\"pause-indicator\"></span> Let me just put a note on my side so I can reach out when the timing's right for you.",
       responses: [
+        { label: 'I know the date', next: 'schedule_followup' },
         { label: 'Send me information', next: 'email_first' },
-        { label: 'What\'s the market context?', next: 'market_context' },
         { label: 'Try later today', next: 'schedule_followup' },
         { label: 'Try next week', next: 'schedule_followup' },
         { label: "Just forget it", next: 'respect_decision' }
@@ -572,23 +703,23 @@
     },
     objection_locked_in: {
       stage: 'Objection Handling',
-      text: "<span class=\"tone-marker understanding\">understanding tone</span> I totally understand - you're locked in, so this isn't relevant right now. <span class=\"pause-indicator\"></span> Here's what I'd suggest though: when you're about 6 months out from your next renewal, that's when it makes sense to start shopping competitively. <span class=\"pause-indicator\"></span><br><br>Would it be okay if I reach out around that time? <span class=\"pause-indicator\"></span> Or would you prefer I just send some information now for reference down the road?",
+      text: "<span class=\"tone-marker understanding\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> That's actually good—you won't be paying out-of-contract rates. <span class=\"pause-indicator\"></span> That locks in certainty for now.<br><br><span class=\"tone-marker confident\">Reframe</span> <span class=\"pause-indicator\"></span> Here's what I'd suggest though: <span class=\"pause-indicator\"></span> 6 months before your NEXT renewal, that's when you actually have leverage. <span class=\"pause-indicator\"></span> Why not let me put a calendar reminder for then? <span class=\"pause-indicator\"></span> When that 6-month window hits, I'll run an audit so you know what competitive rates look like when you have negotiating power.<br><br><span class=\"tone-marker curious\">Close</span> <span class=\"pause-indicator\"></span> So when does your current contract expire?",
       responses: [
-        { label: 'Yes, reach out in 6 months', next: 'schedule_followup' },
+        { label: 'I know the date', next: 'schedule_followup' },
         { label: 'Send information for later', next: 'email_first' },
         { label: "Not interested", next: 'respect_decision' }
       ]
     },
+    // ===== ALTERNATIVE OPENERS =====
     opener_direct_question: {
       stage: 'Opening',
-      text: "<span class=\"tone-marker confident\">confident, conversational tone</span> <span class=\"pause-indicator\"></span> Hi {{contact.first_name}}, this is (your name) from Power Choosers. <span class=\"pause-indicator\"></span> Real quick - I'm calling because most companies I talk to are either overpaying on their electricity or don't really have visibility into what they're spending. <span class=\"pause-indicator\"></span><br><br>Can I ask - how is {{account.name}} actually managing that right now?",
+      text: "<span class=\"tone-marker confident\">Direct Question (Second Opinion)</span><br><br>Hi {{contact.first_name}}, this is (your name) from Power Choosers. <span class=\"pause-indicator\"></span> Real quick— <span class=\"pause-indicator\"></span> most {{account.industry}} companies your size are either overpaying on electricity or don't have visibility into what the full market is quoting. <span class=\"pause-indicator\"></span><br><br>Can I ask— <span class=\"pause-indicator\"></span> have you had a second opinion on your current rates lately?",
       responses: [
-        { label: "Yeah, we're on top of it", next: 'ack_dq_confident' },
-        { label: "Not really, it's kind of a mess", next: 'ack_dq_struggling' },
-        { label: "We have someone handling it", next: 'ack_dq_delegated' },
-        { label: "Why are you calling? / What's this about?", next: 'ack_dq_defensive' },
-        { label: "Not interested / we're fine", next: 'ack_dq_not_interested' },
-        { label: "We just locked in a contract", next: 'ack_dq_just_renewed' }
+        { label: "No, we haven't", next: 'broker_audit_reframe' },
+        { label: "We use a broker", next: 'broker_audit_intro' },
+        { label: "What do you mean?", next: 'value_proposition' },
+        { label: "We're happy with our rates", next: 'probe_deeper' },
+        { label: "Not interested", next: 'objection_not_interested' }
       ]
     },
     ack_dq_confident: {
@@ -603,11 +734,11 @@
     },
     ack_dq_delegated: {
       stage: 'Discovery - Transition',
-      text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Got it - so you've delegated it. <span class=\"pause-indicator\"></span> That's smart. <span class=\"pause-indicator\"></span> Just curious though - do you know what you're actually spending annually? <span class=\"pause-indicator\"></span> And who's your vendor right now?",
+      text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Got it - so you've delegated it. <span class=\"pause-indicator\"></span> That's smart. <span class=\"pause-indicator\"></span> Is that a broker handling it, or an internal team?",
       responses: [
-        { label: 'Know spending / vendor is known', next: 'situation_contract_expiry' },
-        { label: 'Know spending / vendor unknown', next: 'situation_supplier_name' },
-        { label: "Don't know spending or vendor", next: 'situation_monthly_spend' }
+        { label: 'We use a broker', next: 'broker_audit_intro' },
+        { label: 'Internal team', next: 'situation_contract_expiry' },
+        { label: "Not sure", next: 'situation_monthly_spend' }
       ]
     },
     ack_dq_defensive: {
@@ -616,16 +747,18 @@
       responses: [
         { label: "Fair enough, let's talk", next: 'situation_discovery' },
         { label: "I hear you, but what exactly?", next: 'value_proposition' },
+        { label: "We use a broker", next: 'broker_audit_intro' },
         { label: "Not interested", next: 'objection_not_interested' }
       ]
     },
     ack_dq_not_interested: {
       stage: 'Discovery - Transition',
-      text: "<span class=\"tone-marker understanding\">understanding tone</span> <span class=\"pause-indicator\"></span> No worries at all. <span class=\"pause-indicator\"></span> Quick thing though - when does your contract actually expire? <span class=\"pause-indicator\"></span> Just want to plant it on my radar for down the road.",
+      text: "<span class=\"tone-marker understanding\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> I totally understand. <span class=\"pause-indicator\"></span> You've got a solution that's working, and changing is risky.<br><br><span class=\"tone-marker curious\">Reframe</span> <span class=\"pause-indicator\"></span> Real quick question though— <span class=\"pause-indicator\"></span> have you had a second opinion on your current rates in the last 12-18 months? <span class=\"pause-indicator\"></span> Because we typically find that companies are overpaying 15-20% just because they haven't seen the full market.<br><br><span class=\"tone-marker confident\">Close</span> <span class=\"pause-indicator\"></span> What if we just ran an audit to see what the market's actually quoting right now? <span class=\"pause-indicator\"></span> No obligation. <span class=\"pause-indicator\"></span> If your current rates are competitive, I'll tell you that. <span class=\"pause-indicator\"></span> If there's a gap, now you know.",
       responses: [
-        { label: 'Know expiration date', next: 'schedule_followup' },
-        { label: "Not sure", next: 'respect_decision' },
-        { label: "Don't want to discuss", next: 'respect_decision' }
+        { label: "That sounds reasonable", next: 'broker_audit_close' },
+        { label: 'I know when our contract expires', next: 'schedule_followup' },
+        { label: "We use a broker", next: 'broker_audit_intro' },
+        { label: "Not interested", next: 'respect_decision' }
       ]
     },
     ack_dq_just_renewed: {
@@ -640,7 +773,7 @@
     },
     opener_transparent: {
       stage: 'Opening',
-      text: "Hi {{contact.first_name}}, this is (your name) from Power Choosers. <span class=\"pause-indicator\"></span> I know this is random, but I'm calling about electricity costs. <span class=\"pause-indicator\"></span> Full transparency - this is a sales call. I know I'm calling you out of the blue. <span class=\"pause-indicator\"></span> Is now actually a bad time for a quick chat?",
+      text: "<span class=\"tone-marker friendly\">Transparent Opener</span><br><br>Hi {{contact.first_name}}, this is (your name) from Power Choosers. <span class=\"pause-indicator\"></span> I know this is random, but I'm calling about electricity costs. <span class=\"pause-indicator\"></span><br><br>Full transparency— <span class=\"pause-indicator\"></span> this is a sales call. <span class=\"pause-indicator\"></span> I know I'm calling you out of the blue. <span class=\"pause-indicator\"></span> Is now actually a bad time for a quick chat?",
       responses: [
         { label: 'Now is fine / I\'ve got a minute', next: 'opener_transparent_followup' },
         { label: 'What is this about?', next: 'opener_transparent_followup' },
@@ -652,8 +785,9 @@
       stage: 'Opening',
       text: "<span class=\"pause-indicator\"></span> Perfect. <span class=\"pause-indicator\"></span> So real talk - most companies I talk to, they don't have a strategy around electricity costs. <span class=\"pause-indicator\"></span> And it's costing them real money. Do you feel like you have a solid handle on your electricity costs?",
       responses: [
-        { label: 'Yes, I handle it well', next: 'situation_discovery' },
-        { label: "Not really / I'm not sure", next: 'situation_discovery' },
+        { label: 'Yes, I handle it well', next: 'probe_deeper' },
+        { label: "Not really / I'm not sure", next: 'consequence_variant_happy' },
+        { label: "We use a broker", next: 'broker_audit_intro' },
         { label: "I don't handle that", next: 'gatekeeper_intro' }
       ]
     },
@@ -668,17 +802,18 @@
     },
     opener_social_proof: {
       stage: 'Opening',
-      text: "Hi {{contact.first_name}}, this is (your name) from Power Choosers. <span class=\"pause-indicator\"></span> I've been working with several companies in {{account.city}}, and honestly, they're all dealing with rising electricity costs. <span class=\"pause-indicator\"></span> That's actually why I'm calling - wanted to see if you're experiencing something similar?",
+      text: "<span class=\"tone-marker confident\">Market Data Opener</span><br><br>Hey {{contact.first_name}}, this is (your name) from Power Choosers. <span class=\"pause-indicator\"></span> I'm calling because we just ran analysis on {{account.industry}} companies in the Texas market, <span class=\"pause-indicator\"></span> and we're seeing that most are paying 15-20% more than market rates. <span class=\"pause-indicator\"></span><br><br>Wanted to see if {{account.name}} is experiencing something similar?",
       responses: [
-        { label: 'Yes, costs have been going up', next: 'situation_discovery' },
+        { label: 'Yes, costs have been going up', next: 'consequence_variant_rates' },
         { label: "Not really an issue", next: 'opener_social_proof_skeptical' },
-        { label: 'Tell me more', next: 'situation_discovery' },
+        { label: "We use a broker", next: 'broker_audit_intro' },
+        { label: 'Tell me more', next: 'broker_audit_reframe' },
         { label: 'Not interested', next: 'objection_not_interested' }
       ]
     },
     opener_social_proof_skeptical: {
       stage: 'Opening',
-      text: "<span class=\"tone-marker curious\">curious tone</span> I totally get that, you know? <span class=\"pause-indicator\"></span> So let me ask you this though - are you aware of how much electricity rates have gone up in the last 4 years? <span class=\"pause-indicator\"></span> Like, the market has moved a LOT.",
+      text: "<span class=\"tone-marker curious\">curious tone</span> I totally get that, you know? <span class=\"pause-indicator\"></span> So let me ask you this though - are you aware of how much electricity rates have gone up in the last 4 years? <span class=\"pause-indicator\"></span> Like, the market has moved a LOT—mostly because data centers and AI are using crazy amounts of power.",
       responses: [
         { label: 'I\'ve heard about rate increases', next: 'market_context' },
         { label: 'Not really aware', next: 'market_context' },
@@ -687,12 +822,11 @@
     },
     opener_quick_check: {
       stage: 'Opening',
-      text: "Real quick—did I catch you in the middle of something, or do you have 30 seconds?<br><br><span class=\"pause-indicator\"></span> Got it. <span class=\"pause-indicator\"></span> So I'm basically the glue between electricity suppliers and account holders like you here in Texas. <span class=\"pause-indicator\"></span> The writing's kind of on the wall for next year—energy expenses are trending up, and a lot of companies are addressing it now instead of waiting until it hits their budget.<br><br>Have you already extended your energy agreements past 2026, or is that still open?",
+      text: "<span class=\"tone-marker confident\">Audit Positioning Opener</span><br><br>Hi {{contact.first_name}}, this is (your name) from Power Choosers. <span class=\"pause-indicator\"></span> What we do is run what we call broker audits— <span class=\"pause-indicator\"></span> basically a market check on your current energy rates. <span class=\"pause-indicator\"></span><br><br>We pull quotes from 100+ suppliers and show you what you're actually paying vs. market. <span class=\"pause-indicator\"></span><br><br>Have you ever had something like that run before?",
       responses: [
-        { label: "We've extended / locked in past 2026", next: 'ack_just_renewed' },
-        { label: "Still open / contract expires before 2027", next: 'situation_discovery' },
-        { label: "Not sure / need to check", next: 'situation_contract_expiry' },
-        { label: "What's this about?", next: 'ack_defensive' },
+        { label: "No, never heard of that", next: 'broker_audit_reframe' },
+        { label: "What exactly is that?", next: 'broker_audit_reframe' },
+        { label: "We use a broker already", next: 'broker_audit_intro' },
         { label: "Not interested", next: 'objection_not_interested' }
       ]
     },
@@ -833,7 +967,7 @@
     },
     consequence_variant_rates: {
       stage: 'Discovery - Consequence (Rates)',
-      text: "<span class=\"tone-marker serious\">pause, then real tone</span> <span class=\"pause-indicator\"></span> Look - most companies wait until 90 days before renewal to shop. <span class=\"pause-indicator\"></span> That's a bad play. Rates have typically gone up, and suppliers know you don't have much time before your contract expires, so they'll give you a higher quote. <span class=\"pause-indicator\"></span><br><br>It's almost like booking a plane ticket <span class=\"pause-indicator\"></span> - when you go on a flight, do you reserve that flight months in advance or the week before? <span class=\"pause-indicator\"></span><br><br>Exactly. The more seats available on the plane, the cheaper the ticket. <span class=\"pause-indicator\"></span><br><br>Electricity works the same way but on a massive scale. <span class=\"pause-indicator\"></span> The earlier you reserve your price, the more supply is actually available. And with electricity prices rising right now, that gap is huge - we're seeing companies forced to pay 30%, 50%, sometimes 100% more. <span class=\"pause-indicator\"></span><br><br>Companies are being forced to pay that premium just because of timing. <span class=\"pause-indicator\"></span><br><br>What do you think?",
+      text: "<span class=\"tone-marker serious\">pause, then real tone</span> <span class=\"pause-indicator\"></span> Look - most {{account.industry}} companies wait until 90 days before renewal to shop. <span class=\"pause-indicator\"></span> That's a bad play. Rates have typically gone up, and suppliers know you don't have much time before your contract expires, so they'll give you a higher quote. <span class=\"pause-indicator\"></span><br><br>It's almost like booking a plane ticket <span class=\"pause-indicator\"></span> - when you go on a flight, do you reserve that flight months in advance or the week before? <span class=\"pause-indicator\"></span><br><br>Exactly. The more seats available on the plane, the cheaper the ticket. <span class=\"pause-indicator\"></span><br><br>Electricity works the same way but on a massive scale. <span class=\"pause-indicator\"></span> The earlier you reserve your price, the more supply is actually available. And with electricity prices rising right now, that gap is huge - we're seeing {{account.industry}} companies forced to pay 30%, 50%, sometimes 100% more. <span class=\"pause-indicator\"></span><br><br>Companies are being forced to pay that premium just because of timing. <span class=\"pause-indicator\"></span><br><br>What do you think, {{contact.first_name}}?",
       responses: [
         { label: "That's probably $20K-$40K", next: 'solution_variant_rates' },
         { label: "Could be $50K+ a year", next: 'solution_variant_rates' },
@@ -1016,14 +1150,13 @@
     },
     close_variant_rates: {
       stage: 'Closing (Rates)',
-      text: "<span class=\"tone-marker confident\">calm, peer-to-peer tone</span> <span class=\"pause-indicator\"></span> Okay, so here's what makes sense. <span class=\"pause-indicator\"></span> We've identified that timing is your leverage. <span class=\"pause-indicator\"></span> The earlier you lock something in, the better rates you get. <span class=\"pause-indicator\"></span><br><br>So here's what I'm thinking - we could do a quick 15-minute video walkthrough right now where I show you exactly how the process works. <span class=\"pause-indicator\"></span> Then you'll KNOW what you're getting into before we schedule the full analysis. <span class=\"pause-indicator\"></span> Or we can set up a quick 30-minute call where I walk you through exactly what we pulled from the market right now. <span class=\"pause-indicator\"></span><br><br>No pressure, no commitment - just data so you can make an informed decision. <span class=\"pause-indicator\"></span><br><br>What works better - video walkthrough now or scheduled call?",
+      text: "<span class=\"tone-marker confident\">Alternative Choice Close</span><br><br>\"So I can either:<br><br><strong>OPTION 1:</strong> <span class=\"pause-indicator\"></span> Run the audit right now, have it done by Thursday, and we jump on a call Friday morning to review it.<br><br><strong>OPTION 2:</strong> <span class=\"pause-indicator\"></span> Or if you want to think about it first, I can send you the audit overview and we can reconnect next week to dig into the details.<br><br>Which would work better for you?\"<br><br><em>Either option = forward progress. No \"no\" available.</em>",
       responses: [
-        { label: 'Video walkthrough now', next: 'video_walkthrough' },
-        { label: 'Friday works for call', next: 'close_meeting_scheduled' },
-        { label: 'Tomorrow works for call', next: 'close_meeting_scheduled' },
-        { label: 'I need to check with my team first', next: 'close_meeting_team_involved' },
-        { label: 'Let me think about it', next: 'close_meeting_think_about_it' },
-        { label: 'Send me something first', next: 'email_first' }
+        { label: 'Option 1 - Audit now, call Friday', next: 'close_step4_calendar' },
+        { label: 'Option 2 - Think about it first', next: 'close_step4_calendar' },
+        { label: 'I need to check with my team first', next: 'objection_need_to_check' },
+        { label: 'Let me think about it', next: 'close_think_about_it' },
+        { label: 'Send me something first', next: 'objection_send_something' }
       ]
     },
     close_variant_complicated: {
@@ -1052,14 +1185,13 @@
     },
     close_variant_happy: {
       stage: 'Closing (Reality Check)',
-      text: "<span class=\"tone-marker curious\">non-threatening, validation tone</span> <span class=\"pause-indicator\"></span> So here's what I propose - let me run a quick rate analysis. <span class=\"pause-indicator\"></span> I'll pull what the market's actually quoting right now, compare it to what you're paying, and show you if there's a gap. <span class=\"pause-indicator\"></span><br><br>No obligation, no strings. <span class=\"pause-indicator\"></span> Just data. <span class=\"pause-indicator\"></span> If you're actually getting a good deal, I'll tell you that too. <span class=\"pause-indicator\"></span><br><br>We could do a quick 15-minute video walkthrough right now where I show you exactly how the analysis works. <span class=\"pause-indicator\"></span> Then you'll KNOW what you're getting into. <span class=\"pause-indicator\"></span> Or takes me about 3 days to pull everything, then we hop on a quick call and I show you what I found. <span class=\"pause-indicator\"></span><br><br>What works better - video walkthrough now or Thursday afternoon call?",
+      text: "<span class=\"tone-marker understanding\">Soft/Collaborative Close</span><br><br>\"So it sounds like this is definitely worth exploring. <span class=\"pause-indicator\"></span><br><br>Before we end the call, <span class=\"pause-indicator\"></span> what would be most helpful for you at this point? <span class=\"pause-indicator\"></span><br><br>Do you want to schedule time to review the audit findings, <span class=\"pause-indicator\"></span> or would you rather I send something over first?\"<br><br><em>(Listen - they'll tell you the path. Puts them in control, removes pressure.)</em>",
       responses: [
-        { label: 'Video walkthrough now', next: 'video_walkthrough' },
-        { label: 'Thursday works', next: 'close_meeting_scheduled' },
-        { label: 'Thursday afternoon works', next: 'close_meeting_scheduled' },
-        { label: 'What\'s this going to cost me?', next: 'close_meeting_cost_question' },
-        { label: 'Seems like a lot of work', next: 'close_meeting_work_concern' },
-        { label: 'Send me something first', next: 'email_first' }
+        { label: 'Schedule time to review', next: 'close_step4_calendar' },
+        { label: 'Send something first', next: 'objection_send_something' },
+        { label: 'What would you recommend?', next: 'close_step3_assumptive' },
+        { label: 'What\'s this going to cost me?', next: 'objection_commission' },
+        { label: 'I need to think about it', next: 'close_think_about_it' }
       ]
     },
     close_variant_lockedin: {
@@ -1086,10 +1218,11 @@
     },
     close_meeting_scheduled: {
       stage: 'Closing',
-      text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Perfect. <span class=\"pause-indicator\"></span> I'll send you a calendar invite right now so we block it in. <span class=\"pause-indicator\"></span> This way I can have your numbers pulled and ready to go. <span class=\"pause-indicator\"></span><br><br>Looking forward to showing you what we found.",
+      text: "<span class=\"tone-marker confident\">Calendar Confirmation</span> <span class=\"pause-indicator\"></span> Perfect. <span class=\"pause-indicator\"></span> I'm sending you the calendar invite right now... <span class=\"pause-indicator\"></span><br><br><em>(Send invite while on the phone)</em><br><br>\"Did you get it in your inbox?\"<br><br><em>⚠️ Stay on line until they confirm!</em>",
       responses: [
-        { label: 'Great, looking forward to it', next: 'meeting_scheduled' },
-        { label: 'Sounds good', next: 'meeting_scheduled' }
+        { label: 'They confirmed - ask for invoice', next: 'close_invoice_soft_ask' },
+        { label: 'They confirmed - wrap up', next: 'close_final_confirmation' },
+        { label: "They didn't get it", next: 'close_send_invite_retry' }
       ]
     },
     video_walkthrough: {
@@ -1159,39 +1292,158 @@
         { label: 'Looking forward to it', next: 'email_captured' }
       ]
     },
+    // ===== 4-STEP PHONE CLOSE FRAMEWORK =====
     close_meeting: {
       stage: 'Closing',
-      text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Perfect. So what you're really looking for is [REFLECT THEIR ANSWER - competitive rates / budget certainty / handling complexity]. <span class=\"pause-indicator\"></span> Here's what I'm thinking - we schedule a quick 15-minute call where I show you exactly what's available in the market right now versus what you're paying. <span class=\"pause-indicator\"></span> This helps you lock in competitive rates before the market moves, you know? <span class=\"pause-indicator\"></span> No pressure, no obligation - just so you have all the information to make the best decision.<br><br>What works better for you - Tuesday or Wednesday?",
+      text: "<span class=\"tone-marker confident\">STEP 1: Recap (15 seconds)</span><br><br>\"Okay, so just to recap: <span class=\"pause-indicator\"></span> You're spending about {{monthly_spend}} monthly, <span class=\"pause-indicator\"></span> your contract expires {{contract_end}}, <span class=\"pause-indicator\"></span> and you're using {{account.supplier}} right now. <span class=\"pause-indicator\"></span> That about right?\"<br><br><em>(Wait for confirmation - builds \"yes momentum\")</em>",
       responses: [
-        { label: 'Tuesday works', next: 'meeting_scheduled' },
-        { label: 'Wednesday works', next: 'meeting_scheduled' },
-        { label: 'Send me something first', next: 'email_first' },
-        { label: 'What would you prepare?', next: 'close_prep_question' }
+        { label: 'Yes, that\'s right', next: 'close_step2_value' },
+        { label: 'Let me correct something', next: 'close_step2_value' },
+        { label: 'Actually, I need to think about this', next: 'close_think_about_it' },
+        { label: 'I need to check with my team first', next: 'objection_need_to_check' }
+      ]
+    },
+    close_step2_value: {
+      stage: 'Closing',
+      text: "<span class=\"tone-marker confident\">STEP 2: Reaffirm Value (20 seconds)</span><br><br>\"The reason I'm calling is because most companies in your situation— <span class=\"pause-indicator\"></span> spending that amount with that contract timeline— <span class=\"pause-indicator\"></span> are leaving 15-20% on the table without realizing it. <span class=\"pause-indicator\"></span><br><br>That's roughly {{potential_savings}} annually you might be overpaying. <span class=\"pause-indicator\"></span><br><br>An audit is how we find out if you're one of them.\"",
+      responses: [
+        { label: 'That would be significant', next: 'close_step3_assumptive' },
+        { label: 'Makes sense', next: 'close_step3_assumptive' },
+        { label: 'How do you know that?', next: 'close_step3_assumptive' },
+        { label: "What's your commission?", next: 'objection_commission' }
+      ]
+    },
+    close_step3_assumptive: {
+      stage: 'Closing',
+      text: "<span class=\"tone-marker confident\">STEP 3: The Assumptive Move (10 seconds)</span><br><br>\"So here's what makes sense: <span class=\"pause-indicator\"></span> I run this audit over the next 2-3 days, <span class=\"pause-indicator\"></span> then we jump on a quick call and I walk you through what I found.\"<br><br><em>(You're not asking permission. You're laying out the plan.)</em>",
+      responses: [
+        { label: 'Sounds good', next: 'close_step4_calendar' },
+        { label: 'How long will the call take?', next: 'close_step4_calendar' },
+        { label: 'What would you need from me?', next: 'close_invoice_soft_ask' },
+        { label: 'Let me think about it', next: 'close_think_about_it' }
+      ]
+    },
+    close_step4_calendar: {
+      stage: 'Closing',
+      text: "<span class=\"tone-marker confident\">STEP 4: Lock In Commitment (Binary Choice)</span><br><br>\"Thursday afternoon at 2 PM or Friday morning at 10 AM— <span class=\"pause-indicator\"></span> what works better?\"<br><br><em>(They're not deciding WHETHER to meet, they're choosing WHEN.)</em>",
+      responses: [
+        { label: 'Thursday at 2 PM', next: 'close_send_invite' },
+        { label: 'Friday at 10 AM', next: 'close_send_invite' },
+        { label: 'Another time works better', next: 'close_send_invite' },
+        { label: 'I need to check my calendar', next: 'close_send_invite' }
+      ]
+    },
+    close_send_invite: {
+      stage: 'Closing',
+      text: "<span class=\"tone-marker confident\">Send Calendar Invite NOW (Stay on Line!)</span><br><br>\"Perfect. <span class=\"pause-indicator\"></span> I'm going to send you a calendar invite right now. <span class=\"pause-indicator\"></span><br><br>Do you have your email with you? <span class=\"pause-indicator\"></span><br><br><em>(Get email, send invite immediately)</em><br><br>\"Sending it over right now... <span class=\"pause-indicator\"></span> did it come through?\"<br><br><em>⚠️ CRITICAL: DO NOT hang up until they confirm receipt!</em><br><em>This alone = 87% show-up rate vs 40% if sent after call.</em>",
+      responses: [
+        { label: 'They confirmed receipt', next: 'close_invoice_soft_ask' },
+        { label: "They didn't get it", next: 'close_send_invite_retry' },
+        { label: 'They want to check spam', next: 'close_send_invite' }
+      ]
+    },
+    close_send_invite_retry: {
+      stage: 'Closing',
+      text: "<span class=\"tone-marker understanding\">Troubleshoot Calendar Invite</span><br><br>\"No worries, let me try again. <span class=\"pause-indicator\"></span> Can you spell your email for me? <span class=\"pause-indicator\"></span><br><br><em>(Confirm email, resend)</em><br><br>\"Sending again... <span class=\"pause-indicator\"></span> check your inbox now. <span class=\"pause-indicator\"></span> Also check spam or promotions folder.\"<br><br><em>Stay patient. This confirmation is worth the extra minute.</em>",
+      responses: [
+        { label: 'They got it now', next: 'close_invoice_soft_ask' },
+        { label: 'Still not working - will call back', next: 'close_meeting_scheduled' }
+      ]
+    },
+    close_invoice_soft_ask: {
+      stage: 'Closing',
+      text: "<span class=\"tone-marker confident\">Soft Invoice Ask (After Calendar Locked)</span><br><br>\"Perfect. <span class=\"pause-indicator\"></span> So I can run the audit with just the info we've talked about— <span class=\"pause-indicator\"></span> monthly spend, contract date, that kind of thing.<br><br>But honestly? <span class=\"pause-indicator\"></span> Having your actual invoice makes it even more accurate. <span class=\"pause-indicator\"></span> That way I can pull your exact rates, contract terms, everything.<br><br>Do you have your last bill handy, <span class=\"pause-indicator\"></span> or should I just work with what we discussed?\"<br><br><em>✅ Frames as helpful, not required<br>✅ Gives them an out<br>✅ Many will grab it rather than say no</em>",
+      responses: [
+        { label: 'I can send it over', next: 'close_invoice_confirmed' },
+        { label: "I'll email it to you", next: 'close_invoice_confirmed' },
+        { label: "Just work with what we discussed", next: 'close_final_confirmation' },
+        { label: "I don't have it handy", next: 'close_invoice_alternative' }
+      ]
+    },
+    close_invoice_alternative: {
+      stage: 'Closing',
+      text: "<span class=\"tone-marker understanding\">Invoice Alternative (No Pressure)</span><br><br>\"No problem at all. <span class=\"pause-indicator\"></span> If you don't have it handy, I can work with what we discussed.<br><br>But if you do find it later, <span class=\"pause-indicator\"></span> just reply to the calendar invite I sent and attach it. <span class=\"pause-indicator\"></span> That way I'll have it before Thursday.\"",
+      responses: [
+        { label: "I'll try to find it", next: 'close_final_confirmation' },
+        { label: 'Sounds good', next: 'close_final_confirmation' }
+      ]
+    },
+    close_invoice_confirmed: {
+      stage: 'Closing',
+      text: "<span class=\"tone-marker confident\">Invoice Commitment Locked!</span><br><br>\"Perfect. <span class=\"pause-indicator\"></span> Just email it to me—you can reply to the calendar invite I just sent. <span class=\"pause-indicator\"></span><br><br>That way I can show you the exact breakdown— <span class=\"pause-indicator\"></span> rates, contract terms, all of it—when we talk Thursday.\"",
+      responses: [
+        { label: 'Will do', next: 'close_final_confirmation' },
+        { label: 'Sounds good', next: 'close_final_confirmation' }
+      ]
+    },
+    close_final_confirmation: {
+      stage: 'Closing',
+      text: "<span class=\"tone-marker confident\">Final Wrap-Up</span><br><br>\"You're all set. <span class=\"pause-indicator\"></span> I'll have the audit done by Thursday morning, <span class=\"pause-indicator\"></span> so you'll have time to look at it before our call.<br><br>I'll give you a quick call Wednesday afternoon just to confirm we're still good. <span class=\"pause-indicator\"></span><br><br>Looking forward to showing you what I find, {{contact.first_name}}. <span class=\"pause-indicator\"></span> Talk soon!\"<br><br><em>✅ Calendar locked<br>✅ Invoice requested (soft)<br>✅ 24-hour reminder planned<br>✅ Professional close</em>",
+      responses: [
+        { label: 'End call - SUCCESS!', next: 'meeting_scheduled' }
+      ]
+    },
+    close_think_about_it: {
+      stage: 'Closing',
+      text: "<span class=\"tone-marker understanding\">Handle \"Let Me Think About It\"</span><br><br>\"I totally understand. <span class=\"pause-indicator\"></span> Here's what makes sense— <span class=\"pause-indicator\"></span> let me run the audit anyway. <span class=\"pause-indicator\"></span><br><br>Then you'll have the data to think about instead of guessing. <span class=\"pause-indicator\"></span><br><br>I'll have it ready by Friday. <span class=\"pause-indicator\"></span> How about I call you Friday afternoon to walk through what I found? <span class=\"pause-indicator\"></span> That way you can make an informed decision.<br><br>That work better than tomorrow? <span class=\"pause-indicator\"></span> Less pressure, you've had time to think.\"<br><br><em>They said yes to thinking. Now you're giving them real data to think ABOUT.</em>",
+      responses: [
+        { label: 'Friday works', next: 'close_send_invite' },
+        { label: 'That makes sense', next: 'close_send_invite' },
+        { label: 'Just send me information first', next: 'objection_send_something' },
+        { label: 'Not interested', next: 'respect_decision' }
       ]
     },
     close_prep_question: {
       stage: 'Closing',
-      text: "<span class=\"tone-marker confident\">confident tone</span> Great question. <span class=\"pause-indicator\"></span> So what I'd do is pull competitive rates from 100+ suppliers in your market, compare them to what you're paying now, and show you exactly what you could save by locking those rates in before the market moves. <span class=\"pause-indicator\"></span><br><br>Plus I'd walk you through how our process works - basically, we handle everything, you just approve whichever option works best. <span class=\"pause-indicator\"></span> Make sense? <span class=\"pause-indicator\"></span> So Tuesday or Wednesday?",
+      text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Great question. <span class=\"pause-indicator\"></span> Here's what the audit is:<br><br>We pull quotes from our network of 100+ suppliers— <span class=\"pause-indicator\"></span> completely different ones than what most brokers work with. <span class=\"pause-indicator\"></span> We standardize everything so you can actually compare apples to apples.<br><br>Then I send you a 1-page summary showing:<br>1. <span class=\"pause-indicator\"></span> What your current rate is<br>2. <span class=\"pause-indicator\"></span> What competitive market rates are for your situation<br>3. <span class=\"pause-indicator\"></span> The annual gap (if there is one)<br><br>Takes us 2-3 days to pull. <span class=\"pause-indicator\"></span> Then we hop on a quick 15-minute call and I walk you through what we found.<br><br>If your current rates are solid, I'll tell you that. <span class=\"pause-indicator\"></span> If there's a gap, now you know exactly what you're leaving on the table. <span class=\"pause-indicator\"></span> Then YOU can decide what to do with that information.<br><br>So Thursday or Friday work for that review call?",
       responses: [
-        { label: 'Tuesday works', next: 'meeting_scheduled' },
-        { label: 'Wednesday works', next: 'meeting_scheduled' },
+        { label: 'Thursday works', next: 'close_meeting_scheduled' },
+        { label: 'Friday works', next: 'close_meeting_scheduled' },
         { label: 'Send email first', next: 'email_first' }
+      ]
+    },
+    // ===== AUDIT PRESENTATION (Gap vs No Gap) =====
+    audit_presentation_gap: {
+      stage: 'Audit Presentation',
+      text: "<span class=\"tone-marker confident\">presenting the gap</span> <span class=\"pause-indicator\"></span> Okay, so here's what I found. <span class=\"pause-indicator\"></span><br><br>You're currently paying [X.X¢ per kWh].<br><br>Competitive market rate for your situation from 100+ suppliers is [Y.Y¢ per kWh].<br><br>That's a [Z.Z¢] gap. <span class=\"pause-indicator\"></span> For {{account.name}} spending {{monthly_spend}} monthly, <span class=\"pause-indicator\"></span> that gap is about {{potential_savings}} per year.<br><br>Over 3 years, that's triple that amount.<br><br>Now, your current broker might not have access to those 100+ suppliers. <span class=\"pause-indicator\"></span> Or they might have access but chose not to shop as aggressively. <span class=\"pause-indicator\"></span> Either way, there's real money here.<br><br><span class=\"tone-marker understanding\">So here's what makes sense:</span> <span class=\"pause-indicator\"></span> We can either work with your current broker and present this data to them— <span class=\"pause-indicator\"></span> give them a chance to match or improve. <span class=\"pause-indicator\"></span> Or, if they can't help you close that gap, we can handle it directly.<br><br>But one way or another, you should be able to get access to these rates. <span class=\"pause-indicator\"></span> Sound fair?",
+      responses: [
+        { label: "Let's work with our current broker first", next: 'audit_work_with_broker' },
+        { label: "Let's move forward with you", next: 'meeting_scheduled' },
+        { label: "I need to think about it", next: 'email_first' }
+      ]
+    },
+    audit_presentation_no_gap: {
+      stage: 'Audit Presentation',
+      text: "<span class=\"tone-marker honest\">honest, credibility-building</span> <span class=\"pause-indicator\"></span> Okay, so I ran the numbers and your broker actually did a really solid job. <span class=\"pause-indicator\"></span><br><br>You're getting market rates— <span class=\"pause-indicator\"></span> within 3-5% of what competitive suppliers are quoting.<br><br>That's actually rare. <span class=\"pause-indicator\"></span> So you can trust your broker. <span class=\"pause-indicator\"></span> They're doing right by you.<br><br><span class=\"tone-marker confident\">Here's what I'd suggest though:</span> <span class=\"pause-indicator\"></span> When you're 6 months out from renewal next time, let me run this audit again. <span class=\"pause-indicator\"></span> Markets change, and it's smart to have a second opinion every cycle. <span class=\"pause-indicator\"></span> Fair?",
+      responses: [
+        { label: "Good to know - reach out in 6 months", next: 'followup_scheduled' },
+        { label: "Thanks for the honesty", next: 'respect_decision' }
+      ]
+    },
+    audit_work_with_broker: {
+      stage: 'Audit Presentation',
+      text: "<span class=\"tone-marker professional\">professional, collaborative</span> <span class=\"pause-indicator\"></span> Totally fair. <span class=\"pause-indicator\"></span> Here's what I'd suggest— <span class=\"pause-indicator\"></span><br><br>Take these numbers to your broker. <span class=\"pause-indicator\"></span> Show them what competitive rates we found. <span class=\"pause-indicator\"></span> Give them a chance to match or improve.<br><br>If they can close the gap, great— <span class=\"pause-indicator\"></span> you win. <span class=\"pause-indicator\"></span> If they can't, you know where to find me.<br><br>Either way, you're making a decision based on complete data instead of partial data. <span class=\"pause-indicator\"></span> That's the whole point of the audit.<br><br>When should I follow up to see what they came back with?",
+      responses: [
+        { label: "Give me 2 weeks", next: 'schedule_followup' },
+        { label: "I'll reach out when I hear back", next: 'email_first' },
+        { label: "Actually, let's just work with you", next: 'meeting_scheduled' }
       ]
     },
     meeting_scheduled: {
       stage: 'Success',
-      text: '✅ <strong>Meeting Scheduled!</strong><br><br>Great job! You successfully:<br>• Opened with pattern interrupt<br>• Led them through discovery<br>• Built emotional connection around consequences<br>• Closed for a meeting<br><br>Key wins: You stayed curious, asked follow-ups, and let THEM discover the pain.',
+      text: '✅ <strong>AUDIT SCHEDULED - SUCCESS!</strong><br><br><strong>4-Step Close Complete!</strong><br><br>You successfully:<br>• ✅ Recap (created yes momentum)<br>• ✅ Reaffirmed Value (quantified gap)<br>• ✅ Assumptive Move (laid out the plan)<br>• ✅ Locked Commitment (binary choice + calendar)<br><br><strong>No-Show Prevention Checklist:</strong><br>• 📅 Calendar invite sent while ON call (87% show-up rate)<br>• 📄 Invoice requested (soft ask)<br>• 📞 24-hour reminder call planned<br>• 📧 Morning-of confirmation email<br><br><strong>Next 48 Hours:</strong><br>1. Run the broker audit (2-3 days)<br>2. Call them Wednesday afternoon to confirm<br>3. Send morning-of email 2 hours before<br>4. Prepare 1-page summary<br><br><strong>Target:</strong> 87%+ show-up rate with this system!',
       responses: [
         { label: 'Start New Call', next: 'start' }
       ]
     },
     email_first: {
       stage: 'Solution - Email First',
-      text: "<span class=\"tone-marker understanding\">understanding tone</span> Totally get it - no pressure. <span class=\"pause-indicator\"></span><br><br>Let me do this... I'll shoot you an email with a quick summary of what we talked about and what the next step would look like. <span class=\"pause-indicator\"></span> That way you've got it in writing and you can think it over. <span class=\"pause-indicator\"></span><br><br>If it makes sense after you think about it, just reply to that email and we'll get the quotes pulled. <span class=\"pause-indicator\"></span> If not, no worries at all. <span class=\"pause-indicator\"></span><br><br>Fair? <span class=\"pause-indicator\"></span><br><br>What's the best email to send that to?",
+      text: "<span class=\"tone-marker understanding\">understanding tone</span> Totally get it - no pressure. <span class=\"pause-indicator\"></span><br><br>Let me do this... <span class=\"pause-indicator\"></span> I'll shoot you an email with a quick summary of what we talked about and what the next step would look like. <span class=\"pause-indicator\"></span> That way you've got it in writing and you can think it over. <span class=\"pause-indicator\"></span><br><br>If it makes sense after you think about it, just reply to that email and we'll get the quotes pulled. <span class=\"pause-indicator\"></span> If not, no worries at all. <span class=\"pause-indicator\"></span><br><br>Fair? <span class=\"pause-indicator\"></span><br><br>What's the best email to send that to?",
       responses: [
         { label: "Sure, it's [email]", next: 'email_captured' },
         { label: "Just send it to my work email", next: 'email_captured' },
-        { label: "Actually, let's just do it now", next: 'close_meeting' },
+        { label: "Actually, let's just schedule it now", next: 'close_meeting' },
+        { label: "When will you follow up?", next: 'email_follow_up' },
         { label: "I don't want to give my email", next: 'respect_decision' }
       ]
     },
@@ -1275,23 +1527,26 @@
         { label: 'Start New Call', next: 'start' }
       ]
     },
+    // ===== OBJECTION HANDLING (ARC Framework: Acknowledge, Reframe, Close) =====
     objection_not_interested: {
       stage: 'Objection Handling',
-      text: "<span class=\"tone-marker understanding\">understanding tone</span> I totally understand. <span class=\"pause-indicator\"></span> Can I ask though <span class=\"pause-indicator\"></span> is it because you've already got a solution that's working great <span class=\"pause-indicator\"></span> or is it more that this just isn't a priority right now?",
+      text: "<span class=\"tone-marker understanding\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> I totally understand. <span class=\"pause-indicator\"></span> You've got a solution that's working, and changing is risky.<br><br><span class=\"tone-marker curious\">Reframe</span> <span class=\"pause-indicator\"></span> Real quick question though— <span class=\"pause-indicator\"></span> have you had a second opinion on your current rates in the last 12-18 months? <span class=\"pause-indicator\"></span> Because we typically find that companies are overpaying 15-20% just because they haven't seen the full market.<br><br><span class=\"tone-marker confident\">Close</span> <span class=\"pause-indicator\"></span> What if we just ran an audit to see what the market's actually quoting right now? <span class=\"pause-indicator\"></span> No obligation. <span class=\"pause-indicator\"></span> If your current rates are competitive, I'll tell you that. <span class=\"pause-indicator\"></span> If there's a gap, now you know.",
       responses: [
+        { label: "That sounds reasonable", next: 'situation_discovery' },
         { label: 'Already have solution', next: 'objection_happy_supplier' },
+        { label: 'We use a broker', next: 'broker_audit_intro' },
         { label: 'Not a priority', next: 'objection_not_priority' },
-        { label: 'What\'s the market context?', next: 'market_context' },
         { label: 'Just not interested', next: 'respect_decision' }
       ]
     },
     objection_happy_supplier: {
       stage: 'Objection Handling',
-      text: "<span class=\"tone-marker confident\">confident tone</span> That's fair. <span class=\"pause-indicator\"></span> And just so you know, we work with ALL suppliers - I'm not trying to switch you or anything like that. <span class=\"pause-indicator\"></span><br><br>What we do is run competitive events across 100+ suppliers so you can lock in the best rate available before the market moves. <span class=\"pause-indicator\"></span><br><br>So I gotta ask - have you shopped the market in the last 12 months to make sure you're getting the best rate available?",
+      text: "<span class=\"tone-marker understanding\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> That's fair. <span class=\"pause-indicator\"></span> And just so you know, we work with ALL suppliers - I'm not trying to switch you or anything like that.<br><br><span class=\"tone-marker confident\">Reframe</span> <span class=\"pause-indicator\"></span> Here's the thing though— <span class=\"pause-indicator\"></span> even if you're happy, have you actually seen what the REST of the market is quoting? <span class=\"pause-indicator\"></span> We typically find a 15-20% gap just because companies haven't shopped 100+ suppliers.<br><br><span class=\"tone-marker curious\">Close</span> <span class=\"pause-indicator\"></span> So I gotta ask - have you shopped the market in the last 12 months to make sure you're getting the best rate available?",
       responses: [
         { label: 'Yes, recently shopped', next: 'probe_deeper' },
         { label: 'Not recently', next: 'consequence_variant_happy' },
-        { label: "No, we haven't", next: 'consequence_variant_happy' }
+        { label: "No, we haven't", next: 'consequence_variant_happy' },
+        { label: 'We use a broker for that', next: 'broker_audit_intro' }
       ]
     },
     objection_market_moved: {
@@ -1303,48 +1558,117 @@
         { label: "Still not interested", next: 'respect_decision' }
       ]
     },
+    objection_need_to_check: {
+      stage: 'Objection Handling',
+      text: "<span class=\"tone-marker understanding\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> Totally fair. <span class=\"pause-indicator\"></span> This needs buy-in from the team.<br><br><span class=\"tone-marker confident\">Reframe</span> <span class=\"pause-indicator\"></span> Here's what I'd suggest— <span class=\"pause-indicator\"></span> why don't we loop them in on a quick call? <span class=\"pause-indicator\"></span> That way there's no game of telephone and everyone hears the audit results at the same time.<br><br><span class=\"tone-marker curious\">Close</span> <span class=\"pause-indicator\"></span> What works better for you guys— <span class=\"pause-indicator\"></span> Thursday at 2 PM or Friday afternoon?",
+      responses: [
+        { label: "Thursday works", next: 'close_meeting_scheduled' },
+        { label: "Friday works better", next: 'close_meeting_scheduled' },
+        { label: "I'll talk to them first and get back to you", next: 'email_first' },
+        { label: "Not interested", next: 'respect_decision' }
+      ]
+    },
+    objection_commission: {
+      stage: 'Objection Handling',
+      text: "<span class=\"tone-marker understanding\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> Fair question. <span class=\"pause-indicator\"></span> I appreciate the directness.<br><br><span class=\"tone-marker confident\">Reframe</span> <span class=\"pause-indicator\"></span> We make money from suppliers when you sign with them. <span class=\"pause-indicator\"></span> Just like your current broker does. <span class=\"pause-indicator\"></span><br><br>But here's the key— <span class=\"pause-indicator\"></span> you pay the same rate whether you go direct or through any broker. <span class=\"pause-indicator\"></span> The supplier already builds in broker commission. <span class=\"pause-indicator\"></span> So you're not paying extra. <span class=\"pause-indicator\"></span> We just handle the shopping so you don't have to.<br><br><span class=\"tone-marker curious\">Close</span> <span class=\"pause-indicator\"></span> And honestly, if we're pulling better rates from 100+ suppliers, <span class=\"pause-indicator\"></span> you might save more than our commission anyway. <span class=\"pause-indicator\"></span> That's why the audit matters— <span class=\"pause-indicator\"></span> you get to see the numbers.",
+      responses: [
+        { label: "That makes sense", next: 'close_meeting' },
+        { label: "Let's see what you find", next: 'close_meeting_scheduled' },
+        { label: "I need to think about it", next: 'email_first' }
+      ]
+    },
+    objection_send_something: {
+      stage: 'Objection Handling',
+      text: "<span class=\"tone-marker understanding\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> I can definitely do that. <span class=\"pause-indicator\"></span> But honestly, most of the time these emails end up in the wrong folder and nothing happens.<br><br><span class=\"tone-marker confident\">Reframe</span> <span class=\"pause-indicator\"></span> How about this— <span class=\"pause-indicator\"></span> let's skip the email for now. <span class=\"pause-indicator\"></span> I'll run a quick audit for you over the next 2-3 days. <span class=\"pause-indicator\"></span> Takes me like 30 minutes of work. <span class=\"pause-indicator\"></span> Then when I call you back, I'll actually have data to show you instead of a generic brochure.<br><br><span class=\"tone-marker curious\">Close</span> <span class=\"pause-indicator\"></span> That way you get something concrete to look at instead of just marketing material. <span class=\"pause-indicator\"></span> Fair? <span class=\"pause-indicator\"></span> What's a good day for a quick call Friday?",
+      responses: [
+        { label: "Friday works", next: 'close_meeting_scheduled' },
+        { label: "Just send the email first", next: 'email_first' },
+        { label: "Not interested", next: 'respect_decision' }
+      ]
+    },
+    objection_talk_to_broker: {
+      stage: 'Objection Handling',
+      text: "<span class=\"tone-marker understanding\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> That makes sense. <span class=\"pause-indicator\"></span> They should know what's up.<br><br><span class=\"tone-marker confident\">Reframe</span> <span class=\"pause-indicator\"></span> Actually, here's what I'd suggest— <span class=\"pause-indicator\"></span> let me run the audit first. <span class=\"pause-indicator\"></span> Then YOU have the data. <span class=\"pause-indicator\"></span> When you talk to your broker, you can show them what the actual market is quoting. <span class=\"pause-indicator\"></span> That way the conversation is way more productive. <span class=\"pause-indicator\"></span> You're not accusing them, you're just showing them the market data.<br><br><span class=\"tone-marker curious\">Close</span> <span class=\"pause-indicator\"></span> I'll have the audit done by Thursday. <span class=\"pause-indicator\"></span> Then you can bring it to your broker conversation and see what they say. <span class=\"pause-indicator\"></span> Sound fair?",
+      responses: [
+        { label: "That makes sense", next: 'close_meeting_scheduled' },
+        { label: "I'll still talk to them first", next: 'email_first' },
+        { label: "Not interested", next: 'respect_decision' }
+      ]
+    },
+    objection_mid_renewal: {
+      stage: 'Objection Handling',
+      text: "<span class=\"tone-marker confident\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> Okay, so timing is actually crucial then. <span class=\"pause-indicator\"></span> This is EXACTLY when an audit matters most.<br><br><span class=\"tone-marker serious\">Reframe</span> <span class=\"pause-indicator\"></span> Here's why: <span class=\"pause-indicator\"></span> You're negotiating rates RIGHT NOW. <span class=\"pause-indicator\"></span> If we pull market quotes from 100+ suppliers TODAY, you can use that as leverage in your negotiations. <span class=\"pause-indicator\"></span> Your broker is probably negotiating with their network—maybe 10-20 suppliers. <span class=\"pause-indicator\"></span> We can show you what the FULL market is quoting.<br><br><span class=\"tone-marker curious\">Close</span> <span class=\"pause-indicator\"></span> When do you need to finalize your contract? <span class=\"pause-indicator\"></span> I can turn around an audit by then so you have it before you lock in rates. <span class=\"pause-indicator\"></span> Could be worth significant money.",
+      responses: [
+        { label: "We need it by [date]", next: 'close_meeting_scheduled' },
+        { label: "That could help", next: 'broker_audit_close' },
+        { label: "We're too far along", next: 'future_opportunity' },
+        { label: "Not interested", next: 'respect_decision' }
+      ]
+    },
+    objection_email_proposal: {
+      stage: 'Objection Handling',
+      text: "<span class=\"tone-marker understanding\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> I can do that, but honestly, email proposals are kind of useless without context.<br><br><span class=\"tone-marker confident\">Reframe</span> <span class=\"pause-indicator\"></span> What's more valuable: <span class=\"pause-indicator\"></span> I run an audit specific to YOUR situation with your actual spend, contract timing, and supplier mix. <span class=\"pause-indicator\"></span> Then I walk you through what I find on a call. <span class=\"pause-indicator\"></span> That way you're seeing YOUR numbers, not a generic proposal.<br><br><span class=\"tone-marker curious\">Close</span> <span class=\"pause-indicator\"></span> Give me 2-3 days to pull the audit. <span class=\"pause-indicator\"></span> Then we can jump on a call and I show you exactly what this looks like for {{account.name}}. <span class=\"pause-indicator\"></span> That's way more useful than a PDF, right?",
+      responses: [
+        { label: "That's fair, let's do it", next: 'close_meeting_scheduled' },
+        { label: "I still want the email first", next: 'email_first' },
+        { label: "Not interested", next: 'respect_decision' }
+      ]
+    },
+    objection_broker_friend: {
+      stage: 'Objection Handling',
+      text: "<span class=\"tone-marker understanding\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> I totally get it. <span class=\"pause-indicator\"></span> Relationships matter, and they should.<br><br><span class=\"tone-marker confident\">Reframe</span> <span class=\"pause-indicator\"></span> I'm not asking you to leave them. <span class=\"pause-indicator\"></span> I'm asking you to know what the full market is quoting. <span class=\"pause-indicator\"></span> Your friend would want you to have the best rates, right? <span class=\"pause-indicator\"></span><br><br>Think of me as a second opinion so you can go to your broker and say, <span class=\"pause-indicator\"></span> 'Hey, I ran an audit. <span class=\"pause-indicator\"></span> Here's what competitive rates look like. <span class=\"pause-indicator\"></span> Can you match this or beat this?'<br><br>Either your broker matches it and you stay with them— <span class=\"pause-indicator\"></span> and they know you were shopping. <span class=\"pause-indicator\"></span> Or they can't, and then you know what you need to do. <span class=\"pause-indicator\"></span> Either way, your friend wins because you have better information.<br><br><span class=\"tone-marker curious\">Close</span> <span class=\"pause-indicator\"></span> Let me run the audit. <span class=\"pause-indicator\"></span> You can use it however you want with your broker. <span class=\"pause-indicator\"></span> Fair?",
+      responses: [
+        { label: "That makes sense", next: 'broker_audit_close' },
+        { label: "I don't want to upset them", next: 'broker_audit_no_switch' },
+        { label: "Not interested", next: 'respect_decision' }
+      ]
+    },
     probe_deeper: {
       stage: 'Discovery',
-      text: "<span class=\"tone-marker curious\">curious tone</span> Interesting. <span class=\"pause-indicator\"></span> And were the rates you're paying now better or worse than what's available in the market right now?",
+      text: "<span class=\"tone-marker curious\">curious tone</span> <span class=\"pause-indicator\"></span> Interesting. <span class=\"pause-indicator\"></span> So you're happy with what you're paying— <span class=\"pause-indicator\"></span> let me ask though, have you actually compared your rates to what's available in the market RIGHT NOW?<br><br>Because here's what I see— <span class=\"pause-indicator\"></span> even companies that shopped 12 months ago are finding the market has shifted. <span class=\"pause-indicator\"></span> New suppliers have entered, rates have moved 15-20%.<br><br>The only way to KNOW if you're getting a good deal is to see what else is out there. <span class=\"pause-indicator\"></span> That's what the audit does— <span class=\"pause-indicator\"></span> takes 2-3 days, no obligation, and you'll KNOW where you stand.<br><br>Worth 15 minutes to confirm you're getting the best rate?",
       responses: [
-        { label: "We're competitive", next: 'respect_decision' },
-        { label: 'Rates went up', next: 'close_meeting' }
+        { label: "Yeah, that makes sense", next: 'broker_audit_close' },
+        { label: "How does that work?", next: 'solution_faq_process' },
+        { label: "We just renewed", next: 'ack_just_renewed' },
+        { label: "Not interested", next: 'respect_decision' }
       ]
     },
     objection_not_priority: {
       stage: 'Objection Handling',
-      text: "<span class=\"tone-marker understanding\">understanding tone</span> I get it. <span class=\"pause-indicator\"></span> Here's what I'd suggest: <span class=\"pause-indicator\"></span> when your contract comes up for renewal in the next 6-12 months, that's when we should talk. <span class=\"pause-indicator\"></span><br><br>Do you know roughly when that is?",
+      text: "<span class=\"tone-marker understanding\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> Makes sense. <span class=\"pause-indicator\"></span> You've got a ton on your plate.<br><br><span class=\"tone-marker confident\">Reframe</span> <span class=\"pause-indicator\"></span> Here's the thing though— <span class=\"pause-indicator\"></span> while it's not a priority, rates are actually going UP right now. <span class=\"pause-indicator\"></span> So the longer you wait, the worse the deal you'll get when you renew. <span class=\"pause-indicator\"></span> Shopping 6-12 months early is how you actually get leverage.<br><br><span class=\"tone-marker curious\">Close</span> <span class=\"pause-indicator\"></span> How long until your contract expires? <span class=\"pause-indicator\"></span> Let me just put a note on my side so I can reach out when the timing's right for you.",
       responses: [
-        { label: 'Yes, I know the date', next: 'schedule_followup' },
+        { label: 'I know the date', next: 'schedule_followup' },
         { label: 'What\'s the market context?', next: 'market_context' },
-        { label: 'Not sure', next: 'respect_decision' }
+        { label: 'Not sure', next: 'email_first' },
+        { label: 'Not interested', next: 'respect_decision' }
       ]
     },
     schedule_followup: {
       stage: 'Follow-up',
-      text: "Perfect. <span class=\"pause-indicator\"></span> Let me put that on my calendar and I'll reach out 60 days before, you know? <span class=\"pause-indicator\"></span> Sound good?",
+      text: "<span class=\"tone-marker confident\">confident tone</span> <span class=\"pause-indicator\"></span> Perfect. <span class=\"pause-indicator\"></span> So I'm putting that on my calendar right now, and I'll reach out 6 months before that expires. <span class=\"pause-indicator\"></span><br><br>That's when you actually have leverage— <span class=\"pause-indicator\"></span> suppliers are competing for your business during off-peak periods.<br><br>What's the best email to send you a calendar reminder? <span class=\"pause-indicator\"></span> That way you don't have to remember - I'll ping you.",
       responses: [
-        { label: 'Yes, that works', next: 'followup_scheduled' },
+        { label: 'Provides email', next: 'followup_scheduled' },
+        { label: 'Just call me when it\'s time', next: 'followup_scheduled' },
         { label: 'Just forget it', next: 'respect_decision' }
       ]
     },
     followup_scheduled: {
       stage: 'Success',
-      text: '✅ <strong>Follow-up Scheduled!</strong><br><br>Excellent! You:<br>• Respected their timeline<br>• Got specific renewal date<br>• Positioned for future outreach<br>• Left door open (not pushy)<br><br>This is often how deals close!',
+      text: '✅ <strong>Follow-up Scheduled!</strong><br><br><strong>Key Stats:</strong> 80% of deals close after 5+ follow-ups. You just planted the seed.<br><br>You successfully:<br>• Respected their timeline<br>• Got specific renewal date<br>• Positioned for future outreach<br>• Left door open (not pushy)<br><br>This is often how deals close! Mark the 6-month reminder.',
       responses: [
         { label: 'Start New Call', next: 'start' }
       ]
     },
     respect_decision: {
       stage: 'Closing',
-      text: "<span class=\"tone-marker professional\">professional tone</span> Fair enough. <span class=\"pause-indicator\"></span> I appreciate the time. <span class=\"pause-indicator\"></span> If anything changes or you want to explore options <span class=\"pause-indicator\"></span> you know how to reach me. <span class=\"pause-indicator\"></span> Have a great day!",
+      text: "<span class=\"tone-marker professional\">professional, authentic tone</span> <span class=\"pause-indicator\"></span> Look, I'm not here to convince you that your broker is bad. <span class=\"pause-indicator\"></span> I'm here to help you see the full market. <span class=\"pause-indicator\"></span> You're a smart operator—you'll make the right call.<br><br>But I'd hate for you to find out 2 years from now that the market was way lower and you could've locked it in early. <span class=\"pause-indicator\"></span> That's money that could've stayed in your business.<br><br>Fair enough though. <span class=\"pause-indicator\"></span> I appreciate the time. <span class=\"pause-indicator\"></span> If anything changes or you want to explore options, <span class=\"pause-indicator\"></span> you know how to reach me. <span class=\"pause-indicator\"></span> Have a great day!",
       responses: [
         { label: 'End Call', next: 'call_success' }
       ]
     },
     gatekeeper_intro: {
       stage: 'Gatekeeper',
-      text: "<span class=\"tone-marker friendly\">friendly, confident tone</span> {{day.part}}, this is Lewis. <span class=\"pause-indicator\"></span> Just a quick question — how does your company typically handle energy contract renewals? <span class=\"pause-indicator\"></span> Is that something (CFO/Operations Manager/{{contact.first_name}}) handles?",
+      text: "<span class=\"tone-marker friendly\">friendly, confident tone</span> {{day.part}}, this is Lewis. <span class=\"pause-indicator\"></span> Just a quick question — how does your company typically handle energy contract renewals? <span class=\"pause-indicator\"></span> Is that something the {{contact.title}} handles, or is {{contact.first_name}} the right person?",
       responses: [
         { label: "Who should I connect you with?", next: 'gatekeeper_connect_request' },
         { label: "What is this about?", next: 'gatekeeper_what_about' },
@@ -1445,35 +1769,42 @@
     },
     voicemail: {
       stage: 'Voicemail',
-      text: "<span class=\"tone-marker professional\">professional tone</span> Voicemail detected. What would you say?<br><br><em>Tip: Keep it brief (20 seconds), mention specific reason for call, and give them permission to not call back.</em>",
+      text: "<span class=\"tone-marker professional\">Voicemail Script (30 seconds - Keep It Short)</span><br><br>\"Hi {{contact.first_name}}, this is (your name) from Power Choosers.<br><br><span class=\"pause-indicator\"></span> I'm calling because we ran analysis on companies in your industry, and most are paying 15-20% more on electricity than they should be.<br><br><span class=\"pause-indicator\"></span> I wanted to see if {{account.name}} might be experiencing the same thing. <span class=\"pause-indicator\"></span> It's literally just a 15-minute conversation.<br><br><span class=\"pause-indicator\"></span> You can reach me at (your number) or find me on LinkedIn.<br><br><span class=\"pause-indicator\"></span> Again, (your name). Thanks.\"<br><br><em>✅ Name stated twice (they might only catch end)<br>✅ Specific problem (overpaying 15-20%)<br>✅ Time commitment clear (15 minutes)<br>✅ Two ways to reach you (phone + LinkedIn)<br>✅ Under 30 seconds</em>",
       responses: [
-        { label: 'Generic voicemail', next: 'vm_feedback1' },
-        { label: 'Specific value voicemail', next: 'vm_feedback2' },
-        { label: 'Start over', next: 'start' }
+        { label: 'Left voicemail - move on', next: 'voicemail_left' },
+        { label: 'Start New Call', next: 'start' }
       ]
     },
-    vm_feedback1: {
-      stage: 'Feedback',
-      text: "⚠️ <strong>That voicemail was too generic.</strong><br><br>It didn't include:<br>• Why you called specifically<br>• What you help with<br>• Permission for them to ignore it<br><br>Better approach: Be specific about their situation or market opportunity.",
+    voicemail_left: {
+      stage: 'Voicemail',
+      text: "✅ <strong>Voicemail Left!</strong><br><br><strong>Next Steps:</strong><br>• Wait 3-5 days before second callback (not same day)<br>• Send LinkedIn connection request<br>• Move to next prospect<br><br><strong>Remember:</strong> Leave this voicemail ONCE. Don't sound needy on follow-ups.",
       responses: [
-        { label: 'Try again', next: 'voicemail' },
-        { label: 'Next scenario', next: 'start' }
+        { label: 'Start New Call', next: 'start' }
       ]
     },
-    vm_feedback2: {
-      stage: 'Feedback',
-      text: "✅ <strong>Good voicemail!</strong><br><br>You mentioned:<br>• Specific reason for call<br>• Relevant market context<br>• Permission for them to not call back<br><br>That increases callback rate by 30%+",
+    second_callback: {
+      stage: 'Second Callback',
+      text: "<span class=\"tone-marker confident\">Second Callback Script (More Direct)</span><br><br>\"Hey {{contact.first_name}}, (your name), Power Choosers— <span class=\"pause-indicator\"></span> calling back real quick.<br><br><span class=\"pause-indicator\"></span> Last time I tried to reach you, I mentioned we audit electricity costs. <span class=\"pause-indicator\"></span> Honestly, the reason I'm persistent is because we typically find that 60-70% of companies are overpaying just because they haven't had a second opinion in a while.<br><br><span class=\"pause-indicator\"></span> You might not be one of them— <span class=\"pause-indicator\"></span> your broker might have you dialed in perfectly. <span class=\"pause-indicator\"></span> But wouldn't it be worth 15 minutes to know for sure?<br><br><span class=\"pause-indicator\"></span> I'm going to stop by your LinkedIn, but reach out if you want to chat.\"<br><br><em>✅ Acknowledges previous attempt<br>✅ Explains WHY you're calling again<br>✅ Admits they might not need it (credibility)<br>✅ Quantifies gap (60-70% overpaying)<br>✅ Moves to LinkedIn (omnichannel)</em>",
       responses: [
-        { label: 'Next scenario', next: 'start' },
-        { label: 'Review call flow', next: 'start' }
+        { label: 'They answered - proceed', next: 'hook' },
+        { label: 'Left second voicemail', next: 'second_callback_sent' },
+        { label: 'Start New Call', next: 'start' }
+      ]
+    },
+    second_callback_sent: {
+      stage: 'Second Callback',
+      text: "✅ <strong>Second Callback Complete!</strong><br><br><strong>Next Steps:</strong><br>• Move to email outreach (Day 5)<br>• Send LinkedIn message (Day 10)<br>• One more call attempt (Day 15)<br>• Then respect the no<br><br><strong>Remember:</strong> 5+ follow-ups close 80% of deals. This is part of the process!",
+      responses: [
+        { label: 'Start New Call', next: 'start' }
       ]
     },
     no_answer: {
       stage: 'No Answer',
-      text: "No one answered. What's your next move?",
+      text: "<span class=\"tone-marker professional\">No one answered. What's your next move?</span><br><br><em>Tip: If this is a first attempt, leave a voicemail. If you've called before, consider the second callback approach.</em>",
       responses: [
-        { label: 'Leave voicemail', next: 'voicemail' },
-        { label: 'Hang up & call back later', next: 'start' },
+        { label: 'Leave voicemail (first attempt)', next: 'voicemail' },
+        { label: 'Second callback (called before)', next: 'second_callback' },
+        { label: 'Hang up & try later', next: 'start' },
         { label: 'Try different number', next: 'dialing' }
       ]
     },
@@ -1494,15 +1825,17 @@
     monthlySpend: null  // Store entered monthly spend value
   };
 
-  // Phase definitions with entry points
+  // Phase definitions with entry points (PEACE Framework aligned)
   const PHASES = [
     { name: 'Pre-Call', stagePattern: 'Pre-Call Prep', entryPoint: 'pre_call_qualification' },
     { name: 'Opening', stagePattern: 'Opening', entryPoint: 'hook' },
+    { name: 'Broker Audit', stagePattern: 'Broker Audit', entryPoint: 'broker_audit_intro' },
     { name: 'Situation', stagePattern: 'Discovery - Situation', entryPoint: 'situation_discovery' },
     { name: 'Problem', stagePattern: 'Discovery - Problem', entryPoint: 'problem_discovery' },
     { name: 'Consequence', stagePattern: 'Discovery - Consequence', entryPoint: 'consequence_discovery' },
     { name: 'Solution', stagePattern: 'Discovery - Solution', entryPoint: 'solution_discovery' },
-    { name: 'Closing', stagePattern: 'Closing', entryPoint: 'trial_close_1' },
+    { name: 'Audit Results', stagePattern: 'Audit Presentation', entryPoint: 'audit_presentation_gap' },
+    { name: 'Closing', stagePattern: 'Closing', entryPoint: 'close_meeting' },
     { name: 'Objections', stagePattern: 'Objection Handling', entryPoint: 'objection_not_interested' },
     { name: 'Success', stagePattern: 'Success', entryPoint: 'meeting_scheduled' }
   ];
@@ -1511,41 +1844,46 @@
   let completedPhases = new Set();
   let lastPhase = null;
 
-  // Opener management
+  // Opener management (PEACE Framework - 5 Tested Openers)
   const OPENER_CONFIGS = {
     default: {
       key: 'pattern_interrupt_opening',
-      label: 'Bold Direct (Default)',
-      state: 'pattern_interrupt_opening'
+      label: 'Permission + Empathy (Primary)',
+      state: 'pattern_interrupt_opening',
+      description: 'PEACE-aligned. Best for: Decision-makers who value respect for their time. Highest conversion - permission-based reduces early hang-ups.'
     },
     direct_question: {
       key: 'opener_direct_question',
-      label: 'Direct Question',
-      state: 'opener_direct_question'
+      label: 'Second Opinion',
+      state: 'opener_direct_question',
+      description: 'Best for: Prospects skeptical of their current broker. Non-threatening framing.'
+    },
+    social_proof: {
+      key: 'opener_social_proof',
+      label: 'Market Data',
+      state: 'opener_social_proof',
+      description: 'Best for: Building credibility with market intelligence. Third-party data is credible.'
+    },
+    quick_check: {
+      key: 'opener_quick_check',
+      label: 'Audit Positioning',
+      state: 'opener_quick_check',
+      description: 'Best for: Explaining your unique value upfront. Immediately clear what you do.'
     },
     transparent: {
       key: 'opener_transparent',
       label: 'Transparent',
-      state: 'opener_transparent'
-    },
-    social_proof: {
-      key: 'opener_social_proof',
-      label: 'Social Proof',
-      state: 'opener_social_proof'
-    },
-    quick_check: {
-      key: 'opener_quick_check',
-      label: 'Quick Check',
-      state: 'opener_quick_check'
+      state: 'opener_transparent',
+      description: 'Best for: Disarming skeptical prospects. Full transparency builds trust.'
     }
   };
 
   let currentOpener = OPENER_CONFIGS.default;
   let availableOpeners = [
     OPENER_CONFIGS.direct_question,
-    OPENER_CONFIGS.transparent,
     OPENER_CONFIGS.social_proof,
-    OPENER_CONFIGS.quick_check
+    OPENER_CONFIGS.quick_check,
+    OPENER_CONFIGS.transparent
   ];
 
   // Expose opener state for phone widget to sync (will be set up later when module is fully initialized)
