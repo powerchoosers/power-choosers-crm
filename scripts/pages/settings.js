@@ -1436,20 +1436,54 @@ class SettingsPage {
             userBio.value = g.bio || '';
         }
         
-        // Render avatar preview if available
+        // Render avatar preview if available (with editable hover effect)
         const avatarPreview = document.getElementById('user-avatar-preview');
-        if (avatarPreview && (g.hostedPhotoURL || g.photoURL)) {
-            const avatarUrl = g.hostedPhotoURL || g.photoURL;
-            avatarPreview.innerHTML = `
-                <img src="${avatarUrl}" alt="Profile" 
-                     style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid var(--orange-primary);">
-            `;
-        } else if (avatarPreview) {
-            avatarPreview.innerHTML = `
-                <div style="width: 64px; height: 64px; border-radius: 50%; background: var(--grey-600); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 600;">
-                    ${(g.firstName || 'U').charAt(0).toUpperCase()}
-                </div>
-            `;
+        if (avatarPreview) {
+            const avatarUrl = g.hostedPhotoURL || g.photoURL || '';
+            if (avatarUrl) {
+                avatarPreview.innerHTML = `
+                    <div class="editable-profile-pic-container" style="position: relative; display: inline-block; cursor: pointer;">
+                        <img src="${avatarUrl}" alt="Profile" 
+                             class="settings-profile-pic"
+                             style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 3px solid var(--orange-primary); display: block;">
+                        <div class="profile-pic-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0); border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s ease; opacity: 0; pointer-events: none;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0; transition: opacity 0.2s ease;">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                `;
+                
+                // Setup hover effect and click handler
+                const container = avatarPreview.querySelector('.editable-profile-pic-container');
+                const overlay = avatarPreview.querySelector('.profile-pic-overlay');
+                const pencilIcon = overlay.querySelector('svg');
+                
+                if (container && overlay && pencilIcon) {
+                    container.addEventListener('mouseenter', () => {
+                        overlay.style.background = 'rgba(0, 0, 0, 0.5)';
+                        overlay.style.opacity = '1';
+                        pencilIcon.style.opacity = '1';
+                    });
+                    
+                    container.addEventListener('mouseleave', () => {
+                        overlay.style.background = 'rgba(0, 0, 0, 0)';
+                        overlay.style.opacity = '0';
+                        pencilIcon.style.opacity = '0';
+                    });
+                    
+                    container.addEventListener('click', async () => {
+                        await this.uploadProfilePictureFromSettings();
+                    });
+                }
+            } else {
+                avatarPreview.innerHTML = `
+                    <div style="width: 64px; height: 64px; border-radius: 50%; background: var(--grey-600); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 600;">
+                        ${(g.firstName || 'U').charAt(0).toUpperCase()}
+                    </div>
+                `;
+            }
         }
 
         // Render general settings
@@ -1931,6 +1965,104 @@ class SettingsPage {
             console.error('[Signature] Upload failed (server endpoint):', error);
             throw error;
         }
+    }
+
+    // Upload profile picture from settings page
+    async uploadProfilePictureFromSettings() {
+        // Create file input
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.style.display = 'none';
+
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                if (window.showToast) {
+                    window.showToast('Please select a valid image file.', 'error');
+                }
+                return;
+            }
+
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                if (window.showToast) {
+                    window.showToast('Image file must be smaller than 5MB.', 'error');
+                }
+                return;
+            }
+
+            try {
+                if (window.showToast) {
+                    window.showToast('Uploading profile picture...', 'info');
+                }
+
+                // Convert to base64
+                const base64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const result = reader.result;
+                        const base64Data = result.split(',')[1];
+                        resolve(base64Data);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
+                // Upload to server
+                const apiBase = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+                const uploadResponse = await fetch(`${apiBase}/api/upload/signature-image`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64, type: 'profile' })
+                });
+
+                if (!uploadResponse.ok) {
+                    throw new Error(`Upload failed: ${uploadResponse.status}`);
+                }
+
+                const result = await uploadResponse.json();
+                const imageUrl = result.imageUrl || (result.success && result.data?.link);
+
+                if (!imageUrl) {
+                    throw new Error('Server did not return image URL');
+                }
+
+                // Update settings with new hosted photo URL
+                if (!this.state.settings.general) {
+                    this.state.settings.general = {};
+                }
+                this.state.settings.general.hostedPhotoURL = imageUrl;
+                this.markDirty();
+                await this.saveSettings();
+
+                // Refresh avatar preview
+                this.renderSettings();
+
+                // Refresh header profile picture
+                if (window.authManager && typeof window.authManager.refreshProfilePhoto === 'function') {
+                    window.authManager.refreshProfilePhoto();
+                }
+
+                if (window.showToast) {
+                    window.showToast('Profile picture updated successfully!', 'success');
+                }
+
+            } catch (error) {
+                console.error('[Settings] Error uploading profile picture:', error);
+                if (window.showToast) {
+                    window.showToast('Failed to upload profile picture. Please try again.', 'error');
+                }
+            }
+        });
+
+        // Trigger file selection
+        document.body.appendChild(fileInput);
+        fileInput.click();
+        document.body.removeChild(fileInput);
     }
 
     async uploadToImgur(file) {
