@@ -1155,6 +1155,29 @@
     }
   }
 
+  // Delete scheduled email without advancing to next step
+  async function deleteScheduledEmailOnly(emailId) {
+    try {
+      const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
+      if (!db) {
+        throw new Error('Firebase not available');
+      }
+
+      // Just delete the email document - don't create next step
+      await db.collection('emails').doc(emailId).delete();
+      
+      // Remove from background loader's in-memory data for instant UI feedback
+      if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.removeEmailById === 'function') {
+        window.BackgroundEmailsLoader.removeEmailById(emailId);
+      }
+      
+      console.log(`[EmailsPage] Deleted scheduled email: ${emailId}`);
+    } catch (error) {
+      console.error('[EmailsPage] Failed to delete scheduled email:', error);
+      throw error;
+    }
+  }
+  
   // Reject scheduled email and advance contact to next stage
   async function rejectAndAdvanceScheduledEmail(emailId) {
     try {
@@ -1180,6 +1203,11 @@
         rejectedAt: Date.now(),
         updatedAt: new Date().toISOString()
       });
+      
+      // Immediately update background loader's in-memory data for instant UI feedback
+      if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.updateEmailStatus === 'function') {
+        window.BackgroundEmailsLoader.updateEmailStatus(emailId, 'rejected');
+      }
 
       // Get sequence to find next step
       if (sequenceId && contactId) {
@@ -2002,15 +2030,8 @@
     const ids = Array.from(state.selected || []);
     if (!ids.length) return;
 
-    // Check if any are scheduled emails
-    const scheduledEmails = state.data.filter(e => ids.includes(e.id) && e.type === 'scheduled');
-    const hasScheduled = scheduledEmails.length > 0;
-
-    const confirmMessage = hasScheduled
-      ? `Are you sure you want to delete ${ids.length} email(s)? ${scheduledEmails.length} scheduled email(s) will be rejected and contacts moved to the next stage.`
-      : `Are you sure you want to delete ${ids.length} email(s)?`;
-
-    if (!confirm(confirmMessage)) return;
+    // Simple confirmation for all emails (scheduled or not)
+    if (!confirm(`Are you sure you want to delete ${ids.length} email(s)?`)) return;
 
     // Store current page before deletion to preserve pagination
     const currentPageBeforeDeletion = state.currentPage;
@@ -2029,13 +2050,15 @@
           try {
             const email = state.data.find(e => e.id === id);
 
-            // For scheduled emails, reject and advance to next stage
-            if (email && email.type === 'scheduled') {
-              await rejectAndAdvanceScheduledEmail(id);
-            } else {
-              // For other emails, normal delete
-              await window.firebaseDB.collection('emails').doc(id).delete();
+            // Delete the email from Firestore
+            await window.firebaseDB.collection('emails').doc(id).delete();
+            
+            // Remove from background loader's in-memory data for instant UI feedback
+            if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.removeEmailById === 'function') {
+              window.BackgroundEmailsLoader.removeEmailById(id);
             }
+            
+            console.log(`[EmailsPage] Deleted email: ${id} (type: ${email?.type || 'unknown'})`)
 
             // Remove from local state
             const emailIndex = state.data.findIndex(e => e.id === id);
@@ -2063,6 +2086,11 @@
         // If no database, just remove from local state
         const idSet = new Set(ids);
         state.data = Array.isArray(state.data) ? state.data.filter(e => !idSet.has(e.id)) : [];
+        
+        // Also remove from background loader
+        if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.removeEmailById === 'function') {
+          ids.forEach(id => window.BackgroundEmailsLoader.removeEmailById(id));
+        }
         completed = ids.length;
         if (progressToast && typeof progressToast.update === 'function') {
           progressToast.update(completed, ids.length);
@@ -2084,6 +2112,16 @@
       // Only adjust page if current page is beyond the new total
       if (currentPageBeforeDeletion > newTotalPages) {
         state.currentPage = newTotalPages;
+      }
+
+      // Invalidate folder count cache to ensure accurate counts
+      if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.invalidateFolderCountCache === 'function') {
+        window.BackgroundEmailsLoader.invalidateFolderCountCache();
+      }
+      
+      // Also invalidate the IndexedDB cache for emails
+      if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+        window.CacheManager.invalidate('emails').catch(() => {});
       }
 
       state.selected.clear();

@@ -393,8 +393,8 @@
             
             const status = email.status || '';
             
-            // Fast path: exclude already sent emails (multiple status indicators)
-            if (status === 'sent' || status === 'delivered' || status === 'error') return false;
+            // Fast path: exclude already sent, rejected, or errored emails (multiple status indicators)
+            if (status === 'sent' || status === 'delivered' || status === 'error' || status === 'rejected') return false;
             
             // Exclude emails stuck in 'sending' state if send time has passed (likely already sent)
             if (status === 'sending') {
@@ -921,6 +921,33 @@
     }
   }
   
+  // Remove email by ID from in-memory data (for immediate UI updates after delete/reject)
+  function removeEmailById(emailId) {
+    if (!emailId) return false;
+    const index = emailsData.findIndex(e => e.id === emailId);
+    if (index !== -1) {
+      emailsData.splice(index, 1);
+      console.log('[BackgroundEmailsLoader] Removed email from memory:', emailId);
+      invalidateFolderCountCache();
+      return true;
+    }
+    return false;
+  }
+  
+  // Update email status in memory (for immediate UI updates after status change)
+  function updateEmailStatus(emailId, newStatus) {
+    if (!emailId) return false;
+    const email = emailsData.find(e => e.id === emailId);
+    if (email) {
+      email.status = newStatus;
+      email.updatedAt = new Date().toISOString();
+      console.log('[BackgroundEmailsLoader] Updated email status in memory:', emailId, newStatus);
+      invalidateFolderCountCache();
+      return true;
+    }
+    return false;
+  }
+  
   // Export public API
   window.BackgroundEmailsLoader = {
     getEmailsData: () => emailsData,
@@ -937,7 +964,9 @@
     getTotalCount: getTotalCount,
     getTotalCountByFolder: getTotalCountByFolder,
     invalidateFolderCountCache: invalidateFolderCountCache,
-    getInMemoryCountByFolder: getInMemoryCountByFolder
+    getInMemoryCountByFolder: getInMemoryCountByFolder,
+    removeEmailById: removeEmailById,
+    updateEmailStatus: updateEmailStatus
   };
   
   console.log('[BackgroundEmailsLoader] Module initialized');
