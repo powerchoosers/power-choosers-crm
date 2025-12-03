@@ -440,9 +440,9 @@
 
         const status = email.status || '';
 
-        // Fast path: exclude already sent emails (multiple status indicators)
-        // CRITICAL: Check status to catch emails that were sent but type wasn't updated
-        if (status === 'sent' || status === 'delivered' || status === 'error') return false;
+        // Fast path: exclude already sent, rejected, or errored emails (multiple status indicators)
+        // CRITICAL: Check status to catch emails that were sent/rejected but type wasn't updated
+        if (status === 'sent' || status === 'delivered' || status === 'error' || status === 'rejected') return false;
 
         // Exclude emails stuck in 'sending' state if send time has passed (likely already sent)
         if (status === 'sending') {
