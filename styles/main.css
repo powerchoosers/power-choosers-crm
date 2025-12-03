@@ -22090,6 +22090,60 @@ div[id="account-contacts-list"] .contact-item .contact-name {
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid var(--border-light);
+}
+
+/* Editable Profile Picture Hover Effects */
+.editable-profile-pic-container {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.editable-profile-pic-container:hover {
+    transform: scale(1.02);
+}
+
+.profile-pic-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease, opacity 0.2s ease;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.editable-profile-pic-container:hover .profile-pic-overlay {
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.profile-pic-overlay svg {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.editable-profile-pic-container:hover .profile-pic-overlay svg {
+    opacity: 1;
+}
+
+/* Settings page profile picture */
+.settings-profile-pic {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--orange-primary);
+    display: block;
     flex-shrink: 0;
 }
 

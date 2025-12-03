@@ -1464,25 +1464,65 @@ class SettingsPage {
                     container.addEventListener('mouseenter', () => {
                         overlay.style.background = 'rgba(0, 0, 0, 0.5)';
                         overlay.style.opacity = '1';
+                        overlay.style.pointerEvents = 'auto'; // Allow clicks on hover
                         pencilIcon.style.opacity = '1';
                     });
                     
                     container.addEventListener('mouseleave', () => {
                         overlay.style.background = 'rgba(0, 0, 0, 0)';
                         overlay.style.opacity = '0';
+                        overlay.style.pointerEvents = 'none'; // Block clicks when not hovering
                         pencilIcon.style.opacity = '0';
                     });
                     
-                    container.addEventListener('click', async () => {
+                    container.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
                         await this.uploadProfilePictureFromSettings();
                     });
                 }
             } else {
+                // No photo - show editable placeholder with hover effect
                 avatarPreview.innerHTML = `
-                    <div style="width: 64px; height: 64px; border-radius: 50%; background: var(--grey-600); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 600;">
-                        ${(g.firstName || 'U').charAt(0).toUpperCase()}
+                    <div class="editable-profile-pic-container" style="position: relative; display: inline-block; cursor: pointer;">
+                        <div style="width: 64px; height: 64px; border-radius: 50%; background: var(--grey-600); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 600; border: 3px solid var(--orange-primary);">
+                            ${(g.firstName || 'U').charAt(0).toUpperCase()}
+                        </div>
+                        <div class="profile-pic-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0); border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: background 0.2s ease; opacity: 0; pointer-events: none;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0; transition: opacity 0.2s ease;">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </div>
                     </div>
                 `;
+                
+                // Setup hover effect and click handler for placeholder
+                const container = avatarPreview.querySelector('.editable-profile-pic-container');
+                const overlay = avatarPreview.querySelector('.profile-pic-overlay');
+                const pencilIcon = overlay?.querySelector('svg');
+                
+                if (container && overlay && pencilIcon) {
+                    container.addEventListener('mouseenter', () => {
+                        overlay.style.background = 'rgba(0, 0, 0, 0.5)';
+                        overlay.style.opacity = '1';
+                        overlay.style.pointerEvents = 'auto';
+                        pencilIcon.style.opacity = '1';
+                    });
+                    
+                    container.addEventListener('mouseleave', () => {
+                        overlay.style.background = 'rgba(0, 0, 0, 0)';
+                        overlay.style.opacity = '0';
+                        overlay.style.pointerEvents = 'none';
+                        pencilIcon.style.opacity = '0';
+                    });
+                    
+                    container.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        await this.uploadProfilePictureFromSettings();
+                    });
+                }
             }
         }
 

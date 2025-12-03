@@ -327,11 +327,19 @@ class AuthManager {
                     profilePic.src = avatarUrl + '?t=' + Date.now();
                 }
                 // Wrap in editable container if not already wrapped (delay to ensure DOM is ready)
-                setTimeout(() => {
+                // Use multiple attempts to ensure image is loaded and visible
+                const setupPic = (attempt = 0) => {
                     if (profilePic && profilePic.parentNode && !profilePic.closest('.editable-profile-pic-container')) {
-                        this.setupEditableProfilePic(profilePic, avatarUrl, user);
+                        // Check if image is loaded or has src
+                        if (profilePic.complete || profilePic.src) {
+                            this.setupEditableProfilePic(profilePic, avatarUrl, user);
+                        } else if (attempt < 5) {
+                            // Retry if image not loaded yet (max 5 attempts = 500ms)
+                            setTimeout(() => setupPic(attempt + 1), 100);
+                        }
                     }
-                }, 50);
+                };
+                setTimeout(() => setupPic(), 50);
             }
             if (profilePicLarge) {
                 profilePicLarge.src = avatarUrl;
@@ -341,11 +349,19 @@ class AuthManager {
                     profilePicLarge.src = avatarUrl + '?t=' + Date.now();
                 }
                 // Wrap in editable container if not already wrapped (delay to ensure DOM is ready)
-                setTimeout(() => {
+                // Use multiple attempts to ensure image is loaded and visible
+                const setupPicLarge = (attempt = 0) => {
                     if (profilePicLarge && profilePicLarge.parentNode && !profilePicLarge.closest('.editable-profile-pic-container')) {
-                        this.setupEditableProfilePic(profilePicLarge, avatarUrl, user);
+                        // Check if image is loaded or has src
+                        if (profilePicLarge.complete || profilePicLarge.src) {
+                            this.setupEditableProfilePic(profilePicLarge, avatarUrl, user);
+                        } else if (attempt < 5) {
+                            // Retry if image not loaded yet (max 5 attempts = 500ms)
+                            setTimeout(() => setupPicLarge(attempt + 1), 100);
+                        }
                     }
-                }, 50);
+                };
+                setTimeout(() => setupPicLarge(), 50);
             }
             if (profileFallback) {
                 profileFallback.style.display = 'none';
@@ -444,16 +460,18 @@ class AuthManager {
         container.addEventListener('mouseenter', () => {
             overlay.style.background = 'rgba(0, 0, 0, 0.5)';
             overlay.style.opacity = '1';
+            overlay.style.pointerEvents = 'auto'; // Allow clicks on hover
             pencilIcon.style.opacity = '1';
         });
 
         container.addEventListener('mouseleave', () => {
             overlay.style.background = 'rgba(0, 0, 0, 0)';
             overlay.style.opacity = '0';
+            overlay.style.pointerEvents = 'none'; // Block clicks when not hovering
             pencilIcon.style.opacity = '0';
         });
 
-        // Add click handler to upload new image
+        // Add click handler to upload new image (on container, overlay passes through)
         container.addEventListener('click', (e) => {
             e.stopPropagation();
             e.preventDefault();
@@ -683,6 +701,17 @@ function setupEventListeners() {
             e.stopPropagation();
             const isHidden = profileDropdown.hasAttribute('hidden');
             if (isHidden) {
+                // When opening dropdown, ensure profile picture is wrapped
+                setTimeout(() => {
+                    const profilePicLarge = document.getElementById('user-profile-pic-large');
+                    if (profilePicLarge && profilePicLarge.src && !profilePicLarge.closest('.editable-profile-pic-container')) {
+                        const user = this.user || firebase.auth().currentUser;
+                        if (user) {
+                            const avatarUrl = profilePicLarge.src;
+                            this.setupEditableProfilePic(profilePicLarge, avatarUrl, user);
+                        }
+                    }
+                }, 100);
                 profileDropdown.removeAttribute('hidden');
             } else {
                 profileDropdown.setAttribute('hidden', '');
