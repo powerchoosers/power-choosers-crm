@@ -302,16 +302,38 @@ class AuthManager {
         const profileName = document.getElementById('user-profile-name');
         const profileEmail = document.getElementById('user-profile-email');
 
-        if (user.photoURL) {
-            // Show Google profile picture, hide fallback
+        // Get hosted photo URL from settings if available, otherwise use Google photoURL
+        let avatarUrl = null;
+        try {
+            const settings = window.SettingsPage?.getSettings?.() || {};
+            avatarUrl = settings?.general?.hostedPhotoURL || null;
+        } catch (e) {
+            console.warn('[Auth] Could not get hosted photo from settings:', e);
+        }
+        
+        // Fallback to Google photoURL if no hosted version
+        if (!avatarUrl && user.photoURL) {
+            avatarUrl = user.photoURL;
+        }
+
+        if (avatarUrl) {
+            // Show profile picture (prefer hosted version), hide fallback
             if (profilePic) {
-                profilePic.src = user.photoURL;
+                profilePic.src = avatarUrl;
                 profilePic.alt = user.displayName || user.email;
                 profilePic.style.display = 'block';
+                // Add cache busting if using Google URL directly (helps with updates)
+                if (avatarUrl === user.photoURL && avatarUrl.includes('googleusercontent.com')) {
+                    profilePic.src = avatarUrl + '?t=' + Date.now();
+                }
             }
             if (profilePicLarge) {
-                profilePicLarge.src = user.photoURL;
+                profilePicLarge.src = avatarUrl;
                 profilePicLarge.alt = user.displayName || user.email;
+                // Add cache busting if using Google URL directly
+                if (avatarUrl === user.photoURL && avatarUrl.includes('googleusercontent.com')) {
+                    profilePicLarge.src = avatarUrl + '?t=' + Date.now();
+                }
             }
             if (profileFallback) {
                 profileFallback.style.display = 'none';
@@ -340,6 +362,16 @@ class AuthManager {
 
         if (profileEmail) {
             profileEmail.textContent = user.email;
+        }
+    }
+
+    // Refresh profile photo (called when settings updates hostedPhotoURL)
+    refreshProfilePhoto() {
+        if (this.user) {
+            console.log('[Auth] Refreshing profile photo from settings...');
+            this.updateUserProfile(this.user);
+        } else {
+            console.warn('[Auth] Cannot refresh profile photo - no user logged in');
         }
     }
 
