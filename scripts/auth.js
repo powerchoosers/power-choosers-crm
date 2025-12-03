@@ -326,6 +326,12 @@ class AuthManager {
                 if (avatarUrl === user.photoURL && avatarUrl.includes('googleusercontent.com')) {
                     profilePic.src = avatarUrl + '?t=' + Date.now();
                 }
+                // Wrap in editable container if not already wrapped (delay to ensure DOM is ready)
+                setTimeout(() => {
+                    if (profilePic && profilePic.parentNode && !profilePic.closest('.editable-profile-pic-container')) {
+                        this.setupEditableProfilePic(profilePic, avatarUrl, user);
+                    }
+                }, 50);
             }
             if (profilePicLarge) {
                 profilePicLarge.src = avatarUrl;
@@ -334,6 +340,12 @@ class AuthManager {
                 if (avatarUrl === user.photoURL && avatarUrl.includes('googleusercontent.com')) {
                     profilePicLarge.src = avatarUrl + '?t=' + Date.now();
                 }
+                // Wrap in editable container if not already wrapped (delay to ensure DOM is ready)
+                setTimeout(() => {
+                    if (profilePicLarge && profilePicLarge.parentNode && !profilePicLarge.closest('.editable-profile-pic-container')) {
+                        this.setupEditableProfilePic(profilePicLarge, avatarUrl, user);
+                    }
+                }, 50);
             }
             if (profileFallback) {
                 profileFallback.style.display = 'none';
@@ -365,11 +377,228 @@ class AuthManager {
         }
     }
 
+    // Setup editable profile picture with hover effect
+    setupEditableProfilePic(imgElement, currentAvatarUrl, user) {
+        // Skip if already wrapped
+        if (imgElement.closest('.editable-profile-pic-container')) {
+            return;
+        }
+
+        // Check if image is visible (has src and is displayed)
+        if (!imgElement.src || imgElement.style.display === 'none') {
+            return;
+        }
+
+        // Get the size from the image (for proper overlay sizing)
+        const imgWidth = imgElement.offsetWidth || parseInt(window.getComputedStyle(imgElement).width) || 40;
+        const imgHeight = imgElement.offsetHeight || parseInt(window.getComputedStyle(imgElement).height) || 40;
+        const size = Math.max(imgWidth, imgHeight);
+
+        // Create wrapper container
+        const container = document.createElement('div');
+        container.className = 'editable-profile-pic-container';
+        container.style.cssText = `position: relative; display: inline-block; cursor: pointer; width: ${size}px; height: ${size}px; flex-shrink: 0;`;
+
+        // Wrap the image
+        imgElement.parentNode.insertBefore(container, imgElement);
+        container.appendChild(imgElement);
+
+        // Ensure image maintains its size
+        imgElement.style.width = '100%';
+        imgElement.style.height = '100%';
+        imgElement.style.objectFit = 'cover';
+
+        // Create overlay for hover effect
+        const overlay = document.createElement('div');
+        overlay.className = 'profile-pic-overlay';
+        overlay.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s ease, opacity 0.2s ease;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 10;
+        `;
+
+        // Create pencil icon
+        const pencilIcon = document.createElement('div');
+        pencilIcon.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+        `;
+        pencilIcon.style.cssText = 'opacity: 0; transition: opacity 0.2s ease;';
+        overlay.appendChild(pencilIcon);
+        container.appendChild(overlay);
+
+        // Add hover effect
+        container.addEventListener('mouseenter', () => {
+            overlay.style.background = 'rgba(0, 0, 0, 0.5)';
+            overlay.style.opacity = '1';
+            pencilIcon.style.opacity = '1';
+        });
+
+        container.addEventListener('mouseleave', () => {
+            overlay.style.background = 'rgba(0, 0, 0, 0)';
+            overlay.style.opacity = '0';
+            pencilIcon.style.opacity = '0';
+        });
+
+        // Add click handler to upload new image
+        container.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            this.uploadProfilePicture(currentAvatarUrl, user);
+        });
+    }
+
+    // Upload profile picture (shared function)
+    async uploadProfilePicture(currentAvatarUrl, user) {
+        // Create file input
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.style.display = 'none';
+
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                if (window.showToast) {
+                    window.showToast('Please select a valid image file.', 'error');
+                }
+                return;
+            }
+
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                if (window.showToast) {
+                    window.showToast('Image file must be smaller than 5MB.', 'error');
+                }
+                return;
+            }
+
+            try {
+                if (window.showToast) {
+                    window.showToast('Uploading profile picture...', 'info');
+                }
+
+                // Convert to base64
+                const base64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const result = reader.result;
+                        const base64Data = result.split(',')[1];
+                        resolve(base64Data);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
+                // Upload to server
+                const apiBase = 'https://power-choosers-crm-792458658491.us-south1.run.app';
+                const uploadResponse = await fetch(`${apiBase}/api/upload/signature-image`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: base64, type: 'profile' })
+                });
+
+                if (!uploadResponse.ok) {
+                    throw new Error(`Upload failed: ${uploadResponse.status}`);
+                }
+
+                const result = await uploadResponse.json();
+                const imageUrl = result.imageUrl || (result.success && result.data?.link);
+
+                if (!imageUrl) {
+                    throw new Error('Server did not return image URL');
+                }
+
+                // Update settings with new hosted photo URL
+                if (window.SettingsPage && window.SettingsPage.instance) {
+                    const settingsPage = window.SettingsPage.instance;
+                    if (!settingsPage.state.settings.general) {
+                        settingsPage.state.settings.general = {};
+                    }
+                    settingsPage.state.settings.general.hostedPhotoURL = imageUrl;
+                    settingsPage.markDirty();
+                    await settingsPage.saveSettings();
+                } else {
+                    // Fallback: try to update settings directly
+                    try {
+                        const settings = window.SettingsPage?.getSettings?.() || {};
+                        if (!settings.general) settings.general = {};
+                        settings.general.hostedPhotoURL = imageUrl;
+                        localStorage.setItem('crm-settings', JSON.stringify(settings));
+                        
+                        // Try to save to Firebase
+                        if (window.firebaseDB) {
+                            const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+                                ? window.DataManager.getCurrentUserEmail()
+                                : ((window.currentUserEmail || '').toLowerCase());
+                            const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
+                                ? window.DataManager.isCurrentUserAdmin()
+                                : (window.currentUserRole === 'admin');
+                            const docId = isAdmin ? 'user-settings' : `user-settings-${userEmail}`;
+                            await window.firebaseDB.collection('settings').doc(docId).set({
+                                ...settings,
+                                ownerId: userEmail || '',
+                                lastUpdated: new Date().toISOString()
+                            }, { merge: true });
+                        }
+                    } catch (err) {
+                        console.error('[Auth] Error saving profile picture to settings:', err);
+                    }
+                }
+
+                // Refresh profile photo display
+                this.refreshProfilePhoto();
+
+                if (window.showToast) {
+                    window.showToast('Profile picture updated successfully!', 'success');
+                }
+
+            } catch (error) {
+                console.error('[Auth] Error uploading profile picture:', error);
+                if (window.showToast) {
+                    window.showToast('Failed to upload profile picture. Please try again.', 'error');
+                }
+            }
+        });
+
+        // Trigger file selection
+        document.body.appendChild(fileInput);
+        fileInput.click();
+        document.body.removeChild(fileInput);
+    }
+
     // Refresh profile photo (called when settings updates hostedPhotoURL)
     refreshProfilePhoto() {
         if (this.user) {
             console.log('[Auth] Refreshing profile photo from settings...');
             this.updateUserProfile(this.user);
+            // Re-setup editable containers after refresh
+            setTimeout(() => {
+                const profilePic = document.getElementById('user-profile-pic');
+                const profilePicLarge = document.getElementById('user-profile-pic-large');
+                if (profilePic && profilePic.src) {
+                    this.setupEditableProfilePic(profilePic, profilePic.src, this.user);
+                }
+                if (profilePicLarge && profilePicLarge.src) {
+                    this.setupEditableProfilePic(profilePicLarge, profilePicLarge.src, this.user);
+                }
+            }, 100);
         } else {
             console.warn('[Auth] Cannot refresh profile photo - no user logged in');
         }
