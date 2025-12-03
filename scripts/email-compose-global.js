@@ -2735,6 +2735,11 @@
     
     if (!editor) return;
 
+    // CRITICAL: Extract signature BEFORE clearing editor for skeleton animation
+    // This must happen before startGeneratingAnimation which clears innerHTML
+    const existingSignature = extractSignature(editor.innerHTML);
+    console.log('[AI] Extracted signature before generation:', existingSignature ? 'YES' : 'NO');
+
     // Close AI bar immediately
     if (aiBar) {
       aiBar.classList.remove('open');
@@ -2865,7 +2870,12 @@
         setTimeout(() => {
           // IMPORTANT: For structured HTML templates, DO NOT append existing signature
           // since the template includes a hard-coded signature block.
-          const finalHtml = templateType ? html : preserveSignatureAfterAI(editor, html);
+          // For standard emails, preserve the signature that was extracted BEFORE skeleton animation
+          let finalHtml = html;
+          if (!templateType) {
+            // Standard email: restore signature that was extracted before skeleton cleared editor
+            finalHtml = preserveSignatureAfterAI(editor, html, existingSignature);
+          }
           
           // Mark content type for sending (but don't activate HTML source view)
           if (templateType) {
@@ -4251,12 +4261,15 @@
       let sigDiv = doc.querySelector('[data-signature="true"]');
       
       // 2. Look for div with signature-like styling (check both inline and computed)
+      // This matches both standard signatures (margin-top: 20px) and custom HTML signatures (margin-top: 28px)
       if (!sigDiv) {
         sigDiv = Array.from(doc.querySelectorAll('div')).find(div => {
           const style = div.getAttribute('style') || '';
-          // Check if style contains signature-like patterns
+          // Check if style contains signature-like patterns (standard or custom HTML signature)
           return (style.includes('margin-top') && style.includes('padding-top') && style.includes('border-top')) ||
-                 (style.includes('border-top: 1px solid'));
+                 (style.includes('border-top: 1px solid')) ||
+                 // Custom HTML signature has margin-top: 28px and specific font-family
+                 (style.includes('margin-top: 28px') && style.includes('padding-top: 24px'));
         });
       }
       
@@ -4281,16 +4294,26 @@
   /**
    * Preserve and restore signature after AI content insertion
    * Enhanced version from old emails.js lines 1120-1147
+   * @param {HTMLElement} editor - The editor element
+   * @param {string} aiContent - The AI-generated HTML content
+   * @param {string|null} preExtractedSignature - Signature extracted BEFORE skeleton animation (optional)
    */
-  function preserveSignatureAfterAI(editor, aiContent) {
+  function preserveSignatureAfterAI(editor, aiContent, preExtractedSignature = null) {
     if (!editor) return aiContent;
     
     try {
-      // Extract existing signature BEFORE modifications
-      const currentContent = editor.innerHTML;
-      const signature = extractSignature(currentContent);
+      // Use pre-extracted signature if provided (extracted before skeleton cleared editor)
+      // Otherwise try to extract from current editor content (may be empty if skeleton already cleared it)
+      let signature = preExtractedSignature;
       
-      console.log('[Signature] Current signature found:', signature ? 'YES' : 'NO');
+      if (!signature) {
+        // Fallback: try to extract from current content (may be empty if skeleton cleared it)
+        const currentContent = editor.innerHTML;
+        signature = extractSignature(currentContent);
+        console.log('[Signature] Fallback: Extracted from current content:', signature ? 'YES' : 'NO');
+      } else {
+        console.log('[Signature] Using pre-extracted signature (from before skeleton):', signature ? 'YES' : 'NO');
+      }
       
       // Remove any existing signature from AI content using DOM parser
       let cleanHtml = aiContent;
