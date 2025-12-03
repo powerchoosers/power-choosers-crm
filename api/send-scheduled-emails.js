@@ -18,14 +18,16 @@ async function getUserSignature(ownerId) {
     return { signatureHtml: '', signatureText: '' };
   }
 
-  logger.debug('[SendScheduledEmails] Looking up signature for ownerId:', ownerId);
+  // Normalize ownerId to lowercase for consistent matching
+  const normalizedOwnerId = String(ownerId).toLowerCase().trim();
+  logger.debug('[SendScheduledEmails] Looking up signature for ownerId:', normalizedOwnerId);
 
   try {
     // Fetch user settings from Firestore
     // Settings are saved with doc ID like 'user-settings' (admin) or 'user-settings-{email}' (employee)
     // Try by ownerId query first (preferred), then fallback to direct doc lookup
     let settingsSnap = await db.collection('settings')
-      .where('ownerId', '==', ownerId)
+      .where('ownerId', '==', normalizedOwnerId)
       .limit(1)
       .get();
 
@@ -33,7 +35,7 @@ async function getUserSignature(ownerId) {
 
     // Fallback: Try direct document lookup by email-based ID
     if (settingsSnap.empty) {
-      const docId = `user-settings-${ownerId}`;
+      const docId = `user-settings-${normalizedOwnerId}`;
       logger.debug('[SendScheduledEmails] Trying direct doc lookup:', docId);
       const directDoc = await db.collection('settings').doc(docId).get();
       if (directDoc.exists) {
@@ -561,11 +563,26 @@ export default async function handler(req, res) {
         let finalHtml = emailData.html || '';
         let finalText = emailData.text || '';
 
+        // Log signature settings for debugging
+        logger.debug('[SendScheduledEmails] Signature settings:', {
+          emailId: emailDoc.id,
+          includeSignature: emailSettings.content.includeSignature,
+          ownerId: emailData.ownerId,
+          htmlLength: finalHtml.length
+        });
+
         // Add signature if enabled in settings
         if (emailSettings.content.includeSignature) {
           // Check if this is a full HTML template (has DOCTYPE or full HTML structure)
           const isHtmlTemplate = finalHtml.includes('<!DOCTYPE html>') || 
                                  (finalHtml.includes('<html') && finalHtml.includes('</html>'));
+          
+          logger.debug('[SendScheduledEmails] HTML template check:', {
+            emailId: emailDoc.id,
+            isHtmlTemplate,
+            hasDoctype: finalHtml.includes('<!DOCTYPE html>'),
+            hasHtmlTags: finalHtml.includes('<html') && finalHtml.includes('</html>')
+          });
           
           if (isHtmlTemplate) {
             // HTML template emails: Keep hardcoded signature (don't modify)
@@ -576,9 +593,20 @@ export default async function handler(req, res) {
             // Standard email (HTML fragment): Append signature from settings
             const { signatureHtml, signatureText } = await getUserSignature(emailData.ownerId);
             
+            logger.debug('[SendScheduledEmails] Signature lookup result:', {
+              emailId: emailDoc.id,
+              ownerId: emailData.ownerId,
+              hasSignatureHtml: !!signatureHtml,
+              signatureHtmlLength: signatureHtml?.length || 0,
+              hasSignatureText: !!signatureText
+            });
+            
             if (signatureHtml) {
               // Append signature to end of HTML fragment
               finalHtml = finalHtml + signatureHtml;
+              logger.debug('[SendScheduledEmails] Signature HTML appended, new length:', finalHtml.length);
+            } else {
+              logger.warn('[SendScheduledEmails] No signature HTML returned for ownerId:', emailData.ownerId);
             }
             
             if (signatureText) {
@@ -586,6 +614,8 @@ export default async function handler(req, res) {
               finalText = finalText + signatureText;
             }
           }
+        } else {
+          logger.debug('[SendScheduledEmails] Signature disabled for this email:', emailDoc.id);
         }
 
         // Inject custom tracking pixel and click tracking
