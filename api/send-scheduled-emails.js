@@ -28,7 +28,11 @@ function validateEmailBeforeSending(html, text, subject) {
     { pattern: /\[contact_company\]/i, reason: 'Unfilled placeholder' },
     { pattern: /\[contact_job_title\]/i, reason: 'Unfilled placeholder' },
     { pattern: /personalization instructions/i, reason: 'AI referencing instructions' },
-    { pattern: /i'll write the email immediately/i, reason: 'AI promising to write later' }
+    { pattern: /i'll write the email immediately/i, reason: 'AI promising to write later' },
+    // Raw JSON artifacts
+    { pattern: /"subject"\s*:\s*"/i, reason: 'Raw JSON content detected' },
+    { pattern: /"greeting"\s*:\s*"/i, reason: 'Raw JSON content detected' },
+    { pattern: /\{\s*"subject"\s*:/i, reason: 'Raw JSON content detected' }
   ];
   
   for (const { pattern, reason } of badPatterns) {

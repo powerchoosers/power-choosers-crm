@@ -39,7 +39,11 @@ function validateGeneratedContent(html, text, subject) {
     { pattern: /recipient details:/i, reason: 'AI listing required details' },
     { pattern: /company information:/i, reason: 'AI listing required info' },
     { pattern: /i'll write the email immediately/i, reason: 'AI promising to write later' },
-    { pattern: /personalization instructions/i, reason: 'AI referencing instructions' }
+    { pattern: /personalization instructions/i, reason: 'AI referencing instructions' },
+    // Raw JSON artifacts (means parsing failed)
+    { pattern: /"subject"\s*:\s*"/i, reason: 'Raw JSON response detected' },
+    { pattern: /"greeting"\s*:\s*"/i, reason: 'Raw JSON response detected' },
+    { pattern: /\{\s*"subject"\s*:/i, reason: 'Raw JSON response detected' }
   ];
   
   for (const { pattern, reason } of badPatterns) {
@@ -733,6 +737,48 @@ export default async function handler(req, res) {
         const emailData = emailDoc.data();
         logger.debug('[GenerateScheduledEmails] Processing email:', emailDoc.id);
         
+        // Helper to mark a generation as invalid and schedule retry/stop
+        const markGenerationInvalid = async (reason) => {
+          logger.warn(`[GenerateScheduledEmails] ⚠️ BAD GENERATION for ${emailDoc.id}: ${reason}`);
+          const attempts = (emailData.generationAttempts || 0) + 1;
+          const maxAttempts = 3;
+          
+          if (attempts >= maxAttempts) {
+            logger.error(`[GenerateScheduledEmails] ❌ Email ${emailDoc.id} failed ${attempts} times, marking as permanent error`);
+            await emailDoc.ref.update({
+              status: 'generation_failed',
+              lastGenerationAttempt: Date.now(),
+              generationFailureReason: `${reason} (failed ${attempts} times)`,
+              generationAttempts: attempts,
+              ownerId: emailData.ownerId || 'l.patterson@powerchoosers.com',
+              assignedTo: emailData.assignedTo || emailData.ownerId || 'l.patterson@powerchoosers.com',
+              createdBy: emailData.createdBy || emailData.ownerId || 'l.patterson@powerchoosers.com'
+            });
+            
+            errors.push({
+              emailId: emailDoc.id,
+              error: `Permanent failure after ${attempts} attempts: ${reason}`,
+              willRetry: false
+            });
+          } else {
+            await emailDoc.ref.update({
+              status: 'not_generated',
+              lastGenerationAttempt: Date.now(),
+              generationFailureReason: reason,
+              generationAttempts: attempts,
+              ownerId: emailData.ownerId || 'l.patterson@powerchoosers.com',
+              assignedTo: emailData.assignedTo || emailData.ownerId || 'l.patterson@powerchoosers.com',
+              createdBy: emailData.createdBy || emailData.ownerId || 'l.patterson@powerchoosers.com'
+            });
+            
+            errors.push({
+              emailId: emailDoc.id,
+              error: `Bad generation (attempt ${attempts}/${maxAttempts}): ${reason}`,
+              willRetry: true
+            });
+          }
+        };
+        
         // Get contact data for personalization
         let contactData = {};
         let accountData = {};
@@ -994,6 +1040,13 @@ export default async function handler(req, res) {
             }
             bodyText = parts.join('\n\n') || raw;
           }
+          else {
+            const looksLikeJson = /"subject"\s*:\s*/i.test(raw) || /"greeting"\s*:\s*/i.test(raw);
+            if (looksLikeJson) {
+              await markGenerationInvalid('Malformed JSON output (raw fields present)');
+              return;
+            }
+          }
 
           // For true cold intro steps, use angle-based subject generation
           // This gives Perplexity creative control while ensuring angle-specific variation
@@ -1120,53 +1173,7 @@ export default async function handler(req, res) {
         );
         
         if (!validation.isValid) {
-          logger.warn(`[GenerateScheduledEmails] ⚠️ BAD GENERATION DETECTED for email ${emailDoc.id}:`, validation.reason);
-          logger.warn(`[GenerateScheduledEmails] Marking email for re-generation on next cron run`);
-          
-          const attempts = (emailData.generationAttempts || 0) + 1;
-          const maxAttempts = 3; // Max retry attempts
-          
-          if (attempts >= maxAttempts) {
-            // Too many failed attempts - mark as permanent error
-            logger.error(`[GenerateScheduledEmails] ❌ Email ${emailDoc.id} failed ${attempts} times, marking as permanent error`);
-            await emailDoc.ref.update({
-              status: 'generation_failed',
-              lastGenerationAttempt: Date.now(),
-              generationFailureReason: `${validation.reason} (failed ${attempts} times)`,
-              generationAttempts: attempts,
-              // Preserve ownership fields
-              ownerId: emailData.ownerId || 'l.patterson@powerchoosers.com',
-              assignedTo: emailData.assignedTo || emailData.ownerId || 'l.patterson@powerchoosers.com',
-              createdBy: emailData.createdBy || emailData.ownerId || 'l.patterson@powerchoosers.com'
-            });
-            
-            errors.push({
-              emailId: emailDoc.id,
-              error: `Permanent failure after ${attempts} attempts: ${validation.reason}`,
-              willRetry: false
-            });
-          } else {
-            // Mark as needs_regeneration instead of pending_approval
-            // This will be picked up on the next cron run
-            await emailDoc.ref.update({
-              status: 'not_generated', // Reset to not_generated so it gets picked up again
-              lastGenerationAttempt: Date.now(),
-              generationFailureReason: validation.reason,
-              generationAttempts: attempts,
-              // Preserve ownership fields
-              ownerId: emailData.ownerId || 'l.patterson@powerchoosers.com',
-              assignedTo: emailData.assignedTo || emailData.ownerId || 'l.patterson@powerchoosers.com',
-              createdBy: emailData.createdBy || emailData.ownerId || 'l.patterson@powerchoosers.com'
-            });
-            
-            errors.push({
-              emailId: emailDoc.id,
-              error: `Bad generation (attempt ${attempts}/${maxAttempts}): ${validation.reason}`,
-              willRetry: true
-            });
-          }
-          
-          // Skip to next email - don't count as success
+          await markGenerationInvalid(validation.reason);
           return;
         }
         
