@@ -7339,11 +7339,84 @@ body {
     line-height: 1.5;
 }
 
+/* CRITICAL: Remove white backgrounds from nested elements to prevent white blocks */
+/* Only reset elements that DON'T have inline background styles (inline styles have higher specificity) */
+/* This prevents CRM dark theme CSS from adding unwanted white backgrounds */
+#email-detail-page .email-content.sent-email-preview div:not([style*="background"]),
+#email-detail-page .email-content.sent-email-preview p:not([style*="background"]),
+#email-detail-page .email-content.sent-email-preview span:not([style*="background"]),
+#email-detail-page .email-content.sent-email-preview table:not([style*="background"]),
+#email-detail-page .email-content.sent-email-preview td:not([style*="background"]),
+#email-detail-page .email-content.sent-email-preview tr:not([style*="background"]),
+#email-detail-page .email-content.sent-email-preview blockquote:not([style*="background"]),
+#email-detail-page .email-content.sent-email-preview pre:not([style*="background"]),
+#email-detail-page .email-content.sent-email-preview code:not([style*="background"]),
+#email-detail-page .email-content.sent-email-preview section:not([style*="background"]),
+#email-detail-page .email-content.sent-email-preview article:not([style*="background"]),
+#email-detail-page .email-content.sent-email-preview aside:not([style*="background"]),
+#email-detail-page .email-content.sent-email-preview header:not([style*="background"]),
+#email-detail-page .email-content.sent-email-preview footer:not([style*="background"]) {
+    background-color: transparent !important;
+    background-image: none !important;
+}
+
+/* Fix blockquote styling (email reply indicators) - remove white background, keep border */
+#email-detail-page .email-content.sent-email-preview blockquote {
+    background-color: transparent !important;
+    border: none !important;
+    margin: 0 !important;
+    padding-left: 0 !important;
+}
+
+/* Fix any Gmail-style quote blocks */
+#email-detail-page .email-content.sent-email-preview .gmail_quote,
+#email-detail-page .email-content.sent-email-preview [class*="quote"],
+#email-detail-page .email-content.sent-email-preview [class*="Quote"] {
+    background-color: transparent !important;
+    border: none !important;
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+}
+
+/* AGGRESSIVE: Override inline white/light backgrounds that create visible blocks */
+/* These are often baked into email HTML and need to be removed for the preview */
+#email-detail-page .email-content.sent-email-preview [style*="background:#fff"],
+#email-detail-page .email-content.sent-email-preview [style*="background: #fff"],
+#email-detail-page .email-content.sent-email-preview [style*="background:#FFF"],
+#email-detail-page .email-content.sent-email-preview [style*="background: #FFF"],
+#email-detail-page .email-content.sent-email-preview [style*="background:white"],
+#email-detail-page .email-content.sent-email-preview [style*="background: white"],
+#email-detail-page .email-content.sent-email-preview [style*="background-color:#fff"],
+#email-detail-page .email-content.sent-email-preview [style*="background-color: #fff"],
+#email-detail-page .email-content.sent-email-preview [style*="background-color:#FFF"],
+#email-detail-page .email-content.sent-email-preview [style*="background-color: #FFF"],
+#email-detail-page .email-content.sent-email-preview [style*="background-color:white"],
+#email-detail-page .email-content.sent-email-preview [style*="background-color: white"],
+#email-detail-page .email-content.sent-email-preview [style*="background-color:#ffffff"],
+#email-detail-page .email-content.sent-email-preview [style*="background-color: #ffffff"],
+#email-detail-page .email-content.sent-email-preview [style*="background-color:#FFFFFF"],
+#email-detail-page .email-content.sent-email-preview [style*="background-color: #FFFFFF"] {
+    background-color: transparent !important;
+    background: transparent !important;
+}
+
+/* Reset legacy attributes that can force white blocks */
+#email-detail-page .email-content.sent-email-preview [bgcolor],
+#email-detail-page .email-content.sent-email-preview [background] {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
 /* Default text color for elements without inline styles */
 #email-detail-page .email-content.sent-email-preview {
     color: #1a1a1a;
 }
 
+/* Aggressive: force all descendants to transparent backgrounds (except signature) */
+#email-detail-page .email-content.sent-email-preview *:not([data-signature="true"]):not([data-signature="true"] *) {
+    background: transparent !important;
+    background-color: transparent !important;
+}
 /* Link colors - only override if no inline style present */
 #email-detail-page .email-content.sent-email-preview a:not([style*="color"]) {
     color: #1a73e8;
