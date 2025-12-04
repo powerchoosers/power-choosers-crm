@@ -220,23 +220,41 @@ function buildCustomHtmlSignature(general) {
                         <tr>
                             <!-- LinkedIn -->
                             <td style="padding-right: 16px;">
-                                <a href="${linkedIn}" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none;">
-                                    <img src="https://img.icons8.com/ios-filled/16/64748b/linkedin.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: -1px; margin-right: 6px;">
-                                    LinkedIn
+                                <a href="${linkedIn}" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-block;">
+                                    <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse: collapse;">
+                                        <tr>
+                                            <td style="vertical-align: middle; padding-right: 8px;">
+                                                <img src="https://img.icons8.com/ios-filled/16/64748b/linkedin.png" width="14" height="14" alt="" style="display: block;">
+                                            </td>
+                                            <td style="vertical-align: middle; line-height: 14px; color: #64748b;">LinkedIn</td>
+                                        </tr>
+                                    </table>
                                 </a>
                             </td>
                             <!-- Website -->
                             <td style="padding-right: 16px;">
-                                <a href="https://powerchoosers.com" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none;">
-                                    <img src="https://img.icons8.com/ios-filled/16/64748b/domain.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: -1px; margin-right: 6px;">
-                                    Website
+                                <a href="https://powerchoosers.com" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-block;">
+                                    <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse: collapse;">
+                                        <tr>
+                                            <td style="vertical-align: middle; padding-right: 8px;">
+                                                <img src="https://img.icons8.com/ios-filled/16/64748b/domain.png" width="14" height="14" alt="" style="display: block;">
+                                            </td>
+                                            <td style="vertical-align: middle; line-height: 14px; color: #64748b;">Website</td>
+                                        </tr>
+                                    </table>
                                 </a>
                             </td>
                             <!-- Schedule -->
                             <td>
-                                <a href="https://powerchoosers.com/schedule" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none;">
-                                    <img src="https://img.icons8.com/ios-filled/16/64748b/calendar--v1.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: -1px; margin-right: 6px;">
-                                    Schedule
+                                <a href="https://powerchoosers.com/schedule" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-block;">
+                                    <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse: collapse;">
+                                        <tr>
+                                            <td style="vertical-align: middle; padding-right: 8px;">
+                                                <img src="https://img.icons8.com/ios-filled/16/64748b/calendar--v1.png" width="14" height="14" alt="" style="display: block;">
+                                            </td>
+                                            <td style="vertical-align: middle; line-height: 14px; color: #64748b;">Schedule</td>
+                                        </tr>
+                                    </table>
                                 </a>
                             </td>
                         </tr>
