@@ -516,7 +516,7 @@
     // ===== NEPQ 5-STAGE DISCOVERY SYSTEM =====
     nepq_situation_questions: {
       stage: 'NEPQ Discovery - Situation',
-      text: "<span class=\"tone-marker curious\">🔍 STAGE 2: NEPQ SITUATION QUESTIONS</span><br><br><span class=\"tone-marker curious\">CURIOUS TONE</span> (no judgment, just gathering data)<br><br>\"So what are you doing now for your electricity procurement... <span class=\"pause-indicator\"></span> just so I have more context?\"<br><br><em>⏸️ Wait for answer, then follow up:</em><br><br>\"And roughly how much are you spending monthly... <span class=\"pause-indicator\"></span> just so I understand the scope we're talking about?\"",
+      text: "<span class=\"tone-marker curious\">🔍 STAGE 1: NEPQ SITUATION QUESTIONS</span><br><br><span class=\"tone-marker curious\">CURIOUS TONE</span> (no judgment, just gathering data)<br><br>\"So what are you doing now for your electricity procurement... <span class=\"pause-indicator\"></span> just so I have more context?\"<br><br><em>⏸️ Wait for answer, then follow up:</em><br><br>\"And roughly how much are you spending monthly... <span class=\"pause-indicator\"></span> just so I understand the scope we're talking about?\"",
       responses: [
         { label: "$10K-25K monthly", next: 'nepq_situation_broker_check' },
         { label: "$25K-50K monthly", next: 'nepq_situation_broker_check' },
