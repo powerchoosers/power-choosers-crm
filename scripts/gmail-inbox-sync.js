@@ -146,7 +146,30 @@
   }
 
   /**
+   * Decode base64url to UTF-8 string (handles Gmail's URL-safe base64)
+   */
+  function decodeBase64Url(data) {
+    if (!data) return '';
+    try {
+      // Convert URL-safe base64 to standard base64
+      const base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+      // Decode base64 to binary string
+      const binaryString = atob(base64);
+      // Convert binary string to UTF-8
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return new TextDecoder('utf-8').decode(bytes);
+    } catch (e) {
+      console.warn('[GmailSync] Base64 decode error:', e);
+      return '';
+    }
+  }
+
+  /**
    * Parse Gmail message into our email format
+   * Handles complex MIME structures including multipart/related, multipart/mixed, etc.
    */
   function parseGmailMessage(message, userEmail) {
     const headers = message.payload?.headers || [];
@@ -155,35 +178,101 @@
       return header ? header.value : '';
     };
 
-    // Extract body parts
+    // Extract body parts and attachments
     let htmlBody = '';
     let textBody = '';
+    const attachments = [];
+    const inlineImages = {}; // Map CID -> data URL
 
-    const extractBody = (part) => {
+    /**
+     * Recursively extract content from MIME parts
+     * Priority: HTML > Plain text
+     * Also extracts attachments and inline images
+     */
+    const extractParts = (part, depth = 0) => {
       if (!part) return;
 
-      if (part.mimeType === 'text/html' && part.body?.data) {
-        htmlBody = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-      } else if (part.mimeType === 'text/plain' && part.body?.data) {
-        textBody = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+      const mimeType = (part.mimeType || '').toLowerCase();
+      const partHeaders = part.headers || [];
+      const getPartHeader = (name) => {
+        const h = partHeaders.find(h => h.name.toLowerCase() === name.toLowerCase());
+        return h ? h.value : '';
+      };
+
+      // Get Content-ID for inline images
+      const contentId = getPartHeader('Content-ID')?.replace(/[<>]/g, '') || '';
+      const contentDisposition = getPartHeader('Content-Disposition') || '';
+      const isInline = contentDisposition.toLowerCase().includes('inline') || contentId;
+      const isAttachment = contentDisposition.toLowerCase().includes('attachment');
+
+      // Handle different MIME types
+      if (mimeType === 'text/html' && part.body?.data) {
+        // Prefer later HTML parts (they're usually the full version)
+        const decoded = decodeBase64Url(part.body.data);
+        if (decoded && (!htmlBody || decoded.length > htmlBody.length)) {
+          htmlBody = decoded;
+        }
+      } else if (mimeType === 'text/plain' && part.body?.data) {
+        const decoded = decodeBase64Url(part.body.data);
+        if (decoded && !textBody) {
+          textBody = decoded;
+        }
+      } else if (mimeType.startsWith('image/') && part.body) {
+        // Handle inline images
+        if (isInline && contentId && part.body.attachmentId) {
+          // Store reference for later - we'd need another API call to get the actual data
+          // For now, store metadata
+          inlineImages[contentId] = {
+            mimeType: mimeType,
+            attachmentId: part.body.attachmentId,
+            size: part.body.size || 0
+          };
+        } else if (isAttachment || part.body.attachmentId) {
+          // Regular image attachment
+          attachments.push({
+            filename: part.filename || `image_${attachments.length}.${mimeType.split('/')[1] || 'png'}`,
+            mimeType: mimeType,
+            size: part.body.size || 0,
+            attachmentId: part.body.attachmentId
+          });
+        }
+      } else if (part.body?.attachmentId && part.filename) {
+        // Other attachments (PDFs, docs, etc.)
+        attachments.push({
+          filename: part.filename,
+          mimeType: mimeType,
+          size: part.body.size || 0,
+          attachmentId: part.body.attachmentId
+        });
       }
 
       // Recursively process multipart messages
-      if (part.parts) {
-        part.parts.forEach(extractBody);
+      if (part.parts && part.parts.length > 0) {
+        // Process all subparts
+        for (const subpart of part.parts) {
+          extractParts(subpart, depth + 1);
+        }
       }
     };
 
-    extractBody(message.payload);
+    // Start extraction from payload
+    extractParts(message.payload);
 
-    // If no parts, try direct body
+    // If still no content, try direct body
     if (!htmlBody && !textBody && message.payload?.body?.data) {
-      const bodyContent = atob(message.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-      if (message.payload.mimeType === 'text/html') {
-        htmlBody = bodyContent;
-      } else {
-        textBody = bodyContent;
+      const decoded = decodeBase64Url(message.payload.body.data);
+      if (decoded) {
+        if ((message.payload.mimeType || '').includes('html')) {
+          htmlBody = decoded;
+        } else {
+          textBody = decoded;
+        }
       }
+    }
+
+    // If still no HTML but have text, convert text to basic HTML
+    if (!htmlBody && textBody) {
+      htmlBody = `<div style="white-space: pre-wrap; font-family: sans-serif;">${textBody.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>`;
     }
 
     // Parse references header
@@ -205,15 +294,33 @@
       threadId = `gmail_thread_${message.threadId}`;
     }
 
-    // Sanitize HTML (basic XSS protection)
+    // Sanitize HTML (basic XSS protection - preserve images and styles)
     const sanitizeHtml = (html) => {
       if (!html) return '';
-      // Remove script tags
+      // Remove only dangerous elements, preserve images and inline styles
       return html
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        .replace(/on\w+="[^"]*"/gi, '')
-        .replace(/on\w+='[^']*'/gi, '');
+        .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+        .replace(/javascript:/gi, '')
+        .replace(/on(click|load|error|mouseover|mouseout|focus|blur|submit|change|input|keyup|keydown|keypress)=/gi, 'data-disabled-');
     };
+
+    // Parse the actual received date from internalDate (milliseconds since epoch)
+    const receivedDate = new Date(parseInt(message.internalDate));
+    const headerDate = getHeader('Date');
+    let emailDate = receivedDate;
+    
+    // Try to parse header date if available (more accurate)
+    if (headerDate) {
+      try {
+        const parsed = new Date(headerDate);
+        if (!isNaN(parsed.getTime())) {
+          emailDate = parsed;
+        }
+      } catch (e) {
+        // Use receivedDate
+      }
+    }
 
     return {
       // Gmail-specific fields
@@ -232,6 +339,11 @@
       inReplyTo: inReplyTo,
       references: references,
       
+      // Attachments metadata (attachment data requires separate API call)
+      attachments: attachments.length > 0 ? attachments : null,
+      hasAttachments: attachments.length > 0,
+      attachmentCount: attachments.length,
+      
       // Threading
       threadId: threadId,
       
@@ -240,6 +352,7 @@
       emailType: 'received',
       status: 'received',
       provider: 'gmail_api', // Matches existing provider pattern
+      unread: message.labelIds?.includes('UNREAD') || false,
       
       // CRITICAL: Set ownership fields for Firestore rules compliance
       // Fallback to admin if userEmail is empty
@@ -247,9 +360,11 @@
       assignedTo: (userEmail && userEmail.trim()) ? userEmail.toLowerCase().trim() : 'l.patterson@powerchoosers.com',
       createdBy: (userEmail && userEmail.trim()) ? userEmail.toLowerCase().trim() : 'l.patterson@powerchoosers.com',
       
-      // Timestamps
-      date: getHeader('Date') ? new Date(getHeader('Date')).toISOString() : new Date(parseInt(message.internalDate)).toISOString(),
-      receivedAt: new Date(parseInt(message.internalDate)).toISOString(),
+      // Timestamps - CRITICAL: Use actual email date for sorting
+      // 'date' and 'receivedAt' should be the actual email timestamp for proper chronological sorting
+      date: emailDate.toISOString(),
+      receivedAt: receivedDate.toISOString(),
+      timestamp: emailDate.getTime(), // Numeric timestamp for reliable sorting
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       
@@ -259,19 +374,52 @@
   }
 
   /**
-   * Check if email already exists in Firestore (by gmailMessageId)
+   * Check if email already exists in Firestore (by gmailMessageId AND ownerId)
+   * CRITICAL: Each agent has their own inbox - check by BOTH gmailMessageId AND owner
+   * This ensures each agent gets their own copy of emails, not blocked by other agents' syncs
    */
-  async function emailExists(gmailMessageId) {
+  async function emailExists(gmailMessageId, userEmail) {
     try {
       const db = firebase.firestore();
+      const ownerEmail = (userEmail || '').toLowerCase().trim();
+      
+      // Query by both gmailMessageId AND ownerId to ensure per-agent deduplication
       const snap = await db.collection('emails')
         .where('gmailMessageId', '==', gmailMessageId)
+        .where('ownerId', '==', ownerEmail)
         .limit(1)
         .get();
       return !snap.empty;
     } catch (error) {
       console.error('[GmailSync] Error checking email existence:', error);
       return false;
+    }
+  }
+
+  /**
+   * Fetch attachment data from Gmail API
+   * Returns base64 encoded attachment data
+   */
+  async function fetchGmailAttachment(accessToken, messageId, attachmentId) {
+    try {
+      const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gmail API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.data; // base64url encoded
+    } catch (error) {
+      console.error('[GmailSync] Failed to fetch attachment:', attachmentId, error);
+      return null;
     }
   }
 
@@ -361,8 +509,9 @@
       // Process each message
       for (const msg of messages) {
         try {
-          // Check if already exists
-          const exists = await emailExists(msg.id);
+          // Check if already exists FOR THIS USER (each agent has their own inbox)
+          // This ensures Agent A's synced emails don't block Agent B from syncing the same email
+          const exists = await emailExists(msg.id, userEmail);
           if (exists) {
             skipped++;
             continue;
@@ -381,7 +530,7 @@
             continue;
           }
 
-          // Parse and save
+          // Parse and save with ownership set to current user
           const emailData = parseGmailMessage(fullMessage, userEmail);
           const savedId = await saveEmailToFirestore(emailData);
           
@@ -401,6 +550,25 @@
 
       // Notify BackgroundEmailsLoader to refresh
       if (synced > 0) {
+        // CRITICAL: Invalidate email cache so background loader refetches fresh data
+        // This ensures newly synced emails appear immediately with correct sorting
+        if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+          await window.CacheManager.invalidate('emails');
+          console.log('[GmailSync] Cache invalidated after sync');
+        }
+        
+        // Invalidate folder count cache in background loader
+        if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.invalidateFolderCountCache === 'function') {
+          window.BackgroundEmailsLoader.invalidateFolderCountCache();
+        }
+        
+        // Trigger reload of background emails loader for immediate UI update
+        if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.reload === 'function') {
+          // Don't await - let it run in background
+          window.BackgroundEmailsLoader.reload();
+        }
+        
+        // Dispatch event for any listeners
         document.dispatchEvent(new CustomEvent('pc:emails-updated', { 
           detail: { source: 'gmail_sync', synced } 
         }));
@@ -471,11 +639,76 @@
     document._gmailSyncBound = true;
   }
 
+  /**
+   * Fetch and decode an attachment for display
+   * @param {string} emailId - The Firestore email document ID
+   * @param {string} attachmentId - The Gmail attachment ID
+   * @returns {Promise<{data: string, mimeType: string}|null>}
+   */
+  async function getAttachment(emailId, attachmentId) {
+    try {
+      // Get the email document to find the Gmail message ID
+      const db = firebase.firestore();
+      const emailDoc = await db.collection('emails').doc(emailId).get();
+      
+      if (!emailDoc.exists) {
+        console.error('[GmailSync] Email not found:', emailId);
+        return null;
+      }
+      
+      const email = emailDoc.data();
+      const gmailMessageId = email.gmailMessageId;
+      
+      if (!gmailMessageId) {
+        console.error('[GmailSync] No Gmail message ID for email:', emailId);
+        return null;
+      }
+      
+      // Get access token
+      const accessToken = await getGmailAccessToken();
+      if (!accessToken) {
+        console.error('[GmailSync] No access token available');
+        return null;
+      }
+      
+      // Fetch the attachment
+      const attachmentData = await fetchGmailAttachment(accessToken, gmailMessageId, attachmentId);
+      if (!attachmentData) {
+        return null;
+      }
+      
+      // Find the attachment metadata
+      const attachmentMeta = (email.attachments || []).find(a => a.attachmentId === attachmentId);
+      const mimeType = attachmentMeta?.mimeType || 'application/octet-stream';
+      
+      // Convert base64url to standard base64
+      const base64 = attachmentData.replace(/-/g, '+').replace(/_/g, '/');
+      
+      return {
+        data: base64,
+        mimeType: mimeType,
+        filename: attachmentMeta?.filename || 'attachment'
+      };
+    } catch (error) {
+      console.error('[GmailSync] Failed to get attachment:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Force re-sync (ignores cooldown)
+   */
+  async function forceSync(maxMessages = MAX_MESSAGES_PER_SYNC) {
+    return syncGmailInbox({ force: true, maxMessages });
+  }
+
   // Export public API
   window.GmailInboxSync = {
     sync: syncGmailInbox,
+    forceSync: forceSync,
     isAvailable: isGmailSyncAvailable,
-    getStatus: getSyncStatus
+    getStatus: getSyncStatus,
+    getAttachment: getAttachment
   };
 
   console.log('[GmailSync] Client-side Gmail sync module initialized');

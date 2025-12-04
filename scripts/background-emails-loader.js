@@ -57,6 +57,16 @@
     const receivedAt = tsToIso(data.receivedAt);
     const scheduledSendTime = tsToMs(data.scheduledSendTime); // Keep as milliseconds for numeric comparison
     const generatedAt = tsToIso(data.generatedAt);
+    
+    // CRITICAL: Normalize 'date' field for consistent sorting across all email sources
+    // Priority: existing date field > receivedAt > sentAt > createdAt
+    // This ensures emails from Gmail, SendGrid, and sequences all sort correctly
+    let date = data.date;
+    if (!date || typeof date !== 'string') {
+      // Try to parse from receivedAt, sentAt, or createdAt
+      date = receivedAt || sentAt || createdAt || new Date().toISOString();
+    }
+    
     const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
     return {
       id,
@@ -68,6 +78,7 @@
       scheduledSendTime,
       generatedAt,
       timestamp,
+      date, // IMPORTANT: Ensure date field is always set for sorting
       emailType: data.type || (data.provider === 'sendgrid_inbound' || data.provider === 'gmail_api' ? 'received' : 'sent')
     };
   }

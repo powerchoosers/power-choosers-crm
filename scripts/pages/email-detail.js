@@ -284,13 +284,25 @@
         contentHtml = '<p>No content available</p>';
       }
       
-      // Add signature if email should have one (scheduled/sent emails from sequences)
-      // Check if email is from a sequence or has type that suggests it should include signature
-      const shouldShowSignature = email.type === 'scheduled' || 
-                                   email.type === 'auto-email' || 
-                                   email.type === 'manual-email' ||
-                                   email.sequenceId ||
-                                   (email.status && email.status !== 'received');
+      // IMPORTANT: For SENT emails, the signature is already baked into the HTML content.
+      // Do NOT add another signature - this causes duplicate signatures in the sent tab.
+      // Only add signature for scheduled emails that haven't been sent yet (preview mode).
+      const isSentEmail = email.type === 'sent' || email.status === 'sent';
+      
+      // Check if email already has a signature embedded (multiple detection patterns)
+      const hasExistingSignature = contentHtml.includes('border-top: 2px solid #E8A23A') || // Orange line
+                                    contentHtml.includes('border-top:2px solid #E8A23A') ||
+                                    contentHtml.includes('Power Choosers — Choose Wisely') || // Footer text
+                                    contentHtml.includes('powerchoosers.com') && contentHtml.includes('Lead Energy Strategist');
+      
+      // Only add signature for scheduled emails (preview) that don't already have one
+      const shouldShowSignature = !isSentEmail && 
+                                   !hasExistingSignature &&
+                                   (email.type === 'scheduled' || 
+                                    email.type === 'auto-email' || 
+                                    email.type === 'manual-email' ||
+                                    email.sequenceId ||
+                                    (email.status && email.status !== 'received'));
       
       if (shouldShowSignature) {
         try {
@@ -306,14 +318,19 @@
               signatureHtml = signature.replace(/<img[^>]*alt=["']Signature["'][\s\S]*?>/gi, '');
             }
             
-            // Only add if content doesn't already include signature
-            if (signatureHtml && !contentHtml.includes('margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;')) {
-              contentHtml += signatureHtml;
-            }
+            contentHtml += signatureHtml;
           }
         } catch (error) {
           console.warn('[EmailDetail] Error adding signature:', error);
         }
+      }
+      
+      // Add sent-email-preview class for sent emails to render with white background
+      // This makes the preview match how recipients see the email in their inbox
+      if (isSentEmail || email.type === 'sent' || email.status === 'sent') {
+        els.emailContent.classList.add('sent-email-preview');
+      } else {
+        els.emailContent.classList.remove('sent-email-preview');
       }
       
       els.emailContent.innerHTML = contentHtml;
