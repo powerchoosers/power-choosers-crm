@@ -25,41 +25,68 @@ async function getUserSignature(ownerId) {
   try {
     // Fetch user settings from Firestore
     // Settings are saved with doc ID like 'user-settings' (admin) or 'user-settings-{email}' (employee)
-    // Try by ownerId query first (preferred), then fallback to direct doc lookup
-    let settingsSnap = await db.collection('settings')
-      .where('ownerId', '==', normalizedOwnerId)
-      .limit(1)
-      .get();
-
-    logger.debug('[SendScheduledEmails] Query by ownerId result:', settingsSnap.empty ? 'empty' : 'found');
-
-    // Fallback: Try direct document lookup by email-based ID
-    if (settingsSnap.empty) {
-      const docId = `user-settings-${normalizedOwnerId}`;
-      logger.debug('[SendScheduledEmails] Trying direct doc lookup:', docId);
-      const directDoc = await db.collection('settings').doc(docId).get();
-      if (directDoc.exists) {
-        settingsSnap = { empty: false, docs: [directDoc] };
+    // IMPORTANT: Try direct doc lookup FIRST to avoid matching call-scripts documents
+    let settingsDoc = null;
+    let settingsSnap = { empty: true, docs: [] };
+    
+    // Priority 1: Try direct document lookup by email-based ID (most reliable)
+    const docId = `user-settings-${normalizedOwnerId}`;
+    logger.debug('[SendScheduledEmails] Trying direct doc lookup first:', docId);
+    const directDoc = await db.collection('settings').doc(docId).get();
+    if (directDoc.exists) {
+      const data = directDoc.data();
+      // Validate it's actually a settings doc (has emailSignature or general)
+      if (data.emailSignature || data.general) {
+        settingsDoc = directDoc;
         logger.debug('[SendScheduledEmails] Found settings via direct doc lookup');
+      } else {
+        logger.debug('[SendScheduledEmails] Direct doc exists but missing emailSignature/general, skipping');
       }
     }
 
-    // Fallback: Try legacy admin settings doc
-    if (settingsSnap.empty) {
+    // Priority 2: Try legacy admin settings doc
+    if (!settingsDoc) {
       logger.debug('[SendScheduledEmails] Trying legacy admin doc: user-settings');
       const adminDoc = await db.collection('settings').doc('user-settings').get();
       if (adminDoc.exists) {
-        settingsSnap = { empty: false, docs: [adminDoc] };
-        logger.debug('[SendScheduledEmails] Found settings via legacy admin doc');
+        const data = adminDoc.data();
+        if (data.emailSignature || data.general) {
+          settingsDoc = adminDoc;
+          logger.debug('[SendScheduledEmails] Found settings via legacy admin doc');
+        }
       }
     }
 
-    if (settingsSnap.empty) {
-      logger.warn('[SendScheduledEmails] No settings found for user:', ownerId);
+    // Priority 3: Fallback to ownerId query (but filter out call-scripts docs)
+    if (!settingsDoc) {
+      logger.debug('[SendScheduledEmails] Trying ownerId query as fallback');
+      const querySnap = await db.collection('settings')
+        .where('ownerId', '==', normalizedOwnerId)
+        .get();
+      
+      // Filter to find actual settings documents (not call-scripts)
+      for (const doc of querySnap.docs) {
+        const data = doc.data();
+        // Skip call-scripts documents (they don't have emailSignature)
+        if (doc.id.startsWith('call-scripts-')) {
+          logger.debug('[SendScheduledEmails] Skipping call-scripts document:', doc.id);
+          continue;
+        }
+        // Check if it has the expected structure
+        if (data.emailSignature || data.general) {
+          settingsDoc = doc;
+          logger.debug('[SendScheduledEmails] Found settings via ownerId query:', doc.id);
+          break;
+        }
+      }
+    }
+
+    if (!settingsDoc) {
+      logger.warn('[SendScheduledEmails] No settings found for user after all lookup attempts:', ownerId);
       return { signatureHtml: '', signatureText: '' };
     }
 
-    const data = settingsSnap.docs[0].data();
+    const data = settingsDoc.data();
     const signature = data.emailSignature || {};
     const general = data.general || {};
     const sigText = signature.text || '';
