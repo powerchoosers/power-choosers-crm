@@ -2658,24 +2658,24 @@ class SettingsPage {
                     <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
                         <tr>
                             <!-- LinkedIn -->
-                            <td style="padding-right: 16px;">
-                                <a href="${linkedIn}" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none;">
-                                    <img src="https://img.icons8.com/ios-filled/16/64748b/linkedin.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: -1px; margin-right: 6px;">
-                                    LinkedIn
+                            <td style="padding-right: 16px; vertical-align: middle;">
+                                <a href="${linkedIn}" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-block; line-height: 14px;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/linkedin.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
+                                    <span style="display: inline-block; vertical-align: middle; line-height: 14px;">LinkedIn</span>
                                 </a>
                             </td>
                             <!-- Website -->
-                            <td style="padding-right: 16px;">
-                                <a href="https://powerchoosers.com" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none;">
-                                    <img src="https://img.icons8.com/ios-filled/16/64748b/domain.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: -1px; margin-right: 6px;">
-                                    Website
+                            <td style="padding-right: 16px; vertical-align: middle;">
+                                <a href="https://powerchoosers.com" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-block; line-height: 14px;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/domain.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
+                                    <span style="display: inline-block; vertical-align: middle; line-height: 14px;">Website</span>
                                 </a>
                             </td>
                             <!-- Schedule -->
-                            <td>
-                                <a href="https://powerchoosers.com/schedule" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none;">
-                                    <img src="https://img.icons8.com/ios-filled/16/64748b/calendar--v1.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: -1px; margin-right: 6px;">
-                                    Schedule
+                            <td style="vertical-align: middle;">
+                                <a href="https://powerchoosers.com/schedule" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-block; line-height: 14px;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/calendar--v1.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
+                                    <span style="display: inline-block; vertical-align: middle; line-height: 14px;">Schedule</span>
                                 </a>
                             </td>
                         </tr>
