@@ -2,6 +2,66 @@ import { db } from './_firebase.js';
 import * as IndustryDetection from './_industry-detection.js';
 import logger from './_logger.js';
 
+// ========== BAD GENERATION DETECTION ==========
+
+/**
+ * Detect malformed AI generations that should not be sent
+ * Returns { isValid: boolean, reason: string }
+ */
+function validateGeneratedContent(html, text, subject) {
+  const content = (html || '') + ' ' + (text || '') + ' ' + (subject || '');
+  const contentLower = content.toLowerCase();
+  
+  // Patterns that indicate the AI returned a "meta" response instead of actual email
+  const badPatterns = [
+    // AI asking for more information
+    { pattern: /i appreciate the detailed personalization/i, reason: 'AI asked for more information instead of generating' },
+    { pattern: /i need to clarify/i, reason: 'AI asked for clarification' },
+    { pattern: /what i need to proceed/i, reason: 'AI requested more details' },
+    { pattern: /please share the recipient/i, reason: 'AI requested recipient info' },
+    { pattern: /once you provide these details/i, reason: 'AI waiting for details' },
+    { pattern: /to write this email following your/i, reason: 'AI explaining what it needs' },
+    { pattern: /i'll generate.*once you/i, reason: 'AI conditional generation' },
+    { pattern: /\*\*the issue:\*\*/i, reason: 'AI meta-response with issue header' },
+    { pattern: /\*\*what i need:\*\*/i, reason: 'AI meta-response with needs header' },
+    { pattern: /\*\*confirmation:\*\*/i, reason: 'AI asking for confirmation' },
+    
+    // Unfilled placeholders
+    { pattern: /\[contact_first_name\]/i, reason: 'Unfilled placeholder: contact_first_name' },
+    { pattern: /\[contact_company\]/i, reason: 'Unfilled placeholder: contact_company' },
+    { pattern: /\[contact_job_title\]/i, reason: 'Unfilled placeholder: contact_job_title' },
+    { pattern: /\[company_industry\]/i, reason: 'Unfilled placeholder: company_industry' },
+    { pattern: /\[contact_linkedin_recent_activity\]/i, reason: 'Unfilled placeholder: linkedin_activity' },
+    { pattern: /\[city\]|\[state\]/i, reason: 'Unfilled placeholder: location' },
+    { pattern: /\{\{[a-z_]+\}\}/i, reason: 'Unfilled mustache placeholder' },
+    
+    // Other meta patterns
+    { pattern: /recipient details:/i, reason: 'AI listing required details' },
+    { pattern: /company information:/i, reason: 'AI listing required info' },
+    { pattern: /i'll write the email immediately/i, reason: 'AI promising to write later' },
+    { pattern: /personalization instructions/i, reason: 'AI referencing instructions' }
+  ];
+  
+  for (const { pattern, reason } of badPatterns) {
+    if (pattern.test(content)) {
+      return { isValid: false, reason };
+    }
+  }
+  
+  // Check for suspiciously short content (less than 50 chars excluding HTML tags)
+  const textOnly = (text || '').replace(/<[^>]+>/g, '').trim();
+  if (textOnly.length < 50) {
+    return { isValid: false, reason: 'Content too short (less than 50 characters)' };
+  }
+  
+  // Check for missing subject
+  if (!subject || subject.trim().length < 5) {
+    return { isValid: false, reason: 'Missing or invalid subject line' };
+  }
+  
+  return { isValid: true, reason: null };
+}
+
 // ========== INDUSTRY DETECTION FUNCTIONS ==========
 
 // Infer industry from company name
@@ -1051,8 +1111,67 @@ export default async function handler(req, res) {
           exemption_type: accountData?.taxExemptStatus || null
         };
         
+        // CRITICAL: Validate generated content before saving
+        // Detect malformed AI generations that should not be sent
+        const validation = validateGeneratedContent(
+          generatedContent.html, 
+          generatedContent.text, 
+          generatedContent.subject
+        );
+        
+        if (!validation.isValid) {
+          logger.warn(`[GenerateScheduledEmails] ⚠️ BAD GENERATION DETECTED for email ${emailDoc.id}:`, validation.reason);
+          logger.warn(`[GenerateScheduledEmails] Marking email for re-generation on next cron run`);
+          
+          const attempts = (emailData.generationAttempts || 0) + 1;
+          const maxAttempts = 3; // Max retry attempts
+          
+          if (attempts >= maxAttempts) {
+            // Too many failed attempts - mark as permanent error
+            logger.error(`[GenerateScheduledEmails] ❌ Email ${emailDoc.id} failed ${attempts} times, marking as permanent error`);
+            await emailDoc.ref.update({
+              status: 'generation_failed',
+              lastGenerationAttempt: Date.now(),
+              generationFailureReason: `${validation.reason} (failed ${attempts} times)`,
+              generationAttempts: attempts,
+              // Preserve ownership fields
+              ownerId: emailData.ownerId || 'l.patterson@powerchoosers.com',
+              assignedTo: emailData.assignedTo || emailData.ownerId || 'l.patterson@powerchoosers.com',
+              createdBy: emailData.createdBy || emailData.ownerId || 'l.patterson@powerchoosers.com'
+            });
+            
+            errors.push({
+              emailId: emailDoc.id,
+              error: `Permanent failure after ${attempts} attempts: ${validation.reason}`,
+              willRetry: false
+            });
+          } else {
+            // Mark as needs_regeneration instead of pending_approval
+            // This will be picked up on the next cron run
+            await emailDoc.ref.update({
+              status: 'not_generated', // Reset to not_generated so it gets picked up again
+              lastGenerationAttempt: Date.now(),
+              generationFailureReason: validation.reason,
+              generationAttempts: attempts,
+              // Preserve ownership fields
+              ownerId: emailData.ownerId || 'l.patterson@powerchoosers.com',
+              assignedTo: emailData.assignedTo || emailData.ownerId || 'l.patterson@powerchoosers.com',
+              createdBy: emailData.createdBy || emailData.ownerId || 'l.patterson@powerchoosers.com'
+            });
+            
+            errors.push({
+              emailId: emailDoc.id,
+              error: `Bad generation (attempt ${attempts}/${maxAttempts}): ${validation.reason}`,
+              willRetry: true
+            });
+          }
+          
+          // Skip to next email - don't count as success
+          return;
+        }
+        
         // Enhanced debug logging
-          const ctaType = perplexityResult.output?.cta_type || perplexityResult.metadata?.cta_type || 'unknown';
+        const ctaType = perplexityResult.output?.cta_type || perplexityResult.metadata?.cta_type || 'unknown';
         logger.debug(`[GenerateScheduledEmails] Generated email details:`, {
             subject: generatedContent.subject,
             angleUsed: generatedContent.angle_used,
