@@ -1493,26 +1493,153 @@
                 ]
             },
             // ===== PRIMARY OPENER: PEACE-Aligned Permission + Empathy =====
+            // ===== NEPQ + PEACE INTEGRATED OPENER =====
             pattern_interrupt_opening: {
                 stage: 'Opening',
-                text: "<span class=\"tone-marker confident\">P - Permission (respect their time)</span><br><br>Hey {{contact.first_name}}, this is <span class=\"name-badge\">(your name)</span> from Power Choosers. <span class=\"pause-indicator\"></span> Real quick—did I catch you in the middle of something, or do you have 30 seconds?<br><br><span class=\"pause-indicator\"></span><span class=\"pause-indicator\"></span><span class=\"pause-indicator\"></span> <em>(Wait 3 seconds - let them respond)</em>",
+                text: "<span class=\"tone-marker curious\">🎯 NEPQ CONNECTION PHASE</span><br><br><span class=\"tone-marker curious\">CURIOUS TONE</span> (raised pitch, genuine interest)<br><br>\"Hey {{contact.first_name}}, this is <span class=\"name-badge\">(your name)</span> from PowerChoosers.<br><br><span class=\"pause-indicator\"></span><span class=\"pause-indicator\"></span> <em>[PAUSE 2 seconds]</em><br><br>Real quick... <span class=\"pause-indicator\"></span> did I catch you in the middle of something... <span class=\"pause-indicator\"></span> or do you have about 30 seconds?\"<br><br><em>⏸️ WAIT for response - don't jump in.</em>",
                 responses: [
-                    { label: "I've got a minute / Go ahead", next: 'peace_empathy' },
-                    { label: "What's this about?", next: 'peace_empathy' },
+                    { label: "Yeah, go ahead", next: 'nepq_empathy_bridge' },
+                    { label: "What's this about?", next: 'nepq_empathy_bridge' },
                     { label: "Actually busy right now", next: 'objection_bad_timing' },
-                    { label: "We use a broker", next: 'broker_audit_intro' },
-                    { label: "Not interested", next: 'objection_not_interested' }
+                    { label: "We use a broker", next: 'nepq_broker_clarify' },
+                    { label: "Not interested", next: 'nepq_objection_clarify' }
                 ]
             },
-            peace_empathy: {
+            nepq_empathy_bridge: {
                 stage: 'Opening',
-                text: "<span class=\"tone-marker understanding\">E - Empathy (show you understand their reality)</span><br><br>Perfect. <span class=\"pause-indicator\"></span> So look, I know energy isn't exactly top of mind for most {{contact.title}}s. <span class=\"pause-indicator\"></span> That's actually the problem I'm calling about.<br><br><span class=\"tone-marker serious\">A - Ask (dig into their situation)</span><br><br>Here's what I see with most {{account.industry}} companies your size: <span class=\"pause-indicator\"></span> they wait until 60-90 days before their contract expires to shop rates. <span class=\"pause-indicator\"></span> By that time, the market's already moved, and they've lost all their negotiating leverage. <span class=\"pause-indicator\"></span> Rates are typically 10-15% higher because of timing alone.<br><br><span class=\"tone-marker concerned\">C - Consequence (quantify the impact)</span><br><br>For a company spending $50K+ monthly, <span class=\"pause-indicator\"></span> that timing gap could easily cost you $60K-$100K annually. <span class=\"pause-indicator\"></span> Real money, you know?<br><br><span class=\"tone-marker confident\">E - End (permission-based qualification)</span><br><br>Have you already locked in your energy agreements past 2026, <span class=\"pause-indicator\"></span> or is that contract renewal window still open for you?",
+                text: "<span class=\"tone-marker concerned\">🎯 NEPQ EMPATHY BRIDGE</span><br><br><span class=\"tone-marker concerned\">CONCERNED TONE</span> (lower pitch, empathetic)<br><br>\"Perfect. <span class=\"pause-indicator\"></span> So look... <span class=\"pause-indicator\"></span> I know energy contracts probably aren't top of mind for most {{contact.title}}s... <span class=\"pause-indicator\"></span><br><br>That's actually the problem I'm calling about.\"<br><br><span class=\"tone-marker challenging\">CHALLENGING TONE</span><br><br>\"Here's what I see with most {{account.industry}} companies your size... <span class=\"pause-indicator\"></span> they wait until 60-90 days before their contract expires to shop rates. <span class=\"pause-indicator\"></span> Rates are typically 10-15% higher because of timing alone.<br><br>For a company spending $50K+ monthly... <span class=\"pause-indicator\"></span> that timing gap could easily cost you $60K-$100K annually.\"<br><br><span class=\"tone-marker curious\">CURIOUS TONE</span><br><br>\"Have you already locked in your energy agreements past 2026... <span class=\"pause-indicator\"></span> or is that contract renewal window still open for you?\"",
                 responses: [
                     { label: "Locked in past 2026", next: 'ack_just_renewed' },
-                    { label: "Contract expires before 2027", next: 'broker_audit_close' },
-                    { label: "Not sure when it expires", next: 'situation_contract_expiry' },
-                    { label: "We use a broker", next: 'broker_audit_intro' },
-                    { label: "Not interested", next: 'objection_not_interested' }
+                    { label: "Contract expires before 2027", next: 'nepq_situation_questions' },
+                    { label: "Not sure when it expires", next: 'nepq_situation_questions' },
+                    { label: "We use a broker", next: 'nepq_broker_clarify' },
+                    { label: "Not interested", next: 'nepq_objection_clarify' }
+                ]
+            },
+            // ===== NEPQ DISCOVERY SYSTEM =====
+            nepq_situation_questions: {
+                stage: 'NEPQ Discovery - Situation',
+                text: "<span class=\"tone-marker curious\">🔍 NEPQ SITUATION QUESTIONS</span><br><br><span class=\"tone-marker curious\">CURIOUS TONE</span> (no judgment)<br><br>\"So what are you doing now for your electricity procurement... <span class=\"pause-indicator\"></span> just so I have more context?\"<br><br>\"And roughly how much are you spending monthly?\"",
+                responses: [
+                    { label: "$10K-50K monthly", next: 'nepq_problem_awareness' },
+                    { label: "$50K+ monthly", next: 'nepq_problem_awareness' },
+                    { label: "Not sure exactly", next: 'nepq_problem_awareness' }
+                ]
+            },
+            nepq_problem_awareness: {
+                stage: 'NEPQ Discovery - Problem',
+                text: "<span class=\"tone-marker skeptical\">🔍 NEPQ PROBLEM AWARENESS</span><br><br><span class=\"tone-marker skeptical\">SKEPTICAL TONE</span> (emphasis on \"LIKE\")<br><br>\"So you've been handling this for a few years... <span class=\"pause-indicator\"></span><br><br>I mean, do you LIKE the results you've been getting?\"",
+                responses: [
+                    { label: "Yeah, it's been fine", next: 'nepq_problem_probe' },
+                    { label: "Could be better", next: 'nepq_solution_awareness' },
+                    { label: "We use a broker", next: 'nepq_broker_clarify' }
+                ]
+            },
+            nepq_problem_probe: {
+                stage: 'NEPQ Discovery - Problem',
+                text: "<span class=\"tone-marker confused\">CONFUSED TONE</span> (furrowed brow)<br><br>\"Oh... when you say 'fine'... what do you mean by that?\"<br><br><em>Force them to define \"fine\"</em><br><br>\"When you last renewed... did you get 5-10 competitive quotes... or more like 2-3 options?\"",
+                responses: [
+                    { label: "5-10 quotes", next: 'nepq_solution_awareness' },
+                    { label: "2-3 options", next: 'nepq_solution_awareness' },
+                    { label: "Just renewed with same supplier", next: 'nepq_solution_awareness' }
+                ]
+            },
+            nepq_solution_awareness: {
+                stage: 'NEPQ Discovery - Solution',
+                text: "<span class=\"tone-marker curious\">🎯 NEPQ SOLUTION AWARENESS</span><br><br><span class=\"tone-marker curious\">CURIOUS/COLLABORATIVE TONE</span><br><br>\"Let's say we could show you what competitive rates look like from 100+ suppliers... <span class=\"pause-indicator\"></span> not just 10-20...<br><br>How do you see that benefiting you the most?\"<br><br><em>Make them articulate the benefit themselves</em>",
+                responses: [
+                    { label: "We'd know if getting good deal", next: 'nepq_consequence_questions' },
+                    { label: "Could save money", next: 'nepq_consequence_questions' },
+                    { label: "More options", next: 'nepq_consequence_questions' }
+                ]
+            },
+            nepq_consequence_questions: {
+                stage: 'NEPQ Discovery - Consequence',
+                text: "<span class=\"tone-marker challenging\">⚠️ NEPQ CONSEQUENCE (MOST POWERFUL)</span><br><br><span class=\"tone-marker challenging\">CHALLENGING TONE</span> (direct, make inaction feel risky)<br><br>\"So if this stays the same for the next 6-12 months... <span class=\"pause-indicator\"></span> and you're still overpaying without knowing it...<br><br>What do you think that could cost you?\"<br><br><em>Wait. Let them calculate.</em><br><br>\"Are you willing to settle for that?\"",
+                responses: [
+                    { label: "No, definitely not", next: 'nepq_micro_commitment_1' },
+                    { label: "Should probably look into it", next: 'nepq_micro_commitment_1' },
+                    { label: "We're locked in anyway", next: 'ack_just_renewed' }
+                ]
+            },
+            // ===== NEPQ 3-STEP OBJECTION FORMULA =====
+            nepq_broker_clarify: {
+                stage: 'NEPQ Objection - Broker',
+                text: "<span class=\"tone-marker confused\">🔄 NEPQ 3-STEP: CLARIFY</span><br><br><span class=\"tone-marker confused\">CONFUSED TONE</span> (like you don't understand)<br><br>\"Oh... <span class=\"pause-indicator\"></span> you use a broker...<br><br>Can I ask... what do you mean by that?\"<br><br><em>Don't assume. Make them explain.</em>",
+                responses: [
+                    { label: "They handle our electricity", next: 'nepq_broker_discuss' },
+                    { label: "They shop rates for us", next: 'nepq_broker_discuss' }
+                ]
+            },
+            nepq_broker_discuss: {
+                stage: 'NEPQ Objection - Broker',
+                text: "<span class=\"tone-marker confused\">🔄 NEPQ 3-STEP: DISCUSS</span><br><br>\"Oh I see... so they handle everything...<br><br>In what way, though?\"<br><br><span class=\"tone-marker curious\">CURIOUS TONE</span><br><br>\"And when you last renewed... how many quotes did they bring you?\"",
+                responses: [
+                    { label: "2-3 quotes", next: 'nepq_broker_diffuse' },
+                    { label: "5-10 quotes", next: 'nepq_broker_diffuse' },
+                    { label: "Not sure", next: 'nepq_broker_diffuse' }
+                ]
+            },
+            nepq_broker_diffuse: {
+                stage: 'NEPQ Objection - Broker',
+                text: "<span class=\"tone-marker challenging\">🔄 NEPQ 3-STEP: DIFFUSE</span><br><br><span class=\"tone-marker challenging\">CHALLENGING TONE</span> (make THEM say it)<br><br>\"There are 100+ suppliers in the actual market...<br><br>If your broker only works with 10-20... <span class=\"pause-indicator\"></span> what do you think that means for the rates you're seeing?\"<br><br><em>They'll say it themselves</em>",
+                responses: [
+                    { label: "Might not see all options", next: 'nepq_micro_commitment_1' },
+                    { label: "Could be missing out", next: 'nepq_micro_commitment_1' },
+                    { label: "They shop everything", next: 'broker_audit_intro' }
+                ]
+            },
+            nepq_objection_clarify: {
+                stage: 'NEPQ Objection - Not Interested',
+                text: "<span class=\"tone-marker confused\">🔄 NEPQ 3-STEP: CLARIFY</span><br><br><span class=\"tone-marker confused\">CONFUSED TONE</span><br><br>\"Oh... not interested...<br><br>Can I ask... not interested in what specifically?\"<br><br><em>Most people can't articulate WHY</em>",
+                responses: [
+                    { label: "Not interested in changing", next: 'nepq_not_interested_diffuse' },
+                    { label: "Too busy right now", next: 'objection_bad_timing' },
+                    { label: "Happy with what we have", next: 'nepq_broker_clarify' }
+                ]
+            },
+            nepq_not_interested_diffuse: {
+                stage: 'NEPQ Objection - Not Interested',
+                text: "<span class=\"tone-marker understanding\">🔄 NEPQ 3-STEP: DIFFUSE</span><br><br>\"I totally get that... and I'm not asking you to change anything right now.<br><br>Here's the only question: Would it be valuable to at least KNOW if you're leaving money on the table?\"",
+                responses: [
+                    { label: "I guess that would be useful", next: 'nepq_micro_commitment_1' },
+                    { label: "How long would that take?", next: 'nepq_micro_commitment_1' },
+                    { label: "Still not interested", next: 'respect_decision' }
+                ]
+            },
+            // ===== NEPQ MICRO-COMMITMENT CLOSING =====
+            nepq_micro_commitment_1: {
+                stage: 'NEPQ Closing',
+                text: "<span class=\"tone-marker curious\">✅ MICRO-COMMITMENT #1: Audit Interest</span><br><br><span class=\"tone-marker curious\">CURIOUS TONE</span><br><br>\"Do you feel like running an audit... to see what the full market is quoting... is something worth exploring?\"",
+                responses: [
+                    { label: "Yeah, I think so", next: 'nepq_micro_commitment_2' },
+                    { label: "It could be", next: 'nepq_micro_commitment_2' },
+                    { label: "I'm not sure", next: 'close_think_about_it' }
+                ]
+            },
+            nepq_micro_commitment_2: {
+                stage: 'NEPQ Closing',
+                text: "<span class=\"tone-marker curious\">✅ MICRO-COMMITMENT #2: Defend Why</span><br><br>\"Why do you feel it's worth it, though?\"<br><br><em>💡 GOLD - They're convincing themselves!</em>",
+                responses: [
+                    { label: "Want to make sure not overpaying", next: 'nepq_micro_commitment_3' },
+                    { label: "Would be good to know", next: 'nepq_micro_commitment_3' },
+                    { label: "Could save money", next: 'nepq_micro_commitment_3' }
+                ]
+            },
+            nepq_micro_commitment_3: {
+                stage: 'NEPQ Closing',
+                text: "<span class=\"tone-marker confident\">✅ MICRO-COMMITMENT #3: Calendar</span><br><br>\"Perfect... so I'll run that audit over the next 2-3 days...<br><br>Does Thursday at 2 PM work... or would Friday morning be better?\"",
+                responses: [
+                    { label: "Thursday at 2 PM", next: 'nepq_micro_commitment_4' },
+                    { label: "Friday morning", next: 'nepq_micro_commitment_4' }
+                ]
+            },
+            nepq_micro_commitment_4: {
+                stage: 'NEPQ Closing',
+                text: "<span class=\"tone-marker confident\">✅ MICRO-COMMITMENT #4: Calendar Confirmed</span><br><br>\"Great. I'm sending you a calendar invite right now...<br><br>Did you get it?\"<br><br><em>⚠️ STAY ON LINE until confirmed!</em><br><br><strong>Total: 4 Micro-Commitments</strong><br>✅ Yes to audit<br>✅ Defended why<br>✅ Committed to call<br>✅ Accepted invite",
+                responses: [
+                    { label: "Yeah, I see it", next: 'close_invoice_soft_ask' },
+                    { label: "Got it", next: 'close_invoice_soft_ask' }
                 ]
             },
             // ===== BROKER AUDIT STRATEGY (Non-Combative Competitive) =====
@@ -2321,7 +2448,7 @@
             },
             meeting_scheduled: {
                 stage: 'Success',
-                text: '✅ <strong>AUDIT SCHEDULED - SUCCESS!</strong><br><br><strong>4-Step Close Complete!</strong><br><br>You successfully:<br>• ✅ Recap (created yes momentum)<br>• ✅ Reaffirmed Value (quantified gap)<br>• ✅ Assumptive Move (laid out the plan)<br>• ✅ Locked Commitment (binary choice + calendar)<br><br><strong>No-Show Prevention Checklist:</strong><br>• 📅 Calendar invite sent while ON call (87% show-up rate)<br>• 📄 Invoice requested (soft ask)<br>• 📞 24-hour reminder call planned<br>• 📧 Morning-of confirmation email<br><br><strong>Target:</strong> 87%+ show-up rate with this system!',
+                text: '✅ <strong>AUDIT SCHEDULED - NEPQ SUCCESS!</strong><br><br><strong>🎯 NEPQ Framework Complete!</strong><br><br><strong>You successfully used:</strong><br>• 🎤 <strong>5 Tonalities</strong> (Curious, Confused, Concerned, Challenging, Playful)<br>• 🔍 <strong>5 Question Types</strong> (Situation → Problem → Solution → Consequence → Qualifying)<br>• 🔄 <strong>3-Step Objection Formula</strong> (Clarify → Discuss → Diffuse)<br>• ✅ <strong>4 Micro-Commitments</strong> (Audit → Why → Calendar → Confirmed)<br><br><strong>Key NEPQ Principle:</strong><br>\"The prospect persuaded THEMSELVES. You asked the right questions.\"<br><br><strong>No-Show Prevention:</strong><br>• 📅 Calendar invite while ON call (87% show-up)<br>• 📄 Invoice requested (soft ask)<br>• 📞 24-hour reminder call<br>• 📧 Morning-of confirmation email<br><br><strong>Target:</strong> 35-45% audit request rate with NEPQ!',
                 responses: [
                     { label: 'Start New Call', next: 'start' }
                 ]
