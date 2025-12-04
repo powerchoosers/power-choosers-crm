@@ -334,7 +334,161 @@
       }
       
       els.emailContent.innerHTML = contentHtml;
+      
+      // CRITICAL: For sent emails, strip white/light backgrounds from ALL child elements
+      // This prevents visible white blocks that don't match the container background
+      // The main container already has white background, so nested elements should be transparent
+      if (isSentEmail || email.type === 'sent' || email.status === 'sent') {
+        stripNestedBackgrounds(els.emailContent);
+        removeBrokenOrTinyImages(els.emailContent);
+        removeEmptyWhiteBlocks(els.emailContent);
+      }
     }
+  }
+  
+  // Strip white/light backgrounds from nested elements to prevent visible blocks
+  function stripNestedBackgrounds(container) {
+    if (!container) return;
+    
+    // Get all child elements (inline styles + attributes)
+    const elements = container.querySelectorAll('*');
+    
+    elements.forEach(el => {
+      const originalStyle = el.getAttribute('style') || '';
+      const styleLower = originalStyle.toLowerCase();
+      
+      // Detect white / near-white backgrounds in inline styles
+      const hasWhiteBg = /background(-color)?:\s*(#fff(?:fff)?|white|#fefefe|#f8f8f8|#fcfcfc|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)|rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*(0?\.\d+|1)\s*\))/i.test(styleLower);
+      
+      if (hasWhiteBg) {
+        // Remove background / background-color declarations from inline styles
+        const newStyle = originalStyle
+          .replace(/background(-color)?:\s*[^;]+;?/gi, '')
+          .trim();
+        
+        if (newStyle) {
+          el.setAttribute('style', newStyle);
+        } else {
+          el.removeAttribute('style');
+        }
+        
+        // Also ensure computed background is cleared
+        el.style.background = 'transparent';
+        el.style.backgroundColor = 'transparent';
+      }
+      
+      // Remove deprecated attributes that set background colors
+      if (el.hasAttribute('bgcolor')) {
+        el.removeAttribute('bgcolor');
+        el.style.backgroundColor = 'transparent';
+      }
+      if (el.hasAttribute('background')) {
+        el.removeAttribute('background');
+        el.style.background = 'transparent';
+      }
+    });
+    
+    // SECOND PASS: Clear computed white/near-white backgrounds (from embedded style tags)
+    elements.forEach(el => {
+      try {
+        const bg = window.getComputedStyle(el).backgroundColor || '';
+        // Match white / near-white computed background
+        const isWhiteBg = /(rgba?\(\s*255\s*,\s*255\s*,\s*255(?:\s*,\s*(0?\.\d+|1))?\s*\))|(#fff(?:fff)?)/i.test(bg);
+        if (isWhiteBg) {
+          el.style.backgroundColor = 'transparent';
+          el.style.background = 'transparent';
+          el.style.backgroundImage = 'none';
+          
+          // If the element is effectively empty and small, remove it entirely
+          const hasMedia = el.querySelector('img, svg');
+          const text = (el.textContent || '').trim();
+          if (!hasMedia && !text && el.clientWidth <= 80 && el.clientHeight <= 120) {
+            el.remove();
+          }
+        }
+      } catch (_) {
+        // ignore
+      }
+    });
+    
+    // Also remove backgrounds from blockquotes (common in email threads)
+    const blockquotes = container.querySelectorAll('blockquote');
+    blockquotes.forEach(bq => {
+      bq.style.backgroundColor = 'transparent';
+      bq.style.background = 'transparent';
+      bq.style.border = 'none';
+      bq.style.paddingLeft = '0';
+      bq.style.marginLeft = '0';
+    });
+  }
+
+  // Remove broken/empty/tiny inline images that render as white blocks (e.g., missing avatars or 1x1 pixels)
+  function removeBrokenOrTinyImages(container) {
+    if (!container) return;
+    const imgs = Array.from(container.querySelectorAll('img'));
+    imgs.forEach(img => {
+      const src = (img.getAttribute('src') || '').trim();
+      // Remove CID inline refs or empty sources
+      if (!src || src === '#' || src.toLowerCase().startsWith('cid:')) {
+        img.remove();
+        return;
+      }
+      // Remove known 1x1 tracking pixels
+      if (/base64,([a-z0-9+\/=]{0,20})?r0lgodlhaqaba/i.test(src)) {
+        img.remove();
+        return;
+      }
+      // On error, remove the image to avoid empty white boxes
+      img.onerror = () => {
+        img.remove();
+      };
+      // After load, remove if tiny (likely a pixel or broken placeholder)
+      const tryRemoveTiny = () => {
+        const w = img.naturalWidth || img.width || 0;
+        const h = img.naturalHeight || img.height || 0;
+        if ((w > 0 && h > 0 && (w <= 2 && h <= 2)) || (w <= 1 || h <= 1)) {
+          img.remove();
+        }
+      };
+      if (img.complete) {
+        tryRemoveTiny();
+      } else {
+        img.addEventListener('load', tryRemoveTiny, { once: true });
+      }
+    });
+  }
+
+  // Remove empty, small, white-background blocks (common leftover containers/placeholders)
+  function removeEmptyWhiteBlocks(container) {
+    if (!container) return;
+    const elements = Array.from(container.querySelectorAll('*:not([data-signature="true"]):not([data-signature="true"] *)'));
+    elements.forEach(el => {
+      // Skip images (handled separately)
+      if (el.tagName === 'IMG') return;
+
+      const text = (el.textContent || '').trim();
+      const hasMedia = el.querySelector('img, svg, video, audio, canvas, iframe');
+      if (text || hasMedia) return;
+
+      const rect = el.getBoundingClientRect();
+      const w = rect.width || el.clientWidth || 0;
+      const h = rect.height || el.clientHeight || 0;
+
+      // Only target small-ish empty blocks
+      if (w > 140 || h > 140) return;
+
+      const style = window.getComputedStyle(el);
+      const bg = (style.backgroundColor || '').toLowerCase();
+      const isWhiteBg = /(rgba?\(\s*255\s*,\s*255\s*,\s*255(?:\s*,\s*(0?\.\d+|1))?\s*\))|(#fff(?:fff)?)/i.test(bg);
+
+      // Also check inline styles for white backgrounds
+      const inlineStyle = (el.getAttribute('style') || '').toLowerCase();
+      const inlineWhite = /background(-color)?:\s*(#fff(?:fff)?|white|#fefefe|#f8f8f8|#fcfcfc|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)|rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*(0?\.\d+|1)\s*\))/i.test(inlineStyle);
+
+      if (isWhiteBg || inlineWhite || (w <= 80 && h <= 120)) {
+        el.remove();
+      }
+    });
   }
 
   // Go back to previous page based on navigation source
