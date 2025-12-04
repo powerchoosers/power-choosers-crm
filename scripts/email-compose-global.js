@@ -4308,7 +4308,7 @@
       
       if (!signature) {
         // Fallback: try to extract from current content (may be empty if skeleton cleared it)
-        const currentContent = editor.innerHTML;
+      const currentContent = editor.innerHTML;
         signature = extractSignature(currentContent);
         console.log('[Signature] Fallback: Extracted from current content:', signature ? 'YES' : 'NO');
       } else {

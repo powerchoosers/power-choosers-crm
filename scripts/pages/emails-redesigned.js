@@ -1177,7 +1177,7 @@
       throw error;
     }
   }
-  
+
   // Reject scheduled email and advance contact to next stage
   async function rejectAndAdvanceScheduledEmail(emailId) {
     try {
@@ -2051,7 +2051,7 @@
             const email = state.data.find(e => e.id === id);
 
             // Delete the email from Firestore
-            await window.firebaseDB.collection('emails').doc(id).delete();
+              await window.firebaseDB.collection('emails').doc(id).delete();
             
             // Remove from background loader's in-memory data for instant UI feedback
             if (window.BackgroundEmailsLoader && typeof window.BackgroundEmailsLoader.removeEmailById === 'function') {
