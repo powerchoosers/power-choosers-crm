@@ -334,7 +334,7 @@ export default async function handler(req, res) {
     }
     
     const recipientEmail = extractEmailAddress(emailData.to || '');
-    
+
     // Validate recipient email (required for Firestore rules compliance)
     // If no valid recipient email found, assign to admin as fallback
     const ownerEmail = (recipientEmail && recipientEmail.includes('@')) 

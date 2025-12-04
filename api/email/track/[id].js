@@ -146,10 +146,10 @@ export default async function handler(req, res) {
               isBotFlagged: deviceType === 'bot'
             };
 
-            await ref.update({
-              openCount: (currentData.openCount || 0) + 1,
+          await ref.update({
+            openCount: (currentData.openCount || 0) + 1,
               opens: existingOpens.concat([openEvent]),
-              updatedAt: openedAt,
+            updatedAt: openedAt,
               lastOpened: openedAt,
               // Flag if this looks like a bot/proxy open
               ...(deviceType === 'bot' ? { botFlagged: true } : {})

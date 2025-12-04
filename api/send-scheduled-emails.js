@@ -8,6 +8,45 @@ import logger from './_logger.js';
 const gmailService = new GmailService();
 
 /**
+ * Pre-send validation: Detect malformed AI generations that should not be sent
+ * Returns { isValid: boolean, reason: string }
+ */
+function validateEmailBeforeSending(html, text, subject) {
+  const content = (html || '') + ' ' + (text || '') + ' ' + (subject || '');
+  
+  // Patterns that indicate the AI returned a "meta" response instead of actual email
+  const badPatterns = [
+    { pattern: /i appreciate the detailed personalization/i, reason: 'AI asked for more information' },
+    { pattern: /i need to clarify/i, reason: 'AI asked for clarification' },
+    { pattern: /what i need to proceed/i, reason: 'AI requested more details' },
+    { pattern: /please share the recipient/i, reason: 'AI requested recipient info' },
+    { pattern: /once you provide these details/i, reason: 'AI waiting for details' },
+    { pattern: /to write this email following your/i, reason: 'AI explaining what it needs' },
+    { pattern: /\*\*the issue:\*\*/i, reason: 'AI meta-response with issue header' },
+    { pattern: /\*\*what i need:\*\*/i, reason: 'AI meta-response with needs header' },
+    { pattern: /\[contact_first_name\]/i, reason: 'Unfilled placeholder' },
+    { pattern: /\[contact_company\]/i, reason: 'Unfilled placeholder' },
+    { pattern: /\[contact_job_title\]/i, reason: 'Unfilled placeholder' },
+    { pattern: /personalization instructions/i, reason: 'AI referencing instructions' },
+    { pattern: /i'll write the email immediately/i, reason: 'AI promising to write later' }
+  ];
+  
+  for (const { pattern, reason } of badPatterns) {
+    if (pattern.test(content)) {
+      return { isValid: false, reason };
+    }
+  }
+  
+  // Check for suspiciously short content
+  const textOnly = (text || '').replace(/<[^>]+>/g, '').trim();
+  if (textOnly.length < 30) {
+    return { isValid: false, reason: 'Content too short' };
+  }
+  
+  return { isValid: true, reason: null };
+}
+
+/**
  * Fetch and build signature HTML for a user
  * @param {string} ownerId - User email to fetch signature for
  * @returns {Object} { signatureHtml, signatureText } or empty strings if not available
@@ -152,8 +191,9 @@ function buildCustomHtmlSignature(general) {
   const initials = `${firstName.charAt(0).toUpperCase()}${lastName.charAt(0).toUpperCase()}`;
   
   // Build email-compatible HTML signature (table-based for maximum compatibility)
+  // Reduced spacing: margin-top 8px + padding-top 8px = 16px total (was 36px)
   return `
-<div style="margin-top: 20px; padding-top: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+<div style="margin-top: 8px; padding-top: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
     <!-- Orange gradient divider -->
     <div style="height: 2px; background: linear-gradient(to right, #f59e0b 0%, #f59e0b 40%, transparent 100%); margin-bottom: 24px;"></div>
     
@@ -579,6 +619,38 @@ export default async function handler(req, res) {
         } else {
           // Non-sequence email: use defaults
           emailSettings = resolveEmailSettings(null, null);
+        }
+
+        // CRITICAL: Pre-send validation - block malformed AI generations
+        const preSendValidation = validateEmailBeforeSending(
+          emailData.html,
+          emailData.text,
+          emailData.subject
+        );
+        
+        if (!preSendValidation.isValid) {
+          logger.error(`[SendScheduledEmails] ⚠️ BLOCKED BAD EMAIL ${emailDoc.id}: ${preSendValidation.reason}`);
+          
+          // Mark as needs_regeneration and reset status
+          await emailDoc.ref.update({
+            status: 'not_generated', // Reset to trigger regeneration
+            blockedFromSending: true,
+            blockedReason: preSendValidation.reason,
+            blockedAt: Date.now(),
+            generationAttempts: (emailData.generationAttempts || 0) + 1,
+            // Preserve ownership
+            ownerId: emailData.ownerId,
+            assignedTo: emailData.assignedTo || emailData.ownerId,
+            createdBy: emailData.createdBy || emailData.ownerId
+          });
+          
+          errors.push({
+            emailId: emailDoc.id,
+            error: `Blocked: ${preSendValidation.reason}`,
+            willRetry: true
+          });
+          
+          continue; // Skip this email
         }
 
         // Prepare email content with signature if enabled
