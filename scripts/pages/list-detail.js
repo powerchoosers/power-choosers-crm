@@ -4403,6 +4403,25 @@ async function handleDeleteConfirm(ids, view) {
           try {
             console.log(`[Bulk Delete] Deleting ${view}: ${id}`);
             await window.firebaseDB.collection(collectionName).doc(id).delete();
+            // Drop from background caches so deleted rows do not reappear
+            try {
+              if (view === 'people' && window.BackgroundContactsLoader?.getContactsData) {
+                const arr = window.BackgroundContactsLoader.getContactsData() || [];
+                const idx = arr.findIndex(c => c.id === id);
+                if (idx >= 0) arr.splice(idx, 1);
+              }
+              if (view === 'accounts' && window.BackgroundAccountsLoader?.getAccountsData) {
+                const arr = window.BackgroundAccountsLoader.getAccountsData() || [];
+                const idx = arr.findIndex(a => a.id === id);
+                if (idx >= 0) arr.splice(idx, 1);
+              }
+            } catch (_) { /* cache cleanup best-effort */ }
+            // Trim IndexedDB cache for this record
+            try {
+              if (window.CacheManager?.deleteRecord) {
+                window.CacheManager.deleteRecord(collectionName, id);
+              }
+            } catch (_) { /* ignore cache errors */ }
             completed++;
             console.log(`[Bulk Delete] Successfully deleted ${view} ${id}`);
             // Update progress toast after each successful delete
@@ -4440,6 +4459,37 @@ async function handleDeleteConfirm(ids, view) {
             const listData = listDoc.data();
             const listKind = listData.kind || listData.targetType || view || 'people';
             const targetType = listKind === 'accounts' ? 'accounts' : 'people';
+
+            // Remove list membership rows for the deleted ids so stale members do not come back
+            const chunks = [];
+            for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
+            for (const chunk of chunks) {
+              try {
+                let q = window.firebaseDB.collection('listMembers')
+                  .where('targetType', '==', targetType)
+                  .where('targetId', 'in', chunk);
+                if (listId) q = q.where('listId', '==', listId);
+                const snap = await q.get();
+                if (!snap.empty) {
+                  const batch = window.firebaseDB.batch();
+                  snap.forEach(doc => batch.delete(doc.ref));
+                  await batch.commit();
+                  console.log(`[Bulk Delete] Removed ${snap.size} listMembers rows for ${listId || 'all lists'}`);
+                }
+              } catch (e) { console.warn('[Bulk Delete] listMembers cleanup failed:', e); }
+
+              if (listId) {
+                try {
+                  const subSnap = await window.firebaseDB.collection('lists').doc(listId).collection('members').where('targetId', 'in', chunk).get();
+                  if (!subSnap.empty) {
+                    const batch = window.firebaseDB.batch();
+                    subSnap.forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
+                    console.log(`[Bulk Delete] Removed ${subSnap.size} legacy members for list ${listId}`);
+                  }
+                } catch (e) { console.warn('[Bulk Delete] Subcollection cleanup failed:', e); }
+              }
+            }
 
             // Calculate ACTUAL count from listMembers collection
             const actualCountQuery = await window.firebaseDB.collection('listMembers')
@@ -4508,27 +4558,6 @@ async function handleDeleteConfirm(ids, view) {
             }
           }
 
-          // Update BackgroundListsLoader cache locally (cost-effective: avoids Firestore read)
-          if (window.BackgroundListsLoader && typeof window.BackgroundListsLoader.updateListCountLocally === 'function') {
-            window.BackgroundListsLoader.updateListCountLocally(listId, newRecordCount);
-          }
-
-          // Dispatch event to notify lists-overview of count change
-          try {
-            const listState = window.ListDetail && window.ListDetail._getState ? window.ListDetail._getState() : null;
-            const listName = listState?.listName || window.listDetailContext?.listName || 'List';
-            document.dispatchEvent(new CustomEvent('pc:list-count-updated', {
-              detail: {
-                listId,
-                listName,
-                kind: view,
-                deletedCount: completed,
-                newCount: newRecordCount
-              }
-            }));
-          } catch (e) {
-            console.warn('[Bulk Delete] Failed to dispatch count update event:', e);
-          }
         } catch (countError) {
           console.warn('[Bulk Delete] Failed to update list recordCount:', countError);
         }
