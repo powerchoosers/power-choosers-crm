@@ -20,46 +20,37 @@ async function getUserSignature(ownerId) {
 
   // Normalize ownerId to lowercase for consistent matching
   const normalizedOwnerId = String(ownerId).toLowerCase().trim();
-  logger.debug('[SendScheduledEmails] Looking up signature for ownerId:', normalizedOwnerId);
 
   try {
     // Fetch user settings from Firestore
     // Settings are saved with doc ID like 'user-settings' (admin) or 'user-settings-{email}' (employee)
     // IMPORTANT: Try direct doc lookup FIRST to avoid matching call-scripts documents
     let settingsDoc = null;
-    let settingsSnap = { empty: true, docs: [] };
     
     // Priority 1: Try direct document lookup by email-based ID (most reliable)
     const docId = `user-settings-${normalizedOwnerId}`;
-    logger.debug('[SendScheduledEmails] Trying direct doc lookup first:', docId);
     const directDoc = await db.collection('settings').doc(docId).get();
     if (directDoc.exists) {
       const data = directDoc.data();
       // Validate it's actually a settings doc (has emailSignature or general)
       if (data.emailSignature || data.general) {
         settingsDoc = directDoc;
-        logger.debug('[SendScheduledEmails] Found settings via direct doc lookup');
-      } else {
-        logger.debug('[SendScheduledEmails] Direct doc exists but missing emailSignature/general, skipping');
       }
     }
 
     // Priority 2: Try legacy admin settings doc
     if (!settingsDoc) {
-      logger.debug('[SendScheduledEmails] Trying legacy admin doc: user-settings');
       const adminDoc = await db.collection('settings').doc('user-settings').get();
       if (adminDoc.exists) {
         const data = adminDoc.data();
         if (data.emailSignature || data.general) {
           settingsDoc = adminDoc;
-          logger.debug('[SendScheduledEmails] Found settings via legacy admin doc');
         }
       }
     }
 
     // Priority 3: Fallback to ownerId query (but filter out call-scripts docs)
     if (!settingsDoc) {
-      logger.debug('[SendScheduledEmails] Trying ownerId query as fallback');
       const querySnap = await db.collection('settings')
         .where('ownerId', '==', normalizedOwnerId)
         .get();
@@ -69,13 +60,11 @@ async function getUserSignature(ownerId) {
         const data = doc.data();
         // Skip call-scripts documents (they don't have emailSignature)
         if (doc.id.startsWith('call-scripts-')) {
-          logger.debug('[SendScheduledEmails] Skipping call-scripts document:', doc.id);
           continue;
         }
         // Check if it has the expected structure
         if (data.emailSignature || data.general) {
           settingsDoc = doc;
-          logger.debug('[SendScheduledEmails] Found settings via ownerId query:', doc.id);
           break;
         }
       }
@@ -97,24 +86,14 @@ async function getUserSignature(ownerId) {
     // Check if custom HTML signature is enabled
     const useCustomHtml = signature.useCustomHtml === true || signature.customHtmlEnabled === true;
 
-    logger.debug('[SendScheduledEmails] Signature data found:', {
-      hasText: !!sigText,
-      textLength: sigText.length,
-      hasImage: !!sigImage,
-      imageEnabled: signatureImageEnabled,
-      useCustomHtml: useCustomHtml
-    });
-
     // If custom HTML signature is enabled, build premium signature
     if (useCustomHtml) {
       const customSignature = buildCustomHtmlSignature(general);
       const customSignatureText = buildCustomSignatureText(general);
-      logger.debug('[SendScheduledEmails] Using custom HTML signature');
       return { signatureHtml: customSignature, signatureText: customSignatureText };
     }
 
     if (!sigText && !sigImage) {
-      logger.debug('[SendScheduledEmails] No signature text or image configured');
       return { signatureHtml: '', signatureText: '' };
     }
 
@@ -139,8 +118,6 @@ async function getUserSignature(ownerId) {
 
     // Build plain text signature
     let signatureText = '\n\n---\n' + sigText;
-
-    logger.debug('[SendScheduledEmails] Built signature HTML, length:', signatureHtml.length);
 
     return { signatureHtml, signatureText };
   } catch (error) {
@@ -615,25 +592,13 @@ export default async function handler(req, res) {
             // HTML template emails: Keep hardcoded signature (don't modify)
             // HTML templates already have their own signature built into the template
             // This matches the behavior in email-compose-global.js
-            logger.debug('[SendScheduledEmails] HTML template email - keeping hardcoded signature, not applying settings signature');
           } else {
             // Standard email (HTML fragment): Append signature from settings
             const { signatureHtml, signatureText } = await getUserSignature(emailData.ownerId);
             
-            logger.debug('[SendScheduledEmails] Signature lookup result:', {
-              emailId: emailDoc.id,
-              ownerId: emailData.ownerId,
-              hasSignatureHtml: !!signatureHtml,
-              signatureHtmlLength: signatureHtml?.length || 0,
-              hasSignatureText: !!signatureText
-            });
-            
             if (signatureHtml) {
               // Append signature to end of HTML fragment
               finalHtml = finalHtml + signatureHtml;
-              logger.debug('[SendScheduledEmails] Signature HTML appended, new length:', finalHtml.length);
-            } else {
-              logger.warn('[SendScheduledEmails] No signature HTML returned for ownerId:', emailData.ownerId);
             }
             
             if (signatureText) {
@@ -641,8 +606,6 @@ export default async function handler(req, res) {
               finalText = finalText + signatureText;
             }
           }
-        } else {
-          logger.debug('[SendScheduledEmails] Signature disabled for this email:', emailDoc.id);
         }
 
         // Inject custom tracking pixel and click tracking
@@ -655,11 +618,6 @@ export default async function handler(req, res) {
           finalHtml = injectTracking(finalHtml, trackingId, {
             enableOpenTracking,
             enableClickTracking
-          });
-          logger.debug('[SendScheduledEmails] Injected tracking pixel into email:', {
-            emailId: trackingId,
-            openTracking: enableOpenTracking,
-            clickTracking: enableClickTracking
           });
         }
 
