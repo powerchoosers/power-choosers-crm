@@ -2588,8 +2588,9 @@ class SettingsPage {
         
         // Build email-compatible HTML signature (table-based for maximum compatibility)
         // Based on the premium perplexity signature design
+        // Reduced spacing: margin-top 8px + padding-top 8px = 16px total (was 36px)
         return `
-<div contenteditable="false" data-signature="true" style="margin-top: 20px; padding-top: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+<div contenteditable="false" data-signature="true" style="margin-top: 8px; padding-top: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
     <!-- Orange gradient divider -->
     <div style="height: 2px; background: linear-gradient(to right, #f59e0b 0%, #f59e0b 40%, transparent 100%); margin-bottom: 24px;"></div>
     
@@ -2658,24 +2659,42 @@ class SettingsPage {
                     <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
                         <tr>
                             <!-- LinkedIn -->
-                            <td style="padding-right: 16px; vertical-align: middle;">
-                                <a href="${linkedIn}" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-block; line-height: 14px;">
-                                    <img src="https://img.icons8.com/ios-filled/16/64748b/linkedin.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
-                                    <span style="display: inline-block; vertical-align: middle; line-height: 14px;">LinkedIn</span>
+                            <td style="padding-right: 16px;">
+                                <a href="${linkedIn}" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-block;">
+                                    <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse: collapse;">
+                                        <tr>
+                                            <td style="vertical-align: middle; padding-right: 8px;">
+                                                <img src="https://img.icons8.com/ios-filled/16/64748b/linkedin.png" width="14" height="14" alt="" style="display: block;">
+                                            </td>
+                                            <td style="vertical-align: middle; line-height: 14px; color: #64748b;">LinkedIn</td>
+                                        </tr>
+                                    </table>
                                 </a>
                             </td>
                             <!-- Website -->
-                            <td style="padding-right: 16px; vertical-align: middle;">
-                                <a href="https://powerchoosers.com" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-block; line-height: 14px;">
-                                    <img src="https://img.icons8.com/ios-filled/16/64748b/domain.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
-                                    <span style="display: inline-block; vertical-align: middle; line-height: 14px;">Website</span>
+                            <td style="padding-right: 16px;">
+                                <a href="https://powerchoosers.com" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-block;">
+                                    <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse: collapse;">
+                                        <tr>
+                                            <td style="vertical-align: middle; padding-right: 8px;">
+                                                <img src="https://img.icons8.com/ios-filled/16/64748b/domain.png" width="14" height="14" alt="" style="display: block;">
+                                            </td>
+                                            <td style="vertical-align: middle; line-height: 14px; color: #64748b;">Website</td>
+                                        </tr>
+                                    </table>
                                 </a>
                             </td>
                             <!-- Schedule -->
-                            <td style="vertical-align: middle;">
-                                <a href="https://powerchoosers.com/schedule" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-block; line-height: 14px;">
-                                    <img src="https://img.icons8.com/ios-filled/16/64748b/calendar--v1.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
-                                    <span style="display: inline-block; vertical-align: middle; line-height: 14px;">Schedule</span>
+                            <td>
+                                <a href="https://powerchoosers.com/schedule" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none; display: inline-block;">
+                                    <table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse: collapse;">
+                                        <tr>
+                                            <td style="vertical-align: middle; padding-right: 8px;">
+                                                <img src="https://img.icons8.com/ios-filled/16/64748b/calendar--v1.png" width="14" height="14" alt="" style="display: block;">
+                                            </td>
+                                            <td style="vertical-align: middle; line-height: 14px; color: #64748b;">Schedule</td>
+                                        </tr>
+                                    </table>
                                 </a>
                             </td>
                         </tr>

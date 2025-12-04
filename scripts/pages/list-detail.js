@@ -88,7 +88,7 @@
       const email = window.currentUserEmail || '';
       if (email && typeof email === 'string' && email.trim()) {
         return email.toLowerCase().trim();
-      }
+    }
     }
     // Fallback to admin if userEmail cannot be determined (required for Firestore rules compliance)
     return 'l.patterson@powerchoosers.com';

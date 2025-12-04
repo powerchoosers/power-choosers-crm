@@ -3690,7 +3690,7 @@ class PowerChoosersCRM {
                     return 'l.patterson@powerchoosers.com';
                 };
                 const userEmail = getUserEmail();
-
+                
                 // 3. Batch write all new assignments
                 const batch = db.batch();
                 newRecordIds.forEach(recordId => {

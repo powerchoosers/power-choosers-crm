@@ -5421,7 +5421,7 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
                       } catch (e) {}
                       return '';
                     })()}
-                  </div>
+                </div>
                 </div>
                 <div class="setting-item" id="sig-image-setting" ${(() => {
                   // Hide signature image option if custom HTML is enabled (it includes avatar)
