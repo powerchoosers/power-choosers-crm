@@ -176,7 +176,7 @@ function buildCustomHtmlSignature(general) {
   
   // Build email-compatible HTML signature (table-based for maximum compatibility)
   return `
-<div style="margin-top: 28px; padding-top: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+<div style="margin-top: 20px; padding-top: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
     <!-- Orange gradient divider -->
     <div style="height: 2px; background: linear-gradient(to right, #f59e0b 0%, #f59e0b 40%, transparent 100%); margin-bottom: 24px;"></div>
     
@@ -244,21 +244,21 @@ function buildCustomHtmlSignature(general) {
                             <!-- LinkedIn -->
                             <td style="padding-right: 16px;">
                                 <a href="${linkedIn}" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none;">
-                                    <img src="https://img.icons8.com/ios-filled/16/64748b/linkedin.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/linkedin.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: -1px; margin-right: 6px;">
                                     LinkedIn
                                 </a>
                             </td>
                             <!-- Website -->
                             <td style="padding-right: 16px;">
                                 <a href="https://powerchoosers.com" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none;">
-                                    <img src="https://img.icons8.com/ios-filled/16/64748b/domain.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/domain.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: -1px; margin-right: 6px;">
                                     Website
                                 </a>
                             </td>
                             <!-- Schedule -->
                             <td>
                                 <a href="https://powerchoosers.com/schedule" target="_blank" style="font-size: 12px; font-weight: 500; color: #64748b; text-decoration: none;">
-                                    <img src="https://img.icons8.com/ios-filled/16/64748b/calendar--v1.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+                                    <img src="https://img.icons8.com/ios-filled/16/64748b/calendar--v1.png" width="14" height="14" alt="" style="display: inline-block; vertical-align: -1px; margin-right: 6px;">
                                     Schedule
                                 </a>
                             </td>
