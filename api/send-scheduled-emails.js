@@ -7,6 +7,9 @@ import logger from './_logger.js';
 // Initialize Gmail service
 const gmailService = new GmailService();
 
+// Stale protection: how long we allow "sending" before auto-finalizing
+const STALE_SENDING_MS = 10 * 60 * 1000; // 10 minutes
+
 /**
  * Pre-send validation: Detect malformed AI generations that should not be sent
  * Returns { isValid: boolean, reason: string }
@@ -737,7 +740,7 @@ export default async function handler(req, res) {
         // CRITICAL: Initialize tracking fields to match manual emails structure
         // This ensures tracking pixels display correctly in emails-redesigned.js sent tab
         // CRITICAL: Preserve ownership fields for Firestore rules compliance
-        await emailDoc.ref.update({
+        const sentPayload = {
           type: 'sent',
           status: 'sent',
           emailType: 'sent',           // Required for emails-redesigned.js filter
@@ -767,7 +770,15 @@ export default async function handler(req, res) {
           assignedTo: emailData.assignedTo || emailData.ownerId,
           createdBy: emailData.createdBy || emailData.ownerId
           // Note: subject, html, text are preserved automatically by Firestore update()
-        });
+        };
+
+        // Retry the final write once on transient failure to avoid leaving emails stuck in "sending"
+        try {
+          await emailDoc.ref.update(sentPayload);
+        } catch (updateErr) {
+          logger.warn('[SendScheduledEmails] Final sent update failed, retrying once:', emailDoc.id, updateErr);
+          await emailDoc.ref.update(sentPayload);
+        }
 
         sentCount++;
 
@@ -941,6 +952,45 @@ export default async function handler(req, res) {
         }
       }
     }
+
+  // Reconcile any emails stuck in "sending" (process may have been interrupted after send)
+  try {
+    const now = Date.now();
+    const staleSendingSnap = await db.collection('emails')
+      .where('status', '==', 'sending')
+      .where('sendingStartedAt', '<=', new Date(now - STALE_SENDING_MS))
+      .limit(50)
+      .get();
+
+    if (!staleSendingSnap.empty) {
+      logger.warn('[SendScheduledEmails] Found stale sending emails, auto-finalizing:', staleSendingSnap.size);
+      for (const doc of staleSendingSnap.docs) {
+        const data = doc.data() || {};
+        try {
+          await doc.ref.update({
+            type: 'sent',
+            status: 'sent',
+            emailType: 'sent',
+            isSentEmail: true,
+            sentAt: data.sentAt || now,
+            date: data.date || new Date().toISOString(),
+            timestamp: data.timestamp || new Date().toISOString(),
+            provider: data.provider || 'gmail',
+            updatedAt: new Date().toISOString(),
+            // Preserve ownership fields
+            ownerId: data.ownerId || 'l.patterson@powerchoosers.com',
+            assignedTo: data.assignedTo || data.ownerId || 'l.patterson@powerchoosers.com',
+            createdBy: data.createdBy || data.ownerId || 'l.patterson@powerchoosers.com',
+            reconStatus: 'auto-finalized-from-sending'
+          });
+        } catch (reconErr) {
+          logger.error('[SendScheduledEmails] Failed to auto-finalize stale sending email:', doc.id, reconErr);
+        }
+      }
+    }
+  } catch (staleErr) {
+    logger.error('[SendScheduledEmails] Stale sending reconciliation failed:', staleErr);
+  }
 
     logger.debug('[SendScheduledEmails] Send process complete. Sent:', sentCount, 'Errors:', errors.length);
 
