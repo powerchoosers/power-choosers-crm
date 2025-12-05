@@ -13,7 +13,7 @@ const gmailService = new GmailService();
  */
 function validateEmailBeforeSending(html, text, subject) {
   const content = (html || '') + ' ' + (text || '') + ' ' + (subject || '');
-  
+
   // Patterns that indicate the AI returned a "meta" response instead of actual email
   const badPatterns = [
     { pattern: /i appreciate the detailed personalization/i, reason: 'AI asked for more information' },
@@ -34,19 +34,19 @@ function validateEmailBeforeSending(html, text, subject) {
     { pattern: /"greeting"\s*:\s*"/i, reason: 'Raw JSON content detected' },
     { pattern: /\{\s*"subject"\s*:/i, reason: 'Raw JSON content detected' }
   ];
-  
+
   for (const { pattern, reason } of badPatterns) {
     if (pattern.test(content)) {
       return { isValid: false, reason };
     }
   }
-  
+
   // Check for suspiciously short content
   const textOnly = (text || '').replace(/<[^>]+>/g, '').trim();
   if (textOnly.length < 30) {
     return { isValid: false, reason: 'Content too short' };
   }
-  
+
   return { isValid: true, reason: null };
 }
 
@@ -72,8 +72,8 @@ async function getUserSignature(ownerId) {
 
     // Priority 1: Try direct document lookup by email-based ID (most reliable)
     const docId = `user-settings-${normalizedOwnerId}`;
-      const directDoc = await db.collection('settings').doc(docId).get();
-      if (directDoc.exists) {
+    const directDoc = await db.collection('settings').doc(docId).get();
+    if (directDoc.exists) {
       const data = directDoc.data();
       // Validate it's actually a settings doc (has emailSignature or general)
       if (data.emailSignature || data.general) {
@@ -97,7 +97,7 @@ async function getUserSignature(ownerId) {
       const querySnap = await db.collection('settings')
         .where('ownerId', '==', normalizedOwnerId)
         .get();
-      
+
       // Filter to find actual settings documents (not call-scripts)
       for (const doc of querySnap.docs) {
         const data = doc.data();
@@ -143,20 +143,20 @@ async function getUserSignature(ownerId) {
     // Build HTML signature (use email-safe inline styles, NO non-standard attributes)
     // Avoid contenteditable and data-* attributes as they may be stripped by email clients
     let signatureHtml = '<div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #cccccc;">';
-    
+
     if (sigText) {
       // Use explicit font-family for email compatibility
       const textHtml = sigText.replace(/\n/g, '<br>');
       signatureHtml += `<div style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; color: #333333; line-height: 1.5;">${textHtml}</div>`;
     }
-    
+
     // Include image if enabled
     if (sigImage && signatureImageEnabled) {
       const width = imageSize.width || 200;
       const height = imageSize.height || 100;
       signatureHtml += `<div style="margin-top: 12px;"><img src="${sigImage}" alt="Signature" width="${width}" height="${height}" style="max-width: ${width}px; max-height: ${height}px; border-radius: 4px; display: block;" /></div>`;
     }
-    
+
     signatureHtml += '</div>';
 
     // Build plain text signature
@@ -175,7 +175,7 @@ async function getUserSignature(ownerId) {
  */
 function buildCustomHtmlSignature(general) {
   const g = general || {};
-  
+
   // Get profile data with fallbacks
   const firstName = g.firstName || '';
   const lastName = g.lastName || '';
@@ -187,13 +187,13 @@ function buildCustomHtmlSignature(general) {
   const location = g.location || 'Fort Worth, TX';
   const linkedIn = g.linkedIn || 'https://www.linkedin.com/company/power-choosers';
   const avatar = g.hostedPhotoURL || g.photoURL || '';
-  
+
   // Clean phone for tel: link
   const phoneClean = phone.replace(/[^\d+]/g, '');
-  
+
   // Build initials fallback
   const initials = `${firstName.charAt(0).toUpperCase()}${lastName.charAt(0).toUpperCase()}`;
-  
+
   // Build email-compatible HTML signature (table-based for maximum compatibility)
   // Reduced spacing: margin-top 8px + padding-top 8px = 16px total (was 36px)
   return `
@@ -327,7 +327,7 @@ function buildCustomSignatureText(general) {
   const phone = g.phone || '';
   const email = g.email || '';
   const location = g.location || 'Fort Worth, TX';
-  
+
   let text = '\n\n---\n';
   text += `${name}\n`;
   text += `${title}\n`;
@@ -456,7 +456,7 @@ export default async function handler(req, res) {
     if (immediate && emailId) {
       logger.debug('[SendScheduledEmails] Immediate send requested for email:', emailId);
       const emailDoc = await db.collection('emails').doc(emailId).get();
-      
+
       if (!emailDoc.exists) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -467,7 +467,7 @@ export default async function handler(req, res) {
       }
 
       const emailData = emailDoc.data();
-      
+
       // Validate the email can be sent
       if (emailData.type !== 'scheduled') {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -496,18 +496,18 @@ export default async function handler(req, res) {
 
       logger.debug('[SendScheduledEmails] Processing immediate send for email:', emailId);
     } else {
-    // Query for emails that are ready to send.
-    // IMPORTANT: We now treat both 'approved' and 'pending_approval' as sendable
-    // once their scheduledSendTime has passed. This allows sequences to continue
-    // even if the user doesn't manually approve every email.
-    // Note: This runs server-side with Firebase Admin SDK, which bypasses Firestore rules
-    // The ownership fields were added during email creation to ensure client-side queries work
-    // Limit to 50 emails per run (Gmail API has very high quota: 1 billion quota units/day)
-    const readyToSendQuery = db.collection('emails')
-      .where('type', '==', 'scheduled')
-      .where('status', 'in', ['approved', 'pending_approval'])
-      .where('scheduledSendTime', '<=', now)
-      .limit(50);
+      // Query for emails that are ready to send.
+      // IMPORTANT: We now treat both 'approved' and 'pending_approval' as sendable
+      // once their scheduledSendTime has passed. This allows sequences to continue
+      // even if the user doesn't manually approve every email.
+      // Note: This runs server-side with Firebase Admin SDK, which bypasses Firestore rules
+      // The ownership fields were added during email creation to ensure client-side queries work
+      // Limit to 50 emails per run (Gmail API has very high quota: 1 billion quota units/day)
+      const readyToSendQuery = db.collection('emails')
+        .where('type', '==', 'scheduled')
+        .where('status', 'in', ['approved', 'pending_approval'])
+        .where('scheduledSendTime', '<=', now)
+        .limit(50);
 
       readyToSendSnapshot = await readyToSendQuery.get();
     }
@@ -631,10 +631,10 @@ export default async function handler(req, res) {
           emailData.text,
           emailData.subject
         );
-        
+
         if (!preSendValidation.isValid) {
           logger.error(`[SendScheduledEmails] ⚠️ BLOCKED BAD EMAIL ${emailDoc.id}: ${preSendValidation.reason}`);
-          
+
           // Mark as needs_regeneration and reset status
           await emailDoc.ref.update({
             status: 'not_generated', // Reset to trigger regeneration
@@ -647,13 +647,13 @@ export default async function handler(req, res) {
             assignedTo: emailData.assignedTo || emailData.ownerId,
             createdBy: emailData.createdBy || emailData.ownerId
           });
-          
+
           errors.push({
             emailId: emailDoc.id,
             error: `Blocked: ${preSendValidation.reason}`,
             willRetry: true
           });
-          
+
           continue; // Skip this email
         }
 
@@ -672,16 +672,16 @@ export default async function handler(req, res) {
         // Add signature if enabled in settings
         if (emailSettings.content.includeSignature) {
           // Check if this is a full HTML template (has DOCTYPE or full HTML structure)
-          const isHtmlTemplate = finalHtml.includes('<!DOCTYPE html>') || 
-                                 (finalHtml.includes('<html') && finalHtml.includes('</html>'));
-          
+          const isHtmlTemplate = finalHtml.includes('<!DOCTYPE html>') ||
+            (finalHtml.includes('<html') && finalHtml.includes('</html>'));
+
           logger.debug('[SendScheduledEmails] HTML template check:', {
             emailId: emailDoc.id,
             isHtmlTemplate,
             hasDoctype: finalHtml.includes('<!DOCTYPE html>'),
             hasHtmlTags: finalHtml.includes('<html') && finalHtml.includes('</html>')
           });
-          
+
           if (isHtmlTemplate) {
             // HTML template emails: Keep hardcoded signature (don't modify)
             // HTML templates already have their own signature built into the template
@@ -689,12 +689,12 @@ export default async function handler(req, res) {
           } else {
             // Standard email (HTML fragment): Append signature from settings
             const { signatureHtml, signatureText } = await getUserSignature(emailData.ownerId);
-            
+
             if (signatureHtml) {
               // Append signature to end of HTML fragment
               finalHtml = finalHtml + signatureHtml;
             }
-            
+
             if (signatureText) {
               // Append plain text signature
               finalText = finalText + signatureText;
@@ -708,7 +708,7 @@ export default async function handler(req, res) {
         if (!hasTrackingPixel(finalHtml)) {
           const enableOpenTracking = emailSettings?.deliverability?.openTracking !== false;
           const enableClickTracking = emailSettings?.deliverability?.clickTracking !== false;
-          
+
           finalHtml = injectTracking(finalHtml, trackingId, {
             enableOpenTracking,
             enableClickTracking
@@ -729,7 +729,7 @@ export default async function handler(req, res) {
           inReplyTo: emailData.inReplyTo || undefined,
           references: emailData.references || undefined
         });
-        
+
         logger.debug('[SendScheduledEmails] Email sent successfully via Gmail:', emailDoc.id, sendResult.messageId);
 
         // Update email record with FINAL HTML that includes signature
@@ -745,6 +745,8 @@ export default async function handler(req, res) {
           // Save the FINAL HTML/text that was actually sent (includes signature)
           html: finalHtml,
           text: finalText,
+          // CRITICAL: Mark HTML emails so email-detail.js renders them correctly
+          isHtmlEmail: isHtmlTemplate || (finalHtml && finalHtml.includes('data-signature="true"')),
           sentAt: Date.now(),
           date: new Date().toISOString(),      // Required for emails page sorting
           timestamp: new Date().toISOString(), // Required for emails page fallback
