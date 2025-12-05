@@ -304,8 +304,9 @@
         email.type === 'scheduled' || email.type === 'auto-email' ||
         email.type === 'manual-email' || email.sequenceId;
 
-      // Signature detection for sent emails
-      const signatureMarker = /(data-signature="true"|border-top:\s*2px\s*solid\s*#E8A23A|Power Choosers — Choose Wisely|powerchoosers\.com|Lead Energy Strategist)/i;
+      // Signature detection for sent emails - multiple patterns for robustness
+      // Note: "—" is em dash (U+2014), also check for regular hyphen "-" and encoded versions
+      const signatureMarker = /(data-signature="true"|data-signature='true'|border-top:\s*2px\s*solid\s*#E8A23A|Power Choosers\s*[-—–]\s*Choose Wisely|powerchoosers\.com|Lead Energy Strategist|Choose Wisely\.\s*Power Your Savings)/i;
       const sigIndex = rawHtml.search(signatureMarker);
 
       const isHtmlEmailFlag = email.isHtmlEmail === true || email.isHtmlEmail === 'true';
@@ -315,22 +316,50 @@
         signatureMarker.test(email.html || '') ||
         signatureMarker.test(email.content || '');
 
+      // Debug logging for signature detection issues
+      console.log('[EmailDetail] Render decision:', {
+        emailId: email.id,
+        isOurEmail,
+        isHtmlEmailFlag,
+        hasSignatureMarker,
+        sigIndex,
+        rawHtmlLength: (rawHtml || '').length,
+        rawTextLength: (rawText || '').length,
+        looksLikeHtml,
+        emailType: email.type,
+        emailStatus: email.status
+      });
+
       // For RECEIVED emails: prefer HTML to preserve styling (LinkedIn, newsletters, etc.)
       // For SENT emails: prefer HTML when marked as HTML email OR when signature marker detected
       // CRITICAL: Check signature marker FIRST for sent emails to preserve custom HTML signature structure
       // Also use fallback sources if rawHtml is empty
       const htmlSource = (rawHtml && rawHtml.trim()) || email.html || email.content || '';
+      
+      // CRITICAL FIX: Also check if rawHtml has HTML structure - if so, prefer HTML rendering
+      // This catches cases where signature marker detection fails but HTML is valid
+      const htmlHasStructure = /<table|<div\s|<img\s|<a\s|style="/i.test(rawHtml || '');
+      
       if (isOurEmail && hasSignatureMarker && htmlSource) {
         // Our sent emails with custom HTML signature: preserve the full HTML structure
+        console.log('[EmailDetail] Using HTML path: hasSignatureMarker');
         contentHtml = renderOurHtmlEmail(htmlSource);
       } else if (isOurEmail && isHtmlEmailFlag && rawHtml && rawHtml.trim()) {
         // Our sent HTML template emails (AI/templated with isHtmlEmail flag): keep original HTML
+        console.log('[EmailDetail] Using HTML path: isHtmlEmailFlag');
+        contentHtml = renderOurHtmlEmail(rawHtml);
+      } else if (isOurEmail && htmlHasStructure && rawHtml && rawHtml.trim()) {
+        // FALLBACK: Our sent email has HTML structure (tables, divs, images) - use HTML rendering
+        // This catches emails where marker detection failed but HTML is clearly structured
+        console.log('[EmailDetail] Using HTML path: htmlHasStructure fallback');
         contentHtml = renderOurHtmlEmail(rawHtml);
       } else if (!isOurEmail && rawHtml && rawHtml.trim() && looksLikeHtml) {
         // Received email with proper HTML - use it
+        console.log('[EmailDetail] Using HTML path: received email');
         contentHtml = sanitizeEmailHtml(rawHtml);
       } else if (isOurEmail && rawText && rawText.trim()) {
         // Sent email with text but NO signature marker in HTML - use text to preserve line breaks
+        console.log('[EmailDetail] Using TEXT path: rawText with signature extraction');
         const decoded = decodeQuotedPrintable(rawText);
         let signatureHtml = '';
 
