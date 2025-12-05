@@ -30,9 +30,6 @@ async function finalizeAsSent(emailDoc, payload) {
   await emailDoc.ref.set(payload, { merge: true });
 }
 
-// Stale protection: how long we allow "sending" before auto-finalizing
-const STALE_SENDING_MS = 10 * 60 * 1000; // 10 minutes
-
 /**
  * Pre-send validation: Detect malformed AI generations that should not be sent
  * Returns { isValid: boolean, reason: string }
