@@ -849,6 +849,9 @@
             hasMoreData = false;
           }
           
+          // Ensure scheduled emails are present even when served from cache
+          await ensureAllScheduledEmailsLoaded();
+
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:emails-loaded', { 
             detail: { count: cached.length, cached: true } 
@@ -897,6 +900,9 @@
               }
             } catch(_) { emailsData = cached; }
             console.log('[BackgroundEmailsLoader] ✓ Loaded', emailsData.length, 'emails from cache (delayed, filtered)');
+            
+            // Ensure scheduled emails are present even when served from cache (delayed path)
+            await ensureAllScheduledEmailsLoaded();
             
             // Check if there are more emails (same logic as main cache load)
             if (window.currentUserRole === 'admin') {
