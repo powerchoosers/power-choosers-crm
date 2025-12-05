@@ -15,6 +15,7 @@
   let emailsData = [];
   let _unsubscribe = null;
   let _sentEmailsUnsubscribe = null; // Separate listener for sent email tracking updates
+  let _scheduledEmailsUnsubscribe = null; // Separate listener for scheduled emails
   let _cacheWritePending = false;
   let lastLoadedDoc = null; // For pagination
   let hasMoreData = true; // For pagination
@@ -427,6 +428,15 @@
               return sendTime && typeof sendTime === 'number' && sendTime >= oneMinuteAgo;
             }
             
+            // Show newly created emails (no status yet) if they have scheduledSendTime
+            // This ensures emails created by sequences are visible immediately
+            if (!status && email.scheduledSendTime) {
+              const sendTime = email.scheduledSendTime;
+              // Show if send time is in the future or very recent (within last 5 minutes)
+              // This catches emails that were just created and are being processed
+              return sendTime && typeof sendTime === 'number' && sendTime >= (now - 5 * 60 * 1000);
+            }
+            
             // Exclude emails with missing/null status and no scheduledSendTime (orphaned records)
             if (!status && !email.scheduledSendTime) return false;
             
@@ -625,6 +635,68 @@
           console.warn('[BackgroundEmailsLoader] Failed to start sent emails listener:', e);
         }
       }
+      
+      // ADDITIONAL LISTENER: Watch for scheduled emails (critical for sequence emails)
+      // This ensures newly created scheduled emails are always picked up, even if they're
+      // processed quickly and not in the top 100 by createdAt
+      if (!_scheduledEmailsUnsubscribe) {
+        try {
+          _scheduledEmailsUnsubscribe = window.firebaseDB
+            .collection('emails')
+            .where('type', '==', 'scheduled')
+            .orderBy('createdAt', 'desc')
+            .limit(200) // Watch up to 200 scheduled emails
+            .onSnapshot(async (snapshot) => {
+              const updated = [];
+              snapshot.forEach(doc => {
+                const data = doc.data();
+                const createdAt = tsToIso(data.createdAt);
+                const updatedAt = tsToIso(data.updatedAt);
+                const sentAt = tsToIso(data.sentAt);
+                const receivedAt = tsToIso(data.receivedAt);
+                const scheduledSendTime = tsToMs(data.scheduledSendTime);
+                const generatedAt = tsToIso(data.generatedAt);
+                const timestamp = sentAt || receivedAt || createdAt || new Date().toISOString();
+                updated.push({
+                  id: doc.id,
+                  ...data,
+                  createdAt,
+                  updatedAt,
+                  sentAt,
+                  receivedAt,
+                  scheduledSendTime,
+                  generatedAt,
+                  timestamp,
+                  emailType: data.type || 'scheduled'
+                });
+              });
+
+              // Merge updates into existing data by ID
+              const map = new Map(emailsData.map(e => [e.id, e]));
+              updated.forEach(e => map.set(e.id, e));
+              emailsData = Array.from(map.values())
+                .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+              // Invalidate folder count cache
+              invalidateFolderCountCache();
+
+              // Dispatch update event so emails-redesigned.js refreshes
+              document.dispatchEvent(new CustomEvent('pc:emails-updated', { detail: { count: emailsData.length } }));
+              
+              console.log('[BackgroundEmailsLoader] Scheduled emails listener updated', updated.length, 'emails');
+            }, (error) => {
+              console.error('[BackgroundEmailsLoader] Scheduled emails listener error:', error);
+              // If index is missing, log a helpful message
+              if (error.code === 'failed-precondition') {
+                console.warn('[BackgroundEmailsLoader] Firestore index required for scheduled emails. Check error message for index creation link.');
+              }
+            });
+          
+          console.log('[BackgroundEmailsLoader] Scheduled emails listener started');
+        } catch (e) {
+          console.warn('[BackgroundEmailsLoader] Failed to start scheduled emails listener:', e);
+        }
+      }
     } catch (e) {
       console.warn('[BackgroundEmailsLoader] Failed to start realtime listener:', e);
     }
@@ -687,8 +759,25 @@
       listeners.push(
         db.collection('emails').where('assignedTo','==',email).limit(100).onSnapshot(handleSnapshot, (e)=>handleError(e, 'assigned'))
       );
+      // Add scheduled emails listener for employees (critical for sequence emails)
+      listeners.push(
+        db.collection('emails')
+          .where('type', '==', 'scheduled')
+          .where('ownerId', '==', email)
+          .orderBy('createdAt', 'desc')
+          .limit(200)
+          .onSnapshot(handleSnapshot, (e) => handleError(e, 'scheduled-owned'))
+      );
+      listeners.push(
+        db.collection('emails')
+          .where('type', '==', 'scheduled')
+          .where('assignedTo', '==', email)
+          .orderBy('createdAt', 'desc')
+          .limit(200)
+          .onSnapshot(handleSnapshot, (e) => handleError(e, 'scheduled-assigned'))
+      );
       _unsubscribe = () => { try { listeners.forEach(u=>u && u()); } catch(_) {} };
-      console.log('[BackgroundEmailsLoader] Scoped realtime listeners started');
+      console.log('[BackgroundEmailsLoader] Scoped realtime listeners started (including scheduled emails)');
     } catch (e) {
       console.warn('[BackgroundEmailsLoader] Failed to start scoped realtime listeners:', e);
     }
@@ -772,6 +861,10 @@
           } else {
           startRealtimeListener();
           }
+
+        // Fire a background refresh to avoid stale cache (non-blocking)
+        // This keeps Scheduled/Sent tabs in sync after server-side changes.
+        loadFromFirestore().catch(e => console.warn('[BackgroundEmailsLoader] Background refresh after cache load failed:', e));
         } else {
           // Cache empty, load from Firestore
           console.log('[BackgroundEmailsLoader] Cache empty, loading from Firestore');
@@ -841,6 +934,16 @@
             document.dispatchEvent(new CustomEvent('pc:emails-loaded', { 
               detail: { count: cached.length, cached: true } 
             }));
+
+            // Start listeners after cache load
+            if (window.currentUserRole !== 'admin') {
+              startRealtimeListenerScoped(window.currentUserEmail || '');
+            } else {
+              startRealtimeListener();
+            }
+
+            // Kick off a background refresh to avoid stale cache (non-blocking)
+            loadFromFirestore().catch(e => console.warn('[BackgroundEmailsLoader] Background refresh after delayed cache load failed:', e));
           } else {
             await loadFromFirestore();
           }
@@ -968,6 +1071,7 @@
       try { 
         if (_unsubscribe) { _unsubscribe(); _unsubscribe = null; } 
         if (_sentEmailsUnsubscribe) { _sentEmailsUnsubscribe(); _sentEmailsUnsubscribe = null; } 
+        if (_scheduledEmailsUnsubscribe) { _scheduledEmailsUnsubscribe(); _scheduledEmailsUnsubscribe = null; } 
       } catch(_) {} 
     },
     getCount: () => emailsData.length,

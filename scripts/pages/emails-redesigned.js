@@ -465,6 +465,15 @@
           return true;
         }
 
+        // Show newly created emails (no status yet) if they have scheduledSendTime
+        // This ensures emails created by sequences are visible immediately
+        if (!status && email.scheduledSendTime) {
+          const sendTime = email.scheduledSendTime;
+          // Show if send time is in the future or very recent (within last 5 minutes)
+          // This catches emails that were just created and are being processed
+          return sendTime && typeof sendTime === 'number' && sendTime >= (now - 5 * 60 * 1000);
+        }
+
         // Exclude emails with missing/null status and no scheduledSendTime (orphaned records)
         if (!status && !email.scheduledSendTime) return false;
 
