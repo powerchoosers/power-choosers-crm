@@ -7,37 +7,37 @@
  * Usage: window.EmailCompose.openTo('email@example.com', 'Contact Name')
  */
 
-(function() {
+(function () {
   if (!window.EmailCompose) window.EmailCompose = {};
-  
-  window.EmailCompose.openTo = function(toEmail, name = '') {
+
+  window.EmailCompose.openTo = function (toEmail, name = '') {
     try {
       toEmail = String(toEmail || '').trim();
-    } catch(_) {
+    } catch (_) {
       toEmail = '';
     }
-    
+
     if (!toEmail || !/@/.test(toEmail)) {
       window.crm?.showToast && window.crm.showToast('No valid email found');
       return;
     }
-    
+
     console.log('[EmailCompose] Opening compose for:', toEmail, name || '');
-    
+
     // Always try to open compose window directly on current page
     // No navigation - stay on whatever page user is currently on
     openComposeWindowDirect(toEmail, name);
   };
-  
+
   function openComposeWindowDirect(toEmail, name) {
     const composeWindow = document.getElementById('compose-window');
-    
+
     if (!composeWindow) {
       console.warn('[EmailCompose] Compose window not found in DOM');
       window.crm?.showToast && window.crm.showToast('Email compose not available');
       return;
     }
-    
+
     // Try emails-redesigned.js first, but fallback to direct DOM manipulation
     if (window.emailManager && typeof window.emailManager.openComposeWindow === 'function') {
       console.log('[EmailCompose] Using emails-redesigned.js compose function...');
@@ -47,15 +47,15 @@
       openComposeDirectly(toEmail, name);
     }
   }
-  
+
   function openComposeWithManager(toEmail, name) {
     const emailManager = window.emailManager;
-    
+
     if (emailManager && typeof emailManager.openComposeWindow === 'function') {
       console.log('[EmailCompose] Opening compose with emails-redesigned.js...');
       // Call openComposeWindow with null to ensure it's treated as a new email
       emailManager.openComposeWindow(null);
-      
+
       // Wait for compose window to be ready, then prefill
       setTimeout(() => {
         const composeWindow = document.getElementById('compose-window');
@@ -91,19 +91,19 @@
         const toInput = document.getElementById('compose-to');
         const subjectInput = document.getElementById('compose-subject');
         const bodyInput = document.querySelector('.body-input');
-        
+
         console.log('[EmailCompose] Subject field value after opening:', subjectInput?.value);
-        
+
         if (toInput) {
           toInput.value = toEmail;
         }
-        
+
         // Ensure subject is empty for new emails
         if (subjectInput && subjectInput.value.includes('Re:')) {
           console.log('[EmailCompose] Clearing Re: prefix from subject');
           subjectInput.value = '';
         }
-        
+
         // Ensure HTML mode is OFF when opening (show rendered view, not source)
         if (emailManager._isHtmlMode) {
           console.log('[EmailCompose] Resetting HTML mode on open');
@@ -116,33 +116,33 @@
             codeBtn.setAttribute('title', 'Edit raw HTML');
           }
         }
-        
+
         // If body has HTML email content, ensure it's rendered (not shown as source)
         if (bodyInput && bodyInput.getAttribute('data-html-email') === 'true') {
           console.log('[EmailCompose] HTML email detected, ensuring rendered view');
           bodyInput.removeAttribute('data-mode');
         }
-        
+
         // Detect if content is HTML template and set attribute for persistence
         if (bodyInput && bodyInput.innerHTML) {
           const content = bodyInput.innerHTML;
-          const isHtml = content.includes('<!DOCTYPE html>') || 
-                         content.includes('<html') || 
-                         (content.includes('<div') && content.includes('class="container"')) ||
-                         content.includes('class="header"') ||
-                         content.includes('font-family: Arial') ||
-                         content.includes('max-width: 600px');
-          
+          const isHtml = content.includes('<!DOCTYPE html>') ||
+            content.includes('<html') ||
+            (content.includes('<div') && content.includes('class="container"')) ||
+            content.includes('class="header"') ||
+            content.includes('font-family: Arial') ||
+            content.includes('max-width: 600px');
+
           if (isHtml && !bodyInput.getAttribute('data-html-email')) {
             bodyInput.setAttribute('data-html-email', 'true');
             console.log('[EmailCompose] Detected HTML email, setting attribute for persistence');
           }
         }
-          
+
         // Focus the To input
         setTimeout(() => toInput?.focus(), 100);
       }, 200);
-      
+
       // Setup toolbar event listeners after compose window is ready
       setTimeout(() => {
         const composeWindow = document.getElementById('compose-window');
@@ -155,41 +155,41 @@
       window.crm?.showToast && window.crm.showToast('Email compose not available');
     }
   }
-  
+
   function openComposeDirectly(toEmail, name) {
     const composeWindow = document.getElementById('compose-window');
-    
+
     if (!composeWindow) {
       console.warn('[EmailCompose] Compose window not found');
       return;
     }
-    
+
     // Reset compose window fields
     const toInput = document.getElementById('compose-to');
     const subjectInput = document.getElementById('compose-subject');
     const ccInput = document.getElementById('compose-cc');
     const bccInput = document.getElementById('compose-bcc');
     const bodyInput = document.querySelector('.body-input');
-    
+
     // Clear all fields
     if (toInput) toInput.value = '';
     if (subjectInput) subjectInput.value = '';
     if (ccInput) ccInput.value = '';
     if (bccInput) bccInput.value = '';
     if (bodyInput) bodyInput.innerHTML = '';
-    
+
     // Clear attachments
     if (window.emailAttachments) {
       window.emailAttachments = [];
       updateAttachmentBadge();
     }
-    
+
     // Show compose window
     composeWindow.style.display = 'flex';
     setTimeout(() => {
       composeWindow.classList.add('open');
     }, 10);
-    
+
     // Ensure preview state is reset when opening
     try {
       const previewContainer = composeWindow.querySelector('.preview-container');
@@ -219,8 +219,8 @@
         previewBtn.setAttribute('title', 'Preview');
         previewBtn.setAttribute('aria-label', 'Preview message');
       }
-    } catch(_) {}
-    
+    } catch (_) { }
+
     // Prefill the To field
     setTimeout(() => {
       if (toInput) {
@@ -228,13 +228,13 @@
         toInput.focus();
       }
     }, 100);
-    
+
     // Setup close button functionality if not already set up
     setupComposeCloseButton();
-    
+
     // Setup toolbar event listeners
     setupToolbarEventListeners(composeWindow);
-    
+
     // Initialize AI bar if present
     const aiBar = composeWindow.querySelector('.ai-bar');
     if (aiBar && !aiBar.dataset.rendered) {
@@ -242,21 +242,21 @@
         renderAIBar(aiBar);
       }, 200);
     }
-    
+
     console.log('[EmailCompose] Opened compose window directly for:', toEmail);
   }
-  
+
   function setupComposeCloseButton() {
     const closeBtn = document.getElementById('compose-close');
     const composeWindow = document.getElementById('compose-window');
-    
+
     if (closeBtn && !closeBtn.dataset.listenerAdded) {
-      closeBtn.addEventListener('click', function(e) {
+      closeBtn.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
-        
+
         console.log('[EmailCompose] Closing and fully resetting compose window...');
-        
+
         // FULL RESET: Clear all fields and state for clean slate on next open
         try {
           // 1. Clear all input fields
@@ -265,7 +265,7 @@
           const bccInput = composeWindow?.querySelector('#compose-bcc');
           const subjectInput = composeWindow?.querySelector('#compose-subject');
           const bodyInput = composeWindow?.querySelector('.body-input');
-          
+
           if (toInput) toInput.value = '';
           if (ccInput) ccInput.value = '';
           if (bccInput) bccInput.value = '';
@@ -281,7 +281,7 @@
             bodyInput.style.transition = '';
             bodyInput.classList.remove('preview-showing', 'preview-hiding');
           }
-          
+
           // 2. Reset preview state completely
           const previewContainer = composeWindow?.querySelector('.preview-container');
           if (composeWindow?.classList.contains('preview-mode')) {
@@ -290,20 +290,20 @@
           if (previewContainer) {
             previewContainer.remove();
           }
-          
+
           // 3. Restore all UI elements visibility
           const composeHeader = composeWindow?.querySelector('.compose-header');
           const composeRecipients = composeWindow?.querySelector('.compose-recipients');
           const composeSubject = composeWindow?.querySelector('.compose-subject');
           const composeFooter = composeWindow?.querySelector('.compose-footer');
           const editorToolbar = composeWindow?.querySelector('.editor-toolbar');
-          
+
           if (composeHeader) composeHeader.style.display = '';
           if (composeRecipients) composeRecipients.style.display = '';
           if (composeSubject) composeSubject.style.display = '';
           if (composeFooter) composeFooter.style.display = '';
           if (editorToolbar) editorToolbar.style.display = '';
-          
+
           // 4. Reset preview button to default state
           const previewBtn = composeWindow?.querySelector('[data-action="preview"]');
           if (previewBtn) {
@@ -316,7 +316,7 @@
             previewBtn.setAttribute('aria-label', 'Preview message');
             previewBtn.disabled = false;
           }
-          
+
           // 5. Clear AI bar state (prompt text and status)
           const aiBar = composeWindow?.querySelector('.ai-bar');
           if (aiBar) {
@@ -327,12 +327,12 @@
             aiBar.classList.remove('open');
             aiBar.setAttribute('aria-hidden', 'true');
           }
-          
+
           // 6. Close all toolbars
           const formattingBar = composeWindow?.querySelector('.formatting-bar');
           const linkBar = composeWindow?.querySelector('.link-bar');
           const variablesBar = composeWindow?.querySelector('.variables-bar');
-          
+
           if (formattingBar) {
             formattingBar.classList.remove('open');
             formattingBar.setAttribute('aria-hidden', 'true');
@@ -345,7 +345,7 @@
             variablesBar.classList.remove('open');
             variablesBar.setAttribute('aria-hidden', 'true');
           }
-          
+
           // 7. Reset HTML mode state
           if (window.emailManager && window.emailManager._isHtmlMode) {
             console.log('[EmailCompose] Resetting HTML mode state');
@@ -357,17 +357,17 @@
               codeBtn.setAttribute('title', 'Edit raw HTML');
             }
           }
-          
+
           // 8. Clear any generation metadata
           if (window._lastGeneratedMetadata) {
             window._lastGeneratedMetadata = null;
           }
-          
+
           console.log('[EmailCompose] Full reset complete - clean slate ready');
-        } catch(err) {
+        } catch (err) {
           console.error('[EmailCompose] Error during reset:', err);
         }
-        
+
         // Close compose window with animation
         if (composeWindow) {
           composeWindow.classList.remove('open');
@@ -375,16 +375,16 @@
             composeWindow.style.display = 'none';
           }, 300);
         }
-        
+
         console.log('[EmailCompose] Compose window closed');
       });
-      
+
       closeBtn.dataset.listenerAdded = 'true';
     }
   }
-  
+
   // ========== TOOLBAR FUNCTIONS (from emails.js) ==========
-  
+
   // Main toolbar action dispatcher
   function handleToolbarAction(action, btn, editor, formattingBar, linkBar, composeWindow) {
     try {
@@ -392,7 +392,7 @@
       const variablesBar = composeWindow?.querySelector('.variables-bar');
       const aiBar = composeWindow?.querySelector('.ai-bar');
       console.log('[Toolbar] handleToolbarAction:', action, { editor, formattingBar, linkBar, variablesBar });
-      
+
       // Helper function to close all toolbars
       const closeAllToolbars = () => {
         formattingBar?.classList.remove('open');
@@ -403,14 +403,14 @@
         variablesBar?.setAttribute('aria-hidden', 'true');
         aiBar?.classList.remove('open');
         aiBar?.setAttribute('aria-hidden', 'true');
-        
+
         // Also close any formatting popovers
         composeWindow?.querySelectorAll('.format-popover').forEach(p => p.classList.remove('open'));
-        
+
         // Reset button states
         composeWindow?.querySelectorAll('.toolbar-btn[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
       };
-      
+
       switch (action) {
         case 'formatting': {
           closeAllToolbars();
@@ -431,7 +431,7 @@
             const textInput = linkBar?.querySelector('[data-link-text]');
             if (textInput && hasText) textInput.value = sel.toString();
             (linkBar?.querySelector('[data-link-url]') || textInput)?.focus();
-          } catch (_) {}
+          } catch (_) { }
           break;
         }
         case 'variables': {
@@ -483,12 +483,12 @@
     if (format === 'font' || format === 'size' || format === 'color' || format === 'highlight') {
       const popover = btn.nextElementSibling;
       console.log('Popover found:', popover);
-      
+
       if (popover) {
         const isOpen = popover.classList.toggle('open');
         console.log('Popover isOpen:', isOpen);
         btn.setAttribute('aria-expanded', String(isOpen));
-        
+
         // Close other popovers
         formattingBar.querySelectorAll('.format-popover').forEach(p => {
           if (p !== popover) {
@@ -507,28 +507,28 @@
     // Handle text formatting
     if (format === 'bold' || format === 'italic' || format === 'underline') {
       console.log('🎨 Applying format:', format);
-      
+
       // Ensure we have a selection and focus
       ensureSelection();
       editor.focus();
-      
+
       // Check current state using queryCommandState for accuracy
       const isCurrentlyActive = document.queryCommandState(format);
       console.log('🎨 Current state from queryCommandState:', isCurrentlyActive);
-      
+
       // Apply the formatting
       const result = document.execCommand(format, false, null);
       console.log('🎨 execCommand result:', result);
-      
+
       // Update button state based on actual command state
       const newState = document.queryCommandState(format);
       console.log('🎨 New state after execCommand:', newState);
       btn.setAttribute('aria-pressed', String(newState));
-      
+
       // Update persistent formatting state
       setFormattingState(format, newState);
       console.log('🎨 Updated persistent formatting state for:', format, '=', newState);
-      
+
     } else if (format === 'insertOrderedList' || format === 'insertUnorderedList') {
       console.log('📝 Applying list format:', format);
       ensureSelection();
@@ -542,10 +542,10 @@
   function insertLink(editor, linkBar) {
     const textInput = linkBar.querySelector('[data-link-text]');
     const urlInput = linkBar.querySelector('[data-link-url]');
-    
+
     const text = textInput?.value?.trim() || '';
     const url = urlInput?.value?.trim() || '';
-    
+
     if (!url) {
       window.crm?.showToast('Please enter a URL');
       return;
@@ -553,12 +553,12 @@
 
     const linkText = text || url;
     const linkHtml = `<a href="${url}" target="_blank" rel="noopener noreferrer">${linkText}</a>`;
-    
+
     // Restore saved selection at editor before inserting
     restoreSavedSelection();
     ensureSelection();
     document.execCommand('insertHTML', false, linkHtml);
-    
+
     // Clear inputs and close bar
     textInput.value = '';
     urlInput.value = '';
@@ -655,16 +655,16 @@
     console.log('🎯 ensureSelection called');
     const editor = document.querySelector('.body-input[contenteditable="true"]');
     console.log('🎯 Editor element:', editor);
-    
+
     if (!editor) {
       console.log('🎯 No editor found, returning');
       return;
     }
-    
+
     // Focus the editor
     editor.focus();
     console.log('🎯 Editor focused');
-    
+
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) {
       console.log('🎯 No selection, creating one');
@@ -683,12 +683,12 @@
   function applyStyleToSelection(editor, cssText) {
     console.log('🔧 applyStyleToSelection called with:', cssText);
     const selection = window.getSelection();
-    
+
     if (!selection || selection.rangeCount === 0) {
       console.log('🔧 No selection, ensuring selection first');
       ensureSelection();
     }
-    
+
     const range = selection.getRangeAt(0);
     if (range.collapsed) {
       console.log('🔧 Collapsed range, creating span for future typing');
@@ -735,7 +735,7 @@
       const styleAttr = span.getAttribute('style');
       const hasNoStyle = !styleAttr || styleAttr.trim() === '';
       const trivialStyle = styleAttr && /^(?:\s*(background-color:\s*transparent;)?\s*(color:\s*var\(--text-primary\);)?\s*)$/i.test(styleAttr.trim());
-      
+
       // Unwrap spans that are empty or style-less to prevent caret/backspace issues
       if ((onlyZWNJ && span.childNodes.length <= 1) || hasNoStyle || trivialStyle) {
         const parent = span.parentNode;
@@ -749,17 +749,17 @@
   // Apply color to selection
   function applyColorToSelection(color) {
     console.log('🎨 [NEW] applyColorToSelection called with:', color);
-    
+
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) {
       console.log('🎨 [NEW] No selection found');
       return;
     }
-    
+
     const range = selection.getRangeAt(0);
     console.log('🎨 [NEW] Range collapsed:', range.collapsed);
     console.log('🎨 [NEW] Selected text:', range.toString());
-    
+
     if (color === 'transparent' || color === null) {
       // Only affect future typing; preserve existing content.
       if (!range.collapsed) {
@@ -776,7 +776,7 @@
       const success = document.execCommand('foreColor', false, color);
       console.log('🎨 [NEW] foreColor success:', success);
     }
-    
+
     // Update formatting state
     setFormattingState('color', color);
     console.log('🎨 [NEW] Updated formatting state');
@@ -797,17 +797,17 @@
   // Apply highlight to selection
   function applyHighlightToSelection(color) {
     console.log('🖍️ [NEW] applyHighlightToSelection called with:', color);
-    
+
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) {
       console.log('🖍️ [NEW] No selection found');
       return;
     }
-    
+
     const range = selection.getRangeAt(0);
     console.log('🖍️ [NEW] Range collapsed:', range.collapsed);
     console.log('🖍️ [NEW] Selected text:', range.toString());
-    
+
     if (color === 'transparent' || color === null) {
       // Only affect future typing; preserve existing content.
       if (!range.collapsed) {
@@ -824,7 +824,7 @@
       const success = document.execCommand('hiliteColor', false, color);
       console.log('🖍️ [NEW] hiliteColor success:', success);
     }
-    
+
     // Update formatting state
     setFormattingState('backgroundColor', color);
     console.log('🖍️ [NEW] Updated formatting state');
@@ -836,7 +836,7 @@
         // Move caret out of any highlighted span so new typing uses default
         moveCursorOutsideHighlightedSpans(ed);
         // Explicitly clear the pending highlight typing style at the caret
-        try { document.execCommand('styleWithCSS', true); } catch (_) {}
+        try { document.execCommand('styleWithCSS', true); } catch (_) { }
         const r1 = document.execCommand('hiliteColor', false, 'transparent');
         const r2 = document.execCommand('backColor', false, 'transparent');
         console.log('🖍️ Cleared caret typing style: hiliteColor ->', r1, ' backColor ->', r2);
@@ -855,7 +855,7 @@
         sel.removeAllRanges();
         sel.addRange(window._editorSelection);
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // Move cursor outside colored spans
@@ -901,7 +901,7 @@
       console.log('🎨 Moved cursor after highest colored span');
       return;
     }
-    
+
     console.log('🎨 No colored span found, cursor position unchanged');
   }
 
@@ -948,7 +948,7 @@
       console.log('🖍️ Moved cursor after highest highlighted span');
       return;
     }
-    
+
     console.log('🖍️ No highlighted span found, cursor position unchanged');
   }
 
@@ -957,10 +957,10 @@
     console.log(`🎨 Ensuring plain typing context for ${type}`);
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
-    
+
     const range = selection.getRangeAt(0);
     if (!range.collapsed) return;
-    
+
     // Create a neutral span at caret
     const span = document.createElement('span');
     span.innerHTML = '\u200C'; // Zero-width non-joiner
@@ -974,59 +974,59 @@
   function toggleFormattingBar() {
     const formattingBar = document.querySelector('.formatting-bar');
     if (!formattingBar) return;
-    
+
     const isOpen = formattingBar.classList.toggle('open');
     formattingBar.setAttribute('aria-hidden', String(!isOpen));
-    
+
     // Update the button's aria-expanded state
     const formattingBtn = document.querySelector('[data-action="formatting"]');
     if (formattingBtn) {
       formattingBtn.setAttribute('aria-expanded', String(isOpen));
     }
-    
+
     console.log('[Formatting] Bar toggled:', isOpen ? 'open' : 'closed');
   }
 
   function toggleHtmlMode(composeWindow) {
     console.log('[HTML Mode] toggleHtmlMode called with composeWindow:', composeWindow);
-    
+
     if (!composeWindow) {
       composeWindow = document.querySelector('#compose-window, .compose-window');
       console.log('[HTML Mode] Found composeWindow:', composeWindow);
     }
-    
+
     if (!composeWindow) {
       console.error('[HTML Mode] No compose window found');
       return;
     }
-    
+
     const editor = composeWindow.querySelector('.body-input');
     const codeBtn = composeWindow.querySelector('[data-action="code"]');
-    
+
     console.log('[HTML Mode] Editor:', editor, 'Code button:', codeBtn);
-    
+
     if (!editor || !codeBtn) {
       console.error('[HTML Mode] Missing editor or code button');
       return;
     }
-    
+
     // Check if we're in HTML mode using data-mode attribute (like the original)
     const isHtmlMode = editor.getAttribute('data-mode') === 'html';
     console.log('[HTML Mode] Current mode:', isHtmlMode ? 'HTML' : 'Rich text');
-    
+
     if (isHtmlMode) {
       // Exit HTML mode: render HTML
       const raw = editor.textContent || '';
       editor.removeAttribute('data-mode');
       editor.innerHTML = raw;
       editor.contentEditable = 'true';
-      
+
       // Update button
       codeBtn.textContent = '</>';
       codeBtn.setAttribute('aria-label', 'Edit raw HTML');
       codeBtn.classList.remove('is-active');
       codeBtn.setAttribute('aria-pressed', 'false');
-      
+
       console.log('[HTML Mode] Switched to rich text mode');
     } else {
       // Enter HTML mode: show raw HTML
@@ -1034,60 +1034,60 @@
       editor.setAttribute('data-mode', 'html');
       editor.textContent = html;
       editor.contentEditable = 'true';
-      
+
       // Update button
       codeBtn.textContent = 'Aa';
       codeBtn.setAttribute('aria-label', 'Exit HTML mode');
       codeBtn.classList.add('is-active');
       codeBtn.setAttribute('aria-pressed', 'true');
-      
+
       console.log('[HTML Mode] Switched to HTML mode');
     }
   }
 
   function handleImageUpload(editor) {
     console.log('[Image Upload] handleImageUpload called with editor:', editor);
-    
+
     if (!editor) {
       console.error('[Image Upload] No editor provided');
       return;
     }
-    
+
     // Create a file input element
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
     fileInput.style.display = 'none';
-    
+
     fileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      
+
       // Check file size (limit to 5MB)
       if (file.size > 5 * 1024 * 1024) {
         window.crm?.showToast('Image file too large. Please choose a file under 5MB.');
         return;
       }
-      
+
       // Create a FileReader to convert image to data URL
       const reader = new FileReader();
       reader.onload = (event) => {
         const dataUrl = event.target.result;
-        
+
         // Insert image into editor
         const img = document.createElement('img');
         img.src = dataUrl;
         img.style.maxWidth = '100%';
         img.style.height = 'auto';
         img.alt = file.name;
-        
+
         // Insert at cursor position
         const selection = window.getSelection();
         if (selection.rangeCount > 0) {
           const range = selection.getRangeAt(0);
           range.deleteContents();
           range.insertNode(img);
-          
+
           // Move cursor after the image
           range.setStartAfter(img);
           range.setEndAfter(img);
@@ -1097,19 +1097,19 @@
           // If no selection, append to end
           editor.appendChild(img);
         }
-        
+
         console.log('[Image Upload] Image inserted successfully');
         window.crm?.showToast('Image uploaded successfully');
       };
-      
+
       reader.onerror = () => {
         console.error('[Image Upload] Error reading file');
         window.crm?.showToast('Error uploading image. Please try again.');
       };
-      
+
       reader.readAsDataURL(file);
     });
-    
+
     // Trigger file selection
     document.body.appendChild(fileInput);
     fileInput.click();
@@ -1118,35 +1118,35 @@
 
   function handleFileAttachment(editor) {
     console.log('[File Attachment] handleFileAttachment called with editor:', editor);
-    
+
     // Create a file input element
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.multiple = true; // Allow multiple files
     fileInput.style.display = 'none';
-    
+
     fileInput.addEventListener('change', (e) => {
       const files = Array.from(e.target.files);
       if (files.length === 0) return;
-      
+
       // Check file sizes (limit to 10MB per file)
       const maxSize = 10 * 1024 * 1024; // 10MB
       const oversizedFiles = files.filter(file => file.size > maxSize);
-      
+
       if (oversizedFiles.length > 0) {
         window.crm?.showToast(`Some files are too large. Maximum size is 10MB per file.`);
         return;
       }
-      
+
       // Store files and update UI
       files.forEach(file => {
         addAttachment(file);
       });
-      
+
       console.log('[File Attachment] Added', files.length, 'files');
       window.crm?.showToast(`Added ${files.length} file${files.length > 1 ? 's' : ''}`);
     });
-    
+
     // Trigger file selection
     document.body.appendChild(fileInput);
     fileInput.click();
@@ -1158,7 +1158,7 @@
     if (!window.emailAttachments) {
       window.emailAttachments = [];
     }
-    
+
     const attachment = {
       id: `att_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // String ID to avoid precision issues
       name: file.name,
@@ -1167,9 +1167,9 @@
       file: file,
       icon: getFileIcon(file.type, file.name)
     };
-    
+
     console.log('[File Attachment] Adding attachment with ID:', attachment.id, 'Type:', typeof attachment.id);
-    
+
     window.emailAttachments.push(attachment);
     updateAttachmentBadge();
   }
@@ -1177,39 +1177,39 @@
   function removeAttachment(attachmentId) {
     console.log('[File Attachment] removeAttachment called with ID:', attachmentId, 'Type:', typeof attachmentId);
     console.log('[File Attachment] Current attachments:', window.emailAttachments);
-    
+
     if (!window.emailAttachments) {
       console.log('[File Attachment] No attachments array found');
       return;
     }
-    
+
     const initialLength = window.emailAttachments.length;
-    
+
     // Convert to string for consistent comparison
     const stringId = String(attachmentId);
     console.log('[File Attachment] Converting ID to string:', stringId);
-    
+
     // Log each attachment ID and type for debugging
     window.emailAttachments.forEach((att, index) => {
       console.log(`[File Attachment] Attachment ${index}: ID=${att.id}, Type=${typeof att.id}, Match=${att.id === stringId}`);
     });
-    
+
     window.emailAttachments = window.emailAttachments.filter(att => {
       const matches = att.id !== stringId;
       console.log(`[File Attachment] Filtering attachment ${att.id}: ${matches ? 'KEEP' : 'REMOVE'}`);
       return matches;
     });
-    
+
     const finalLength = window.emailAttachments.length;
-    
+
     console.log('[File Attachment] Removed attachment. Before:', initialLength, 'After:', finalLength);
-    
+
     updateAttachmentBadge();
   }
 
   function getFileIcon(mimeType, fileName) {
     const extension = fileName.split('.').pop()?.toLowerCase();
-    
+
     // Document types
     if (mimeType.includes('pdf') || extension === 'pdf') {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1220,7 +1220,7 @@
         <polyline points="10,9 9,9 8,9"/>
       </svg>`;
     }
-    
+
     if (mimeType.includes('word') || extension === 'doc' || extension === 'docx') {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -1230,7 +1230,7 @@
         <polyline points="10,9 9,9 8,9"/>
       </svg>`;
     }
-    
+
     if (mimeType.includes('excel') || extension === 'xls' || extension === 'xlsx') {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -1240,7 +1240,7 @@
         <polyline points="10,9 9,9 8,9"/>
       </svg>`;
     }
-    
+
     if (mimeType.includes('powerpoint') || extension === 'ppt' || extension === 'pptx') {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -1250,7 +1250,7 @@
         <polyline points="10,9 9,9 8,9"/>
       </svg>`;
     }
-    
+
     // Image types
     if (mimeType.includes('image')) {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1259,7 +1259,7 @@
         <polyline points="21,15 16,10 5,21"/>
       </svg>`;
     }
-    
+
     // Archive types
     if (mimeType.includes('zip') || extension === 'zip' || extension === 'rar' || extension === '7z') {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1268,7 +1268,7 @@
         <line x1="12" y1="22.08" x2="12" y2="12"/>
       </svg>`;
     }
-    
+
     // Text files
     if (mimeType.includes('text') || extension === 'txt' || extension === 'csv') {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1279,7 +1279,7 @@
         <polyline points="10,9 9,9 8,9"/>
       </svg>`;
     }
-    
+
     // Default file icon
     return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -1293,22 +1293,22 @@
       console.log('[File Attachment] No compose footer found');
       return;
     }
-    
+
     // Remove existing badge
     const existingBadge = composeFooter.querySelector('.attachment-badge');
     if (existingBadge) {
       console.log('[File Attachment] Removing existing badge');
       existingBadge.remove();
     }
-    
+
     // Don't show badge if no attachments
     if (!window.emailAttachments || window.emailAttachments.length === 0) {
       console.log('[File Attachment] No attachments to display');
       return;
     }
-    
+
     console.log('[File Attachment] Creating badge for', window.emailAttachments.length, 'attachments');
-    
+
     // Create attachment badge
     const badge = document.createElement('div');
     badge.className = 'attachment-badge';
@@ -1331,11 +1331,11 @@
         `).join('')}
       </div>
     `;
-    
+
     // Add click handler for remove buttons - use more specific targeting
     badge.addEventListener('click', (e) => {
       console.log('[File Attachment] Badge clicked, target:', e.target);
-      
+
       // Check if the clicked element or its parent is a remove button
       const removeBtn = e.target.closest('.attachment-remove');
       if (removeBtn) {
@@ -1346,7 +1346,7 @@
         removeAttachment(attachmentId);
       }
     });
-    
+
     // Insert badge after compose-actions
     const composeActions = composeFooter.querySelector('.compose-actions');
     if (composeActions) {
@@ -1377,35 +1377,35 @@
     const composeSubject = compose.querySelector('.compose-subject');
     const editorToolbar = compose.querySelector('.editor-toolbar');
     const composeFooter = compose.querySelector('.compose-footer');
-    
+
     // Check if we're currently in preview mode
     const isPreview = compose.classList.contains('preview-mode');
-    
+
     if (isPreview) {
       // Exit preview mode with animation
-      
+
       // Remove preview-mode class immediately to restore toolbar interactivity
       compose.classList.remove('preview-mode');
-      
+
       if (previewContainer) {
         // Add exit animation class
         previewContainer.classList.add('exiting');
-        
+
         // Wait for animation to complete before removing
         setTimeout(() => {
           previewContainer.remove();
-          
+
           // Show editor with animation
           if (editor) {
             editor.style.display = '';
             editor.classList.add('preview-showing');
-            
+
             // Clean up animation class
             setTimeout(() => {
               editor.classList.remove('preview-showing');
             }, 300);
           }
-          
+
           // Show UI elements (they'll fade in via CSS transition)
           if (composeHeader) composeHeader.style.display = '';
           if (composeRecipients) composeRecipients.style.display = '';
@@ -1413,7 +1413,7 @@
           if (composeFooter) composeFooter.style.display = '';
         }, 300); // Match animation duration
       }
-      
+
       if (previewBtn) {
         previewBtn.innerHTML = `
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1425,32 +1425,32 @@
       }
     } else {
       // Enter preview mode with animation
-      
+
       // Animate editor out
       if (editor) {
         editor.classList.add('preview-hiding');
-        
+
         // Wait for editor fade out before showing preview
         setTimeout(() => {
           editor.style.display = 'none';
           editor.classList.remove('preview-hiding');
         }, 250);
       }
-      
+
       // Add preview-mode class (toolbar stays visible via CSS override)
       compose.classList.add('preview-mode');
-      
+
       // Hide non-toolbar UI elements
       if (composeHeader) composeHeader.style.display = 'none';
       if (composeRecipients) composeRecipients.style.display = 'none';
       if (composeSubject) composeSubject.style.display = 'none';
       if (composeFooter) composeFooter.style.display = 'none';
-      
+
       // Get current email content
       const bodyInput = compose.querySelector('.body-input');
       const isHtmlEmail = bodyInput?.getAttribute('data-html-email') === 'true';
       const content = bodyInput?.innerHTML || '';
-      
+
       // Create preview container with rounded top corners
       const preview = document.createElement('div');
       preview.className = 'preview-container';
@@ -1466,7 +1466,7 @@
         z-index: 10;
         border-radius: 12px 12px 0 0;
       `;
-      
+
       // Create back button container with rounded top
       const backBtnContainer = document.createElement('div');
       backBtnContainer.style.cssText = `
@@ -1480,7 +1480,7 @@
         z-index: 100;
         border-radius: 12px 12px 0 0;
       `;
-      
+
       const closeBtn = document.createElement('button');
       closeBtn.textContent = '← Back to Editor';
       closeBtn.style.cssText = `
@@ -1505,11 +1505,11 @@
       closeBtn.onclick = () => togglePreviewMode();
       backBtnContainer.appendChild(closeBtn);
       preview.appendChild(backBtnContainer);
-      
+
       // Create iframe container with padding
       const iframeContainer = document.createElement('div');
       iframeContainer.style.cssText = 'padding: 20px;';
-      
+
       // Create preview content with proper iframe or direct HTML
       if (isHtmlEmail) {
         // HTML emails: use iframe for isolation
@@ -1533,12 +1533,12 @@
         contentWrapper.innerHTML = content;
         iframeContainer.appendChild(contentWrapper);
       }
-      
+
       preview.appendChild(iframeContainer);
-      
+
       // Add preview to compose editor (animation will trigger via CSS)
       compose.querySelector('.compose-editor').appendChild(preview);
-      
+
       // Update button icon to edit/pencil
       if (previewBtn) {
         previewBtn.innerHTML = `
@@ -1561,7 +1561,7 @@
     const formattingBar = composeWindow.querySelector('.formatting-bar');
     const linkBar = composeWindow.querySelector('.link-bar');
     const variablesBar = composeWindow.querySelector('.variables-bar');
-    
+
     // Save selection on editor events
     const saveSelection = () => {
       const sel = window.getSelection();
@@ -1569,28 +1569,28 @@
         window._editorSelection = sel.getRangeAt(0).cloneRange();
       }
     };
-    
+
     const restoreSelection = () => {
       if (!window._editorSelection) return;
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(window._editorSelection);
     };
-    
+
     // Editor selection events
     editor?.addEventListener('keyup', saveSelection);
     editor?.addEventListener('mouseup', saveSelection);
     editor?.addEventListener('blur', saveSelection);
-    
+
     // Toolbar actions - DEDUPLICATED to prevent multiple listeners
     if (!document._composeToolbarClickBound) {
       document._composeToolbarClickBound = true;
       document.addEventListener('click', (e) => {
         const btn = e.target.closest('.toolbar-btn');
         if (!btn) return;
-        
+
         const action = btn.dataset.action;
-        
+
         if (action === 'formatting') {
           toggleFormattingBar();
         } else if (action === 'preview') {
@@ -1602,7 +1602,7 @@
           const formattingBar = composeWindow?.querySelector('.formatting-bar');
           const linkBar = composeWindow?.querySelector('.link-bar');
           const variablesBar = composeWindow?.querySelector('.variables-bar');
-          
+
           if (editor) {
             handleToolbarAction(action, btn, editor, formattingBar, linkBar, composeWindow);
           }
@@ -1610,44 +1610,44 @@
       });
       console.log('[EmailCompose] Toolbar click listener bound (deduplicated)');
     }
-    
+
     // Formatting button clicks
     formattingBar?.addEventListener('click', (e) => {
       const btn = e.target.closest('.fmt-btn');
       if (!btn) return;
-      
+
       const format = btn.getAttribute('data-fmt');
       console.log('🎨 Formatting format:', format);
       saveSelection();
       ensureSelection();
       handleFormatting(format, btn, editor, formattingBar, restoreSelection);
     });
-    
+
     // Popover item interactions
     formattingBar?.addEventListener('click', (e) => {
       const popoverItem = e.target.closest('.popover-item');
       const colorSwatch = e.target.closest('.color-swatch');
-      
+
       if (!popoverItem && !colorSwatch) return;
-      
+
       e.stopPropagation();
       restoreSelection();
-      
+
       // Handle font selection
       if (popoverItem && popoverItem.classList.contains('font-item')) {
         const fontFamily = popoverItem.getAttribute('data-font');
         const fontLabel = popoverItem.textContent;
-        
+
         // Update the font button label
         const fontBtn = formattingBar.querySelector('[data-fmt="font"]');
         if (fontBtn) {
           const label = fontBtn.querySelector('[data-current-font]');
           if (label) label.textContent = fontLabel;
         }
-        
+
         // Apply font to editor
         document.execCommand('fontName', false, fontFamily);
-        
+
         // Close popover
         const popover = popoverItem.closest('.format-popover');
         if (popover) {
@@ -1656,23 +1656,23 @@
           if (btn) btn.setAttribute('aria-expanded', 'false');
         }
       }
-      
+
       // Handle size selection
       if (popoverItem && popoverItem.classList.contains('size-item')) {
         const fontSize = popoverItem.getAttribute('data-size');
-        
+
         // Update the size button label
         const sizeBtn = formattingBar.querySelector('[data-fmt="size"]');
         if (sizeBtn) {
           const label = sizeBtn.querySelector('[data-current-size]');
           if (label) label.textContent = fontSize;
         }
-        
+
         ensureSelection();
-        
+
         // Apply size using direct CSS styling
         applyStyleToSelection(editor, `font-size:${fontSize}px;`);
-        
+
         // Close popover
         const popover = popoverItem.closest('.format-popover');
         if (popover) {
@@ -1685,36 +1685,36 @@
       // Handle text color
       if (colorSwatch && colorSwatch.closest('.color-popover')) {
         const color = colorSwatch.getAttribute('data-color');
-        
+
         ensureSelection();
-        
+
         // Use the new simple color application method
         applyColorToSelection(color === 'transparent' ? null : color);
-        
+
         const pop = colorSwatch.closest('.format-popover');
         pop?.classList.remove('open');
-        
+
         const colorBtn = formattingBar.querySelector('[data-fmt="color"]');
-        colorBtn?.setAttribute('aria-expanded','false');
+        colorBtn?.setAttribute('aria-expanded', 'false');
       }
 
       // Handle highlight color
       if (colorSwatch && colorSwatch.closest('.highlight-popover')) {
         const color = colorSwatch.getAttribute('data-color');
-        
+
         ensureSelection();
-        
+
         // Use the new simple highlight application method
         applyHighlightToSelection(color === 'transparent' ? null : color);
-        
+
         const pop = colorSwatch.closest('.format-popover');
         pop?.classList.remove('open');
-        
+
         const highlightBtn = formattingBar.querySelector('[data-fmt="highlight"]');
-        highlightBtn?.setAttribute('aria-expanded','false');
+        highlightBtn?.setAttribute('aria-expanded', 'false');
       }
     });
-    
+
     // Link bar interactions
     linkBar?.addEventListener('click', (e) => {
       if (e.target.matches('[data-link-insert]')) {
@@ -1724,7 +1724,7 @@
         linkBar.setAttribute('aria-hidden', 'true');
       }
     });
-    
+
     // Variables bar interactions
     variablesBar?.addEventListener('click', (e) => {
       if (e.target.matches('[data-vars-close]')) {
@@ -1758,10 +1758,10 @@
   }
 
   // ========== ENTER KEY HANDLER FOR SINGLE SPACING ==========
-  
+
   function setupComposeEnterKeyHandler() {
     if (document._emailComposeEnterHandlerBound) return;
-    
+
     // Use event delegation to handle dynamically created compose windows
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -1769,7 +1769,7 @@
         if (editor && editor.contains(e.target)) {
           console.log('[Enter] Enter key pressed in email editor');
           e.preventDefault();
-          
+
           // Check if cursor is INSIDE signature (not just near it)
           const selection = window.getSelection();
           if (selection.rangeCount > 0) {
@@ -1780,33 +1780,33 @@
               return;
             }
           }
-          
+
           // Insert single line break for single spacing (like Gmail/Outlook)
           // Use a cleaner approach that doesn't compound with CSS line-height
-            try {
+          try {
             // Get current selection and range
-              const selection = window.getSelection();
+            const selection = window.getSelection();
             if (!selection || selection.rangeCount === 0) return;
-            
-              const range = selection.getRangeAt(0);
-              
+
+            const range = selection.getRangeAt(0);
+
             // Insert a single <br> with proper spacing control
             // This creates a clean line break without compounding margins
-              const br = document.createElement('br');
+            const br = document.createElement('br');
             range.deleteContents();
-              range.insertNode(br);
-              
+            range.insertNode(br);
+
             // Create a zero-width space node after br to ensure proper cursor positioning
             const textNode = document.createTextNode('\u200B'); // Zero-width space
-              range.setStartAfter(br);
+            range.setStartAfter(br);
             range.insertNode(textNode);
-            
+
             // Move cursor after the text node
             range.setStartAfter(textNode);
-              range.collapse(true);
-              selection.removeAllRanges();
-              selection.addRange(range);
-            
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+
             console.log('[Enter] Single line break inserted with proper spacing');
           } catch (error) {
             console.error('[Enter] Failed to insert line break:', error);
@@ -1821,53 +1821,53 @@
         }
       }
     });
-    
+
     document._emailComposeEnterHandlerBound = true;
   }
-  
+
   // Helper function to check if cursor is INSIDE signature (not just near)
   function isCursorInsideSignature(editor, range) {
     // Check if the cursor's parent node is within a signature element
     const signatureElements = editor.querySelectorAll('[data-signature], .signature, .email-signature');
     if (signatureElements.length === 0) return false;
-    
+
     // Get the current node where cursor is positioned
     let currentNode = range.startContainer;
     if (currentNode.nodeType === Node.TEXT_NODE) {
       currentNode = currentNode.parentNode;
     }
-    
+
     // Walk up the DOM tree to check if we're inside a signature
     for (const signature of signatureElements) {
       if (signature.contains(currentNode)) {
         return true;
       }
     }
-    
+
     return false;
   }
-  
+
   // Initialize the Enter key handler
   setupComposeEnterKeyHandler();
 
   // ========== AI GENERATION ANIMATION FUNCTIONS ==========
-  
+
   function startGeneratingAnimation(composeWindow, mode = 'standard') {
     const subjectInput = composeWindow?.querySelector('#compose-subject');
     const bodyInput = composeWindow?.querySelector('.body-input');
     const composeBody = composeWindow?.querySelector('.compose-body');
-    
+
     // Add glow effect and skeleton to subject input
     if (subjectInput) {
       subjectInput.classList.add('compose-generating');
       createSkeletonInField(subjectInput, 'subject');
     }
-    
+
     // Add glow effect to compose-body container (outer border)
     if (composeBody) {
       composeBody.classList.add('compose-generating');
     }
-    
+
     // Different body animations for HTML vs standard emails
     if (bodyInput) {
       if (mode === 'html') {
@@ -1878,43 +1878,43 @@
         createSkeletonInField(bodyInput, 'body');
       }
     }
-    
+
     console.log(`[AI Animation] Started generating animation (${mode} mode)`);
   }
-  
+
   function stopGeneratingAnimation(composeWindow) {
     const subjectInput = composeWindow?.querySelector('#compose-subject');
     const bodyInput = composeWindow?.querySelector('.body-input');
     const composeBody = composeWindow?.querySelector('.compose-body');
-    
+
     // Remove glow effect and skeleton from subject input
     if (subjectInput) {
       subjectInput.classList.remove('compose-generating');
       removeSkeletonFromField(subjectInput);
     }
-    
+
     // Remove glow effect from compose-body container
     if (composeBody) {
       composeBody.classList.remove('compose-generating');
     }
-    
+
     // Remove skeleton or shimmer from body input
     if (bodyInput) {
       removeSkeletonFromField(bodyInput);
       removeHtmlEmailShimmer(bodyInput);
     }
-    
+
     console.log('[AI Animation] Stopped generating animation');
   }
-  
+
   function createSkeletonInField(inputField, type) {
     // Clear any existing content
     inputField.innerHTML = '';
-    
+
     // Create skeleton container
     const skeletonContainer = document.createElement('div');
     skeletonContainer.className = 'field-skeleton-container';
-    
+
     if (type === 'subject') {
       // Subject skeleton: 2 short bars
       skeletonContainer.innerHTML = `
@@ -1931,10 +1931,10 @@
         <div class="skeleton-bar skeleton-body-5"></div>
       `;
     }
-    
+
     // Add skeleton to input field
     inputField.appendChild(skeletonContainer);
-    
+
     // Start skeleton animation
     setTimeout(() => {
       const bars = skeletonContainer.querySelectorAll('.skeleton-bar');
@@ -1944,14 +1944,14 @@
       });
     }, 50);
   }
-  
+
   function removeSkeletonFromField(inputField) {
     const skeletonContainer = inputField.querySelector('.field-skeleton-container');
     if (skeletonContainer) {
       // Fade out skeleton
       skeletonContainer.style.opacity = '0';
       skeletonContainer.style.transition = 'opacity 0.3s ease';
-      
+
       // Remove after fade
       setTimeout(() => {
         if (skeletonContainer.parentNode) {
@@ -1960,23 +1960,23 @@
       }, 300);
     }
   }
-  
+
   function typewriterEffect(element, text, speed = 30) {
     if (!element || !text) return;
-    
+
     // Remove skeleton first
     removeSkeletonFromField(element);
-    
+
     // Wait for skeleton to fade out, then start typewriter
     setTimeout(() => {
       // Handle both input fields and contentEditable elements
       const isInput = element.tagName === 'INPUT' || element.tagName === 'TEXTAREA';
-      
+
       if (isInput) {
         // For input fields, use value property
         element.value = '';
         element.style.borderRight = '2px solid var(--orange-primary)';
-        
+
         let i = 0;
         const timer = setInterval(() => {
           if (i < text.length) {
@@ -1993,7 +1993,7 @@
         element.style.borderRight = '2px solid var(--orange-primary)';
         element.style.overflow = 'hidden';
         element.style.whiteSpace = 'nowrap';
-        
+
         let i = 0;
         const timer = setInterval(() => {
           if (i < text.length) {
@@ -2009,19 +2009,19 @@
       }
     }, 350); // Wait for skeleton fade out
   }
-  
+
   function progressiveReveal(element, html) {
     if (!element || !html) return;
-    
+
     // Remove skeleton first
     removeSkeletonFromField(element);
-    
+
     // Wait for skeleton to fade out, then reveal content
     setTimeout(() => {
       // For HTML content, we need to render it properly
       // First, set the HTML content
       element.innerHTML = html;
-      
+
       // Then animate the paragraphs in
       const paragraphs = element.querySelectorAll('p');
       paragraphs.forEach((p, index) => {
@@ -2032,37 +2032,37 @@
       });
     }, 350); // Wait for skeleton fade out
   }
-  
+
   function animateTextIntoField(field, content, animationType = 'progressive') {
     if (!field || !content) return;
-    
+
     // Clear field first
     field.value = '';
     field.innerHTML = '';
-    
+
     // Add temporary styling for animation
     field.style.position = 'relative';
-    
+
     if (animationType === 'typewriter') {
       typewriterEffect(field, content);
     } else {
       progressiveReveal(field, content);
     }
   }
-  
+
   // ========== HTML EMAIL TEMPLATE ANIMATION ==========
-  
+
   function createHtmlEmailShimmer(bodyInput) {
     if (!bodyInput) return;
-    
+
     // Clear existing content
     bodyInput.innerHTML = '';
-    
+
     // Create shimmer placeholder that mimics email structure
     const shimmerContainer = document.createElement('div');
     shimmerContainer.className = 'html-email-shimmer-container';
     shimmerContainer.style.cssText = 'padding: 20px;';
-    
+
     shimmerContainer.innerHTML = `
       <div class="html-email-shimmer" style="height: 60px; margin-bottom: 20px; border-radius: 8px;"></div>
       <div class="html-email-shimmer" style="height: 20px; width: 70%; margin-bottom: 12px; border-radius: 4px;"></div>
@@ -2070,18 +2070,18 @@
       <div class="html-email-shimmer" style="height: 40px; width: 50%; margin: 0 auto 20px; border-radius: 20px;"></div>
       <div class="html-email-shimmer" style="height: 60px; border-radius: 8px;"></div>
     `;
-    
+
     bodyInput.appendChild(shimmerContainer);
   }
-  
+
   function removeHtmlEmailShimmer(bodyInput) {
     if (!bodyInput) return;
-    
+
     const shimmerContainer = bodyInput.querySelector('.html-email-shimmer-container');
     if (shimmerContainer) {
       shimmerContainer.style.opacity = '0';
       shimmerContainer.style.transition = 'opacity 0.3s ease';
-      
+
       setTimeout(() => {
         if (shimmerContainer.parentNode) {
           shimmerContainer.remove();
@@ -2089,19 +2089,19 @@
       }, 300);
     }
   }
-  
+
   // Render HTML email in an isolated iframe to prevent CSS bleeding
   function renderHtmlEmailInIframe(editor, html) {
     if (!editor || !html) return;
-    
+
     // Remove shimmer first
     removeHtmlEmailShimmer(editor);
-    
+
     // Wait for shimmer to fade out
     setTimeout(() => {
       // Clear editor and create iframe container
       editor.innerHTML = '';
-      
+
       // Create iframe wrapper
       const iframeWrapper = document.createElement('div');
       iframeWrapper.className = 'html-email-iframe-wrapper';
@@ -2114,7 +2114,7 @@
         border-radius: 8px;
         overflow: hidden;
       `;
-      
+
       // Create iframe for CSS isolation
       const iframe = document.createElement('iframe');
       iframe.className = 'html-email-iframe';
@@ -2126,10 +2126,10 @@
         background: white;
         display: block;
       `;
-      
+
       // Set iframe content using srcdoc (isolates CSS completely)
       iframe.srcdoc = html;
-      
+
       // Auto-resize iframe to content height
       iframe.onload = () => {
         try {
@@ -2142,59 +2142,59 @@
           console.warn('[HTML Email] Could not resize iframe:', e);
         }
       };
-      
+
       // Append iframe to wrapper and wrapper to editor
       iframeWrapper.appendChild(iframe);
       editor.appendChild(iframeWrapper);
-      
+
       // Fade in animation
       editor.style.opacity = '0';
       editor.style.transform = 'translateY(10px)';
       editor.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-      
+
       setTimeout(() => {
         editor.style.opacity = '1';
         editor.style.transform = 'translateY(0)';
       }, 50);
-      
+
       console.log('[HTML Email] Rendered in isolated iframe to prevent CSS bleeding');
     }, 350);
   }
-  
+
   function revealHtmlEmailSections(element, html) {
     if (!element || !html) return;
-    
+
     // Remove shimmer first
     removeHtmlEmailShimmer(element);
-    
+
     // Wait for shimmer to fade out
     setTimeout(() => {
       // Insert the HTML content
       element.innerHTML = html;
-      
+
       // Find major sections and wrap them for animation
       // Look for common email template structures
       const children = Array.from(element.children);
-      
+
       children.forEach((child, index) => {
         // Determine section type based on content and position
         let sectionType = 'body';
-        
+
         if (index === 0) {
           sectionType = 'header';
         } else if (child.querySelector('a[href]') && child.textContent.length < 100) {
           sectionType = 'cta';
-        } else if (child.querySelector('img') || child.textContent.toLowerCase().includes('best regards') || 
-                   child.textContent.toLowerCase().includes('sincerely') || index === children.length - 1) {
+        } else if (child.querySelector('img') || child.textContent.toLowerCase().includes('best regards') ||
+          child.textContent.toLowerCase().includes('sincerely') || index === children.length - 1) {
           sectionType = 'signature';
         } else if (index === 1) {
           sectionType = 'greeting';
         }
-        
+
         // Add reveal animation classes
         child.classList.add('html-email-reveal');
         child.setAttribute('data-section', sectionType);
-        
+
         // Trigger animation
         setTimeout(() => {
           child.classList.add('visible');
@@ -2204,20 +2204,20 @@
   }
 
   // ========== AI BAR RENDERING ==========
-  
+
   function renderAIBar(aiBar) {
     if (!aiBar) return;
-    
+
     if (aiBar.dataset.rendered === 'true') {
       console.log('[AI] Bar already rendered');
       return;
     }
-    
+
     console.log('[AI] Rendering AI bar...');
-    
+
     // Get custom prompts from settings (Phase 1 integration)
     const aiTemplates = getAITemplatesFromSettings();
-    
+
     const suggestions = [
       { text: 'Warm intro after a call', prompt: aiTemplates.warm_intro, template: 'warm_intro' },
       { text: 'Follow-up with value props', prompt: aiTemplates.follow_up, template: 'follow_up' },
@@ -2226,7 +2226,7 @@
       { text: 'Cold email outreach', prompt: aiTemplates.cold_email, template: 'cold_email' },
       { text: 'Invoice request', prompt: aiTemplates.invoice, template: 'invoice' }
     ];
-    
+
     aiBar.innerHTML = `
       <div class="ai-inner">
         <div class="ai-row">
@@ -2234,11 +2234,11 @@
                     placeholder="Describe the email you want... (tone, goal, offer, CTA)"></textarea>
         </div>
         <div class="ai-row suggestions" role="list">
-          ${suggestions.map(s => 
-            `<button class="ai-suggestion" type="button" 
+          ${suggestions.map(s =>
+      `<button class="ai-suggestion" type="button" 
                      data-prompt="${escapeHtml(s.prompt)}" 
                      data-template="${s.template}">${s.text}</button>`
-          ).join('')}
+    ).join('')}
         </div>
         <div class="ai-row actions">
           <button class="fmt-btn ai-generate" data-mode="standard">Generate Standard</button>
@@ -2247,7 +2247,7 @@
         </div>
       </div>
     `;
-    
+
     // Wire events
     wireAIBarEvents(aiBar);
     aiBar.dataset.rendered = 'true';
@@ -2258,13 +2258,13 @@
     console.log('[AI] Wiring suggestion button events...');
     const suggestionButtons = aiBar.querySelectorAll('.ai-suggestion');
     console.log('[AI] Found suggestion buttons:', suggestionButtons.length);
-    
+
     suggestionButtons.forEach((btn, index) => {
       console.log(`[AI] Adding click listener to suggestion ${index}:`, btn.textContent);
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         console.log('[AI] Suggestion clicked:', btn.textContent);
         const ta = aiBar.querySelector('.ai-prompt');
         if (ta) {
@@ -2275,7 +2275,7 @@
         }
       });
     });
-    
+
     console.log('[AI] Wiring generate button events...');
     aiBar.querySelectorAll('.ai-generate').forEach((btn, index) => {
       console.log(`[AI] Adding click listener to generate button ${index}:`, btn.textContent);
@@ -2294,7 +2294,7 @@
     try {
       const settings = window.SettingsPage?.getSettings?.() || {};
       const aiTemplates = settings?.aiTemplates || {};
-      
+
       return {
         warm_intro: aiTemplates.warm_intro || 'Warm intro after a call',
         follow_up: aiTemplates.follow_up || 'Follow-up with tailored value props',
@@ -2369,7 +2369,7 @@
   }
 
   // ========== AI HELPER FUNCTIONS ==========
-  
+
   // Browser-compatible industry detection (matches api/_industry-detection.js)
   function inferIndustryFromCompanyName(companyName) {
     if (!companyName) return '';
@@ -2461,12 +2461,12 @@
 
     return '';
   }
-  
+
   async function lookupPersonByEmail(email) {
     try {
       const e = String(email || '').trim().toLowerCase();
       if (!e) return null;
-      
+
       // Try Firebase first (like old emails.js)
       if (window.firebaseDB) {
         let snap;
@@ -2485,26 +2485,26 @@
         if (snap && !snap.empty) {
           const doc = snap.docs[0];
           const person = { id: doc.id, ...(doc.data ? doc.data() : {}) };
-          
+
           // Attempt to match an account (like old emails.js)
           let account = null;
           if (window.BackgroundAccountsLoader) {
             const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
-            const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g,' ').replace(/\s+/g,' ').trim();
+            const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g, ' ').replace(/\s+/g, ' ').trim();
             const comp = norm(person.company || '');
-            
+
             if (comp) {
               account = accounts.find(a => {
                 const accountName = a.accountName || a.name || '';
                 if (!accountName) return false;
                 const normalizedAccountName = norm(accountName);
-                return normalizedAccountName === comp || 
-                       normalizedAccountName.includes(comp) || 
-                       comp.includes(normalizedAccountName);
+                return normalizedAccountName === comp ||
+                  normalizedAccountName.includes(comp) ||
+                  comp.includes(normalizedAccountName);
               }) || null;
             }
           }
-          
+
           return {
             id: person.id,
             email: email,
@@ -2528,17 +2528,17 @@
                 if (companyName) {
                   detectedIndustry = inferIndustryFromCompanyName(companyName);
                 }
-                
+
                 // Try description if still not found
                 if (!detectedIndustry) {
-                  const accountDesc = account.shortDescription || account.short_desc || 
-                                     account.descriptionShort || account.description || '';
+                  const accountDesc = account.shortDescription || account.short_desc ||
+                    account.descriptionShort || account.description || '';
                   if (accountDesc) {
                     detectedIndustry = inferIndustryFromDescription(accountDesc);
                   }
                 }
               }
-              
+
               return {
                 id: account.id,
                 name: account.accountName || account.name || '',
@@ -2558,19 +2558,19 @@
           };
         }
       }
-      
+
       // Fallback to cache-based lookup
       let people = [];
       if (window.BackgroundPeopleLoader && typeof window.BackgroundPeopleLoader.getPeopleData === 'function') {
         people = window.BackgroundPeopleLoader.getPeopleData() || [];
       }
-      
-      const person = people.find(p => 
-        p.email === email || 
-        p.workEmail === email || 
+
+      const person = people.find(p =>
+        p.email === email ||
+        p.workEmail === email ||
         p.personalEmail === email
       );
-      
+
       if (person) {
         return {
           email: email,
@@ -2587,7 +2587,7 @@
           department: person.department || ''
         };
       }
-      
+
       // Final fallback
       return {
         email: email,
@@ -2616,40 +2616,40 @@
     try {
       // Get accounts data
       let accounts = [];
-      
+
       // Priority 1: BackgroundAccountsLoader
       if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
         accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
       }
-      
+
       // Priority 2: CacheManager
       if (accounts.length === 0 && window.CacheManager && typeof window.CacheManager.get === 'function') {
         accounts = await window.CacheManager.get('accounts') || [];
       }
 
       // Find matching account by company name OR email domain
-      const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g,' ').replace(/\s+/g,' ').trim();
+      const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g, ' ').replace(/\s+/g, ' ').trim();
       const comp = norm(recipient.company || '');
       const domain = (recipient.email || '').split('@')[1]?.toLowerCase() || '';
-      
+
       let acct = null;
-      
+
       // Try company name match first
       if (comp) {
         acct = accounts.find(a => {
           const accountName = a.accountName || a.name || '';
           if (!accountName) return false;
           const normalizedAccountName = norm(accountName);
-          return normalizedAccountName === comp || 
-                 normalizedAccountName.includes(comp) || 
-                 comp.includes(normalizedAccountName);
+          return normalizedAccountName === comp ||
+            normalizedAccountName.includes(comp) ||
+            comp.includes(normalizedAccountName);
         }) || null;
       }
-      
+
       // Try domain match if no company match
       if (!acct && domain) {
         acct = accounts.find(a => {
-          const d = String(a.domain || a.website || '').toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0];
+          const d = String(a.domain || a.website || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
           return d && domain.endsWith(d);
         }) || null;
       }
@@ -2659,7 +2659,7 @@
         if (!recipient.company) {
           recipient.company = acct.accountName || acct.name || '';
         }
-        
+
         // Infer industry if missing (using shared detection logic)
         let detectedIndustry = acct.industry || '';
         if (!detectedIndustry) {
@@ -2668,24 +2668,24 @@
           if (companyName) {
             detectedIndustry = inferIndustryFromCompanyName(companyName);
           }
-          
+
           // Try description if still not found
           if (!detectedIndustry) {
-            const accountDesc = acct.shortDescription || acct.short_desc || 
-                               acct.descriptionShort || acct.description || '';
+            const accountDesc = acct.shortDescription || acct.short_desc ||
+              acct.descriptionShort || acct.description || '';
             if (accountDesc) {
               detectedIndustry = inferIndustryFromDescription(accountDesc);
             }
           }
         }
-        
+
         const acctEnergy = {
           supplier: acct.electricitySupplier || '',
           currentRate: acct.currentRate || '',
           usage: acct.annualUsage || '',
           contractEnd: acct.contractEndDate || ''
         };
-        
+
         recipient.account = {
           id: acct.id,
           name: acct.accountName || acct.name || '',
@@ -2706,12 +2706,12 @@
           squareFootage: acct.squareFootage || acct.square_footage || acct.companySquareFootage || null,
           occupancyPct: acct.occupancyPct || acct.occupancy_pct || acct.companyOccupancyPct || null
         };
-        
+
         // Also set recipient.industry if missing
         if (!recipient.industry && detectedIndustry) {
           recipient.industry = detectedIndustry;
         }
-        
+
         let rate = String(acctEnergy.currentRate || '').trim();
         if (/^\.\d+$/.test(rate)) rate = '0' + rate;
         recipient.energy = { ...acctEnergy, currentRate: rate };
@@ -2724,7 +2724,7 @@
   }
 
   // ========== AI GENERATION CORE ==========
-  
+
   async function generateWithAI(aiBar, mode = 'standard') {
     const compose = document.getElementById('compose-window');
     const editor = compose?.querySelector('.body-input');
@@ -2732,7 +2732,7 @@
     const prompt = aiBar?.querySelector('.ai-prompt')?.value?.trim() || '';
     const toInput = compose?.querySelector('#compose-to');
     const subjectInput = compose?.querySelector('#compose-subject');
-    
+
     if (!editor) return;
 
     // CRITICAL: Extract signature BEFORE clearing editor for skeleton animation
@@ -2749,11 +2749,11 @@
     // Start generating animation with appropriate mode
     startGeneratingAnimation(compose, mode);
     if (status) status.textContent = 'Generating...';
-    
+
     try {
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
       const genUrl = `${base}/api/perplexity-email`;
-      
+
       console.log('[AI] Calling Perplexity Sonar...');
 
       // Get recipient data with enrichment
@@ -2772,7 +2772,7 @@
       // Get settings once
       const settings = (window.SettingsPage?.getSettings?.()) || {};
       const g = settings?.general || {};
-      const senderName = (g.firstName && g.lastName) 
+      const senderName = (g.firstName && g.lastName)
         ? `${g.firstName} ${g.lastName}`.trim()
         : (g.agentName || 'Power Choosers Team');
 
@@ -2843,7 +2843,7 @@
         if (cleanSubject.startsWith('Re: ')) {
           cleanSubject = cleanSubject.substring(4);
         }
-        
+
         // For cold emails, enhance subject with observation-based generator if it seems generic
         const isColdEmail = templateType === 'cold_email' || /cold.*email/i.test(prompt);
         if (isColdEmail && recipient) {
@@ -2851,14 +2851,14 @@
           const observation = recipient?.account?.shortDescription || recipient?.account?.descriptionShort || '';
           // Use observation-based subject if API returned generic subject
           const apiSubject = cleanSubject.toLowerCase();
-          const isGenericSubject = apiSubject.includes('hi') || apiSubject.includes('hello') || 
-                                  apiSubject.includes('i can help') || apiSubject.length < 20;
+          const isGenericSubject = apiSubject.includes('hi') || apiSubject.includes('hello') ||
+            apiSubject.includes('i can help') || apiSubject.length < 20;
           if (isGenericSubject) {
             cleanSubject = generateColdEmailSubject(recipient, industry, observation);
             console.log('[AI] Using observation-based subject line for cold email');
           }
         }
-        
+
         // Animate subject line with typewriter effect
         setTimeout(() => {
           typewriterEffect(subjectInput, cleanSubject, 50);
@@ -2876,7 +2876,7 @@
             // Standard email: restore signature that was extracted before skeleton cleared editor
             finalHtml = preserveSignatureAfterAI(editor, html, existingSignature);
           }
-          
+
           // Mark content type for sending (but don't activate HTML source view)
           if (templateType) {
             editor.setAttribute('data-template-type', templateType);
@@ -2885,17 +2885,17 @@
             editor.removeAttribute('data-template-type');
             editor.removeAttribute('data-html-email');
           }
-          
+
           // Ensure we're NOT in HTML source code view mode
           // If emailManager exists and is in HTML mode, toggle it off to show rendered view
           if (window.emailManager && window.emailManager._isHtmlMode) {
             console.log('[AI] Exiting HTML source mode to show rendered template');
             window.emailManager.toggleHtmlMode(compose);
           }
-          
+
           // Ensure data-mode is NOT set (this was causing the monospace font issue)
           editor.removeAttribute('data-mode');
-          
+
           // Use different animations based on template type
           if (templateType) {
             // HTML email template: wrap in iframe to isolate CSS and prevent style bleeding
@@ -2906,7 +2906,7 @@
             editor.style.opacity = '0';
             editor.style.transform = 'translateY(10px)';
             editor.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-            
+
             // Trigger the animation
             setTimeout(() => {
               editor.style.opacity = '1';
@@ -2930,15 +2930,15 @@
   }
 
   // ========== TEMPLATE BUILDER FUNCTIONS ==========
-  
+
   // Get industry-specific value props from settings
   function getIndustryValueProps(industry, jobTitle) {
     const settings = (window.SettingsPage?.getSettings?.()) || {};
     const industryData = settings?.industrySegmentation?.rules?.[industry?.toLowerCase()] || {};
-    
+
     // Check for exact match first
     const industryKey = industry?.toLowerCase() || '';
-    
+
     // Try to find matching industry rule
     let matchedRule = null;
     if (settings?.industrySegmentation?.rules) {
@@ -2955,7 +2955,7 @@
         }
       }
     }
-    
+
     // Manufacturing-specific value props
     if (industry?.toLowerCase()?.includes('manufacturing') || industryKey === 'manufacturing') {
       return [
@@ -2964,7 +2964,7 @@
         'Avoid peak-season supplier rush'
       ];
     }
-    
+
     // Healthcare-specific
     if (industry?.toLowerCase()?.includes('healthcare') || industry?.toLowerCase()?.includes('hospital') || industryKey === 'healthcare') {
       return [
@@ -2973,7 +2973,7 @@
         'Cost control without impacting patient care'
       ];
     }
-    
+
     // Hospitality-specific
     if (industry?.toLowerCase()?.includes('hotel') || industry?.toLowerCase()?.includes('hospitality') || industryKey === 'hospitality') {
       return [
@@ -2982,7 +2982,7 @@
         'Guest experience maintained with reliable utilities'
       ];
     }
-    
+
     // Food Production-specific
     if (industry?.toLowerCase()?.includes('food') || industry?.toLowerCase()?.includes('production') || industryKey === 'food') {
       return [
@@ -2991,7 +2991,7 @@
         'Operational continuity through renewals'
       ];
     }
-    
+
     // Nonprofit-specific
     if (industry?.toLowerCase()?.includes('nonprofit') || industry?.toLowerCase()?.includes('charity') || industryKey === 'nonprofit') {
       return [
@@ -3000,7 +3000,7 @@
         'Compliance handled professionally'
       ];
     }
-    
+
     // Retail-specific
     if (industry?.toLowerCase()?.includes('retail') || industryKey === 'retail') {
       return [
@@ -3009,7 +3009,7 @@
         'Centralized procurement for all locations'
       ];
     }
-    
+
     // Education-specific
     if (industry?.toLowerCase()?.includes('education') || industryKey === 'education') {
       return [
@@ -3018,7 +3018,7 @@
         'Student safety maintained with reliable power'
       ];
     }
-    
+
     // Generic fallback
     return [
       'Competitive market analysis vs. current spend',
@@ -3026,12 +3026,12 @@
       'Transparent pricing without hidden fees'
     ];
   }
-  
+
   // Generate observation-based cold email subject lines
   function generateColdEmailSubject(recipient, industry, observation) {
     const company = recipient?.company || recipient?.accountName || 'your organization';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
-    
+
     // Observation-based subjects (highest open rate)
     const subjectTemplates = {
       manufacturing: [
@@ -3083,10 +3083,10 @@
         `${company} + energy costs - quick question`
       ]
     };
-    
+
     const industryKey = industry?.toLowerCase() || 'generic';
     let templates = subjectTemplates.generic;
-    
+
     // Find matching industry templates
     for (const [key, templateList] of Object.entries(subjectTemplates)) {
       if (industryKey.includes(key) || key.includes(industryKey)) {
@@ -3094,29 +3094,29 @@
         break;
       }
     }
-    
+
     // If specific templates found, use them; otherwise use generic
     if (templates.length > 0) {
       const subject = templates[Math.floor(Math.random() * templates.length)];
-      
+
       // Replace variables
       return subject
         .replace(/\[company\]/gi, company)
         .replace(/\[first_name\]/gi, firstName)
         .replace(/\[job_title\]/gi, recipient?.title || recipient?.job || 'leader');
     }
-    
+
     // Final fallback
     return `Quick question about ${company}'s energy strategy`;
   }
-  
+
   // Build sender profile signature once for all HTML templates
   function getSenderProfile() {
     const settings = (window.SettingsPage?.getSettings?.()) || {};
     const g = settings?.general || {};
     const first = g.firstName || '';
     const last = g.lastName || '';
-    
+
     // Priority: Settings (firstName + lastName) → Firebase auth displayName → "Power Choosers Team"
     let name = '';
     if (first && last) {
@@ -3128,14 +3128,14 @@
         if (user?.displayName) {
           name = user.displayName.trim();
         }
-      } catch (_) {}
-      
+      } catch (_) { }
+
       // Final fallback to "Power Choosers Team" (NOT "Power Choosers CRM")
       if (!name) {
         name = 'Power Choosers Team';
       }
     }
-    
+
     return {
       name,
       title: g.jobTitle || 'Energy Strategist',
@@ -3149,7 +3149,7 @@
 
   function buildSignatureBlock() {
     const s = getSenderProfile();
-    
+
     // Debug logging to verify location is being retrieved
     console.log('[Signature] Building signature block with:', {
       name: s.name,
@@ -3159,7 +3159,7 @@
       phone: s.phone,
       email: s.email
     });
-    
+
     // Use separate divs for each line instead of <br> tags to ensure proper line breaks
     return `
       <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
@@ -3187,7 +3187,7 @@
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
     const s = getSenderProfile();
-    
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -3285,14 +3285,14 @@
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
     const s = getSenderProfile();
-    
+
     const valueProps = data.value_props || [
       'Access to 50+ competitive suppliers',
       'No cost for our procurement service',
       'Transparent rate comparison',
       'Expert contract negotiation'
     ];
-    
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -3410,14 +3410,14 @@
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
     const s = getSenderProfile();
-    
+
     const assessmentItems = data.assessment_items || [
       'Current rate vs. market rates ($0.085/kWh benchmark)',
       'Contract expiration timeline',
       'Hidden charges and fees analysis',
       'Efficiency improvement opportunities'
     ];
-    
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -3528,13 +3528,13 @@
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
     const s = getSenderProfile();
-    
+
     const timeline = data.timeline || [
       'Contract review and approval (24 Hours)',
       'Supplier onboarding and enrollment (30-45 days)',
       'Service activation (seamless transition)'
     ];
-    
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -3625,7 +3625,7 @@
     </div>
     <div class="timeline-box">
       <h3>📅 Implementation Timeline</h3>
-      ${timeline.map((step, i) => `<div class="timeline-step"><p><strong>Step ${i+1}:</strong> ${step}</p></div>`).join('')}
+      ${timeline.map((step, i) => `<div class="timeline-step"><p><strong>Step ${i + 1}:</strong> ${step}</p></div>`).join('')}
     </div>
     <div class="main-paragraph">
       <p>Our team has negotiated these rates exclusively for your facility. The pricing is competitive, the transition is seamless, and you maintain complete control throughout the process. This is a <strong>time-sensitive offer</strong> as market conditions continue to shift.</p>
@@ -3665,11 +3665,11 @@
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
     const industry = recipient?.industry || recipient?.account?.industry || '';
     const s = getSenderProfile();
-    
+
     // Get industry-specific value props if available
     const industryValueProps = getIndustryValueProps(industry, recipient?.title || recipient?.job);
     const valueProps = data.value_props || industryValueProps || [];
-    
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -3785,21 +3785,21 @@
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
     const s = getSenderProfile();
-    
+
     const checklistItems = data.checklist_items || [
       'Invoice date and service address',
       'Billing period (start and end dates)',
       'Detailed charge breakdown (kWh rate, demand charges, fees)',
       'Payment details and service address'
     ];
-    
+
     const discrepancies = data.discrepancies || [
       'Above-market kWh rates',
       'Hidden demand charges',
       'Incorrect contract terms',
       'Billing errors and overcharges'
     ];
-    
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -3931,7 +3931,7 @@
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
     const s = getSenderProfile();
-    
+
     // Simplify subject for preview (remove sender name, keep first 50 chars)
     const simplifySubject = (subject) => {
       if (!subject) return `Energy Solutions for ${company}`;
@@ -3943,16 +3943,16 @@
       }
       return simplified || `Energy Solutions for ${company}`;
     };
-    
+
     const displaySubject = simplifySubject(data.subject);
-    
+
     const sections = data.sections || [
       'We\'ve secured exclusive rates for facilities that are 10-20% below typical renewal offers',
       'Our team handles all supplier negotiations and contract reviews at no cost to you',
       'You maintain complete control and transparency throughout the entire process',
       'Early action now protects you from anticipated rate increases'
     ];
-    
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -4052,24 +4052,49 @@
   }
 
   // ========== EMAIL FORMATTING FUNCTIONS ==========
-  
+
   function wrapSonarHtmlWithBranding(sonarGeneratedHtml, recipient, subject) {
     const settings = (window.SettingsPage?.getSettings?.()) || {};
     const g = settings?.general || {};
-    
+
     const senderFirstName = g.firstName || '';
     const senderLastName = g.lastName || '';
-    const senderName = (senderFirstName && senderLastName) 
-        ? `${senderFirstName} ${senderLastName}`.trim()
-        : (g.agentName || 'Power Choosers Team');
-    
+    const senderName = (senderFirstName && senderLastName)
+      ? `${senderFirstName} ${senderLastName}`.trim()
+      : (g.agentName || 'Power Choosers Team');
+
     const senderEmail = g.email || 'l.patterson@powerchoosers.com';
     const senderPhone = g.phone || '';
     const senderTitle = g.jobTitle || 'Energy Strategist';
     const senderLocation = g.location || '';
     const senderCompany = g.companyName || 'Power Choosers';
     const senderAvatar = g.hostedPhotoURL || g.photoURL || '';
-    
+
+    /* Check if Custom HTML Signature is enabled and use it if so */
+    const sigSettings = settings.emailSignature || {};
+    if (sigSettings.useCustomHtml || sigSettings.customHtmlEnabled) {
+      // Get the actual custom HTML signature (built from settings profile data)
+      let customSignature = '';
+      if (window.getEmailSignature && typeof window.getEmailSignature === 'function') {
+        customSignature = window.getEmailSignature();
+      } else if (window.buildCustomHtmlSignature && typeof window.buildCustomHtmlSignature === 'function') {
+        customSignature = window.buildCustomHtmlSignature(g);
+      }
+
+      if (customSignature) {
+        return `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto;">
+      ${sonarGeneratedHtml}
+      
+      <div style="margin-top: 20px;">
+        ${customSignature}
+      </div>
+    </div>
+        `;
+      }
+    }
+
+    /* Fallback to standard hardcoded signature if no custom HTML signature */
     return `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto;">
         ${sonarGeneratedHtml}
@@ -4115,16 +4140,16 @@
       const r = recipient || {};
       const contact = r;
       const account = r.account || {};
-      
+
       // Get sender info from settings (like wrapSonarHtmlWithBranding does)
       const settings = (window.SettingsPage?.getSettings?.()) || {};
       const g = settings?.general || {};
       const senderFirstName = g.firstName || '';
       const senderLastName = g.lastName || '';
-      const senderName = (senderFirstName && senderLastName) 
-          ? `${senderFirstName} ${senderLastName}`.trim()
-          : (g.agentName || 'Power Choosers Team');
-      
+      const senderName = (senderFirstName && senderLastName)
+        ? `${senderFirstName} ${senderLastName}`.trim()
+        : (g.agentName || 'Power Choosers Team');
+
       const sender = {
         first_name: senderFirstName,
         last_name: senderLastName,
@@ -4139,8 +4164,8 @@
       const get = (obj, key) => {
         const k = String(key || '').trim();
         const map = {
-          first_name: (obj.firstName || (obj.name||'').split(' ')[0] || ''),
-          last_name: (obj.lastName || (obj.name||'').split(' ').slice(1).join(' ') || ''),
+          first_name: (obj.firstName || (obj.name || '').split(' ')[0] || ''),
+          last_name: (obj.lastName || (obj.name || '').split(' ').slice(1).join(' ') || ''),
           full_name: (obj.fullName || obj.name || [obj.firstName, obj.lastName].filter(Boolean).join(' ') || ''),
           title: (obj.title || obj.job || obj.role || obj.jobTitle || ''),
           email: (obj.email || ''),
@@ -4183,7 +4208,7 @@
       tmp.querySelectorAll('.var-chip').forEach(chip => {
         const dataVar = chip.getAttribute('data-var') || '';
         const m = dataVar.match(/^([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)$/);
-        if (!m) { chip.replaceWith(document.createTextNode(chip.textContent||'')); return; }
+        if (!m) { chip.replaceWith(document.createTextNode(chip.textContent || '')); return; }
         const scope = m[1];
         const key = m[2];
         let val = '';
@@ -4203,23 +4228,23 @@
   function formatTemplatedEmail(result, recipient, templateType) {
     try {
       console.log('[AI] Formatting templated email, type:', templateType);
-      
+
       // Clean all string fields in result to remove citations
       if (result && typeof result === 'object') {
         Object.keys(result).forEach(key => {
           if (typeof result[key] === 'string') {
             result[key] = removeCitationBrackets(result[key]);
           } else if (Array.isArray(result[key])) {
-            result[key] = result[key].map(item => 
+            result[key] = result[key].map(item =>
               typeof item === 'string' ? removeCitationBrackets(item) : item
             );
           }
         });
       }
-      
+
       // Extract data from JSON response
       const subject = result.subject || 'Energy Solutions';
-      
+
       // Build template HTML using the appropriate builder
       let templateHtml = buildTemplateHtml(templateType, result, recipient);
 
@@ -4229,11 +4254,11 @@
       } catch (e) {
         console.warn('[AI] Token replacement failed (non-fatal):', e);
       }
-      
+
       // IMPORTANT: Templates already include a hard-coded signature block.
       // Do NOT wrap with branding/signature to avoid duplication.
       console.log('[AI] Template email built successfully (no extra signature wrap)');
-      
+
       return {
         subject: improveSubject(subject, recipient),
         html: templateHtml
@@ -4255,11 +4280,11 @@
     try {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
-      
+
       // Look for signature div by multiple methods:
       // 1. Data attribute
       let sigDiv = doc.querySelector('[data-signature="true"]');
-      
+
       // 2. Look for div with signature-like styling (check both inline and computed)
       // This matches both standard signatures (margin-top: 20px) and custom HTML signatures (margin-top: 28px)
       if (!sigDiv) {
@@ -4267,23 +4292,23 @@
           const style = div.getAttribute('style') || '';
           // Check if style contains signature-like patterns (standard or custom HTML signature)
           return (style.includes('margin-top') && style.includes('padding-top') && style.includes('border-top')) ||
-                 (style.includes('border-top: 1px solid')) ||
-                 // Custom HTML signature has margin-top: 28px and specific font-family
-                 (style.includes('margin-top: 28px') && style.includes('padding-top: 24px'));
+            (style.includes('border-top: 1px solid')) ||
+            // Custom HTML signature has margin-top: 28px and specific font-family
+            (style.includes('margin-top: 28px') && style.includes('padding-top: 24px'));
         });
       }
-      
+
       // 3. Look for last div that contains typical signature content
       if (!sigDiv) {
         const allDivs = Array.from(doc.querySelectorAll('div'));
         sigDiv = allDivs.reverse().find(div => {
           const text = div.textContent.toLowerCase();
-          return text.includes('energy strategist') || 
-                 text.includes('power choosers') ||
-                 (text.includes('phone:') && text.includes('email:'));
+          return text.includes('energy strategist') ||
+            text.includes('power choosers') ||
+            (text.includes('phone:') && text.includes('email:'));
         });
       }
-      
+
       return sigDiv ? sigDiv.outerHTML : null;
     } catch (e) {
       console.warn('[Email] extractSignature failed:', e);
@@ -4300,21 +4325,21 @@
    */
   function preserveSignatureAfterAI(editor, aiContent, preExtractedSignature = null) {
     if (!editor) return aiContent;
-    
+
     try {
       // Use pre-extracted signature if provided (extracted before skeleton cleared editor)
       // Otherwise try to extract from current editor content (may be empty if skeleton already cleared it)
       let signature = preExtractedSignature;
-      
+
       if (!signature) {
         // Fallback: try to extract from current content (may be empty if skeleton cleared it)
-      const currentContent = editor.innerHTML;
+        const currentContent = editor.innerHTML;
         signature = extractSignature(currentContent);
         console.log('[Signature] Fallback: Extracted from current content:', signature ? 'YES' : 'NO');
       } else {
         console.log('[Signature] Using pre-extracted signature (from before skeleton):', signature ? 'YES' : 'NO');
       }
-      
+
       // Remove any existing signature from AI content using DOM parser
       let cleanHtml = aiContent;
       const aiSig = extractSignature(aiContent);
@@ -4322,17 +4347,17 @@
         console.log('[Signature] Removing signature from AI content');
         const parser = new DOMParser();
         const doc = parser.parseFromString(aiContent, 'text/html');
-        const sigDiv = doc.querySelector('[data-signature="true"]') || 
-                      Array.from(doc.querySelectorAll('div')).find(div => 
-                        div.style.marginTop === '20px' && 
-                        div.style.paddingTop === '20px'
-                      );
+        const sigDiv = doc.querySelector('[data-signature="true"]') ||
+          Array.from(doc.querySelectorAll('div')).find(div =>
+            div.style.marginTop === '20px' &&
+            div.style.paddingTop === '20px'
+          );
         if (sigDiv) {
           sigDiv.remove();
           cleanHtml = doc.body.innerHTML;
         }
       }
-      
+
       // Place signature after the AI content's closing
       let finalContent = cleanHtml;
       if (signature) {
@@ -4342,7 +4367,7 @@
       } else {
         console.log('[Signature] No signature to append');
       }
-      
+
       return finalContent;
     } catch (e) {
       console.warn('[Signature] Failed to preserve signature:', e);
@@ -4354,10 +4379,10 @@
     try {
       console.log('[AI] Formatting generated email, mode:', mode);
       console.log('[AI] Raw result:', result);
-      
+
       let subject = '';
       let body = '';
-      
+
       // Try to parse as JSON first
       try {
         // 1) Strip code fences if present (```json ... ``` or ``` ... ```)
@@ -4379,7 +4404,7 @@
           if (typeof jsonData[key] === 'string') {
             jsonData[key] = removeCitationBrackets(jsonData[key]);
           } else if (Array.isArray(jsonData[key])) {
-            jsonData[key] = jsonData[key].map(item => 
+            jsonData[key] = jsonData[key].map(item =>
               typeof item === 'string' ? removeCitationBrackets(item) : item
             );
           }
@@ -4414,39 +4439,39 @@
           // Ensure closing has proper line breaks (e.g., "Best regards,\nLewis")
           // Handle both escaped \n (from JSON) and actual newlines
           let closing = String(jsonData.closing || '');
-          
+
           // CRITICAL FIX: Convert escaped \n (literal string "\\n") to actual newline first
           // This handles cases where Perplexity returns "Best regards,\nLewis" as escaped string
           closing = closing.replace(/\\n/g, '\n');
-          
+
           // Handle different closing formats and ensure proper line break
           if (closing.includes('Best regards,')) {
             // Check if there's already a newline after the comma
             if (!closing.match(/Best regards,\s*\n/i)) {
-            // Replace "Best regards, Name" with "Best regards,\nName"
-            closing = closing.replace(/Best regards,\s*/i, 'Best regards,\n');
+              // Replace "Best regards, Name" with "Best regards,\nName"
+              closing = closing.replace(/Best regards,\s*/i, 'Best regards,\n');
             }
           } else if (closing.includes('Sincerely,')) {
             if (!closing.match(/Sincerely,\s*\n/i)) {
-            closing = closing.replace(/Sincerely,\s*/i, 'Sincerely,\n');
+              closing = closing.replace(/Sincerely,\s*/i, 'Sincerely,\n');
             }
           } else if (closing.includes('Regards,')) {
             if (!closing.match(/Regards,\s*\n/i)) {
-            closing = closing.replace(/Regards,\s*/i, 'Regards,\n');
+              closing = closing.replace(/Regards,\s*/i, 'Regards,\n');
             }
           }
-          
+
           body += '\n\n' + closing;
         }
         console.log('[AI] Built body from JSON:', body);
 
       } catch (jsonError) {
         console.log('[AI] Not JSON, falling back to text parsing');
-        
+
         // Fallback to original text parsing
         const lines = result.split('\n');
         let inBody = false;
-        
+
         for (const line of lines) {
           if (line.startsWith('Subject:')) {
             subject = removeCitationBrackets(line.replace('Subject:', '').trim());
@@ -4456,16 +4481,16 @@
             body += removeCitationBrackets(line) + '\n';
           }
         }
-        
+
         // Clean the body
         body = removeCitationBrackets(body);
-        
+
         // If no subject found, use a default
         if (!subject) {
           subject = 'Energy Solutions';
         }
       }
-      
+
       // Convert body to HTML with proper paragraph spacing (emails.js approach)
       // Rebuild body and normalize paragraphs: ensure blank line between paragraphs
       const normalizedBody = body
@@ -4522,12 +4547,12 @@
           }
         })
         .join('');
-      
+
       // Check mode: HTML uses profile branding, standard uses signature settings
       if (mode === 'html') {
         // HTML mode: Wrap with branding for profile-based signature
         const fullHtml = wrapSonarHtmlWithBranding(htmlBody, recipient, subject);
-        
+
         return {
           subject: improveSubject(subject, recipient),
           html: fullHtml
@@ -4550,7 +4575,7 @@
 
   function buildTemplateHtml(templateType, data, recipient) {
     const fromEmail = 'l.patterson@powerchoosers.com';
-    
+
     switch (templateType) {
       case 'warm_intro':
         return buildWarmIntroHtml(data, recipient, fromEmail);
@@ -4572,26 +4597,26 @@
   }
 
   // ========== AI BUTTON HANDLER ==========
-  
+
   function setupAIButtonHandler() {
     document.addEventListener('click', (e) => {
       if (e.target.closest('[data-action="ai"]')) {
         e.preventDefault();
         e.stopPropagation();
-        
+
         const composeWindow = document.getElementById('compose-window');
         const aiBar = composeWindow?.querySelector('.ai-bar');
-        
+
         if (aiBar) {
           // Initialize AI bar if not already rendered
           if (!aiBar.dataset.rendered) {
             renderAIBar(aiBar);
           }
-          
+
           // Toggle AI bar
           const isOpen = aiBar.classList.toggle('open');
           aiBar.setAttribute('aria-hidden', String(!isOpen));
-          
+
           console.log('[AI] AI bar toggled:', isOpen ? 'open' : 'closed');
         }
       }
@@ -4599,7 +4624,7 @@
   }
 
   // ========== AI PANEL FUNCTIONS ==========
-  
+
   /**
    * Opens the AI Panel, delegating to the main email manager if available.
    */
@@ -4607,14 +4632,14 @@
     // Try to find the AI bar in any compose window
     const composeWindow = document.querySelector('#compose-window, .compose-window');
     const aiBar = composeWindow?.querySelector('.ai-bar');
-    
+
     if (aiBar) {
       // Ensure AI bar is rendered before toggling
       if (!aiBar.dataset.rendered) {
         console.log('[EmailCompose] Rendering AI bar before toggle...');
         renderAIBar(aiBar);
       }
-      
+
       const isOpen = aiBar.classList.toggle('open');
       aiBar.setAttribute('aria-hidden', String(!isOpen));
       console.log('[EmailCompose] Toggled AI bar directly. Open:', isOpen);
@@ -4624,42 +4649,42 @@
   }
 
   // ========== EMAIL SENDING FUNCTIONS ==========
-  
+
   /**
    * Convert HTML content to plain text
    * Preserves line breaks and formatting where possible
    */
   function convertHtmlToPlainText(html) {
     if (!html) return '';
-    
+
     // Create a temporary div to parse HTML
     const temp = document.createElement('div');
     temp.innerHTML = html;
-    
+
     // Remove script and style elements
     const scripts = temp.querySelectorAll('script, style');
     scripts.forEach(el => el.remove());
-    
+
     // Remove signature blocks (they'll be added separately as plain text)
     const signatureDivs = temp.querySelectorAll('[data-signature="true"]');
     signatureDivs.forEach(el => el.remove());
-    
+
     // Convert <br> and <p> tags to line breaks
     const brs = temp.querySelectorAll('br');
     brs.forEach(br => {
       br.replaceWith(document.createTextNode('\n'));
     });
-    
-    const paragraphs = temp.querySelectorAll('p');
-    paragraphs.forEach((p, index) => {
-      if (index > 0) {
-        p.insertAdjacentText('beforebegin', '\n\n');
-      }
-    });
-    
+
+    // Replace block-level elements with newlines to prevent text running together
+    // Add two newlines after closing block tags for paragraph separation
+    // Add one newline before opening block tags to ensure content starts on a new line
+    temp.innerHTML = temp.innerHTML
+      .replace(/<\/(div|p|tr|h[1-6]|li|blockquote)[^>]*>/gi, '\n\n') // Extra spacing after closing blocks
+      .replace(/<(div|p|tr|h[1-6]|li|blockquote)[^>]*>/gi, '\n');    // Single newline before opening blocks
+
     // Convert common HTML elements to text
     let text = temp.textContent || temp.innerText || '';
-    
+
     // Clean up whitespace
     text = text
       .replace(/\r\n/g, '\n')  // Normalize line breaks
@@ -4667,20 +4692,20 @@
       .replace(/[ \t]+/g, ' ')   // Collapse multiple spaces/tabs
       .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
       .trim();
-    
+
     return text;
   }
-  
+
   async function sendEmailViaGmail(emailData) {
     try {
       const { to, subject, content, plainTextContent, from, fromName, _deliverability, threadId, inReplyTo, references, trackingMetadata, isHtmlEmail } = emailData;
-      
+
       // Generate unique tracking ID for this email
       const trackingId = `gmail_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+
       // Explicit boolean conversion - ensure it's always a boolean, never undefined
       const isHtmlEmailBoolean = Boolean(isHtmlEmail);
-      
+
       console.log('[Gmail] Email data received:', {
         isHtmlEmail: isHtmlEmailBoolean,
         contentLength: content.length,
@@ -4688,7 +4713,7 @@
         from: from || 'not set',
         fromName: fromName || 'not set'
       });
-      
+
       // Prepare email data for Gmail API
       const emailPayload = {
         to: to,
@@ -4705,7 +4730,7 @@
         _deliverability: _deliverability,
         userEmail: window.currentUserEmail || null // Pass user email for domain-wide delegation
       };
-      
+
       // Send via Gmail API (still using sendgrid-send endpoint name for backward compatibility)
       const response = await fetch(`${window.API_BASE_URL}/api/email/sendgrid-send`, {
         method: 'POST',
@@ -4722,7 +4747,7 @@
 
       const result = await response.json();
       console.log('[Gmail] Email sent successfully:', result);
-      
+
       // Store email record for tracking
       if (window.emailTrackingManager && result.trackingId) {
         const trackingEmailData = {
@@ -4739,9 +4764,11 @@
           threadId: result.threadId || threadId || null,
           inReplyTo: inReplyTo || null,
           references: Array.isArray(references) ? references : (references ? [references] : []),
-          trackingMetadata: trackingMetadata || null
+          trackingMetadata: trackingMetadata || null,
+          // CRITICAL: Include isHtmlEmail so email-detail.js knows how to render
+          isHtmlEmail: isHtmlEmailBoolean || false
         };
-        
+
         try {
           await window.emailTrackingManager.saveEmailRecord(trackingEmailData);
           console.log('[Gmail] Email record saved to tracking system');
@@ -4749,7 +4776,7 @@
           console.warn('[Gmail] Failed to save email record:', trackingError);
         }
       }
-      
+
       return {
         success: true,
         trackingId: result.trackingId,
@@ -4768,10 +4795,10 @@
     const toInput = document.getElementById('compose-to');
     const subjectInput = document.getElementById('compose-subject');
     const bodyInput = document.querySelector('.body-input');
-    
+
     const to = toInput?.value?.trim() || '';
     const subject = subjectInput?.value?.trim() || '';
-    
+
     // Extract HTML content - handle iframe case for HTML templates
     let body = '';
     if (bodyInput) {
@@ -4787,10 +4814,10 @@
         console.log('[EmailCompose] Using innerHTML directly, length:', body.length);
       }
     }
-    
+
     // Check attribute first, then detect HTML structure as fallback
     const hasHtmlAttribute = bodyInput?.getAttribute('data-html-email') === 'true';
-    
+
     // More flexible HTML structure detection - check for common HTML email patterns
     const hasHtmlStructure = body && (
       body.includes('<!DOCTYPE html>') ||
@@ -4807,26 +4834,26 @@
       body.includes('background-color:') ||
       (body.includes('<table') && body.includes('style=')) // Common in HTML emails
     );
-    
+
     // Explicit boolean conversion - prioritize attribute, then structure
     const isHtmlEmail = Boolean(hasHtmlAttribute || hasHtmlStructure);
-    
+
     console.log('[EmailCompose] Email mode:', isHtmlEmail ? 'HTML Template' : 'Standard');
-    console.log('[EmailCompose] Detection:', {hasHtmlAttribute, hasHtmlStructure});
+    console.log('[EmailCompose] Detection:', { hasHtmlAttribute, hasHtmlStructure });
     console.log('[EmailCompose] Content preview:', body.substring(0, 100) + '...');
-    
+
     if (!to) {
       window.crm?.showToast('Please enter recipients');
       toInput?.focus();
       return;
     }
-    
+
     if (!subject) {
       window.crm?.showToast('Please enter a subject');
       subjectInput?.focus();
       return;
     }
-    
+
     if (!body) {
       window.crm?.showToast('Please enter email content');
       bodyInput?.focus();
@@ -4835,9 +4862,9 @@
 
     try {
       // Get deliverability settings from settings.js
-      const settings = (window.SettingsPage && window.SettingsPage.getSettings) ? window.SettingsPage.getSettings() : (JSON.parse(localStorage.getItem('crm-settings')||'{}'));
+      const settings = (window.SettingsPage && window.SettingsPage.getSettings) ? window.SettingsPage.getSettings() : (JSON.parse(localStorage.getItem('crm-settings') || '{}'));
       const deliverRaw = settings?.emailDeliverability || {};
-      
+
       // Map settings format to sendgrid-service format
       const deliver = {
         enableTracking: deliverRaw.enableTracking !== false && deliverRaw.enableClickTracking !== false,
@@ -4848,7 +4875,7 @@
         useBrandedHtmlTemplate: deliverRaw.useBrandedHtmlTemplate === true,
         signatureImageEnabled: deliverRaw.signatureImageEnabled !== false
       };
-      
+
       // Show sending state
       const sendButton = document.querySelector('#compose-send');
       if (sendButton) {
@@ -4861,7 +4888,7 @@
       let contentWithSignature = body;
       let finalContent = body;
       let plainTextContent = ''; // For plain text fallback
-      
+
       if (isHtmlEmail) {
         // HTML email templates: Don't apply any signature settings
         // They have their own hardcoded signatures via wrapSonarHtmlWithBranding
@@ -4873,16 +4900,16 @@
       } else {
         // Standard email: Keep as HTML and apply HTML signature from settings
         console.log('[Signature Debug] Standard email - applying HTML signature from settings');
-        
+
         let preparedBody = body;
-        
+
         // Remove any existing signature from the body (prevent duplication)
         const temp = document.createElement('div');
         temp.innerHTML = preparedBody;
         const existingSignatures = temp.querySelectorAll('[data-signature="true"]');
         existingSignatures.forEach(sig => sig.remove());
         preparedBody = temp.innerHTML;
-        
+
         // Get HTML signature from settings (includes image if enabled)
         let signatureHtml = '';
         if (window.getEmailSignature && typeof window.getEmailSignature === 'function') {
@@ -4893,58 +4920,58 @@
           // Fallback: try to get signature from settings directly
           const settings = window.SettingsPage?.getSettings?.() || {};
           const signature = settings?.emailSignature || {};
-          
+
           if (signature.text || signature.image) {
             signatureHtml += '<div contenteditable="false" data-signature="true" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">';
-            
+
             if (signature.text) {
               const textHtml = signature.text.replace(/\n/g, '<br>');
               signatureHtml += `<div style="font-family: inherit; font-size: 14px; color: #333; line-height: 1.4;">${textHtml}</div>`;
             }
-            
+
             // Include image if enabled and present
             if (signature.image && deliver.signatureImageEnabled !== false) {
               const width = signature.imageSize?.width || 200;
               const height = signature.imageSize?.height || 100;
               signatureHtml += `<div style="margin-top: 10px;"><img src="${signature.image}" alt="Signature" style="max-width: ${width}px; max-height: ${height}px; border-radius: 4px;" /></div>`;
             }
-            
+
             signatureHtml += '</div>';
           }
         }
-          
-          // If no signature from settings, build basic one
+
+        // If no signature from settings, build basic one
         if (!signatureHtml) {
-            const settings = window.SettingsPage?.getSettings?.() || {};
-            const general = settings.general || {};
-            const name = (general.firstName && general.lastName) 
-              ? `${general.firstName} ${general.lastName}`.trim()
-              : (general.agentName || 'Power Choosers Team');
-            
+          const settings = window.SettingsPage?.getSettings?.() || {};
+          const general = settings.general || {};
+          const name = (general.firstName && general.lastName)
+            ? `${general.firstName} ${general.lastName}`.trim()
+            : (general.agentName || 'Power Choosers Team');
+
           signatureHtml = `<div contenteditable="false" data-signature="true" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
             <div style="font-family: inherit; font-size: 14px; color: #333; line-height: 1.4;">${name}<br>Energy Strategist</div>
             </div>`;
-            
-            console.log('[Signature Debug] Using fallback signature');
-          }
-          
+
+          console.log('[Signature Debug] Using fallback signature');
+        }
+
         // Add signature to HTML content
         if (signatureHtml) {
           console.log('[Signature Debug] Adding HTML signature to email');
           finalContent = preparedBody + signatureHtml;
           contentWithSignature = finalContent;
-          } else {
+        } else {
           finalContent = preparedBody;
-            contentWithSignature = preparedBody;
-          }
-        
+          contentWithSignature = preparedBody;
+        }
+
         // Generate plain text version for fallback (without image)
         plainTextContent = convertHtmlToPlainText(preparedBody);
         const signatureText = window.getEmailSignatureText ? window.getEmailSignatureText() : '';
         if (signatureText) {
           plainTextContent += signatureText;
         }
-        
+
         console.log('[Signature Debug] HTML email with signature, length:', finalContent.length);
       }
 
@@ -4952,7 +4979,7 @@
       const senderProfile = getSenderProfile();
       const senderEmail = senderProfile.email || 'l.patterson@powerchoosers.com';
       let senderName = senderProfile.name;
-      
+
       // Additional fallback: if name is still empty or "Power Choosers Team", try Firebase auth
       if (!senderName || senderName === 'Power Choosers Team') {
         try {
@@ -4961,14 +4988,14 @@
             senderName = user.displayName.trim();
             console.log('[EmailCompose] Using Firebase auth displayName as sender name:', senderName);
           }
-        } catch (_) {}
-        
+        } catch (_) { }
+
         // Final fallback
         if (!senderName) {
           senderName = 'Power Choosers Team';
         }
       }
-      
+
       // Debug logging to verify sender name
       console.log('[EmailCompose] Sender details:', {
         email: senderEmail,
@@ -4993,7 +5020,7 @@
         console.log('[EmailCompose] Sending via Gmail with fromName:', senderName);
         result = await sendEmailViaGmail({ ...emailData, _deliverability: deliver });
         console.log('[EmailCompose] Email sent via Gmail');
-        
+
         // Track email performance if metadata is available
         if (window._lastGeneratedMetadata) {
           const trackingData = {
@@ -5005,7 +5032,7 @@
             timestamp: new Date().toISOString(),
             event: 'sent'
           };
-          
+
           // Send to tracking endpoint
           const baseUrl = window.API_BASE_URL || window.location.origin || '';
           fetch(`${baseUrl}/api/track-email-performance`, {
@@ -5013,7 +5040,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(trackingData)
           }).catch(err => console.warn('[Tracking] Failed to log send event:', err));
-          
+
           // Clear metadata after tracking
           window._lastGeneratedMetadata = null;
         }
@@ -5021,10 +5048,10 @@
         console.error('[EmailCompose] Gmail send failed:', gmailError);
         throw new Error(`Failed to send email: ${gmailError.message}`);
       }
-      
+
       // Close compose window on success
       closeComposeWindow();
-      
+
       // Show success message
       window.crm?.showToast('Email sent successfully!');
 
@@ -5061,7 +5088,7 @@
       if (e.target.closest('#compose-send')) {
         e.preventDefault();
         e.stopPropagation();
-        
+
         console.log('[EmailCompose] Send button clicked');
         sendEmail();
       }
@@ -5069,10 +5096,10 @@
   }
 
   // ========== INITIALIZATION ==========
-  
+
   // Setup AI functionality
   setupAIButtonHandler();
-  
+
   // Setup send button functionality
   setupSendButtonHandler();
 
