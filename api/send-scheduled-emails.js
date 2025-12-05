@@ -178,9 +178,10 @@ async function getUserSignature(ownerId) {
       return { signatureHtml: '', signatureText: '' };
     }
 
-    // Build HTML signature (use email-safe inline styles, NO non-standard attributes)
-    // Avoid contenteditable and data-* attributes as they may be stripped by email clients
-    let signatureHtml = '<div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #cccccc;">';
+    // Build HTML signature (use email-safe inline styles)
+    // CRITICAL: data-signature="true" is required for email-detail.js to render this as HTML
+    // Also include border-top: 2px solid #E8A23A for fallback detection
+    let signatureHtml = '<div data-signature="true" style="margin-top: 24px; padding-top: 16px; border-top: 2px solid #E8A23A;">';
 
     if (sigText) {
       // Use explicit font-family for email compatibility
@@ -234,10 +235,11 @@ function buildCustomHtmlSignature(general) {
 
   // Build email-compatible HTML signature (table-based for maximum compatibility)
   // Reduced spacing: margin-top 8px + padding-top 8px = 16px total (was 36px)
+  // CRITICAL: data-signature="true" is required for email-detail.js to render this as HTML
   return `
-<div style="margin-top: 8px; padding-top: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-    <!-- Orange gradient divider -->
-    <div style="height: 2px; background: linear-gradient(to right, #f59e0b 0%, #f59e0b 40%, transparent 100%); margin-bottom: 24px;"></div>
+<div data-signature="true" style="margin-top: 8px; padding-top: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+    <!-- Orange gradient divider - border-top for email-detail.js detection fallback -->
+    <div style="height: 2px; border-top: 2px solid #E8A23A; background: linear-gradient(to right, #f59e0b 0%, #f59e0b 40%, transparent 100%); margin-bottom: 24px;"></div>
     
     <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
         <tr>
@@ -813,6 +815,13 @@ export default async function handler(req, res) {
           createdBy: emailData.createdBy || emailData.ownerId
           // Note: subject, html, text are preserved automatically by Firestore update()
         };
+        
+        logger.log('[SendScheduledEmails] sentPayload constructed for:', emailDoc.id, {
+          type: sentPayload.type,
+          status: sentPayload.status,
+          gmailMessageId: sentPayload.gmailMessageId,
+          ownerId: sentPayload.ownerId
+        });
 
         // Finalize as sent with retry + merge fallback to avoid stuck "sending"
         logger.log('[SendScheduledEmails] Calling finalizeAsSent for:', emailDoc.id);
