@@ -12,22 +12,37 @@ const STALE_SENDING_MS = 10 * 60 * 1000; // 10 minutes
 
 // Helper: finalize an email as sent with retries and merge fallback
 async function finalizeAsSent(emailDoc, payload) {
+  const emailId = emailDoc.id;
+  logger.log(`[SendScheduledEmails] Finalizing email ${emailId} as sent...`);
+  
   // First attempt
   try {
     await emailDoc.ref.update(payload);
-    return;
+    logger.log(`[SendScheduledEmails] ✓ Email ${emailId} finalized as sent (first attempt)`);
+    return true;
   } catch (err1) {
-    logger.warn('[SendScheduledEmails] Final sent update failed, retrying once:', emailDoc.id, err1);
+    logger.warn(`[SendScheduledEmails] Final sent update failed for ${emailId}, retrying:`, err1.message || err1);
   }
+  
   // Second attempt
   try {
     await emailDoc.ref.update(payload);
-    return;
+    logger.log(`[SendScheduledEmails] ✓ Email ${emailId} finalized as sent (second attempt)`);
+    return true;
   } catch (err2) {
-    logger.warn('[SendScheduledEmails] Final sent update second attempt failed, using merge set:', emailDoc.id, err2);
+    logger.warn(`[SendScheduledEmails] Final sent update second attempt failed for ${emailId}, using merge set:`, err2.message || err2);
   }
+  
   // Last resort: merge set
-  await emailDoc.ref.set(payload, { merge: true });
+  try {
+    await emailDoc.ref.set(payload, { merge: true });
+    logger.log(`[SendScheduledEmails] ✓ Email ${emailId} finalized as sent (merge set fallback)`);
+    return true;
+  } catch (err3) {
+    logger.error(`[SendScheduledEmails] ❌ CRITICAL: All finalization attempts failed for ${emailId}:`, err3.message || err3);
+    // Re-throw so caller knows it failed
+    throw new Error(`Failed to finalize email ${emailId} as sent after 3 attempts: ${err3.message}`);
+  }
 }
 
 /**
@@ -692,19 +707,20 @@ export default async function handler(req, res) {
           htmlLength: finalHtml.length
         });
 
+        // Check if this is a full HTML template (has DOCTYPE or full HTML structure)
+        // IMPORTANT: Must be defined outside if-block since it's used in sentPayload
+        const isHtmlTemplate = finalHtml.includes('<!DOCTYPE html>') ||
+          (finalHtml.includes('<html') && finalHtml.includes('</html>'));
+
+        logger.debug('[SendScheduledEmails] HTML template check:', {
+          emailId: emailDoc.id,
+          isHtmlTemplate,
+          hasDoctype: finalHtml.includes('<!DOCTYPE html>'),
+          hasHtmlTags: finalHtml.includes('<html') && finalHtml.includes('</html>')
+        });
+
         // Add signature if enabled in settings
         if (emailSettings.content.includeSignature) {
-          // Check if this is a full HTML template (has DOCTYPE or full HTML structure)
-          const isHtmlTemplate = finalHtml.includes('<!DOCTYPE html>') ||
-            (finalHtml.includes('<html') && finalHtml.includes('</html>'));
-
-          logger.debug('[SendScheduledEmails] HTML template check:', {
-            emailId: emailDoc.id,
-            isHtmlTemplate,
-            hasDoctype: finalHtml.includes('<!DOCTYPE html>'),
-            hasHtmlTags: finalHtml.includes('<html') && finalHtml.includes('</html>')
-          });
-
           if (isHtmlTemplate) {
             // HTML template emails: Keep hardcoded signature (don't modify)
             // HTML templates already have their own signature built into the template
@@ -753,7 +769,13 @@ export default async function handler(req, res) {
           references: emailData.references || undefined
         });
 
-        logger.debug('[SendScheduledEmails] Email sent successfully via Gmail:', emailDoc.id, sendResult.messageId);
+        logger.log('[SendScheduledEmails] ✓ Email sent successfully via Gmail:', emailDoc.id, 'messageId:', sendResult.messageId);
+        
+        // Validate sendResult before proceeding
+        if (!sendResult || !sendResult.messageId) {
+          logger.error('[SendScheduledEmails] ❌ Gmail returned invalid sendResult for:', emailDoc.id, JSON.stringify(sendResult));
+          throw new Error('Gmail send returned invalid result - missing messageId');
+        }
 
         // Update email record with FINAL HTML that includes signature
         // CRITICAL: Save the actual sent content so CRM display matches what recipient received
@@ -793,7 +815,9 @@ export default async function handler(req, res) {
         };
 
         // Finalize as sent with retry + merge fallback to avoid stuck "sending"
-        await finalizeAsSent(emailDoc, sentPayload);
+        logger.log('[SendScheduledEmails] Calling finalizeAsSent for:', emailDoc.id);
+        const finalized = await finalizeAsSent(emailDoc, sentPayload);
+        logger.log('[SendScheduledEmails] finalizeAsSent returned:', finalized, 'for:', emailDoc.id);
 
         sentCount++;
 
