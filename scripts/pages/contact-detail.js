@@ -6511,9 +6511,33 @@
         // We do this regardless of email presence, as the sequence might start with a Task.
         if (true) {
           try {
-            const sequenceDoc = await db.collection('sequences').doc(sequenceId).get();
-            const sequenceData = sequenceDoc.data();
-            const hasActiveMembers = (sequenceData?.stats?.active || 0) > 0;
+            // Get sequence data - prefer local cache (which we just updated) over Firestore read
+            let sequenceData = null;
+            let hasActiveMembers = 0;
+            let isSequenceActive = true; // Default to active (most sequences are active by default)
+            
+            // Try local cache first (most up-to-date since we just updated it)
+            if (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function') {
+              const sequences = window.BackgroundSequencesLoader.getSequencesData();
+              const seq = sequences.find(s => s.id === sequenceId);
+              if (seq) {
+                sequenceData = seq;
+                hasActiveMembers = seq.stats?.active || 0;
+                isSequenceActive = seq.isActive !== false && seq.status !== 'paused';
+              }
+            }
+            
+            // Fallback to Firestore if cache miss
+            if (!sequenceData) {
+              const sequenceDoc = await db.collection('sequences').doc(sequenceId).get();
+              sequenceData = sequenceDoc.data();
+              hasActiveMembers = (sequenceData?.stats?.active || 0) > 0;
+              isSequenceActive = sequenceData?.isActive !== false && sequenceData?.status !== 'paused';
+            }
+            
+            // Since we just added a member, we know there's at least 1 active member
+            // Use the higher of: cached value or 1 (to handle race conditions)
+            hasActiveMembers = Math.max(hasActiveMembers, 1);
 
             // Also check if there are any existing sequenceActivations for this sequence
             let hasExistingActivations = false;
@@ -6529,7 +6553,20 @@
             }
 
             // If sequence is active, automatically create sequenceActivation for this new contact
-            if (hasActiveMembers || hasExistingActivations) {
+            // Align with sequence-builder/list-detail auto-start behavior: start when sequence is active,
+            // OR when there are already activations/members (covers first-contact case).
+            // Since we just added a member, hasActiveMembers will be >= 1, so this should always trigger
+            // unless the sequence is explicitly paused or inactive.
+            const shouldAutoStart = isSequenceActive || hasActiveMembers > 0 || hasExistingActivations;
+            console.log('[ContactDetail] Auto-start check:', {
+              isSequenceActive,
+              hasActiveMembers,
+              hasExistingActivations,
+              shouldAutoStart,
+              sequenceId,
+              contactName: state.currentContact.name
+            });
+            if (shouldAutoStart) {
               console.log('[ContactDetail] Sequence is active, auto-starting for new contact:', state.currentContact.name);
 
               const getUserEmail = () => {
@@ -6568,7 +6605,10 @@
               // Trigger immediate processing
               try {
                 const baseUrl = window.API_BASE_URL || window.location.origin || '';
-                const response = await fetch(`${baseUrl}/api/process-sequence-activations`, {
+                const apiUrl = `${baseUrl}/api/process-sequence-activations`;
+                console.log('[ContactDetail] Triggering activation processing:', { apiUrl, activationId });
+                
+                const response = await fetch(apiUrl, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -6579,12 +6619,24 @@
 
                 if (response.ok) {
                   const result = await response.json();
-                  console.log('[ContactDetail] Auto-started sequence for new contact:', result);
+                  console.log('[ContactDetail] ✓ Auto-started sequence for new contact:', result);
                 } else {
-                  console.warn('[ContactDetail] Auto-start failed, but contact was added. Will be picked up by next cron run.');
+                  const errorText = await response.text().catch(() => 'Unknown error');
+                  console.warn('[ContactDetail] Auto-start API call failed:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: errorText,
+                    activationId
+                  });
+                  console.warn('[ContactDetail] Contact was added. Will be picked up by next cron run.');
                 }
               } catch (autoStartError) {
-                console.warn('[ContactDetail] Auto-start failed (non-fatal):', autoStartError);
+                console.error('[ContactDetail] Auto-start API call exception:', {
+                  error: autoStartError,
+                  message: autoStartError.message,
+                  stack: autoStartError.stack,
+                  activationId
+                });
                 // Contact is still added, cron will pick it up
               }
             }
