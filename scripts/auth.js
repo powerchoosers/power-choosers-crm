@@ -310,6 +310,13 @@ class AuthManager {
         } catch (e) {
             console.warn('[Auth] Could not get hosted photo from settings:', e);
         }
+        // Fallback to locally cached settings (persists across sessions)
+        if (!avatarUrl) {
+            try {
+                const savedSettings = JSON.parse(localStorage.getItem('crm-settings') || '{}');
+                avatarUrl = savedSettings?.general?.hostedPhotoURL || savedSettings?.general?.photoURL || null;
+            } catch (_) {}
+        }
         
         // Fallback to Google photoURL if no hosted version
         if (!avatarUrl && user.photoURL) {
