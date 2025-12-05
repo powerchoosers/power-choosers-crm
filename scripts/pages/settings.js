@@ -784,6 +784,10 @@ class SettingsPage {
                                 this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
                             }
                             console.log('[Settings] Loaded from CacheManager cache', { bridgeToMobile: this.state.settings.bridgeToMobile });
+                            // Sync header avatar after cache load
+                            if (window.authManager?.refreshProfilePhoto) {
+                                setTimeout(() => window.authManager.refreshProfilePhoto(), 50);
+                            }
                             return;
                         }
                     }
@@ -884,6 +888,11 @@ class SettingsPage {
                                         console.warn('[Settings] Failed to cache settings:', error);
                                     }
                                 }
+                                
+                                // Sync header avatar after load
+                                if (window.authManager?.refreshProfilePhoto) {
+                                    setTimeout(() => window.authManager.refreshProfilePhoto(), 50);
+                                }
                                 return;
                             }
                         } else {
@@ -909,6 +918,11 @@ class SettingsPage {
                                 } catch (error) {
                                     console.warn('[Settings] Failed to cache settings:', error);
                                 }
+                            }
+                            
+                            // Sync header avatar after load
+                            if (window.authManager?.refreshProfilePhoto) {
+                                setTimeout(() => window.authManager.refreshProfilePhoto(), 50);
                             }
                             return;
                         }
@@ -1186,6 +1200,11 @@ class SettingsPage {
                 } catch (cacheErr) {
                     console.warn('[Settings] Failed to cache settings after save:', cacheErr);
                 }
+            }
+            
+            // Refresh header avatar immediately after save so it sticks across the UI
+            if (window.authManager?.refreshProfilePhoto) {
+                setTimeout(() => window.authManager.refreshProfilePhoto(), 50);
             }
             
             // Show success message

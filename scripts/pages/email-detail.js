@@ -1,5 +1,5 @@
 'use strict';
-(function(){
+(function () {
   const state = {
     currentEmail: null
   };
@@ -23,7 +23,7 @@
     els.deleteBtn = document.getElementById('delete-email-btn');
     els.regenerateBtn = document.getElementById('regenerate-email-btn');
     els.actionBar = els.page ? els.page.querySelector('.page-actions') : null;
-    
+
     // Reply container elements
     els.replyContainer = document.getElementById('email-reply-container');
     els.replyToInput = document.getElementById('reply-to-input');
@@ -38,7 +38,7 @@
     els.replyFormattingBar = els.replyContainer ? els.replyContainer.querySelector('.reply-formatting-bar') : null;
     els.replyLinkBar = els.replyContainer ? els.replyContainer.querySelector('.reply-link-bar') : null;
     els.replyAiBar = els.replyContainer ? els.replyContainer.querySelector('.reply-ai-bar') : null;
-    
+
     return els.page;
   }
 
@@ -73,18 +73,18 @@
   // Show email detail
   async function show(emailId) {
     if (!initDomRefs()) return;
-    
+
     // CRITICAL: Clean up any existing scheduled email buttons BEFORE loading new email
     // This prevents duplicate buttons when navigating between emails
     if (els.actionBar) {
       const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .generate-btn, .regenerate-btn, .send-now-btn, .qa-btn-send-now, .quick-action-btn.qa-btn-send-now');
       existingBtns.forEach(btn => btn.remove());
     }
-    
+
     try {
       // Load email data from Firebase
       const emailDoc = await firebase.firestore().collection('emails').doc(emailId).get();
-      
+
       if (!emailDoc.exists) {
         console.error('Email not found:', emailId);
         goBack();
@@ -117,17 +117,17 @@
 
       // Populate email details
       populateEmailDetails(state.currentEmail);
-      
+
       // Add action buttons for scheduled emails (all statuses)
       if (state.currentEmail.type === 'scheduled') {
         addScheduledEmailActions();
       } else {
         resetScheduledEmailActions();
       }
-      
+
       // Mark as read
       await markAsRead(emailId);
-      
+
     } catch (error) {
       console.error('Failed to load email:', error);
       goBack();
@@ -147,11 +147,11 @@
     // Helper function to get account logoUrl from recipient email
     function getRecipientAccountInfo(recipientEmail) {
       if (!recipientEmail) return { logoUrl: null, domain: null };
-      
+
       try {
         const recipientDomain = extractDomain(recipientEmail);
         if (!recipientDomain) return { logoUrl: null, domain: null };
-        
+
         // Try to find account by domain
         const accounts = window.getAccountsData ? window.getAccountsData() : [];
         const account = accounts.find(a => {
@@ -160,12 +160,12 @@
           const domainLower = recipientDomain.toLowerCase();
           return accountDomain === domainLower || accountWebsite === domainLower;
         });
-        
+
         if (account) {
           const logoUrl = account.logoUrl || account.logo || account.companyLogo || account.iconUrl || account.companyIcon;
           return { logoUrl: logoUrl || null, domain: account.domain || account.website || recipientDomain };
         }
-        
+
         return { logoUrl: null, domain: recipientDomain };
       } catch (_) {
         return { logoUrl: null, domain: extractDomain(recipientEmail) };
@@ -175,7 +175,7 @@
     // Set sender/recipient info
     const contactId = email.contactId || email.contact_id || null;
     const knownContactName = email.contactName || email.contact?.name || '';
-    
+
     if (els.senderName) {
       if (isSentEmail) {
         // For sent/scheduled emails, show recipient name
@@ -218,7 +218,7 @@
         }
         els.senderEmail.textContent = recipientEmail || 'Unknown';
       } else {
-      els.senderEmail.textContent = email.from || 'Unknown';
+        els.senderEmail.textContent = email.from || 'Unknown';
       }
     }
 
@@ -247,12 +247,12 @@
         els.senderAvatar.innerHTML = faviconHtml;
       } else {
         // Use domain favicon for received emails
-      const domain = extractDomain(email.from);
-      const faviconHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
-        domain: domain,
-        size: 40
-      });
-      els.senderAvatar.innerHTML = faviconHtml;
+        const domain = extractDomain(email.from);
+        const faviconHtml = window.__pcFaviconHelper.generateCompanyIconHTML({
+          domain: domain,
+          size: 40
+        });
+        els.senderAvatar.innerHTML = faviconHtml;
       }
     }
 
@@ -271,49 +271,261 @@
       const rawHtml = email.html || email.content || email.originalContent || '';
       const rawText = email.text || '';
       const looksLikeHtml = /<\s*(p|div|br|table|tr|td|li|ol|ul|span|strong|em|html|body|head|style|blockquote)/i.test(rawHtml || '') ||
-                            /<\/\w+>/.test(rawHtml || '');
+        /<\/\w+>/.test(rawHtml || '');
       const hasLineBreaks = /\r|\n/.test(rawText || rawHtml || '');
       const htmlHasBlockTags = /<\s*(br|p|div|li|tr|table|blockquote)/i.test(rawHtml || '');
-      
+      const formatSentencesAsParagraphs = (text) => {
+        if (!text) return '';
+        let normalized = String(text).replace(/\r\n/g, '\n');
+        // If greeting runs into body ("Hi Name,I noticed"), insert a blank line after greeting
+        normalized = normalized.replace(/^((hi|hello|hey)\s+[^,]+,)\s*(?=\S)/i, '$1\n\n');
+        // Prefer double-newline paragraph splits if present
+        if (/\n\s*\n/.test(normalized)) {
+          const blocks = normalized
+            .split(/\n\s*\n+/)
+            .map(b => b.trim())
+            .filter(Boolean);
+          if (blocks.length > 0) {
+            return blocks.map(b => `<p style="margin: 0 0 12px 0; color: var(--text-primary, #ffffff);">${escapeHtml(b)}</p>`).join('');
+          }
+        }
+        // Sentence-based split: allow missing spaces after punctuation
+        const parts = normalized.split(/(?<=[.!?])\s*(?=[A-Z0-9])/).filter(Boolean);
+        const items = parts.length > 1 ? parts : [normalized];
+        return items
+          .map(p => `<p style="margin: 0 0 12px 0; color: var(--text-primary, #ffffff);">${escapeHtml(p.trim())}</p>`)
+          .join('');
+      };
+
       let contentHtml = '';
-      
-      // Prefer text/plain when HTML lacks real block tags; otherwise use HTML; fallback to text
-      if (!htmlHasBlockTags && rawText && rawText.trim()) {
+
+      // Check if this is a sent/scheduled email (our emails) vs received (inbox)
+      const isOurEmail = email.type === 'sent' || email.status === 'sent' ||
+        email.type === 'scheduled' || email.type === 'auto-email' ||
+        email.type === 'manual-email' || email.sequenceId;
+
+      // Signature detection for sent emails
+      const signatureMarker = /(data-signature="true"|border-top:\s*2px\s*solid\s*#E8A23A|Power Choosers — Choose Wisely|powerchoosers\.com|Lead Energy Strategist)/i;
+      const sigIndex = rawHtml.search(signatureMarker);
+
+      const isHtmlEmailFlag = email.isHtmlEmail === true || email.isHtmlEmail === 'true';
+      // Check multiple sources for signature marker (rawHtml, rawText, or email.html)
+      const hasSignatureMarker = signatureMarker.test(rawHtml || '') ||
+        signatureMarker.test(rawText || '') ||
+        signatureMarker.test(email.html || '') ||
+        signatureMarker.test(email.content || '');
+
+      // For RECEIVED emails: prefer HTML to preserve styling (LinkedIn, newsletters, etc.)
+      // For SENT emails: prefer HTML when marked as HTML email OR when signature marker detected
+      // CRITICAL: Check signature marker FIRST for sent emails to preserve custom HTML signature structure
+      // Also use fallback sources if rawHtml is empty
+      const htmlSource = (rawHtml && rawHtml.trim()) || email.html || email.content || '';
+      if (isOurEmail && hasSignatureMarker && htmlSource) {
+        // Our sent emails with custom HTML signature: preserve the full HTML structure
+        contentHtml = renderOurHtmlEmail(htmlSource);
+      } else if (isOurEmail && isHtmlEmailFlag && rawHtml && rawHtml.trim()) {
+        // Our sent HTML template emails (AI/templated with isHtmlEmail flag): keep original HTML
+        contentHtml = renderOurHtmlEmail(rawHtml);
+      } else if (!isOurEmail && rawHtml && rawHtml.trim() && looksLikeHtml) {
+        // Received email with proper HTML - use it
+        contentHtml = sanitizeEmailHtml(rawHtml);
+      } else if (isOurEmail && rawText && rawText.trim()) {
+        // Sent email with text but NO signature marker in HTML - use text to preserve line breaks
         const decoded = decodeQuotedPrintable(rawText);
-        contentHtml = `<div style="white-space: pre-line;">${escapeHtml(decoded)}</div>`;
+        let signatureHtml = '';
+
+        // Try to extract signature safely from HTML content using DOM parser
+        if (rawHtml && rawHtml.trim()) {
+          try {
+            // Decode first to ensure we parse valid HTML
+            const decodedHtml = decodeQuotedPrintable(rawHtml);
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = decodedHtml;
+
+            // Look for signature container
+            // Priority: data-signature attribute (used by our custom HTML signature)
+            const sigEl = tempDiv.querySelector('[data-signature="true"]');
+
+            if (sigEl) {
+              // Found structured signature - use it
+              signatureHtml = sigEl.outerHTML;
+
+              // Light sanitization to remove scripts, but avoid double-decoding
+              signatureHtml = signatureHtml
+                .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                .replace(/on\w+="[^"]*"/gi, '');
+            } else {
+              // Fallback: try to find signature by markers if attribute missing
+              const sigMatch = decodedHtml.match(signatureMarker);
+              if (sigMatch && sigMatch.index !== undefined) {
+                // If marker found, try to find the container tag
+                const idx = sigMatch.index;
+                const beforeSig = decodedHtml.substring(0, idx);
+
+                // Try to find the closest opening div/table before the marker
+                const lastTag = Math.max(
+                  beforeSig.lastIndexOf('<div'),
+                  beforeSig.lastIndexOf('<table')
+                );
+
+                if (lastTag > -1) {
+                  signatureHtml = decodedHtml.substring(lastTag);
+                } else {
+                  // Last resort: slice from marker
+                  signatureHtml = decodedHtml.substring(idx);
+                }
+
+                // Sanitize (light) - preserve HTML structure
+                signatureHtml = signatureHtml
+                  .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                  .replace(/on\w+="[^"]*"/gi, '');
+              }
+            }
+          } catch (e) {
+            console.warn('[EmailDetail] Error extracting signature:', e);
+          }
+        }
+
+        // Failed to extract via DOM/decoded path, fallback to light sanitization (only if signatureHtml empty)
+        if (!signatureHtml && sigIndex > -1) {
+          const sigSlice = rawHtml.slice(sigIndex);
+          // CRITICAL: Use renderOurHtmlEmail instead of sanitizeEmailHtml to preserve signature structure!
+          signatureHtml = renderOurHtmlEmail(sigSlice);
+        }
+
+        contentHtml = `<div style="white-space: pre-line; color: var(--text-primary, #ffffff);">${escapeHtml(decoded)}</div>${signatureHtml}`;
+      } else if (isOurEmail && rawHtml && rawHtml.trim()) {
+        // Sent email without text part - extract body before signature and preserve manual breaks
+        const decodedRawHtml = decodeQuotedPrintable(rawHtml);
+        const temp = document.createElement('div');
+        temp.innerHTML = decodedRawHtml;
+
+        // Extract signature block if present
+        let signatureHtml = '';
+        const signatureEl = temp.querySelector('[data-signature]');
+        if (signatureEl) {
+          // Use outerHTML directly and light sanitize (avoid double-decode from sanitizeEmailHtml)
+          signatureHtml = signatureEl.outerHTML
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+            .replace(/on\w+="[^"]*"/gi, '');
+          signatureEl.remove();
+        }
+
+        // Remaining body (manual typing may have <br> tags). Convert <br> and block tags to newlines before stripping.
+        const bodyHtml = temp.innerHTML || '';
+        let bodyWithNewlines = bodyHtml
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<\/(div|p|tr|h[1-6]|li|blockquote)[^>]*>/gi, '\n\n') // Extra spacing interaction after closing blocks
+          .replace(/<(div|p|tr|h[1-6]|li|blockquote)[^>]*>/gi, '\n');    // Single newline before opening blocks
+
+        const textOnly = bodyWithNewlines.replace(/<[^>]*>/g, '').trim();
+        contentHtml = `<div style="white-space: pre-line; color: var(--text-primary, #ffffff);">${escapeHtml(textOnly)}</div>${signatureHtml}`;
       } else if (rawHtml && rawHtml.trim() && looksLikeHtml) {
         contentHtml = sanitizeEmailHtml(rawHtml);
       } else if (rawText && rawText.trim()) {
-        const decodedText = decodeQuotedPrintable(rawText);
-        contentHtml = decodedText.replace(/\r\n|\r|\n/g, '<br>');
+        // Fallback to text with preserved line breaks
+        const decoded = decodeQuotedPrintable(rawText);
+        contentHtml = `<div style="white-space: pre-line;">${escapeHtml(decoded)}</div>`;
       } else if (rawHtml && rawHtml.trim()) {
-        // Treat raw html as text if it lacks meaningful tags
         const decodedText = decodeQuotedPrintable(rawHtml);
         contentHtml = decodedText.replace(/\r\n|\r|\n/g, '<br>');
       } else {
         contentHtml = '<p>No content available</p>';
       }
-      
+
+      // Final fallback for NON-HTML sent emails only (manual text emails)
+      // Do NOT apply to isHtmlEmailFlag emails - those should keep their HTML structure/signature
+      if (isOurEmail && !isHtmlEmailFlag && contentHtml) {
+        try {
+          const tmp = document.createElement('div');
+          // Strip style blocks that can leak into textContent
+          tmp.innerHTML = contentHtml;
+          tmp.querySelectorAll('style').forEach(s => s.remove());
+          const plain = (tmp.textContent || '').trim();
+
+          // Check if content looks like one big paragraph (common patterns: ".We ", "?When ", ".Our ")
+          const looksLikeOneBlock = /[.!?][A-Z]/.test(plain) || // No space after punctuation before capital
+            (plain.length > 200 && !(/<\s*(p|br)\b/i.test(contentHtml)));
+
+          if (plain && looksLikeOneBlock) {
+            // Split on sentence boundaries: period/exclamation/question followed by capital letter
+            // Handle both with and without space after punctuation
+            const sentences = plain.split(/(?<=[.!?])\s*(?=[A-Z])/).filter(s => s.trim());
+
+            if (sentences.length > 1) {
+              // Group into logical paragraphs (roughly 2-3 sentences each, or split on "Best regards" etc.)
+              const paragraphs = [];
+              let current = [];
+
+              for (const sentence of sentences) {
+                const trimmed = sentence.trim();
+                // Start new paragraph on greeting, closing, or questions
+                if (/^(Hi|Hello|Hey|Dear|Best regards|Cheers|Thanks|Question|Out of curiosity)/i.test(trimmed) && current.length > 0) {
+                  paragraphs.push(current.join(' '));
+                  current = [trimmed];
+                } else {
+                  current.push(trimmed);
+                  // After 2-3 sentences, start a new paragraph
+                  if (current.length >= 3) {
+                    paragraphs.push(current.join(' '));
+                    current = [];
+                  }
+                }
+              }
+              if (current.length > 0) {
+                paragraphs.push(current.join(' '));
+              }
+
+              // Render as separate <p> tags
+              if (paragraphs.length > 1) {
+                contentHtml = paragraphs
+                  .map(p => `<p style="margin: 0 0 16px 0; color: var(--text-primary, #ffffff);">${escapeHtml(p)}</p>`)
+                  .join('');
+              }
+            }
+          }
+        } catch (_) {
+          // best-effort; if parsing fails, keep original contentHtml
+        }
+      }
+
+      // For HTML emails (AI-generated), fix greeting line break in the HTML without destroying structure
+      if (isOurEmail && isHtmlEmailFlag && contentHtml) {
+        // Fix "Hi Name,I noticed" → "Hi Name,<br><br>I noticed" pattern in HTML
+        contentHtml = contentHtml.replace(
+          /(<[^>]*>)?((?:Hi|Hello|Hey|Dear)\s+[^,<]+,)\s*(?=[A-Z])/gi,
+          (match, tag, greeting) => {
+            if (tag) return tag + greeting + '<br><br>';
+            return greeting + '<br><br>';
+          }
+        );
+      }
+
+      // Global greeting break fix for any sent email content (HTML or synthesized)
+      if (isOurEmail && contentHtml) {
+        contentHtml = contentHtml.replace(/((?:Hi|Hello|Hey|Dear)\s+[^,<]{1,80},)\s*(?=[^\s<])/i, '$1<br><br>');
+      }
+
       // IMPORTANT: For SENT emails, the signature is already baked into the HTML content.
       // Do NOT add another signature - this causes duplicate signatures in the sent tab.
       // Only add signature for scheduled emails that haven't been sent yet (preview mode).
       const isSentEmail = email.type === 'sent' || email.status === 'sent';
-      
+
       // Check if email already has a signature embedded (multiple detection patterns)
       const hasExistingSignature = contentHtml.includes('border-top: 2px solid #E8A23A') || // Orange line
-                                    contentHtml.includes('border-top:2px solid #E8A23A') ||
-                                    contentHtml.includes('Power Choosers — Choose Wisely') || // Footer text
-                                    contentHtml.includes('powerchoosers.com') && contentHtml.includes('Lead Energy Strategist');
-      
+        contentHtml.includes('border-top:2px solid #E8A23A') ||
+        contentHtml.includes('Power Choosers — Choose Wisely') || // Footer text
+        contentHtml.includes('powerchoosers.com') && contentHtml.includes('Lead Energy Strategist');
+
       // Only add signature for scheduled emails (preview) that don't already have one
-      const shouldShowSignature = !isSentEmail && 
-                                   !hasExistingSignature &&
-                                   (email.type === 'scheduled' || 
-                                   email.type === 'auto-email' || 
-                                   email.type === 'manual-email' ||
-                                   email.sequenceId ||
-                                    (email.status && email.status !== 'received'));
-      
+      const shouldShowSignature = !isSentEmail &&
+        !hasExistingSignature &&
+        (email.type === 'scheduled' ||
+          email.type === 'auto-email' ||
+          email.type === 'manual-email' ||
+          email.sequenceId ||
+          (email.status && email.status !== 'received'));
+
       if (shouldShowSignature) {
         try {
           const signature = window.getEmailSignature ? window.getEmailSignature() : '';
@@ -322,19 +534,19 @@
             const settings = (window.SettingsPage?.getSettings?.()) || {};
             const deliver = settings?.emailDeliverability || {};
             let signatureHtml = signature;
-            
+
             // Remove signature image if disabled
             if (deliver.signatureImageEnabled === false) {
               signatureHtml = signature.replace(/<img[^>]*alt=["']Signature["'][\s\S]*?>/gi, '');
             }
-            
-              contentHtml += signatureHtml;
+
+            contentHtml += signatureHtml;
           }
         } catch (error) {
           console.warn('[EmailDetail] Error adding signature:', error);
         }
       }
-      
+
       // Add sent-email-preview class for sent emails to render with white background
       // This makes the preview match how recipients see the email in their inbox
       if (isSentEmail || email.type === 'sent' || email.status === 'sent') {
@@ -342,9 +554,9 @@
       } else {
         els.emailContent.classList.remove('sent-email-preview');
       }
-      
+
       els.emailContent.innerHTML = contentHtml;
-      
+
       // CRITICAL: For sent emails, strip white/light backgrounds from ALL child elements
       // This prevents visible white blocks that don't match the container background
       // The main container already has white background, so nested elements should be transparent
@@ -355,22 +567,26 @@
       }
     }
   }
-  
+
   // Strip white/light backgrounds from nested elements to prevent visible blocks
   function stripNestedBackgrounds(container) {
     if (!container) return;
-    
+
     // Get all child elements (inline styles + attributes)
     const elements = container.querySelectorAll('*');
-    
+
     elements.forEach(el => {
       const originalStyle = el.getAttribute('style') || '';
       const styleLower = originalStyle.toLowerCase();
-      
+
       // Detect white / near-white backgrounds in inline styles
       const hasWhiteBg = /background(-color)?:\s*(#fff(?:fff)?|white|#fefefe|#f8f8f8|#fcfcfc|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)|rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*(0?\.\d+|1)\s*\))/i.test(styleLower);
-      
+
       // Remove any inline background/background-image regardless of color and strip !important
+      // Skip cleaning inside signature so we don't kill the orange divider
+      if (el.closest('[data-signature="true"]')) {
+        return;
+      }
       const newStyle = originalStyle
         .replace(/background-image\s*:\s*[^;]+;?/gi, '')
         .replace(/background(-color)?\s*:\s*[^;]+;?/gi, '')
@@ -386,7 +602,7 @@
       el.style.background = 'transparent';
       el.style.backgroundColor = 'transparent';
       el.style.backgroundImage = 'none';
-      
+
       // Remove deprecated attributes that set background colors
       if (el.hasAttribute('bgcolor')) {
         el.removeAttribute('bgcolor');
@@ -407,33 +623,34 @@
         node.style.backgroundColor = 'transparent';
       }
     });
-    
-      // SECOND PASS: Clear computed backgrounds (white or otherwise) and images
+
+    // SECOND PASS: Clear computed backgrounds (white or otherwise) and images
     elements.forEach(el => {
       try {
-          const cs = window.getComputedStyle(el);
-          const bgImg = (cs.backgroundImage || '').toLowerCase();
-          const bgColor = cs.backgroundColor || '';
-          const hasBgImg = bgImg && bgImg !== 'none';
-          const hasBgColor = bgColor && bgColor !== 'rgba(0, 0, 0, 0)';
+        if (el.closest('[data-signature="true"]')) return;
+        const cs = window.getComputedStyle(el);
+        const bgImg = (cs.backgroundImage || '').toLowerCase();
+        const bgColor = cs.backgroundColor || '';
+        const hasBgImg = bgImg && bgImg !== 'none';
+        const hasBgColor = bgColor && bgColor !== 'rgba(0, 0, 0, 0)';
 
-          if (hasBgImg || hasBgColor) {
-            el.style.backgroundColor = 'transparent';
-            el.style.background = 'transparent';
-            el.style.backgroundImage = 'none';
-            
-            // If the element is effectively empty and small, remove it entirely
-            const hasMedia = el.querySelector('img, svg');
-            const text = (el.textContent || '').trim();
-            if (!hasMedia && !text && el.clientWidth <= 80 && el.clientHeight <= 120) {
-              el.remove();
-            }
+        if (hasBgImg || hasBgColor) {
+          el.style.backgroundColor = 'transparent';
+          el.style.background = 'transparent';
+          el.style.backgroundImage = 'none';
+
+          // If the element is effectively empty and small, remove it entirely
+          const hasMedia = el.querySelector('img, svg');
+          const text = (el.textContent || '').trim();
+          if (!hasMedia && !text && el.clientWidth <= 80 && el.clientHeight <= 120) {
+            el.remove();
           }
+        }
       } catch (_) {
         // ignore
       }
     });
-    
+
     // Also remove backgrounds from blockquotes (common in email threads)
     const blockquotes = container.querySelectorAll('blockquote');
     blockquotes.forEach(bq => {
@@ -526,17 +743,17 @@
   function goBack() {
     // Check navigation source and navigate accordingly
     const navSource = window._emailNavigationSource;
-    
+
     if (navSource === 'contact-detail' && window._emailNavigationContactId) {
       // Return to contact detail page
       const contactId = window._emailNavigationContactId;
       const tempContact = window._emailNavigationTempContact;
-      
+
       // Clear navigation variables
       window._emailNavigationSource = null;
       window._emailNavigationContactId = null;
       window._emailNavigationTempContact = null;
-      
+
       // Navigate to contact detail
       if (window.crm && typeof window.crm.navigateToPage === 'function') {
         window.crm.navigateToPage('people');
@@ -545,7 +762,7 @@
           let attempts = 0;
           const maxAttempts = 25;
           const retryInterval = 80;
-          
+
           const retry = () => {
             attempts++;
             if (window.ContactDetail && typeof window.ContactDetail.show === 'function') {
@@ -564,11 +781,11 @@
     } else if (navSource === 'task-detail' && window._emailNavigationTaskId) {
       // Return to task detail page
       const taskId = window._emailNavigationTaskId;
-      
+
       // Clear navigation variables
       window._emailNavigationSource = null;
       window._emailNavigationTaskId = null;
-      
+
       // Navigate to task detail
       if (window.crm && typeof window.crm.navigateToPage === 'function') {
         window.crm.navigateToPage('tasks');
@@ -577,7 +794,7 @@
           let attempts = 0;
           const maxAttempts = 25;
           const retryInterval = 80;
-          
+
           const retry = () => {
             attempts++;
             if (window.TaskDetail && typeof window.TaskDetail.show === 'function') {
@@ -592,24 +809,24 @@
     } else if (navSource === 'home' || navSource === 'dashboard') {
       // Return to home/dashboard page
       window._emailNavigationSource = null;
-      
+
       if (window.crm && typeof window.crm.navigateToPage === 'function') {
         window.crm.navigateToPage('dashboard');
       }
     } else {
       // Default: return to emails page (preserve existing behavior)
-    // Dispatch restore event to restore emails page state
-    if (window._emailsNavigationState) {
-      document.dispatchEvent(new CustomEvent('pc:emails-restore', {
-        detail: window._emailsNavigationState
-      }));
-      // Clear the stored state
-      window._emailsNavigationState = null;
-    }
+      // Dispatch restore event to restore emails page state
+      if (window._emailsNavigationState) {
+        document.dispatchEvent(new CustomEvent('pc:emails-restore', {
+          detail: window._emailsNavigationState
+        }));
+        // Clear the stored state
+        window._emailsNavigationState = null;
+      }
 
-    // Navigate back to emails page
-    if (window.crm && typeof window.crm.navigateToPage === 'function') {
-      window.crm.navigateToPage('emails');
+      // Navigate back to emails page
+      if (window.crm && typeof window.crm.navigateToPage === 'function') {
+        window.crm.navigateToPage('emails');
       }
     }
   }
@@ -620,7 +837,7 @@
 
     try {
       const newStarred = !state.currentEmail.starred;
-      
+
       // Update in Firebase
       await firebase.firestore().collection('emails').doc(state.currentEmail.id).update({
         starred: newStarred
@@ -646,10 +863,10 @@
   // Reply to email
   function replyToEmail() {
     if (!state.currentEmail || !els.replyContainer) return;
-    
+
     const email = state.currentEmail;
     const isSentEmail = email.isSentEmail || email.type === 'sent';
-    
+
     // Extract recipient email
     let recipientEmail = '';
     if (isSentEmail) {
@@ -659,12 +876,12 @@
       // For received emails, reply to sender
       recipientEmail = extractEmail(email.from);
     }
-    
+
     // Set reply fields
     if (els.replyToInput) {
       els.replyToInput.value = recipientEmail || extractEmail(email.from);
     }
-    
+
     if (els.replySubjectInput) {
       const currentSubject = email.subject || '';
       if (!currentSubject.toLowerCase().startsWith('re:')) {
@@ -673,23 +890,23 @@
         els.replySubjectInput.value = currentSubject;
       }
     }
-    
+
     // Clear body and add signature
     if (els.replyBodyInput) {
       // Ensure contenteditable is enabled
       els.replyBodyInput.contentEditable = 'true';
       els.replyBodyInput.setAttribute('contenteditable', 'true');
-      
+
       // Start with empty content (user will type here)
       els.replyBodyInput.innerHTML = '';
-      
+
       // Add a paragraph element for typing (like forward does)
       const replyParagraph = document.createElement('p');
       replyParagraph.style.margin = '0 0 16px 0';
       replyParagraph.style.color = 'var(--text-primary)';
       replyParagraph.innerHTML = '<br>'; // Empty paragraph with line break for typing
       els.replyBodyInput.appendChild(replyParagraph);
-      
+
       // Add original email thread (Gmail-style)
       try {
         const originalContent = email.html || email.text || email.content || '';
@@ -703,12 +920,12 @@
           divider.style.fontSize = '13px';
           divider.setAttribute('contenteditable', 'false');
           divider.setAttribute('data-quoted-content', 'true');
-          
+
           // Format original email header
           const originalFrom = email.from || 'Unknown Sender';
           const originalDate = email.date ? new Date(email.date).toLocaleString() : '';
           const originalSubject = email.subject || '';
-          
+
           // Create quoted content container
           const quotedContainer = document.createElement('div');
           quotedContainer.style.margin = '0';
@@ -721,7 +938,7 @@
           quotedContainer.style.lineHeight = '1.5';
           quotedContainer.setAttribute('contenteditable', 'false');
           quotedContainer.setAttribute('data-quoted-content', 'true');
-          
+
           // Add header info
           const headerInfo = document.createElement('div');
           headerInfo.style.marginBottom = '8px';
@@ -729,14 +946,14 @@
           headerInfo.style.color = 'var(--text-primary)';
           headerInfo.innerHTML = `On ${originalDate}, ${originalFrom} wrote:`;
           quotedContainer.appendChild(headerInfo);
-          
+
           // Add original content
           const contentDiv = document.createElement('div');
           contentDiv.style.color = 'var(--text-secondary)';
           contentDiv.style.whiteSpace = 'pre-wrap';
           contentDiv.setAttribute('contenteditable', 'false');
           contentDiv.setAttribute('data-quoted-content', 'true');
-          
+
           // If HTML, strip and convert to plain text for quoted section
           if (email.html) {
             const tempDiv = document.createElement('div');
@@ -747,17 +964,17 @@
           } else {
             contentDiv.textContent = originalContent;
           }
-          
+
           quotedContainer.appendChild(contentDiv);
           divider.appendChild(quotedContainer);
-          
+
           // Insert divider before signature
           els.replyBodyInput.appendChild(divider);
         }
       } catch (error) {
         console.warn('[EmailDetail] Error adding original email thread:', error);
       }
-      
+
       // Add signature if available
       try {
         const signature = window.getEmailSignature ? window.getEmailSignature() : '';
@@ -773,35 +990,35 @@
         console.warn('[EmailDetail] Error adding signature:', error);
       }
     }
-    
+
     // Update avatar with agent's profile photo
     updateReplyAvatar();
-    
+
     // Show reply container
     els.replyContainer.style.display = 'block';
-    
+
     // Smooth scroll to reply container
     setTimeout(() => {
       if (els.replyContainer) {
-        els.replyContainer.scrollIntoView({ 
-          behavior: 'smooth', 
+        els.replyContainer.scrollIntoView({
+          behavior: 'smooth',
           block: 'end',
           inline: 'nearest'
         });
       }
-      
+
       // Focus body input after scroll
       setTimeout(() => {
         if (els.replyBodyInput) {
           // Ensure it's editable
           els.replyBodyInput.contentEditable = 'true';
           els.replyBodyInput.focus();
-          
+
           // Move cursor to the paragraph (before signature)
           try {
             const range = document.createRange();
             const sel = window.getSelection();
-            
+
             // Find the first paragraph element (where user should type)
             const firstParagraph = els.replyBodyInput.querySelector('p');
             if (firstParagraph) {
@@ -811,12 +1028,12 @@
             } else {
               // Fallback: find first editable element
               let firstEditable = els.replyBodyInput.firstChild;
-              while (firstEditable && 
-                     (firstEditable.getAttribute?.('contenteditable') === 'false' ||
-                      firstEditable.getAttribute?.('data-signature') === 'true')) {
+              while (firstEditable &&
+                (firstEditable.getAttribute?.('contenteditable') === 'false' ||
+                  firstEditable.getAttribute?.('data-signature') === 'true')) {
                 firstEditable = firstEditable.nextSibling;
               }
-              
+
               if (firstEditable) {
                 if (firstEditable.nodeType === Node.TEXT_NODE) {
                   range.setStart(firstEditable, 0);
@@ -832,7 +1049,7 @@
               }
               range.collapse(true);
             }
-            
+
             sel.removeAllRanges();
             sel.addRange(range);
           } catch (error) {
@@ -843,7 +1060,7 @@
         }
       }, 300);
     }, 100);
-    
+
     // Setup reply container event listeners if not already set
     if (!els.replyContainer.dataset.listenersAdded) {
       setupReplyContainerEvents();
@@ -854,15 +1071,15 @@
   // Forward email
   function forwardEmail() {
     if (!state.currentEmail || !els.replyContainer) return;
-    
+
     const email = state.currentEmail;
-    
+
     // Clear "To" field for forwarding
     if (els.replyToInput) {
       els.replyToInput.value = '';
       els.replyToInput.removeAttribute('readonly');
     }
-    
+
     if (els.replySubjectInput) {
       const currentSubject = email.subject || '';
       if (!currentSubject.toLowerCase().startsWith('fwd:') && !currentSubject.toLowerCase().startsWith('fw:')) {
@@ -871,12 +1088,12 @@
         els.replySubjectInput.value = currentSubject;
       }
     }
-    
+
     // Add forwarded email content to body
     if (els.replyBodyInput) {
       // Ensure contenteditable is enabled
       els.replyBodyInput.contentEditable = 'true';
-      
+
       const forwardedContent = `
         <div style="margin: 20px 0; padding: 15px; border-left: 3px solid var(--border-light); background: var(--bg-item);">
           <div style="margin-bottom: 10px; font-weight: 600; color: var(--text-primary);">---------- Forwarded message ----------</div>
@@ -888,9 +1105,9 @@
           </div>
         </div>
       `;
-      
+
       els.replyBodyInput.innerHTML = forwardedContent;
-      
+
       // Add signature if available
       try {
         const signature = window.getEmailSignature ? window.getEmailSignature() : '';
@@ -901,23 +1118,23 @@
         console.warn('[EmailDetail] Error adding signature:', error);
       }
     }
-    
+
     // Update avatar with agent's profile photo
     updateReplyAvatar();
-    
+
     // Show reply container
     els.replyContainer.style.display = 'block';
-    
+
     // Smooth scroll to reply container
     setTimeout(() => {
       if (els.replyContainer) {
-        els.replyContainer.scrollIntoView({ 
-          behavior: 'smooth', 
+        els.replyContainer.scrollIntoView({
+          behavior: 'smooth',
           block: 'end',
           inline: 'nearest'
         });
       }
-      
+
       // Focus "To" input after scroll
       setTimeout(() => {
         if (els.replyToInput) {
@@ -925,14 +1142,14 @@
         }
       }, 300);
     }, 100);
-    
+
     // Setup reply container event listeners if not already set
     if (!els.replyContainer.dataset.listenersAdded) {
       setupReplyContainerEvents();
       els.replyContainer.dataset.listenersAdded = 'true';
     }
   }
-  
+
   // Extract email address from "Name <email>" format
   function extractEmail(emailString) {
     if (!emailString) return '';
@@ -940,18 +1157,18 @@
     if (match) return match[1];
     return emailString;
   }
-  
+
   // Update reply avatar with agent's profile photo
   function updateReplyAvatar() {
     const avatarEl = els.replyContainer ? els.replyContainer.querySelector('.reply-avatar') : null;
     if (!avatarEl) return;
-    
+
     try {
       // Get profile photo from settings
       const settings = (window.SettingsPage?.getSettings?.()) || {};
       const g = settings?.general || {};
       const profilePhotoUrl = g.hostedPhotoURL || g.photoURL || '';
-      
+
       if (profilePhotoUrl) {
         // Use profile photo
         avatarEl.innerHTML = `<img src="${escapeHtml(profilePhotoUrl)}" alt="Profile" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-light);" />`;
@@ -960,7 +1177,7 @@
         const firstName = g.firstName || '';
         const lastName = g.lastName || '';
         const initials = ((firstName.charAt(0) || '') + (lastName.charAt(0) || '')).toUpperCase() || 'U';
-        
+
         // Try Firebase auth as fallback
         if (!initials || initials === 'U') {
           try {
@@ -975,16 +1192,16 @@
                 return;
               }
             }
-          } catch (_) {}
+          } catch (_) { }
         }
-        
+
         avatarEl.innerHTML = `<div style="width: 32px; height: 32px; border-radius: 50%; background: var(--orange-subtle); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 14px; letter-spacing: 0.5px; border: 1px solid var(--border-light);" aria-hidden="true">${escapeHtml(initials)}</div>`;
       }
     } catch (error) {
       console.warn('[EmailDetail] Error updating reply avatar:', error);
     }
   }
-  
+
   // Setup reply container event listeners
   function setupReplyContainerEvents() {
     // Ensure reply body input is always editable
@@ -992,27 +1209,27 @@
       // Ensure contenteditable is set
       els.replyBodyInput.contentEditable = 'true';
       els.replyBodyInput.setAttribute('contenteditable', 'true');
-      
+
       // Add focus handler to ensure it's editable and create typing area if needed
       els.replyBodyInput.addEventListener('focus', () => {
         els.replyBodyInput.contentEditable = 'true';
-        
+
         // If no editable content exists, create a paragraph
-        const hasEditableContent = els.replyBodyInput.querySelector('p') || 
-                                   Array.from(els.replyBodyInput.childNodes).some(node => 
-                                     node.nodeType === Node.TEXT_NODE || 
-                                     (node.nodeType === Node.ELEMENT_NODE && 
-                                      node.getAttribute('contenteditable') !== 'false' &&
-                                      node.getAttribute('data-signature') !== 'true' &&
-                                      node.getAttribute('data-quoted-content') !== 'true')
-                                   );
-        
+        const hasEditableContent = els.replyBodyInput.querySelector('p') ||
+          Array.from(els.replyBodyInput.childNodes).some(node =>
+            node.nodeType === Node.TEXT_NODE ||
+            (node.nodeType === Node.ELEMENT_NODE &&
+              node.getAttribute('contenteditable') !== 'false' &&
+              node.getAttribute('data-signature') !== 'true' &&
+              node.getAttribute('data-quoted-content') !== 'true')
+          );
+
         if (!hasEditableContent) {
           const p = document.createElement('p');
           p.innerHTML = '<br>';
           p.style.margin = '0 0 16px 0';
           p.style.color = 'var(--text-primary)';
-          
+
           // Insert before quoted content or signature if they exist
           const quotedContent = els.replyBodyInput.querySelector('[data-quoted-content="true"]');
           const signature = els.replyBodyInput.querySelector('[data-signature="true"]');
@@ -1023,7 +1240,7 @@
           } else {
             els.replyBodyInput.appendChild(p);
           }
-          
+
           // Set cursor in the new paragraph
           setTimeout(() => {
             const range = document.createRange();
@@ -1035,14 +1252,14 @@
           }, 0);
         }
       });
-      
+
       // Add click handler to ensure it's editable
       els.replyBodyInput.addEventListener('click', (e) => {
         // Don't allow clicking on quoted content or signature
         if (e.target.closest('[data-quoted-content="true"]')) {
           e.preventDefault();
           e.stopPropagation();
-          
+
           // Move cursor to the paragraph before quoted content
           const quoted = e.target.closest('[data-quoted-content="true"]');
           let p = quoted.previousElementSibling;
@@ -1054,7 +1271,7 @@
             p.style.color = 'var(--text-primary)';
             quoted.parentNode.insertBefore(p, quoted);
           }
-          
+
           // Set cursor at the end of the paragraph
           setTimeout(() => {
             const range = document.createRange();
@@ -1066,7 +1283,7 @@
           }, 0);
           return;
         }
-        
+
         // Don't allow clicking on signature
         if (e.target.closest('[data-signature="true"]')) {
           e.preventDefault();
@@ -1083,24 +1300,24 @@
           }
           return;
         }
-        
+
         els.replyBodyInput.contentEditable = 'true';
         els.replyBodyInput.focus();
       });
-      
+
       // Add keydown handler to ensure typing works and handle Enter key
       els.replyBodyInput.addEventListener('keydown', (e) => {
         // Ensure contenteditable is true
         if (els.replyBodyInput.contentEditable !== 'true') {
           els.replyBodyInput.contentEditable = 'true';
         }
-        
+
         // Handle Backspace/Delete to prevent signature and quoted content deletion
         if (e.key === 'Backspace' || e.key === 'Delete') {
           const selection = window.getSelection();
           if (selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);
-            
+
             // Check if we're about to delete quoted content
             const quotedElements = els.replyBodyInput.querySelectorAll('[data-quoted-content="true"]');
             for (const quoted of quotedElements) {
@@ -1109,7 +1326,7 @@
                   console.log('[EmailDetail] Backspace/Delete would affect quoted content - preventing');
                   e.preventDefault();
                   e.stopPropagation();
-                  
+
                   // Move cursor to the paragraph before quoted content
                   let p = quoted.previousElementSibling;
                   if (!p || p.tagName !== 'P') {
@@ -1120,7 +1337,7 @@
                     p.style.color = 'var(--text-primary)';
                     quoted.parentNode.insertBefore(p, quoted);
                   }
-                  
+
                   // Set cursor at the end of the paragraph
                   const newRange = document.createRange();
                   newRange.selectNodeContents(p);
@@ -1133,10 +1350,10 @@
                 console.warn('[EmailDetail] Error checking quoted content:', err);
               }
             }
-            
+
             // Check if we're about to delete the signature
             const signatureElements = els.replyBodyInput.querySelectorAll('[data-signature="true"]');
-            
+
             for (const signature of signatureElements) {
               // Check if the range would delete or affect the signature
               try {
@@ -1144,7 +1361,7 @@
                   console.log('[EmailDetail] Backspace/Delete would affect signature - preventing');
                   e.preventDefault();
                   e.stopPropagation();
-                  
+
                   // Move cursor to the paragraph before signature
                   let p = signature.previousElementSibling;
                   if (!p || p.tagName !== 'P') {
@@ -1155,7 +1372,7 @@
                     p.style.color = 'var(--text-primary)';
                     signature.parentNode.insertBefore(p, signature);
                   }
-                  
+
                   // Set cursor at the end of the paragraph
                   const newRange = document.createRange();
                   newRange.selectNodeContents(p);
@@ -1168,19 +1385,19 @@
                 // intersectsNode might not be available in all browsers, use alternative check
                 console.warn('[EmailDetail] intersectsNode not available, using alternative check');
               }
-              
+
               // Check if cursor is right before signature and backspace would delete it
               if (range.collapsed) {
                 const container = range.startContainer;
                 let node = container.nodeType === Node.TEXT_NODE ? container.parentNode : container;
-                
+
                 // Check if the next sibling is the signature
                 if (node && node.nextSibling === signature) {
                   // Check if we're at the end of the node
-                  const isAtEnd = range.startOffset === (container.nodeType === Node.TEXT_NODE 
-                    ? container.textContent.length 
+                  const isAtEnd = range.startOffset === (container.nodeType === Node.TEXT_NODE
+                    ? container.textContent.length
                     : node.childNodes.length);
-                  
+
                   if (isAtEnd) {
                     console.log('[EmailDetail] Backspace at end before signature - preventing');
                     e.preventDefault();
@@ -1188,7 +1405,7 @@
                     return;
                   }
                 }
-                
+
                 // Check if we're inside a node that's a direct child of signature
                 let walker = node;
                 while (walker && walker !== els.replyBodyInput) {
@@ -1200,7 +1417,7 @@
                   }
                   walker = walker.parentNode;
                 }
-                
+
                 // Check if we're at the very beginning and signature is the first child
                 // This handles the case where user backspaces all the way to the beginning
                 if (els.replyBodyInput.firstChild === signature) {
@@ -1209,23 +1426,23 @@
                   e.stopPropagation();
                   return;
                 }
-                
+
                 // Check if we're in the first editable element and it's empty, and signature is next
-                const firstEditable = Array.from(els.replyBodyInput.childNodes).find(n => 
-                  n !== signature && 
+                const firstEditable = Array.from(els.replyBodyInput.childNodes).find(n =>
+                  n !== signature &&
                   (n.nodeType === Node.ELEMENT_NODE || n.nodeType === Node.TEXT_NODE) &&
                   n.getAttribute?.('contenteditable') !== 'false'
                 );
-                
+
                 if (firstEditable && firstEditable.nextSibling === signature) {
                   // Check if firstEditable is empty or cursor is at the start
                   const isEmpty = firstEditable.nodeType === Node.TEXT_NODE
                     ? firstEditable.textContent.trim() === ''
-                    : (firstEditable.textContent.trim() === '' || 
-                       (firstEditable.innerHTML === '<br>' || firstEditable.innerHTML === ''));
-                  
+                    : (firstEditable.textContent.trim() === '' ||
+                      (firstEditable.innerHTML === '<br>' || firstEditable.innerHTML === ''));
+
                   const isAtStart = range.startOffset === 0;
-                  
+
                   if ((isEmpty || isAtStart) && e.key === 'Backspace') {
                     console.log('[EmailDetail] Backspace in empty element before signature - preventing');
                     e.preventDefault();
@@ -1237,10 +1454,10 @@
                 // Non-collapsed range (selection) - check if it includes signature
                 const startNode = range.startContainer;
                 const endNode = range.endContainer;
-                
+
                 let startParent = startNode.nodeType === Node.TEXT_NODE ? startNode.parentNode : startNode;
                 let endParent = endNode.nodeType === Node.TEXT_NODE ? endNode.parentNode : endNode;
-                
+
                 // Walk up to check if signature is in the selection
                 let walker = startParent;
                 while (walker && walker !== els.replyBodyInput) {
@@ -1252,7 +1469,7 @@
                   }
                   walker = walker.parentNode;
                 }
-                
+
                 walker = endParent;
                 while (walker && walker !== els.replyBodyInput) {
                   if (walker === signature) {
@@ -1267,12 +1484,12 @@
             }
           }
         }
-        
+
         // Handle Enter key for single spacing (like email-compose-global.js)
         if (e.key === 'Enter') {
           console.log('[EmailDetail] Enter key pressed in reply body input');
           e.preventDefault();
-          
+
           // Check if cursor is INSIDE signature (not just near it)
           const selection = window.getSelection();
           if (selection.rangeCount > 0) {
@@ -1283,32 +1500,32 @@
               return;
             }
           }
-          
+
           // Insert single line break for single spacing (like Gmail/Outlook)
           try {
             // Get current selection and range
             const selection = window.getSelection();
             if (!selection || selection.rangeCount === 0) return;
-            
+
             const range = selection.getRangeAt(0);
-            
+
             // Insert a single <br> with proper spacing control
             // This creates a clean line break without compounding margins
             const br = document.createElement('br');
             range.deleteContents();
             range.insertNode(br);
-            
+
             // Create a zero-width space node after br to ensure proper cursor positioning
             const textNode = document.createTextNode('\u200B'); // Zero-width space
             range.setStartAfter(br);
             range.insertNode(textNode);
-            
+
             // Move cursor after the text node
             range.setStartAfter(textNode);
             range.collapse(true);
             selection.removeAllRanges();
             selection.addRange(range);
-            
+
             console.log('[EmailDetail] Single line break inserted with proper spacing');
           } catch (error) {
             console.error('[EmailDetail] Failed to insert line break:', error);
@@ -1322,16 +1539,16 @@
           }
           return; // Don't process other keydown logic for Enter
         }
-        
+
         // If typing at the signature, move cursor before it (for other keys)
         const sel = window.getSelection();
         if (sel.rangeCount > 0) {
           const range = sel.getRangeAt(0);
           const container = range.commonAncestorContainer;
-          const signature = container.nodeType === Node.ELEMENT_NODE 
+          const signature = container.nodeType === Node.ELEMENT_NODE
             ? container.closest('[data-signature="true"]')
             : container.parentElement?.closest('[data-signature="true"]');
-          
+
           if (signature) {
             e.preventDefault();
             // Find or create paragraph before signature
@@ -1343,7 +1560,7 @@
               p.style.color = 'var(--text-primary)';
               signature.parentNode.insertBefore(p, signature);
             }
-            
+
             // Move cursor to paragraph
             const newRange = document.createRange();
             newRange.selectNodeContents(p);
@@ -1353,35 +1570,35 @@
           }
         }
       });
-      
+
       // Prevent default drag behavior that might interfere
       els.replyBodyInput.addEventListener('dragstart', (e) => {
         e.preventDefault();
       });
     }
-    
+
     // Helper function to check if cursor is INSIDE signature (not just near)
     function isCursorInsideSignature(editor, range) {
       // Check if the cursor's parent node is within a signature element
       const signatureElements = editor.querySelectorAll('[data-signature="true"], .signature, .email-signature');
       if (signatureElements.length === 0) return false;
-      
+
       // Get the current node where cursor is positioned
       let currentNode = range.startContainer;
       if (currentNode.nodeType === Node.TEXT_NODE) {
         currentNode = currentNode.parentNode;
       }
-      
+
       // Walk up the DOM tree to check if we're inside a signature
       for (const signature of signatureElements) {
         if (signature.contains(currentNode)) {
           return true;
         }
       }
-      
+
       return false;
     }
-    
+
     // Cc/Bcc toggle
     if (els.replyCcToggle && els.replyCcBcc) {
       els.replyCcToggle.addEventListener('click', () => {
@@ -1389,7 +1606,7 @@
         els.replyCcBcc.style.display = isVisible ? 'none' : 'block';
       });
     }
-    
+
     // Discard button
     if (els.replyDiscardBtn) {
       els.replyDiscardBtn.addEventListener('click', () => {
@@ -1398,21 +1615,21 @@
         }
       });
     }
-    
+
     // Send button
     if (els.replySendBtn) {
       els.replySendBtn.addEventListener('click', sendReply);
     }
-    
+
     // Toolbar buttons
     if (els.replyContainer) {
       els.replyContainer.addEventListener('click', (e) => {
         const btn = e.target.closest('.toolbar-btn');
         if (!btn) return;
-        
+
         const action = btn.dataset.action;
         const editor = els.replyBodyInput;
-        
+
         if (action === 'formatting') {
           toggleFormattingBar();
         } else if (action === 'link') {
@@ -1425,20 +1642,20 @@
           toggleAIBar();
         }
       });
-      
+
       // Formatting bar buttons
       if (els.replyFormattingBar) {
         els.replyFormattingBar.addEventListener('click', (e) => {
           const btn = e.target.closest('.fmt-btn');
           if (!btn) return;
-          
+
           const format = btn.getAttribute('data-fmt');
           if (format) {
             handleFormatting(format, btn, els.replyBodyInput);
           }
         });
       }
-      
+
       // Link bar buttons
       if (els.replyLinkBar) {
         els.replyLinkBar.addEventListener('click', (e) => {
@@ -1450,7 +1667,7 @@
           }
         });
       }
-      
+
       // AI bar buttons
       if (els.replyAiBar) {
         els.replyAiBar.addEventListener('click', (e) => {
@@ -1463,46 +1680,46 @@
       }
     }
   }
-  
+
   // Toggle formatting bar
   function toggleFormattingBar() {
     if (!els.replyFormattingBar) return;
-    
+
     // Close link bar if open
     if (els.replyLinkBar && els.replyLinkBar.classList.contains('open')) {
       els.replyLinkBar.classList.remove('open');
       els.replyLinkBar.setAttribute('aria-hidden', 'true');
     }
-    
+
     // Close AI bar if open
     if (els.replyAiBar && els.replyAiBar.classList.contains('open')) {
       els.replyAiBar.classList.remove('open');
       els.replyAiBar.setAttribute('aria-hidden', 'true');
     }
-    
+
     const isOpen = els.replyFormattingBar.classList.toggle('open');
     els.replyFormattingBar.setAttribute('aria-hidden', String(!isOpen));
   }
-  
+
   // Toggle link bar
   function toggleLinkBar() {
     if (!els.replyLinkBar) return;
-    
+
     // Close formatting bar if open
     if (els.replyFormattingBar && els.replyFormattingBar.classList.contains('open')) {
       els.replyFormattingBar.classList.remove('open');
       els.replyFormattingBar.setAttribute('aria-hidden', 'true');
     }
-    
+
     // Close AI bar if open
     if (els.replyAiBar && els.replyAiBar.classList.contains('open')) {
       els.replyAiBar.classList.remove('open');
       els.replyAiBar.setAttribute('aria-hidden', 'true');
     }
-    
+
     const isOpen = els.replyLinkBar.classList.toggle('open');
     els.replyLinkBar.setAttribute('aria-hidden', String(!isOpen));
-    
+
     // Prefill link text from selection
     try {
       const sel = window.getSelection();
@@ -1510,28 +1727,28 @@
       const textInput = els.replyLinkBar.querySelector('[data-link-text]');
       if (textInput && hasText) textInput.value = sel.toString();
       (els.replyLinkBar.querySelector('[data-link-url]') || textInput)?.focus();
-    } catch (_) {}
+    } catch (_) { }
   }
-  
+
   // Toggle AI bar
   function toggleAIBar() {
     if (!els.replyAiBar) return;
-    
+
     // Close formatting bar if open
     if (els.replyFormattingBar && els.replyFormattingBar.classList.contains('open')) {
       els.replyFormattingBar.classList.remove('open');
       els.replyFormattingBar.setAttribute('aria-hidden', 'true');
     }
-    
+
     // Close link bar if open
     if (els.replyLinkBar && els.replyLinkBar.classList.contains('open')) {
       els.replyLinkBar.classList.remove('open');
       els.replyLinkBar.setAttribute('aria-hidden', 'true');
     }
-    
+
     const isOpen = els.replyAiBar.classList.toggle('open');
     els.replyAiBar.setAttribute('aria-hidden', String(!isOpen));
-    
+
     // Focus prompt input when opened
     if (isOpen) {
       const promptInput = els.replyAiBar.querySelector('.ai-prompt');
@@ -1540,15 +1757,15 @@
       }
     }
   }
-  
+
   // Handle formatting
   function handleFormatting(format, btn, editor) {
     if (!editor) return;
-    
+
     // Ensure editor is editable and focused
     editor.contentEditable = 'true';
     editor.focus();
-    
+
     // Ensure we have a selection
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) {
@@ -1559,24 +1776,24 @@
       sel.removeAllRanges();
       sel.addRange(range);
     }
-    
+
     document.execCommand(format, false, null);
-    
+
     // Update button state
     if (format === 'bold' || format === 'italic' || format === 'underline') {
       const isActive = document.queryCommandState(format);
       btn.setAttribute('aria-pressed', String(isActive));
     }
   }
-  
+
   // Insert link
   function insertLink(editor, linkBar) {
     const textInput = linkBar.querySelector('[data-link-text]');
     const urlInput = linkBar.querySelector('[data-link-url]');
-    
+
     const text = textInput?.value?.trim() || '';
     const url = urlInput?.value?.trim() || '';
-    
+
     if (!url) {
       window.crm?.showToast('Please enter a URL');
       return;
@@ -1584,59 +1801,59 @@
 
     const linkText = text || url;
     const linkHtml = `<a href="${url}" target="_blank" rel="noopener noreferrer">${linkText}</a>`;
-    
+
     editor.focus();
     document.execCommand('insertHTML', false, linkHtml);
-    
+
     // Clear inputs and close bar
     textInput.value = '';
     urlInput.value = '';
     linkBar.classList.remove('open');
     linkBar.setAttribute('aria-hidden', 'true');
   }
-  
+
   // Handle file attachment (matching global compose pattern)
   function handleFileAttachment(editor) {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.multiple = true;
     fileInput.style.display = 'none';
-    
+
     fileInput.addEventListener('change', (e) => {
       const files = Array.from(e.target.files);
       if (files.length === 0) return;
-      
+
       // Check file sizes (limit to 10MB per file)
       const maxSize = 10 * 1024 * 1024; // 10MB
       const oversizedFiles = files.filter(file => file.size > maxSize);
-      
+
       if (oversizedFiles.length > 0) {
         window.crm?.showToast(`Some files are too large. Maximum size is 10MB per file.`);
         return;
       }
-      
+
       // Store files and update UI (using same pattern as global compose)
       files.forEach(file => {
         addReplyAttachment(file);
       });
-      
+
       console.log('[EmailDetail] Added', files.length, 'files');
       window.crm?.showToast(`Added ${files.length} file${files.length > 1 ? 's' : ''}`);
     });
-    
+
     // Trigger file selection
     document.body.appendChild(fileInput);
     fileInput.click();
     document.body.removeChild(fileInput);
   }
-  
+
   // Add attachment (matching global compose pattern)
   function addReplyAttachment(file) {
     // Store attachment data
     if (!window.emailAttachments) {
       window.emailAttachments = [];
     }
-    
+
     const attachment = {
       id: `att_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // String ID to avoid precision issues
       name: file.name,
@@ -1645,51 +1862,51 @@
       file: file,
       icon: getFileIcon(file.type, file.name)
     };
-    
+
     console.log('[EmailDetail] Adding attachment with ID:', attachment.id, 'Type:', typeof attachment.id);
-    
+
     window.emailAttachments.push(attachment);
     updateReplyAttachmentBadge();
   }
-  
+
   // Remove attachment (matching global compose pattern)
   function removeReplyAttachment(attachmentId) {
     console.log('[EmailDetail] removeAttachment called with ID:', attachmentId, 'Type:', typeof attachmentId);
     console.log('[EmailDetail] Current attachments:', window.emailAttachments);
-    
+
     if (!window.emailAttachments) {
       console.log('[EmailDetail] No attachments array found');
       return;
     }
-    
+
     const initialLength = window.emailAttachments.length;
-    
+
     // Convert to string for consistent comparison
     const stringId = String(attachmentId);
     console.log('[EmailDetail] Converting ID to string:', stringId);
-    
+
     // Log each attachment ID and type for debugging
     window.emailAttachments.forEach((att, index) => {
       console.log(`[EmailDetail] Attachment ${index}: ID=${att.id}, Type=${typeof att.id}, Match=${att.id === stringId}`);
     });
-    
+
     window.emailAttachments = window.emailAttachments.filter(att => {
       const matches = att.id !== stringId;
       console.log(`[EmailDetail] Filtering attachment ${att.id}: ${matches ? 'KEEP' : 'REMOVE'}`);
       return matches;
     });
-    
+
     const finalLength = window.emailAttachments.length;
-    
+
     console.log('[EmailDetail] Removed attachment. Before:', initialLength, 'After:', finalLength);
-    
+
     updateReplyAttachmentBadge();
   }
-  
+
   // Get file icon (matching global compose pattern)
   function getFileIcon(mimeType, fileName) {
     const extension = fileName.split('.').pop()?.toLowerCase();
-    
+
     // Document types
     if (mimeType.includes('pdf') || extension === 'pdf') {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1700,7 +1917,7 @@
         <polyline points="10,9 9,9 8,9"/>
       </svg>`;
     }
-    
+
     if (mimeType.includes('word') || extension === 'doc' || extension === 'docx') {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -1710,7 +1927,7 @@
         <polyline points="10,9 9,9 8,9"/>
       </svg>`;
     }
-    
+
     if (mimeType.includes('excel') || extension === 'xls' || extension === 'xlsx') {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -1720,7 +1937,7 @@
         <polyline points="10,9 9,9 8,9"/>
       </svg>`;
     }
-    
+
     if (mimeType.includes('powerpoint') || extension === 'ppt' || extension === 'pptx') {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -1730,7 +1947,7 @@
         <polyline points="10,9 9,9 8,9"/>
       </svg>`;
     }
-    
+
     // Image types
     if (mimeType.includes('image')) {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1739,7 +1956,7 @@
         <polyline points="21,15 16,10 5,21"/>
       </svg>`;
     }
-    
+
     // Archive types
     if (mimeType.includes('zip') || extension === 'zip' || extension === 'rar' || extension === '7z') {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1748,7 +1965,7 @@
         <line x1="12" y1="22.08" x2="12" y2="12"/>
       </svg>`;
     }
-    
+
     // Text files
     if (mimeType.includes('text') || extension === 'txt' || extension === 'csv') {
       return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1759,14 +1976,14 @@
         <polyline points="10,9 9,9 8,9"/>
       </svg>`;
     }
-    
+
     // Default file icon
     return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
       <polyline points="14,2 14,8 20,8"/>
     </svg>`;
   }
-  
+
   // Format file size (matching global compose pattern)
   function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
@@ -1775,7 +1992,7 @@
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
-  
+
   // Update attachment badge in reply footer (matching global compose pattern)
   function updateReplyAttachmentBadge() {
     const replyFooter = els.replyContainer ? els.replyContainer.querySelector('.email-reply-footer') : null;
@@ -1783,22 +2000,22 @@
       console.log('[EmailDetail] No reply footer found');
       return;
     }
-    
+
     // Remove existing badge
     const existingBadge = replyFooter.querySelector('.attachment-badge');
     if (existingBadge) {
       console.log('[EmailDetail] Removing existing badge');
       existingBadge.remove();
     }
-    
+
     // Don't show badge if no attachments
     if (!window.emailAttachments || window.emailAttachments.length === 0) {
       console.log('[EmailDetail] No attachments to display');
       return;
     }
-    
+
     console.log('[EmailDetail] Creating badge for', window.emailAttachments.length, 'attachments');
-    
+
     // Create attachment badge
     const badge = document.createElement('div');
     badge.className = 'attachment-badge';
@@ -1821,11 +2038,11 @@
         `).join('')}
       </div>
     `;
-    
+
     // Add click handler for remove buttons - use more specific targeting (matching global compose)
     badge.addEventListener('click', (e) => {
       console.log('[EmailDetail] Badge clicked, target:', e.target);
-      
+
       // Check if the clicked element or its parent is a remove button
       const removeBtn = e.target.closest('.attachment-remove');
       if (removeBtn) {
@@ -1836,7 +2053,7 @@
         removeReplyAttachment(attachmentId);
       }
     });
-    
+
     // Insert badge after reply-actions
     const replyActions = replyFooter.querySelector('.reply-actions');
     if (replyActions) {
@@ -1846,23 +2063,23 @@
       console.error('[EmailDetail] Could not find reply-actions element');
     }
   }
-  
+
   // Handle image upload
   function handleImageUpload(editor) {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
     fileInput.style.display = 'none';
-    
+
     fileInput.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      
+
       if (file.size > 5 * 1024 * 1024) {
         window.crm?.showToast('Image file too large. Please choose a file under 5MB.');
         return;
       }
-      
+
       const reader = new FileReader();
       reader.onload = (event) => {
         const dataUrl = event.target.result;
@@ -1871,7 +2088,7 @@
         img.style.maxWidth = '100%';
         img.style.height = 'auto';
         img.alt = file.name;
-        
+
         editor.focus();
         const selection = window.getSelection();
         if (selection.rangeCount > 0) {
@@ -1886,50 +2103,50 @@
           editor.appendChild(img);
         }
       };
-      
+
       reader.readAsDataURL(file);
     });
-    
+
     document.body.appendChild(fileInput);
     fileInput.click();
     document.body.removeChild(fileInput);
   }
-  
+
   // Send reply/forward
   async function sendReply() {
     if (!state.currentEmail || !els.replyToInput || !els.replySubjectInput || !els.replyBodyInput) return;
-    
+
     const to = els.replyToInput.value.trim();
     const subject = els.replySubjectInput.value.trim();
     const body = els.replyBodyInput.innerHTML || '';
-    
+
     if (!to) {
       window.crm?.showToast('Please enter recipients');
       els.replyToInput.focus();
       return;
     }
-    
+
     if (!subject) {
       window.crm?.showToast('Please enter a subject');
       els.replySubjectInput.focus();
       return;
     }
-    
+
     if (!body || body.trim() === '') {
       window.crm?.showToast('Please enter email content');
       els.replyBodyInput.focus();
       return;
     }
-    
+
     try {
       // Get sender details from settings
       const settings = (window.SettingsPage?.getSettings?.()) || {};
       const g = settings?.general || {};
       const senderEmail = g.email || 'l.patterson@powerchoosers.com';
-      const senderName = (g.firstName && g.lastName) 
+      const senderName = (g.firstName && g.lastName)
         ? `${g.firstName} ${g.lastName}`.trim()
         : (g.agentName || 'Power Choosers Team');
-      
+
       // Prepare email data
       const emailData = {
         to: to.split(',').map(email => email.trim()),
@@ -1942,13 +2159,13 @@
         inReplyTo: state.currentEmail.id,
         references: state.currentEmail.references || [state.currentEmail.id]
       };
-      
+
       // Disable send button
       if (els.replySendBtn) {
         els.replySendBtn.disabled = true;
         els.replySendBtn.textContent = 'Sending...';
       }
-      
+
       // Get deliverability settings
       const deliverRaw = settings?.emailDeliverability || {};
       const deliver = {
@@ -1960,7 +2177,7 @@
         useBrandedHtmlTemplate: deliverRaw.useBrandedHtmlTemplate === true,
         signatureImageEnabled: deliverRaw.signatureImageEnabled !== false
       };
-      
+
       // Send via Gmail API
       const baseUrl = window.API_BASE_URL || window.location.origin || '';
       const response = await fetch(`${baseUrl}/api/email/sendgrid-send`, {
@@ -1972,16 +2189,16 @@
           trackingId: `sendgrid_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         })
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to send email');
       }
-      
+
       // Show success and close
       window.crm?.showToast('Email sent successfully!');
       closeReplyContainer();
-      
+
     } catch (error) {
       console.error('[EmailDetail] Send error:', error);
       window.crm?.showToast('Failed to send email: ' + error.message);
@@ -1992,31 +2209,31 @@
       }
     }
   }
-  
+
   // Generate reply with AI
   async function generateReplyWithAI(mode = 'standard') {
     if (!state.currentEmail || !els.replyAiBar || !els.replyBodyInput) return;
-    
+
     const email = state.currentEmail;
     const status = els.replyAiBar.querySelector('.ai-status');
     const promptInput = els.replyAiBar.querySelector('.ai-prompt');
     const userPrompt = promptInput?.value?.trim() || '';
-    
+
     // Close AI bar
     els.replyAiBar.classList.remove('open');
     els.replyAiBar.setAttribute('aria-hidden', 'true');
-    
+
     if (status) status.textContent = 'Generating...';
-    
+
     try {
       const base = (window.API_BASE_URL || window.location.origin || '').replace(/\/$/, '');
       const genUrl = `${base}/api/perplexity-email`;
-      
+
       console.log('[EmailDetail] Generating reply with AI, mode:', mode);
-      
+
       // Extract recipient email
       const recipientEmail = els.replyToInput?.value?.trim() || extractEmail(email.from);
-      
+
       // Lookup recipient data
       let recipient = null;
       try {
@@ -2027,11 +2244,11 @@
             .where('email', '==', recipientEmail)
             .limit(1)
             .get();
-          
+
           if (!peopleQuery.empty) {
             const personDoc = peopleQuery.docs[0];
             recipient = { id: personDoc.id, ...personDoc.data() };
-            
+
             // Enrich with account data if available
             if (recipient.accountId || recipient.account_id) {
               const accountId = recipient.accountId || recipient.account_id;
@@ -2039,7 +2256,7 @@
                 .collection('accounts')
                 .doc(accountId)
                 .get();
-              
+
               if (accountDoc.exists) {
                 recipient.account = { id: accountDoc.id, ...accountDoc.data() };
               }
@@ -2049,7 +2266,7 @@
       } catch (error) {
         console.warn('[EmailDetail] Failed to lookup recipient:', error);
       }
-      
+
       // Build email thread context for intelligent reply generation
       const emailThreadContext = {
         subject: email.subject || '',
@@ -2059,18 +2276,18 @@
         // Extract text content from email (strip HTML)
         content: email.text || email.content || (email.html ? stripHtml(email.html) : '') || ''
       };
-      
+
       // Build intelligent prompt based on email thread
       let intelligentPrompt = userPrompt;
-      
+
       if (!userPrompt) {
         // Check if this is an out-of-office message
         const contentLower = emailThreadContext.content.toLowerCase();
         const subjectLower = emailThreadContext.subject.toLowerCase();
         const isOutOfOffice = /out of(?:[ -]the)?[ -]office|ooo|away from|be back|returning/i.test(contentLower) ||
-                             /out of(?:[ -]the)?[ -]office|ooo|away from/i.test(subjectLower) ||
-                             /won'?t be (?:in|available)|will be unavailable/i.test(contentLower);
-        
+          /out of(?:[ -]the)?[ -]office|ooo|away from/i.test(subjectLower) ||
+          /won'?t be (?:in|available)|will be unavailable/i.test(contentLower);
+
         if (isOutOfOffice) {
           // Generate simple acknowledgment for OOO messages
           intelligentPrompt = `This is an out-of-office auto-reply message. Generate a brief, professional acknowledgment:
@@ -2110,21 +2327,21 @@ Subject: ${emailThreadContext.subject}
 From: ${emailThreadContext.from}
 Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.content.length > 500 ? '...' : ''}`;
       }
-      
+
       // Get settings
       const settings = (window.SettingsPage?.getSettings?.()) || {};
       const g = settings?.general || {};
-      const senderName = (g.firstName && g.lastName) 
+      const senderName = (g.firstName && g.lastName)
         ? `${g.firstName} ${g.lastName}`.trim()
         : (g.agentName || 'Power Choosers Team');
-      
+
       // Get AI templates from settings
       const aiTemplates = settings?.aiTemplates || {};
       const whoWeAre = aiTemplates.who_we_are || 'You are an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates.';
-      
+
       // Get industry segmentation
       const industrySegmentation = settings?.industrySegmentation || null;
-      
+
       // Call Perplexity API
       const response = await fetch(genUrl, {
         method: 'POST',
@@ -2140,21 +2357,21 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
           industrySegmentation: industrySegmentation
         })
       });
-      
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log('[EmailDetail] AI response received:', result);
-      
+
       // Handle response based on mode
       const templateType = result.templateType || null;
       const output = result.output || '';
-      
+
       let subject = '';
       let html = '';
-      
+
       if (mode === 'html' && templateType) {
         // HTML mode with structured JSON - use buildGeneralHtml for general template
         if (templateType === 'general') {
@@ -2178,7 +2395,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         subject = formatted.subject;
         html = formatted.html;
       }
-      
+
       // Update subject if needed
       if (subject && els.replySubjectInput) {
         const currentSubject = els.replySubjectInput.value || '';
@@ -2186,13 +2403,13 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
           els.replySubjectInput.value = subject.startsWith('Re:') ? subject : `Re: ${subject}`;
         }
       }
-      
+
       // Insert generated content into reply body
       if (html && els.replyBodyInput) {
         // Clear existing content but preserve signature
         const signature = els.replyBodyInput.querySelector('[data-signature="true"]');
         els.replyBodyInput.innerHTML = '';
-        
+
         // Insert generated content
         if (mode === 'html' && templateType) {
           // For HTML emails, render in iframe like global compose
@@ -2207,7 +2424,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
             els.replyBodyInput.appendChild(tempDiv.firstChild);
           }
         }
-        
+
         // Re-add signature if it existed
         if (signature) {
           els.replyBodyInput.appendChild(signature);
@@ -2226,20 +2443,20 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
             console.warn('[EmailDetail] Error adding signature:', error);
           }
         }
-        
+
         // Focus the body input
         els.replyBodyInput.focus();
       }
-      
+
       if (status) status.textContent = 'Generated successfully!';
-      
+
     } catch (error) {
       console.error('[EmailDetail] AI generation failed:', error);
       if (status) status.textContent = 'Generation failed. Please try again.';
       window.crm?.showToast('Failed to generate reply: ' + error.message);
     }
   }
-  
+
   // Helper: Strip HTML tags
   function stripHtml(html) {
     if (!html) return '';
@@ -2247,15 +2464,15 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     tmp.innerHTML = html;
     return tmp.textContent || tmp.innerText || '';
   }
-  
+
   // Helper: Format standard reply
   function formatStandardReply(output, recipient) {
     // Get sender's first name for signature
     const settings = (window.SettingsPage?.getSettings?.()) || {};
-    const senderFirstName = settings?.general?.firstName || 
-                           window.authManager?.getCurrentUser()?.displayName?.split(' ')[0] || 
-                           'Power Choosers Team';
-    
+    const senderFirstName = settings?.general?.firstName ||
+      window.authManager?.getCurrentUser()?.displayName?.split(' ')[0] ||
+      'Power Choosers Team';
+
     // If output is a string, try to parse as JSON first
     if (typeof output === 'string') {
       try {
@@ -2264,12 +2481,12 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
           .replace(/^\s*```json\s*/i, '')
           .replace(/^\s*```\s*/i, '')
           .replace(/\s*```\s*$/i, '');
-        
+
         // Extract the first JSON object only (ignore trailing notes)
         const match = jsonText.match(/\{[\s\S]*\}/);
         if (match) {
           const parsed = JSON.parse(match[0]);
-          
+
           // Successfully parsed JSON - format it
           const subject = parsed.subject || '';
           const greeting = parsed.greeting || '';
@@ -2278,23 +2495,23 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
             parsed.paragraph2,
             parsed.paragraph3
           ].filter(Boolean);
-          
+
           // Add signature to last paragraph
           const html = `<p>${greeting}</p>${paragraphs.map(p => `<p>${p}</p>`).join('')}<p><br></p><p>Best regards,<br>${senderFirstName}</p>`;
-          
+
           return { subject, html };
         }
       } catch (e) {
         console.warn('[EmailDetail] JSON parse failed, treating as plain text:', e);
       }
-      
+
       // Fallback: treat as plain text with signature
       return {
         subject: '',
         html: output.replace(/\n/g, '<br>') + `<br><br>Best regards,<br>${senderFirstName}`
       };
     }
-    
+
     // Already an object - format directly
     const subject = output.subject || '';
     const greeting = output.greeting || '';
@@ -2303,20 +2520,20 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       output.paragraph2,
       output.paragraph3
     ].filter(Boolean);
-    
+
     // Add signature to formatted output
     const html = `<p>${greeting}</p>${paragraphs.map(p => `<p>${p}</p>`).join('')}<p><br></p><p>Best regards,<br>${senderFirstName}</p>`;
-    
+
     return { subject, html };
   }
-  
+
   // Helper: Build simple HTML reply (fallback)
   function buildSimpleReplyHtml(data, recipient, fromEmail) {
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
     const greeting = data.greeting || `Hi ${firstName},`;
     const opening = data.opening_paragraph || data.paragraph1 || '';
     const sections = data.sections || [];
-    
+
     return `
       <p>${greeting}</p>
       ${opening ? `<p>${opening}</p>` : ''}
@@ -2328,12 +2545,12 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       ` : ''}
     `;
   }
-  
+
   // Helper: Build general HTML template (imported from global compose)
   function buildGeneralHtml(data, recipient, fromEmail) {
     const company = recipient?.company || recipient?.accountName || 'Your Company';
     const firstName = recipient?.firstName || recipient?.name?.split(' ')[0] || 'there';
-    
+
     // Get sender profile
     const settings = (window.SettingsPage?.getSettings?.()) || {};
     const g = settings?.general || {};
@@ -2345,7 +2562,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       phone: g.phone || '',
       avatar: g.hostedPhotoURL || g.photoURL || ''
     };
-    
+
     // Simplify subject for preview
     const simplifySubject = (subject) => {
       if (!subject) return `Energy Solutions for ${company}`;
@@ -2355,16 +2572,16 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       }
       return simplified || `Energy Solutions for ${company}`;
     };
-    
+
     const displaySubject = simplifySubject(data.subject);
-    
+
     const sections = data.sections || [
       'We\'ve secured exclusive rates for facilities that are 15-25% below typical renewal offers',
       'Our team handles all supplier negotiations and contract reviews at no cost to you',
       'You maintain complete control and transparency throughout the entire process',
       'Early action now protects you from anticipated rate increases'
     ];
-    
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -2462,7 +2679,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
 </html>
     `;
   }
-  
+
   // Helper: Render HTML email in iframe (like global compose)
   function renderHtmlEmailInIframe(editor, html) {
     // Create iframe for HTML email
@@ -2474,18 +2691,18 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     iframe.style.borderRadius = 'var(--border-radius-sm)';
     iframe.style.overflow = 'hidden';
     iframe.setAttribute('sandbox', 'allow-same-origin');
-    
+
     editor.innerHTML = '';
     editor.appendChild(iframe);
-    
+
     // Write HTML to iframe with rounded corners styling
     const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
     iframeDoc.open();
-    
+
     // Inject CSS to round corners of email container
     // Try to find and replace existing border-radius, or add it
     let roundedHtml = html;
-    
+
     // If there's already a style tag, inject into it
     if (/<style[^>]*>/i.test(roundedHtml)) {
       roundedHtml = roundedHtml.replace(
@@ -2519,21 +2736,21 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         }
       </style>` + roundedHtml;
     }
-    
+
     // Also update any existing border-radius in container styles to match
     roundedHtml = roundedHtml.replace(
       /\.container\s*\{[^}]*border-radius:\s*[^;]+;/gi,
       '.container { border-radius: 12px;'
     );
-    
+
     iframeDoc.write(roundedHtml);
     iframeDoc.close();
   }
-  
+
   // Close reply container
   function closeReplyContainer() {
     if (!els.replyContainer) return;
-    
+
     // Clear fields
     if (els.replyToInput) {
       els.replyToInput.value = '';
@@ -2547,13 +2764,13 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       els.replyBodyInput.contentEditable = 'true'; // Ensure editable
     }
     if (els.replyCcBcc) els.replyCcBcc.style.display = 'none';
-    
+
     // Clear attachments when closing
     if (window.emailAttachments) {
       window.emailAttachments = [];
       updateReplyAttachmentBadge();
     }
-    
+
     // Hide container
     els.replyContainer.style.display = 'none';
   }
@@ -2705,9 +2922,9 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     if (!els.regenerateBtn) {
       return;
     }
-    
+
     const { visible, text, disabled, onClick } = options;
-    
+
     if (!visible) {
       els.regenerateBtn.style.display = 'none';
       els.regenerateBtn.disabled = false;
@@ -2715,7 +2932,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       els.regenerateBtn.onclick = null;
       return;
     }
-    
+
     // Show the button (use inline-block to match other buttons in the header)
     els.regenerateBtn.style.display = 'inline-block';
     els.regenerateBtn.disabled = !!disabled;
@@ -2735,7 +2952,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     if (els.forwardBtn) {
       els.forwardBtn.style.display = isScheduled ? 'none' : '';
     }
-    
+
     // Show regenerate button for scheduled emails, hide for others
     if (isScheduled) {
       // The regenerate button will be configured by addScheduledEmailActions()
@@ -2759,12 +2976,12 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       disableContactNameLink();
       return;
     }
-    
+
     disableContactNameLink();
     els.senderName.classList.add('email-detail-contact-link');
     els.senderName.setAttribute('role', 'link');
     els.senderName.setAttribute('tabindex', '0');
-    
+
     senderNameClickHandler = (event) => {
       if (event) event.preventDefault();
       openContactDetailFromEmail(contactId);
@@ -2776,14 +2993,14 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         openContactDetailFromEmail(contactId);
       }
     };
-    
+
     els.senderName.addEventListener('click', senderNameClickHandler);
     els.senderName.addEventListener('keydown', senderNameKeyHandler);
   }
 
   function disableContactNameLink() {
     if (!els.senderName) return;
-    
+
     if (senderNameClickHandler) {
       els.senderName.removeEventListener('click', senderNameClickHandler);
       senderNameClickHandler = null;
@@ -2792,7 +3009,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       els.senderName.removeEventListener('keydown', senderNameKeyHandler);
       senderNameKeyHandler = null;
     }
-    
+
     els.senderName.classList.remove('email-detail-contact-link');
     els.senderName.removeAttribute('role');
     els.senderName.removeAttribute('tabindex');
@@ -2800,12 +3017,12 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
 
   function openContactDetailFromEmail(contactId) {
     if (!contactId) return;
-    
+
     // Store navigation context for back button
     const emailId = state.currentEmail?.id || null;
     window._contactNavigationSource = 'email-detail';
     window._emailDetailReturn = { emailId };
-    
+
     // Try to prefetch full contact data with company context
     try {
       // First try to get full contact from people data cache
@@ -2814,7 +3031,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         const peopleData = window.getPeopleData();
         fullContact = peopleData.find(p => p.id === contactId);
       }
-      
+
       // If we found the full contact in cache, use it
       if (fullContact) {
         window._prefetchedContactForDetail = fullContact;
@@ -2822,7 +3039,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         // Fallback: Build contact object from email data with company context
         const isSentEmail = state.currentEmail.isSentEmail || state.currentEmail.type === 'sent' || state.currentEmail.type === 'scheduled';
         let contactEmail = '';
-        
+
         if (isSentEmail) {
           // For sent/scheduled emails, recipient is the contact
           if (Array.isArray(state.currentEmail.to)) {
@@ -2834,14 +3051,14 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
           // For received emails, sender is the contact
           contactEmail = state.currentEmail.from || '';
         }
-        
+
         // Extract domain to help find account
         const emailDomain = contactEmail ? extractDomain(contactEmail) : '';
-        
+
         // Try to find linked account by domain
         let linkedAccountId = null;
         let linkedAccountName = state.currentEmail.companyName || state.currentEmail.company || '';
-        
+
         if (emailDomain && window.getAccountsData && typeof window.getAccountsData === 'function') {
           const accounts = window.getAccountsData();
           const linkedAccount = accounts.find(a => {
@@ -2850,13 +3067,13 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
             const domainLower = emailDomain.toLowerCase();
             return accountDomain === domainLower || accountWebsite === domainLower;
           });
-          
+
           if (linkedAccount) {
             linkedAccountId = linkedAccount.id;
             linkedAccountName = linkedAccount.name || linkedAccount.accountName || linkedAccountName;
           }
         }
-        
+
         // Build enriched contact object
         window._prefetchedContactForDetail = {
           id: contactId,
@@ -2875,11 +3092,11 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         name: state.currentEmail?.contactName || 'Unknown'
       };
     }
-    
+
     // Navigate to people page (where contact detail is shown)
     if (window.crm && typeof window.crm.navigateToPage === 'function') {
       window.crm.navigateToPage('people');
-      
+
       // Use retry pattern to ensure ContactDetail module is ready
       requestAnimationFrame(() => {
         let attempts = 0;
@@ -2905,7 +3122,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     }
 
     const status = (state.currentEmail.status || 'not_generated').toLowerCase();
-    
+
     setQuickActionButtonsForSchedule(true);
 
     // Remove any existing scheduled email buttons
@@ -2943,11 +3160,11 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       // For pending_approval: Show only Approve button
       // Delete button (trash icon) will serve as reject button
       // Regenerate Email button is already shown via configureRegenerateButton()
-    const approveBtn = document.createElement('button');
-    approveBtn.className = 'btn-primary approve-btn';
-    approveBtn.textContent = 'Approve';
-    approveBtn.addEventListener('click', () => approveScheduledEmail(state.currentEmail.id));
-    els.actionBar.insertBefore(approveBtn, els.deleteBtn);
+      const approveBtn = document.createElement('button');
+      approveBtn.className = 'btn-primary approve-btn';
+      approveBtn.textContent = 'Approve';
+      approveBtn.addEventListener('click', () => approveScheduledEmail(state.currentEmail.id));
+      els.actionBar.insertBefore(approveBtn, els.deleteBtn);
     } else if (status === 'approved') {
       // For approved: Show Send Now button
       // Delete button (trash icon) will serve as reject button
@@ -3126,7 +3343,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       await show(emailId);
     } catch (error) {
       console.error('[EmailDetail] Failed to generate email:', error);
-      
+
       // Update status back to not_generated on error
       try {
         const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
@@ -3140,7 +3357,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       } catch (updateError) {
         console.error('[EmailDetail] Failed to update error status:', updateError);
       }
-      
+
       if (window.crm && window.crm.showToast) {
         window.crm.showToast('Failed to generate email: ' + error.message);
       }
@@ -3187,14 +3404,14 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       await show(emailId);
     } catch (error) {
       console.error('[EmailDetail] Failed to regenerate email:', error);
-      
+
       // Update status back to previous status on error
       try {
         const db = window.firebaseDB || (window.firebase && window.firebase.firestore());
         if (db) {
           // Restore previous status (or pending_approval if it was generating)
           const restoreStatus = previousStatus || 'pending_approval';
-          
+
           await db.collection('emails').doc(emailId).update({
             status: restoreStatus,
             errorMessage: error.message,
@@ -3204,7 +3421,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       } catch (updateError) {
         console.error('[EmailDetail] Failed to update error status:', updateError);
       }
-      
+
       if (window.crm && window.crm.showToast) {
         window.crm.showToast('Failed to regenerate email: ' + error.message);
       }
@@ -3215,7 +3432,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
   async function generateEmailContentForScheduledEmail(emailId, emailData) {
     const baseUrl = window.API_BASE_URL || window.location.origin || '';
     const generateUrl = `${baseUrl}/api/generate-scheduled-emails`;
-    
+
     // Call the centralized generate-scheduled-emails API
     // This ensures all improvements to angle selection, tone openers, and CTAs automatically apply
     const response = await fetch(generateUrl, {
@@ -3233,11 +3450,11 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     }
 
     const result = await response.json();
-    
+
     if (!result.success) {
       throw new Error(result.error || 'Failed to generate email');
     }
-    
+
     // Email has been generated by the API with all the angle-based improvements
     // The API handles:
     // - Industry detection
@@ -3247,7 +3464,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     // - Angle-based subject lines
     // - Content sanitization
     // - Template building (HTML or standard mode)
-    
+
     return result;
   }
 
@@ -3257,9 +3474,9 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     // For now, use a simplified version
     const subject = result.subject || 'Energy Solutions';
     const html = result.html || result.output || '<p>Email content</p>';
-    
+
     return { subject, html };
-        }
+  }
 
   // Helper: Format standard email for scheduled emails (preserves line breaks)
   function formatStandardEmailForScheduled(output, recipient) {
@@ -3281,7 +3498,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     } catch (e) {
       console.warn('[EmailDetail] JSON parse failed, treating as plain text');
     }
-    
+
     if (jsonData) {
       const subject = jsonData.subject || 'Energy Solutions';
       const paragraphs = [
@@ -3290,14 +3507,14 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         jsonData.paragraph2,
         jsonData.paragraph3
       ].filter(Boolean);
-      
+
       const senderFirstName = (window.SettingsPage?.getSettings?.()?.general?.firstName || 'Power Choosers Team').split(' ')[0];
       const closing = `Best regards,\n${senderFirstName}`;
-      
+
       // Fix line breaks: preserve paragraph structure with proper spacing (matches generate-scheduled-emails.js)
       const html = paragraphs.map(p => `<p style="margin:0 0 16px 0; color:#222;">${escapeHtml(p)}</p>`).join('') + `<p style="margin:16px 0 0 0; color:#222;">${escapeHtml(closing)}</p>`;
       const text = paragraphs.join('\n\n') + '\n\n' + closing;
-      
+
       return { subject, html, text };
     } else {
       // Plain text fallback - preserve line breaks properly
@@ -3328,7 +3545,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
   // Decode quoted-printable content (from old emails.js)
   function decodeQuotedPrintable(text) {
     if (!text) return '';
-    
+
     return text
       .replace(/=\r?\n/g, '') // Remove soft line breaks
       .replace(/=([0-9A-F]{2})/g, (match, hex) => {
@@ -3341,17 +3558,17 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
   // Sanitize email HTML content with quoted-printable decoding (from old emails.js)
   function sanitizeEmailHtml(html) {
     if (!html) return '<p>No content available</p>';
-    
+
     try {
       // First decode quoted-printable
       let decodedHtml = decodeQuotedPrintable(html);
-      
+
       // Drop head and its children to avoid meta parsing errors
       decodedHtml = decodedHtml.replace(/<head[\s\S]*?>[\s\S]*?<\/head>/gi, '');
       // Remove meta, script, link, base tags anywhere
       decodedHtml = decodedHtml.replace(/<\s*(meta|script|link|base)[^>]*>[\s\S]*?<\/\s*\1\s*>/gi, '');
       decodedHtml = decodedHtml.replace(/<\s*(meta|script|link|base)[^>]*>/gi, '');
-      
+
       // AGGRESSIVE quoted-printable cleanup
       decodedHtml = decodedHtml
         .replace(/href=3D"/gi, 'href="')
@@ -3359,24 +3576,24 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         .replace(/href="3D"/gi, 'href="')
         .replace(/src="3D"/gi, 'src="')
         .replace(/=3D/gi, '=');
-      
+
       // Fix the specific pattern we're seeing: 3D%22
       decodedHtml = decodedHtml
         .replace(/href=3D%22/gi, 'href="')
         .replace(/src=3D%22/gi, 'src="')
         .replace(/href="3D%22/gi, 'href="')
         .replace(/src="3D%22/gi, 'src="');
-      
+
       // Fix malformed URLs that start with encoding artifacts
       decodedHtml = decodedHtml
         .replace(/(href|src)="3D"?([^"]*)/gi, '$1="$2')
         .replace(/(href|src)=3D%22([^"]*)/gi, '$1="$2');
-      
+
       // Upgrade insecure src/href to https
       decodedHtml = decodedHtml.replace(/(\s(?:src|href)=")http:\/\//gi, '$1https://');
       // Prevent navigation JS URLs
       decodedHtml = decodedHtml.replace(/href="javascript:[^"]*"/gi, 'href="#"');
-      
+
       // Additional basic sanitization
       decodedHtml = decodedHtml
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -3395,6 +3612,56 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       // If no content after sanitization, show fallback
       if (!decodedHtml.trim() || decodedHtml.trim() === '') {
         return '<p>No content available</p>';
+      }
+
+      // Convert literal newlines to <br> in text that's NOT inside HTML tags
+      // This handles cases like "Best regards,\nLewis" appearing in mixed HTML content
+      // The regex targets newlines that appear in text content, not between tags
+      decodedHtml = decodedHtml.replace(/([^>\s])(\r\n|\r|\n)([^<\s])/g, '$1<br>$3');
+      // Also handle newlines after closing tags followed by text
+      decodedHtml = decodedHtml.replace(/>(\r\n|\r|\n)([^<\s])/g, '><br>$2');
+      // Handle newlines in closing text content (like "Best regards,\nLewis" at end)
+      decodedHtml = decodedHtml.replace(/,(\r\n|\r|\n)([A-Z][a-z]+)/g, ',<br>$2');
+
+      // Fix greeting running into body: "Hi Name,I noticed" → "Hi Name,<br><br>I noticed"
+      // This handles AI-generated emails where the greeting isn't separated
+      decodedHtml = decodedHtml.replace(
+        /((?:Hi|Hello|Hey|Dear)\s+[^,<]{1,50},)\s*(?=[A-Z])/gi,
+        '$1<br><br>'
+      );
+
+      // For AI emails without paragraph structure, add breaks between sentence groups
+      // Only if there are no <p> tags and content looks like one block
+      const hasParaTags = /<p[\s>]/i.test(decodedHtml);
+      const looksLikeOneBlock = !hasParaTags && /[.!?][A-Z]/.test(decodedHtml);
+
+      if (looksLikeOneBlock) {
+        // Find the signature boundary (preserve signature HTML intact)
+        const sigMatch = decodedHtml.match(/(data-signature|border-top:\s*2px\s*solid\s*#E8A23A|Power Choosers — Choose Wisely)/i);
+        let bodyPart = decodedHtml;
+        let sigPart = '';
+
+        if (sigMatch && sigMatch.index !== undefined) {
+          // Find the start of the signature container (back up to find opening tag)
+          const beforeSig = decodedHtml.substring(0, sigMatch.index);
+          const lastDivOrTable = Math.max(
+            beforeSig.lastIndexOf('<div'),
+            beforeSig.lastIndexOf('<table'),
+            beforeSig.lastIndexOf('<tr')
+          );
+          if (lastDivOrTable > -1) {
+            bodyPart = decodedHtml.substring(0, lastDivOrTable);
+            sigPart = decodedHtml.substring(lastDivOrTable);
+          }
+        }
+
+        // Add paragraph breaks in body part only
+        // Split on sentence boundaries followed by capital letters (no space)
+        bodyPart = bodyPart.replace(/([.!?])([A-Z])/g, '$1<br><br>$2');
+        // Also split on "Best regards," or similar closings
+        bodyPart = bodyPart.replace(/(Best regards|Cheers|Thanks|Sincerely),?\s*([A-Z])/gi, '$1,<br><br>$2');
+
+        decodedHtml = bodyPart + sigPart;
       }
 
       // Wrap content with CSS to match signature color and be dynamic for email clients
@@ -3438,10 +3705,40 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     }
   }
 
+  // Lighter sanitizer for our own HTML emails to keep signature styling intact
+  function renderOurHtmlEmail(html) {
+    if (!html) return '<p>No content available</p>';
+    try {
+      let decoded = decodeQuotedPrintable(html);
+      // Remove scripts/iframes/event handlers/js urls/tracking pixels but keep style/head
+      decoded = decoded
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+        .replace(/on\w+="[^"]*"/gi, '')
+        .replace(/javascript:/gi, '')
+        .replace(/data:text\/html/gi, '')
+        .replace(/<img[^>]*src=["'][^"']*\/api\/email\/track\/[^"']+["'][^>]*>/gi, '')
+        .replace(/<img[^>]*src=["'][^"']*vercel\.app\/api\/email\/track\/[^"']+["'][^>]*>/gi, '');
+
+      // Convert literal newlines in text nodes to <br> when not inside tags
+      decoded = decoded.replace(/([^>\s])(\r\n|\r|\n)([^<\s])/g, '$1<br>$3');
+      decoded = decoded.replace(/>(\r\n|\r|\n)([^<\s])/g, '><br>$2');
+      decoded = decoded.replace(/,(\r\n|\r|\n)([A-Z][a-z]+)/g, ',<br>$2');
+
+      // Fix greeting run-on inside HTML text
+      decoded = decoded.replace(/((?:Hi|Hello|Hey|Dear)\s+[^,<]{1,80},)\s*(?=[A-Z])/gi, '$1<br><br>');
+
+      return decoded;
+    } catch (e) {
+      console.error('Failed to render our HTML email:', e);
+      return html;
+    }
+  }
+
   // Utility functions (improved to handle quoted email formats)
   function extractDomain(email) {
     if (!email || typeof email !== 'string') return '';
-    
+
     // Handle format: "Name" <email@domain.com> or Name <email@domain.com>
     const angleMatch = email.match(/<(.+)>/);
     if (angleMatch) {
@@ -3449,7 +3746,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       const domainMatch = emailPart.match(/@(.+)$/);
       return domainMatch ? domainMatch[1] : '';
     }
-    
+
     // Handle format: email@domain.com
     const match = email.match(/@(.+)$/);
     return match ? match[1] : '';
@@ -3492,12 +3789,12 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       if (snap && !snap.empty) {
         const doc = snap.docs[0];
         const contact = doc.data();
-        
+
         // Build full name from contact
         const firstName = contact.firstName || '';
         const lastName = contact.lastName || '';
         const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
-        
+
         if (fullName) {
           contactNameCache.set(normalizedEmail, fullName);
           // Trigger a re-render if email detail is showing
@@ -3506,7 +3803,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
           }
           return fullName;
         }
-        
+
         // Fallback to contact name field
         if (contact.name) {
           contactNameCache.set(normalizedEmail, contact.name);
@@ -3526,10 +3823,10 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
   // Helper function to format email username as "First Last"
   function formatEmailAsName(emailUsername) {
     if (!emailUsername || typeof emailUsername !== 'string') return emailUsername;
-    
+
     // Remove common prefixes/suffixes
     let cleaned = emailUsername.toLowerCase().trim();
-    
+
     // Handle common separators: aaron.rodriguez, aaron_rodriguez, aaron-rodriguez
     let parts = [];
     if (cleaned.includes('.')) {
@@ -3543,46 +3840,46 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       // For now, just return capitalized single word
       return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
     }
-    
+
     // Capitalize each part and join
     parts = parts
       .filter(p => p.length > 0) // Remove empty parts
       .map(p => p.charAt(0).toUpperCase() + p.slice(1)); // Capitalize first letter
-    
+
     if (parts.length >= 2) {
       return parts.join(' ');
     } else if (parts.length === 1) {
       return parts[0];
     }
-    
+
     return emailUsername; // Fallback
   }
 
   function extractName(email) {
     // Handle null, undefined, or empty values
     if (!email) return 'Unknown';
-    
+
     // Convert to string if it's not already
     if (typeof email !== 'string') {
       email = String(email);
     }
-    
+
     // If it's still empty after conversion, return Unknown
     if (!email.trim()) return 'Unknown';
-    
+
     // Extract email address from various formats
     let emailAddress = '';
     let extractedName = '';
-    
+
     // Handle format: "Name" <email@domain.com>
     const quotedMatch = email.match(/^"([^"]+)"\s*<(.+)>$/);
     if (quotedMatch) {
       extractedName = quotedMatch[1];
       emailAddress = quotedMatch[2].toLowerCase().trim();
     } else {
-    // Handle format: Name <email@domain.com>
-    const angleMatch = email.match(/^([^<]+)\s*<(.+)>$/);
-    if (angleMatch) {
+      // Handle format: Name <email@domain.com>
+      const angleMatch = email.match(/^([^<]+)\s*<(.+)>$/);
+      if (angleMatch) {
         extractedName = angleMatch[1].trim();
         emailAddress = angleMatch[2].toLowerCase().trim();
       } else {
@@ -3590,21 +3887,21 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         emailAddress = email.toLowerCase().trim();
       }
     }
-    
+
     // If we already have a name from the email string, use it
     if (extractedName && extractedName.length > 0) {
       return extractedName;
     }
-    
+
     // Otherwise, try to look up contact by email address
     if (emailAddress && emailAddress.includes('@')) {
       const normalizedEmail = emailAddress.toLowerCase().trim();
-      
+
       // Priority 1: Check cache (populated by Firebase lookups)
       if (contactNameCache.has(normalizedEmail)) {
         return contactNameCache.get(normalizedEmail);
       }
-      
+
       // Priority 2: Use cached people data - no API calls needed
       try {
         const people = window.getPeopleData ? window.getPeopleData() : [];
@@ -3612,7 +3909,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
           const contactEmail = (p.email || '').toLowerCase().trim();
           return contactEmail === normalizedEmail;
         });
-        
+
         if (contact) {
           // Build full name from contact
           const firstName = contact.firstName || '';
@@ -3632,7 +3929,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       } catch (_) {
         // Silently fail and continue to fallback
       }
-      
+
       // Priority 3: If cache is empty, trigger async Firebase lookup (non-blocking)
       // This will update the cache and trigger a re-render when complete
       if (window.firebaseDB && !pendingLookups.has(normalizedEmail)) {
@@ -3641,17 +3938,17 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         });
       }
     }
-    
+
     // If no contact found, format email username as "First Last"
     if (emailAddress && emailAddress.includes('@')) {
       const emailMatch = emailAddress.match(/^(.+)@/);
-    if (emailMatch) {
+      if (emailMatch) {
         const emailUsername = emailMatch[1];
         const formattedName = formatEmailAsName(emailUsername);
         return formattedName;
       }
     }
-    
+
     return email; // Final fallback to full string
   }
 
@@ -3709,8 +4006,8 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
   }
 
   // Export for global access
-  window.EmailDetail = { 
+  window.EmailDetail = {
     init,
-    show 
+    show
   };
 })();
