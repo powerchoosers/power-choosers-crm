@@ -69,11 +69,11 @@ async function getUserSignature(ownerId) {
     // Settings are saved with doc ID like 'user-settings' (admin) or 'user-settings-{email}' (employee)
     // IMPORTANT: Try direct doc lookup FIRST to avoid matching call-scripts documents
     let settingsDoc = null;
-    
+
     // Priority 1: Try direct document lookup by email-based ID (most reliable)
     const docId = `user-settings-${normalizedOwnerId}`;
-    const directDoc = await db.collection('settings').doc(docId).get();
-    if (directDoc.exists) {
+      const directDoc = await db.collection('settings').doc(docId).get();
+      if (directDoc.exists) {
       const data = directDoc.data();
       // Validate it's actually a settings doc (has emailSignature or general)
       if (data.emailSignature || data.general) {
@@ -125,7 +125,7 @@ async function getUserSignature(ownerId) {
     const sigImage = signature.image || '';
     const imageSize = signature.imageSize || { width: 200, height: 100 };
     const signatureImageEnabled = data.emailDeliverability?.signatureImageEnabled !== false;
-    
+
     // Check if custom HTML signature is enabled
     const useCustomHtml = signature.useCustomHtml === true || signature.customHtmlEnabled === true;
 
