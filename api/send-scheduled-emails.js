@@ -7,6 +7,29 @@ import logger from './_logger.js';
 // Initialize Gmail service
 const gmailService = new GmailService();
 
+// Max time we'll allow an email to remain "sending" before auto-finalizing
+const STALE_SENDING_MS = 10 * 60 * 1000; // 10 minutes
+
+// Helper: finalize an email as sent with retries and merge fallback
+async function finalizeAsSent(emailDoc, payload) {
+  // First attempt
+  try {
+    await emailDoc.ref.update(payload);
+    return;
+  } catch (err1) {
+    logger.warn('[SendScheduledEmails] Final sent update failed, retrying once:', emailDoc.id, err1);
+  }
+  // Second attempt
+  try {
+    await emailDoc.ref.update(payload);
+    return;
+  } catch (err2) {
+    logger.warn('[SendScheduledEmails] Final sent update second attempt failed, using merge set:', emailDoc.id, err2);
+  }
+  // Last resort: merge set
+  await emailDoc.ref.set(payload, { merge: true });
+}
+
 // Stale protection: how long we allow "sending" before auto-finalizing
 const STALE_SENDING_MS = 10 * 60 * 1000; // 10 minutes
 
@@ -772,13 +795,8 @@ export default async function handler(req, res) {
           // Note: subject, html, text are preserved automatically by Firestore update()
         };
 
-        // Retry the final write once on transient failure to avoid leaving emails stuck in "sending"
-        try {
-          await emailDoc.ref.update(sentPayload);
-        } catch (updateErr) {
-          logger.warn('[SendScheduledEmails] Final sent update failed, retrying once:', emailDoc.id, updateErr);
-          await emailDoc.ref.update(sentPayload);
-        }
+        // Finalize as sent with retry + merge fallback to avoid stuck "sending"
+        await finalizeAsSent(emailDoc, sentPayload);
 
         sentCount++;
 
@@ -956,36 +974,50 @@ export default async function handler(req, res) {
   // Reconcile any emails stuck in "sending" (process may have been interrupted after send)
   try {
     const now = Date.now();
+    const cutoffMs = now - STALE_SENDING_MS;
+    // Pull a reasonable batch and decide staleness in code so we also handle missing sendingStartedAt
     const staleSendingSnap = await db.collection('emails')
       .where('status', '==', 'sending')
-      .where('sendingStartedAt', '<=', new Date(now - STALE_SENDING_MS))
-      .limit(50)
+      .orderBy('createdAt', 'desc')
+      .limit(200)
       .get();
 
     if (!staleSendingSnap.empty) {
-      logger.warn('[SendScheduledEmails] Found stale sending emails, auto-finalizing:', staleSendingSnap.size);
+      let finalized = 0;
       for (const doc of staleSendingSnap.docs) {
         const data = doc.data() || {};
+        const sendingStarted = data.sendingStartedAt?.toMillis ? data.sendingStartedAt.toMillis() : data.sendingStartedAt;
+        const createdAt = data.createdAt?.toMillis ? data.createdAt.toMillis() : data.createdAt;
+        const stale = (sendingStarted && sendingStarted <= cutoffMs) ||
+                      (!sendingStarted && createdAt && createdAt <= cutoffMs);
+        if (!stale) continue;
+
+        const payload = {
+          type: 'sent',
+          status: 'sent',
+          emailType: 'sent',
+          isSentEmail: true,
+          sentAt: data.sentAt || now,
+          date: data.date || new Date().toISOString(),
+          timestamp: data.timestamp || new Date().toISOString(),
+          provider: data.provider || 'gmail',
+          updatedAt: new Date().toISOString(),
+          // Preserve ownership fields
+          ownerId: data.ownerId || 'l.patterson@powerchoosers.com',
+          assignedTo: data.assignedTo || data.ownerId || 'l.patterson@powerchoosers.com',
+          createdBy: data.createdBy || data.ownerId || 'l.patterson@powerchoosers.com',
+          reconStatus: 'auto-finalized-from-sending'
+        };
+
         try {
-          await doc.ref.update({
-            type: 'sent',
-            status: 'sent',
-            emailType: 'sent',
-            isSentEmail: true,
-            sentAt: data.sentAt || now,
-            date: data.date || new Date().toISOString(),
-            timestamp: data.timestamp || new Date().toISOString(),
-            provider: data.provider || 'gmail',
-            updatedAt: new Date().toISOString(),
-            // Preserve ownership fields
-            ownerId: data.ownerId || 'l.patterson@powerchoosers.com',
-            assignedTo: data.assignedTo || data.ownerId || 'l.patterson@powerchoosers.com',
-            createdBy: data.createdBy || data.ownerId || 'l.patterson@powerchoosers.com',
-            reconStatus: 'auto-finalized-from-sending'
-          });
+          await finalizeAsSent(doc, payload);
+          finalized++;
         } catch (reconErr) {
           logger.error('[SendScheduledEmails] Failed to auto-finalize stale sending email:', doc.id, reconErr);
         }
+      }
+      if (finalized > 0) {
+        logger.warn('[SendScheduledEmails] Auto-finalized stale sending emails:', finalized);
       }
     }
   } catch (staleErr) {
