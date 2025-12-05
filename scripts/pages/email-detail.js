@@ -3735,6 +3735,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
   }
 
   // Lighter sanitizer for our own HTML emails to keep signature styling intact
+  // Also wraps with dark mode CSS overrides for CRM display
   function renderOurHtmlEmail(html) {
     if (!html) return '<p>No content available</p>';
     try {
@@ -3749,15 +3750,95 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         .replace(/<img[^>]*src=["'][^"']*\/api\/email\/track\/[^"']+["'][^>]*>/gi, '')
         .replace(/<img[^>]*src=["'][^"']*vercel\.app\/api\/email\/track\/[^"']+["'][^>]*>/gi, '');
 
-      // Convert literal newlines in text nodes to <br> when not inside tags
-      decoded = decoded.replace(/([^>\s])(\r\n|\r|\n)([^<\s])/g, '$1<br>$3');
-      decoded = decoded.replace(/>(\r\n|\r|\n)([^<\s])/g, '><br>$2');
-      decoded = decoded.replace(/,(\r\n|\r|\n)([A-Z][a-z]+)/g, ',<br>$2');
+      // CRITICAL: Detect if this is contentEditable HTML (uses <div> for line breaks)
+      // vs AI-generated HTML (uses proper paragraph structure)
+      // contentEditable pattern: <div>text</div><div><br></div><div>text</div>
+      const isContentEditableHtml = /<div>[^<]*<\/div>\s*<div>/i.test(decoded) && 
+                                    !/<table|<style|class="/i.test(decoded);
+      
+      if (isContentEditableHtml) {
+        // Manual email from contentEditable: convert <div> structure to proper paragraphs
+        // This preserves line breaks that user typed
+        console.log('[EmailDetail] Detected contentEditable HTML - preserving div structure');
+        
+        // Extract signature before processing body (keep signature HTML intact)
+        let signatureHtml = '';
+        const sigMatch = decoded.match(/<div[^>]*data-signature="true"[\s\S]*$/i);
+        if (sigMatch) {
+          signatureHtml = sigMatch[0];
+          decoded = decoded.substring(0, sigMatch.index);
+        }
+        
+        // Process the body: convert divs to paragraphs with proper spacing
+        // Empty divs with just <br> become spacing
+        decoded = decoded
+          .replace(/<div><br\s*\/?><\/div>/gi, '<p style="margin: 0 0 12px 0;">&nbsp;</p>')
+          .replace(/<div>([^<]*)<\/div>/gi, '<p style="margin: 0 0 12px 0; color: var(--text-primary, #ffffff);">$1</p>')
+          .replace(/<br\s*\/?>/gi, '<br>');
+        
+        // Re-append signature
+        decoded = decoded + signatureHtml;
+      } else {
+        // AI-generated or structured HTML: use existing newline conversion
+        // Convert literal newlines in text nodes to <br> when not inside tags
+        decoded = decoded.replace(/([^>\s])(\r\n|\r|\n)([^<\s])/g, '$1<br>$3');
+        decoded = decoded.replace(/>(\r\n|\r|\n)([^<\s])/g, '><br>$2');
+        decoded = decoded.replace(/,(\r\n|\r|\n)([A-Z][a-z]+)/g, ',<br>$2');
+      }
 
       // Fix greeting run-on inside HTML text
       decoded = decoded.replace(/((?:Hi|Hello|Hey|Dear)\s+[^,<]{1,80},)\s*(?=[A-Z])/gi, '$1<br><br>');
 
-      return decoded;
+      // CRITICAL: Wrap with dark mode CSS overrides for CRM display
+      // The signature HTML has hardcoded dark colors for email clients (light backgrounds)
+      // But our CRM has a dark UI, so we override text colors to white
+      const darkModeWrapper = `
+        <div class="crm-email-content">
+          <style>
+            /* Override signature text colors for dark CRM UI */
+            .crm-email-content [data-signature="true"],
+            .crm-email-content [data-signature="true"] * {
+              color: var(--text-primary, #ffffff) !important;
+            }
+            /* Keep orange accent color for dividers and highlights */
+            .crm-email-content [data-signature="true"] [style*="#f59e0b"],
+            .crm-email-content [data-signature="true"] [style*="#E8A23A"] {
+              color: #f59e0b !important;
+            }
+            /* Override common dark text colors used in signature */
+            .crm-email-content [style*="color: #0b1b45"],
+            .crm-email-content [style*="color:#0b1b45"],
+            .crm-email-content [style*="color: #1e3a8a"],
+            .crm-email-content [style*="color:#1e3a8a"],
+            .crm-email-content [style*="color: #333"],
+            .crm-email-content [style*="color:#333"],
+            .crm-email-content [style*="color: #64748b"],
+            .crm-email-content [style*="color:#64748b"],
+            .crm-email-content [style*="color: #94a3b8"],
+            .crm-email-content [style*="color:#94a3b8"],
+            .crm-email-content [style*="color: #a0aec0"],
+            .crm-email-content [style*="color:#a0aec0"] {
+              color: var(--text-primary, #ffffff) !important;
+            }
+            /* Ensure links remain visible */
+            .crm-email-content a {
+              color: var(--orange-primary, #f59e0b) !important;
+            }
+            /* Email body text should also be white */
+            .crm-email-content {
+              color: var(--text-primary, #ffffff);
+            }
+            .crm-email-content p,
+            .crm-email-content div:not([data-signature="true"]),
+            .crm-email-content span {
+              color: var(--text-primary, #ffffff);
+            }
+          </style>
+          ${decoded}
+        </div>
+      `;
+
+      return darkModeWrapper;
     } catch (e) {
       console.error('Failed to render our HTML email:', e);
       return html;
