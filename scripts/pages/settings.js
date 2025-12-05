@@ -728,6 +728,7 @@ class SettingsPage {
                     return (window.currentUserEmail || '').toLowerCase();
                 }
             };
+            const getDocId = (email, admin) => admin ? 'user-settings' : `user-settings-${email}`;
             const isAdmin = () => {
                 try {
                     if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
@@ -739,15 +740,20 @@ class SettingsPage {
                 }
             };
             
+            // Current user context (used for cache + Firestore)
+            const email = getUserEmail();
+            const isAdminUser = isAdmin();
+            const docId = getDocId(email, isAdminUser);
+            
             // First try to load from CacheManager (cache-first)
             if (window.CacheManager) {
                 try {
                     const cachedSettings = await window.CacheManager.get('settings');
                     if (cachedSettings && cachedSettings.length > 0) {
-                        const settingsData = cachedSettings[0];
+                        // Prefer doc that matches current user (id or ownerId)
+                        const settingsData = cachedSettings.find(s => s.id === docId || (s.ownerId || '').toLowerCase() === email) || cachedSettings[0];
                         // Check ownership for non-admin users
-                        if (!isAdmin()) {
-                            const email = getUserEmail();
+                        if (!isAdminUser) {
                             const settingsOwnerId = (settingsData.ownerId || '').toLowerCase();
                             const settingsUserId = settingsData.userId;
                             const currentUserId = window.firebase && window.firebase.auth && window.firebase.auth().currentUser ? window.firebase.auth().currentUser.uid : null;
@@ -812,14 +818,11 @@ class SettingsPage {
                     };
                     
                     const email = getUserEmail();
-                    const isAdminUser = isAdmin();
                     
                     // Try per-user settings doc first (employees), then fallback to 'user-settings' (admin/legacy)
                     let settingsDoc = null;
-                    let docId = null;
                     
                     if (!isAdminUser && email) {
-                        docId = `user-settings-${email}`;
                         try {
                             settingsDoc = await window.firebaseDB.collection('settings').doc(docId).get();
                             // If document doesn't exist (for new employees), that's fine - we'll create it on save
@@ -838,7 +841,6 @@ class SettingsPage {
                     
                     // Fallback to legacy 'user-settings' if per-user doc doesn't exist or user is admin
                     if ((!settingsDoc || !settingsDoc.exists) && isAdminUser) {
-                        docId = 'user-settings';
                         try {
                             settingsDoc = await window.firebaseDB.collection('settings').doc(docId).get();
                         } catch (err) {
@@ -877,7 +879,7 @@ class SettingsPage {
                                 // Cache the settings for future use
                                 if (window.CacheManager) {
                                     try {
-                                        await window.CacheManager.set('settings', [{ id: 'user-settings', ...firebaseSettings }]);
+                                        await window.CacheManager.set('settings', [{ id: docId, ...firebaseSettings }]);
                                     } catch (error) {
                                         console.warn('[Settings] Failed to cache settings:', error);
                                     }
@@ -902,7 +904,7 @@ class SettingsPage {
                             // Cache the settings for future use
                             if (window.CacheManager) {
                                 try {
-                                    await window.CacheManager.set('settings', [{ id: 'user-settings', ...firebaseSettings }]);
+                                    await window.CacheManager.set('settings', [{ id: docId, ...firebaseSettings }]);
                                     console.log('[Settings] Cached settings for future use');
                                 } catch (error) {
                                     console.warn('[Settings] Failed to cache settings:', error);
@@ -1176,6 +1178,15 @@ class SettingsPage {
             
             // Also save to localStorage as backup
             localStorage.setItem('crm-settings', JSON.stringify(this.state.settings));
+            
+            // Cache for faster reloads (per-user doc id)
+            if (window.CacheManager) {
+                try {
+                    await window.CacheManager.set('settings', [{ id: docId, ...this.state.settings }]);
+                } catch (cacheErr) {
+                    console.warn('[Settings] Failed to cache settings after save:', cacheErr);
+                }
+            }
             
             // Show success message
             if (window.showToast) {

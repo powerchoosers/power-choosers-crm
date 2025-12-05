@@ -7331,7 +7331,7 @@ body {
 /* Sent email preview - render with white background to match recipient view */
 /* This makes the CRM preview look exactly like what recipients see in Gmail/Outlook */
 #email-detail-page .email-content.sent-email-preview {
-    background: #ffffff;
+    background: transparent;
     color: #1a1a1a;
     padding: 24px;
     border-radius: var(--border-radius-md);
@@ -7416,6 +7416,13 @@ body {
 #email-detail-page .email-content.sent-email-preview *:not([data-signature="true"]):not([data-signature="true"] *) {
     background: transparent !important;
     background-color: transparent !important;
+    background-image: none !important;
+}
+#email-detail-page .email-content.sent-email-preview body,
+#email-detail-page .email-content.sent-email-preview html {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
 }
 /* Link colors - only override if no inline style present */
 #email-detail-page .email-content.sent-email-preview a:not([style*="color"]) {

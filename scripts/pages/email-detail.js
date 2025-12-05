@@ -267,19 +267,29 @@
 
     // Set email content - try multiple content fields like old system
     if (els.emailContent) {
-      // Try multiple content fields in order of preference
-      const htmlContent = email.html || email.content || email.originalContent || '';
-      const textContent = email.text || '';
+      // Prefer true HTML; if the stored html is really plain text, fall back to text with preserved breaks
+      const rawHtml = email.html || email.content || email.originalContent || '';
+      const rawText = email.text || '';
+      const looksLikeHtml = /<\s*(p|div|br|table|tr|td|li|ol|ul|span|strong|em|html|body|head|style|blockquote)/i.test(rawHtml || '') ||
+                            /<\/\w+>/.test(rawHtml || '');
+      const hasLineBreaks = /\r|\n/.test(rawText || rawHtml || '');
+      const htmlHasBlockTags = /<\s*(br|p|div|li|tr|table|blockquote)/i.test(rawHtml || '');
       
       let contentHtml = '';
       
-      if (htmlContent && htmlContent.trim()) {
-        // Use HTML content with sanitization
-        contentHtml = sanitizeEmailHtml(htmlContent);
-      } else if (textContent && textContent.trim()) {
-        // Fallback to text content with line breaks
-        const decodedText = decodeQuotedPrintable(textContent);
-        contentHtml = decodedText.replace(/\n/g, '<br>');
+      // Prefer text/plain when HTML lacks real block tags; otherwise use HTML; fallback to text
+      if (!htmlHasBlockTags && rawText && rawText.trim()) {
+        const decoded = decodeQuotedPrintable(rawText);
+        contentHtml = `<div style="white-space: pre-line;">${escapeHtml(decoded)}</div>`;
+      } else if (rawHtml && rawHtml.trim() && looksLikeHtml) {
+        contentHtml = sanitizeEmailHtml(rawHtml);
+      } else if (rawText && rawText.trim()) {
+        const decodedText = decodeQuotedPrintable(rawText);
+        contentHtml = decodedText.replace(/\r\n|\r|\n/g, '<br>');
+      } else if (rawHtml && rawHtml.trim()) {
+        // Treat raw html as text if it lacks meaningful tags
+        const decodedText = decodeQuotedPrintable(rawHtml);
+        contentHtml = decodedText.replace(/\r\n|\r|\n/g, '<br>');
       } else {
         contentHtml = '<p>No content available</p>';
       }
@@ -299,9 +309,9 @@
       const shouldShowSignature = !isSentEmail && 
                                    !hasExistingSignature &&
                                    (email.type === 'scheduled' || 
-                                    email.type === 'auto-email' || 
-                                    email.type === 'manual-email' ||
-                                    email.sequenceId ||
+                                   email.type === 'auto-email' || 
+                                   email.type === 'manual-email' ||
+                                   email.sequenceId ||
                                     (email.status && email.status !== 'received'));
       
       if (shouldShowSignature) {
@@ -318,7 +328,7 @@
               signatureHtml = signature.replace(/<img[^>]*alt=["']Signature["'][\s\S]*?>/gi, '');
             }
             
-            contentHtml += signatureHtml;
+              contentHtml += signatureHtml;
           }
         } catch (error) {
           console.warn('[EmailDetail] Error adding signature:', error);
@@ -360,22 +370,22 @@
       // Detect white / near-white backgrounds in inline styles
       const hasWhiteBg = /background(-color)?:\s*(#fff(?:fff)?|white|#fefefe|#f8f8f8|#fcfcfc|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)|rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*(0?\.\d+|1)\s*\))/i.test(styleLower);
       
-      if (hasWhiteBg) {
-        // Remove background / background-color declarations from inline styles
-        const newStyle = originalStyle
-          .replace(/background(-color)?:\s*[^;]+;?/gi, '')
-          .trim();
-        
-        if (newStyle) {
-          el.setAttribute('style', newStyle);
-        } else {
-          el.removeAttribute('style');
-        }
-        
-        // Also ensure computed background is cleared
-        el.style.background = 'transparent';
-        el.style.backgroundColor = 'transparent';
+      // Remove any inline background/background-image regardless of color and strip !important
+      const newStyle = originalStyle
+        .replace(/background-image\s*:\s*[^;]+;?/gi, '')
+        .replace(/background(-color)?\s*:\s*[^;]+;?/gi, '')
+        .replace(/!\s*important/gi, '')
+        .trim();
+
+      if (newStyle && newStyle !== originalStyle) {
+        el.setAttribute('style', newStyle);
+      } else if (!newStyle) {
+        el.removeAttribute('style');
       }
+
+      el.style.background = 'transparent';
+      el.style.backgroundColor = 'transparent';
+      el.style.backgroundImage = 'none';
       
       // Remove deprecated attributes that set background colors
       if (el.hasAttribute('bgcolor')) {
@@ -387,25 +397,38 @@
         el.style.background = 'transparent';
       }
     });
+
+    // Clear body/html backgrounds embedded in email HTML
+    const body = container.querySelector('body');
+    const html = container.querySelector('html');
+    [body, html].forEach(node => {
+      if (node) {
+        node.style.background = 'transparent';
+        node.style.backgroundColor = 'transparent';
+      }
+    });
     
-    // SECOND PASS: Clear computed white/near-white backgrounds (from embedded style tags)
+      // SECOND PASS: Clear computed backgrounds (white or otherwise) and images
     elements.forEach(el => {
       try {
-        const bg = window.getComputedStyle(el).backgroundColor || '';
-        // Match white / near-white computed background
-        const isWhiteBg = /(rgba?\(\s*255\s*,\s*255\s*,\s*255(?:\s*,\s*(0?\.\d+|1))?\s*\))|(#fff(?:fff)?)/i.test(bg);
-        if (isWhiteBg) {
-          el.style.backgroundColor = 'transparent';
-          el.style.background = 'transparent';
-          el.style.backgroundImage = 'none';
-          
-          // If the element is effectively empty and small, remove it entirely
-          const hasMedia = el.querySelector('img, svg');
-          const text = (el.textContent || '').trim();
-          if (!hasMedia && !text && el.clientWidth <= 80 && el.clientHeight <= 120) {
-            el.remove();
+          const cs = window.getComputedStyle(el);
+          const bgImg = (cs.backgroundImage || '').toLowerCase();
+          const bgColor = cs.backgroundColor || '';
+          const hasBgImg = bgImg && bgImg !== 'none';
+          const hasBgColor = bgColor && bgColor !== 'rgba(0, 0, 0, 0)';
+
+          if (hasBgImg || hasBgColor) {
+            el.style.backgroundColor = 'transparent';
+            el.style.background = 'transparent';
+            el.style.backgroundImage = 'none';
+            
+            // If the element is effectively empty and small, remove it entirely
+            const hasMedia = el.querySelector('img, svg');
+            const text = (el.textContent || '').trim();
+            if (!hasMedia && !text && el.clientWidth <= 80 && el.clientHeight <= 120) {
+              el.remove();
+            }
           }
-        }
       } catch (_) {
         // ignore
       }
@@ -461,12 +484,14 @@
   // Remove empty, small, white-background blocks (common leftover containers/placeholders)
   function removeEmptyWhiteBlocks(container) {
     if (!container) return;
-    const elements = Array.from(container.querySelectorAll('*:not([data-signature="true"]):not([data-signature="true"] *)'));
+    const elements = Array.from(container.querySelectorAll('*'));
     elements.forEach(el => {
       // Skip images (handled separately)
       if (el.tagName === 'IMG') return;
 
-      const text = (el.textContent || '').trim();
+      // Treat nbsp-only content as empty
+      const textRaw = (el.textContent || '');
+      const text = textRaw.replace(/\u00a0/g, '').trim();
       const hasMedia = el.querySelector('img, svg, video, audio, canvas, iframe');
       if (text || hasMedia) return;
 
@@ -474,18 +499,24 @@
       const w = rect.width || el.clientWidth || 0;
       const h = rect.height || el.clientHeight || 0;
 
-      // Only target small-ish empty blocks
-      if (w > 140 || h > 140) return;
+      // Consider narrow columns even if tall (e.g., placeholder cells)
+      const narrowColumn = w <= 140;
+      if (!narrowColumn) return;
 
       const style = window.getComputedStyle(el);
-      const bg = (style.backgroundColor || '').toLowerCase();
-      const isWhiteBg = /(rgba?\(\s*255\s*,\s*255\s*,\s*255(?:\s*,\s*(0?\.\d+|1))?\s*\))|(#fff(?:fff)?)/i.test(bg);
+      const bgColor = style.backgroundColor || '';
+      const hasBgColor = bgColor && bgColor !== 'rgba(0, 0, 0, 0)';
+      const hasBgImage = (style.backgroundImage || '').toLowerCase() !== 'none';
 
-      // Also check inline styles for white backgrounds
+      // Also check inline styles for any background declaration
       const inlineStyle = (el.getAttribute('style') || '').toLowerCase();
-      const inlineWhite = /background(-color)?:\s*(#fff(?:fff)?|white|#fefefe|#f8f8f8|#fcfcfc|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)|rgba\(\s*255\s*,\s*255\s*,\s*255\s*,\s*(0?\.\d+|1)\s*\))/i.test(inlineStyle);
+      const inlineHasBg = /background(-color)?\s*:/i.test(inlineStyle);
 
-      if (isWhiteBg || inlineWhite || (w <= 80 && h <= 120)) {
+      const insideSignature = el.closest('[data-signature="true"]');
+      const withinSigThreshold = insideSignature ? w <= 60 : true;
+
+      // Remove if empty + has bg color or image or is tiny
+      if ((hasBgColor || hasBgImage || inlineHasBg || w <= 80 || h <= 120) && withinSigThreshold) {
         el.remove();
       }
     });
