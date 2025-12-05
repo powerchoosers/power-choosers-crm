@@ -7328,11 +7328,11 @@ body {
     overflow: hidden;
 }
 
-/* Sent email preview - render with white background to match recipient view */
-/* This makes the CRM preview look exactly like what recipients see in Gmail/Outlook */
+/* Sent email preview - render with CRM dark theme colors */
+/* Text should be white/light for dark CRM background */
 #email-detail-page .email-content.sent-email-preview {
     background: transparent;
-    color: #1a1a1a;
+    color: var(--text-primary, #ffffff);
     padding: 24px;
     border-radius: var(--border-radius-md);
     /* Reset line-height to match email clients */
@@ -7407,9 +7407,9 @@ body {
     background-color: transparent !important;
 }
 
-/* Default text color for elements without inline styles */
+/* Default text color for elements without inline styles - use CRM theme color */
 #email-detail-page .email-content.sent-email-preview {
-    color: #1a1a1a;
+    color: var(--text-primary, #ffffff);
 }
 
 /* Aggressive: force all descendants to transparent backgrounds (except signature) */
@@ -7448,11 +7448,28 @@ body {
 }
 
 /* Don't override elements that have inline styles - let inline win */
-/* Only apply default color to elements without inline color */
+/* Only apply default color to elements without inline color - use CRM theme */
 #email-detail-page .email-content.sent-email-preview p:not([style]),
 #email-detail-page .email-content.sent-email-preview div:not([style]),
 #email-detail-page .email-content.sent-email-preview span:not([style]) {
-    color: #1a1a1a;
+    color: var(--text-primary, #ffffff);
+}
+
+/* CRITICAL: Override signature inline dark colors for CRM dark theme display */
+/* The signature HTML has hardcoded dark colors for light email clients */
+/* But we need white text for our dark CRM UI */
+#email-detail-page .email-content.sent-email-preview [data-signature="true"],
+#email-detail-page .email-content.sent-email-preview [data-signature="true"] * {
+    color: var(--text-primary, #ffffff) !important;
+}
+/* Keep orange accent color for title/highlights in signature */
+#email-detail-page .email-content.sent-email-preview [data-signature="true"] [style*="#f59e0b"],
+#email-detail-page .email-content.sent-email-preview [data-signature="true"] [style*="color: #f59e0b"] {
+    color: #f59e0b !important;
+}
+/* Keep links visible with orange accent */
+#email-detail-page .email-content.sent-email-preview [data-signature="true"] a {
+    color: var(--orange-primary, #f59e0b) !important;
 }
 
 /* Round corners on HTML email containers */
