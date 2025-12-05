@@ -77,6 +77,7 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
   const metaDescription = post.metaDescription || '';
   const keywords = post.keywords || '';
   const content = post.content || '';
+  const tags = (keywords || '').split(',').map(tag => tag.trim()).filter(Boolean);
   const featuredImage = post.featuredImage || '';
   const publishDate = post.publishDate ?
     (post.publishDate.toDate ? post.publishDate.toDate() : new Date(post.publishDate)) :
@@ -130,8 +131,11 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
     <link rel="stylesheet" href="../styles/public.css">
     <style>
       /* Article */
-      .article-container{max-width:900px;margin:0 auto;padding:60px 24px}
-      .article-header{margin-bottom:48px}
+      .article-page{max-width:1400px;margin:0 auto;padding:60px 24px}
+      .article-layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:32px;align-items:start}
+      .article-main{min-width:0}
+      .article-container{max-width:900px;margin:0;padding:0}
+      .article-header{margin-bottom:32px}
       .article-meta{display:flex;align-items:center;gap:16px;margin-bottom:16px;color:var(--muted);font-size:14px}
       .article-category{display:inline-block;padding:6px 12px;background:linear-gradient(135deg,rgba(11,27,69,.1),rgba(245,158,11,.1));border-radius:6px;font-size:12px;font-weight:600;color:var(--brand-blue)}
       .article-title{font-size:48px;font-weight:800;line-height:1.2;margin-bottom:24px;color:var(--brand-blue)}
@@ -150,7 +154,7 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
       .article-content a:hover{color:#d97706}
       
       /* Author Bio Section */
-      .author-bio-section{max-width:900px;margin:60px auto 0;padding:0 24px}
+      .author-bio-section{max-width:900px;margin:60px 0 0;padding:0}
       .author-bio-container{background:linear-gradient(135deg,#f8fafc 0%, #ffffff 100%);border:1px solid var(--border);border-radius:var(--radius);padding:32px;box-shadow:0 4px 12px rgba(0,0,0,.05)}
       .author-bio-content{display:flex;align-items:center;gap:24px}
       .author-avatar{flex-shrink:0}
@@ -193,6 +197,33 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
         .recent-posts-section h2{font-size:32px;margin-bottom:32px}
         .recent-posts-grid{grid-template-columns:1fr;gap:24px}
       }
+
+      /* Sidebar */
+      .article-sidebar{position:sticky;top:120px;align-self:start;display:flex;flex-direction:column;gap:16px}
+      .sidebar-card{background:linear-gradient(135deg,#ffffff 0%, #fafbfc 100%);border:1px solid rgba(229,231,235,.6);border-radius:var(--radius);padding:20px;box-shadow:0 4px 12px rgba(0,0,0,.05)}
+      .sidebar-card h3{font-size:18px;font-weight:700;margin:0 0 10px;color:var(--brand-blue)}
+      .sidebar-card p{margin:0 0 12px;color:var(--muted);line-height:1.6;font-size:14px}
+      .newsletter-form{display:flex;flex-direction:column;gap:10px}
+      .newsletter-form input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:14px}
+      .newsletter-form input:focus{outline:none;border-color:var(--brand-orange);box-shadow:0 0 0 3px rgba(245,158,11,.12)}
+      .sidebar-list{display:flex;flex-direction:column;gap:12px;margin:0;padding:0;list-style:none}
+      .sidebar-list a{color:var(--brand-blue);font-weight:600;line-height:1.4;text-decoration:none;transition:color .2s}
+      .sidebar-list a:hover{color:var(--brand-orange);text-decoration:none}
+      .sidebar-tag{display:inline-flex;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;font-size:12px;font-weight:600;color:var(--brand-blue);background:rgba(11,27,69,.04);margin:4px 6px 0 0}
+      .sidebar-cta{display:inline-flex;align-items:center;justify-content:center;margin-top:8px}
+
+      @media (max-width: 1100px){
+        .article-layout{grid-template-columns:1fr}
+        .article-sidebar{position:static;flex-direction:row;flex-wrap:wrap}
+        .sidebar-card{flex:1 1 260px}
+      }
+      @media (max-width: 768px){
+        .article-title{font-size:32px}
+        .article-content{font-size:16px}
+        .article-content h2{font-size:24px}
+        .article-content h3{font-size:20px}
+        .article-sidebar{flex-direction:column}
+      }
     </style>
     <!-- Apollo Tracking Script -->
     <script>function initApollo(){var n=Math.random().toString(36).substring(7),o=document.createElement("script");o.src="https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache="+n,o.async=!0,o.defer=!0,o.onload=function(){window.trackingFunctions.onLoad({appId:"691c89270f724f000d121b65"})},document.head.appendChild(o)}initApollo();</script>
@@ -218,57 +249,108 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
         </nav>
     </header>
     
-    <article class="article-container">
-        <header class="article-header">
-            ${post.category ? `<span class="article-category">${escapeHtml(post.category)}</span>` : ''}
-            <h1 class="article-title">${escapeHtml(title)}</h1>
-            <div class="article-meta">
-                <time datetime="${publishDate.toISOString()}">${formattedDate}</time>
+    <div class="article-page">
+      <div class="article-layout">
+        <div class="article-main">
+          <article class="article-container">
+              <header class="article-header">
+                  ${post.category ? `<span class="article-category">${escapeHtml(post.category)}</span>` : ''}
+                  <h1 class="article-title">${escapeHtml(title)}</h1>
+                  <div class="article-meta">
+                      <time datetime="${publishDate.toISOString()}">${formattedDate}</time>
+                  </div>
+              </header>
+              
+              ${featuredImage ? `
+              <div class="article-featured-image">
+                  <img src="${escapeHtml(featuredImage)}" alt="${escapeHtml(title)}">
+              </div>
+              ` : ''}
+              
+              <div class="article-content">
+                  ${content}
+              </div>
+          </article>
+          
+          ${authorInfo && (authorInfo.firstName || authorInfo.lastName) ? `
+          <section class="author-bio-section">
+              <div class="author-bio-container">
+                  <div class="author-bio-content">
+                      ${authorInfo.hostedPhotoURL || authorInfo.photoURL ? `
+                      <div class="author-avatar">
+                          <img src="${escapeHtml(authorInfo.hostedPhotoURL || authorInfo.photoURL)}" alt="${escapeHtml((authorInfo.firstName || '') + ' ' + (authorInfo.lastName || ''))}">
+                      </div>
+                      ` : ''}
+                      <div class="author-info">
+                          <h3 class="author-name">${escapeHtml((authorInfo.firstName || '') + ' ' + (authorInfo.lastName || ''))}</h3>
+                          <p class="author-title">${escapeHtml(authorInfo.jobTitle || 'Energy Strategist')}</p>
+                          ${authorInfo.bio ? `
+                          <p class="author-bio-text" style="margin: 12px 0; color: var(--text); line-height: 1.6; font-size: 15px;">
+                              ${escapeHtml(authorInfo.bio).replace(/\n/g, '<br>')}
+                          </p>
+                          ` : ''}
+                          ${authorInfo.linkedIn ? `
+                          <div class="author-social">
+                              <a href="${escapeHtml(authorInfo.linkedIn)}" target="_blank" rel="noopener" class="linkedin-link" aria-label="LinkedIn Profile">
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                                  </svg>
+                              </a>
+                          </div>
+                          ` : ''}
+                      </div>
+                  </div>
+              </div>
+          </section>
+          ` : ''}
+        </div>
+
+        <aside class="article-sidebar" aria-label="Article sidebar">
+          <div class="sidebar-card">
+            <h3>Email Newsletter</h3>
+            <p>Get weekly commercial energy insights and rate moves.</p>
+            <form class="newsletter-form" action="mailto:info@powerchoosers.com" method="post" enctype="text/plain">
+              <input type="email" name="email" placeholder="Work email" required>
+              <button type="submit" class="btn btn-primary">Get updates</button>
+            </form>
+          </div>
+
+          <div class="sidebar-card">
+            <h3>Recent Posts</h3>
+            ${recentPosts && recentPosts.length > 0 ? `
+              <ul class="sidebar-list">
+                ${recentPosts.slice(0,4).map(rp => {
+                  const slug = rp.slug || rp.id;
+                  const url = `https://powerchoosers.com/posts/${slug}`;
+                  const titleText = rp.title || 'Untitled';
+                  const cat = rp.category || '';
+                  return `
+                    <li>
+                      <a href="${escapeHtml(url)}">${escapeHtml(titleText)}</a>
+                      ${cat ? `<div style="font-size:12px;color:var(--muted);margin-top:2px;">${escapeHtml(cat)}</div>` : ''}
+                    </li>
+                  `;
+                }).join('')}
+              </ul>
+            ` : `<p>No recent posts yet.</p>`}
+          </div>
+
+          <div class="sidebar-card">
+            <h3>Featured Resource</h3>
+            <p>Estimate your TDU delivery charges and demand costs.</p>
+            <a class="btn btn-outline sidebar-cta" href="https://powerchoosers.com/tdu-delivery-charges">TDU Delivery Charges</a>
+          </div>
+
+          <div class="sidebar-card">
+            <h3>Categories & Tags</h3>
+            <div class="tag-list">
+              ${post.category ? `<span class="sidebar-tag">${escapeHtml(post.category)}</span>` : ''}
+              ${tags.length ? tags.map(tag => `<span class="sidebar-tag">${escapeHtml(tag)}</span>`).join('') : '<p style="margin:6px 0 0;color:var(--muted);font-size:13px;">No tags provided</p>'}
             </div>
-        </header>
-        
-        ${featuredImage ? `
-        <div class="article-featured-image">
-            <img src="${escapeHtml(featuredImage)}" alt="${escapeHtml(title)}">
-        </div>
-        ` : ''}
-        
-        <div class="article-content">
-            ${content}
-        </div>
-    </article>
-    
-    ${authorInfo && (authorInfo.firstName || authorInfo.lastName) ? `
-    <section class="author-bio-section">
-        <div class="author-bio-container">
-            <div class="author-bio-content">
-                ${authorInfo.hostedPhotoURL || authorInfo.photoURL ? `
-                <div class="author-avatar">
-                    <img src="${escapeHtml(authorInfo.hostedPhotoURL || authorInfo.photoURL)}" alt="${escapeHtml((authorInfo.firstName || '') + ' ' + (authorInfo.lastName || ''))}">
-                </div>
-                ` : ''}
-                <div class="author-info">
-                    <h3 class="author-name">${escapeHtml((authorInfo.firstName || '') + ' ' + (authorInfo.lastName || ''))}</h3>
-                    <p class="author-title">${escapeHtml(authorInfo.jobTitle || 'Energy Strategist')}</p>
-                    ${authorInfo.bio ? `
-                    <p class="author-bio-text" style="margin: 12px 0; color: var(--text); line-height: 1.6; font-size: 15px;">
-                        ${escapeHtml(authorInfo.bio).replace(/\n/g, '<br>')}
-                    </p>
-                    ` : ''}
-                    ${authorInfo.linkedIn ? `
-                    <div class="author-social">
-                        <a href="${escapeHtml(authorInfo.linkedIn)}" target="_blank" rel="noopener" class="linkedin-link" aria-label="LinkedIn Profile">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                            </svg>
-                        </a>
-                    </div>
-                    ` : ''}
-                </div>
-            </div>
-        </div>
-    </section>
-    ` : ''}
+          </div>
+        </aside>
+      </div>
+    </div>
     
     ${recentPosts.length > 0 ? `
     <section class="recent-posts-section">

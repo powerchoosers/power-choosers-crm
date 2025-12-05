@@ -1178,7 +1178,7 @@ export default async function handler(req, res) {
         }
         
         // Enhanced debug logging
-        const ctaType = perplexityResult.output?.cta_type || perplexityResult.metadata?.cta_type || 'unknown';
+          const ctaType = perplexityResult.output?.cta_type || perplexityResult.metadata?.cta_type || 'unknown';
         logger.debug(`[GenerateScheduledEmails] Generated email details:`, {
             subject: generatedContent.subject,
             angleUsed: generatedContent.angle_used,
