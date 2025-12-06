@@ -7332,7 +7332,7 @@ body {
 /* Text should be white/light for dark CRM background */
 #email-detail-page .email-content.sent-email-preview {
     background: transparent;
-    color: var(--text-primary, #ffffff);
+    color: var(--text-primary, #ffffff) !important;
     padding: 24px;
     border-radius: var(--border-radius-md);
     /* Reset line-height to match email clients */
@@ -7409,7 +7409,7 @@ body {
 
 /* Default text color for elements without inline styles - use CRM theme color */
 #email-detail-page .email-content.sent-email-preview {
-    color: var(--text-primary, #ffffff);
+    color: var(--text-primary, #ffffff) !important;
 }
 
 /* Aggressive: force all descendants to transparent backgrounds (except signature) */
@@ -7452,7 +7452,7 @@ body {
 #email-detail-page .email-content.sent-email-preview p:not([style]),
 #email-detail-page .email-content.sent-email-preview div:not([style]),
 #email-detail-page .email-content.sent-email-preview span:not([style]) {
-    color: var(--text-primary, #ffffff);
+    color: var(--text-primary, #ffffff) !important;
 }
 
 /* CRITICAL: Override signature inline dark colors for CRM dark theme display */
