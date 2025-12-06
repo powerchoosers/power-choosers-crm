@@ -267,6 +267,12 @@
 
     // Set email content - try multiple content fields like old system
     if (els.emailContent) {
+      // Helper: ensure closing line breaks for common sign-offs (helps manual single-break cases)
+      const applyClosingBreaks = (html) => {
+        if (!html) return html;
+        return html.replace(/(Best regards,|Regards,|Thanks,|Thank you,|Cheers,)\s*(?!<br>)(?!<\/p>)(?!<\/div>)/gi, '$1<br><br>');
+      };
+
       // Prefer true HTML; if the stored html is really plain text, fall back to text with preserved breaks
       const rawHtml = email.html || email.content || email.originalContent || '';
       const rawText = email.text || '';
@@ -353,6 +359,15 @@
         // This catches emails where marker detection failed but HTML is clearly structured
         console.log('[EmailDetail] Using HTML path: htmlHasStructure fallback');
         contentHtml = renderOurHtmlEmail(rawHtml);
+      } else if (isOurEmail && !looksLikeHtml && rawText && rawText.includes('\n')) {
+        // Manual/plain emails with real newlines: build paragraphs to preserve line breaks
+        console.log('[EmailDetail] Using TEXT paragraph path for manual/plain email');
+        const decoded = decodeQuotedPrintable(rawText);
+        const lines = decoded.split(/\r\n|\r|\n/);
+        const paras = lines.map(line => line.trim() === ''
+          ? '<p style="margin: 0 0 12px 0; color: var(--text-primary, #ffffff);">&nbsp;</p>'
+          : `<p style="margin: 0 0 12px 0; color: var(--text-primary, #ffffff);">${escapeHtml(line)}</p>`);
+        contentHtml = paras.join('');
       } else if (!isOurEmail && rawHtml && rawHtml.trim() && looksLikeHtml) {
         // Received email with proper HTML - use it
         console.log('[EmailDetail] Using HTML path: received email');
@@ -461,6 +476,9 @@
       } else {
         contentHtml = '<p>No content available</p>';
       }
+
+      // Apply closing line break heuristic (helps manual emails where "Best regards,Name" collapses)
+      contentHtml = applyClosingBreaks(contentHtml);
 
       // Final fallback for NON-HTML sent emails only (manual text emails)
       // Do NOT apply to isHtmlEmailFlag emails - those should keep their HTML structure/signature
