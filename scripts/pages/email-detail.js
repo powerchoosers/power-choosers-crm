@@ -3826,12 +3826,12 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
             }
             /* Email body text should also be white */
             .crm-email-content {
-              color: var(--text-primary, #ffffff);
+              color: var(--text-primary, #ffffff) !important;
             }
             .crm-email-content p,
             .crm-email-content div:not([data-signature="true"]),
             .crm-email-content span {
-              color: var(--text-primary, #ffffff);
+              color: var(--text-primary, #ffffff) !important;
             }
           </style>
           ${decoded}
