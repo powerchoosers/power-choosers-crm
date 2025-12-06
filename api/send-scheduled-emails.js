@@ -238,8 +238,8 @@ function buildCustomHtmlSignature(general) {
   // CRITICAL: data-signature="true" is required for email-detail.js to render this as HTML
   return `
 <div data-signature="true" style="margin-top: 8px; padding-top: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-    <!-- Orange gradient divider - border-top for email-detail.js detection fallback -->
-    <div style="height: 2px; border-top: 2px solid #E8A23A; background: linear-gradient(to right, #f59e0b 0%, #f59e0b 40%, transparent 100%); margin-bottom: 24px;"></div>
+    <!-- Orange gradient divider (fade) to match compose-global.js design -->
+    <div style="height: 2px; background: linear-gradient(to right, #f59e0b 0%, #f59e0b 40%, transparent 100%); margin-bottom: 24px;"></div>
     
     <table cellpadding="0" cellspacing="0" border="0" style="border-collapse: collapse;">
         <tr>
