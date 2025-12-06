@@ -851,7 +851,7 @@
           
           // Ensure scheduled emails are present even when served from cache
           await ensureAllScheduledEmailsLoaded();
-
+          
           // Notify that cached data is available
           document.dispatchEvent(new CustomEvent('pc:emails-loaded', { 
             detail: { count: cached.length, cached: true } 

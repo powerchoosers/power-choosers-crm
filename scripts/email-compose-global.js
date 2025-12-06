@@ -1530,6 +1530,15 @@
           line-height: 1.6;
           color: #1f2937;
         `;
+        // Preserve signature colors by excluding signature nodes from inherited color
+        const styleEl = document.createElement('style');
+        styleEl.textContent = `
+          .preview-container .content-wrapper :not([data-signature="true"]):not([data-signature="true"] *) {
+            color: #1f2937;
+          }
+        `;
+        contentWrapper.classList.add('content-wrapper');
+        contentWrapper.appendChild(styleEl);
         contentWrapper.innerHTML = content;
         iframeContainer.appendChild(contentWrapper);
       }
