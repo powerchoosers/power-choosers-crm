@@ -7407,9 +7407,14 @@ body {
     background-color: transparent !important;
 }
 
-/* Default text color for elements without inline styles - use CRM theme color */
-#email-detail-page .email-content.sent-email-preview {
+/* Default text color for body text (exclude signature so it keeps its own colors) */
+#email-detail-page .email-content.sent-email-preview :not([data-signature="true"]):not([data-signature="true"] *) {
     color: var(--text-primary, #ffffff) !important;
+}
+/* Preserve signature colors: do not override inline colors */
+#email-detail-page .email-content.sent-email-preview [data-signature="true"],
+#email-detail-page .email-content.sent-email-preview [data-signature="true"] * {
+    color: inherit !important;
 }
 
 /* Aggressive: force all descendants to transparent backgrounds (except signature) */
@@ -7455,22 +7460,7 @@ body {
     color: var(--text-primary, #ffffff) !important;
 }
 
-/* CRITICAL: Override signature inline dark colors for CRM dark theme display */
-/* The signature HTML has hardcoded dark colors for light email clients */
-/* But we need white text for our dark CRM UI */
-#email-detail-page .email-content.sent-email-preview [data-signature="true"],
-#email-detail-page .email-content.sent-email-preview [data-signature="true"] * {
-    color: var(--text-primary, #ffffff) !important;
-}
-/* Keep orange accent color for title/highlights in signature */
-#email-detail-page .email-content.sent-email-preview [data-signature="true"] [style*="#f59e0b"],
-#email-detail-page .email-content.sent-email-preview [data-signature="true"] [style*="color: #f59e0b"] {
-    color: #f59e0b !important;
-}
-/* Keep links visible with orange accent */
-#email-detail-page .email-content.sent-email-preview [data-signature="true"] a {
-    color: var(--orange-primary, #f59e0b) !important;
-}
+/* Allow signature to keep its own inline colors; rely on its own contrast */
 
 /* Round corners on HTML email containers */
 #email-detail-page .email-content>div,

@@ -6529,7 +6529,7 @@
             
             // Fallback to Firestore if cache miss
             if (!sequenceData) {
-              const sequenceDoc = await db.collection('sequences').doc(sequenceId).get();
+            const sequenceDoc = await db.collection('sequences').doc(sequenceId).get();
               sequenceData = sequenceDoc.data();
               hasActiveMembers = (sequenceData?.stats?.active || 0) > 0;
               isSequenceActive = sequenceData?.isActive !== false && sequenceData?.status !== 'paused';

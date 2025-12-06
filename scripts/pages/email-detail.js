@@ -270,7 +270,24 @@
       // Helper: ensure closing line breaks for common sign-offs (helps manual single-break cases)
       const applyClosingBreaks = (html) => {
         if (!html) return html;
-        return html.replace(/(Best regards,|Regards,|Thanks,|Thank you,|Cheers,)\s*(?!<br>)(?!<\/p>)(?!<\/div>)/gi, '$1<br><br>');
+        // Insert breaks after common sign-offs even inside <p>/<div>
+        const patterns = [
+          /(Best regards,)\s*(<\/p>|<\/div>|$)/gi,
+          /(Regards,)\s*(<\/p>|<\/div>|$)/gi,
+          /(Thanks,)\s*(<\/p>|<\/div>|$)/gi,
+          /(Thank you,)\s*(<\/p>|<\/div>|$)/gi,
+          /(Cheers,)\s*(<\/p>|<\/div>|$)/gi,
+          /(Best regards,)\s*(?!<br>)/gi,
+          /(Regards,)\s*(?!<br>)/gi,
+          /(Thanks,)\s*(?!<br>)/gi,
+          /(Thank you,)\s*(?!<br>)/gi,
+          /(Cheers,)\s*(?!<br>)/gi,
+        ];
+        let out = html;
+        patterns.forEach(re => {
+          out = out.replace(re, '$1<br><br>');
+        });
+        return out;
       };
 
       // Prefer true HTML; if the stored html is really plain text, fall back to text with preserved breaks
@@ -340,16 +357,30 @@
       // For SENT emails: prefer HTML when marked as HTML email OR when signature marker detected
       // CRITICAL: Check signature marker FIRST for sent emails to preserve custom HTML signature structure
       // Also use fallback sources if rawHtml is empty
-      const htmlSource = (rawHtml && rawHtml.trim()) || email.html || email.content || '';
+      let htmlSource = (rawHtml && rawHtml.trim()) || email.html || email.content || '';
       
       // CRITICAL FIX: Also check if rawHtml has HTML structure - if so, prefer HTML rendering
       // This catches cases where signature marker detection fails but HTML is valid
       const htmlHasStructure = /<table|<div\s|<img\s|<a\s|style="/i.test(rawHtml || '');
       
+      // Heuristic: if HTML has signature but body has no block tags, wrap body in a paragraph and add spacing
+      const wrapInlineBody = (html) => {
+        if (!html) return html;
+        const sigMatch = html.match(/(<div[^>]*data-signature="true"[^>]*>[\s\S]*)/i);
+        if (!sigMatch) return html;
+        const bodyPart = html.slice(0, sigMatch.index).trim();
+        const sigPart = sigMatch[1];
+        const hasBlocks = /<\s*(p|br|div|table|tr|td|ul|ol|li|blockquote|hr)/i.test(bodyPart);
+        if (hasBlocks || bodyPart.length === 0) return html;
+        const wrappedBody = `<p style="margin: 0 0 12px 0; color: var(--text-primary, #ffffff);">${escapeHtml(bodyPart)}</p><br><br>`;
+        console.log('[EmailDetail] Wrapped inline HTML body before signature');
+        return wrappedBody + sigPart;
+      };
+
       if (isOurEmail && hasSignatureMarker && htmlSource) {
         // Our sent emails with custom HTML signature: preserve the full HTML structure
         console.log('[EmailDetail] Using HTML path: hasSignatureMarker');
-        contentHtml = renderOurHtmlEmail(htmlSource);
+        contentHtml = renderOurHtmlEmail(wrapInlineBody(htmlSource));
       } else if (isOurEmail && isHtmlEmailFlag && rawHtml && rawHtml.trim()) {
         // Our sent HTML template emails (AI/templated with isHtmlEmail flag): keep original HTML
         console.log('[EmailDetail] Using HTML path: isHtmlEmailFlag');
@@ -359,11 +390,18 @@
         // This catches emails where marker detection failed but HTML is clearly structured
         console.log('[EmailDetail] Using HTML path: htmlHasStructure fallback');
         contentHtml = renderOurHtmlEmail(rawHtml);
-      } else if (isOurEmail && !looksLikeHtml && rawText && rawText.includes('\n')) {
-        // Manual/plain emails with real newlines: build paragraphs to preserve line breaks
-        console.log('[EmailDetail] Using TEXT paragraph path for manual/plain email');
+      } else if (isOurEmail && rawText) {
+        // Manual/plain emails: always build paragraphs from text to preserve single/new line breaks
+        console.log('[EmailDetail] Using TEXT paragraph path for manual/plain email', {
+          rawTextLength: rawText.length,
+          sample: rawText.slice(0, 200),
+          hasNewlines: /\r|\n/.test(rawText),
+          looksLikeHtml,
+          isHtmlEmailFlag
+        });
         const decoded = decodeQuotedPrintable(rawText);
         const lines = decoded.split(/\r\n|\r|\n/);
+        console.log('[EmailDetail] Decoded lines count:', lines.length, 'First lines:', lines.slice(0, 5));
         const paras = lines.map(line => line.trim() === ''
           ? '<p style="margin: 0 0 12px 0; color: var(--text-primary, #ffffff);">&nbsp;</p>'
           : `<p style="margin: 0 0 12px 0; color: var(--text-primary, #ffffff);">${escapeHtml(line)}</p>`);
@@ -476,6 +514,40 @@
       } else {
         contentHtml = '<p>No content available</p>';
       }
+
+      // Heuristic: ensure a break before signature if body is inline
+      const ensureSignatureSpacing = (html) => {
+        if (!html || !isOurEmail) return html;
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        const sig = temp.querySelector('[data-signature="true"]');
+        if (!sig) return html;
+        const prev = sig.previousSibling;
+        // If previous sibling is a text node or inline element without a trailing <br>, add one
+        if (prev && prev.nodeType === Node.TEXT_NODE) {
+          const txt = prev.textContent || '';
+          if (txt.trim().length > 0) {
+            const br = document.createElement('br');
+            const br2 = document.createElement('br');
+            sig.parentNode.insertBefore(br, sig);
+            sig.parentNode.insertBefore(br2, sig);
+            console.log('[EmailDetail] Inserted break before signature (text node)');
+          }
+        } else if (prev && prev.nodeType === Node.ELEMENT_NODE) {
+          const prevTag = prev.tagName.toLowerCase();
+          const blockTags = ['p', 'div', 'br', 'table', 'tr', 'td'];
+          if (!blockTags.includes(prevTag)) {
+            const br = document.createElement('br');
+            const br2 = document.createElement('br');
+            sig.parentNode.insertBefore(br, sig);
+            sig.parentNode.insertBefore(br2, sig);
+            console.log('[EmailDetail] Inserted break before signature (inline elem)', prevTag);
+          }
+        }
+        return temp.innerHTML;
+      };
+
+      contentHtml = ensureSignatureSpacing(contentHtml);
 
       // Apply closing line break heuristic (helps manual emails where "Best regards,Name" collapses)
       contentHtml = applyClosingBreaks(contentHtml);
@@ -750,8 +822,8 @@
     if (!container) return;
     const elements = Array.from(container.querySelectorAll('*'));
     elements.forEach(el => {
-      // Skip images (handled separately)
-      if (el.tagName === 'IMG') return;
+      // Skip images (handled separately) and line breaks (we need <br> for manual line spacing)
+      if (el.tagName === 'IMG' || el.tagName === 'BR') return;
 
       // Treat nbsp-only content as empty
       const textRaw = (el.textContent || '');
@@ -3757,7 +3829,9 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
   function renderOurHtmlEmail(html) {
     if (!html) return '<p>No content available</p>';
     try {
+      console.log('[EmailDetail] renderOurHtmlEmail input length:', html.length, 'sample:', html.slice(0, 200));
       let decoded = decodeQuotedPrintable(html);
+      console.log('[EmailDetail] After decode length:', decoded.length, 'sample:', decoded.slice(0, 200));
       // Remove scripts/iframes/event handlers/js urls/tracking pixels but keep style/head
       decoded = decoded
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -3767,6 +3841,11 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         .replace(/data:text\/html/gi, '')
         .replace(/<img[^>]*src=["'][^"']*\/api\/email\/track\/[^"']+["'][^>]*>/gi, '')
         .replace(/<img[^>]*src=["'][^"']*vercel\.app\/api\/email\/track\/[^"']+["'][^>]*>/gi, '');
+
+      // Convert zero-width spaces (often left from contentEditable) into breaks
+      decoded = decoded.replace(/[\u200b\u200c\u200d]+/g, '<br>');
+      decoded = decoded.replace(/(<br>\s*){2,}/g, '<br><br>');
+      console.log('[EmailDetail] After zero-width replacement length:', decoded.length, 'sample:', decoded.slice(0, 200));
 
       // CRITICAL: Detect if this is contentEditable HTML (uses <div> for line breaks)
       // vs AI-generated HTML (uses proper paragraph structure)
@@ -3807,55 +3886,43 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       // Fix greeting run-on inside HTML text
       decoded = decoded.replace(/((?:Hi|Hello|Hey|Dear)\s+[^,<]{1,80},)\s*(?=[A-Z])/gi, '$1<br><br>');
 
+      // If we have a signature but the body has no block tags, wrap body in a paragraph and add spacing
+      const sigMatch = decoded.match(/(<div[^>]*data-signature="true"[^>]*>[\s\S]*)/i);
+      if (sigMatch) {
+        const bodyPart = decoded.slice(0, sigMatch.index).trim();
+        const sigPart = sigMatch[1];
+        const hasBlocks = /<\s*(p|br|div|table|tr|td|ul|ol|li|blockquote|hr)/i.test(bodyPart);
+        if (!hasBlocks && bodyPart.length > 0) {
+          const wrappedBody = `<p style="margin: 0 0 12px 0; color: var(--text-primary, #ffffff);">${escapeHtml(bodyPart)}</p>`;
+          decoded = `${wrappedBody}<br><br>${sigPart}`;
+          console.log('[EmailDetail] Wrapped inline body before signature (no blocks detected)');
+        }
+      }
+
       // CRITICAL: Wrap with dark mode CSS overrides for CRM display
-      // The signature HTML has hardcoded dark colors for email clients (light backgrounds)
-      // But our CRM has a dark UI, so we override text colors to white
+      // Keep body text white for dark UI, but allow signature inline colors to remain
       const darkModeWrapper = `
         <div class="crm-email-content">
           <style>
-            /* Override signature text colors for dark CRM UI */
-            .crm-email-content [data-signature="true"],
-            .crm-email-content [data-signature="true"] * {
-              color: var(--text-primary, #ffffff) !important;
-            }
-            /* Keep orange accent color for dividers and highlights */
-            .crm-email-content [data-signature="true"] [style*="#f59e0b"],
-            .crm-email-content [data-signature="true"] [style*="#E8A23A"] {
-              color: #f59e0b !important;
-            }
-            /* Override common dark text colors used in signature */
-            .crm-email-content [style*="color: #0b1b45"],
-            .crm-email-content [style*="color:#0b1b45"],
-            .crm-email-content [style*="color: #1e3a8a"],
-            .crm-email-content [style*="color:#1e3a8a"],
-            .crm-email-content [style*="color: #333"],
-            .crm-email-content [style*="color:#333"],
-            .crm-email-content [style*="color: #64748b"],
-            .crm-email-content [style*="color:#64748b"],
-            .crm-email-content [style*="color: #94a3b8"],
-            .crm-email-content [style*="color:#94a3b8"],
-            .crm-email-content [style*="color: #a0aec0"],
-            .crm-email-content [style*="color:#a0aec0"] {
-              color: var(--text-primary, #ffffff) !important;
-            }
             /* Ensure links remain visible */
             .crm-email-content a {
               color: var(--orange-primary, #f59e0b) !important;
             }
-            /* Email body text should also be white */
-            .crm-email-content {
+            /* Email body text should be white; do not force color inside signature */
+            .crm-email-content :not([data-signature="true"]):not([data-signature="true"] *) {
               color: var(--text-primary, #ffffff) !important;
             }
-            .crm-email-content p,
-            .crm-email-content div:not([data-signature="true"]),
-            .crm-email-content span {
-              color: var(--text-primary, #ffffff) !important;
+            /* Preserve signature colors: do not override inline colors */
+            .crm-email-content [data-signature="true"],
+            .crm-email-content [data-signature="true"] * {
+              color: inherit;
             }
           </style>
           ${decoded}
         </div>
       `;
 
+      console.log('[EmailDetail] renderOurHtmlEmail output length:', darkModeWrapper.length, 'sample:', darkModeWrapper.slice(0, 200));
       return darkModeWrapper;
     } catch (e) {
       console.error('Failed to render our HTML email:', e);
