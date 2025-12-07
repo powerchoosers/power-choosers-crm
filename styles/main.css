@@ -267,6 +267,10 @@
     font-size: 14px;
     line-height: 1.5;
     resize: vertical;
+    margin-top: 10px;
+    /* Added spacing from toolbar */
+    margin-bottom: 10px;
+    /* Added spacing below body */
 }
 
 .compose-footer {
@@ -586,9 +590,9 @@ button:hover:not(:disabled):not(.step-option),
     margin: 0;
 }
 
-/* Normalize br spacing for consistent single-line breaks */
+/* Normalize br spacing: keep inline to avoid extra caret rows when empty */
 .body-input br {
-    display: block;
+    display: inline;
     margin: 0;
     content: '';
 }
@@ -7323,7 +7327,8 @@ body {
 
 #email-detail-page .email-content {
     line-height: 1.6;
-    color: var(--text-primary);
+    /* NOTE: Do not set color here - it cascades to signature and overrides inline colors */
+    /* Body text color is set on specific containers, signature preserves its own inline colors */
     border-radius: var(--border-radius-sm);
     overflow: hidden;
 }
@@ -7332,8 +7337,8 @@ body {
 /* Text should be white/light for dark CRM background */
 #email-detail-page .email-content.sent-email-preview {
     background: transparent;
-    color: var(--text-primary, #ffffff) !important;
-    padding: 24px;
+    /* No extra padding; mirror inbox spacing */
+    padding: 0;
     border-radius: var(--border-radius-md);
     /* Reset line-height to match email clients */
     line-height: 1.5;
@@ -7407,28 +7412,28 @@ body {
     background-color: transparent !important;
 }
 
-/* Default text color for body text (exclude signature so it keeps its own colors) */
-#email-detail-page .email-content.sent-email-preview :not([data-signature="true"]):not([data-signature="true"] *) {
+/* Default text color for body content wrapper only - signature is handled separately */
+#email-detail-page .email-content.sent-email-preview [data-body="true"],
+#email-detail-page .email-content.sent-email-preview [data-body="true"] * {
     color: var(--text-primary, #ffffff) !important;
 }
-/* Preserve signature colors: do not override inline colors */
-#email-detail-page .email-content.sent-email-preview [data-signature="true"],
-#email-detail-page .email-content.sent-email-preview [data-signature="true"] * {
-    color: inherit !important;
-}
 
-/* Aggressive: force all descendants to transparent backgrounds (except signature) */
-#email-detail-page .email-content.sent-email-preview *:not([data-signature="true"]):not([data-signature="true"] *) {
+/* Signature: NO color rules - JavaScript preserveSignatureColors() handles inline colors */
+/* Backgrounds: make transparent for everything except signature elements */
+#email-detail-page .email-content.sent-email-preview [data-body="true"],
+#email-detail-page .email-content.sent-email-preview [data-body="true"] * {
     background: transparent !important;
     background-color: transparent !important;
     background-image: none !important;
 }
+
 #email-detail-page .email-content.sent-email-preview body,
 #email-detail-page .email-content.sent-email-preview html {
     background: transparent !important;
     background-color: transparent !important;
     background-image: none !important;
 }
+
 /* Link colors - only override if no inline style present */
 #email-detail-page .email-content.sent-email-preview a:not([style*="color"]) {
     color: #1a73e8;
@@ -7452,15 +7457,13 @@ body {
     padding: 0;
 }
 
-/* Don't override elements that have inline styles - let inline win */
-/* Only apply default color to elements without inline color - use CRM theme */
-#email-detail-page .email-content.sent-email-preview p:not([style]),
-#email-detail-page .email-content.sent-email-preview div:not([style]),
-#email-detail-page .email-content.sent-email-preview span:not([style]) {
+/* Body text elements without explicit styling get white text */
+/* Signature elements are excluded - their colors are handled by JavaScript */
+#email-detail-page .email-content.sent-email-preview [data-body="true"] p:not([style*="color"]),
+#email-detail-page .email-content.sent-email-preview [data-body="true"] div:not([style*="color"]),
+#email-detail-page .email-content.sent-email-preview [data-body="true"] span:not([style*="color"]) {
     color: var(--text-primary, #ffffff) !important;
 }
-
-/* Allow signature to keep its own inline colors; rely on its own contrast */
 
 /* Round corners on HTML email containers */
 #email-detail-page .email-content>div,
@@ -7492,14 +7495,15 @@ body {
     text-decoration: underline;
 }
 
-/* Fix signature text color to match email content */
-#email-detail-page .email-content [data-signature="true"],
-#email-detail-page .email-content [data-signature="true"] * {
+/* Signature in sent-email-preview: preserve original inline colors (don't force white) */
+/* Only apply white text override to signature in editable compose areas, not sent previews */
+#email-detail-page .email-content:not(.sent-email-preview) [data-signature="true"],
+#email-detail-page .email-content:not(.sent-email-preview) [data-signature="true"] * {
     color: var(--text-primary) !important;
 }
 
-/* Fix signature border color to be visible on dark background */
-#email-detail-page .email-content [data-signature="true"] {
+/* Fix signature border color to be visible on dark background - only for editable areas */
+#email-detail-page .email-content:not(.sent-email-preview) [data-signature="true"] {
     border-top-color: var(--border-light) !important;
 }
 
@@ -17669,18 +17673,68 @@ input.row-select[type="checkbox"]:focus-visible {
 }
 
 .compose-editor {
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: 0;
+    /* Removed margin to maximize space */
+    margin-top: 10px;
+    /* Spacing above toolbar */
+}
+
+/* Secondary Toolbars (Formatting, Link, Variables) */
+.compose-editor .formatting-bar,
+.compose-editor .link-bar,
+.compose-editor .variables-bar {
+    /* Initially hidden state */
+    display: flex;
+    /* Keep flex but hide via height/opacity */
+    max-height: 0;
+    opacity: 0;
+    padding: 0 16px;
+    /* Collapsed padding */
+    overflow: hidden;
+    visibility: hidden;
+
+    /* Variables from AI bar for consistent look */
+    background: var(--bg-primary);
+    border-left: 1px solid var(--border-light);
+    border-right: 1px solid var(--border-light);
+    /* No bottom border initially */
+    gap: var(--spacing-xs);
+    align-items: center;
+    flex-wrap: wrap;
+
+    /* Smooth transition matching AI bar */
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        padding 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        visibility 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.compose-editor .formatting-bar.open,
+.compose-editor .link-bar.open,
+.compose-editor .variables-bar.open {
+    /* Open state */
+    max-height: 200px;
+    /* Suggestive max-height */
+    opacity: 1;
+    padding: var(--spacing-sm);
+    visibility: visible;
+    border-bottom: 1px solid var(--border-light);
+    /* Show border only when open */
+    overflow: visible;
+    /* Allow popups */
 }
 
 .compose-editor .editor-toolbar {
     background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-bottom: none;
-    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    border: 1px solid var(--border-light) !important;
+    border-radius: var(--border-radius) !important;
     padding: var(--spacing-sm);
     display: flex;
     gap: var(--spacing-xs);
     align-items: center;
+    margin-bottom: 10px;
+    /* Space between toolbar and body */
+    width: 100%;
 }
 
 .compose-editor .editor-content {
@@ -18905,10 +18959,10 @@ input.row-select[type="checkbox"]:focus-visible {
     min-height: 0;
     /* critical: let this area shrink and become scrollable */
     max-height: 100%;
-    padding: 0 16px 16px 16px;
-    /* move compose text up by 5px */
-    margin-top: 10px;
-    /* reduce gap above to bring placeholder up */
+    /* restore top padding so caret isn't flush to the top */
+    padding: 10px 16px 16px 16px;
+    /* no extra top margin; padding handles spacing */
+    margin-top: 0;
     overflow-y: auto;
     /* enable vertical scrolling for long content */
     overflow-x: visible;

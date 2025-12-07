@@ -144,12 +144,13 @@
       }, 200);
 
       // Setup toolbar event listeners after compose window is ready
-      setTimeout(() => {
-        const composeWindow = document.getElementById('compose-window');
-        if (composeWindow) {
-          setupToolbarEventListeners(composeWindow);
-        }
-      }, 300);
+      // DEPRECATED - Handled by global setupMainToolbarHandler
+      // setTimeout(() => {
+      //   const composeWindow = document.getElementById('compose-window');
+      //   if (composeWindow) {
+      //     setupToolbarEventListeners(composeWindow);
+      //   }
+      // }, 300);
     } else {
       console.warn('[EmailCompose] emailManager.openComposeWindow not available');
       window.crm?.showToast && window.crm.showToast('Email compose not available');
@@ -233,7 +234,8 @@
     setupComposeCloseButton();
 
     // Setup toolbar event listeners
-    setupToolbarEventListeners(composeWindow);
+    // DEPRECATED - Handled by global setupMainToolbarHandler
+    // setupToolbarEventListeners(composeWindow);
 
     // Initialize AI bar if present
     const aiBar = composeWindow.querySelector('.ai-bar');
@@ -972,14 +974,33 @@
   }
 
   function toggleFormattingBar() {
-    const formattingBar = document.querySelector('.formatting-bar');
-    if (!formattingBar) return;
+    console.log('[Formatting] toggleFormattingBar called');
 
+    const composeWindow = document.getElementById('compose-window');
+    console.log('[Formatting] Compose window found:', !!composeWindow);
+
+    // Scope to compose window to avoid conflicts with other formatting bars
+    const formattingBar = composeWindow ?
+      composeWindow.querySelector('.formatting-bar') :
+      document.querySelector('.formatting-bar');
+
+    console.log('[Formatting] Formatting bar found:', !!formattingBar);
+
+    if (!formattingBar) {
+      console.warn('[Formatting] No formatting bar found!');
+      return;
+    }
+
+    console.log('[Formatting] Current classes:', formattingBar.className);
     const isOpen = formattingBar.classList.toggle('open');
+    console.log('[Formatting] After toggle, classes:', formattingBar.className);
+
     formattingBar.setAttribute('aria-hidden', String(!isOpen));
 
     // Update the button's aria-expanded state
-    const formattingBtn = document.querySelector('[data-action="formatting"]');
+    const formattingBtn = composeWindow ?
+      composeWindow.querySelector('[data-action="formatting"]') :
+      document.querySelector('[data-action="formatting"]');
     if (formattingBtn) {
       formattingBtn.setAttribute('aria-expanded', String(isOpen));
     }
@@ -1564,7 +1585,8 @@
   // ========== EVENT LISTENERS SETUP ==========
 
   // Setup all toolbar event listeners
-  function setupToolbarEventListeners(composeWindow) {
+  // Setup all toolbar event listeners - DEPRECATED (Moved to setupMainToolbarHandler)
+  function setupToolbarEventListeners_DEPRECATED(composeWindow) {
     const editor = composeWindow.querySelector('.body-input');
     const toolbar = composeWindow.querySelector('.editor-toolbar');
     const formattingBar = composeWindow.querySelector('.formatting-bar');
@@ -1591,10 +1613,10 @@
     editor?.addEventListener('mouseup', saveSelection);
     editor?.addEventListener('blur', saveSelection);
 
-    // Toolbar actions - DEDUPLICATED to prevent multiple listeners
-    if (!document._composeToolbarClickBound) {
-      document._composeToolbarClickBound = true;
-      document.addEventListener('click', (e) => {
+    // Toolbar actions - bind per compose window to avoid being blocked by global guards
+    if (!toolbar?.dataset.listenerAdded) {
+      toolbar.dataset.listenerAdded = 'true';
+      toolbar.addEventListener('click', (e) => {
         const btn = e.target.closest('.toolbar-btn');
         if (!btn) return;
 
@@ -1605,19 +1627,17 @@
         } else if (action === 'preview') {
           togglePreviewMode();
         } else {
-          // Handle all other toolbar actions
-          const composeWindow = document.querySelector('#compose-window, .compose-window');
-          const editor = composeWindow?.querySelector('.body-input');
-          const formattingBar = composeWindow?.querySelector('.formatting-bar');
-          const linkBar = composeWindow?.querySelector('.link-bar');
-          const variablesBar = composeWindow?.querySelector('.variables-bar');
+          // Handle all other toolbar actions using this compose window context
+          const editor = composeWindow.querySelector('.body-input');
+          const formattingBarEl = composeWindow.querySelector('.formatting-bar');
+          const linkBarEl = composeWindow.querySelector('.link-bar');
 
           if (editor) {
-            handleToolbarAction(action, btn, editor, formattingBar, linkBar, composeWindow);
+            handleToolbarAction(action, btn, editor, formattingBarEl, linkBarEl, composeWindow);
           }
         }
       });
-      console.log('[EmailCompose] Toolbar click listener bound (deduplicated)');
+      console.log('[EmailCompose] Toolbar click listener bound (per compose window)');
     }
 
     // Formatting button clicks
@@ -4605,6 +4625,50 @@
     }
   }
 
+  // ========== MAIN TOOLBAR HANDLER (NEW ROBUST VERSION) ==========
+  function setupMainToolbarHandler() {
+    if (document._mainToolbarHandlerBound) return;
+
+    // Document-level listener for all toolbar actions (except AI which has its own)
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.toolbar-btn');
+      if (!btn) return;
+
+      // Skip AI button as it has its own handler (setupAIButtonHandler)
+      if (btn.dataset.action === 'ai') return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const action = btn.dataset.action;
+      const composeWindow = btn.closest('#compose-window') || document.getElementById('compose-window');
+
+      if (!composeWindow) {
+        console.warn('[Toolbar] Compose window context not found for action:', action);
+        return;
+      }
+
+      const editor = composeWindow.querySelector('.body-input');
+      const formattingBar = composeWindow.querySelector('.formatting-bar');
+      const linkBar = composeWindow.querySelector('.link-bar');
+
+      // Special handlers for toggles that don't need editor content immediately
+      if (action === 'formatting') {
+        toggleFormattingBar();
+      } else if (action === 'preview') {
+        togglePreviewMode();
+      } else {
+        if (editor) {
+          handleToolbarAction(action, btn, editor, formattingBar, linkBar, composeWindow);
+        }
+      }
+      console.log('[Toolbar] Global listener handled:', action);
+    });
+
+    document._mainToolbarHandlerBound = true;
+    console.log('[EmailCompose] Main toolbar document listener registered');
+  }
+
   // ========== AI BUTTON HANDLER ==========
 
   function setupAIButtonHandler() {
@@ -5104,10 +5168,212 @@
     });
   }
 
+  // ========== SECONDARY BARS HANDLER (Formatting, Link, Variables) ==========
+
+  function setupSecondaryBarsHandler() {
+    if (document._secondaryBarsHandlerBound) return;
+
+    document.addEventListener('click', (e) => {
+      const composeWindow = document.getElementById('compose-window');
+      if (!composeWindow) return;
+
+      const formattingBar = composeWindow.querySelector('.formatting-bar');
+      const linkBar = composeWindow.querySelector('.link-bar');
+      const variablesBar = composeWindow.querySelector('.variables-bar');
+      const editor = composeWindow.querySelector('.body-input');
+
+      // Handle formatting bar button clicks
+      const fmtBtn = e.target.closest('.formatting-bar .fmt-btn');
+      if (fmtBtn && formattingBar?.contains(fmtBtn)) {
+        const format = fmtBtn.getAttribute('data-fmt');
+        console.log('[SecondaryBars] Formatting button clicked:', format);
+
+        if (format) {
+          // Save selection before handling
+          const sel = window.getSelection();
+          if (sel && sel.rangeCount > 0) {
+            window._editorSelection = sel.getRangeAt(0).cloneRange();
+          }
+
+          ensureSelection();
+          handleFormatting(format, fmtBtn, editor, formattingBar, () => {
+            if (window._editorSelection) {
+              const sel = window.getSelection();
+              sel.removeAllRanges();
+              sel.addRange(window._editorSelection);
+            }
+          });
+        }
+        return;
+      }
+
+      // Handle popover item clicks (font, size)
+      const popoverItem = e.target.closest('.formatting-bar .popover-item');
+      if (popoverItem && formattingBar?.contains(popoverItem)) {
+        e.stopPropagation();
+
+        // Restore selection
+        if (window._editorSelection) {
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(window._editorSelection);
+        }
+
+        // Handle font selection
+        if (popoverItem.classList.contains('font-item')) {
+          const fontFamily = popoverItem.getAttribute('data-font');
+          const fontLabel = popoverItem.textContent;
+          console.log('[SecondaryBars] Font selected:', fontFamily);
+
+          ensureSelection();
+          applyStyleToSelection(editor, `font-family: ${fontFamily};`);
+          setFormattingState('fontFamily', fontFamily);
+
+          // Update label
+          const fontBtn = formattingBar.querySelector('[data-fmt="font"]');
+          const fontLabelEl = fontBtn?.querySelector('[data-current-font]');
+          if (fontLabelEl) fontLabelEl.textContent = fontLabel;
+
+          // Close popover
+          const pop = popoverItem.closest('.format-popover');
+          pop?.classList.remove('open');
+          fontBtn?.setAttribute('aria-expanded', 'false');
+        }
+
+        // Handle size selection
+        if (popoverItem.classList.contains('size-item')) {
+          const size = popoverItem.getAttribute('data-size');
+          console.log('[SecondaryBars] Size selected:', size);
+
+          ensureSelection();
+          applyStyleToSelection(editor, `font-size: ${size}px;`);
+          setFormattingState('fontSize', size);
+
+          // Update label
+          const sizeBtn = formattingBar.querySelector('[data-fmt="size"]');
+          const sizeLabelEl = sizeBtn?.querySelector('[data-current-size]');
+          if (sizeLabelEl) sizeLabelEl.textContent = size;
+
+          // Close popover
+          const pop = popoverItem.closest('.format-popover');
+          pop?.classList.remove('open');
+          sizeBtn?.setAttribute('aria-expanded', 'false');
+        }
+        return;
+      }
+
+      // Handle color swatch clicks
+      const colorSwatch = e.target.closest('.formatting-bar .color-swatch');
+      if (colorSwatch && formattingBar?.contains(colorSwatch)) {
+        e.stopPropagation();
+
+        // Restore selection
+        if (window._editorSelection) {
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(window._editorSelection);
+        }
+
+        // Handle text color
+        if (colorSwatch.closest('.color-popover')) {
+          const color = colorSwatch.getAttribute('data-color');
+          console.log('[SecondaryBars] Text color selected:', color);
+
+          ensureSelection();
+          applyColorToSelection(color === 'transparent' ? null : color);
+
+          const pop = colorSwatch.closest('.format-popover');
+          pop?.classList.remove('open');
+          const colorBtn = formattingBar.querySelector('[data-fmt="color"]');
+          colorBtn?.setAttribute('aria-expanded', 'false');
+        }
+
+        // Handle highlight color
+        if (colorSwatch.closest('.highlight-popover')) {
+          const color = colorSwatch.getAttribute('data-color');
+          console.log('[SecondaryBars] Highlight color selected:', color);
+
+          ensureSelection();
+          applyHighlightToSelection(color === 'transparent' ? null : color);
+
+          const pop = colorSwatch.closest('.format-popover');
+          pop?.classList.remove('open');
+          const highlightBtn = formattingBar.querySelector('[data-fmt="highlight"]');
+          highlightBtn?.setAttribute('aria-expanded', 'false');
+        }
+        return;
+      }
+
+      // Handle link bar buttons
+      if (e.target.matches('[data-link-insert]') && linkBar?.contains(e.target)) {
+        console.log('[SecondaryBars] Link insert button clicked');
+        insertLink(editor, linkBar);
+        return;
+      }
+
+      if (e.target.matches('[data-link-cancel]') && linkBar?.contains(e.target)) {
+        console.log('[SecondaryBars] Link cancel button clicked');
+        linkBar.classList.remove('open');
+        linkBar.setAttribute('aria-hidden', 'true');
+        return;
+      }
+
+      // Handle variables bar buttons
+      if (variablesBar?.contains(e.target)) {
+        // Close button
+        if (e.target.matches('[data-vars-close]')) {
+          console.log('[SecondaryBars] Variables close button clicked');
+          variablesBar.classList.remove('open');
+          variablesBar.setAttribute('aria-hidden', 'true');
+          return;
+        }
+
+        // Variable item click
+        if (e.target.matches('.var-item') || e.target.closest('.var-item')) {
+          const varItem = e.target.closest('.var-item') || e.target;
+          const scope = varItem.getAttribute('data-scope');
+          const key = varItem.getAttribute('data-key');
+          const label = varItem.querySelector('.var-item-label')?.textContent;
+          console.log('[SecondaryBars] Variable item clicked:', scope, key);
+          insertVariableChip(editor, scope, key, label);
+          return;
+        }
+
+        // Tab switching
+        if (e.target.matches('.vars-tab')) {
+          const tab = e.target.getAttribute('data-tab');
+          console.log('[SecondaryBars] Variables tab clicked:', tab);
+
+          variablesBar.querySelectorAll('.vars-tab').forEach(t => {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+          });
+          variablesBar.querySelectorAll('.vars-panel').forEach(p => {
+            p.classList.add('hidden');
+            p.setAttribute('aria-hidden', 'true');
+          });
+          e.target.classList.add('active');
+          e.target.setAttribute('aria-selected', 'true');
+          const panel = variablesBar.querySelector(`.vars-panel[data-tab="${tab}"]`);
+          if (panel) {
+            panel.classList.remove('hidden');
+            panel.setAttribute('aria-hidden', 'false');
+          }
+          return;
+        }
+      }
+    });
+
+    document._secondaryBarsHandlerBound = true;
+    console.log('[EmailCompose] Secondary bars document listener registered');
+  }
+
   // ========== INITIALIZATION ==========
 
   // Setup AI functionality
+  setupMainToolbarHandler();
   setupAIButtonHandler();
+  setupSecondaryBarsHandler();
 
   // Setup send button functionality
   setupSendButtonHandler();

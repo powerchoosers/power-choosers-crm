@@ -683,8 +683,91 @@
         stripNestedBackgrounds(els.emailContent);
         removeBrokenOrTinyImages(els.emailContent);
         removeEmptyWhiteBlocks(els.emailContent);
+        // CRITICAL: Preserve signature inline colors - force them with !important
+        preserveSignatureColors(els.emailContent);
       }
     }
+  }
+
+  // Force preserve inline colors on signature elements using JavaScript
+  // Also lighten dark colors for dark theme readability without changing send-time HTML
+  function preserveSignatureColors(container) {
+    if (!container) return;
+    
+    const signature = container.querySelector('[data-signature="true"]');
+    if (!signature) return;
+    
+    console.log('[EmailDetail] Preserving signature colors...');
+    
+    // Get all elements inside signature
+    const elements = signature.querySelectorAll('*');
+    
+    elements.forEach(el => {
+      const inlineStyle = el.getAttribute('style') || '';
+      
+      // Extract color value from inline style (e.g., "color: #E8A23A" or "color:#666666")
+      const colorMatch = inlineStyle.match(/(?:^|;)\s*color\s*:\s*([^;!]+)/i);
+      if (colorMatch) {
+        const colorValue = colorMatch[1].trim();
+        const adjusted = adjustColorForDarkTheme(colorValue);
+        // Force this color with !important using JavaScript
+        el.style.setProperty('color', adjusted, 'important');
+        console.log('[EmailDetail] Preserved color:', adjusted, 'on', el.tagName);
+      }
+    });
+    
+    // Also check the signature container itself
+    const sigStyle = signature.getAttribute('style') || '';
+    const sigColorMatch = sigStyle.match(/(?:^|;)\s*color\s*:\s*([^;!]+)/i);
+    if (sigColorMatch) {
+      const adjusted = adjustColorForDarkTheme(sigColorMatch[1].trim());
+      signature.style.setProperty('color', adjusted, 'important');
+    }
+  }
+
+  // Lighten dark colors for better contrast in dark theme previews (UI only)
+  function adjustColorForDarkTheme(colorValue) {
+    // Special-case: sender name dark navy -> force white in dark theme preview
+    if (/^#0b1b45$/i.test(colorValue) || /rgb\s*\(\s*11\s*,\s*27\s*,\s*69\s*\)/i.test(colorValue)) {
+      return '#ffffff';
+    }
+
+    // Handle hex (#rrggbb)
+    const hexMatch = colorValue.match(/^#([0-9a-f]{6})$/i);
+    if (hexMatch) {
+      const hex = hexMatch[1];
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return lightenIfDark({ r, g, b });
+    }
+
+    // Handle rgb(...) values
+    const rgbMatch = colorValue.match(/^rgb\\s*\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*\\)$/i);
+    if (rgbMatch) {
+      const r = parseInt(rgbMatch[1], 10);
+      const g = parseInt(rgbMatch[2], 10);
+      const b = parseInt(rgbMatch[3], 10);
+      return lightenIfDark({ r, g, b });
+    }
+
+    // If unknown format, return original
+    return colorValue;
+  }
+
+  // Lighten color if luminance is too low for dark background
+  function lightenIfDark({ r, g, b }) {
+    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    // Threshold ~150: anything darker gets lightened for dark theme readability
+    if (luminance >= 150) {
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+    const factor = 0.55; // amount to pull toward white
+    const lighten = (channel) => Math.min(255, Math.round(channel + (255 - channel) * factor));
+    const nr = lighten(r);
+    const ng = lighten(g);
+    const nb = lighten(b);
+    return `rgb(${nr}, ${ng}, ${nb})`;
   }
 
   // Strip white/light backgrounds from nested elements to prevent visible blocks
@@ -3829,9 +3912,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
   function renderOurHtmlEmail(html) {
     if (!html) return '<p>No content available</p>';
     try {
-      console.log('[EmailDetail] renderOurHtmlEmail input length:', html.length, 'sample:', html.slice(0, 200));
       let decoded = decodeQuotedPrintable(html);
-      console.log('[EmailDetail] After decode length:', decoded.length, 'sample:', decoded.slice(0, 200));
       // Remove scripts/iframes/event handlers/js urls/tracking pixels but keep style/head
       decoded = decoded
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -3842,10 +3923,8 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         .replace(/<img[^>]*src=["'][^"']*\/api\/email\/track\/[^"']+["'][^>]*>/gi, '')
         .replace(/<img[^>]*src=["'][^"']*vercel\.app\/api\/email\/track\/[^"']+["'][^>]*>/gi, '');
 
-      // Convert zero-width spaces (often left from contentEditable) into breaks
-      decoded = decoded.replace(/[\u200b\u200c\u200d]+/g, '<br>');
-      decoded = decoded.replace(/(<br>\s*){2,}/g, '<br><br>');
-      console.log('[EmailDetail] After zero-width replacement length:', decoded.length, 'sample:', decoded.slice(0, 200));
+      // Remove zero-width spaces (they were inflating <br> counts)
+      decoded = decoded.replace(/[\u200b\u200c\u200d]+/g, '');
 
       // CRITICAL: Detect if this is contentEditable HTML (uses <div> for line breaks)
       // vs AI-generated HTML (uses proper paragraph structure)
@@ -3856,7 +3935,6 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       if (isContentEditableHtml) {
         // Manual email from contentEditable: convert <div> structure to proper paragraphs
         // This preserves line breaks that user typed
-        console.log('[EmailDetail] Detected contentEditable HTML - preserving div structure');
         
         // Extract signature before processing body (keep signature HTML intact)
         let signatureHtml = '';
@@ -3867,10 +3945,11 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         }
         
         // Process the body: convert divs to paragraphs with proper spacing
-        // Empty divs with just <br> become spacing
+        // Empty divs with just <br> become a single break (no extra margin)
+        // Normal divs become paragraphs with zero margin to avoid double spacing
         decoded = decoded
-          .replace(/<div><br\s*\/?><\/div>/gi, '<p style="margin: 0 0 12px 0;">&nbsp;</p>')
-          .replace(/<div>([^<]*)<\/div>/gi, '<p style="margin: 0 0 12px 0; color: var(--text-primary, #ffffff);">$1</p>')
+          .replace(/<div><br\s*\/?><\/div>/gi, '<p style="margin: 0; color: var(--text-primary, #ffffff);">&nbsp;</p>')
+          .replace(/<div>([^<]*)<\/div>/gi, '<p style="margin: 0; color: var(--text-primary, #ffffff);">$1</p>')
           .replace(/<br\s*\/?>/gi, '<br>');
         
         // Re-append signature
@@ -3888,15 +3967,28 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
 
       // If we have a signature but the body has no block tags, wrap body in a paragraph and add spacing
       const sigMatch = decoded.match(/(<div[^>]*data-signature="true"[^>]*>[\s\S]*)/i);
+      let hasSignature = false;
       if (sigMatch) {
+        hasSignature = true;
         const bodyPart = decoded.slice(0, sigMatch.index).trim();
         const sigPart = sigMatch[1];
         const hasBlocks = /<\s*(p|br|div|table|tr|td|ul|ol|li|blockquote|hr)/i.test(bodyPart);
         if (!hasBlocks && bodyPart.length > 0) {
           const wrappedBody = `<p style="margin: 0 0 12px 0; color: var(--text-primary, #ffffff);">${escapeHtml(bodyPart)}</p>`;
           decoded = `${wrappedBody}<br><br>${sigPart}`;
-          console.log('[EmailDetail] Wrapped inline body before signature (no blocks detected)');
         }
+      }
+
+      // Wrap body content in a body container so we can scope color to body only
+      if (hasSignature) {
+        const sigMatch2 = decoded.match(/(<div[^>]*data-signature="true"[^>]*>[\s\S]*)/i);
+        if (sigMatch2) {
+          const bodyPart = decoded.slice(0, sigMatch2.index);
+          const sigPart = sigMatch2[1];
+          decoded = `<div data-body="true">${bodyPart}</div>${sigPart}`;
+        }
+      } else {
+        decoded = `<div data-body="true">${decoded}</div>`;
       }
 
       // CRITICAL: Wrap with dark mode CSS overrides for CRM display
@@ -3904,25 +3996,20 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
       const darkModeWrapper = `
         <div class="crm-email-content">
           <style>
-            /* Ensure links remain visible */
-            .crm-email-content a {
+            /* Ensure links remain visible - only if no inline color */
+            .crm-email-content a:not([style*="color"]) {
               color: var(--orange-primary, #f59e0b) !important;
             }
-            /* Email body text should be white; do not force color inside signature */
-            .crm-email-content :not([data-signature="true"]):not([data-signature="true"] *) {
+            /* Email body text should be white */
+            .crm-email-content [data-body="true"] {
               color: var(--text-primary, #ffffff) !important;
             }
-            /* Preserve signature colors: do not override inline colors */
-            .crm-email-content [data-signature="true"],
-            .crm-email-content [data-signature="true"] * {
-              color: inherit;
-            }
+            /* Signature: no color rules - let inline styles control colors naturally */
           </style>
           ${decoded}
         </div>
       `;
 
-      console.log('[EmailDetail] renderOurHtmlEmail output length:', darkModeWrapper.length, 'sample:', darkModeWrapper.slice(0, 200));
       return darkModeWrapper;
     } catch (e) {
       console.error('Failed to render our HTML email:', e);

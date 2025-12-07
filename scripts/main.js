@@ -6375,7 +6375,8 @@ function injectEmailSignature() {
         const guard = '<div data-signature-guard="true" contenteditable="false" style="display:block;height:0;line-height:0;margin:0;padding:0;border:0;"></div>';
         // If body is empty, just add signature
         if (!currentContent.trim()) {
-            bodyInput.innerHTML = '<p><br></p>' + guard + signature;
+            // Use a single empty paragraph with no extra margin to avoid dual caret hot-spots
+            bodyInput.innerHTML = '<p style="margin:0;"><br></p>' + guard + signature;
         } else {
             // Add signature to end of existing content
             // Avoid duplicate guard/signature insertion
