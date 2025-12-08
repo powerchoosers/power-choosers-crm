@@ -6,6 +6,7 @@ class AuthManager {
         this.user = null;
         this.auth = null;
         this.initialized = false;
+        this.tokenRefreshTimer = null;
         
         // Keep header avatar synced whenever settings change anywhere
         document.addEventListener('pc:settings-updated', () => {
@@ -24,6 +25,12 @@ class AuthManager {
             }
 
             this.auth = firebase.auth();
+            try {
+                await this.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+                console.log('[Auth] Set auth persistence to LOCAL');
+            } catch (persistErr) {
+                console.warn('[Auth] Could not set LOCAL persistence, using default', persistErr);
+            }
             this.initialized = true;
             
             console.log('[Auth] Firebase Auth initialized');
@@ -44,6 +51,7 @@ class AuthManager {
       this.user = user;
 
       if (user) {
+        this.startTokenRefreshLoop();
         console.log('[Auth] User object:', {email: user.email, uid: user.uid});
         const emailLower = user.email ? user.email.toLowerCase() : '';
         try {
@@ -93,8 +101,34 @@ class AuthManager {
             await window.CacheManager.invalidateAll();
           }
         } catch(_) {}
+        this.stopTokenRefreshLoop();
         this.showLogin();
       }
+    }
+
+    startTokenRefreshLoop() {
+        if (this.tokenRefreshTimer) {
+            clearInterval(this.tokenRefreshTimer);
+        }
+        // Refresh shortly before the default 1h Firebase token expiry to avoid surprise sign-outs
+        const REFRESH_INTERVAL = 45 * 60 * 1000;
+        this.tokenRefreshTimer = setInterval(async () => {
+            try {
+                if (this.user) {
+                    await this.user.getIdToken(true);
+                    console.log('[Auth] Token refreshed proactively');
+                }
+            } catch (err) {
+                console.warn('[Auth] Token refresh failed (will retry):', err);
+            }
+        }, REFRESH_INTERVAL);
+    }
+
+    stopTokenRefreshLoop() {
+        if (this.tokenRefreshTimer) {
+            clearInterval(this.tokenRefreshTimer);
+            this.tokenRefreshTimer = null;
+        }
     }
 
     async ensureUserProfile(user) {
@@ -244,6 +278,7 @@ class AuthManager {
 
     async signOut() {
       try {
+        this.stopTokenRefreshLoop();
         await this.auth.signOut();
         console.log('[Auth] Sign-out successful');
         try {
