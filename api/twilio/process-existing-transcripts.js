@@ -114,10 +114,6 @@ export default async function handler(req, res) {
                             results.push({ transcriptSid: transcript.sid, sourceSid: transcript.sourceSid, status: 'skipped', error: 'Unresolved Call SID' });
                         } else if (db) {
                             logger.log(`[Process Existing Transcripts] Writing to Firestore: collection='calls', doc='${finalCallSid}'`);
-                            // Check if call already exists to preserve ownership
-                            const existingCall = await db.collection('calls').doc(finalCallSid).get();
-                            const existingData = existingCall.exists ? existingCall.data() : {};
-                            
                             const callData = {
                                 id: finalCallSid,
                                 twilioSid: finalCallSid,
@@ -141,13 +137,7 @@ export default async function handler(req, res) {
                                 outcome: 'Connected',
                                 aiSummary: aiInsights ? aiInsights.summary : 'Transcript processed from Twilio Conversational Intelligence',
                                 timestamp: new Date().toISOString(),
-                                source: 'conversational-intelligence-processing',
-                                // CRITICAL: Set ownership fields for Firestore rules compliance
-                                // Preserve existing ownership or set to admin fallback
-                                ownerId: existingData.ownerId || 'l.patterson@powerchoosers.com',
-                                assignedTo: existingData.assignedTo || existingData.ownerId || 'l.patterson@powerchoosers.com',
-                                createdBy: existingData.createdBy || existingData.ownerId || 'l.patterson@powerchoosers.com',
-                                agentEmail: existingData.agentEmail || existingData.ownerId || 'l.patterson@powerchoosers.com'
+                                source: 'conversational-intelligence-processing'
                             };
                             await db.collection('calls').doc(finalCallSid).set(callData, { merge: true });
                             logger.log(`[Process Existing Transcripts] Successfully updated call data for ${transcript.sid} in Firestore`);

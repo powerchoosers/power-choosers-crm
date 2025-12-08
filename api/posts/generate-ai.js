@@ -37,13 +37,19 @@ HOOK FORMULAS (Use ONE per post):
 POST STRUCTURE REQUIREMENTS:
 1. HOOK (First 1-2 sentences) - Use one of the formulas above
 2. THE PROMISE (Next 1-2 sentences) - Tell them exactly what they'll learn
-3. H2: Introduction (3-4 short paragraphs, each 2-3 sentences max)
-4. H3: Section 1 - [Specific Data Point or Trend]
-5. H3: Section 2 - [Specific Data Point or Trend]
-6. H3: Section 3 - [Specific Data Point or Trend]
+3. H2: Descriptive headline (NOT "Introduction") that names the topic and year (3-4 short paragraphs, each 2-3 sentences max)
+4. H3: Section 1 - Descriptive heading with a specific data point or trend (never "Section 1")
+5. H3: Section 2 - Descriptive heading with a specific data point or trend (never "Section 2")
+6. H3: Section 3 - Descriptive heading with a specific data point or trend (never "Section 3")
 7. H2: "Broker's Take" or "Analyst Insight" (Your OPINION - what you recommend clients do)
 8. H2: Resource Bridge (Link to /resources with specific tool/calculator)
 9. H2: Conclusion (1-2 paragraphs max)
+
+HEADING NAMING RULES (CRITICAL - NEVER BREAK):
+- The hook is plain sentences at the top; never put it inside a heading or label it "Hook".
+- Never use headings titled "Hook", "Introduction", "Section 1", "Section 2", or "Section 3".
+- All H2/H3 headings must be descriptive and keyword-rich (e.g., "Why ERCOT Demand Charges Spike in Summer 2025").
+- The final H2 must be titled exactly "Conclusion".
 
 MANDATORY DATA REQUIREMENTS:
 - Include at least ONE specific percentage, dollar amount, or date in the first 100 words
@@ -148,6 +154,29 @@ function selectHookFormula(contentType, existingPosts) {
   return unusedHooks.length > 0
     ? unusedHooks[0]
     : availableHooks[Math.floor(Math.random() * availableHooks.length)];
+}
+
+// Basic similarity check to avoid regenerating topics that overlap with existing titles
+function isTopicTooSimilar(topic, existingTitles) {
+  const normalize = (text) => (text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const topicTokens = normalize(topic).split(' ').filter(w => w.length > 3);
+  if (topicTokens.length === 0) return false;
+
+  return existingTitles.some(title => {
+    const titleTokens = normalize(title).split(' ').filter(w => w.length > 3);
+    if (titleTokens.length === 0) return false;
+
+    const overlap = topicTokens.filter(w => titleTokens.includes(w));
+    const overlapRatio = overlap.length / Math.min(topicTokens.length, titleTokens.length);
+
+    // Treat as duplicate if there is heavy token overlap (e.g., same "how to read your ... bill" structure)
+    return overlap.length >= 4 || overlapRatio >= 0.6;
+  });
 }
 
 // Determine content type based on 4-1-1 strategy (4 educational, 1 soft-sell, 1 hard-sell)
@@ -370,6 +399,12 @@ function buildUserPrompt(existingPosts) {
     }
   }
 
+  // Remove topics that are too close to existing titles to prevent repeats
+  const dedupedTopicPool = topicPool.filter(topic => !isTopicTooSimilar(topic, existingTitles));
+  if (dedupedTopicPool.length > 0) {
+    topicPool = dedupedTopicPool;
+  }
+
   const randomTopic = topicPool[Math.floor(Math.random() * topicPool.length)];
 
   // Add hook instruction based on selected formula
@@ -395,7 +430,13 @@ function buildUserPrompt(existingPosts) {
     ? 'IMPORTANT: Since this post is about TDU charges or delivery charges, include a link to our TDU Delivery Charges Calculator: <a href="https://powerchoosers.com/tdu-delivery-charges">TDU Delivery Charges Calculator</a>. Only use this specific tool link when the topic is directly related to TDU/delivery charges.'
     : 'IMPORTANT: This post is NOT about TDU/delivery charges. Use a generic link to /resources instead. Do NOT reference the TDU calculator or any other tools that don\'t exist yet.';
 
-  return `${randomTopic}\n\n${hookInstruction}\n\n${geographicInstruction}\n\n${contentTypeInstruction}\n\n${resourceInstruction}\n\n${context}\n\nGenerate a complete blog post following the structure and format specified in the system prompt. Remember: EVERY post must start with the specified HOOK formula, include an "Analyst Take" section with specific recommendations, and include an appropriate resource link (TDU calculator ONLY if topic is relevant, otherwise generic /resources link).`;
+  const headingRules = 'Heading rules: hook is plain text (no heading). Never use headings titled "Hook", "Introduction", "Section 1/2/3". Use descriptive, keyword-rich H2/H3 titles. Final H2 must be exactly "Conclusion".';
+
+  const aiInstruction = randomTopic.toLowerCase().includes('ai') || randomTopic.toLowerCase().includes('automation') || randomTopic.toLowerCase().includes('machine learning')
+    ? 'If the topic involves AI/automation/analytics, name-drop 1-2 leading models (ChatGPT, Gemini) naturally when discussing AI-driven analysis—do this only when AI is relevant.'
+    : '';
+
+  return `${randomTopic}\n\n${hookInstruction}\n\n${geographicInstruction}\n\n${contentTypeInstruction}\n\n${resourceInstruction}\n\n${headingRules}\n\n${aiInstruction}\n\n${context}\n\nGenerate a complete blog post following the structure and format specified in the system prompt. Remember: EVERY post must start with the specified HOOK formula, include an "Analyst Take" section with specific recommendations, and include an appropriate resource link (TDU calculator ONLY if topic is relevant, otherwise generic /resources link).`;
 }
 
 // Parse Perplexity response and extract structured data
