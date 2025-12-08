@@ -2999,6 +2999,7 @@
       }
       
       // Ensure FLOW is available before showing scripts
+      const display = card.querySelector('.ms-display');
       const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
       if (!FLOW) {
         console.warn('[Phone Widget] FLOW not available yet, waiting...');

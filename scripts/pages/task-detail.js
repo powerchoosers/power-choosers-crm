@@ -2717,7 +2717,8 @@
 
       // Use found person or empty object
       person = person || {};
-      const title = person.title || '';
+      // CRITICAL FIX: Use state.contact if available (already loaded by loadContactAccountData) for most reliable title
+      const title = (state.contact && state.contact.title) || person.title || '';
       const company = person.companyName || accountName;
 
       // Compute initials for avatar (same logic as people.js)
@@ -2859,6 +2860,7 @@
       let contactDetailsHTML = '';
       
       // CRITICAL FIX: Use state.account if available (already loaded by loadContactAccountData) for most reliable account data
+      const linkedAccount = state.account || findAssociatedAccount(person) || null;
       const accountId = linkedAccount?.id || '';
       const companyLink = company ? `<a href="#account-details" class="company-link" id="task-header-company-link" title="View account details" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>` : '';
       
