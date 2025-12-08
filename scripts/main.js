@@ -5058,29 +5058,126 @@ class PowerChoosersCRM {
     }
 
     getPriorityBackground(priority) {
-        console.log('🎨 BACKGROUND called with:', priority);
         const p = (priority || '').toLowerCase().trim();
         switch(p) {
             case 'low': return '#495057';
             case 'medium': return 'rgba(255, 193, 7, 0.15)';
             case 'high': return 'rgba(220, 53, 69, 0.15)';
-            default: 
-                console.log('⚠️ DEFAULT background for priority:', priority);
-                return '#495057';
+            case 'sequence': return 'rgba(111, 66, 193, 0.18)';
+            default: return '#495057';
         }
     }
 
     getPriorityColor(priority) {
-        console.log('🎨 COLOR called with:', priority);
         const p = (priority || '').toLowerCase().trim();
         switch(p) {
             case 'low': return '#e9ecef';
             case 'medium': return '#ffc107';
             case 'high': return '#dc3545';
-            default: 
-                console.log('⚠️ DEFAULT color for priority:', priority);
-                return '#e9ecef';
+            case 'sequence': return '#ffffff';
+            default: return '#e9ecef';
         }
+    }
+
+    // Helper function to get LinkedIn tasks from sequences (matches tasks.js logic)
+    async getLinkedInTasksFromSequences() {
+        const linkedInTasks = [];
+        const getUserEmail = () => {
+            try {
+                if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                    return window.DataManager.getCurrentUserEmail().toLowerCase();
+                }
+                return (window.currentUserEmail || '').toLowerCase();
+            } catch (_) {
+                return (window.currentUserEmail || '').toLowerCase();
+            }
+        };
+        const userEmail = getUserEmail();
+        const isAdmin = () => {
+            try {
+                if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+                    return window.DataManager.isCurrentUserAdmin();
+                }
+                return window.currentUserRole === 'admin';
+            } catch (_) {
+                return window.currentUserRole === 'admin';
+            }
+        };
+
+        try {
+            if (!window.firebaseDB) {
+                return linkedInTasks;
+            }
+
+            // Query tasks collection for sequence tasks
+            const tasksQuery = window.firebaseDB.collection('tasks')
+                .where('sequenceId', '!=', null)
+                .get();
+
+            const tasksSnapshot = await tasksQuery;
+
+            if (tasksSnapshot.empty) {
+                return linkedInTasks;
+            }
+
+            tasksSnapshot.forEach(doc => {
+                const taskData = doc.data();
+
+                // Only include LinkedIn task types
+                const taskType = String(taskData.type || '').toLowerCase();
+                if (!taskType.includes('linkedin') && !taskType.includes('li-')) {
+                    return;
+                }
+
+                // Filter by ownership (non-admin users)
+                if (!isAdmin()) {
+                    const ownerId = (taskData.ownerId || '').toLowerCase();
+                    const assignedTo = (taskData.assignedTo || '').toLowerCase();
+                    const createdBy = (taskData.createdBy || '').toLowerCase();
+                    if (ownerId !== userEmail && assignedTo !== userEmail && createdBy !== userEmail) {
+                        return;
+                    }
+                }
+
+                // Only include pending tasks
+                if (taskData.status === 'completed') {
+                    return;
+                }
+
+                // Convert Firestore data to task format
+                const task = {
+                    id: taskData.id || doc.id,
+                    title: taskData.title || '',
+                    contact: taskData.contact || '',
+                    account: taskData.account || '',
+                    type: taskData.type || 'linkedin',
+                    priority: taskData.priority || 'sequence',
+                    dueDate: taskData.dueDate || '',
+                    dueTime: taskData.dueTime || '',
+                    status: taskData.status || 'pending',
+                    sequenceId: taskData.sequenceId || '',
+                    contactId: taskData.contactId || '',
+                    accountId: taskData.accountId || '',
+                    stepId: taskData.stepId || '',
+                    stepIndex: taskData.stepIndex !== undefined ? taskData.stepIndex : -1,
+                    isLinkedInTask: true,
+                    isSequenceTask: taskData.isSequenceTask || true,
+                    ownerId: taskData.ownerId || '',
+                    assignedTo: taskData.assignedTo || '',
+                    createdBy: taskData.createdBy || '',
+                    createdAt: taskData.createdAt || (taskData.timestamp && taskData.timestamp.toDate ? taskData.timestamp.toDate().getTime() : taskData.timestamp) || Date.now(),
+                    timestamp: taskData.timestamp && taskData.timestamp.toDate ? taskData.timestamp.toDate().getTime() : (taskData.timestamp || Date.now())
+                };
+
+                linkedInTasks.push(task);
+            });
+
+            console.log('[CRM] Loaded', linkedInTasks.length, 'LinkedIn sequence tasks for Today\'s Tasks widget');
+        } catch (error) {
+            console.error('[CRM] Error loading LinkedIn sequence tasks:', error);
+        }
+
+        return linkedInTasks;
     }
 
     async loadTodaysTasks(skipFirebase = false) {
@@ -5176,6 +5273,10 @@ class PowerChoosersCRM {
                     return ownerId === email || assignedTo === email || createdBy === email;
                 });
             }
+            
+            // CRITICAL FIX: Filter out completed tasks from localStorage cache (they shouldn't show in Today's Tasks)
+            // This prevents stale completed tasks from showing when switching browsers
+            localTasks = localTasks.filter(t => (t.status || 'pending') !== 'completed');
         } catch (_) { localTasks = []; }
 
         // Always render immediately from localStorage cache first
@@ -5196,9 +5297,27 @@ class PowerChoosersCRM {
 
                             // CRITICAL FIX: Always prefer Firebase as the source of truth
                             // Firebase tasks override any stale local copies with the same ID
+                            // CRITICAL: Filter out completed tasks from Firebase results
                             const mergedTasksMap = new Map();
-                            firebaseTasks.forEach(t => { if (t && t.id) mergedTasksMap.set(t.id, t); });
-                            localTasks.forEach(t => { if (t && t.id && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t); });
+                            firebaseTasks.forEach(t => { 
+                                if (t && t.id && (t.status || 'pending') !== 'completed') {
+                                    mergedTasksMap.set(t.id, t);
+                                }
+                            });
+                            localTasks.forEach(t => { 
+                                if (t && t.id && (t.status || 'pending') !== 'completed' && !mergedTasksMap.has(t.id)) {
+                                    mergedTasksMap.set(t.id, t);
+                                }
+                            });
+                            
+                            // CRITICAL FIX: Add LinkedIn sequence tasks (only pending ones)
+                            const linkedInTasks = await this.getLinkedInTasksFromSequences();
+                            linkedInTasks.forEach(t => { 
+                                if (t && t.id && (t.status || 'pending') !== 'completed' && !mergedTasksMap.has(t.id)) {
+                                    mergedTasksMap.set(t.id, t);
+                                }
+                            });
+                            
                             const mergedTasks = Array.from(mergedTasksMap.values());
                             
                             // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
@@ -5235,9 +5354,27 @@ class PowerChoosersCRM {
                             const firebaseTasks = Array.from(tasksMap.values());
 
                             // CRITICAL FIX: Always prefer Firebase as the source of truth
+                            // CRITICAL: Filter out completed tasks from Firebase results
                             const mergedTasksMap = new Map();
-                            firebaseTasks.forEach(t => { if (t && t.id) mergedTasksMap.set(t.id, t); });
-                            localTasks.forEach(t => { if (t && t.id && !mergedTasksMap.has(t.id)) mergedTasksMap.set(t.id, t); });
+                            firebaseTasks.forEach(t => { 
+                                if (t && t.id && (t.status || 'pending') !== 'completed') {
+                                    mergedTasksMap.set(t.id, t);
+                                }
+                            });
+                            localTasks.forEach(t => { 
+                                if (t && t.id && (t.status || 'pending') !== 'completed' && !mergedTasksMap.has(t.id)) {
+                                    mergedTasksMap.set(t.id, t);
+                                }
+                            });
+                            
+                            // CRITICAL FIX: Add LinkedIn sequence tasks (only pending ones)
+                            const linkedInTasks = await this.getLinkedInTasksFromSequences();
+                            linkedInTasks.forEach(t => { 
+                                if (t && t.id && (t.status || 'pending') !== 'completed' && !mergedTasksMap.has(t.id)) {
+                                    mergedTasksMap.set(t.id, t);
+                                }
+                            });
+                            
                             const mergedTasks = Array.from(mergedTasksMap.values());
                             
                             // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
@@ -5268,9 +5405,27 @@ class PowerChoosersCRM {
                     
                     // CRITICAL FIX: Always prefer Firebase as the source of truth
                     // Firebase tasks override any stale local copies with the same ID
+                    // CRITICAL: Filter out completed tasks from Firebase results
                     const allTasksMap = new Map();
-                    firebaseTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
-                    localTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+                    firebaseTasks.forEach(t => { 
+                        if (t && t.id && (t.status || 'pending') !== 'completed') {
+                            allTasksMap.set(t.id, t);
+                        }
+                    });
+                    localTasks.forEach(t => { 
+                        if (t && t.id && (t.status || 'pending') !== 'completed' && !allTasksMap.has(t.id)) {
+                            allTasksMap.set(t.id, t);
+                        }
+                    });
+                    
+                    // CRITICAL FIX: Add LinkedIn sequence tasks (only pending ones)
+                    const linkedInTasks = await this.getLinkedInTasksFromSequences();
+                    linkedInTasks.forEach(t => { 
+                        if (t && t.id && (t.status || 'pending') !== 'completed' && !allTasksMap.has(t.id)) {
+                            allTasksMap.set(t.id, t);
+                        }
+                    });
+                    
                     const mergedTasks = Array.from(allTasksMap.values());
                     
                     // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
@@ -5299,10 +5454,16 @@ class PowerChoosersCRM {
         // allTasks is already merged and deduped by the caller (local first, then Firebase)
 
         // Filter to today's and overdue pending tasks
+        // CRITICAL FIX: Filter out completed tasks and tasks without valid due dates
         let todaysTasks = allTasks.filter(task => {
+            // Exclude completed tasks
+            if ((task.status || 'pending') === 'completed') return false;
+            // Only include pending tasks
             if ((task.status || 'pending') !== 'pending') return false;
+            // Must have a valid due date
             const d = parseDateStrict(task.dueDate);
             if (!d) return false;
+            // Include today and overdue tasks
             return d.getTime() <= today.getTime();
         });
 
@@ -5367,14 +5528,16 @@ class PowerChoosersCRM {
             tasksHtml = pageTasks.map(task => {
                 const timeText = this.getTaskTimeText(task);
                 const displayTitle = this.updateTaskTitle(task);
-                console.log('🔍 TASK DEBUG - Priority:', task.priority, 'Type:', typeof task.priority, 'Full task:', task);
+                // CRITICAL FIX: Set priority to 'sequence' for sequence tasks (matches tasks.js logic)
+                const isSequenceTask = !!task.isSequenceTask || !!task.isLinkedInTask;
+                const priorityValue = isSequenceTask ? 'sequence' : (task.priority || '');
                 return `
                     <div class="task-item" data-task-id="${task.id}" style="cursor: pointer;">
                         <div class="task-info">
                             <div class="task-name" style="color: var(--grey-400); font-weight: 400; transition: var(--transition-fast);">${this.escapeHtml(displayTitle)}</div>
                             <div class="task-time">${timeText}</div>
                         </div>
-                        <span class="priority-badge ${task.priority}" style="background: ${this.getPriorityBackground(task.priority)}; color: ${this.getPriorityColor(task.priority)};">${task.priority}</span>
+                        <span class="priority-badge ${priorityValue}" style="background: ${this.getPriorityBackground(priorityValue)}; color: ${this.getPriorityColor(priorityValue)};">${priorityValue}</span>
                     </div>
                 `;
             }).join('');

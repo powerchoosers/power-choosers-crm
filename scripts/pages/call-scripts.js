@@ -368,6 +368,20 @@
       potentialSavings = Math.round(annualSpend * 0.25); // 25% savings estimate
     }
 
+    // Get agent name from settings (first name only from general settings)
+    let agentFirstName = '';
+    try {
+      if (window.SettingsPage && typeof window.SettingsPage.getSettings === 'function') {
+        const settings = window.SettingsPage.getSettings();
+        if (settings && settings.general) {
+          agentFirstName = settings.general.firstName || '';
+        }
+      }
+    } catch (_) {
+      // Fallback if settings not available
+      agentFirstName = '';
+    }
+
     // Format numbers with commas
     const formatCurrency = (num) => {
       if (num === 0 || !num) return 'an estimated amount';
