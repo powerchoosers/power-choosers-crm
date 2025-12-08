@@ -783,6 +783,11 @@ class SettingsPage {
                             if (!this.state.settings.emailSignature.imageSize) {
                                 this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
                             }
+                            // Persist hosted photo locally for header fallback
+                            const hosted = settingsData?.general?.hostedPhotoURL;
+                            if (hosted) {
+                                try { localStorage.setItem('pc-hosted-photo', hosted); } catch(_) {}
+                            }
                             console.log('[Settings] Loaded from CacheManager cache', { bridgeToMobile: this.state.settings.bridgeToMobile });
                             // Sync header avatar after cache load
                             if (window.authManager?.refreshProfilePhoto) {
@@ -889,6 +894,12 @@ class SettingsPage {
                                     }
                                 }
                                 
+                                // Persist hosted photo locally for header fallback
+                                const hosted = firebaseSettings?.general?.hostedPhotoURL;
+                                if (hosted) {
+                                    try { localStorage.setItem('pc-hosted-photo', hosted); } catch(_) {}
+                                }
+                                
                                 // Sync header avatar after load
                                 if (window.authManager?.refreshProfilePhoto) {
                                     setTimeout(() => window.authManager.refreshProfilePhoto(), 50);
@@ -918,6 +929,12 @@ class SettingsPage {
                                 } catch (error) {
                                     console.warn('[Settings] Failed to cache settings:', error);
                                 }
+                            }
+                            
+                            // Persist hosted photo locally for header fallback
+                            const hosted = firebaseSettings?.general?.hostedPhotoURL;
+                            if (hosted) {
+                                try { localStorage.setItem('pc-hosted-photo', hosted); } catch(_) {}
                             }
                             
                             // Sync header avatar after load
@@ -1201,6 +1218,14 @@ class SettingsPage {
                     console.warn('[Settings] Failed to cache settings after save:', cacheErr);
                 }
             }
+            
+            // Save hosted photo locally for quick header fallback
+            try {
+                const hosted = this.state.settings?.general?.hostedPhotoURL;
+                if (hosted) {
+                    localStorage.setItem('pc-hosted-photo', hosted);
+                }
+            } catch(_) {}
             
             // Refresh header avatar immediately after save so it sticks across the UI
             if (window.authManager?.refreshProfilePhoto) {

@@ -4400,29 +4400,6 @@ var console = {
         const action = typeMap[type] || 'Task for';
         title = `${action} ${company}`;
       }
-      // Get user email for ownership (required for Firestore rules compliance)
-      const getUserEmail = () => {
-        try {
-          if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
-            const email = window.DataManager.getCurrentUserEmail();
-            if (email && typeof email === 'string' && email.trim()) {
-              return email.toLowerCase().trim();
-            }
-          }
-          const email = window.currentUserEmail || '';
-          if (email && typeof email === 'string' && email.trim()) {
-            return email.toLowerCase().trim();
-          }
-        } catch (_) {
-          const email = window.currentUserEmail || '';
-          if (email && typeof email === 'string' && email.trim()) {
-            return email.toLowerCase().trim();
-          }
-        }
-        return 'l.patterson@powerchoosers.com';
-      };
-      const userEmail = getUserEmail();
-
       const newTask = {
         id: 'task_' + Date.now(),
         title,
@@ -4436,10 +4413,6 @@ var console = {
         dueTime,
         status: 'pending',
         notes,
-        // CRITICAL: Set ownership fields for Firestore rules compliance
-        ownerId: userEmail,
-        assignedTo: userEmail,
-        createdBy: userEmail,
         createdAt: Date.now()
       };
       try {
@@ -5593,38 +5566,14 @@ var console = {
       const db = window.firebaseDB;
       let newId = null;
       if (db && typeof db.collection === 'function') {
-        // Get user email for ownership (required for Firestore rules compliance)
-        const getUserEmail = () => {
-          try {
-            if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
-              const email = window.DataManager.getCurrentUserEmail();
-              if (email && typeof email === 'string' && email.trim()) {
-                return email.toLowerCase().trim();
-              }
-            }
-            const email = window.currentUserEmail || '';
-            if (email && typeof email === 'string' && email.trim()) {
-              return email.toLowerCase().trim();
-            }
-          } catch (_) {
-            const email = window.currentUserEmail || '';
-            if (email && typeof email === 'string' && email.trim()) {
-              return email.toLowerCase().trim();
-            }
-          }
-          return 'l.patterson@powerchoosers.com';
-        };
-        const userEmail = getUserEmail();
-
         const payload = {
           name,
           kind: 'accounts',
           count: 1,
           recordCount: 1,
-          // CRITICAL: Set ownership fields for Firestore rules compliance
-          ownerId: userEmail,
-          createdBy: userEmail,
-          assignedTo: userEmail
+          ownerId: window.currentUserEmail || '',
+          createdBy: window.currentUserEmail || '',
+          assignedTo: window.currentUserEmail || ''
         };
         if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
           payload.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
@@ -6084,29 +6033,6 @@ var console = {
       if (!type || !priority || !dueDate || !dueTime) return;
       const title = `${type} — ${company}`;
       const accountId = a.id || '';
-      // Get user email for ownership (required for Firestore rules compliance)
-      const getUserEmail = () => {
-        try {
-          if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
-            const email = window.DataManager.getCurrentUserEmail();
-            if (email && typeof email === 'string' && email.trim()) {
-              return email.toLowerCase().trim();
-            }
-          }
-          const email = window.currentUserEmail || '';
-          if (email && typeof email === 'string' && email.trim()) {
-            return email.toLowerCase().trim();
-          }
-        } catch (_) {
-          const email = window.currentUserEmail || '';
-          if (email && typeof email === 'string' && email.trim()) {
-            return email.toLowerCase().trim();
-          }
-        }
-        return 'l.patterson@powerchoosers.com';
-      };
-      const userEmail = getUserEmail();
-
       const newTask = {
         id: 'task_' + Date.now(),
         title,
@@ -6118,10 +6044,6 @@ var console = {
         dueTime,
         status: 'pending',
         notes,
-        // CRITICAL: Set ownership fields for Firestore rules compliance
-        ownerId: userEmail,
-        assignedTo: userEmail,
-        createdBy: userEmail,
         createdAt: Date.now()
       };
       try {
