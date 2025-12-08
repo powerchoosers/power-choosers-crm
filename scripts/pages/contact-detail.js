@@ -6424,39 +6424,12 @@
 
       const db = window.firebaseDB;
       if (db && typeof db.collection === 'function') {
-        // Get user email for ownership (required for Firestore rules compliance)
-        const getUserEmail = () => {
-          try {
-            if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
-              const email = window.DataManager.getCurrentUserEmail();
-              if (email && typeof email === 'string' && email.trim()) {
-                return email.toLowerCase().trim();
-              }
-            }
-            const email = window.currentUserEmail || '';
-            if (email && typeof email === 'string' && email.trim()) {
-              return email.toLowerCase().trim();
-            }
-          } catch (_) {
-            const email = window.currentUserEmail || '';
-            if (email && typeof email === 'string' && email.trim()) {
-              return email.toLowerCase().trim();
-            }
-          }
-          return 'l.patterson@powerchoosers.com';
-        };
-        const userEmail = getUserEmail();
-
         const doc = {
           sequenceId,
           targetId: contactId,
           targetType: 'people',
           hasEmail: hasEmail, // Track whether contact has email
-          skipEmailSteps: !hasEmail, // Flag to skip email steps
-          // CRITICAL: Set ownership fields for Firestore rules compliance
-          ownerId: userEmail,
-          assignedTo: userEmail,
-          createdBy: userEmail
+          skipEmailSteps: !hasEmail // Flag to skip email steps
         };
         if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
           doc.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
@@ -6511,33 +6484,9 @@
         // We do this regardless of email presence, as the sequence might start with a Task.
         if (true) {
           try {
-            // Get sequence data - prefer local cache (which we just updated) over Firestore read
-            let sequenceData = null;
-            let hasActiveMembers = 0;
-            let isSequenceActive = true; // Default to active (most sequences are active by default)
-            
-            // Try local cache first (most up-to-date since we just updated it)
-            if (window.BackgroundSequencesLoader && typeof window.BackgroundSequencesLoader.getSequencesData === 'function') {
-              const sequences = window.BackgroundSequencesLoader.getSequencesData();
-              const seq = sequences.find(s => s.id === sequenceId);
-              if (seq) {
-                sequenceData = seq;
-                hasActiveMembers = seq.stats?.active || 0;
-                isSequenceActive = seq.isActive !== false && seq.status !== 'paused';
-              }
-            }
-            
-            // Fallback to Firestore if cache miss
-            if (!sequenceData) {
             const sequenceDoc = await db.collection('sequences').doc(sequenceId).get();
-              sequenceData = sequenceDoc.data();
-              hasActiveMembers = (sequenceData?.stats?.active || 0) > 0;
-              isSequenceActive = sequenceData?.isActive !== false && sequenceData?.status !== 'paused';
-            }
-            
-            // Since we just added a member, we know there's at least 1 active member
-            // Use the higher of: cached value or 1 (to handle race conditions)
-            hasActiveMembers = Math.max(hasActiveMembers, 1);
+            const sequenceData = sequenceDoc.data();
+            const hasActiveMembers = (sequenceData?.stats?.active || 0) > 0;
 
             // Also check if there are any existing sequenceActivations for this sequence
             let hasExistingActivations = false;
@@ -6553,20 +6502,7 @@
             }
 
             // If sequence is active, automatically create sequenceActivation for this new contact
-            // Align with sequence-builder/list-detail auto-start behavior: start when sequence is active,
-            // OR when there are already activations/members (covers first-contact case).
-            // Since we just added a member, hasActiveMembers will be >= 1, so this should always trigger
-            // unless the sequence is explicitly paused or inactive.
-            const shouldAutoStart = isSequenceActive || hasActiveMembers > 0 || hasExistingActivations;
-            console.log('[ContactDetail] Auto-start check:', {
-              isSequenceActive,
-              hasActiveMembers,
-              hasExistingActivations,
-              shouldAutoStart,
-              sequenceId,
-              contactName: state.currentContact.name
-            });
-            if (shouldAutoStart) {
+            if (hasActiveMembers || hasExistingActivations) {
               console.log('[ContactDetail] Sequence is active, auto-starting for new contact:', state.currentContact.name);
 
               const getUserEmail = () => {
@@ -6591,11 +6527,9 @@
                 status: 'pending',
                 processedContacts: 0,
                 totalContacts: 1,
-                // CRITICAL: Set ownership fields for Firestore rules compliance
-                // Fallback to admin if userEmail not provided
-                ownerId: (userEmail && userEmail.trim()) ? userEmail.toLowerCase().trim() : 'l.patterson@powerchoosers.com',
-                assignedTo: (userEmail && userEmail.trim()) ? userEmail.toLowerCase().trim() : 'l.patterson@powerchoosers.com',
-                createdBy: (userEmail && userEmail.trim()) ? userEmail.toLowerCase().trim() : 'l.patterson@powerchoosers.com',
+                ownerId: userEmail || 'unknown',
+                assignedTo: userEmail || 'unknown',
+                createdBy: userEmail || 'unknown',
                 createdAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || Date.now()
               };
 
@@ -6605,10 +6539,7 @@
               // Trigger immediate processing
               try {
                 const baseUrl = window.API_BASE_URL || window.location.origin || '';
-                const apiUrl = `${baseUrl}/api/process-sequence-activations`;
-                console.log('[ContactDetail] Triggering activation processing:', { apiUrl, activationId });
-                
-                const response = await fetch(apiUrl, {
+                const response = await fetch(`${baseUrl}/api/process-sequence-activations`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -6619,24 +6550,12 @@
 
                 if (response.ok) {
                   const result = await response.json();
-                  console.log('[ContactDetail] ✓ Auto-started sequence for new contact:', result);
+                  console.log('[ContactDetail] Auto-started sequence for new contact:', result);
                 } else {
-                  const errorText = await response.text().catch(() => 'Unknown error');
-                  console.warn('[ContactDetail] Auto-start API call failed:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    error: errorText,
-                    activationId
-                  });
-                  console.warn('[ContactDetail] Contact was added. Will be picked up by next cron run.');
+                  console.warn('[ContactDetail] Auto-start failed, but contact was added. Will be picked up by next cron run.');
                 }
               } catch (autoStartError) {
-                console.error('[ContactDetail] Auto-start API call exception:', {
-                  error: autoStartError,
-                  message: autoStartError.message,
-                  stack: autoStartError.stack,
-                  activationId
-                });
+                console.warn('[ContactDetail] Auto-start failed (non-fatal):', autoStartError);
                 // Contact is still added, cron will pick it up
               }
             }
@@ -6781,37 +6700,7 @@
       const db = window.firebaseDB;
       let newId = null;
       if (db && typeof db.collection === 'function') {
-        // Get user email for ownership (required for Firestore rules compliance)
-        const getUserEmail = () => {
-          try {
-            if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
-              const email = window.DataManager.getCurrentUserEmail();
-              if (email && typeof email === 'string' && email.trim()) {
-                return email.toLowerCase().trim();
-              }
-            }
-            const email = window.currentUserEmail || '';
-            if (email && typeof email === 'string' && email.trim()) {
-              return email.toLowerCase().trim();
-            }
-          } catch (_) {
-            const email = window.currentUserEmail || '';
-            if (email && typeof email === 'string' && email.trim()) {
-              return email.toLowerCase().trim();
-            }
-          }
-          return 'l.patterson@powerchoosers.com';
-        };
-        const userEmail = getUserEmail();
-
-        const payload = { 
-          name, 
-          stats: { active: 1, paused: 0, notSent: 0, bounced: 0, spamBlocked: 0, finished: 0, scheduled: 0, delivered: 0, replyPct: 0, interestedPct: 0 },
-          // CRITICAL: Set ownership fields for Firestore rules compliance
-          ownerId: userEmail,
-          assignedTo: userEmail,
-          createdBy: userEmail
-        };
+        const payload = { name, stats: { active: 1, paused: 0, notSent: 0, bounced: 0, spamBlocked: 0, finished: 0, scheduled: 0, delivered: 0, replyPct: 0, interestedPct: 0 } };
         if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
           payload.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
           payload.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();
@@ -6827,38 +6716,7 @@
         // We'll directly add the member document
         const contactId = state.currentContact?.id;
         if (contactId) {
-          // Get user email for ownership (required for Firestore rules compliance)
-          const getUserEmail = () => {
-            try {
-              if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
-                const email = window.DataManager.getCurrentUserEmail();
-                if (email && typeof email === 'string' && email.trim()) {
-                  return email.toLowerCase().trim();
-                }
-              }
-              const email = window.currentUserEmail || '';
-              if (email && typeof email === 'string' && email.trim()) {
-                return email.toLowerCase().trim();
-              }
-            } catch (_) {
-              const email = window.currentUserEmail || '';
-              if (email && typeof email === 'string' && email.trim()) {
-                return email.toLowerCase().trim();
-              }
-            }
-            return 'l.patterson@powerchoosers.com';
-          };
-          const userEmail = getUserEmail();
-
-          const doc = { 
-            sequenceId: newId, 
-            targetId: contactId, 
-            targetType: 'people',
-            // CRITICAL: Set ownership fields for Firestore rules compliance
-            ownerId: userEmail,
-            assignedTo: userEmail,
-            createdBy: userEmail
-          };
+          const doc = { sequenceId: newId, targetId: contactId, targetType: 'people' };
           if (window.firebase?.firestore?.FieldValue?.serverTimestamp) {
             doc.createdAt = window.firebase.firestore.FieldValue.serverTimestamp();
             doc.updatedAt = window.firebase.firestore.FieldValue.serverTimestamp();

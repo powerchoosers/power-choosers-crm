@@ -6,6 +6,11 @@ class AuthManager {
         this.user = null;
         this.auth = null;
         this.initialized = false;
+        
+        // Keep header avatar synced whenever settings change anywhere
+        document.addEventListener('pc:settings-updated', () => {
+            this.refreshProfilePhoto();
+        });
     }
 
     async init() {
@@ -316,6 +321,10 @@ class AuthManager {
                 const savedSettings = JSON.parse(localStorage.getItem('crm-settings') || '{}');
                 avatarUrl = savedSettings?.general?.hostedPhotoURL || savedSettings?.general?.photoURL || null;
             } catch (_) {}
+        }
+        // Fallback to dedicated hosted photo cache key
+        if (!avatarUrl) {
+            try { avatarUrl = localStorage.getItem('pc-hosted-photo') || null; } catch(_) {}
         }
         
         // Fallback to Google photoURL if no hosted version
