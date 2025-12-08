@@ -2984,6 +2984,7 @@
     }
 
     function toggleMiniScripts(card){
+      if (!card) return;
       const wrap = card.querySelector('.mini-scripts-wrap');
       if (!wrap) return;
       
@@ -2999,7 +3000,8 @@
       }
       
       // Ensure FLOW is available before showing scripts
-      const display = card.querySelector('.ms-display');
+      const displaySelector = '.ms-display';
+      let display = card.querySelector(displaySelector);
       const FLOW = window.callScriptsModule && window.callScriptsModule.FLOW;
       if (!FLOW) {
         console.warn('[Phone Widget] FLOW not available yet, waiting...');
@@ -3010,6 +3012,9 @@
             toggleMiniScripts(card); // Retry toggle
           } else {
             console.error('[Phone Widget] FLOW still not available after wait');
+            if (!display && card) {
+              display = card.querySelector(displaySelector);
+            }
             if (display) {
               display.innerHTML = '<p style="color: var(--text-error); padding: var(--spacing-md);">Scripts not available. Please refresh the page.</p>';
             }
