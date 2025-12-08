@@ -781,6 +781,7 @@
     }
 
     if (els.rescheduleBtn) {
+      enhanceRescheduleButton(els.rescheduleBtn);
       els.rescheduleBtn.addEventListener('click', handleTaskReschedule);
     }
 
@@ -1136,8 +1137,369 @@
   }
 
   function handleTaskReschedule() {
-    // TODO: Implement reschedule functionality
-    console.log('Reschedule task:', state.currentTask);
+    try {
+      if (!els.rescheduleBtn) return;
+      injectRescheduleStyles();
+      openReschedulePopover(els.rescheduleBtn);
+    } catch (err) {
+      console.warn('[TaskDetail] Reschedule failed to open', err);
+    }
+  }
+
+  let _reschedulePopover = null;
+  let _reschedulePopoverCleanup = null;
+
+  function enhanceRescheduleButton(btn) {
+    if (!btn || btn.dataset.rescheduleReady) return;
+    btn.dataset.rescheduleReady = 'true';
+    btn.setAttribute('aria-label', 'Reschedule task');
+    btn.setAttribute('title', 'Reschedule');
+    btn.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="16" y1="2" x2="16" y2="6"></line>
+        <line x1="8" y1="2" x2="8" y2="6"></line>
+        <line x1="3" y1="10" x2="21" y2="10"></line>
+        <line x1="9" y1="14" x2="11" y2="14"></line>
+        <line x1="13" y1="18" x2="15" y2="18"></line>
+      </svg>
+    `;
+  }
+
+  function injectRescheduleStyles() {
+    const id = 'task-detail-reschedule-styles';
+    if (document.getElementById(id)) return;
+    const style = document.createElement('style');
+    style.id = id;
+    style.textContent = `
+      .reschedule-popover {
+        position: absolute;
+        z-index: 1300;
+        background: var(--bg-card);
+        color: var(--text-primary);
+        border: 1px solid var(--border-light);
+        border-radius: var(--border-radius-lg);
+        box-shadow: var(--elevation-card);
+        min-width: 320px;
+        max-width: 380px;
+        overflow: hidden;
+        opacity: 0;
+        transform: translateY(-6px);
+        transition: transform 200ms ease, opacity 200ms ease;
+      }
+      .reschedule-popover.--show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .reschedule-popover .tp-inner { padding: 12px 12px 10px 12px; }
+      .reschedule-popover .tp-header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 10px; }
+      .reschedule-popover .tp-title { font-weight: 600; color: var(--text-primary); }
+      .reschedule-popover .tp-body { max-height: 480px; overflow: auto; }
+      .reschedule-popover .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+      .reschedule-popover label { display:flex; flex-direction:column; gap:6px; font-size:12px; color: var(--text-secondary); position: relative; }
+      .reschedule-popover input.input-dark, .reschedule-popover textarea.input-dark {
+        width: 100%; padding: 10px 12px; background: var(--bg-item); color: var(--text-primary);
+        border: 2px solid var(--border-light); border-radius: 8px; font-size: 0.9rem;
+      }
+      .reschedule-popover .form-actions { display:flex; justify-content:flex-end; gap:8px; }
+      .reschedule-popover .btn-primary { height:32px; padding:0 12px; border-radius: var(--border-radius-sm); background: var(--grey-700); color: var(--text-inverse); border:1px solid var(--grey-600); font-weight:600; }
+      .reschedule-popover .btn-text { height:32px; padding:0 12px; border-radius: var(--border-radius-sm); background: transparent; color: var(--text-secondary); border:1px solid transparent; }
+      .reschedule-popover .btn-text:hover { background: var(--grey-700); color: var(--text-inverse); }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function openReschedulePopover(anchorEl) {
+    closeReschedulePopover();
+    const task = state.currentTask || {};
+
+    const pop = document.createElement('div');
+    pop.className = 'reschedule-popover';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', 'Reschedule task');
+
+    const initialDate = parseDateStrictSafe(task.dueDate) || new Date();
+    const initialTime = task.dueTime || '';
+
+    pop.innerHTML = `
+      <div class="tp-inner">
+        <div class="tp-header">
+          <div class="tp-title">Reschedule</div>
+          <button type="button" class="close-btn" data-close aria-label="Close">×</button>
+        </div>
+        <div class="tp-body">
+          <form id="reschedule-form">
+            <div class="form-row">
+              <label>Time
+                <input type="text" name="dueTime" class="input-dark" value="${escapeHtml(initialTime)}" placeholder="10:30 AM" required />
+              </label>
+              <label>Due date
+                <input type="text" name="dueDate" class="input-dark" value="${escapeHtml(fmtDate(initialDate))}" readonly />
+                <button type="button" class="calendar-toggle-btn" aria-label="Open calendar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                  </svg>
+                </button>
+              </label>
+            </div>
+            <div class="calendar-toolbar" style="display:none;">
+              <div class="calendar-header">
+                <button type="button" class="calendar-nav-btn" data-nav="-1" aria-label="Previous month">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15,18 9,12 15,6"></polyline>
+                  </svg>
+                </button>
+                <div class="calendar-month-year"></div>
+                <button type="button" class="calendar-nav-btn" data-nav="1" aria-label="Next month">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9,18 15,12 9,6"></polyline>
+                  </svg>
+                </button>
+              </div>
+              <div class="calendar-weekdays">
+                <div class="calendar-weekday">S</div>
+                <div class="calendar-weekday">M</div>
+                <div class="calendar-weekday">T</div>
+                <div class="calendar-weekday">W</div>
+                <div class="calendar-weekday">T</div>
+                <div class="calendar-weekday">F</div>
+                <div class="calendar-weekday">S</div>
+              </div>
+              <div class="calendar-days"></div>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-text" data-close>Cancel</button>
+              <button type="submit" class="btn-primary">Save</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(pop);
+    requestAnimationFrame(() => pop.classList.add('--show'));
+    positionPopover(anchorEl, pop);
+
+    const form = pop.querySelector('#reschedule-form');
+    const dueDateInput = form.querySelector('input[name="dueDate"]');
+    const dueTimeInput = form.querySelector('input[name="dueTime"]');
+    const toolbar = form.querySelector('.calendar-toolbar');
+    const daysEl = form.querySelector('.calendar-days');
+    const monthYearEl = form.querySelector('.calendar-month-year');
+
+    let viewDate = new Date(initialDate);
+    let selectedDate = new Date(initialDate);
+
+    const renderCalendar = () => {
+      monthYearEl.textContent = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      daysEl.innerHTML = '';
+      const first = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+      const pad = first.getDay();
+      for (let i = 0; i < pad; i++) daysEl.insertAdjacentHTML('beforeend', `<div class="calendar-day calendar-day-empty"></div>`);
+      const last = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
+      for (let d = 1; d <= last; d++) {
+        const dt = new Date(viewDate.getFullYear(), viewDate.getMonth(), d);
+        const isSel = dt.toDateString() === selectedDate.toDateString();
+        const isToday = dt.toDateString() === new Date().toDateString();
+        const cls = ['calendar-day', isSel && 'calendar-day-selected', isToday && 'calendar-day-today'].filter(Boolean).join(' ');
+        daysEl.insertAdjacentHTML('beforeend', `<button type="button" class="${cls}" data-day="${d}">${d}</button>`);
+      }
+    };
+
+    const close = () => closeReschedulePopover();
+
+    const onClick = (e) => {
+      if (e.target.closest('[data-close]')) {
+        e.preventDefault();
+        close();
+        return;
+      }
+      if (e.target.closest('.calendar-toggle-btn')) {
+        e.preventDefault();
+        toolbar.style.display = toolbar.style.display === 'none' ? 'block' : 'none';
+        if (toolbar.style.display === 'block') renderCalendar();
+        return;
+      }
+      const navBtn = e.target.closest('.calendar-nav-btn');
+      if (navBtn) {
+        const delta = Number(navBtn.dataset.nav || 0);
+        viewDate.setMonth(viewDate.getMonth() + delta);
+        renderCalendar();
+        return;
+      }
+      const dayBtn = e.target.closest('.calendar-day[data-day]');
+      if (dayBtn) {
+        const day = Number(dayBtn.dataset.day);
+        selectedDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
+        dueDateInput.value = fmtDate(selectedDate);
+        renderCalendar();
+        toolbar.style.display = 'none';
+        return;
+      }
+    };
+
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      }
+    };
+
+    const onOutsideClick = (e) => {
+      if (!pop.contains(e.target) && e.target !== anchorEl) {
+        close();
+      }
+    };
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const dueDate = dueDateInput.value.trim();
+      const dueTime = normalizeTimeInput(dueTimeInput.value.trim());
+      if (!dueDate || !dueTime) return;
+      dueTimeInput.value = dueTime;
+      await saveReschedule({ dueDate, dueTime });
+      close();
+      await navigateToAdjacentTask('next');
+    });
+
+    pop.addEventListener('click', onClick);
+    document.addEventListener('click', onOutsideClick, true);
+    document.addEventListener('keydown', onKey);
+
+    _reschedulePopover = pop;
+    _reschedulePopoverCleanup = () => {
+      document.removeEventListener('click', onOutsideClick, true);
+      document.removeEventListener('keydown', onKey);
+      if (pop && pop.parentElement) pop.parentElement.removeChild(pop);
+      _reschedulePopover = null;
+      _reschedulePopoverCleanup = null;
+    };
+  }
+
+  function closeReschedulePopover() {
+    if (_reschedulePopoverCleanup) _reschedulePopoverCleanup();
+  }
+
+  function normalizeTimeInput(raw) {
+    if (!raw) return '';
+    let v = raw.toUpperCase().replace(/[^\dAPM:\s]/g, '').trim();
+    v = v.replace(/\s+/g, ' ');
+    const match = v.match(/(\d{1,2})(?::?(\d{2}))?\s*(AM|PM)?/);
+    if (!match) return raw;
+    let h = parseInt(match[1], 10);
+    let m = match[2] ? match[2] : '00';
+    let ap = match[3] || '';
+    if (m.length === 1) m = `0${m}`;
+    if (h === 0) h = 12;
+    if (h > 12 && !ap) { ap = 'PM'; h = h - 12; }
+    if (!ap) ap = 'AM';
+    return `${h}:${m} ${ap}`.replace(/\s+/g, ' ').trim();
+  }
+
+  async function saveReschedule({ dueDate, dueTime }) {
+    const task = state.currentTask;
+    if (!task || !task.id) return;
+
+    const payload = {
+      dueDate,
+      dueTime,
+      status: task.status || 'pending',
+      updatedAt: Date.now(),
+      timestamp: Date.now()
+    };
+
+    try {
+      if (window.firebaseDB) {
+        await window.firebaseDB.collection('tasks').doc(task.id).update(payload);
+      }
+    } catch (err) {
+      console.warn('[TaskDetail] Failed to reschedule task in Firestore', err);
+    }
+
+    try { Object.assign(task, payload); } catch (_) { }
+
+    const updateLocalCache = (key) => {
+      try {
+        const arr = JSON.parse(localStorage.getItem(key) || '[]');
+        const updated = arr.map(t => {
+          if (t && t.id === task.id) return { ...t, ...payload };
+          return t;
+        });
+        localStorage.setItem(key, JSON.stringify(updated));
+      } catch (_) { }
+    };
+
+    try {
+      const getUserEmail = () => {
+        try {
+          if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') return window.DataManager.getCurrentUserEmail();
+          return (window.currentUserEmail || '').toLowerCase();
+        } catch (_) { return (window.currentUserEmail || '').toLowerCase(); }
+      };
+      const email = getUserEmail();
+      const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
+      updateLocalCache(namespacedKey);
+      updateLocalCache('userTasks');
+    } catch (_) { }
+
+    if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
+      try { await window.BackgroundTasksLoader.forceReload(); } catch (e) { console.warn('[TaskDetail] Failed to refresh BackgroundTasksLoader after reschedule', e); }
+    }
+
+    if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+      try { await window.CacheManager.invalidate('tasks'); } catch (_) { }
+    }
+
+    if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
+      try { window.crm.loadTodaysTasks(); } catch (_) { }
+    }
+
+    window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { taskId: task.id, rescheduled: true } }));
+    document.dispatchEvent(new CustomEvent('pc:task-updated', { detail: { id: task.id, changes: { dueDate, dueTime } } }));
+
+    if (window.crm && typeof window.crm.showToast === 'function') {
+      try { window.crm.showToast('Task rescheduled'); } catch (_) { }
+    }
+  }
+
+  function fmtDate(date) {
+    if (!(date instanceof Date) || isNaN(date)) return '';
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
+  }
+
+  function parseDateStrictSafe(dateStr) {
+    if (!dateStr) return null;
+    try {
+      if (dateStr.includes('/')) {
+        const [mm, dd, yyyy] = dateStr.split('/').map(n => parseInt(n, 10));
+        if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
+      } else if (dateStr.includes('-')) {
+        const [yyyy, mm, dd] = dateStr.split('-').map(n => parseInt(n, 10));
+        if (!isNaN(mm) && !isNaN(dd) && !isNaN(yyyy)) return new Date(yyyy, mm - 1, dd);
+      }
+      const d = new Date(dateStr);
+      if (!isNaN(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    } catch (_) { }
+    return null;
+  }
+
+  function positionPopover(anchorEl, pop) {
+    try {
+      const rect = anchorEl.getBoundingClientRect();
+      const popRect = pop.getBoundingClientRect();
+      const anchorCenter = rect.left + rect.width / 2;
+      const desiredLeft = Math.round(window.scrollX + anchorCenter - popRect.width / 2);
+      const clampedLeft = Math.max(8, Math.min(desiredLeft, (window.scrollX + document.documentElement.clientWidth) - popRect.width - 8));
+      const top = Math.round(window.scrollY + rect.bottom + 8);
+      pop.style.left = `${clampedLeft}px`;
+      pop.style.top = `${top}px`;
+    } catch (_) { }
   }
 
   // Save task notes to recent activities
