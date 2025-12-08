@@ -1,26 +1,26 @@
-(function(){
+(function () {
   'use strict';
 
   // ===== Dynamic variables helpers (chips + live-call substitution) =====
-  function escapeHtml(str){
+  function escapeHtml(str) {
     if (str == null) return '';
     return String(str)
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;')
-      .replace(/'/g,'&#039;');
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
-  function dayPart(){
+  function dayPart() {
     try {
       const h = new Date().getHours();
       if (h >= 5 && h < 12) return 'Good morning';
       if (h >= 12 && h < 17) return 'Good afternoon';
       if (h >= 17 && h <= 20) return 'Good evening';
       return 'Hello';
-    } catch(_) { return 'Hello'; }
+    } catch (_) { return 'Hello'; }
   }
-  function getPhoneWidgetContext(){
+  function getPhoneWidgetContext() {
     try {
       // Try to get context from phone widget's global currentCallContext
       if (window.currentCallContext) {
@@ -37,7 +37,7 @@
       if (window.PhoneWidget && typeof window.PhoneWidget.getContext === 'function') {
         return window.PhoneWidget.getContext() || {};
       }
-    } catch(_) {}
+    } catch (_) { }
     // Fallback: infer from DOM
     try {
       const card = document.getElementById('phone-widget');
@@ -49,22 +49,22 @@
       let company = '';
       const parts = sub.split('•').map(s => s.trim());
       if (parts.length >= 1) company = parts[0];
-      const number = (parts[1] || '').replace(/[^+\d]/g,'');
+      const number = (parts[1] || '').replace(/[^+\d]/g, '');
       return { name, company, number, isActive: inCall, contactId: null, accountId: null };
-    } catch(_) {}
-    return { name:'', company:'', number:'', isActive:false, contactId: null, accountId: null };
+    } catch (_) { }
+    return { name: '', company: '', number: '', isActive: false, contactId: null, accountId: null };
   }
-  function splitName(full){
-    const s = String(full||'').trim();
-    if (!s) return { first:'', last:'', full:'' };
+  function splitName(full) {
+    const s = String(full || '').trim();
+    if (!s) return { first: '', last: '', full: '' };
     const parts = s.split(/\s+/);
     return { first: parts[0] || '', last: parts.slice(1).join(' ') || '', full: s };
   }
-  function normName(s){
-    return String(s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+  function normName(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   }
-  function normalizeAccount(a){
-    const obj = a ? {...a} : {};
+  function normalizeAccount(a) {
+    const obj = a ? { ...a } : {};
     // Normalize supplier aliases
     obj.supplier = obj.supplier || obj.currentSupplier || obj.current_supplier || obj.energySupplier || obj.electricitySupplier || obj.supplierName || '';
     // Normalize contract end aliases
@@ -79,14 +79,14 @@
     obj.website = obj.website || obj.domain || '';
     return obj;
   }
-  function formatDateMDY(v){
+  function formatDateMDY(v) {
     try {
       if (!v) return '';
-      
+
       // Use the same robust date parsing logic as account-detail.js
       const str = String(v).trim();
       let d;
-      
+
       if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
         // For ISO dates, parse components to avoid timezone issues
         const parts = str.split('-');
@@ -101,23 +101,23 @@
           d = new Date(str + 'T00:00:00');
         }
       }
-      
+
       if (isNaN(d.getTime())) return String(v); // keep raw if unparsable
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      const dd = String(d.getDate()).padStart(2,'0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
       const yyyy = d.getFullYear();
       return `${mm}/${dd}/${yyyy}`;
-    } catch(_) { return String(v||''); }
+    } catch (_) { return String(v || ''); }
   }
-  
-  function toMDY(v){
+
+  function toMDY(v) {
     try {
       if (!v) return '';
-      
+
       // Use the same robust date parsing logic as account-detail.js
       const str = String(v).trim();
       let d;
-      
+
       if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
         // For ISO dates, parse components to avoid timezone issues
         const parts = str.split('-');
@@ -132,17 +132,17 @@
           d = new Date(str + 'T00:00:00');
         }
       }
-      
+
       if (isNaN(d.getTime())) return String(v);
-      const mm = String(d.getMonth()+1).padStart(2,'0');
-      const dd = String(d.getDate()).padStart(2,'0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
       const yyyy = d.getFullYear();
       return `${mm}/${dd}/${yyyy}`;
-    } catch(_) { return String(v||''); }
+    } catch (_) { return String(v || ''); }
   }
-  function normalizeContact(c){
-    const obj = c ? {...c} : {};
-    const nameGuess = obj.name || ((obj.firstName||obj.first_name||'') + ' ' + (obj.lastName||obj.last_name||'')).trim();
+  function normalizeContact(c) {
+    const obj = c ? { ...c } : {};
+    const nameGuess = obj.name || ((obj.firstName || obj.first_name || '') + ' ' + (obj.lastName || obj.last_name || '')).trim();
     const sp = splitName(nameGuess);
     obj.firstName = obj.firstName || obj.first_name || sp.first;
     obj.lastName = obj.lastName || obj.last_name || sp.last;
@@ -157,7 +157,7 @@
         // Prefer direct work, then mobile, then other, then any legacy phone
         obj.phone = obj.phone || obj.workDirectPhone || obj.mobile || obj.otherPhone || obj.mobile_phone || '';
       }
-    } catch(_) {
+    } catch (_) {
       obj.phone = obj.phone || obj.workDirectPhone || obj.mobile || obj.otherPhone || obj.mobile_phone || '';
     }
     obj.mobile = obj.mobile || obj.mobile_phone || '';
@@ -173,26 +173,26 @@
     obj.accountId = obj.accountId || obj.account_id || obj.account || obj.companyId || '';
     return obj;
   }
-  function normPhone(p){ return String(p||'').replace(/\D/g,'').slice(-10); }
-  function normDomain(email){ return String(email||'').split('@')[1]?.toLowerCase() || ''; }
-  function getPeopleCache(){ try { return (typeof window.getPeopleData==='function' ? (window.getPeopleData()||[]) : []); } catch(_) { return []; } }
-  function getAccountsCache(){ try { return (typeof window.getAccountsData==='function' ? (window.getAccountsData()||[]) : []); } catch(_) { return []; } }
-  function findContactByNumberOrName(number, name){
+  function normPhone(p) { return String(p || '').replace(/\D/g, '').slice(-10); }
+  function normDomain(email) { return String(email || '').split('@')[1]?.toLowerCase() || ''; }
+  function getPeopleCache() { try { return (typeof window.getPeopleData === 'function' ? (window.getPeopleData() || []) : []); } catch (_) { return []; } }
+  function getAccountsCache() { try { return (typeof window.getAccountsData === 'function' ? (window.getAccountsData() || []) : []); } catch (_) { return []; } }
+  function findContactByNumberOrName(number, name) {
     const people = getPeopleCache();
     const n10 = normPhone(number);
-    const nm = String(name||'').toLowerCase();
-    const norm = (p) => String(p||'').toLowerCase().replace(/\s+/g,' ').trim();
-    const byNum = people.find(p=> {
+    const nm = String(name || '').toLowerCase();
+    const norm = (p) => String(p || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const byNum = people.find(p => {
       const candidates = [p.workDirectPhone, p.mobile, p.otherPhone, p.phone];
       return candidates.some(ph => normPhone(ph) === n10);
     });
     if (byNum) return byNum;
     if (nm) {
-      return people.find(p => norm(`${p.firstName||''} ${p.lastName||''}`) === norm(name) || norm(p.name||p.fullName||'') === norm(name));
+      return people.find(p => norm(`${p.firstName || ''} ${p.lastName || ''}`) === norm(name) || norm(p.name || p.fullName || '') === norm(name));
     }
     return null;
   }
-  function findAccountForContact(contact){
+  function findAccountForContact(contact) {
     if (!contact) return null;
     const accounts = getAccountsCache();
     // 1) Direct accountId linkage if present
@@ -202,20 +202,20 @@
         const hitById = accounts.find(a => String(a.id || a.accountId || a._id) === String(accId));
         if (hitById) return hitById;
       }
-    } catch(_) {}
-    const clean = (s)=> String(s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g,' ').replace(/\s+/g,' ').trim();
-    const comp = clean(contact.company||contact.companyName||'');
+    } catch (_) { }
+    const clean = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\b(llc|inc|inc\.|co|co\.|corp|corp\.|ltd|ltd\.)\b/g, ' ').replace(/\s+/g, ' ').trim();
+    const comp = clean(contact.company || contact.companyName || '');
     if (comp) {
-      const hit = accounts.find(a=> {
-        const an = clean(a.accountName||a.name||a.companyName||'');
-        return an && (an===comp || an.includes(comp) || comp.includes(an));
+      const hit = accounts.find(a => {
+        const an = clean(a.accountName || a.name || a.companyName || '');
+        return an && (an === comp || an.includes(comp) || comp.includes(an));
       });
       if (hit) return hit;
     }
-    const domain = normDomain(contact.email||'');
+    const domain = normDomain(contact.email || '');
     if (domain) {
-      const match = accounts.find(a=> {
-        const d = String(a.domain||a.website||'').toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0];
+      const match = accounts.find(a => {
+        const d = String(a.domain || a.website || '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
         return d && (domain.endsWith(d) || d.endsWith(domain));
       });
       if (match) return match;
@@ -223,83 +223,83 @@
     return null;
   }
 
-  function getLiveData(){
+  function getLiveData() {
     const ctx = getPhoneWidgetContext();
     const nameParts = splitName(ctx.name || '');
     let contact = null; let account = null;
-    
+
     // Priority 1: If user has manually selected a contact in the Call Scripts search, use that
     try {
       if (typeof state !== 'undefined' && state && state.overrideContactId) {
         const people = getPeopleCache();
         const sel = people.find(p => {
-          const pid = String(p.id||'');
-          const alt1 = String(p.contactId||'');
-          const alt2 = String(p._id||'');
-          const target = String(state.overrideContactId||'');
-          return pid===target || alt1===target || alt2===target;
+          const pid = String(p.id || '');
+          const alt1 = String(p.contactId || '');
+          const alt2 = String(p._id || '');
+          const target = String(state.overrideContactId || '');
+          return pid === target || alt1 === target || alt2 === target;
         });
         if (sel) contact = sel;
       }
-    } catch(_) {}
-    
+    } catch (_) { }
+
     // Priority 2: If phone widget has contactId in context, use that (direct contact call)
     if (!contact && ctx.contactId) {
       try {
         const people = getPeopleCache();
         const found = people.find(p => {
-          const pid = String(p.id||'');
-          const alt1 = String(p.contactId||'');
-          const alt2 = String(p._id||'');
-          const target = String(ctx.contactId||'');
-          return pid===target || alt1===target || alt2===target;
+          const pid = String(p.id || '');
+          const alt1 = String(p.contactId || '');
+          const alt2 = String(p._id || '');
+          const target = String(ctx.contactId || '');
+          return pid === target || alt1 === target || alt2 === target;
         });
         if (found) contact = found;
-      } catch(_) {}
+      } catch (_) { }
     }
-    
+
     // Priority 3: Try to find contact by number or name
     if (!contact) {
       try {
         contact = findContactByNumberOrName(ctx.number, ctx.name) || {};
-      } catch(_) { contact = {}; }
+      } catch (_) { contact = {}; }
     }
-    
+
     // Fallback to context if fields empty
-    if (!contact.firstName && (ctx.name||'')) {
+    if (!contact.firstName && (ctx.name || '')) {
       const sp = splitName(ctx.name);
       contact.firstName = sp.first; contact.lastName = sp.last; contact.fullName = sp.full;
     }
     if (!contact.company && ctx.company) contact.company = ctx.company;
     // Normalize selected/derived contact fields so variables populate reliably
-    try { contact = normalizeContact(contact); } catch(_) {}
-    
+    try { contact = normalizeContact(contact); } catch (_) { }
+
     // Try to find account - prefer accountId from context, then from contact
     if (ctx.accountId) {
       try {
         const accounts = getAccountsCache();
         const found = accounts.find(a => {
-          const aid = String(a.id||'');
-          const alt1 = String(a.accountId||'');
-          const alt2 = String(a._id||'');
-          const target = String(ctx.accountId||'');
-          return aid===target || alt1===target || alt2===target;
+          const aid = String(a.id || '');
+          const alt1 = String(a.accountId || '');
+          const alt2 = String(a._id || '');
+          const target = String(ctx.accountId || '');
+          return aid === target || alt1 === target || alt2 === target;
         });
         if (found) account = found;
-      } catch(_) {}
+      } catch (_) { }
     }
-    
+
     // If no account found via accountId, try finding from contact
     if (!account) {
-      try { account = findAccountForContact(contact) || {}; } catch(_) { account = {}; }
+      try { account = findAccountForContact(contact) || {}; } catch (_) { account = {}; }
     }
-    
-    try { account = normalizeAccount(account); } catch(_) {}
+
+    try { account = normalizeAccount(account); } catch (_) { }
     // Borrow supplier/contract_end from contact if account missing them
     if (!account.supplier && contact.supplier) account.supplier = contact.supplier;
     if (!account.contract_end && contact.contract_end) account.contract_end = contact.contract_end;
     if (!account.contractEnd && contact.contract_end) account.contractEnd = contact.contract_end;
-    
+
     // If no account found, fall back to using the selected contact's company for {{account.name}}
     if (!account.name && (contact.company || contact.companyName)) {
       account.name = contact.company || contact.companyName;
@@ -307,7 +307,7 @@
     if (!account.name && ctx.company) account.name = ctx.company;
     return { ctx, contact, account };
   }
-  function chip(scope, key){
+  function chip(scope, key) {
     const friendly = {
       'name': 'company name',
       'first_name': 'first name',
@@ -321,27 +321,27 @@
       'state': 'state',
       'website': 'website',
       'title': 'job title'
-    }[key] || String(key).replace(/_/g,' ').toLowerCase();
+    }[key] || String(key).replace(/_/g, ' ').toLowerCase();
     const token = `{{${scope}.${key}}}`;
     return `<span class="var-chip" data-var="${scope}.${key}" data-token="${token}" contenteditable="false">${friendly}</span>`;
   }
-  function renderTemplate(str, mode){
+  function renderTemplate(str, mode) {
     if (!str) return '';
     const dp = dayPart();
     const data = getLiveData();
-    
+
     // Calculate savings based on monthly spend from state
     let monthlySpend = 0;
     let annualSpend = 0;
     let potentialSavings = 0;
-    
+
     // Use stored monthly spend value if available
     if (state.monthlySpend && state.monthlySpend > 0) {
       monthlySpend = state.monthlySpend;
     } else {
       // Fallback: Try to extract monthly spend from state history
       const currentState = state.current;
-      const historyItem = Array.isArray(state.history) 
+      const historyItem = Array.isArray(state.history)
         ? state.history.find(h => (typeof h === 'object' ? h.current === 'situation_discovery' : h === 'situation_discovery'))
         : null;
       if (historyItem) {
@@ -362,20 +362,21 @@
         }
       }
     }
-    
+
     if (monthlySpend > 0) {
       annualSpend = monthlySpend * 12;
       potentialSavings = Math.round(annualSpend * 0.25); // 25% savings estimate
     }
-    
+
     // Format numbers with commas
     const formatCurrency = (num) => {
       if (num === 0 || !num) return 'an estimated amount';
       return '$' + num.toLocaleString();
     };
-    
+
     const values = {
       'day.part': dp,
+      'agent.first_name': agentFirstName,
       'contact.first_name': data.contact.firstName || data.contact.first || splitName(data.contact.name).first || splitName(data.ctx.name).first || '',
       'contact.last_name': data.contact.lastName || data.contact.last || splitName(data.contact.name).last || splitName(data.ctx.name).last || '',
       'contact.full_name': data.contact.fullName || data.contact.name || data.ctx.name || '',
@@ -394,31 +395,20 @@
       'annual_spend': formatCurrency(annualSpend),
       'potential_savings': formatCurrency(potentialSavings)
     };
-    
+
     let result = String(str);
-    
+
     // Replace {{variable}} placeholders with actual values
     for (const [key, value] of Object.entries(values)) {
       const pattern = new RegExp(`\\{\\{\\s*${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\}\\}`, 'gi');
       result = result.replace(pattern, escapeHtml(value || ''));
     }
-    
+
     // Handle badge placeholders - replace (contact name) etc. with actual data if available
     const contactName = values['contact.first_name'] || values['contact.full_name'] || '';
     const companyName = values['account.name'] || '';
-    
-    // Get your name from settings (first name only from general settings)
-    let yourName = '';
-    try {
-      const settings = SettingsPage.getSettings();
-      if (settings && settings.general) {
-        yourName = settings.general.firstName || '';
-      }
-    } catch (_) {
-      // Fallback if settings not available
-      yourName = '';
-    }
-    
+    const yourName = agentFirstName; // Use agentFirstName from above
+
     // Replace badge placeholders with plain text (no badge classes)
     // Handle both HTML-wrapped and plain text versions
     if (contactName) {
@@ -443,17 +433,17 @@
       // Plain text version (no HTML)
       result = result.replace(/\(company name\)/gi, escapeHtml(companyName));
     }
-    
+
     // Tone markers and pause indicators are kept as-is (they're already properly formatted HTML)
     // No additional processing needed - they render correctly
-    
+
     return result;
   }
-  function isLiveCall(){
+  function isLiveCall() {
     try {
       const ctx = getPhoneWidgetContext();
       return !!ctx.isActive;
-    } catch(_) { return false; }
+    } catch (_) { return false; }
   }
 
   // PEACE Framework Call Flow (Based on 2025 Research + Broker Audit Strategy)
@@ -493,7 +483,7 @@
     // ===== SIX SCENARIOS NATURAL OPENING + TIMING QUALIFICATION =====
     opening_quick_intro: {
       stage: 'Opening - Quick Intro & Permission',
-      text: "Hey {{contact.first_name}}! This is Lewis.<br><br><span class=\"pause-indicator\"></span> <em>[PAUSE 1 second]</em><br><br>Real quick... did I catch you at a bad time... or do you have about 30 seconds?",
+      text: "Hey {{contact.first_name}}! This is {{agent.first_name}}.<br><br><span class=\"pause-indicator\"></span> <em>[PAUSE 1 second]</em><br><br>Real quick... did I catch you at a bad time... or do you have about 30 seconds?",
       responses: [
         { label: 'Yeah, go ahead', next: 'opening_industry_context' },
         { label: 'I got 30 seconds', next: 'opening_industry_context' },
@@ -503,9 +493,9 @@
     },
     opening_industry_context: {
       stage: 'Opening - Industry Context',
-      text: "Perfect. So I work with {{account.industry}} companies on electricity procurement.<br><br><span class=\"pause-indicator\"></span> <em>[PAUSE 1 second]</em>",
+      text: "Perfect. So I work with {{account.industry}} companies on electricity procurement.<br><br><span class=\"pause-indicator\"></span> <em>[PAUSE 1 second - let that land]</em>",
       responses: [
-        { label: 'Continue', next: 'problem_bridge' }
+        { label: 'Continue to problem', next: 'problem_bridge' }
       ]
     },
     problem_bridge: {
@@ -536,7 +526,7 @@
         { label: '2 or 3 quotes', next: 'key_question_confidence' },
         { label: 'Just current supplier', next: 'key_question_confidence' },
         { label: '5 to 10 quotes', next: 'discovery_supplier_count' },
-        { label: 'We have a broker handle it', next: 'nepq_broker_clarify' },
+        { label: 'We have a broker handle it', next: 'objection_broker_intro' },
         { label: 'Never really counted', next: 'key_question_confidence' }
       ]
     },
@@ -548,7 +538,7 @@
         { label: 'They work fine', next: 'probe_confidence' },
         { label: 'Not 100% sure', next: 'probe_confidence' },
         { label: 'Not very confident', next: 'gap_creator' },
-        { label: 'We use a broker', next: 'nepq_broker_clarify' }
+        { label: 'We use a broker', next: 'objection_broker_intro' }
       ]
     },
     probe_confidence: {
@@ -559,7 +549,7 @@
         { label: 'Just been with them forever', next: 'gap_creator' },
         { label: "We don't really know", next: 'gap_creator' },
         { label: "We've compared before", next: 'discovery_supplier_count' },
-        { label: "That's what our broker does", next: 'nepq_broker_clarify' }
+        { label: "That's what our broker does", next: 'objection_broker_intro' }
       ]
     },
     gap_creator: {
@@ -607,7 +597,7 @@
       responses: [
         { label: 'No, we just trust them', next: 'gap_creator' },
         { label: "Actually that's a good point", next: 'gap_creator' },
-        { label: 'Still not interested', next: 'respect_decision' }
+        { label: 'Still not interested', next: 'close_respect_decision' }
       ]
     },
     consequence_quantify: {
@@ -624,20 +614,48 @@
       stage: 'Solution - Audit Proposal',
       text: "Here's what I'd suggest we do:<br><br>I pull together a quick audit for you. Takes me like 2 or 3 days. I reach out to 100 plus suppliers, get competitive bids from ones you probably haven't even talked to.<br><br>Then we jump on a quick call... maybe 15 minutes. I show you what's out there, you compare, and you decide if it makes sense.<br><br>No pressure, no obligation. Just data so you can make a smart decision.<br><br>Fair?",
       responses: [
-        { label: "Fair, let's do it", next: 'nepq_micro_commitment_3' },
+        { label: "Fair, let's do it", next: 'close_calendar_commitment' },
         { label: 'How would that actually work?', next: 'solution_explain_process' },
-        { label: 'Send me something first', next: 'email_first' },
-        { label: 'When would we talk?', next: 'nepq_micro_commitment_3' }
+        { label: 'Send me something first', next: 'solution_email_first' },
+        { label: 'When would we talk?', next: 'close_calendar_commitment' }
       ]
     },
     solution_explain_process: {
       stage: 'Solution - Explain Process',
       text: "Super simple. You give me like three things: your monthly spend, when your contract ends, and who your current supplier is. That's it.<br><br>I take a couple days, I coordinate with all these suppliers, pull competitive bids from the ones you haven't talked to.<br><br>We hop on a 15 minute call. I walk you through what everyone's quoting. You look at the numbers, you compare, you decide.<br><br>Simple as that.",
       responses: [
-        { label: "Okay, let's do it", next: 'nepq_micro_commitment_3' },
-        { label: 'When would we talk?', next: 'nepq_micro_commitment_3' },
-        { label: 'Send me info first', next: 'email_first' }
+        { label: "Okay, let's do it", next: 'close_calendar_commitment' },
+        { label: 'When would we talk?', next: 'close_calendar_commitment' },
+        { label: 'Send me info first', next: 'solution_email_first' }
       ]
+    },
+    close_calendar_commitment: {
+      stage: 'Close - Calendar Commitment',
+      text: "Perfect. So here's what I need: Your monthly spend, when you renew, and your current supplier name if you know it.<br><br>That's it. I'll handle the rest.<br><br>When works this week for a quick call? Monday, Tuesday, or Wednesday?",
+      responses: [
+        { label: 'Monday afternoon', next: 'close_invite_sent' },
+        { label: 'Tuesday morning', next: 'close_invite_sent' },
+        { label: 'Wednesday anytime', next: 'close_invite_sent' },
+        { label: 'Let me check', next: 'close_send_calendar_link' }
+      ]
+    },
+    close_invite_sent: {
+      stage: 'Close - Invite Sent',
+      text: "Perfect. I'm sending you a calendar invite right now.<br><br>We'll go over your specs and I'll pull those quotes for you.<br><br>See you then.",
+      responses: []
+    },
+    close_send_calendar_link: {
+      stage: 'Close - Send Calendar Link',
+      text: "No problem. I'll send you a calendar link so you can pick a time that works for you.<br><br>Sound good?",
+      responses: [
+        { label: 'Sounds good', next: 'close_invite_sent' },
+        { label: 'Perfect', next: 'close_invite_sent' }
+      ]
+    },
+    solution_email_first: {
+      stage: 'Solution - Email First',
+      text: "Sure thing. What's your email? I'll send you over a quick breakdown of how this works.",
+      responses: []
     },
     locked_in_future: {
       stage: 'Objection - Locked In',
@@ -651,27 +669,25 @@
     },
     locked_in_plant_seed: {
       stage: 'Objection - Plant Seed',
-      text: "Perfect timing actually. Here's the thing... most companies start thinking about this like 6 months before it expires.<br><br>So you've still got some time to plan this right.<br><br>What I'd suggest... let me put on my calendar to reach back out to you in the right month. That way, you're not scrambling at the last minute when rates are going up.<br><br>Sound good?",
+      text: "Perfect timing actually. Here's the thing... most companies start thinking about this like 6 months before it expires.<br><br>So you've still got some time to plan this right.<br><br>What I'd suggest... let me put on my calendar to reach back out to you in like [appropriate month]. That way, you're not scrambling at the last minute when rates are going up.<br><br>Sound good?",
       responses: [
         { label: 'Yeah, that works', next: 'locked_in_confirm_callback' },
         { label: 'Sure, reach out later', next: 'locked_in_confirm_callback' },
-        { label: 'Actually send info now', next: 'email_first' }
+        { label: 'Actually send info now', next: 'solution_email_first' }
       ]
     },
     locked_in_confirm_callback: {
       stage: 'Objection - Callback Confirmed',
-      text: "Perfect. I'm putting it on my calendar to reach out before you're in a crunch.<br><br>We'll get you a game plan sorted out before renewal hits.<br><br>Talk soon.",
-      responses: [
-        { label: 'Great', next: 'followup_scheduled' }
-      ]
+      text: "Perfect. I'm putting it on my calendar to reach out in [X months].<br><br>We'll get you a game plan sorted out before you're in a crunch.<br><br>Talk soon.",
+      responses: []
     },
     reschedule_callback: {
       stage: 'Reschedule - Callback',
       text: "No problem at all. When's a better time this week... or next week?",
       responses: [
-        { label: 'Tomorrow at 2', next: 'close_send_invite' },
-        { label: 'Next week Monday', next: 'close_send_invite' },
-        { label: '[Any time]', next: 'close_send_invite' }
+        { label: 'Tomorrow at 2', next: 'close_invite_sent' },
+        { label: 'Next week Monday', next: 'close_invite_sent' },
+        { label: '[Any time]', next: 'close_invite_sent' }
       ]
     },
     gatekeeper_route: {
@@ -679,7 +695,7 @@
       text: "Got it. Can you transfer me to {{contact.first_name}}... or should I just follow up with them directly?",
       responses: [
         { label: "I'll transfer you", next: 'gatekeeper_wait' },
-        { label: "Here's their number", next: 'close_meeting_scheduled' },
+        { label: "Here's their number", next: 'close_respect_decision' },
         { label: 'Let me take your info', next: 'gatekeeper_info' }
       ]
     },
@@ -717,14 +733,13 @@
     },
     // ===== NEPQ + PEACE INTEGRATED OPENER =====
     pattern_interrupt_opening: {
-      stage: 'Opening',
-      text: "<span class=\"tone-marker curious\">🎯 NEPQ CONNECTION PHASE</span><br><br><span class=\"tone-marker curious\">CURIOUS TONE</span> (raised pitch at end, genuine interest)<br><br>\"Hey {{contact.first_name}}, this is Lewis from PowerChoosers.<br><br><span class=\"pause-indicator\"></span><span class=\"pause-indicator\"></span> <em>[PAUSE 2 seconds - let them hear your name]</em><br><br>Real quick... <span class=\"pause-indicator\"></span> did I catch you in the middle of something... <span class=\"pause-indicator\"></span> or do you have about 30 seconds?\"<br><br><em>⏸️ WAIT for response - don't jump in. Let them process.</em>",
+      stage: 'Opening - Quick Intro & Permission',
+      text: "Hey {{contact.first_name}}! This is {{agent.first_name}}.<br><br><span class=\"pause-indicator\"></span> <em>[PAUSE 1 second]</em><br><br>Real quick... did I catch you at a bad time... or do you have about 30 seconds?",
       responses: [
-        { label: "Yeah, go ahead", next: 'nepq_empathy_bridge' },
-        { label: "What's this about?", next: 'nepq_empathy_bridge' },
-        { label: "Actually busy right now", next: 'objection_bad_timing' },
-        { label: "We use a broker", next: 'nepq_broker_clarify' },
-        { label: "Not interested", next: 'nepq_objection_clarify' }
+        { label: 'Yeah, go ahead', next: 'opening_industry_context' },
+        { label: 'I got 30 seconds', next: 'opening_industry_context' },
+        { label: 'Actually, not a good time', next: 'reschedule_callback' },
+        { label: 'What is this about?', next: 'opening_industry_context' }
       ]
     },
     nepq_empathy_bridge: {
@@ -967,7 +982,56 @@
         { label: "Not a priority right now", next: 'nepq_consequence_challenge' }
       ]
     },
-    // ===== NEPQ 3-STEP OBJECTION FORMULA: BROKER HANDLING =====
+    // ===== NEPQ BROKER OBJECTION HANDLING (Per NEPQ Document) =====
+    objection_broker_intro: {
+      stage: 'Objection - Broker (Clarify)',
+      text: "Oh, you use a broker... So when you say that, do they handle like everything or just coordinate quotes for you?<br><br><span class=\"pause-indicator\"></span><em>[PAUSE]</em>",
+      responses: [
+        { label: 'They handle everything', next: 'objection_broker_discuss' },
+        { label: 'They shop rates', next: 'objection_broker_discuss' },
+        { label: 'They get us quotes', next: 'objection_broker_discuss' },
+        { label: 'They negotiate for us', next: 'objection_broker_discuss' }
+      ]
+    },
+    objection_broker_discuss: {
+      stage: 'Objection - Broker (Discuss)',
+      text: "Got it. So when you last renewed, how many quotes did they actually bring you? Like 5, 10... or more like 2, 3?",
+      responses: [
+        { label: '2 or 3 quotes', next: 'objection_broker_gap' },
+        { label: '5 to 10 quotes', next: 'objection_broker_gap' },
+        { label: 'Just renewed with same supplier', next: 'objection_broker_gap' },
+        { label: 'Not sure', next: 'objection_broker_gap' }
+      ]
+    },
+    objection_broker_gap: {
+      stage: 'Objection - Broker Gap Reveal',
+      text: "Okay so like 2 or 3 quotes. And do you know how many suppliers your broker actually works with? Like 20, 30... or closer to 100 plus?<br><br><span class=\"pause-indicator\"></span><em>[PAUSE]</em>",
+      responses: [
+        { label: '20 to 30', next: 'objection_broker_reveal_gap' },
+        { label: '50 suppliers', next: 'objection_broker_reveal_gap' },
+        { label: '100 plus', next: 'consequence_quantify' },
+        { label: 'I have no idea', next: 'objection_broker_reveal_gap' }
+      ]
+    },
+    objection_broker_reveal_gap: {
+      stage: 'Objection - Broker Gap Revealed',
+      text: "So there's actually 100 plus suppliers in the market... but your broker probably only works with like 20, 30, maybe 50.<br><br><span class=\"pause-indicator\"></span><em>[PAUSE 3 SECONDS]</em><br><br>That means like half the market... your broker doesn't even have access to.<br><br>Wouldn't it be worth seeing what that other half is quoting?",
+      responses: [
+        { label: 'Yeah, that makes sense', next: 'solution_audit_proposal' },
+        { label: 'How would that work?', next: 'solution_explain_process' },
+        { label: "We're happy with them", next: 'objection_broker_happy' }
+      ]
+    },
+    objection_broker_happy: {
+      stage: 'Objection - Broker Happy',
+      text: "I get it. They're probably doing a good job.<br><br>But real quick... have you ever had like a second opinion? Where someone compared your broker's rates to the broader market just to see?<br><br><span class=\"pause-indicator\"></span><em>[PAUSE]</em>",
+      responses: [
+        { label: 'No, we just trust them', next: 'gap_creator' },
+        { label: "We've checked before", next: 'gap_creator' },
+        { label: 'Why would we need to?', next: 'gap_creator' }
+      ]
+    },
+    // ===== NEPQ 3-STEP OBJECTION FORMULA: BROKER HANDLING (Legacy - kept for backward compatibility) =====
     nepq_broker_clarify: {
       stage: 'NEPQ Objection - Broker',
       text: "<span class=\"tone-marker confused\">🔄 NEPQ 3-STEP: CLARIFY</span><br><br><span class=\"tone-marker confused\">CONFUSED TONE</span> (like you don't understand)<br><br>\"Oh... <span class=\"pause-indicator\"></span> you use a broker... <span class=\"pause-indicator\"></span><br><br>Can I ask... <span class=\"pause-indicator\"></span> what do you mean by that?\"<br><br><em>⏸️ Don't assume. Make them explain.</em>",
@@ -2154,14 +2218,21 @@
     },
     // ===== OBJECTION HANDLING (ARC Framework: Acknowledge, Reframe, Close) =====
     objection_not_interested: {
-      stage: 'Objection Handling',
-      text: "<span class=\"tone-marker understanding\">ARC: Acknowledge</span> <span class=\"pause-indicator\"></span> I totally understand. <span class=\"pause-indicator\"></span> You've got a solution that's working, and changing is risky.<br><br><span class=\"tone-marker curious\">Reframe</span> <span class=\"pause-indicator\"></span> Real quick question though— <span class=\"pause-indicator\"></span> have you had a second opinion on your current rates in the last 12-18 months? <span class=\"pause-indicator\"></span> Because we typically find that companies are overpaying 15-20% just because they haven't seen the full market.<br><br><span class=\"tone-marker confident\">Close</span> <span class=\"pause-indicator\"></span> What if we just ran an audit to see what the market's actually quoting right now? <span class=\"pause-indicator\"></span> No obligation. <span class=\"pause-indicator\"></span> If your current rates are competitive, I'll tell you that. <span class=\"pause-indicator\"></span> If there's a gap, now you know.",
+      stage: 'Objection - Not Interested',
+      text: "Fair enough. Can I ask why? Is it because you're happy with what you're paying right now... or more just not a priority at the moment?<br><br><span class=\"pause-indicator\"></span><em>[PAUSE]</em>",
       responses: [
-        { label: "That sounds reasonable", next: 'situation_discovery' },
-        { label: 'Already have solution', next: 'objection_happy_supplier' },
-        { label: 'We use a broker', next: 'broker_audit_intro' },
-        { label: 'Not a priority', next: 'objection_not_priority' },
-        { label: 'Just not interested', next: 'respect_decision' }
+        { label: 'Happy with rates', next: 'confidence_challenge' },
+        { label: 'Just not a priority', next: 'consequence_challenge' },
+        { label: 'Still not interested', next: 'close_respect_decision' }
+      ]
+    },
+    consequence_challenge: {
+      stage: 'Objection - Consequence Challenge',
+      text: "I get it, not a priority right now. But here's the thing... while you're handling everything else, your electricity costs are going up in the background. And nobody's shopping, so you're locked in at rates way higher than new customers get.<br><br>When renewal hits... it's a crisis. No leverage, stuck.<br><br>What would that cost you? Maybe {{potential_savings}} over like 3 years?",
+      responses: [
+        { label: "Wow, didn't think about it like that", next: 'solution_audit_proposal' },
+        { label: "That's a good point", next: 'solution_audit_proposal' },
+        { label: 'Still not interested', next: 'close_respect_decision' }
       ]
     },
     objection_happy_supplier: {
@@ -2284,6 +2355,11 @@
         { label: 'Start New Call', next: 'start' }
       ]
     },
+    close_respect_decision: {
+      stage: 'Close - Respected',
+      text: "Totally fair. No pressure at all.<br><br>But hey, if anything changes or you ever want to just see what the market's doing, feel free to reach out.<br><br>Take care.",
+      responses: []
+    },
     respect_decision: {
       stage: 'Closing',
       text: "<span class=\"tone-marker professional\">professional, authentic tone</span> <span class=\"pause-indicator\"></span> Look, I'm not here to convince you that your broker is bad. <span class=\"pause-indicator\"></span> I'm here to help you see the full market. <span class=\"pause-indicator\"></span> You're a smart operator—you'll make the right call.<br><br>But I'd hate for you to find out 2 years from now that the market was way lower and you could've locked it in early. <span class=\"pause-indicator\"></span> That's money that could've stayed in your business.<br><br>Fair enough though. <span class=\"pause-indicator\"></span> I appreciate the time. <span class=\"pause-indicator\"></span> If anything changes or you want to explore options, <span class=\"pause-indicator\"></span> you know how to reach me. <span class=\"pause-indicator\"></span> Have a great day!",
@@ -2293,7 +2369,7 @@
     },
     gatekeeper_intro: {
       stage: 'Gatekeeper',
-      text: "<span class=\"tone-marker friendly\">friendly, confident tone</span> {{day.part}}, this is Lewis. <span class=\"pause-indicator\"></span> Just a quick question — how does your company typically handle energy contract renewals? <span class=\"pause-indicator\"></span> Is that something the {{contact.title}} handles, or is {{contact.first_name}} the right person?",
+      text: "<span class=\"tone-marker friendly\">friendly, confident tone</span> {{day.part}}, this is {{agent.first_name}}. <span class=\"pause-indicator\"></span> Just a quick question — how does your company typically handle energy contract renewals? <span class=\"pause-indicator\"></span> Is that something the {{contact.title}} handles, or is {{contact.first_name}} the right person?",
       responses: [
         { label: "Who should I connect you with?", next: 'gatekeeper_connect_request' },
         { label: "What is this about?", next: 'gatekeeper_what_about' },
@@ -2514,7 +2590,7 @@
   // Expose opener state for phone widget to sync (will be set up later when module is fully initialized)
 
   // Elements
-  function els(){
+  function els() {
     return {
       display: document.getElementById('call-scripts-display'),
       responses: document.getElementById('call-scripts-responses'),
@@ -2534,10 +2610,10 @@
       el.style.height = startHeight + 'px';
       el.style.overflow = 'hidden';
       el.style.transition = `height ${duration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
-      
+
       // Apply content changes
       applyChangesFn();
-      
+
       // Double RAF for reliable layout after DOM mutations
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -2551,15 +2627,15 @@
             el.style.overflow = '';
             return;
           }
-          
+
           const cleanup = () => {
             el.style.height = '';
             el.style.transition = '';
             el.style.overflow = '';
           };
-          
+
           const timer = setTimeout(cleanup, duration + 50);
-          el.addEventListener('transitionend', function handler(ev){
+          el.addEventListener('transitionend', function handler(ev) {
             if (ev.propertyName === 'height') {
               clearTimeout(timer);
               cleanup();
@@ -2567,8 +2643,8 @@
           }, { once: true });
         });
       });
-    } catch(_) {
-      try { applyChangesFn(); } catch(e) {}
+    } catch (_) {
+      try { applyChangesFn(); } catch (e) { }
     }
   }
 
@@ -2601,7 +2677,7 @@
             return window.DataManager.getCurrentUserEmail();
           }
           return (window.currentUserEmail || '').toLowerCase();
-        } catch(_) {
+        } catch (_) {
           return (window.currentUserEmail || '').toLowerCase();
         }
       };
@@ -2610,25 +2686,25 @@
           if (window.firebase && window.firebase.auth && window.firebase.auth().currentUser) {
             return window.firebase.auth().currentUser.uid;
           }
-        } catch(_) {}
+        } catch (_) { }
         return null;
       };
-      
+
       const email = getUserEmail();
       const userId = getCurrentUserId();
       if (!email) return;
-      
+
       // Use per-user document pattern from settings.js
       const docId = `call-scripts-${email}`;
       const docRef = window.firebaseDB.collection('settings').doc(docId);
-      
+
       const updateData = {
         openerKey: openerKey,
         ownerId: email,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       };
       if (userId) updateData.userId = userId;
-      
+
       // Check if document exists
       const doc = await docRef.get();
       if (doc.exists) {
@@ -2640,7 +2716,7 @@
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
       }
-    } catch(err) {
+    } catch (err) {
       console.warn('[Call Scripts] Could not save opener selection:', err);
     }
   }
@@ -2655,17 +2731,17 @@
             return window.DataManager.getCurrentUserEmail();
           }
           return (window.currentUserEmail || '').toLowerCase();
-        } catch(_) {
+        } catch (_) {
           return (window.currentUserEmail || '').toLowerCase();
         }
       };
       const email = getUserEmail();
       if (!email) return;
-      
+
       // Use per-user document like settings.js
       const docId = `call-scripts-${email}`;
       const doc = await window.firebaseDB.collection('settings').doc(docId).get();
-      
+
       if (doc.exists) {
         const data = doc.data();
         if (data && data.openerKey) {
@@ -2679,13 +2755,13 @@
               OPENER_CONFIGS.social_proof,
               OPENER_CONFIGS.quick_check
             ];
-            
+
             // Set current opener to saved one
             currentOpener = savedOpener;
-            
+
             // Build availableOpeners: all openers except the saved one
             availableOpeners = allOpeners.filter(o => o.key !== savedOpener.key);
-            
+
             updateHookOpener();
           }
         } else {
@@ -2708,7 +2784,7 @@
           OPENER_CONFIGS.quick_check
         ];
       }
-    } catch(err) {
+    } catch (err) {
       console.warn('[Call Scripts] Could not load saved opener:', err);
       // On error, reset to clean initial state
       currentOpener = OPENER_CONFIGS.default;
@@ -2793,17 +2869,17 @@
     const selector = document.createElement('div');
     selector.id = 'call-scripts-opener-selector';
     selector.className = 'opener-selector';
-    
+
     // Build list of all openers, avoiding duplicates
     const seenKeys = new Set();
     const allOpeners = [];
-    
+
     // Add current opener first
     if (currentOpener && !seenKeys.has(currentOpener.key)) {
       allOpeners.push(currentOpener);
       seenKeys.add(currentOpener.key);
     }
-    
+
     // Add available openers (excluding current)
     availableOpeners.forEach(opener => {
       if (opener && opener.key && !seenKeys.has(opener.key) && opener.key !== currentOpener.key) {
@@ -2811,14 +2887,14 @@
         seenKeys.add(opener.key);
       }
     });
-    
+
     selector.innerHTML = `
       <div class="opener-selector-label">Choose Your Opener:</div>
       <div class="opener-buttons">
         ${allOpeners.map(opener => {
-          const isActive = currentOpener.key === opener.key;
-          return `<button class="opener-btn ${isActive ? 'active' : ''}" data-opener="${opener.key}">${opener.label}</button>`;
-        }).join('')}
+      const isActive = currentOpener.key === opener.key;
+      return `<button class="opener-btn ${isActive ? 'active' : ''}" data-opener="${opener.key}">${opener.label}</button>`;
+    }).join('')}
       </div>
     `;
 
@@ -2844,16 +2920,16 @@
           currentOpener = opener;
           availableOpeners = availableOpeners.filter(o => o.key !== opener.key);
           availableOpeners.push(oldDefault);
-          
+
           updateHookOpener();
           buildOpenerSelector();
-          
+
           // Save to Firebase immediately
           saveOpenerSelection(openerKey);
-          
+
           // If we're at opening phase, jump to the new opener to update script display
-          if (state.current === 'hook' || state.current === 'pattern_interrupt_opening' || 
-              state.current.startsWith('opener_')) {
+          if (state.current === 'hook' || state.current === 'pattern_interrupt_opening' ||
+            state.current.startsWith('opener_')) {
             state.history.push({
               current: state.current,
               responseLabel: `Switched to ${opener.label} opener`
@@ -2870,13 +2946,13 @@
   function updateOpenerSelectorVisibility() {
     const selector = document.getElementById('call-scripts-opener-selector');
     if (!selector) return;
-    
+
     const node = FLOW[state.current] || FLOW.start;
     const showSelector = state.current === 'hook' || node.stage === 'Opening';
     selector.style.display = showSelector ? 'block' : 'none';
   }
 
-  function render(){
+  function render() {
     const { display, responses, backBtn } = els();
     const node = FLOW[state.current] || FLOW.start;
 
@@ -2889,7 +2965,7 @@
     // Build opener selector
     buildOpenerSelector();
 
-    if (display){
+    if (display) {
       const html = renderTemplate(node.text || '', 'text');
 
       // Animate script display height change after initial render
@@ -2900,13 +2976,13 @@
       }
     }
 
-    if (responses){
+    if (responses) {
       // Rebuild response buttons with an animated resize
       const buildResponses = () => {
         responses.innerHTML = '';
         responses.classList.remove('full-width');
 
-        if (state.current === 'start'){
+        if (state.current === 'start') {
           const btn = document.createElement('button');
           btn.className = 'dial-btn';
           btn.type = 'button';
@@ -2914,31 +2990,31 @@
           btn.addEventListener('click', () => go('pre_call_qualification'));
           responses.appendChild(btn);
           responses.classList.add('full-width');
-        } else if (state.current === 'situation_discovery' || 
-                   state.current === 'ack_confident_handle' || 
-                   state.current === 'ack_struggling' || 
-                   state.current === 'ack_no_idea' ||
-                   state.current === 'ack_dq_confident' ||
-                   state.current === 'ack_dq_struggling' ||
-                   state.current === 'ack_vendor_handling') {
+        } else if (state.current === 'situation_discovery' ||
+          state.current === 'ack_confident_handle' ||
+          state.current === 'ack_struggling' ||
+          state.current === 'ack_no_idea' ||
+          state.current === 'ack_dq_confident' ||
+          state.current === 'ack_dq_struggling' ||
+          state.current === 'ack_vendor_handling') {
           // Special handling for monthly spend input - all states that ask about monthly spending
           const inputWrap = document.createElement('div');
           inputWrap.className = 'monthly-spend-input-wrap';
           inputWrap.style.cssText = 'width: 100%; margin-bottom: 12px;';
-          
+
           const label = document.createElement('label');
           label.textContent = 'Monthly Spend:';
           label.style.cssText = 'display: block; margin-bottom: 6px; color: var(--text-primary); font-size: 14px;';
           inputWrap.appendChild(label);
-          
+
           const inputContainer = document.createElement('div');
           inputContainer.style.cssText = 'display: flex; gap: 8px; align-items: center;';
-          
+
           const dollarSign = document.createElement('span');
           dollarSign.textContent = '$';
           dollarSign.style.cssText = 'color: var(--text-primary); font-size: 16px; font-weight: 500;';
           inputContainer.appendChild(dollarSign);
-          
+
           const input = document.createElement('input');
           input.type = 'number';
           input.placeholder = 'Enter amount (e.g., 5000)';
@@ -2952,7 +3028,7 @@
           inputContainer.appendChild(input);
           inputWrap.appendChild(inputContainer);
           responses.appendChild(inputWrap);
-          
+
           const nextBtn = document.createElement('button');
           nextBtn.className = 'response-btn';
           nextBtn.type = 'button';
@@ -2974,11 +3050,11 @@
             }
           });
           responses.appendChild(nextBtn);
-          
+
           // Add "Don't know offhand" button (different labels based on state)
-          const dontKnowLabel = state.current === 'ack_no_idea' ? "Honestly don't have a guess" : 
-                                state.current === 'ack_confident_handle' || state.current === 'ack_dq_confident' || state.current === 'ack_dq_struggling' ? "Don't know exact amount" :
-                                "Don't know offhand";
+          const dontKnowLabel = state.current === 'ack_no_idea' ? "Honestly don't have a guess" :
+            state.current === 'ack_confident_handle' || state.current === 'ack_dq_confident' || state.current === 'ack_dq_struggling' ? "Don't know exact amount" :
+              "Don't know offhand";
           const dontKnowBtn = document.createElement('button');
           dontKnowBtn.className = 'response-btn';
           dontKnowBtn.type = 'button';
@@ -3013,7 +3089,7 @@
       }
     }
 
-    if (backBtn){
+    if (backBtn) {
       backBtn.disabled = state.history.length === 0;
     }
 
@@ -3021,7 +3097,7 @@
     state._didInitialRender = true;
   }
 
-  function go(next, responseLabel){
+  function go(next, responseLabel) {
     if (!next || !FLOW[next]) return;
     state.history.push({
       current: state.current,
@@ -3031,14 +3107,14 @@
     render();
   }
 
-  function back(){
+  function back() {
     if (state.history.length === 0) return;
     const prev = state.history.pop();
     state.current = typeof prev === 'object' ? prev.current : prev;
     render();
   }
 
-  function restart(){
+  function restart() {
     state.current = 'start';
     state.history = [];
     state.monthlySpend = null;
@@ -3058,24 +3134,24 @@
     render();
   }
 
-  function handleBackToPrevious(){
+  function handleBackToPrevious() {
     console.log('[Call Scripts] Back button clicked, checking navigation source...');
-    
+
     // Check if we have a stored navigation source
     const navigationSource = window._callScriptsNavigationSource;
     const returnState = window._callScriptsReturn;
-    
+
     console.log('[Call Scripts] Navigation source:', navigationSource, 'Return state:', returnState);
-    
+
     if (navigationSource && returnState) {
       // Clear the navigation variables first
       window._callScriptsNavigationSource = null;
       window._callScriptsReturn = null;
-      
+
       // Navigate back to the source page
       if (window.crm && typeof window.crm.navigateToPage === 'function') {
         window.crm.navigateToPage(navigationSource);
-        
+
         // Dispatch restore event after a short delay to ensure page is ready
         setTimeout(() => {
           const restoreEvent = new CustomEvent(`pc:${navigationSource}-restore`, {
@@ -3094,17 +3170,17 @@
     }
   }
 
-  function bind(){
+  function bind() {
     const { backBtn, backToPreviousBtn, restartBtn, toolbar } = els();
-    if (backBtn && !backBtn._bound){ backBtn.addEventListener('click', back); backBtn._bound = true; }
-    if (backToPreviousBtn && !backToPreviousBtn._bound){ 
-      backToPreviousBtn.addEventListener('click', handleBackToPrevious); 
-      backToPreviousBtn._bound = true; 
+    if (backBtn && !backBtn._bound) { backBtn.addEventListener('click', back); backBtn._bound = true; }
+    if (backToPreviousBtn && !backToPreviousBtn._bound) {
+      backToPreviousBtn.addEventListener('click', handleBackToPrevious);
+      backToPreviousBtn._bound = true;
     }
-    if (restartBtn && !restartBtn._bound){ restartBtn.addEventListener('click', restart); restartBtn._bound = true; }
+    if (restartBtn && !restartBtn._bound) { restartBtn.addEventListener('click', restart); restartBtn._bound = true; }
 
     // Ensure the contact search UI exists under the title
-    try { ensureContactSearchUI(); } catch(_) {}
+    try { ensureContactSearchUI(); } catch (_) { }
 
     // Inject Widgets control (square button + hoverable drawer) to the right of Restart
     if (toolbar && !toolbar._widgetsBound) {
@@ -3189,10 +3265,10 @@
               const { contact } = getLiveData();
               const contactId = contact && (contact.id || contact.contactId || contact._id);
               if (!contactId) { window.crm?.showToast && window.crm.showToast('No contact detected'); return; }
-              if (which === 'health') { try { window.Widgets?.openHealth && window.Widgets.openHealth(contactId); } catch(_) {} }
-              else if (which === 'deal') { try { window.Widgets?.openDeal && window.Widgets.openDeal(contactId); } catch(_) {} }
-              else if (which === 'notes') { try { window.Widgets?.openNotes && window.Widgets.openNotes(contactId); } catch(_) {} }
-              else if (which === 'maps') { try { window.Widgets?.openMaps && window.Widgets.openMaps(contactId); } catch(_) {} }
+              if (which === 'health') { try { window.Widgets?.openHealth && window.Widgets.openHealth(contactId); } catch (_) { } }
+              else if (which === 'deal') { try { window.Widgets?.openDeal && window.Widgets.openDeal(contactId); } catch (_) { } }
+              else if (which === 'notes') { try { window.Widgets?.openNotes && window.Widgets.openNotes(contactId); } catch (_) { } }
+              else if (which === 'maps') { try { window.Widgets?.openMaps && window.Widgets.openMaps(contactId); } catch (_) { } }
               closeSoon();
             } catch (err) { console.warn('Widget open failed', err); }
           });
@@ -3205,7 +3281,7 @@
   }
 
   // ===== Contact search UI (autocomplete) =====
-  function ensureContactSearchUI(){
+  function ensureContactSearchUI() {
     const page = document.getElementById('call-scripts-page');
     if (!page) return;
     const header = page.querySelector('.page-header .page-title-section');
@@ -3234,15 +3310,15 @@
     updateSearchFromContext();
   }
 
-  function getAccountKeyForMatch(a){
-    return String((a && (a.accountName||a.name||a.companyName||''))||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+  function getAccountKeyForMatch(a) {
+    return String((a && (a.accountName || a.name || a.companyName || '')) || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
-  function buildSuggestions(query){
+  function buildSuggestions(query) {
     const input = document.getElementById('call-scripts-contact-search');
     const panel = document.getElementById('call-scripts-search-suggestions');
     if (!input || !panel) return;
-    const q = String(query||'').trim().toLowerCase();
+    const q = String(query || '').trim().toLowerCase();
     const people = getPeopleCache();
     const { account, contact: liveContact } = getLiveData();
     const accKey = getAccountKeyForMatch(account);
@@ -3250,10 +3326,10 @@
 
     // Score contacts
     const scored = people.map(p => {
-      const name = String(p.name || (p.firstName||'') + ' ' + (p.lastName||'')).trim();
-      const email = String(p.email||'').toLowerCase();
-      const phone = String(p.workDirectPhone||p.mobile||p.otherPhone||p.phone||'');
-      const company = String(p.companyName||p.company||p.accountName||'');
+      const name = String(p.name || (p.firstName || '') + ' ' + (p.lastName || '')).trim();
+      const email = String(p.email || '').toLowerCase();
+      const phone = String(p.workDirectPhone || p.mobile || p.otherPhone || p.phone || '');
+      const company = String(p.companyName || p.company || p.accountName || '');
       let score = 0;
       if (accKey) {
         const ck = getAccountKeyForMatch({ accountName: company });
@@ -3267,27 +3343,27 @@
         if (name.toLowerCase().includes(qq)) score += 30;
         if (email.includes(qq)) score += 20;
         if (company.toLowerCase().includes(qq)) score += 10;
-        if (String(phone).replace(/\D/g,'').includes(qq.replace(/\D/g,''))) score += 15;
+        if (String(phone).replace(/\D/g, '').includes(qq.replace(/\D/g, ''))) score += 15;
       }
       return { p, score, name, email, phone, company };
     }).filter(x => x.score > 0 || !q); // when query, require matches; temporary for no-query handling below
 
-    scored.sort((a,b) => b.score - a.score);
+    scored.sort((a, b) => b.score - a.score);
     let top = scored;
     // Exact/prefix match preference when NOT in a live call
     if (q && !isLive) {
       const qn = normName(q);
-      const exact = scored.filter(({name}) => normName(name) === qn);
+      const exact = scored.filter(({ name }) => normName(name) === qn);
       if (exact.length) {
         top = exact;
       } else {
-        const prefix = scored.filter(({name}) => normName(name).startsWith(qn));
+        const prefix = scored.filter(({ name }) => normName(name).startsWith(qn));
         if (prefix.length) top = prefix;
       }
     }
     // If no query and we have an account context, prefer ONLY same-company contacts
     if (!q && accKey) {
-      const sameCo = scored.filter(({company}) => {
+      const sameCo = scored.filter(({ company }) => {
         const ck = getAccountKeyForMatch({ accountName: company });
         return ck && (ck === accKey || ck.includes(accKey) || accKey.includes(ck));
       });
@@ -3298,19 +3374,19 @@
     if (top.length === 0) {
       panel.innerHTML = '<div class="suggestion-empty">No matches</div>';
       panel.hidden = false;
-      input.setAttribute('aria-expanded','true');
+      input.setAttribute('aria-expanded', 'true');
       return;
     }
 
-    panel.innerHTML = top.map(({p, name, email, company}) => {
+    panel.innerHTML = top.map(({ p, name, email, company }) => {
       const cid = String(p.id || p.contactId || p._id || '');
       const label = escapeHtml(name || '(No name)');
       const title = escapeHtml(p.title || p.jobTitle || '');
       const companyName = escapeHtml(company || '');
-      
+
       // Get first letter for glyph
       const firstLetter = (name || '?').charAt(0).toUpperCase();
-      
+
       return `<div class="suggestion-item" role="option" data-contact-id="${escapeHtml(cid)}">
         <div class="sugg-glyph">${firstLetter}</div>
         <div class="sugg-content">
@@ -3321,18 +3397,18 @@
       </div>`;
     }).join('');
     panel.hidden = false;
-    input.setAttribute('aria-expanded','true');
+    input.setAttribute('aria-expanded', 'true');
   }
 
-  function closeSuggestions(){
+  function closeSuggestions() {
     const panel = document.getElementById('call-scripts-search-suggestions');
     const input = document.getElementById('call-scripts-contact-search');
     if (!panel) return;
     panel.hidden = true;
-    if (input) input.setAttribute('aria-expanded','false');
+    if (input) input.setAttribute('aria-expanded', 'false');
   }
 
-  function setSelectedContact(contactId){
+  function setSelectedContact(contactId) {
     state.overrideContactId = contactId ? String(contactId) : null;
     // Update input value
     try {
@@ -3340,23 +3416,23 @@
       if (input) {
         const people = getPeopleCache();
         const sel = people.find(p => {
-          const pid = String(p.id||'');
-          const alt1 = String(p.contactId||'');
-          const alt2 = String(p._id||'');
-          const target = String(contactId||'');
-          return pid===target || alt1===target || alt2===target;
+          const pid = String(p.id || '');
+          const alt1 = String(p.contactId || '');
+          const alt2 = String(p._id || '');
+          const target = String(contactId || '');
+          return pid === target || alt1 === target || alt2 === target;
         });
-        const nm = sel ? (sel.name || ((sel.firstName||'') + ' ' + (sel.lastName||''))).trim() : '';
+        const nm = sel ? (sel.name || ((sel.firstName || '') + ' ' + (sel.lastName || ''))).trim() : '';
         input.value = nm || '';
       }
-    } catch(_) {}
+    } catch (_) { }
     // Close suggestions if open
-    try { closeSuggestions(); } catch(_) {}
+    try { closeSuggestions(); } catch (_) { }
     // Re-render scripts with new context
     render();
   }
 
-  function updateSearchFromContext(){
+  function updateSearchFromContext() {
     const input = document.getElementById('call-scripts-contact-search');
     if (!input) return;
     // Do not override when user has explicitly selected a contact
@@ -3365,17 +3441,17 @@
     // Don't auto-fill name - keep search bar empty for user to type
     // const liveName = (contact && (contact.name || ((contact.firstName||'') + ' ' + (contact.lastName||''))).trim()) || '';
     // if (liveName) input.value = liveName;
-    
+
     // If calling a company number (no live contact id but have account), pre-open suggestions with that account's contacts
     const hasContactId = !!(contact && contact.id);
-    const hasAccount = !!(account && (account.accountName||account.name||account.companyName));
+    const hasAccount = !!(account && (account.accountName || account.name || account.companyName));
     if (!hasContactId && hasAccount) {
       // Don't auto-open suggestions - let user type to search
       // buildSuggestions('');
     }
   }
 
-  function wireSearchHandlers(){
+  function wireSearchHandlers() {
     const input = document.getElementById('call-scripts-contact-search');
     const panel = document.getElementById('call-scripts-search-suggestions');
     if (!input || !panel) return;
@@ -3401,11 +3477,11 @@
         const qVal = normName(val);
         if (!qVal) return;
         const people = getPeopleCache();
-        const exactMatches = people.filter(p => normName(p.name || ((p.firstName||'') + ' ' + (p.lastName||''))) === qVal);
+        const exactMatches = people.filter(p => normName(p.name || ((p.firstName || '') + ' ' + (p.lastName || ''))) === qVal);
         if (exactMatches.length === 1) {
           setSelectedContact(exactMatches[0].id || exactMatches[0].contactId || exactMatches[0]._id);
         }
-      } catch(_) {}
+      } catch (_) { }
     });
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { closeSuggestions(); return; }
@@ -3441,11 +3517,11 @@
         const people = getPeopleCache();
         const qVal = normName(input.value || '');
         if (!qVal) return;
-        const match = people.find(p => normName(p.name || ((p.firstName||'') + ' ' + (p.lastName||''))) === qVal);
+        const match = people.find(p => normName(p.name || ((p.firstName || '') + ' ' + (p.lastName || ''))) === qVal);
         if (match) {
           setSelectedContact(match.id);
         }
-      } catch(_) {}
+      } catch (_) { }
     });
 
     // Click selection
@@ -3465,7 +3541,7 @@
     });
   }
 
-  function init(){
+  function init() {
     bind();
     // Load saved opener preference first, then restart
     loadSavedOpener().then(() => {
@@ -3481,11 +3557,11 @@
       const card = document.getElementById('phone-widget');
       if (card) {
         const obs = new MutationObserver(() => {
-          try { render(); updateSearchFromContext(); } catch(_) {}
+          try { render(); updateSearchFromContext(); } catch (_) { }
         });
         obs.observe(card, { attributes: true, attributeFilter: ['class'] });
       }
-    } catch(_){ }
+    } catch (_) { }
   }
 
   // Eager-load opener preference on module load (so phone widget can use it)
@@ -3494,7 +3570,7 @@
     try {
       await loadSavedOpener();
       updateHookOpener();
-    } catch(_) {
+    } catch (_) {
       // Silently fail - opener will load when page is visited
     }
   })();
