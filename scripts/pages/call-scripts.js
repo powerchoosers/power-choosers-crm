@@ -507,15 +507,8 @@
       ]
     },
     opening_industry_context: {
-      stage: 'Opening - Industry Context',
-      text: "Perfect. So I work with {{account.industry}} companies on electricity procurement.<br><br><span class=\"pause-indicator\"></span> <em>[PAUSE 1 second - let that land]</em>",
-      responses: [
-        { label: 'Continue to problem', next: 'problem_bridge' }
-      ]
-    },
-    problem_bridge: {
-      stage: "Problem Bridge - Why I'm Calling",
-      text: "Perfect. So I'm reaching out because most {{account.industry}} companies your size are overpaying on electricity...<br><br><span class=\"pause-indicator\"></span><em>[PAUSE]</em><br><br>Not because they're doing anything wrong... just because they handle it the same way most companies do.<br><br><span class=\"pause-indicator\"></span><em>[PAUSE]</em><br><br>Are you involved in how {{account.name}} handles electricity?",
+      stage: 'Opening - Industry Context & Problem Bridge',
+      text: "Perfect. So I work with {{account.industry}} companies on electricity procurement.<br><br><span class=\"pause-indicator\"></span> <em>[PAUSE 1 second - let that land]</em><br><br>And im reaching out because most companies in {{account.city}} are overpaying on electricity...<br><br><span class=\"pause-indicator\"></span><em>[PAUSE]</em><br><br>not because they're doing anything wrong...<br><br>its because the market's set up in a way that makes it really hard to see what's available.<br><br><span class=\"pause-indicator\"></span><em>[PAUSE]</em><br><br>Are you involved in how {{account.name}} handles electricity?",
       responses: [
         { label: 'Yeah, somewhat', next: 'timing_qualification' },
         { label: 'I handle it', next: 'timing_qualification' },
@@ -725,8 +718,8 @@
       stage: 'Opening - Transferred Warmup',
       text: "Hey {{contact.first_name}}! Thanks for picking up. {{previousContact}} passed me over to you.<br><br>I know this is kind of random... but do you have about 30 seconds?",
       responses: [
-        { label: 'Yeah, go ahead', next: 'problem_bridge' },
-        { label: 'What is this about?', next: 'problem_bridge' },
+        { label: 'Yeah, go ahead', next: 'opening_industry_context' },
+        { label: 'What is this about?', next: 'opening_industry_context' },
         { label: 'Not a good time', next: 'reschedule_callback' }
       ]
     },

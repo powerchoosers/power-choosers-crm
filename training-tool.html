@@ -1597,7 +1597,7 @@
                 responses: [
                     { label: '10 to 20 suppliers', next: 'gap_revealed' },
                     { label: '50 suppliers', next: 'gap_revealed' },
-                    { label: '100 plus', next: 'gap_revealed' },
+                    { label: '100 plus', next: 'consequence_quantify' },
                     { label: 'I have no idea', next: 'gap_revealed' }
                 ]
             },
@@ -1605,8 +1605,8 @@
                 stage: 'Discovery - Gap Revealed',
                 text: "Actually, there's like 100 plus suppliers out there.<br><br><span class=\"pause-indicator\"></span><em>[PAUSE 3 SECONDS - let this sink in]</em><br><br>So if there's a supplier quoting 15, 20 percent lower than your current rate... you probably wouldn't even know about them.<br><br><span class=\"pause-indicator\"></span><em>[PAUSE 2 SECONDS]</em><br><br>I mean, has that ever crossed your mind? That there could be better rates out there that you're just not seeing?",
                 responses: [
-                    { label: 'Yeah, that bothers me', next: 'nepq_situation_questions' },
-                    { label: 'I guess I never thought about it', next: 'nepq_situation_questions' },
+                    { label: 'Yeah, that bothers me', next: 'consequence_quantify' },
+                    { label: 'I guess I never thought about it', next: 'consequence_quantify' },
                     { label: 'Not really', next: 'confidence_challenge' },
                     { label: 'We trust our current supplier', next: 'confidence_challenge' }
                 ]
