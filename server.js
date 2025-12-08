@@ -1061,7 +1061,21 @@ const server = http.createServer(async (req, res) => {
     const data = await fs.promises.readFile(filePath);
     const contentType = getContentType(filePath);
     logger.debug('Successfully served static file', 'Server', { filePath, contentType });
-    res.writeHead(200, { 'Content-Type': contentType });
+    
+    // Set cache headers - no cache for JS files to prevent stale code, short cache for others
+    const headers = { 'Content-Type': contentType };
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.js' || ext === '.mjs') {
+      // No cache for JavaScript files to ensure latest code is always loaded
+      headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private, max-age=0';
+      headers['Pragma'] = 'no-cache';
+      headers['Expires'] = '0';
+    } else {
+      // Short cache for other static files (CSS, images, etc.)
+      headers['Cache-Control'] = 'public, max-age=300, must-revalidate';
+    }
+    
+    res.writeHead(200, headers);
     res.end(data);
   } catch (error) {
     logger.error('Error reading file', 'Server', { filePath, error: error.message });
