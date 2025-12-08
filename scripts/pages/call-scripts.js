@@ -532,7 +532,7 @@
     },
     key_question_confidence: {
       stage: 'Discovery - Key Question',
-      text: "So [however many they said]...<br><br><span class=\"pause-indicator\"></span><em>[PAUSE 2 seconds]</em><br><br>How confident are you that's actually enough to make sure you're getting competitive pricing?<br><br><span class=\"pause-indicator\"></span><em>[PAUSE - silence is your friend]</em>",
+      text: "So [however many they said]...<br><br><span class=\"pause-indicator\"></span><em>[PAUSE 2 seconds - let that sink in]</em><br><br>How confident are you that's actually enough to make sure you're getting competitive pricing?<br><br><span class=\"pause-indicator\"></span><em>[PAUSE - silence is your friend here. Let them think.]</em>",
       responses: [
         { label: 'Pretty confident', next: 'probe_confidence' },
         { label: 'They work fine', next: 'probe_confidence' },
@@ -583,7 +583,7 @@
     },
     gap_revealed: {
       stage: 'Discovery - Gap Revealed',
-      text: "Actually, there's like 100 plus suppliers out there.<br><br><span class=\"pause-indicator\"></span><em>[PAUSE 3 seconds]</em><br><br>So if there's a supplier quoting 15, 20 percent lower than your current rate... you probably wouldn't even know about them.<br><br><span class=\"pause-indicator\"></span><em>[PAUSE 2 seconds]</em><br><br>I mean, has that ever crossed your mind? That there could be better rates out there that you're just not seeing?",
+      text: "Actually, there's like 100 plus suppliers out there.<br><br><span class=\"pause-indicator\"></span><em>[PAUSE 3 SECONDS - let this sink in]</em><br><br>So if there's a supplier quoting 15, 20 percent lower than your current rate... you probably wouldn't even know about them.<br><br><span class=\"pause-indicator\"></span><em>[PAUSE 2 SECONDS]</em><br><br>I mean, has that ever crossed your mind? That there could be better rates out there that you're just not seeing?",
       responses: [
         { label: 'Yeah, that bothers me', next: 'consequence_quantify' },
         { label: 'I guess I never thought about it', next: 'consequence_quantify' },
@@ -602,7 +602,7 @@
     },
     consequence_quantify: {
       stage: 'Discovery - Consequence Quantified',
-      text: "So here's what I'm thinking... you're spending {{monthly_spend}} a month on electricity right now, right?<br><br>And if there's a 15, 20 percent gap you don't know about, that's roughly {{potential_savings}} a year you could be leaving on the table.<br><br><span class=\"pause-indicator\"></span><em>[PAUSE - let that land]</em><br><br>Over like 3 years, that's... well, you do the math. That's a lot of money.<br><br><span class=\"pause-indicator\"></span><em>[PAUSE 2 seconds]</em><br><br>Are you really willing to just settle for that?",
+      text: "So here's what I'm thinking... you're spending {{monthly_spend}} a month on electricity right now, right?<br><br>And if there's a 15, 20 percent gap you don't know about, that's roughly {{potential_savings}} a year you could be leaving on the table.<br><br><span class=\"pause-indicator\"></span><em>[PAUSE - let that land]</em><br><br>Over like 3 years, that's... well, you do the math. That's a lot of money.<br><br><span class=\"pause-indicator\"></span><em>[PAUSE 2 SECONDS]</em><br><br>Are you really willing to just settle for that?",
       responses: [
         { label: 'No, definitely not', next: 'solution_audit_proposal' },
         { label: 'I should look into it', next: 'solution_audit_proposal' },

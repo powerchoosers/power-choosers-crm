@@ -1,3 +1,16 @@
+console.log('[Server] Starting server.js...');
+
+// Catch any unhandled rejections before imports
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Server] Unhandled Rejection at startup:', reason);
+  console.error('[Server] Promise:', promise);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[Server] Uncaught Exception at startup:', error);
+  process.exit(1);
+});
+
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
@@ -81,11 +94,11 @@ import generateScheduledEmailsHandler from './api/generate-scheduled-emails.js';
 import sendScheduledEmailsHandler from './api/send-scheduled-emails.js';
 import processSequenceActivationsHandler from './api/process-sequence-activations.js';
 import completeSequenceTaskHandler from './api/complete-sequence-task.js';
-import backfillSequenceTasksHandler from './api/backfill-sequence-tasks.js';
+// import backfillSequenceTasksHandler from './api/backfill-sequence-tasks.js';
 import createBookingHandler from './api/create-booking.js';
 
 // ADDITIONAL IMPORTS FOR REMAINING PROXY FUNCTIONS
-import emailBackfillThreadsHandler from './api/email/backfill-threads.js';
+// import emailBackfillThreadsHandler from './api/email/backfill-threads.js';
 import emailUnsubscribeHandler from './api/email/unsubscribe.js';
 import processCallHandler from './api/process-call.js';
 import trackEmailPerformanceHandler from './api/track-email-performance.js';
@@ -720,7 +733,7 @@ const server = http.createServer(async (req, res) => {
     pathname === '/api/email/webhook' ||
     pathname === '/api/email/inbound-email' ||
     pathname === '/api/email/stats' ||
-    pathname === '/api/email/backfill-threads' ||
+    // pathname === '/api/email/backfill-threads' ||
     pathname === '/api/email/unsubscribe' ||
     pathname === '/api/recording' ||
     // New: allow generic preflight for any API path (covers phone lookup/search variants)
@@ -834,9 +847,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/email/stats') {
     return handleApiEmailStats(req, res, parsedUrl);
   }
-  if (pathname === '/api/email/backfill-threads') {
+  /* if (pathname === '/api/email/backfill-threads') {
     return handleApiEmailBackfillThreads(req, res);
-  }
+  } */
   if (pathname === '/api/email/unsubscribe') {
     return handleApiEmailUnsubscribe(req, res);
   }
@@ -852,9 +865,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/complete-sequence-task') {
     return handleApiCompleteSequenceTask(req, res);
   }
-  if (pathname === '/api/backfill-sequence-tasks') {
+  /* if (pathname === '/api/backfill-sequence-tasks') {
     return handleApiBackfillSequenceTasks(req, res);
-  }
+  } */
   if (pathname === '/api/process-call') {
     return handleApiProcessCall(req, res);
   }
@@ -1078,24 +1091,24 @@ function getStorageBucket() {
   if (!admin.apps || admin.apps.length === 0) {
     throw new Error('Firebase Admin not initialized');
   }
-  
+
   const projectId = process.env.FIREBASE_PROJECT_ID || 'power-choosers-crm';
-  
+
   // Check for _NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET first (Cloud Run env var)
   // Then FIREBASE_STORAGE_BUCKET, then default
-  let storageBucket = process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 
+  let storageBucket = process.env._NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
     process.env.FIREBASE_STORAGE_BUCKET;
-  
+
   // Remove gs:// prefix if present
   if (storageBucket && storageBucket.startsWith('gs://')) {
     storageBucket = storageBucket.replace('gs://', '');
   }
-  
+
   // If no bucket specified, use the project's default bucket name
   if (!storageBucket || (!storageBucket.includes('.') && !storageBucket.includes('gs://'))) {
     storageBucket = `${projectId}.firebasestorage.app`;
   }
-  
+
   // Use default bucket (no name = uses project default)
   try {
     return admin.storage().bucket();
@@ -1119,16 +1132,16 @@ async function handlePostRoute(req, res, slug) {
 
     // Get Firebase Storage bucket
     const bucket = getStorageBucket();
-    
+
     // Construct file path in Firebase Storage
     const filename = `${slug}.html`;
     const filePath = `posts/${filename}`;
-    
+
     logger.debug('Fetching post from Firebase Storage', 'PostRoute', { slug, filePath });
-    
+
     // Get the file from Firebase Storage
     const file = bucket.file(filePath);
-    
+
     // Check if file exists
     const [exists] = await file.exists();
     if (!exists) {
@@ -1161,12 +1174,12 @@ async function handlePostRoute(req, res, slug) {
       `);
       return;
     }
-    
+
     // Get file metadata for cache control
     const [metadata] = await file.getMetadata();
     const updatedTime = metadata.updated ? new Date(metadata.updated).getTime() : Date.now();
     const etag = `"${metadata.etag || updatedTime}"`;
-    
+
     // Check if client has cached version (If-None-Match header)
     const ifNoneMatch = req.headers['if-none-match'];
     if (ifNoneMatch === etag) {
@@ -1179,13 +1192,13 @@ async function handlePostRoute(req, res, slug) {
       res.end();
       return;
     }
-    
+
     // Download the file content
     const [fileContent] = await file.download();
     const htmlContent = fileContent.toString('utf8');
-    
+
     logger.debug('Post fetched successfully', 'PostRoute', { slug, contentLength: htmlContent.length });
-    
+
     // Serve the HTML with proper headers
     // Reduced cache time to 5 minutes with must-revalidate for faster updates
     // Load balancer will respect these headers
@@ -1197,11 +1210,11 @@ async function handlePostRoute(req, res, slug) {
       'X-Content-Type-Options': 'nosniff'
     });
     res.end(htmlContent);
-    
+
   } catch (error) {
     logger.error('Error serving post', 'PostRoute', { slug, error: error.message });
     console.error('[PostRoute] Error details:', error);
-    
+
     res.writeHead(500, { 'Content-Type': 'text/html' });
     res.end(`
       <!DOCTYPE html>
@@ -1839,6 +1852,7 @@ async function handleApiTwilioOperatorWebhook(req, res) {
 
 // Start the server with error handling
 logger.debug('Starting server', 'Server', { port: PORT });
+console.log(`[Server] About to bind to port ${PORT}...`);
 try {
   server.listen(PORT, '0.0.0.0', () => {
     logger.info('Power Choosers CRM server running', 'Server', { port: PORT });
@@ -2025,7 +2039,7 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
       const dedupeKey = `${trackingId}_${userKey}`;
       const now = Date.now();
       const lastOpen = trackingDedupeCache.get(dedupeKey);
-      
+
       if (lastOpen && (now - lastOpen) < TRACKING_DEDUPE_WINDOW_MS) {
         // Duplicate open within window - skip recording but still return pixel
         logger.debug('[Email Track] Duplicate open ignored (in-memory cache)', 'Server', {
@@ -2035,7 +2049,7 @@ async function handleApiEmailTrack(req, res, parsedUrl) {
       } else {
         // Update in-memory cache first (fast path)
         trackingDedupeCache.set(dedupeKey, now);
-        
+
         try {
           const db = admin.firestore();
           const ref = db.collection('emails').doc(trackingId);
@@ -2188,7 +2202,7 @@ async function handleApiEmailClick(req, res, parsedUrl) {
     res.end();
   } catch (error) {
     logger.error('[Email Click] Error', 'Server', { error: error.message });
-    
+
     // Try to redirect even on error
     const searchParams = new URLSearchParams(parsedUrl?.search || '');
     const fallbackUrl = searchParams.get('url') ? decodeURIComponent(searchParams.get('url')) : null;
@@ -2206,7 +2220,7 @@ async function handleApiEmailClick(req, res, parsedUrl) {
 function detectDeviceType(userAgent) {
   if (!userAgent) return 'unknown';
   const ua = userAgent.toLowerCase();
-  
+
   if (/bot|crawler|spider|googleimageproxy|feedfetcher|slurp|yahoo|bing|baidu/i.test(ua)) {
     return 'bot';
   }
@@ -2222,7 +2236,7 @@ function detectDeviceType(userAgent) {
 // Helper function to mask IP address for privacy
 function maskIpAddress(ip) {
   if (!ip || ip === 'unknown') return 'unknown';
-  
+
   // IPv4: mask last 2 octets
   if (ip.includes('.')) {
     const parts = ip.split('.');
@@ -2230,7 +2244,7 @@ function maskIpAddress(ip) {
       return `${parts[0]}.${parts[1]}.*.*`;
     }
   }
-  
+
   // IPv6: mask last half
   if (ip.includes(':')) {
     const parts = ip.split(':');
@@ -2238,7 +2252,7 @@ function maskIpAddress(ip) {
       return parts.slice(0, 4).join(':') + ':****';
     }
   }
-  
+
   return ip.substring(0, 10) + '***';
 }
 
