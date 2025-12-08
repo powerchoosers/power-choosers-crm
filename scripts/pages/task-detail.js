@@ -130,6 +130,87 @@
     });
   }
 
+  // Helper function to get LinkedIn tasks from sequences (matches tasks.js and main.js logic)
+  async function getLinkedInTasksFromSequences() {
+    const linkedInTasks = [];
+    const userEmail = getUserEmail();
+
+    try {
+      if (!window.firebaseDB) {
+        return linkedInTasks;
+      }
+
+      // Query tasks collection for sequence tasks
+      const tasksQuery = window.firebaseDB.collection('tasks')
+        .where('sequenceId', '!=', null)
+        .get();
+
+      const tasksSnapshot = await tasksQuery;
+
+      if (tasksSnapshot.empty) {
+        return linkedInTasks;
+      }
+
+      tasksSnapshot.forEach(doc => {
+        const taskData = doc.data();
+
+        // Only include LinkedIn task types
+        const taskType = String(taskData.type || '').toLowerCase();
+        if (!taskType.includes('linkedin') && !taskType.includes('li-')) {
+          return;
+        }
+
+        // Filter by ownership (non-admin users)
+        if (!isAdmin()) {
+          const ownerId = (taskData.ownerId || '').toLowerCase();
+          const assignedTo = (taskData.assignedTo || '').toLowerCase();
+          const createdBy = (taskData.createdBy || '').toLowerCase();
+          if (ownerId !== userEmail && assignedTo !== userEmail && createdBy !== userEmail) {
+            return;
+          }
+        }
+
+        // Only include pending tasks
+        if (taskData.status === 'completed') {
+          return;
+        }
+
+        // Convert Firestore data to task format
+        const task = {
+          id: taskData.id || doc.id,
+          title: taskData.title || '',
+          contact: taskData.contact || '',
+          account: taskData.account || '',
+          type: taskData.type || 'linkedin',
+          priority: taskData.priority || 'sequence',
+          dueDate: taskData.dueDate || '',
+          dueTime: taskData.dueTime || '',
+          status: taskData.status || 'pending',
+          sequenceId: taskData.sequenceId || '',
+          contactId: taskData.contactId || '',
+          accountId: taskData.accountId || '',
+          stepId: taskData.stepId || '',
+          stepIndex: taskData.stepIndex !== undefined ? taskData.stepIndex : -1,
+          isLinkedInTask: true,
+          isSequenceTask: taskData.isSequenceTask || true,
+          ownerId: taskData.ownerId || '',
+          assignedTo: taskData.assignedTo || '',
+          createdBy: taskData.createdBy || '',
+          createdAt: taskData.createdAt || (taskData.timestamp && taskData.timestamp.toDate ? taskData.timestamp.toDate().getTime() : taskData.timestamp) || Date.now(),
+          timestamp: taskData.timestamp && taskData.timestamp.toDate ? taskData.timestamp.toDate().getTime() : (taskData.timestamp || Date.now())
+        };
+
+        linkedInTasks.push(task);
+      });
+
+      console.log('[TaskDetail] Loaded', linkedInTasks.length, 'LinkedIn sequence tasks for navigation');
+    } catch (error) {
+      console.error('[TaskDetail] Error loading LinkedIn sequence tasks:', error);
+    }
+
+    return linkedInTasks;
+  }
+
   // Get primary phone data with type information (same logic as contact-detail.js)
   function getPrimaryPhoneData(contact) {
     if (!contact) return { value: '', type: 'mobile', field: 'mobile' };
@@ -1134,6 +1215,17 @@
         }
       }
 
+      // CRITICAL FIX: Always add LinkedIn sequence tasks (regardless of BackgroundTasksLoader)
+      try {
+        const linkedInTasks = await getLinkedInTasksFromSequences();
+        const allTasksMap = new Map();
+        allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
+        linkedInTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+        allTasks = Array.from(allTasksMap.values());
+      } catch (e) {
+        console.warn('Could not load LinkedIn tasks for navigation:', e);
+      }
+
       // Only query Firebase if BackgroundTasksLoader doesn't have enough data
       if (allTasks.length < 10 && window.firebaseDB) {
         try {
@@ -1199,6 +1291,11 @@
           const allTasksMap = new Map();
           allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
           firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+          
+          // CRITICAL FIX: Add LinkedIn sequence tasks (in case they weren't loaded earlier)
+          const linkedInTasks = await getLinkedInTasksFromSequences();
+          linkedInTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+          
           allTasks = Array.from(allTasksMap.values());
         } catch (e) {
           console.warn('Could not load tasks from Firebase for navigation:', e);
@@ -1442,6 +1539,11 @@
           const allTasksMap = new Map();
           allTasks.forEach(t => { if (t && t.id) allTasksMap.set(t.id, t); });
           firebaseTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+          
+          // CRITICAL FIX: Add LinkedIn sequence tasks
+          const linkedInTasks = await getLinkedInTasksFromSequences();
+          linkedInTasks.forEach(t => { if (t && t.id && !allTasksMap.has(t.id)) allTasksMap.set(t.id, t); });
+          
           allTasks = Array.from(allTasksMap.values());
         } catch (e) {
           console.warn('Could not load tasks from Firebase for navigation buttons:', e);
