@@ -199,7 +199,10 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
       }
 
       /* Sidebar */
-      .article-sidebar{position:sticky;top:120px;align-self:start;display:flex;flex-direction:column;gap:16px}
+      .article-sidebar{position:sticky;top:120px;align-self:start;display:flex;flex-direction:column;gap:16px;height:calc(100vh - 140px);overflow-y:auto;padding-right:4px;scrollbar-gutter:stable}
+      .article-sidebar::-webkit-scrollbar{width:10px}
+      .article-sidebar::-webkit-scrollbar-thumb{background:rgba(15,23,42,.12);border-radius:999px}
+      .article-sidebar::-webkit-scrollbar-track{background:transparent}
       .sidebar-card{background:linear-gradient(135deg,#ffffff 0%, #fafbfc 100%);border:1px solid rgba(229,231,235,.6);border-radius:var(--radius);padding:20px;box-shadow:0 4px 12px rgba(0,0,0,.05)}
       .sidebar-card h3{font-size:18px;font-weight:700;margin:0 0 10px;color:var(--brand-blue)}
       .sidebar-card p{margin:0 0 12px;color:var(--muted);line-height:1.6;font-size:14px}
@@ -214,7 +217,7 @@ function generatePostHTML(post, recentPosts = [], authorInfo = null) {
 
       @media (max-width: 1100px){
         .article-layout{grid-template-columns:1fr}
-        .article-sidebar{position:static;flex-direction:row;flex-wrap:wrap}
+        .article-sidebar{position:static;flex-direction:row;flex-wrap:wrap;height:auto;overflow:visible;padding-right:0}
         .sidebar-card{flex:1 1 260px}
       }
       @media (max-width: 768px){
