@@ -6512,11 +6512,6 @@ function initializeCRM() {
         window.initGlobalSearch();
     }
     
-    // Load sequence debugging tools
-    const debugScript = document.createElement('script');
-    debugScript.src = 'scripts/debug-sequence-flow.js';
-    debugScript.async = true;
-    document.head.appendChild(debugScript);
 }
 
 // Call immediately if DOM is already loaded, otherwise wait
