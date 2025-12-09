@@ -731,8 +731,8 @@ var console = {
       .task-popover .close-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0; background: var(--bg-item); color: var(--grey-300); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer; transition: var(--transition-fast); box-sizing: border-box; }
       .task-popover .close-btn:hover { background: var(--grey-600); color: var(--text-inverse); }
 
-      .dropdown-toggle-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
-      .dropdown-toggle-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color); transform: translateY(calc(-50% - 1px)); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+      .task-popover .dropdown-toggle-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
+      .task-popover .dropdown-toggle-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color); transform: translateY(calc(-50% - 1px)); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
 
       .dropdown-toolbar, .calendar-toolbar { display: none; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); padding: 8px; }
       .dropdown-toolbar .dropdown-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -749,7 +749,7 @@ var console = {
       .dropdown-slide-in { animation: ddIn 160ms ease forwards; }
       .dropdown-slide-out { animation: ddOut 160ms ease forwards; }
       .calendar-slide-in { animation: calIn 200ms ease forwards; }
-      .calendar-slide-out { animation: calOut 200ms ease forwards; }
+      .calendar-slide-out { animation: calOut 300ms ease forwards; }
       @keyframes ddIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes ddOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-6px); } }
       @keyframes calIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
@@ -4349,7 +4349,7 @@ var console = {
       });
     }
     function openCalendar() { if (!calendarToolbar) return; renderCalendar(); calendarToolbar.style.display = 'block'; calendarToolbar.offsetHeight; calendarToolbar.classList.add('calendar-slide-in'); pop.classList.add('calendar-expanded'); }
-    function closeCalendar() { if (!calendarToolbar) return; calendarToolbar.classList.remove('calendar-slide-in'); calendarToolbar.classList.add('calendar-slide-out'); setTimeout(() => { calendarToolbar.style.display = 'none'; calendarToolbar.classList.remove('calendar-slide-out'); }, 200); pop.classList.remove('calendar-expanded'); }
+    function closeCalendar() { if (!calendarToolbar) return; calendarToolbar.classList.remove('calendar-slide-in'); calendarToolbar.classList.add('calendar-slide-out'); setTimeout(() => { calendarToolbar.style.display = 'none'; calendarToolbar.classList.remove('calendar-slide-out'); }, 350); pop.classList.remove('calendar-expanded'); }
     function toggleCalendar() { const visible = calendarToolbar && calendarToolbar.style.display === 'block'; if (visible) closeCalendar(); else openCalendar(); }
     calendarToggle?.addEventListener('click', (e) => { e.stopPropagation(); toggleCalendar(); });
     calendarToolbar?.addEventListener('mousedown', (e) => e.stopPropagation());
@@ -5654,13 +5654,14 @@ var console = {
       .task-popover .close-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0; background: var(--bg-item); color: var(--grey-300); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer; transition: var(--transition-fast); box-sizing: border-box; }
       .task-popover .close-btn:hover { background: var(--grey-600); color: var(--text-inverse); }
 
-      /* Fixed positioning for dropdown arrows - no transform on hover */
-      .dropdown-toggle-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: var(--text-muted); border: none; cursor: pointer; transition: var(--transition-fast); }
-      .dropdown-toggle-btn:hover { color: var(--text-primary); background: transparent; transform: translateY(-50%) !important; }
+      /* Fixed positioning for dropdown arrows - no transform on hover (scoped to task-popover) */
+      .task-popover .dropdown-toggle-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: var(--text-muted); border: none; cursor: pointer; transition: var(--transition-fast); }
+      .task-popover .dropdown-toggle-btn:hover { color: var(--text-primary); background: transparent; transform: translateY(-50%) !important; }
 
-      /* Fixed positioning for calendar icon - no transform on hover */
-      .calendar-toggle-btn { position: absolute; right: 8px; top: 65%; transform: translateY(-50%); width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: var(--text-muted); border: none; cursor: pointer; transition: var(--transition-fast); }
-      .calendar-toggle-btn:hover { color: var(--text-primary); background: transparent; transform: translateY(-50%) !important; }
+      /* Fixed positioning for calendar icon - no transform on hover (scoped to task-popover) */
+      .task-popover .calendar-toggle-btn { position: absolute; right: 8px; top: calc(50% + 12px); transform: translateY(-50%) !important; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; background: transparent; color: var(--text-muted); border: none; cursor: pointer; transition: color var(--transition-fast), background-color var(--transition-fast); line-height: 1; transform-origin: center center; padding: 0; }
+      .task-popover .calendar-toggle-btn:hover { color: var(--text-primary); background: transparent; top: calc(50% + 12px); transform: translateY(-50%) !important; box-shadow: none !important; transition: none !important; }
+      .task-popover .calendar-toggle-btn svg { width: 16px; height: 16px; display: block; }
 
       .dropdown-toolbar, .calendar-toolbar { display: none; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); padding: 8px; }
       .dropdown-toolbar .dropdown-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -5679,7 +5680,7 @@ var console = {
       .dropdown-slide-in { animation: ddIn 160ms ease forwards; }
       .dropdown-slide-out { animation: ddOut 160ms ease forwards; }
       .calendar-slide-in { animation: calIn 200ms ease forwards; }
-      .calendar-slide-out { animation: calOut 200ms ease forwards; }
+      .calendar-slide-out { animation: calOut 300ms ease forwards; }
       @keyframes ddIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes ddOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-6px); } }
       @keyframes calIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
@@ -5939,20 +5940,20 @@ var console = {
 
       const handleEnd = (ev) => {
         if (ev.target !== calendarToolbar) return;
-        calendarToolbar.removeEventListener('transitionend', handleEnd);
+        calendarToolbar.removeEventListener('animationend', handleEnd);
         calendarToolbar.style.display = 'none';
         calendarToolbar.classList.remove('calendar-slide-out');
         pop.classList.remove('calendar-expanded');
         position(); // Reposition popover after shrinking
       };
-      calendarToolbar.addEventListener('transitionend', handleEnd);
+      calendarToolbar.addEventListener('animationend', handleEnd);
       setTimeout(() => {
-        try { calendarToolbar.removeEventListener('transitionend', handleEnd); } catch (_) { }
+        try { calendarToolbar.removeEventListener('animationend', handleEnd); } catch (_) { }
         calendarToolbar.style.display = 'none';
         calendarToolbar.classList.remove('calendar-slide-out');
         pop.classList.remove('calendar-expanded');
         position();
-      }, 600);
+      }, 350);
     };
 
     const toggleToolbar = (el, type) => {

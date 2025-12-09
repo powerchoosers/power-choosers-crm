@@ -251,6 +251,18 @@ class ActivityManager {
     try {
       const emails = await this.fetchEmails();
       
+      // Get all contacts from CRM (people.js) - CRITICAL: Only show emails from contacts in CRM
+      const allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
+      const contactIdsSet = new Set(allContacts.map(c => c.id).filter(Boolean));
+      const contactEmailsSet = new Set(
+        allContacts
+          .map(c => {
+            const email = (c.email || '').toLowerCase().trim();
+            return email || null;
+          })
+          .filter(Boolean)
+      );
+      
       // Helper to extract email addresses from string or array
       const extractEmails = (value) => {
         if (!value) return [];
@@ -266,7 +278,28 @@ class ActivityManager {
       // Helper to normalize email for comparison
       const normalizeEmail = (email) => String(email || '').toLowerCase().trim();
       
+      // Helper to check if email is from a contact in CRM
+      const isEmailFromCrmContact = (email) => {
+        // Check by contactId
+        if (email.contactId && contactIdsSet.has(email.contactId)) {
+          return true;
+        }
+        
+        // Check by email address (to/from fields)
+        const emailTo = extractEmails(email.to);
+        const emailFrom = extractEmails(email.from);
+        const allEmailAddresses = [...emailTo, ...emailFrom];
+        
+        // Check if any email address matches a contact in CRM
+        return allEmailAddresses.some(addr => contactEmailsSet.has(addr));
+      };
+      
       for (const email of emails) {
+        // CRITICAL FILTER: Only include emails from contacts that exist in CRM
+        if (!isEmailFromCrmContact(email)) {
+          continue; // Skip emails not from CRM contacts
+        }
+        
         let shouldInclude = false;
         
         if (entityType === 'global') {
@@ -276,10 +309,9 @@ class ActivityManager {
           if (email.contactId === entityId) {
             shouldInclude = true;
           } else {
-            // Match by email address - get contact's email
-              const contacts = window.getPeopleData ? window.getPeopleData() : [];
-              const contact = contacts.find(c => c.id === entityId);
-              if (contact) {
+            // Match by email address - get contact's email from CRM
+            const contact = allContacts.find(c => c.id === entityId);
+            if (contact) {
               const contactEmail = normalizeEmail(contact.email);
               if (contactEmail) {
                 // Check if contact email matches email's to/from fields
@@ -290,14 +322,42 @@ class ActivityManager {
             }
           }
         } else if (entityType === 'account' && entityId) {
-          if (window.getPeopleData) {
-            const contacts = window.getPeopleData() || [];
-            const accountContacts = contacts.filter(c => c.accountId === entityId);
+          // First check if email has accountId directly
+          if (email.accountId === entityId) {
+            shouldInclude = true;
+          } else {
+            // Get account contacts from CRM
+            const accountContacts = allContacts.filter(c => c.accountId === entityId);
             
-            // Match by contactId
+            // Match by contactId (must be in accountContacts from CRM)
             shouldInclude = accountContacts.some(c => c.id === email.contactId);
             
-            // Also match by email address
+            // Also match by contactCompany name (only if contact is in CRM)
+            if (!shouldInclude && email.contactCompany) {
+              const account = window.getAccountsData ? 
+                (window.getAccountsData() || []).find(a => a.id === entityId) : null;
+              if (account) {
+                const accountName = account.accountName || account.name || account.companyName || '';
+                const emailCompany = String(email.contactCompany || '').trim().toLowerCase();
+                const normalizedAccountName = accountName.trim().toLowerCase();
+                if (emailCompany && normalizedAccountName && 
+                    (emailCompany === normalizedAccountName || 
+                     emailCompany.includes(normalizedAccountName) || 
+                     normalizedAccountName.includes(emailCompany))) {
+                  // Double-check: email must be from a contact in this account
+                  const emailTo = extractEmails(email.to);
+                  const emailFrom = extractEmails(email.from);
+                  const accountContactEmails = accountContacts
+                    .map(c => normalizeEmail(c.email))
+                    .filter(e => e);
+                  shouldInclude = accountContactEmails.some(contactEmail => 
+                    emailTo.includes(contactEmail) || emailFrom.includes(contactEmail)
+                  );
+                }
+              }
+            }
+            
+            // Also match by email address (only from accountContacts in CRM)
             if (!shouldInclude) {
               const accountContactEmails = accountContacts
                 .map(c => normalizeEmail(c.email))
@@ -330,14 +390,24 @@ class ActivityManager {
             (email.html ? this.stripHtml(email.html) : '') || 
             email.content || email.body || '';
           
+          // Get proper timestamp (handle both ISO strings and numbers)
+          const emailTimestamp = email.timestamp || email.sentAt || email.receivedAt || email.date || email.createdAt;
+          
           activities.push({
             id: `email-${email.id}`,
             type: 'email',
             title: email.subject || `${direction} Email`,
             description: this.truncateText(previewText, 100),
-            timestamp: email.timestamp || email.sentAt || email.receivedAt || email.createdAt,
+            timestamp: emailTimestamp,
             icon: 'email',
-            data: email,
+            data: {
+              ...email,
+              // Ensure entityType is set for proper avatar rendering
+              entityType: email.contactId ? 'contact' : (email.accountId ? 'account' : null),
+              // Preserve contactId and accountId for navigation
+              contactId: email.contactId || null,
+              accountId: email.accountId || null
+            },
             emailId: email.id // Store email ID for navigation
           });
         }
@@ -693,15 +763,100 @@ class ActivityManager {
    */
   async fetchEmails() {
     try {
-      if (window.db) {
-        const snapshot = await window.db.collection('emails')
-          .orderBy('timestamp', 'desc')
-          .limit(50)
-          .get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      let emails = [];
+      
+      // Helper functions
+      const getUserEmail = () => {
+        try {
+          if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+            return window.DataManager.getCurrentUserEmail();
+          }
+          return (window.currentUserEmail || '').toLowerCase();
+        } catch(_) {
+          return (window.currentUserEmail || '').toLowerCase();
+        }
+      };
+      const isAdmin = () => {
+        try {
+          if (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function') {
+            return window.DataManager.isCurrentUserAdmin();
+          }
+          return window.currentUserRole === 'admin';
+        } catch(_) {
+          return window.currentUserRole === 'admin';
+        }
+      };
+      
+      // Try Firebase first
+      if (window.firebaseDB) {
+        if (!isAdmin()) {
+          // Non-admin: filter by ownership
+          const email = getUserEmail();
+          if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
+            // Use DataManager helper
+            emails = await window.DataManager.queryWithOwnership('emails');
+            emails = emails.slice(0, 100); // Get more emails for better filtering
+          } else if (email) {
+            // Fallback: try query with ownerId filter
+            try {
+              const snapshot = await window.firebaseDB.collection('emails')
+                .where('ownerId', '==', email)
+                .orderBy('timestamp', 'desc')
+                .limit(100)
+                .get();
+              emails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            } catch (error) {
+              // If query fails (missing index), try without orderBy
+              try {
+                const snapshot = await window.firebaseDB.collection('emails')
+                  .where('ownerId', '==', email)
+                  .limit(100)
+                  .get();
+                emails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Sort client-side
+                emails.sort((a, b) => {
+                  const timeA = this.getTimestampMs(a.timestamp || a.sentAt || a.receivedAt || a.date || a.createdAt);
+                  const timeB = this.getTimestampMs(b.timestamp || b.sentAt || b.receivedAt || b.date || b.createdAt);
+                  return timeB - timeA;
+                });
+              } catch (err2) {
+                console.warn('Error fetching emails (non-admin query):', err2);
+                return [];
+              }
+            }
+          } else {
+            return [];
+          }
+        } else {
+          // Admin: unrestricted query
+          try {
+            const snapshot = await window.firebaseDB.collection('emails')
+              .orderBy('timestamp', 'desc')
+              .limit(100)
+              .get();
+            emails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          } catch (error) {
+            // If orderBy fails, try without it and sort client-side
+            try {
+              const snapshot = await window.firebaseDB.collection('emails')
+                .limit(100)
+                .get();
+              emails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              // Sort client-side
+              emails.sort((a, b) => {
+                const timeA = this.getTimestampMs(a.timestamp || a.sentAt || a.receivedAt || a.date || a.createdAt);
+                const timeB = this.getTimestampMs(b.timestamp || b.sentAt || b.receivedAt || b.date || b.createdAt);
+                return timeB - timeA;
+              });
+            } catch (err2) {
+              console.warn('Error fetching emails:', err2);
+              return [];
+            }
+          }
+        }
       }
       
-      return [];
+      return emails;
     } catch (error) {
       console.error('Error fetching emails:', error);
       return [];
@@ -1348,9 +1503,9 @@ class ActivityManager {
         const domain = account.domain || account.website;
         
         if (logoUrl && window.__pcFaviconHelper) {
-          return window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 28 });
+          return window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 40 });
         } else if (domain && window.__pcFaviconHelper) {
-          return window.__pcFaviconHelper.generateFaviconHTML(domain, 28);
+          return window.__pcFaviconHelper.generateFaviconHTML(domain, 40);
         } else {
           return this.getDefaultCompanyAvatar();
         }
@@ -1381,9 +1536,9 @@ class ActivityManager {
               const domain = account.domain || account.website;
               
               if (logoUrl && window.__pcFaviconHelper) {
-                return window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 28 });
+                return window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain, size: 40 });
               } else if (domain && window.__pcFaviconHelper) {
-                return window.__pcFaviconHelper.generateFaviconHTML(domain, 28);
+                return window.__pcFaviconHelper.generateFaviconHTML(domain, 40);
               } else {
                 return this.getDefaultCompanyAvatar();
               }
@@ -1426,7 +1581,7 @@ class ActivityManager {
    */
   getDefaultCompanyAvatar() {
     return `<div class="activity-entity-avatar-circle company-avatar" aria-hidden="true">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path>
       </svg>
     </div>`;

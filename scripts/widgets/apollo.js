@@ -101,38 +101,54 @@
 
     // Get account name for search
     let accountName = '';
-    if (entityType === 'contact') {
-      // Try to get account name from contact data
-      try {
-        if (window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
-          const contact = window.ContactDetail.state.currentContact;
-          accountName = contact.companyName || contact.company || contact.account || '';
+    
+    // Priority 1: Check task-detail state (for widgets opened from task pages)
+    try {
+      if (window.TaskDetail && window.TaskDetail.state) {
+        const taskState = window.TaskDetail.state;
+        if (taskState.account) {
+          accountName = taskState.account.name || taskState.account.accountName || taskState.account.companyName || '';
+        } else if (taskState.contact) {
+          accountName = taskState.contact.companyName || taskState.contact.company || taskState.contact.account || '';
         }
-        // Fallback: try to get from DOM
-        if (!accountName) {
-          const companyLink = document.querySelector('#contact-company-link');
-          if (companyLink) {
-            accountName = companyLink.textContent?.trim() || '';
+      }
+    } catch (_) { }
+    
+    // Priority 2: Check entity-specific detail pages
+    if (!accountName) {
+      if (entityType === 'contact') {
+        // Try to get account name from contact data
+        try {
+          if (window.ContactDetail && window.ContactDetail.state && window.ContactDetail.state.currentContact) {
+            const contact = window.ContactDetail.state.currentContact;
+            accountName = contact.companyName || contact.company || contact.account || '';
           }
-        }
-      } catch (_) { }
-    } else {
-      // Try to get account name from account data
-      try {
-        if (window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
-          const account = window.AccountDetail.state.currentAccount;
-          accountName = account.name || account.accountName || '';
-        }
-        // Fallback: try to get from DOM (use page title, not contact name)
-        if (!accountName) {
-          const accountTitle = document.querySelector('#account-detail-header .page-title') ||
-            document.querySelector('.contact-page-title') ||
-            document.querySelector('#account-details-page .page-title');
-          if (accountTitle) {
-            accountName = accountTitle.textContent?.trim() || '';
+          // Fallback: try to get from DOM
+          if (!accountName) {
+            const companyLink = document.querySelector('#contact-company-link');
+            if (companyLink) {
+              accountName = companyLink.textContent?.trim() || '';
+            }
           }
-        }
-      } catch (_) { }
+        } catch (_) { }
+      } else {
+        // Try to get account name from account data
+        try {
+          if (window.AccountDetail && window.AccountDetail.state && window.AccountDetail.state.currentAccount) {
+            const account = window.AccountDetail.state.currentAccount;
+            accountName = account.name || account.accountName || '';
+          }
+          // Fallback: try to get from DOM (use page title, not contact name)
+          if (!accountName) {
+            const accountTitle = document.querySelector('#account-detail-header .page-title') ||
+              document.querySelector('.contact-page-title') ||
+              document.querySelector('#account-details-page .page-title');
+            if (accountTitle) {
+              accountName = accountTitle.textContent?.trim() || '';
+            }
+          }
+        } catch (_) { }
+      }
     }
 
     currentAccountName = accountName;
@@ -2360,31 +2376,70 @@
     const out = { companyName: '', domain: '' };
     try {
       lushaLog('Getting context defaults for entity type:', entityType);
-      if (entityType === 'account') {
-        const a = window.AccountDetail?.state?.currentAccount || {};
-        lushaLog('AccountDetail state:', a);
-        out.companyName = a.name || a.accountName || a.companyName || '';
-        const d = a.domain || a.website || a.site || a.companyWebsite || a.websiteUrl || '';
-        if (d) out.domain = deriveDomain(d);
-        lushaLog('Account context derived:', { companyName: out.companyName, domain: out.domain, rawDomain: d });
-      } else {
-        const c = window.ContactDetail?.state?.currentContact || {};
-        lushaLog('ContactDetail state:', c);
-        out.companyName = c.companyName || c.company || c.account || '';
-        const id = window.ContactDetail?.state?._linkedAccountId;
-        lushaLog('Linked account ID:', id);
-        if (id && typeof window.getAccountsData === 'function') {
-          const acc = (window.getAccountsData() || []).find(x => (x.id || x.accountId || x._id) === id);
-          lushaLog('Found linked account:', acc);
-          const d = acc?.domain || acc?.website || acc?.site || '';
+      
+      // Check if we're on task-detail page first (priority for task context)
+      const taskState = window.TaskDetail?.state;
+      if (taskState && (taskState.account || taskState.contact)) {
+        lushaLog('TaskDetail state found:', { hasAccount: !!taskState.account, hasContact: !!taskState.contact });
+        
+        // Prioritize account data from task state
+        if (taskState.account) {
+          const a = taskState.account;
+          out.companyName = a.name || a.accountName || a.companyName || '';
+          const d = a.domain || a.website || a.site || a.companyWebsite || a.websiteUrl || '';
           if (d) out.domain = deriveDomain(d);
-          if (!out.companyName) out.companyName = acc?.name || acc?.accountName || '';
+          lushaLog('TaskDetail account context derived:', { companyName: out.companyName, domain: out.domain, rawDomain: d });
         }
-        if (!out.domain) {
-          const alt = c.companyWebsite || c.website || '';
-          if (alt) out.domain = deriveDomain(alt);
+        
+        // If no account domain, try to get from contact's linked account
+        if (!out.domain && taskState.contact) {
+          const c = taskState.contact;
+          out.companyName = out.companyName || c.companyName || c.company || c.account || '';
+          const accountId = c.accountId || c.account_id;
+          if (accountId && typeof window.getAccountsData === 'function') {
+            const acc = (window.getAccountsData() || []).find(x => (x.id || x.accountId || x._id) === accountId);
+            if (acc) {
+              const d = acc?.domain || acc?.website || acc?.site || '';
+              if (d) out.domain = deriveDomain(d);
+              if (!out.companyName) out.companyName = acc?.name || acc?.accountName || '';
+            }
+          }
+          if (!out.domain) {
+            const alt = c.companyWebsite || c.website || '';
+            if (alt) out.domain = deriveDomain(alt);
+          }
+          lushaLog('TaskDetail contact context derived:', { companyName: out.companyName, domain: out.domain });
         }
-        lushaLog('Contact context derived:', { companyName: out.companyName, domain: out.domain });
+      }
+      
+      // Fallback to AccountDetail/ContactDetail if no task context
+      if (!out.companyName && !out.domain) {
+        if (entityType === 'account') {
+          const a = window.AccountDetail?.state?.currentAccount || {};
+          lushaLog('AccountDetail state:', a);
+          out.companyName = a.name || a.accountName || a.companyName || '';
+          const d = a.domain || a.website || a.site || a.companyWebsite || a.websiteUrl || '';
+          if (d) out.domain = deriveDomain(d);
+          lushaLog('Account context derived:', { companyName: out.companyName, domain: out.domain, rawDomain: d });
+        } else {
+          const c = window.ContactDetail?.state?.currentContact || {};
+          lushaLog('ContactDetail state:', c);
+          out.companyName = c.companyName || c.company || c.account || '';
+          const id = window.ContactDetail?.state?._linkedAccountId;
+          lushaLog('Linked account ID:', id);
+          if (id && typeof window.getAccountsData === 'function') {
+            const acc = (window.getAccountsData() || []).find(x => (x.id || x.accountId || x._id) === id);
+            lushaLog('Found linked account:', acc);
+            const d = acc?.domain || acc?.website || acc?.site || '';
+            if (d) out.domain = deriveDomain(d);
+            if (!out.companyName) out.companyName = acc?.name || acc?.accountName || '';
+          }
+          if (!out.domain) {
+            const alt = c.companyWebsite || c.website || '';
+            if (alt) out.domain = deriveDomain(alt);
+          }
+          lushaLog('Contact context derived:', { companyName: out.companyName, domain: out.domain });
+        }
       }
       // Fallbacks to values we captured when the widget opened
       if (!out.companyName && currentAccountName) out.companyName = currentAccountName;
