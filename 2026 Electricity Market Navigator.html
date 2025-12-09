@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026 Electricity Market Navigator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        :root {
+            --color-primary: #0F766E;
+            --color-primary-light: #14B8A6;
+            --color-primary-dark: #0D5D5A;
+            --color-accent: #F97316;
+            --color-accent-light: #FED7AA;
+            --color-bg: #F8FAFC;
+            --color-surface: #FFFFFF;
+            --color-text: #1E293B;
+            --color-text-secondary: #64748B;
+            --color-success: #10B981;
+            --color-warning: #F59E0B;
+            --color-danger: #EF4444;
+            --color-border: #E2E8F0;
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            --font-family-mono: 'Monaco', 'Courier New', monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background: var(--color-bg);
+            color: var(--color-text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* ===== HEADER & NAVIGATION ===== */
+        header {
+            background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
+            color: white;
+            padding: 20px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: white;
+            text-decoration: none;
+        }
+
+        .download-btn {
+            background: var(--color-accent);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .download-btn:hover {
+            background: #EA580C;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(249, 115, 22, 0.3);
+        }
+
+        /* ===== HERO SECTION ===== */
+        .hero {
+            background: linear-gradient(135deg, var(--color-primary-dark) 0%, #1F2937 100%);
+            color: white;
+            padding: 80px 0;
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .hero .subtitle {
+            font-size: 22px;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 30px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            background: var(--color-accent);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            background: #EA580C;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background: white;
+            color: var(--color-primary);
+        }
+
+        /* ===== CONTENT SECTIONS ===== */
+        section {
+            margin-bottom: 80px;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .section-number {
+            display: inline-block;
+            background: var(--color-primary-light);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            line-height: 50px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 24px;
+            margin-bottom: 16px;
+        }
+
+        h2 {
+            font-size: 36px;
+            color: var(--color-primary-dark);
+            margin-bottom: 16px;
+            font-weight: 700;
+        }
+
+        h3 {
+            font-size: 24px;
+            color: var(--color-primary);
+            margin-top: 32px;
+            margin-bottom: 16px;
+            font-weight: 700;
+        }
+
+        .section-subtitle {
+            font-size: 18px;
+            color: var(--color-text-secondary);
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        p {
+            font-size: 16px;
+            line-height: 1.8;
+            margin-bottom: 16px;
+            color: var(--color-text);
+        }
+
+        /* ===== CHARTS & VISUALIZATIONS ===== */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin: 50px 0;
+        }
+
+        .chart-container {
+            background: var(--color-surface);
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border: 1px solid var(--color-border);
+            position: relative;
+        }
+
+        .chart-container h4 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--color-primary-dark);
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        canvas {
+            max-height: 300px;
+        }
+
+        .chart-note {
+            font-size: 13px;
+            color: var(--color-text-secondary);
+            margin-top: 16px;
+            font-style: italic;
+            text-align: center;
+        }
+
+        /* ===== STAT BOXES ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin: 40px 0;
+        }
+
+        .stat-box {
+            background: var(--color-surface);
+            border-radius: 12px;
+            padding: 32px;
+            border-left: 4px solid var(--color-primary);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: all 0.3s ease;
+        }
+
+        .stat-box:hover {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            transform: translateY(-4px);
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--color-primary);
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        /* ===== FEATURE BOXES ===== */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 32px;
+            margin: 40px 0;
+        }
+
+        .feature-card {
+            background: var(--color-surface);
+            border-radius: 12px;
+            padding: 32px;
+            border: 1px solid var(--color-border);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+            transform: translateY(-8px);
+        }
+
+        .feature-icon {
+            font-size: 40px;
+            margin-bottom: 16px;
+        }
+
+        .feature-card h4 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--color-primary-dark);
+            margin-bottom: 12px;
+        }
+
+        .feature-card p {
+            font-size: 15px;
+            color: var(--color-text-secondary);
+            margin-bottom: 0;
+        }
+
+        /* ===== TABLES ===== */
+        .table-container {
+            background: var(--color-surface);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            margin: 40px 0;
+            border: 1px solid var(--color-border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+            color: white;
+            padding: 16px;
+            text-align: left;
+            font-weight: 700;
+            font-size: 15px;
+        }
+
+        td {
+            padding: 16px;
+            border-bottom: 1px solid var(--color-border);
+            font-size: 15px;
+        }
+
+        tr:hover {
+            background: rgba(15, 118, 110, 0.03);
+        }
+
+        /* ===== TIMELINE ===== */
+        .timeline {
+            position: relative;
+            padding: 40px 0;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 3px;
+            height: 100%;
+            background: linear-gradient(to bottom, var(--color-primary), var(--color-primary-light));
+        }
+
+        .timeline-item {
+            margin-bottom: 50px;
+            position: relative;
+        }
+
+        .timeline-item:nth-child(odd) {
+            padding-right: 51%;
+            text-align: right;
+        }
+
+        .timeline-item:nth-child(even) {
+            padding-left: 51%;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            width: 20px;
+            height: 20px;
+            background: var(--color-primary);
+            border: 3px solid var(--color-bg);
+            border-radius: 50%;
+            transform: translateX(-50%);
+        }
+
+        .timeline-content {
+            background: var(--color-surface);
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            border: 1px solid var(--color-border);
+        }
+
+        .timeline-content h4 {
+            color: var(--color-primary-dark);
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .timeline-content .period {
+            color: var(--color-accent);
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        /* ===== HIGHLIGHT BOXES ===== */
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(15, 118, 110, 0.08) 0%, rgba(20, 184, 166, 0.08) 100%);
+            border-left: 4px solid var(--color-primary);
+            border-radius: 8px;
+            padding: 24px;
+            margin: 32px 0;
+        }
+
+        .highlight-box strong {
+            color: var(--color-primary-dark);
+        }
+
+        /* ===== CTA SECTION ===== */
+        .cta-section {
+            background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 60px 40px;
+            text-align: center;
+            margin: 80px 0;
+        }
+
+        .cta-section h2 {
+            color: white;
+            margin-bottom: 16px;
+        }
+
+        .cta-section p {
+            color: rgba(255,255,255,0.95);
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+
+        /* ===== FOOTER ===== */
+        footer {
+            background: var(--color-text);
+            color: white;
+            text-align: center;
+            padding: 40px 0;
+            margin-top: 80px;
+            font-size: 14px;
+        }
+
+        footer p {
+            color: rgba(255,255,255,0.8);
+            margin-bottom: 8px;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 36px;
+            }
+
+            h2 {
+                font-size: 28px;
+            }
+
+            .timeline::before {
+                left: 10px;
+            }
+
+            .timeline-item:nth-child(odd),
+            .timeline-item:nth-child(even) {
+                padding-left: 50px;
+                padding-right: 0;
+                text-align: left;
+            }
+
+            .timeline-dot {
+                left: 10px;
+            }
+
+            .hero h1 {
+                font-size: 36px;
+            }
+
+            .hero .subtitle {
+                font-size: 18px;
+            }
+        }
+
+        /* ===== PRINT STYLES ===== */
+        @media print {
+            header, .cta-buttons, footer {
+                display: none !important;
+            }
+
+            section {
+                page-break-inside: avoid;
+                margin-bottom: 40px;
+            }
+
+            .chart-container {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">PowerChoosers</div>
+                <button class="download-btn" onclick="downloadPDF()">
+                    📥 Download PDF
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENT WRAPPER FOR PDF -->
+    <div id="pdf-content">
+        <!-- HERO SECTION -->
+        <section class="hero">
+            <div class="container">
+                <h1>Navigate 2026 With Confidence</h1>
+                <p class="subtitle">Strategic Intelligence for Commercial Energy Decision-Makers</p>
+                <p style="color: rgba(255,255,255,0.85); font-size: 16px; max-width: 700px; margin: 0 auto;">The Texas electricity market is at an inflection point. This strategic guide equips you with actionable intelligence to protect margins, optimize budgets, and maintain operational reliability.</p>
+            </div>
+        </section>
+
+        <div class="container">
+            <!-- EXECUTIVE SUMMARY -->
+            <section>
+                <div class="section-header">
+                    <h2>Executive Summary</h2>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-number">45%</div>
+                        <div class="stat-label">Price Increase (ERCOT North)</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">9.6%</div>
+                        <div class="stat-label">Demand Growth 2026</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">$51/MWh</div>
+                        <div class="stat-label">Average Wholesale Price 2026</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">20–30%</div>
+                        <div class="stat-label">Peak Cost Reduction Potential</div>
+                    </div>
+                </div>
+
+                <p>The Texas electricity market enters 2026 facing unprecedented challenges: demand growth driven by data centers and industrial electrification is outpacing supply additions, capacity margins are compressing, and wholesale prices are forecast to rise 45% in ERCOT-North. For commercial energy users, the implications are clear: <strong>organizations that take strategic action in early 2026 can protect margins by 15–25%, while those that delay risk absorbing significant cost increases.</strong></p>
+
+                <div class="highlight-box">
+                    <strong>The Bottom Line:</strong> This is not a passive year. The commercial energy procurement decisions you make in Q1–Q2 2026 will directly determine your cost exposure for the next 3–5 years. Strategic action yields measurable, lasting savings.
+                </div>
+            </section>
+
+            <!-- PART 1: MARKET LANDSCAPE -->
+            <section>
+                <div class="section-header">
+                    <div class="section-number">1</div>
+                    <h2>The 2026 Market Landscape</h2>
+                    <p class="section-subtitle">Understanding the forces reshaping Texas energy supply and demand</p>
+                </div>
+
+                <h3>Demand Surge Meets Supply Constraints</h3>
+                <p>ERCOT forecasts Texas electricity demand will grow 9.6% in 2026—nearly triple the U.S. average growth rate. This unprecedented surge is driven by three converging forces:</p>
+
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <h4>Demand Growth Drivers</h4>
+                        <canvas id="demandChart"></canvas>
+                        <p class="chart-note">ERCOT 2025–2026 Load Forecasts</p>
+                    </div>
+
+                    <div class="chart-container">
+                        <h4>Wholesale Price Forecast</h4>
+                        <canvas id="priceChart"></canvas>
+                        <p class="chart-note">EIA Short-Term Energy Outlook 2026</p>
+                    </div>
+                </div>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🖥️</div>
+                        <h4>Data Center Expansion</h4>
+                        <p>Massive AI infrastructure investments concentrate new demand in select Texas regions, driving localized grid stress and premium pricing during peak periods.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⚙️</div>
+                        <h4>Industrial Growth</h4>
+                        <p>Oil and gas operations, manufacturing, and electrification initiatives expand power consumption across West Texas, increasing baseline regional demand.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📈</div>
+                        <h4>Population Growth</h4>
+                        <p>Continued migration to Texas cities (Dallas-Fort Worth, Houston, Austin) drives residential and commercial demand growth, stretching grid capacity.</p>
+                    </div>
+                </div>
+
+                <h3>The Capacity Paradox</h3>
+                <p>While demand surges, supply additions lag significantly behind. The chart below illustrates the reserve margin compression ERCOT expects through 2029:</p>
+
+                <div class="chart-container" style="margin: 40px 0;">
+                    <h4>ERCOT Reserve Margin Forecast (2025–2029)</h4>
+                    <canvas id="reserveChart"></canvas>
+                    <p class="chart-note">ERCOT Planning Scenarios: Primary Load Forecast</p>
+                </div>
+
+                <div class="highlight-box">
+                    <strong>Critical Implication:</strong> ERCOT's most conservative scenario shows supply could fall 6.2% short of peak summer demand in summer 2026, widening to 32.4% shortfall by 2029 without accelerated generation buildout. This creates a two-tier pricing environment: stable baseload rates with extreme peak-hour volatility.
+                </div>
+
+                <h3>Price Forecast: Rising Base with Peak Volatility</h3>
+                <p>The EIA forecasts commercial retail electricity rates will rise approximately 3.5% in 2026 to an average of 17.6 cents/kWh, with wholesale prices expected to exceed $51/MWh nationally. For ERCOT, the picture is more severe:</p>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Price Component</th>
+                                <th>2025 Baseline</th>
+                                <th>2026 Forecast</th>
+                                <th>Change</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>ERCOT-North Wholesale</strong></td>
+                                <td>$35–38/MWh</td>
+                                <td>$48–55/MWh</td>
+                                <td>+26% to +57%</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Peak-Hour Pricing (Summer)</strong></td>
+                                <td>$65–80/MWh</td>
+                                <td>$100–130/MWh</td>
+                                <td>+54% to +62%</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Commercial Retail Rates</strong></td>
+                                <td>17.0 ¢/kWh</td>
+                                <td>17.6 ¢/kWh</td>
+                                <td>+3.5%</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Non-Commodity Charges</strong></td>
+                                <td>4.2 ¢/kWh</td>
+                                <td>4.5 ¢/kWh</td>
+                                <td>+7.1%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p>What distinguishes 2026 is not just higher prices, but extreme volatility. Organizations exposed to spot market pricing or possessing flexible load patterns will face significant monthly and seasonal swings. Peak-hour pricing could exceed $100–130/MWh during severely constrained periods.</p>
+            </section>
+
+            <!-- PART 2: STRATEGIC IMPLICATIONS -->
+            <section>
+                <div class="section-header">
+                    <div class="section-number">2</div>
+                    <h2>Strategic Implications for Commercial Users</h2>
+                    <p class="section-subtitle">Making critical procurement and hedging decisions</p>
+                </div>
+
+                <h3>The Procurement Timing Question</h3>
+                <p>One of the most consequential decisions commercial energy users face in Q1 2026 is <strong>when to lock in rates for 2027 and beyond.</strong></p>
+
+                <div class="features-grid">
+                    <div class="feature-card" style="border-top: 3px solid #10B981;">
+                        <h4>✓ Earlier Action (Q1–Q2)</h4>
+                        <p><strong>Pros:</strong> Lock in current rates before summer volatility. Preserve cost predictability for 2027–2029 budgets. Benefit from supplier competition early in the season.</p>
+                        <p style="margin-top: 12px; color: var(--color-text);"><strong>Best for:</strong> Stable-load organizations, risk-averse procurement, multi-year budget planning.</p>
+                    </div>
+
+                    <div class="feature-card" style="border-top: 3px solid #F59E0B;">
+                        <h4>⏱ Measured Timing (Q2–Q3)</h4>
+                        <p><strong>Pros:</strong> Staged hedging captures low-price windows. Summer demand visibility improves decision quality. Supplier competition intensifies mid-season.</p>
+                        <p style="margin-top: 12px; color: var(--color-text);"><strong>Best for:</strong> Flexible-load organizations, opportunistic procurement, sophisticated energy teams.</p>
+                    </div>
+
+                    <div class="feature-card" style="border-top: 3px solid #14B8A6;">
+                        <h4>⭐ PowerChoosers Recommendation</h4>
+                        <p><strong>The Split Approach:</strong> Secure 60–70% of baseload by Q2 2026, then preserve 25–30% for opportunistic procurement as market evolves. This balances cost protection with flexibility.</p>
+                        <p style="margin-top: 12px; color: var(--color-text);"><strong>Result:</strong> Typical savings of 8–15% vs. single-timing procurement.</p>
+                    </div>
+                </div>
+
+                <h3>Navigating Supply Chain Complexity</h3>
+                <p>The 2026 market will feature deeper supplier segmentation than previous years. Tier-1 suppliers are increasingly selective, competitive suppliers require stricter terms, and renewable PPAs gain competitive advantage.</p>
+
+                <div class="highlight-box">
+                    <strong>Critical Actions:</strong><br>
+                    • Diversify supplier portfolios (avoid single-supplier concentration)<br>
+                    • Segment loads strategically (baseload fixed, flexible indexed)<br>
+                    • Confirm supplier financial health and credit ratings<br>
+                    • Evaluate alternative structures (green energy, demand response bundling)
+                </div>
+            </section>
+
+            <!-- PART 3: THREE STRATEGIC LEVERS -->
+            <section>
+                <div class="section-header">
+                    <div class="section-number">3</div>
+                    <h2>Three Strategic Levers for Cost Control</h2>
+                    <p class="section-subtitle">Actionable strategies to reduce peak costs and stabilize budgets</p>
+                </div>
+
+                <h3>Lever 1: Demand-Side Management</h3>
+                <p>Energy demand management is no longer optional—it's the fastest ROI lever available to commercial organizations in 2026. By reducing consumption during peak-price hours and shifting flexible loads to off-peak periods, organizations directly reduce exposure to spike pricing.</p>
+
+                <div class="chart-container" style="margin: 32px 0;">
+                    <h4>Demand Response ROI Potential</h4>
+                    <canvas id="rorChart"></canvas>
+                    <p class="chart-note">Typical payback periods by initiative type</p>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Initiative</th>
+                                <th>Implementation Cost</th>
+                                <th>Annual Savings</th>
+                                <th>Payback Period</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Peak-shaving strategies (HVAC scheduling)</td>
+                                <td>$50–100K</td>
+                                <td>$150–250K</td>
+                                <td>4–8 months</td>
+                            </tr>
+                            <tr>
+                                <td>Demand response enrollment</td>
+                                <td>$20–50K</td>
+                                <td>$100–200K</td>
+                                <td>2–6 months</td>
+                            </tr>
+                            <tr>
+                                <td>Time-of-use optimization</td>
+                                <td>$30–75K</td>
+                                <td>$120–180K</td>
+                                <td>3–7 months</td>
+                            </tr>
+                            <tr>
+                                <td>Advanced controls + demand response</td>
+                                <td>$80–150K</td>
+                                <td>$300–500K</td>
+                                <td>2–6 months</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3>Lever 2: Contract Structure & Hedging</h3>
+                <p>Raw price is only one component of total electricity cost. <strong>How you contract for power often matters as much as the price per MWh.</strong></p>
+
+                <p style="margin-top: 32px;"><strong>Recommended 2026 Contract Mix for Most Commercial Users:</strong></p>
+
+                <div class="charts-grid" style="margin: 32px 0;">
+                    <div class="chart-container">
+                        <h4>Optimal Contract Allocation</h4>
+                        <canvas id="allocationChart"></canvas>
+                        <p class="chart-note">65/35 hybrid approach for cost protection</p>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; justify-content: center;">
+                        <div style="background: var(--color-surface); border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid var(--color-border);">
+                            <h4 style="margin-bottom: 16px;">Contract Strategy</h4>
+                            <div style="margin-bottom: 16px;">
+                                <p style="margin: 0; color: var(--color-primary-dark); font-weight: 600;">65% Fixed-Rate Baseload</p>
+                                <p style="margin: 8px 0 0 0; color: var(--color-text-secondary); font-size: 14px;">Covers minimum reliable load with price protection. Insulates against spikes.</p>
+                            </div>
+                            <div>
+                                <p style="margin: 0; color: var(--color-primary-dark); font-weight: 600;">35% Indexed or Short-Term</p>
+                                <p style="margin: 8px 0 0 0; color: var(--color-text-secondary); font-size: 14px;">Provides flexibility for demand swings, seasonal variation, and upside capture.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>Lever 3: Renewable Energy & On-Site Generation</h3>
+                <p>Renewable energy procurement and on-site generation are becoming competitive cost strategies, not just ESG initiatives. Solar and wind PPAs offer 15–20 year price certainty, insulating organizations from commodity volatility.</p>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🔋</div>
+                        <h4>Without On-Site Capacity</h4>
+                        <p>Evaluate virtual PPAs (VPPAs) and renewable energy credits (RECs). Typical 2–5¢/kWh premium, recovered over 10+ years.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">☀️</div>
+                        <h4>With Rooftop/Land Space</h4>
+                        <p>Solar + battery can offset 20–40% of peak costs through on-site generation. Payback 6–10 years with typical capex of $200K–$1M.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🏢</div>
+                        <h4>Multi-Facility Organizations</h4>
+                        <p>Portfolio-level renewable procurement achieves economies of scale. Hedge 50–70% of portfolio with renewables for diversified risk management.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PART 4: DECISION FRAMEWORK -->
+            <section>
+                <div class="section-header">
+                    <div class="section-number">4</div>
+                    <h2>2026 Decision Framework</h2>
+                    <p class="section-subtitle">Aligning procurement strategy with organizational objectives</p>
+                </div>
+
+                <p>Energy decision-makers should evaluate 2026 strategy against three core objectives:</p>
+
+                <div class="features-grid" style="margin: 40px 0;">
+                    <div class="feature-card">
+                        <h4>💰 Objective 1: Cost Predictability</h4>
+                        <p><strong>High Risk Tolerance:</strong> 40–50% indexed pricing for upside capture.</p>
+                        <p style="margin-top: 12px;"><strong>Moderate Risk Tolerance:</strong> 65/35 hybrid hedging approach.</p>
+                        <p style="margin-top: 12px;"><strong>Low Risk Tolerance:</strong> 80–90% fixed-rate for budget certainty.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>⚡ Objective 2: Operational Resilience</h4>
+                        <p><strong>Mission-Critical:</strong> Demand response capability, on-site generation, multiple suppliers.</p>
+                        <p style="margin-top: 12px;"><strong>Operationally Important:</strong> Standard procurement with demand response optionality.</p>
+                        <p style="margin-top: 12px;"><strong>Flexible Operations:</strong> Maximize indexed exposure and emergency DR participation.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🌱 Objective 3: Sustainability Impact</h4>
+                        <p><strong>Net-Zero Targets:</strong> Prioritize renewables, on-site generation, electrification.</p>
+                        <p style="margin-top: 12px;"><strong>ESG Reporting Expected:</strong> Balance renewable mix (20–40%) with cost optimization.</p>
+                        <p style="margin-top: 12px;"><strong>Limited ESG Focus:</strong> Evaluate renewables on financial ROI; often still justified by peak-shaving.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PART 5: ACTION PLAN -->
+            <section>
+                <div class="section-header">
+                    <div class="section-number">5</div>
+                    <h2>2026 Action Plan</h2>
+                    <p class="section-subtitle">Phased implementation timeline for procurement and optimization</p>
+                </div>
+
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <div class="period">IMMEDIATE (January–March 2026)</div>
+                            <h4>Week 1–2: Baseline & Strategy Alignment</h4>
+                            <p>• Conduct detailed load analysis: peak periods, demand response capability, flexibility potential</p>
+                            <p>• Define board-level direction on risk tolerance and ESG commitments</p>
+                            <p>• Identify existing contract renewal dates and expiration timelines</p>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <div class="period">IMMEDIATE (January–March 2026)</div>
+                            <h4>Week 3–4: Market Intelligence & Supplier Outreach</h4>
+                            <p>• Request forward-curve pricing from 3–5 suppliers</p>
+                            <p>• Evaluate demand response programs available in your territory</p>
+                            <p>• Research on-site generation potential (solar assessment, battery ROI)</p>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <div class="period">URGENT (January–March 2026)</div>
+                            <h4>Week 5–8: Procurement Execution</h4>
+                            <p>• Issue competitive RFPs for 60–70% of baseload for 2027–2028</p>
+                            <p>• Evaluate hybrid contract structures (fixed + indexed)</p>
+                            <p>• Lock in rates for Q2 2026 execution timing</p>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <div class="period">MEDIUM-TERM (April–August 2026)</div>
+                            <h4>Load Management Implementation</h4>
+                            <p>• Deploy automated controls and demand response technology</p>
+                            <p>• Enroll in ERCOT demand response programs (CompetitiveNRCx, 4CP)</p>
+                            <p>• Begin tracking peak reduction performance and cost savings</p>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <div class="period">MEDIUM-TERM (April–August 2026)</div>
+                            <h4>Supply Optimization & Renewable Evaluation</h4>
+                            <p>• Negotiate final terms with selected suppliers</p>
+                            <p>• Finalize hybrid contract execution</p>
+                            <p>• Complete solar site assessments and model renewable ROI</p>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <div class="period">FORWARD PLANNING (September–December 2026)</div>
+                            <h4>Q4 Review & 2027–2028 Adjustment</h4>
+                            <p>• Assess actual demand profile, peak timing, and DR performance</p>
+                            <p>• Evaluate pricing trends and market forecast updates</p>
+                            <p>• Begin 2027–2028 procurement planning with operational data</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CLOSING CTA -->
+            <section class="cta-section">
+                <h2>Ready to Navigate 2026 Strategically?</h2>
+                <p>The commercial energy procurement decisions you make in the next 90 days will directly determine your cost exposure for 2027–2029. Organizations that act strategically in Q1–Q2 2026 can reduce energy costs by 15–25% while improving operational resilience.</p>
+                <p>PowerChoosers brings decades of experience navigating complex energy markets. We work as your strategic partner—analyzing your constraints, negotiating competitive terms with 100+ suppliers, and executing demand response and renewable procurement that reduce effective costs.</p>
+                <button class="btn-primary" style="margin: 0 auto;">Start Your 2026 Strategy Today</button>
+            </section>
+
+            <!-- KEY INSIGHTS -->
+            <section>
+                <div class="section-header">
+                    <h2>Key Takeaways</h2>
+                </div>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h4>Demand is Growing Fast</h4>
+                        <p>ERCOT forecasts 9.6% demand growth in 2026, driven by data centers and industrial electrification. Supply lags significantly behind.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📈</div>
+                        <h4>Prices Are Rising</h4>
+                        <p>Wholesale prices expected to increase 45% in ERCOT-North. Peak-hour pricing could exceed $100–130/MWh during constrained periods.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⏰</div>
+                        <h4>Timing Is Critical</h4>
+                        <p>Q1–Q2 2026 procurement decisions will lock in cost exposure for 2027–2029. Act early to capture pricing before summer volatility.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">💡</div>
+                        <h4>Three Proven Levers</h4>
+                        <p>Demand management (20–30% peak reduction), smart hedging (65/35 fix/index), and renewables (15–20 year price certainty).</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <h4>Savings Potential</h4>
+                        <p>Strategic organizations can reduce effective energy costs by 15–25% and improve budget predictability by 40–50%.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🤝</div>
+                        <h4>Partner Advantage</h4>
+                        <p>Work with a broker who understands ERCOT dynamics, has 100+ supplier relationships, and can execute complex procurement strategies.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- REFERENCES -->
+            <section>
+                <h2>References & Data Sources</h2>
+                <p style="margin-bottom: 24px;"><strong>This strategic brief is grounded in authoritative industry research:</strong></p>
+
+                <div style="background: var(--color-surface); border-radius: 12px; padding: 32px; border: 1px solid var(--color-border);">
+                    <p style="margin-bottom: 12px;"><strong>[1]</strong> Electric Reliability Council of Texas (ERCOT). (2025). 2025 Long-Term System Adequacy Assessment. ERCOT grid operator forecast on supply-demand dynamics and planning scenarios through 2029. <span style="color: var(--color-primary);">https://www.ercot.com</span></p>
+
+                    <p style="margin-bottom: 12px;"><strong>[2]</strong> U.S. Energy Information Administration (EIA). (2025). Short-Term Energy Outlook. Wholesale and retail electricity price projections for 2025–2026 with regional ERCOT analysis.</p>
+
+                    <p style="margin-bottom: 12px;"><strong>[3]</strong> Utility Dive. (2025). "Electricity prices to continue rise in 2026." Analysis of EIA forecasts showing 45% ERCOT-North price increase and 9.6% demand growth.</p>
+
+                    <p style="margin-bottom: 12px;"><strong>[4]</strong> KB3 Advisors. (2025). Energy Demand Management: Lock in Predictability and Value in 2026. Strategic framework for demand-side management and procurement design.</p>
+
+                    <p style="margin-bottom: 12px;"><strong>[5]</strong> Phoenix Energy Technologies. (2025). "How Facilities Teams Can Win With Demand Response in 2026." Analysis of demand response revenue, peak cost reduction, and grid resilience strategies.</p>
+
+                    <p style="margin-bottom: 0;"><strong>[6]</strong> Electricity Plans. (2025). Texas Electricity Rate Trends & Price Forecast for 2025. Analysis of ERCOT reserve margins, forward market contracts, and long-term pricing forecasts.</p>
+                </div>
+            </section>
+
+            <!-- CLOSING STATEMENT -->
+            <section style="text-align: center; margin-bottom: 60px;">
+                <h3 style="color: var(--color-primary-dark); font-size: 28px;">The Path Forward</h3>
+                <p style="font-size: 18px; color: var(--color-text-secondary); max-width: 700px; margin: 0 auto;">Your energy procurement strategy for 2026 is too important to leave to chance or generic advice. Every organization's situation is unique—your load profile, operational constraints, risk tolerance, and sustainability commitments all demand a tailored approach.</p>
+                <p style="font-size: 18px; color: var(--color-text-secondary); max-width: 700px; margin: 24px auto 0;">PowerChoosers combines deep market expertise, 100+ supplier relationships, and decades of Texas energy experience to navigate this complexity on your behalf. Let's talk about your 2026 strategy.</p>
+            </section>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="container">
+            <p><strong>PowerChoosers</strong> | Strategic Energy Procurement for Texas Businesses</p>
+            <p>© 2025 PowerChoosers. All rights reserved. This strategic brief is based on current market data and forecasts as of December 2025.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Chart configurations with realistic 2026 electricity market data
+        const ctx1 = document.getElementById('demandChart');
+        new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: ['Population Growth', 'Data Centers', 'Industrial'],
+                datasets: [{
+                    label: 'Demand Growth Impact (%)',
+                    data: [2.1, 5.2, 2.3],
+                    backgroundColor: ['#14B8A6', '#0F766E', '#06B6D4'],
+                    borderRadius: 8,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true, max: 6 } }
+            }
+        });
+
+        const ctx2 = document.getElementById('priceChart');
+        new Chart(ctx2, {
+            type: 'line',
+            data: {
+                labels: ['2024', '2025', '2026 (Forecast)'],
+                datasets: [{
+                    label: 'ERCOT-North $/MWh',
+                    data: [35, 38, 55],
+                    borderColor: '#F97316',
+                    backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#F97316',
+                    pointRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: true, position: 'bottom' } },
+                scales: { y: { beginAtZero: true, max: 65 } }
+            }
+        });
+
+        const ctx3 = document.getElementById('reserveChart');
+        new Chart(ctx3, {
+            type: 'line',
+            data: {
+                labels: ['2025', '2026', '2027', '2028', '2029'],
+                datasets: [{
+                    label: 'Reserve Margin (%)',
+                    data: [13.5, 8.2, -2.1, -15.8, -32.4],
+                    borderColor: '#EF4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#EF4444',
+                    pointRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: true, position: 'bottom' } },
+                scales: { y: { beginAtZero: true, min: -40, max: 20 } }
+            }
+        });
+
+        const ctx4 = document.getElementById('rorChart');
+        new Chart(ctx4, {
+            type: 'bar',
+            data: {
+                labels: ['Peak-Shaving', 'Demand Response', 'Time-of-Use', 'Advanced Controls'],
+                datasets: [{
+                    label: 'Payback Period (Months)',
+                    data: [6, 4, 5, 4],
+                    backgroundColor: ['#10B981', '#3B82F6', '#8B5CF6', '#EC4899'],
+                    borderRadius: 8,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true, max: 8 } }
+            }
+        });
+
+        const ctx5 = document.getElementById('allocationChart');
+        new Chart(ctx5, {
+            type: 'doughnut',
+            data: {
+                labels: ['Fixed Baseload (65%)', 'Indexed/Flexible (35%)'],
+                datasets: [{
+                    data: [65, 35],
+                    backgroundColor: ['#0F766E', '#06B6D4'],
+                    borderColor: '#FFFFFF',
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
+
+        // PDF Download Function
+        function downloadPDF() {
+            const element = document.getElementById('pdf-content');
+            const opt = {
+                margin: 0.5,
+                filename: 'PowerChoosers_2026_Electricity_Navigator.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, logging: false },
+                jsPDF: { orientation: 'portrait', unit: 'in', format: 'letter' }
+            };
+            
+            html2pdf()
+                .set(opt)
+                .from(element)
+                .toPdf()
+                .save();
+        }
+    </script>
+</body>
+</html>
