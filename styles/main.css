@@ -524,7 +524,7 @@ body {
 
 /* === GLOBAL BUTTON HOVER EFFECTS === */
 /* Apply consistent hover effects to all interactive buttons and icons */
-button:hover:not(:disabled):not(.step-option),
+button:hover:not(:disabled):not(.step-option):not(.calendar-toggle-btn):not(.dropdown-toggle-btn),
 .btn:hover:not(:disabled),
 .icon-btn:hover:not(:disabled),
 .rc-page-btn:hover:not(:disabled),
@@ -2740,26 +2740,48 @@ button.step-option:hover,
 .calendar-toggle-btn {
     position: absolute;
     right: 8px;
-    top: 65%;
-    transform: translateY(-50%);
+    top: calc(50% + 12px);
+    transform: translateY(-50%) !important;
     background: transparent;
     border: none;
     color: var(--text-muted);
     cursor: pointer;
-    padding: 4px;
+    padding: 0;
     border-radius: var(--border-radius);
-    transition: var(--transition-fast);
+    transition: color var(--transition-fast), background-color var(--transition-fast);
     display: flex;
     align-items: center;
     justify-content: center;
     height: 20px;
     width: 20px;
+    line-height: 1;
+    transform-origin: center center;
+}
+
+.calendar-toggle-btn svg {
+    width: 16px;
+    height: 16px;
+    display: block;
 }
 
 .calendar-toggle-btn:hover {
     color: var(--text-primary);
     background: transparent;
+    top: calc(50% + 12px);
     transform: translateY(-50%) !important;
+    box-shadow: none !important;
+}
+
+/* Lock all interactive states to prevent global hover transforms from nudging */
+.calendar-toggle-btn:active,
+.calendar-toggle-btn:focus,
+.calendar-toggle-btn:focus-visible,
+button.calendar-toggle-btn:hover {
+    top: calc(50% + 12px);
+    transform: translateY(-50%) !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+    transition: none !important;
 }
 
 /* === DROPDOWN TOGGLE BUTTONS === */
@@ -11929,13 +11951,13 @@ body {
 }
 
 .activity-entity-avatar-circle {
-    width: 24px;
-    height: 24px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.75rem;
+    font-size: 0.875rem;
     font-weight: 600;
     letter-spacing: 0.5px;
     /* Removed border as requested */
@@ -11959,8 +11981,8 @@ body {
 }
 
 .activity-entity-avatar-circle svg {
-    width: 12px;
-    height: 12px;
+    width: 18px;
+    height: 18px;
     stroke: currentColor;
     fill: none;
 }
@@ -16031,21 +16053,21 @@ th.drag-over::after {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
+    width: 36px !important;
     /* match quick-action icon size */
-    height: 36px;
+    height: 36px !important;
     /* enforce perfect square */
-    padding: 0;
+    padding: 0 !important;
     /* remove default button padding */
+    min-width: 36px;
+    min-height: 36px;
     line-height: 0;
     /* prevent baseline offset */
     box-sizing: border-box;
     /* include border in total size */
     border-radius: var(--border-radius);
     vertical-align: middle;
-    background: var(--grey-700);
-    border: 1px solid var(--border-light);
-    color: var(--text-inverse);
+    /* Use btn-primary gradient background instead of solid grey */
     cursor: pointer;
     transition: var(--transition-fast);
 }
@@ -16188,21 +16210,21 @@ th.drag-over::after {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
+    width: 36px !important;
     /* match quick-action icon size */
-    height: 36px;
+    height: 36px !important;
     /* enforce perfect square */
-    padding: 0;
+    padding: 0 !important;
     /* remove default button padding */
+    min-width: 36px;
+    min-height: 36px;
     line-height: 0;
     /* prevent baseline offset */
     box-sizing: border-box;
     /* include border in total size */
     border-radius: var(--border-radius);
     vertical-align: middle;
-    background: var(--grey-700);
-    border: 1px solid var(--border-light);
-    color: var(--text-inverse);
+    /* Use btn-primary gradient background instead of solid grey */
     cursor: pointer;
     transition: var(--transition-fast);
 }

@@ -511,6 +511,143 @@
         margin-right: 0;
       }
       
+      /* Widget Separator */
+      #task-detail-page .widgets-separator {
+        width: 1px;
+        height: 24px;
+        background: var(--border-light);
+        margin: 0 8px;
+      }
+      
+      /* Widgets Wrap */
+      #task-detail-page .widgets-wrap {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+      }
+      
+      /* Widget Button - Square */
+      #task-detail-page #task-open-widgets {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px !important;
+        height: 36px !important;
+        padding: 0 !important;
+        min-width: 36px;
+        min-height: 36px;
+      }
+      
+      #task-detail-page #task-open-widgets svg {
+        width: 18px;
+        height: 18px;
+        display: block;
+        pointer-events: none;
+      }
+      
+      /* Widget Button Hover */
+      #task-detail-page #task-open-widgets:hover {
+        background: var(--bg-secondary);
+        border-color: var(--accent-color);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      
+      /* Widgets Drawer */
+      #task-detail-page .widgets-drawer {
+        position: absolute;
+        top: 50%;
+        right: calc(100% + 8px);
+        /* appear to the left of the button */
+        /* Start slightly to the right and fade in so it slides left into place */
+        transform: translate(10px, -50%);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        background: var(--bg-card);
+        color: var(--text-primary);
+        border: 1px solid var(--border-light);
+        border-radius: var(--border-radius);
+        box-shadow: var(--elevation-card);
+        padding: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        z-index: 20;
+        transition: transform 160ms ease, opacity 160ms ease, visibility 0s linear 160ms;
+        /* delay visibility off so it doesn't flicker */
+        --arrow-size: 8px;
+        /* square size before rotation */
+      }
+      
+      /* Pointed triangle pointing right */
+      #task-detail-page .widgets-drawer::before,
+      #task-detail-page .widgets-drawer::after {
+        content: "";
+        position: absolute;
+        width: var(--arrow-size);
+        height: var(--arrow-size);
+        transform: rotate(45deg);
+        pointer-events: none;
+        right: calc(-1 * var(--arrow-size) / 2 + 1px);
+        top: 50%;
+        transform: translateY(-50%) rotate(45deg);
+      }
+      
+      /* Border layer */
+      #task-detail-page .widgets-drawer::before {
+        background: var(--border-light);
+      }
+      
+      /* Fill layer */
+      #task-detail-page .widgets-drawer::after {
+        background: var(--bg-card);
+        right: calc(-1 * var(--arrow-size) / 2 + 2px);
+      }
+      
+      /* Drawer Open State */
+      #task-detail-page .widgets-wrap.open .widgets-drawer {
+        transform: translate(0, -50%);
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transition: transform 180ms ease, opacity 180ms ease;
+      }
+      
+      /* Widget icon buttons inside drawer */
+      #task-detail-page .widgets-drawer .widget-item {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: var(--border-radius);
+        background: var(--bg-item);
+        border: 1px solid var(--border-light);
+        color: var(--text-inverse);
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      
+      #task-detail-page .widgets-drawer .widget-item:hover {
+        background: var(--bg-secondary);
+        border-color: var(--accent-color);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      
+      #task-detail-page .widgets-drawer .widget-item:focus-visible {
+        outline: 2px solid var(--orange-muted);
+        outline-offset: 2px;
+      }
+      
+      #task-detail-page .widgets-drawer .widget-item svg {
+        width: 18px;
+        height: 18px;
+        display: block;
+        pointer-events: none;
+      }
+      
       /* Ensure page-actions uses flexbox for proper alignment */
       #task-detail-page .page-actions {
         display: flex;
@@ -548,6 +685,30 @@
         background: var(--bg-item);
         color: var(--text-secondary);
         border-color: var(--border-light);
+      }
+
+      /* Reschedule button: square, same height as action button, pagination styling */
+      #task-detail-page #task-reschedule-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border-radius: 8px;
+        background: var(--bg-hover);
+        border: 1px solid transparent;
+        color: var(--text-primary);
+        transition: var(--transition-fast);
+      }
+      #task-detail-page #task-reschedule-btn:hover {
+        background: var(--bg-item);
+        border-color: var(--border-light);
+        color: var(--text-inverse);
+      }
+      #task-detail-page #task-reschedule-btn svg {
+        width: 18px;
+        height: 18px;
       }
       
       /* Contact Link Styles */
@@ -795,6 +956,175 @@
 
     if (nextBtn) {
       nextBtn.addEventListener('click', (e) => { e.preventDefault(); navigateToAdjacentTask('next'); });
+    }
+
+    // Widget button hover functionality
+    const widgetsBtn = document.getElementById('task-open-widgets');
+    const widgetsWrap = document.querySelector('#task-detail-page .widgets-wrap');
+    if (widgetsBtn && widgetsWrap) {
+      // Click toggles open state (also support keyboard)
+      widgetsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const isOpen = widgetsWrap.classList.toggle('open');
+        widgetsBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+
+      // Hover/focus intent: open immediately, close with slight delay
+      const openNow = () => {
+        clearTimeout(widgetsWrap._closeTimer);
+        if (!widgetsWrap.classList.contains('open')) {
+          widgetsWrap.classList.add('open');
+          widgetsBtn.setAttribute('aria-expanded', 'true');
+        }
+      };
+      const closeSoon = () => {
+        clearTimeout(widgetsWrap._closeTimer);
+        widgetsWrap._closeTimer = setTimeout(() => {
+          widgetsWrap.classList.remove('open');
+          widgetsBtn.setAttribute('aria-expanded', 'false');
+        }, 320); // slightly longer grace period to move into the drawer
+      };
+
+      widgetsWrap.addEventListener('mouseenter', openNow);
+      widgetsWrap.addEventListener('mouseleave', closeSoon);
+      widgetsWrap.addEventListener('focusin', openNow);
+      widgetsWrap.addEventListener('focusout', (e) => {
+        // If focus moves outside the wrap, start close timer
+        if (!widgetsWrap.contains(e.relatedTarget)) closeSoon();
+      });
+    }
+
+    // Widget drawer item clicks
+    const widgetsDrawer = document.getElementById('task-widgets-drawer') || document.querySelector('#task-detail-page .widgets-drawer');
+    if (widgetsDrawer && !widgetsDrawer._bound) {
+      widgetsDrawer.addEventListener('click', (e) => {
+        const item = e.target.closest?.('.widget-item');
+        if (!item) return;
+        const which = item.getAttribute('data-widget');
+        handleWidgetAction(which);
+      });
+      widgetsDrawer._bound = '1';
+    }
+  }
+
+  function handleWidgetAction(which) {
+    // Get contact and account IDs from task state
+    const task = state.currentTask;
+    if (!task) {
+      try { window.crm?.showToast && window.crm.showToast('No task data available'); } catch (_) { }
+      return;
+    }
+
+    // Get contact ID from task or state
+    const contactId = task.contactId || state.contact?.id || state.contact?._id;
+    
+    // Get account ID - prioritize state.account, then contact's linked account
+    let accountId = state.account?.id || state.account?.accountId || state.account?._id;
+    if (!accountId && state.contact) {
+      accountId = state.contact.accountId || state.contact.account_id;
+    }
+    // Fallback: try to get from ContactDetail state (like health.js does)
+    if (!accountId && window.ContactDetail && window.ContactDetail.state) {
+      accountId = window.ContactDetail.state._linkedAccountId;
+    }
+
+    switch (which) {
+      case 'lusha': {
+        // Use Lusha/Apollo widget - use account if available, otherwise contact
+        if (window.Widgets) {
+          try {
+            const api = window.Widgets;
+            if (typeof api.isLushaOpen === 'function' && api.isLushaOpen()) {
+              if (typeof api.closeLusha === 'function') { api.closeLusha(); return; }
+            } else if (accountId && typeof api.openLushaForAccount === 'function') {
+              api.openLushaForAccount(accountId); return;
+            } else if (contactId && typeof api.openLusha === 'function') {
+              api.openLusha(contactId); return;
+            }
+          } catch (_) { /* noop */ }
+        }
+        console.log('Widget: Prospect for', accountId ? 'account' : 'contact', accountId || contactId);
+        try { window.crm?.showToast && window.crm.showToast('Open Prospect'); } catch (_) { }
+        break;
+      }
+      case 'maps': {
+        // Google Maps - use account if available, otherwise contact
+        if (window.Widgets) {
+          try {
+            const api = window.Widgets;
+            if (typeof api.isMapsOpen === 'function' && api.isMapsOpen()) {
+              if (typeof api.closeMaps === 'function') { api.closeMaps(); return; }
+            } else if (accountId && typeof api.openMapsForAccount === 'function') {
+              api.openMapsForAccount(accountId); return;
+            } else if (contactId && typeof api.openMaps === 'function') {
+              api.openMaps(contactId); return;
+            }
+          } catch (_) { /* noop */ }
+        }
+        console.log('Widget: Google Maps for', accountId ? 'account' : 'contact', accountId || contactId);
+        try { window.crm?.showToast && window.crm.showToast('Open Google Maps'); } catch (_) { }
+        break;
+      }
+      case 'health': {
+        // Energy Health Check - use contact's linked account (like health.js does)
+        if (window.Widgets) {
+          try {
+            const api = window.Widgets;
+            if (typeof api.isHealthOpen === 'function' && api.isHealthOpen()) {
+              if (typeof api.closeHealth === 'function') { api.closeHealth(); return; }
+            } else if (accountId && typeof api.openHealthForAccount === 'function') {
+              api.openHealthForAccount(accountId); return;
+            } else if (contactId && typeof api.openHealth === 'function') {
+              // Health widget uses contact's linked account internally
+              api.openHealth(contactId); return;
+            }
+          } catch (_) { /* noop */ }
+        }
+        console.log('Widget: Energy Health Check for', accountId ? 'account' : 'contact', accountId || contactId);
+        try { window.crm?.showToast && window.crm.showToast('Open Energy Health Check'); } catch (_) { }
+        break;
+      }
+      case 'deal': {
+        // Deal Calculator - saved to account
+        if (window.Widgets) {
+          try {
+            const api = window.Widgets;
+            if (typeof api.isDealOpen === 'function' && api.isDealOpen()) {
+              if (typeof api.closeDeal === 'function') { api.closeDeal(); return; }
+            } else if (accountId && typeof api.openDealForAccount === 'function') {
+              api.openDealForAccount(accountId); return;
+            } else if (contactId && typeof api.openDeal === 'function') {
+              // Deal calculator should use account, but fallback to contact if no account
+              api.openDeal(contactId); return;
+            }
+          } catch (_) { /* noop */ }
+        }
+        console.log('Widget: Deal Calculator for', accountId ? 'account' : 'contact', accountId || contactId);
+        try { window.crm?.showToast && window.crm.showToast('Open Deal Calculator'); } catch (_) { }
+        break;
+      }
+      case 'notes': {
+        // Notes - use contact directly
+        if (!contactId) {
+          try { window.crm?.showToast && window.crm.showToast('No contact associated with this task'); } catch (_) { }
+          return;
+        }
+        if (window.Widgets) {
+          try {
+            const api = window.Widgets;
+            if (typeof api.isNotesOpen === 'function' && api.isNotesOpen()) {
+              if (typeof api.closeNotes === 'function') { api.closeNotes(); return; }
+            } else if (typeof api.openNotes === 'function') {
+              api.openNotes(contactId); return;
+            }
+          } catch (_) { /* noop */ }
+        }
+        console.log('Widget: Notes for contact', contactId);
+        try { window.crm?.showToast && window.crm.showToast('Open Notes'); } catch (_) { }
+        break;
+      }
+      default:
+        console.log('Unknown widget action:', which);
     }
   }
 
@@ -1182,14 +1512,43 @@
         box-shadow: var(--elevation-card);
         min-width: 320px;
         max-width: 380px;
-        overflow: hidden;
+        overflow: visible;
         opacity: 0;
         transform: translateY(-6px);
-        transition: transform 200ms ease, opacity 200ms ease;
+        --arrow-size: 10px;
       }
       .reschedule-popover.--show {
-        opacity: 1;
-        transform: translateY(0);
+        animation: reschedulePopoverIn 200ms ease forwards;
+      }
+      .reschedule-popover.--hide {
+        animation: reschedulePopoverOut 300ms ease forwards;
+      }
+      @keyframes reschedulePopoverIn {
+        from { opacity: 0; transform: translateY(-6px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes reschedulePopoverOut {
+        from { opacity: 1; transform: translateY(0); }
+        to { opacity: 0; transform: translateY(-6px); }
+      }
+      .reschedule-popover::before,
+      .reschedule-popover::after {
+        content: "";
+        position: absolute;
+        width: var(--arrow-size);
+        height: var(--arrow-size);
+        transform: rotate(45deg);
+        pointer-events: none;
+      }
+      .reschedule-popover[data-placement="bottom"]::before {
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px));
+        top: calc(-1 * var(--arrow-size) / 2 + 1px);
+        background: var(--border-light);
+      }
+      .reschedule-popover[data-placement="bottom"]::after {
+        left: calc(var(--arrow-left, 20px) - (var(--arrow-size) / 2 + 1px));
+        top: calc(-1 * var(--arrow-size) / 2 + 2px);
+        background: var(--bg-card);
       }
       .reschedule-popover .tp-inner { padding: 12px 12px 10px 12px; }
       .reschedule-popover .tp-header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 10px; }
@@ -1202,9 +1561,29 @@
         border: 2px solid var(--border-light); border-radius: 8px; font-size: 0.9rem;
       }
       .reschedule-popover .form-actions { display:flex; justify-content:flex-end; gap:8px; }
-      .reschedule-popover .btn-primary { height:32px; padding:0 12px; border-radius: var(--border-radius-sm); background: var(--grey-700); color: var(--text-inverse); border:1px solid var(--grey-600); font-weight:600; }
+      .reschedule-popover .btn-primary { height:32px; padding:0 12px; border-radius: var(--border-radius-sm); background: var(--orange-primary); color: var(--text-inverse); border:1px solid var(--orange-primary); font-weight:600; }
+      .reschedule-popover .btn-primary:hover { background: var(--orange-dark, #e67e00); border-color: var(--orange-dark, #e67e00); filter: brightness(0.95); }
       .reschedule-popover .btn-text { height:32px; padding:0 12px; border-radius: var(--border-radius-sm); background: transparent; color: var(--text-secondary); border:1px solid transparent; }
       .reschedule-popover .btn-text:hover { background: var(--grey-700); color: var(--text-inverse); }
+      .reschedule-popover .close-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0; background: var(--bg-item); color: var(--grey-300); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); line-height: 1; font-size: 16px; font-weight: 600; cursor: pointer; transition: var(--transition-fast); box-sizing: border-box; }
+      .reschedule-popover .close-btn:hover { background: var(--grey-600); color: var(--text-inverse); }
+      .reschedule-popover .calendar-toolbar { display: none; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); padding: 8px; }
+      .reschedule-popover .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+      .reschedule-popover .calendar-month-year { font-weight: 600; }
+      .reschedule-popover .calendar-nav-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
+      .reschedule-popover .calendar-nav-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+      .reschedule-popover .calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+      .reschedule-popover .calendar-weekday { text-align: center; font-size: 11px; color: var(--text-secondary); font-weight: 600; }
+      .reschedule-popover .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+      .reschedule-popover .calendar-grid button { padding: 6px 0; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; }
+      .reschedule-popover .calendar-grid button:hover { background: var(--bg-secondary); }
+      .reschedule-popover .calendar-grid > div:empty { background: transparent; border: none; }
+      .reschedule-popover .calendar-grid button.today { border-color: var(--orange-primary); }
+      .reschedule-popover .calendar-grid button.selected { background: var(--orange-primary); color: #fff; border-color: var(--orange-primary); }
+      .reschedule-popover .calendar-slide-in { animation: rescheduleCalIn 200ms ease forwards; }
+      .reschedule-popover .calendar-slide-out { animation: rescheduleCalOut 300ms ease forwards; }
+      @keyframes rescheduleCalIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes rescheduleCalOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-8px); } }
     `;
     document.head.appendChild(style);
   }
@@ -1222,6 +1601,7 @@
     const initialTime = task.dueTime || '';
 
     pop.innerHTML = `
+      <div class="arrow" aria-hidden="true"></div>
       <div class="tp-inner">
         <div class="tp-header">
           <div class="tp-title">Reschedule</div>
@@ -1268,7 +1648,7 @@
                 <div class="calendar-weekday">F</div>
                 <div class="calendar-weekday">S</div>
               </div>
-              <div class="calendar-days"></div>
+              <div class="calendar-grid"></div>
             </div>
             <div class="form-actions">
               <button type="button" class="btn-text" data-close>Cancel</button>
@@ -1287,7 +1667,7 @@
     const dueDateInput = form.querySelector('input[name="dueDate"]');
     const dueTimeInput = form.querySelector('input[name="dueTime"]');
     const toolbar = form.querySelector('.calendar-toolbar');
-    const daysEl = form.querySelector('.calendar-days');
+    const daysEl = form.querySelector('.calendar-grid');
     const monthYearEl = form.querySelector('.calendar-month-year');
 
     let viewDate = new Date(initialDate);
@@ -1298,18 +1678,83 @@
       daysEl.innerHTML = '';
       const first = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
       const pad = first.getDay();
-      for (let i = 0; i < pad; i++) daysEl.insertAdjacentHTML('beforeend', `<div class="calendar-day calendar-day-empty"></div>`);
+      for (let i = 0; i < pad; i++) daysEl.insertAdjacentHTML('beforeend', `<div></div>`);
       const last = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
+      const today = new Date();
       for (let d = 1; d <= last; d++) {
         const dt = new Date(viewDate.getFullYear(), viewDate.getMonth(), d);
         const isSel = dt.toDateString() === selectedDate.toDateString();
-        const isToday = dt.toDateString() === new Date().toDateString();
-        const cls = ['calendar-day', isSel && 'calendar-day-selected', isToday && 'calendar-day-today'].filter(Boolean).join(' ');
-        daysEl.insertAdjacentHTML('beforeend', `<button type="button" class="${cls}" data-day="${d}">${d}</button>`);
+        const isToday = dt.toDateString() === today.toDateString();
+        const classes = [];
+        if (isSel) classes.push('selected');
+        if (isToday && !isSel) classes.push('today');
+        const dayBtn = document.createElement('button');
+        dayBtn.type = 'button';
+        dayBtn.textContent = d;
+        dayBtn.className = classes.join(' ');
+        dayBtn.addEventListener('click', () => {
+          selectedDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), d);
+          dueDateInput.value = fmtDate(selectedDate);
+          renderCalendar();
+          closeCalendar();
+        });
+        daysEl.appendChild(dayBtn);
       }
     };
 
-    const close = () => closeReschedulePopover();
+    const openCalendar = () => {
+      if (!toolbar) return;
+      renderCalendar();
+      toolbar.style.display = 'block';
+      toolbar.offsetHeight; // Force reflow
+      toolbar.classList.add('calendar-slide-in');
+    };
+
+    const closeCalendar = () => {
+      if (!toolbar) return;
+      toolbar.classList.remove('calendar-slide-in');
+      toolbar.classList.add('calendar-slide-out');
+      const handleEnd = (ev) => {
+        if (ev.target !== toolbar) return;
+        toolbar.removeEventListener('animationend', handleEnd);
+        toolbar.style.display = 'none';
+        toolbar.classList.remove('calendar-slide-out');
+      };
+      toolbar.addEventListener('animationend', handleEnd);
+      setTimeout(() => {
+        try { toolbar.removeEventListener('animationend', handleEnd); } catch (_) { }
+        toolbar.style.display = 'none';
+        toolbar.classList.remove('calendar-slide-out');
+      }, 350);
+    };
+
+    const toggleCalendar = () => {
+      const visible = toolbar && toolbar.style.display === 'block';
+      if (visible) closeCalendar();
+      else openCalendar();
+    };
+
+    const close = () => {
+      // Close calendar first if open
+      if (toolbar && toolbar.style.display === 'block') {
+        closeCalendar();
+      }
+      // Animate out the popover using CSS animation
+      pop.classList.remove('--show');
+      pop.classList.add('--hide');
+      const handlePopoverEnd = (ev) => {
+        if (ev.target !== pop) return;
+        pop.removeEventListener('animationend', handlePopoverEnd);
+        pop.classList.remove('--hide');
+        closeReschedulePopover();
+      };
+      pop.addEventListener('animationend', handlePopoverEnd);
+      setTimeout(() => {
+        try { pop.removeEventListener('animationend', handlePopoverEnd); } catch (_) { }
+        pop.classList.remove('--hide');
+        closeReschedulePopover();
+      }, 350);
+    };
 
     const onClick = (e) => {
       if (e.target.closest('[data-close]')) {
@@ -1319,8 +1764,7 @@
       }
       if (e.target.closest('.calendar-toggle-btn')) {
         e.preventDefault();
-        toolbar.style.display = toolbar.style.display === 'none' ? 'block' : 'none';
-        if (toolbar.style.display === 'block') renderCalendar();
+        toggleCalendar();
         return;
       }
       const navBtn = e.target.closest('.calendar-nav-btn');
@@ -1328,15 +1772,6 @@
         const delta = Number(navBtn.dataset.nav || 0);
         viewDate.setMonth(viewDate.getMonth() + delta);
         renderCalendar();
-        return;
-      }
-      const dayBtn = e.target.closest('.calendar-day[data-day]');
-      if (dayBtn) {
-        const day = Number(dayBtn.dataset.day);
-        selectedDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
-        dueDateInput.value = fmtDate(selectedDate);
-        renderCalendar();
-        toolbar.style.display = 'none';
         return;
       }
     };
@@ -1499,6 +1934,11 @@
       const top = Math.round(window.scrollY + rect.bottom + 8);
       pop.style.left = `${clampedLeft}px`;
       pop.style.top = `${top}px`;
+      
+      // Position arrow to point to the center of the anchor button
+      const arrowLeft = Math.round(anchorCenter - clampedLeft);
+      pop.style.setProperty('--arrow-left', `${arrowLeft}px`);
+      pop.setAttribute('data-placement', 'bottom');
     } catch (_) { }
   }
 
@@ -5253,6 +5693,7 @@
 
   // Public API
   window.TaskDetail = {
+    state: state, // Expose state so widgets can access account/contact data
     open: async function (taskId, navigationSource = 'tasks') {
       try {
         // CRITICAL: Capture navigation source BEFORE calling navigateToPage

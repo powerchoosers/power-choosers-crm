@@ -442,32 +442,37 @@
       /* Calendar Toggle Button Styles */
       .task-popover .calendar-toggle-btn {
         position: absolute;
-        right: 4px;
-        top: 65%;
-        transform: translateY(-50%);
+        right: 8px;
+        top: calc(50% + 12px);
+        transform: translateY(-50%) !important;
         background: transparent;
         border: none;
         color: var(--text-secondary);
         cursor: pointer;
-        padding: 8px;
+        padding: 0;
         border-radius: 4px;
-        transition: var(--transition-fast);
+        transition: color var(--transition-fast), background-color var(--transition-fast);
         z-index: 1;
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 32px;
-        height: 32px;
+        width: 20px;
+        height: 20px;
+        line-height: 1;
+        transform-origin: center center;
       }
       .task-popover .calendar-toggle-btn:hover {
         color: var(--text-primary);
         background: transparent;
+        top: calc(50% + 12px);
         transform: translateY(-50%) !important;
+        box-shadow: none !important;
+        transition: none !important;
       }
       .task-popover .calendar-toggle-btn svg {
         display: block;
-        width: 20px;
-        height: 20px;
+        width: 16px;
+        height: 16px;
       }
       
       /* Dropdown Toolbar Styles */
@@ -516,6 +521,25 @@
       }
       
       /* Dropdown Option Styles - Using global styles from main.css */
+      
+      /* Calendar Toolbar Styles */
+      .task-popover .calendar-toolbar { display: none; margin-top: 8px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--border-radius); box-shadow: var(--elevation-card); padding: 8px; }
+      .task-popover .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+      .task-popover .calendar-month-year { font-weight: 600; }
+      .task-popover .calendar-nav-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; transition: var(--transition-fast); }
+      .task-popover .calendar-nav-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+      .task-popover .calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+      .task-popover .calendar-weekday { text-align: center; font-size: 11px; color: var(--text-secondary); font-weight: 600; }
+      .task-popover .calendar-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+      .task-popover .calendar-days button { padding: 6px 0; background: var(--bg-item); color: var(--text-inverse); border: 1px solid var(--border-light); border-radius: var(--border-radius-sm); cursor: pointer; }
+      .task-popover .calendar-days button:hover { background: var(--bg-secondary); }
+      .task-popover .calendar-days > div:empty { background: transparent; border: none; }
+      .task-popover .calendar-days button.calendar-day-today { border-color: var(--orange-primary); }
+      .task-popover .calendar-days button.calendar-day-selected { background: var(--primary-700); color: #fff; }
+      .task-popover .calendar-slide-in { animation: contactCalIn 200ms ease forwards; }
+      .task-popover .calendar-slide-out { animation: contactCalOut 300ms ease forwards; }
+      @keyframes contactCalIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes contactCalOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-8px); } }
     `;
     document.head.appendChild(style);
   }
@@ -1361,21 +1385,21 @@
         pop.classList.remove('calendar-expanded');
       });
 
-      // When the toolbar transition ends, hide it and clean up classes
+      // When the toolbar animation ends, hide it and clean up classes
       const handleEnd = (ev) => {
         if (ev.target !== calendarToolbar) return;
-        calendarToolbar.removeEventListener('transitionend', handleEnd);
+        calendarToolbar.removeEventListener('animationend', handleEnd);
         calendarToolbar.style.display = 'none';
         calendarToolbar.classList.remove('calendar-slide-out');
       };
-      calendarToolbar.addEventListener('transitionend', handleEnd);
+      calendarToolbar.addEventListener('animationend', handleEnd);
 
-      // Fallback cleanup in case transitionend doesn't fire
+      // Fallback cleanup in case animationend doesn't fire
       setTimeout(() => {
-        try { calendarToolbar.removeEventListener('transitionend', handleEnd); } catch (_) { }
+        try { calendarToolbar.removeEventListener('animationend', handleEnd); } catch (_) { }
         calendarToolbar.style.display = 'none';
         calendarToolbar.classList.remove('calendar-slide-out');
-      }, 600);
+      }, 350);
     }
 
     // Dropdown toggle functions
