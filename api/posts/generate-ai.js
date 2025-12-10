@@ -77,20 +77,31 @@ This section MUST include:
 - A reason tied to current market conditions (e.g., "Because natural gas futures are trending upward through Q2 2025...")
 
 RESOURCE BRIDGE FORMULA:
-Only link to tools that actually exist. Currently, we have ONE tool available:
-- TDU Delivery Charges Calculator: https://powerchoosers.com/tdu-delivery-charges
+Only link to tools/resources that actually exist. We have TWO resources available:
 
-ONLY use this tool when the post topic is directly related to:
-- TDU charges, delivery charges, transmission and distribution utility fees
-- Texas electricity bills and bill breakdowns
-- Understanding commercial electricity bill components
-- ERCOT delivery charges and TDU rates
+1. TDU Delivery Charges Calculator: https://powerchoosers.com/tdu-delivery-charges
+   ONLY use when the post topic is directly related to:
+   - TDU charges, delivery charges, transmission and distribution utility fees
+   - Texas electricity bills and bill breakdowns
+   - Understanding commercial electricity bill components
+   - ERCOT delivery charges and TDU rates
+   
+   Format: "To [Specific Action related to TDU/delivery charges], use our <a href="https://powerchoosers.com/tdu-delivery-charges">TDU Delivery Charges Calculator</a>. It will [Specific Benefit in 10 words or less]."
 
-When the topic is relevant, use this format:
-"To [Specific Action related to TDU/delivery charges], use our <a href="https://powerchoosers.com/tdu-delivery-charges">TDU Delivery Charges Calculator</a>. It will [Specific Benefit in 10 words or less]."
-Example: "To calculate your exact TDU delivery charges, use our <a href="https://powerchoosers.com/tdu-delivery-charges">TDU Delivery Charges Calculator</a>. It estimates your monthly and annual delivery costs based on your utility and usage."
+2. 2026 Electricity Market Navigator Guide: https://powerchoosers.com/guide-2026.html
+   ONLY use when the post topic is directly related to:
+   - ERCOT capacity cliff, reserve margins, or supply shortages
+   - Market outlook/forecasts for 2026-2028
+   - Renewal timing strategies (6-24 months before expiry)
+   - Peak-hour pricing volatility and capacity issues
+   - Contract timing decisions and strategic planning
+   - Market navigation for commercial energy buyers
+   - ERCOT market trends and future projections
+   
+   Format: "To [Specific Action related to market strategy/timing], download our <a href="https://powerchoosers.com/guide-2026.html">2026 Electricity Market Navigator</a>. It covers [Specific Benefit in 10 words or less]."
+   Example: "To understand the ERCOT capacity cliff and optimal renewal windows, download our <a href="https://powerchoosers.com/guide-2026.html">2026 Electricity Market Navigator</a>. It breaks down reserve margin trends and 6-24 month renewal strategies."
 
-For posts NOT about TDU/delivery charges, use a generic resource link:
+For posts NOT about TDU/delivery charges OR market strategy/timing, use a generic resource link:
 "To explore more energy resources and tools, visit our <a href="/resources">Resources Page</a>."
 
 KEYWORD STRATEGY:
@@ -426,9 +437,32 @@ function buildUserPrompt(existingPosts) {
                       randomTopic.toLowerCase().includes('bill') ||
                       randomTopic.toLowerCase().includes('transmission and distribution');
   
-  const resourceInstruction = tduRelevant 
-    ? 'IMPORTANT: Since this post is about TDU charges or delivery charges, include a link to our TDU Delivery Charges Calculator: <a href="https://powerchoosers.com/tdu-delivery-charges">TDU Delivery Charges Calculator</a>. Only use this specific tool link when the topic is directly related to TDU/delivery charges.'
-    : 'IMPORTANT: This post is NOT about TDU/delivery charges. Use a generic link to /resources instead. Do NOT reference the TDU calculator or any other tools that don\'t exist yet.';
+  // Determine if 2026 Market Navigator guide is relevant based on topic
+  const guideRelevant = randomTopic.toLowerCase().includes('capacity') ||
+                        randomTopic.toLowerCase().includes('reserve margin') ||
+                        randomTopic.toLowerCase().includes('renewal') ||
+                        randomTopic.toLowerCase().includes('contract timing') ||
+                        randomTopic.toLowerCase().includes('peak-hour') ||
+                        randomTopic.toLowerCase().includes('peak hour') ||
+                        randomTopic.toLowerCase().includes('market outlook') ||
+                        randomTopic.toLowerCase().includes('market forecast') ||
+                        randomTopic.toLowerCase().includes('2026') ||
+                        randomTopic.toLowerCase().includes('2027') ||
+                        randomTopic.toLowerCase().includes('2028') ||
+                        randomTopic.toLowerCase().includes('supply shortage') ||
+                        randomTopic.toLowerCase().includes('supply/demand') ||
+                        randomTopic.toLowerCase().includes('market strategy') ||
+                        randomTopic.toLowerCase().includes('market navigation') ||
+                        randomTopic.toLowerCase().includes('ercot') && (randomTopic.toLowerCase().includes('trend') || randomTopic.toLowerCase().includes('outlook') || randomTopic.toLowerCase().includes('forecast'));
+  
+  let resourceInstruction = '';
+  if (tduRelevant) {
+    resourceInstruction = 'IMPORTANT: Since this post is about TDU charges or delivery charges, include a link to our TDU Delivery Charges Calculator: <a href="https://powerchoosers.com/tdu-delivery-charges">TDU Delivery Charges Calculator</a>. Only use this specific tool link when the topic is directly related to TDU/delivery charges.';
+  } else if (guideRelevant) {
+    resourceInstruction = 'IMPORTANT: Since this post is about ERCOT market outlook, capacity/reserve margins, renewal timing, or peak-hour pricing, include a link to our 2026 Market Navigator guide: <a href="https://powerchoosers.com/guide-2026.html">2026 Electricity Market Navigator</a>. This guide covers the capacity cliff, reserve margin trends, and 6-24 month renewal strategies. Only use this link when the topic is directly related to market strategy, timing, or ERCOT forecasts.';
+  } else {
+    resourceInstruction = 'IMPORTANT: This post is NOT about TDU/delivery charges OR market strategy/timing. Use a generic link to /resources instead. Do NOT reference specific tools or guides unless the topic is directly relevant.';
+  }
 
   const headingRules = 'Heading rules: hook is plain text (no heading). Never use headings titled "Hook", "Introduction", "Section 1/2/3". Use descriptive, keyword-rich H2/H3 titles. Final H2 must be exactly "Conclusion".';
 
@@ -436,7 +470,7 @@ function buildUserPrompt(existingPosts) {
     ? 'If the topic involves AI/automation/analytics, name-drop 1-2 leading models (ChatGPT, Gemini) naturally when discussing AI-driven analysis—do this only when AI is relevant.'
     : '';
 
-  return `${randomTopic}\n\n${hookInstruction}\n\n${geographicInstruction}\n\n${contentTypeInstruction}\n\n${resourceInstruction}\n\n${headingRules}\n\n${aiInstruction}\n\n${context}\n\nGenerate a complete blog post following the structure and format specified in the system prompt. Remember: EVERY post must start with the specified HOOK formula, include an "Analyst Take" section with specific recommendations, and include an appropriate resource link (TDU calculator ONLY if topic is relevant, otherwise generic /resources link).`;
+  return `${randomTopic}\n\n${hookInstruction}\n\n${geographicInstruction}\n\n${contentTypeInstruction}\n\n${resourceInstruction}\n\n${headingRules}\n\n${aiInstruction}\n\n${context}\n\nGenerate a complete blog post following the structure and format specified in the system prompt. Remember: EVERY post must start with the specified HOOK formula, include an "Analyst Take" section with specific recommendations, and include an appropriate resource link (TDU calculator if topic is about delivery charges, 2026 Market Navigator if topic is about market strategy/timing/forecasts, otherwise generic /resources link).`;
 }
 
 // Parse Perplexity response and extract structured data
@@ -465,8 +499,8 @@ function parseAIResponse(responseText) {
     const keywords = String(parsed.keywords || '').trim();
     let content = String(parsed.content || '').trim();
 
-    // Ensure content includes resource funnel link (but don't force TDU tool if not relevant)
-    if (!content.includes('/resources') && !content.includes('Resources Page') && !content.includes('tdu-delivery-charges')) {
+    // Ensure content includes resource funnel link (but don't force specific tools if not relevant)
+    if (!content.includes('/resources') && !content.includes('Resources Page') && !content.includes('tdu-delivery-charges') && !content.includes('guide-2026')) {
       // Add generic resource funnel section if missing
       const resourceSection = `
 <h3>Take Action: Access Our Resources</h3>
