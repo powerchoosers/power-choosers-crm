@@ -11980,6 +11980,12 @@ body {
     color: var(--text-secondary);
 }
 
+.activity-entity-avatar-circle.guide-download-avatar {
+    background: linear-gradient(135deg, #0b1b45 0%, #1e3a8a 100%);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(11, 27, 69, 0.25);
+}
+
 .activity-entity-avatar-circle svg {
     width: 18px;
     height: 18px;
