@@ -924,6 +924,15 @@
     window.addEventListener('load', () => {
       buildCharts();
       document.getElementById('download-btn').addEventListener('click', generatePDF);
+      
+      // Auto-download if URL parameter is present (from form submission)
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('auto-download') === 'true') {
+        // Wait for charts to render (Chart.js needs a moment)
+        setTimeout(() => {
+          generatePDF();
+        }, 1500);
+      }
     });
   </script>
 </body>

@@ -252,7 +252,8 @@
         </form>
         <div class="download-panel" id="download-panel">
           <div style="font-weight:700; color:var(--brand-blue); margin-bottom:6px;">Ready to download</div>
-          <a href="/guide-2026-pdf.html" target="_blank" rel="noopener">Open the 2026 Market Navigator (PDF)</a>
+          <a href="/guide-2026-pdf.html?auto-download=true" target="_blank" rel="noopener">Open the 2026 Market Navigator (PDF)</a>
+          <p style="margin:8px 0 0; font-size:12px; color:var(--muted);">The PDF will download automatically when the page loads.</p>
         </div>
       </div>
     </div>
@@ -261,7 +262,9 @@
   <script>
     const form = document.getElementById('gate-form');
     const panel = document.getElementById('download-panel');
-    form.addEventListener('submit', (e) => {
+    const submitBtn = form.querySelector('button[type="submit"]');
+    
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const requiredFields = ['name', 'email', 'company'];
       const valid = requiredFields.every(id => {
@@ -269,8 +272,71 @@
         return el && el.value.trim();
       });
       if (!valid) return;
-      panel.style.display = 'block';
-      panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      
+      // Disable button and show loading state
+      const originalText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+      
+      const contactName = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const companyName = document.getElementById('company').value.trim();
+      
+      // Normalize phone number (optional field, but API expects it)
+      function normalizePhone(input) {
+        const raw = (input || '').toString().trim();
+        if (!raw) return '';
+        const digits = raw.replace(/\D/g, '');
+        let formattedNumber = '';
+        if (digits.length === 11 && digits.startsWith('1')) {
+          formattedNumber = `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+        } else if (digits.length === 10) {
+          formattedNumber = `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+        } else {
+          return raw;
+        }
+        return formattedNumber;
+      }
+      
+      try {
+        const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? 'http://localhost:3000'
+          : 'https://power-choosers-crm-792458658491.us-south1.run.app';
+        
+        const response = await fetch(`${API_BASE_URL}/api/create-booking`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contactName: contactName,
+            companyName: companyName,
+            email: email,
+            phone: '', // Guide download doesn't require phone
+            source: 'guide-download'
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to submit form');
+        }
+        
+        // Show download panel on success
+        panel.style.display = 'block';
+        panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+      } catch (error) {
+        console.error('Error submitting form:', error);
+        // Still show download panel even if API fails (graceful degradation)
+        panel.style.display = 'block';
+        panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } finally {
+        // Re-enable button
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
     });
   </script>
 
