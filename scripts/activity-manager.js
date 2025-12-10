@@ -12,6 +12,9 @@ class ActivityManager {
     this.cacheTimestamp = new Map(); // Cache timestamps for expiration
     this.cacheExpiry = 5 * 60 * 1000; // 5 minutes cache expiry
     this.prerenderedPages = new Map(); // Cache for pre-rendered pages
+    this.fetchLimitPerType = 25; // Smaller initial fetch to speed cold start
+    this.maxFetchLimit = 200; // Safety cap for incremental fetches
+    this.lastFetchLimitUsed = this.fetchLimitPerType;
   }
 
   /**
@@ -33,23 +36,23 @@ class ActivityManager {
     
     try {
       // Get calls
-      const calls = await this.getCallActivities(entityType, entityId);
+      const calls = await this.getCallActivities(entityType, entityId, this.fetchLimitPerType);
       activities.push(...calls);
 
       // Get notes
-      const notes = await this.getNoteActivities(entityType, entityId);
+      const notes = await this.getNoteActivities(entityType, entityId, this.fetchLimitPerType);
       activities.push(...notes);
 
       // Get sequence activities
-      const sequences = await this.getSequenceActivities(entityType, entityId);
+      const sequences = await this.getSequenceActivities(entityType, entityId, this.fetchLimitPerType);
       activities.push(...sequences);
 
       // Get email activities
-      const emails = await this.getEmailActivities(entityType, entityId);
+      const emails = await this.getEmailActivities(entityType, entityId, this.fetchLimitPerType);
       activities.push(...emails);
 
       // Get task activities
-      const tasks = await this.getTaskActivities(entityType, entityId);
+      const tasks = await this.getTaskActivities(entityType, entityId, this.fetchLimitPerType);
       activities.push(...tasks);
 
       // Sort by timestamp (most recent first) using robust timestamp parsing
@@ -63,6 +66,7 @@ class ActivityManager {
       // Cache the results
       this.cache.set(cacheKey, activities);
       this.cacheTimestamp.set(cacheKey, now);
+      this.lastFetchLimitUsed = this.fetchLimitPerType;
 
       return activities;
     } catch (error) {
@@ -74,12 +78,12 @@ class ActivityManager {
   /**
    * Get call activities
    */
-  async getCallActivities(entityType, entityId) {
+  async getCallActivities(entityType, entityId, limit) {
     const activities = [];
     
     try {
       // Get calls from Firebase or local storage
-      const calls = await this.fetchCalls();
+      const calls = await this.fetchCalls(limit);
       
       for (const call of calls) {
         let shouldInclude = false;
@@ -119,14 +123,14 @@ class ActivityManager {
   /**
    * Get note activities
    */
-  async getNoteActivities(entityType, entityId) {
+  async getNoteActivities(entityType, entityId, limit) {
     const activities = [];
     
     try {
       if (entityType === 'global') {
         // For global view, get notes from all contacts and accounts
-        const contacts = await this.fetchContactsWithNotes();
-        const accounts = await this.fetchAccountsWithNotes();
+        const contacts = await this.fetchContactsWithNotes(limit);
+        const accounts = await this.fetchAccountsWithNotes(limit);
         
         for (const contact of contacts) {
           if (contact.notes && contact.notes.trim()) {
@@ -202,11 +206,11 @@ class ActivityManager {
   /**
    * Get sequence activities
    */
-  async getSequenceActivities(entityType, entityId) {
+  async getSequenceActivities(entityType, entityId, limit) {
     const activities = [];
     
     try {
-      const sequences = await this.fetchSequences();
+      const sequences = await this.fetchSequences(limit);
       
       for (const sequence of sequences) {
         let shouldInclude = false;
@@ -245,11 +249,11 @@ class ActivityManager {
   /**
    * Get email activities
    */
-  async getEmailActivities(entityType, entityId) {
+  async getEmailActivities(entityType, entityId, limit) {
     const activities = [];
     
     try {
-      const emails = await this.fetchEmails();
+      const emails = await this.fetchEmails(limit);
       
       // Get all contacts from CRM (people.js) - CRITICAL: Only show emails from contacts in CRM
       const allContacts = window.getPeopleData ? (window.getPeopleData() || []) : [];
@@ -440,13 +444,16 @@ class ActivityManager {
         }
 
         if (shouldInclude) {
+          // Check if this is a guide download task
+          const isGuideDownload = task.title && task.title.startsWith('Guide Download:');
+          
           activities.push({
             id: `task-${task.id}`,
-            type: 'task',
+            type: isGuideDownload ? 'guide-download' : 'task',
             title: task.title || 'Task',
             description: this.truncateText(task.description, 100),
             timestamp: task.timestamp || task.createdAt,
-            icon: 'task',
+            icon: isGuideDownload ? 'download' : 'task',
             data: task
           });
         }
@@ -461,15 +468,15 @@ class ActivityManager {
   /**
    * Fetch calls from Firebase or local storage
    */
-  async fetchCalls() {
+  async fetchCalls(limit = this.fetchLimitPerType) {
     try {
       // Try Firebase first
       if (window.db) {
         const snapshot = await window.db.collection('calls')
           .orderBy('timestamp', 'desc')
-          .limit(50)
+          .limit(limit || this.fetchLimitPerType)
           .get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).slice(0, limit || this.fetchLimitPerType);
       }
       
       // Return empty array if no data available
@@ -503,7 +510,7 @@ class ActivityManager {
   /**
    * Fetch contacts with notes from Firebase and localStorage
    */
-  async fetchContactsWithNotes() {
+  async fetchContactsWithNotes(limit = this.fetchLimitPerType) {
     try {
       let contacts = [];
       
@@ -537,7 +544,7 @@ class ActivityManager {
           if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
             // Use DataManager helper
             const allContacts = await window.DataManager.queryWithOwnership('contacts');
-            contacts = allContacts.filter(c => c.notes && c.notes.trim()).slice(0, 50);
+            contacts = allContacts.filter(c => c.notes && c.notes.trim()).slice(0, limit || this.fetchLimitPerType);
           } else if (email) {
             // Fallback: try single query with ownerId filter
             try {
@@ -546,7 +553,7 @@ class ActivityManager {
                 .where('notes', '>', '')
                 .orderBy('notes')
                 .orderBy('notesUpdatedAt', 'desc')
-                .limit(50)
+                .limit(limit || this.fetchLimitPerType)
                 .get();
               contacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             } catch (error) {
@@ -563,7 +570,7 @@ class ActivityManager {
             .where('notes', '>', '')
             .orderBy('notes')
             .orderBy('notesUpdatedAt', 'desc')
-            .limit(50)
+            .limit(limit || this.fetchLimitPerType)
             .get();
           contacts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }
@@ -583,7 +590,7 @@ class ActivityManager {
         console.warn('Error loading contacts with notes from localStorage:', error);
       }
       
-      return contacts;
+      return contacts.slice(0, limit || this.fetchLimitPerType);
     } catch (error) {
       console.error('Error fetching contacts with notes:', error);
       return [];
@@ -593,7 +600,7 @@ class ActivityManager {
   /**
    * Fetch accounts with notes from Firebase and localStorage
    */
-  async fetchAccountsWithNotes() {
+  async fetchAccountsWithNotes(limit = this.fetchLimitPerType) {
     try {
       let accounts = [];
       
@@ -627,7 +634,7 @@ class ActivityManager {
           if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
             // Use DataManager helper
             const allAccounts = await window.DataManager.queryWithOwnership('accounts');
-            accounts = allAccounts.filter(a => a.notes && a.notes.trim()).slice(0, 50);
+            accounts = allAccounts.filter(a => a.notes && a.notes.trim()).slice(0, limit || this.fetchLimitPerType);
           } else if (email) {
             // Fallback: try single query with ownerId filter
             try {
@@ -636,7 +643,7 @@ class ActivityManager {
                 .where('notes', '>', '')
                 .orderBy('notes')
                 .orderBy('notesUpdatedAt', 'desc')
-                .limit(50)
+                .limit(limit || this.fetchLimitPerType)
                 .get();
               accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             } catch (error) {
@@ -653,7 +660,7 @@ class ActivityManager {
             .where('notes', '>', '')
             .orderBy('notes')
             .orderBy('notesUpdatedAt', 'desc')
-            .limit(50)
+            .limit(limit || this.fetchLimitPerType)
             .get();
           accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }
@@ -673,7 +680,7 @@ class ActivityManager {
         console.warn('Error loading accounts with notes from localStorage:', error);
       }
       
-      return accounts;
+      return accounts.slice(0, limit || this.fetchLimitPerType);
     } catch (error) {
       console.error('Error fetching accounts with notes:', error);
       return [];
@@ -741,14 +748,14 @@ class ActivityManager {
   /**
    * Fetch sequences from Firebase or local storage
    */
-  async fetchSequences() {
+  async fetchSequences(limit = this.fetchLimitPerType) {
     try {
       if (window.db) {
         const snapshot = await window.db.collection('sequences')
           .orderBy('timestamp', 'desc')
-          .limit(50)
+          .limit(limit || this.fetchLimitPerType)
           .get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).slice(0, limit || this.fetchLimitPerType);
       }
       
       return [];
@@ -761,7 +768,7 @@ class ActivityManager {
   /**
    * Fetch emails from Firebase or local storage
    */
-  async fetchEmails() {
+  async fetchEmails(limit = this.fetchLimitPerType) {
     try {
       let emails = [];
       
@@ -795,14 +802,14 @@ class ActivityManager {
           if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
             // Use DataManager helper
             emails = await window.DataManager.queryWithOwnership('emails');
-            emails = emails.slice(0, 100); // Get more emails for better filtering
+            emails = emails.slice(0, limit || this.fetchLimitPerType);
           } else if (email) {
             // Fallback: try query with ownerId filter
             try {
               const snapshot = await window.firebaseDB.collection('emails')
                 .where('ownerId', '==', email)
                 .orderBy('timestamp', 'desc')
-                .limit(100)
+                .limit(limit || this.fetchLimitPerType)
                 .get();
               emails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             } catch (error) {
@@ -810,7 +817,7 @@ class ActivityManager {
               try {
                 const snapshot = await window.firebaseDB.collection('emails')
                   .where('ownerId', '==', email)
-                  .limit(100)
+                  .limit(limit || this.fetchLimitPerType)
                   .get();
                 emails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 // Sort client-side
@@ -832,14 +839,14 @@ class ActivityManager {
           try {
             const snapshot = await window.firebaseDB.collection('emails')
               .orderBy('timestamp', 'desc')
-              .limit(100)
+              .limit(limit || this.fetchLimitPerType)
               .get();
             emails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           } catch (error) {
             // If orderBy fails, try without it and sort client-side
             try {
               const snapshot = await window.firebaseDB.collection('emails')
-                .limit(100)
+                .limit(limit || this.fetchLimitPerType)
                 .get();
               emails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
               // Sort client-side
@@ -856,7 +863,7 @@ class ActivityManager {
         }
       }
       
-      return emails;
+      return emails.slice(0, limit || this.fetchLimitPerType);
     } catch (error) {
       console.error('Error fetching emails:', error);
       return [];
@@ -866,7 +873,7 @@ class ActivityManager {
   /**
    * Fetch tasks from Firebase or local storage
    */
-  async fetchTasks() {
+  async fetchTasks(limit = this.fetchLimitPerType) {
     try {
       let tasks = [];
       
@@ -900,13 +907,13 @@ class ActivityManager {
           if (email && window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
             // Use DataManager helper
             tasks = await window.DataManager.queryWithOwnership('tasks');
-            tasks = tasks.slice(0, 50);
+            tasks = tasks.slice(0, limit || this.fetchLimitPerType);
           } else if (email) {
             // Fallback: two separate queries and merge client-side
             try {
               const [ownedSnap, assignedSnap] = await Promise.all([
-                window.firebaseDB.collection('tasks').where('ownerId', '==', email).orderBy('timestamp', 'desc').limit(50).get(),
-                window.firebaseDB.collection('tasks').where('assignedTo', '==', email).orderBy('timestamp', 'desc').limit(50).get()
+                window.firebaseDB.collection('tasks').where('ownerId', '==', email).orderBy('timestamp', 'desc').limit(limit || this.fetchLimitPerType).get(),
+                window.firebaseDB.collection('tasks').where('assignedTo', '==', email).orderBy('timestamp', 'desc').limit(limit || this.fetchLimitPerType).get()
               ]);
               const tasksMap = new Map();
               ownedSnap.docs.forEach(doc => tasksMap.set(doc.id, { id: doc.id, ...doc.data() }));
@@ -925,7 +932,7 @@ class ActivityManager {
           // Admin: unrestricted query
           const snapshot = await window.firebaseDB.collection('tasks')
             .orderBy('timestamp', 'desc')
-            .limit(50)
+            .limit(limit || this.fetchLimitPerType)
             .get();
           tasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         }
@@ -953,7 +960,7 @@ class ActivityManager {
         console.warn('Error loading tasks from localStorage:', error);
       }
       
-      return tasks;
+      return tasks.slice(0, limit || this.fetchLimitPerType);
     } catch (error) {
       console.error('Error fetching tasks:', error);
       return [];
@@ -1246,6 +1253,7 @@ class ActivityManager {
         this.openEmailDetail(activityId, entityType, entityId);
         break;
       case 'task':
+      case 'guide-download':
         this.openTaskDetail(activityId);
         break;
     }
@@ -1323,10 +1331,27 @@ class ActivityManager {
   }
 
   /**
+   * Ensure we have enough activities loaded for the requested page.
+   * If not, increase the fetch limit (up to a cap) and refresh.
+   */
+  async ensureActivitiesForPage(page, entityType, entityId) {
+    const needed = (page + 1) * this.maxActivitiesPerPage;
+    let activities = await this.getActivities(entityType, entityId);
+    if (activities.length >= needed) return activities;
+
+    // Increase fetch window and try again
+    if (this.fetchLimitPerType < this.maxFetchLimit) {
+      this.fetchLimitPerType = Math.min(this.fetchLimitPerType + 20, this.maxFetchLimit);
+      activities = await this.getActivities(entityType, entityId, true);
+    }
+    return activities;
+  }
+
+  /**
    * Navigate to next page of activities
    */
   async nextPage(containerId, entityType, entityId) {
-    const activities = await this.getActivities(entityType, entityId);
+    const activities = await this.ensureActivitiesForPage(this.currentPage + 1, entityType, entityId);
     const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
     
     if (this.currentPage < totalPages - 1) {
@@ -1355,7 +1380,7 @@ class ActivityManager {
    * Go to specific page
    */
   async goToPage(page, containerId, entityType, entityId) {
-    const activities = await this.getActivities(entityType, entityId);
+    const activities = await this.ensureActivitiesForPage(page, entityType, entityId);
     const totalPages = Math.ceil(activities.length / this.maxActivitiesPerPage);
     
     if (page >= 0 && page < totalPages) {
@@ -1489,6 +1514,12 @@ class ActivityManager {
         return this.getDefaultEntityAvatar();
       }
 
+      // Check if this is a guide download activity
+      if (activity.type === 'guide-download' || 
+          (activity.type === 'task' && activity.title && activity.title.startsWith('Guide Download:'))) {
+        return this.getGuideDownloadAvatar();
+      }
+
       if (activity.data.entityType === 'contact') {
         // Contact avatar with initials
         const contact = activity.data;
@@ -1583,6 +1614,19 @@ class ActivityManager {
     return `<div class="activity-entity-avatar-circle company-avatar" aria-hidden="true">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1"></path>
+      </svg>
+    </div>`;
+  }
+
+  /**
+   * Get guide download avatar (blue circle with download icon)
+   */
+  getGuideDownloadAvatar() {
+    return `<div class="activity-entity-avatar-circle guide-download-avatar" aria-hidden="true" style="background: linear-gradient(135deg, #0b1b45 0%, #1e3a8a 100%); color: #ffffff;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
       </svg>
     </div>`;
   }
@@ -1764,6 +1808,11 @@ class ActivityManager {
       task: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="9,11 12,14 22,4"/>
         <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>`,
+      download: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
       </svg>`
     };
     
