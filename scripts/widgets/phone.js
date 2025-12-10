@@ -2292,6 +2292,19 @@
         if (!str) return '';
         const dp = dayPart();
         const data = getLiveData();
+
+        // Get agent name from settings (first name only from general settings)
+        let agentFirstName = '';
+        try {
+          if (window.SettingsPage && typeof window.SettingsPage.getSettings === 'function') {
+            const settings = window.SettingsPage.getSettings();
+            if (settings && settings.general) {
+              agentFirstName = settings.general.firstName || '';
+            }
+          }
+        } catch (_) {
+          agentFirstName = '';
+        }
         
         // Calculate savings based on monthly spend from state
         let monthlySpend = 0;
@@ -2313,6 +2326,7 @@
         
         const values = {
           'day.part': dp,
+          'agent.first_name': agentFirstName,
           'contact.first_name': data.contact.firstName || data.contact.first_name || splitName(data.contact.name || '').first || splitName(data.contact.fullName || '').first || '',
           'contact.last_name': data.contact.lastName || data.contact.last_name || splitName(data.contact.name || '').last || splitName(data.contact.fullName || '').last || '',
           'contact.full_name': data.contact.fullName || data.contact.name || (data.contact.firstName && data.contact.lastName ? `${data.contact.firstName} ${data.contact.lastName}` : (data.contact.firstName || data.contact.lastName || '')),
