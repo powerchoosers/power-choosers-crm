@@ -371,6 +371,183 @@
       gap: 10px
     }
 
+    /* Resource tools */
+    .resource-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+      margin-top: 12px
+    }
+
+    .resource-card {
+      background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+      border: 1px solid rgba(229, 231, 235, .6);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: var(--transition)
+    }
+
+    .resource-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+      border-color: rgba(245, 158, 11, .25)
+    }
+
+    .resource-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: .2px
+    }
+
+    .resource-card h4 {
+      margin: 0;
+      font-size: 18px;
+      color: var(--brand-blue)
+    }
+
+    .resource-card p {
+      margin: 0;
+      color: #334155;
+      line-height: 1.5;
+      font-size: 14px
+    }
+
+    /* Blog slider */
+    .posts-slider {
+      position: relative;
+      overflow: hidden
+    }
+
+    .posts-track {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(280px, 320px);
+      gap: 14px;
+      overflow-x: auto;
+      padding: 6px 2px 6px 2px;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none
+    }
+
+    .posts-track::-webkit-scrollbar {
+      display: none
+    }
+
+    .post-card {
+      background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+      border: 1px solid rgba(229, 231, 235, .6);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 180px;
+      transition: var(--transition)
+    }
+
+    .post-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+      border-color: rgba(245, 158, 11, .25)
+    }
+
+    .post-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(11, 27, 69, .06);
+      color: var(--brand-blue);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .2px;
+      width: fit-content
+    }
+
+    .post-card h4 {
+      margin: 0;
+      font-size: 18px;
+      color: var(--brand-blue)
+    }
+
+    .post-card p {
+      margin: 0;
+      color: #334155;
+      line-height: 1.5;
+      font-size: 14px;
+      flex: 1
+    }
+
+    .post-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--brand-orange);
+      font-weight: 700;
+      text-decoration: none;
+      font-size: 14px
+    }
+
+    .post-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 12px
+    }
+
+    .post-buttons {
+      display: flex;
+      gap: 8px
+    }
+
+    .post-btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition)
+    }
+
+    .post-btn:hover {
+      border-color: var(--brand-orange);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .06)
+    }
+
+    .post-dots {
+      display: flex;
+      gap: 6px;
+      align-items: center
+    }
+
+    .post-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: var(--transition)
+    }
+
+    .post-dot.active {
+      background: var(--brand-orange);
+      transform: scale(1.1)
+    }
+
     .chip {
       border: 1px solid var(--border);
       background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
@@ -777,13 +954,13 @@
       </div>
       <div>
         <h1>Choose Wisely. Power Your Savings.</h1>
-        <p>We connect your business with the best energy solutions, effortlessly optimizing your spend and impact.</p>
+        <p>Serving deregulated markets nationwide—ERCOT, PJM, MISO, ISO-NE, NYISO. We connect your business with the best energy solutions, effortlessly optimizing your spend and impact.</p>
+        <p style="color:#475569;margin-top:10px;font-size:14px;max-width:640px">
+          Houston, Dallas, Chicago, Boston—wherever power is deregulated, we broker the best commercial electricity and gas rates.
+        </p>
         <div class="hero-cta">
           <a class="btn btn-primary" href="#get-started">Get Started</a>
         </div>
-        <p style="color:#475569;margin-top:10px;font-size:14px;max-width:640px">
-          Serving Texas businesses searching for commercial energy providers, business electricity brokers, and the best commercial electricity rates in Houston, Dallas, and across ERCOT.
-        </p>
       </div>
     </div>
   </section>
@@ -912,6 +1089,54 @@
     </div>
   </section>
 
+  <!-- Tools & Guides -->
+  <section id="tools">
+    <h2 class="section-title">Tools & Guides</h2>
+    <p class="section-sub">Current and upcoming resources to help you plan, price, and renew with confidence.</p>
+    <div class="resource-grid">
+      <a class="resource-card" href="/tdu-delivery-charges.html">
+        <div class="resource-meta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
+          Live tool
+        </div>
+        <h4>TDU Delivery Charges Calculator</h4>
+        <p>Estimate delivery charges by utility and usage so you know your all‑in cost.</p>
+      </a>
+      <a class="resource-card" href="/guide-2026.html">
+        <div class="resource-meta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16v16H4z"></path><path d="M9 9h6v6H9z"></path>
+          </svg>
+          Live guide
+        </div>
+        <h4>2026 Electricity Market Navigator</h4>
+        <p>Capacity cliff, reserve margins, and the 6–24 month renewal windows most teams miss.</p>
+      </a>
+      <div class="resource-card">
+        <div class="resource-meta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle><path d="M12 8v4l2.5 2.5"></path>
+          </svg>
+          Coming soon
+        </div>
+        <h4>Bill Analyzer</h4>
+        <p>Upload bills for automatic rate benchmarking, demand profiling, and renewal timing insights.</p>
+      </div>
+      <div class="resource-card">
+        <div class="resource-meta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12h18"></path><path d="M12 3v18"></path>
+          </svg>
+          Coming soon
+        </div>
+        <h4>Peak-Hour Playbook</h4>
+        <p>Live alerts and playbooks for 4CP and local peaks so you can trim capacity tags.</p>
+      </div>
+    </div>
+  </section>
+
   <!-- Testimonials -->
   <section class="testimonials" id="testimonials">
     <h2 class="section-title">What Our Clients Say</h2>
@@ -932,6 +1157,60 @@
     <p style="color:#475569;font-size:14px;margin-top:18px;max-width:880px">
       We help customers compare commercial electricity rates in Texas, choose reliable electricity suppliers in Houston and Dallas, and work with top commercial energy brokers to secure competitive power and natural gas plans.
     </p>
+  </section>
+
+  <!-- Latest Insights -->
+  <section id="insights">
+    <h2 class="section-title">Latest insights</h2>
+    <p class="section-sub">Market moves, renewal timing, and playbooks from our team.</p>
+    <div class="posts-slider">
+      <div class="posts-track" id="post-track">
+        <div class="post-card">
+          <span class="post-tag">Market Outlook</span>
+          <h4>ERCOT capacity cliff: what 2026–2028 buyers need to do</h4>
+          <p>Reserve margins shrink while demand rises. See why 6–24 month renewals are moving now.</p>
+          <a class="post-link" href="/guide-2026.html">Read guide</a>
+        </div>
+        <div class="post-card">
+          <span class="post-tag">Cost Drivers</span>
+          <h4>Understanding TDU delivery charges in Texas</h4>
+          <p>Break down delivery charges, then estimate your bill impact with our calculator.</p>
+          <a class="post-link" href="/tdu-delivery-charges.html">Use calculator</a>
+        </div>
+        <div class="post-card">
+          <span class="post-tag">Procurement</span>
+          <h4>Fixed vs. Index: how to blend for 2025–2026</h4>
+          <p>Why most facilities land around 65–70% fixed and 30–35% indexed with DR.</p>
+          <a class="post-link" href="/resources.html">View resources</a>
+        </div>
+        <div class="post-card">
+          <span class="post-tag">Peak Strategy</span>
+          <h4>4CP and peak-hour playbooks to trim capacity tags</h4>
+          <p>Practical curtailment steps before the next peaks hit. Alerts coming soon.</p>
+          <a class="post-link" href="/resources.html">View resources</a>
+        </div>
+      </div>
+      <div class="post-nav">
+        <div class="post-buttons">
+          <button class="post-btn" id="post-prev" aria-label="Previous">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <button class="post-btn" id="post-next" aria-label="Next">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 6 15 12 9 18"></polyline>
+            </svg>
+          </button>
+        </div>
+        <div class="post-dots" id="post-dots">
+          <span class="post-dot active"></span>
+          <span class="post-dot"></span>
+          <span class="post-dot"></span>
+          <span class="post-dot"></span>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- Get Started -->
@@ -1222,6 +1501,52 @@
       const elements = document.querySelectorAll('.hero-inner > *, .section-title, .section-sub, .card, .step, .why-card, .t-card, .form-card, .cta-content > *');
       elements.forEach(el => el.classList.add('animate-on-scroll'));
     });
+
+    // Blog slider controls
+    (function () {
+      const track = document.getElementById('post-track');
+      const dotsContainer = document.getElementById('post-dots');
+      const prevBtn = document.getElementById('post-prev');
+      const nextBtn = document.getElementById('post-next');
+      if (!track || !dotsContainer) return;
+
+      const cards = Array.from(track.children);
+      const dots = Array.from(dotsContainer.children);
+
+      function scrollToIndex(idx) {
+        if (!cards[idx]) return;
+        const target = cards[idx];
+        track.scrollTo({ left: target.offsetLeft, behavior: 'smooth' });
+      }
+
+      function updateDots() {
+        if (!cards.length) return;
+        const cardWidth = cards[0].offsetWidth + 14; // gap
+        const idx = Math.round(track.scrollLeft / cardWidth);
+        dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+      }
+
+      prevBtn?.addEventListener('click', () => {
+        const cardWidth = cards[0]?.offsetWidth + 14 || 280;
+        track.scrollBy({ left: -cardWidth, behavior: 'smooth' });
+      });
+
+      nextBtn?.addEventListener('click', () => {
+        const cardWidth = cards[0]?.offsetWidth + 14 || 280;
+        track.scrollBy({ left: cardWidth, behavior: 'smooth' });
+      });
+
+      dots.forEach((dot, i) => {
+        dot.addEventListener('click', () => scrollToIndex(i));
+      });
+
+      track.addEventListener('scroll', () => {
+        window.requestAnimationFrame(updateDots);
+      });
+
+      window.addEventListener('resize', updateDots);
+      updateDots();
+    })();
   </script>
 
   <!-- Shared Public Scripts - Header scroll, mobile nav, animations -->
