@@ -488,11 +488,11 @@
     },
     hook: {
       stage: 'Opening',
-      text: '{{day.part}}, is this (contact name)?',
+      text: 'Who picked up?',
       responses: [
-        { label: 'Yes, speaking', next: 'opening_quick_intro' },
-        { label: "Who's calling?", next: 'opening_quick_intro' },
-        { label: 'Gatekeeper', next: 'gatekeeper_intro' }
+        { label: 'Decision Maker', next: 'opening_quick_intro' },
+        { label: 'Gatekeeper', next: 'gatekeeper_intro' },
+        { label: 'Voicemail', next: 'voicemail' }
       ]
     },
     // ===== SIX SCENARIOS NATURAL OPENING + TIMING QUALIFICATION =====
