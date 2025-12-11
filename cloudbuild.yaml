@@ -24,7 +24,7 @@ steps:
     - '--port'
     - '8080'
     - '--memory'
-    - '512Mi'
+    - '256Mi'
     - '--cpu'
     - '1'
     - '--min-instances'
