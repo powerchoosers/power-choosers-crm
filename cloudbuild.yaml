@@ -31,7 +31,6 @@ steps:
     - '0'
     - '--max-instances'
     - '10'
-    - '--no-cpu-throttling'
     - '--concurrency'
     - '40'
     - '--set-env-vars'
