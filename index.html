@@ -344,17 +344,81 @@
       display: none
     }
 
-    /* Sections */
+    /* Sections - Full width for backgrounds, content constrained inside */
     section {
-      max-width: var(--container);
-      margin: 0 auto;
-      padding: 64px 24px;
       width: 100%;
       position: relative;
     }
 
-    /* Alternate section backgrounds for visual variety */
-    section:nth-child(even):not(.why):not(.testimonials):not(.hero) {
+    /* Default sections - full width background, content centered */
+    section:not(.hero):not(.why):not(.testimonials):not(#get-started):not([style*="background"]) {
+      padding: 64px 0;
+    }
+
+    /* Constrain all direct children of regular sections */
+    section:not(.hero):not(.why):not(.testimonials):not(#get-started):not([style*="background"]) > * {
+      max-width: var(--container);
+      margin-left: auto;
+      margin-right: auto;
+      padding-left: 24px;
+      padding-right: 24px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    /* Hero has its own inner structure */
+    .hero {
+      padding: 0;
+      display: block;
+    }
+
+    .hero-inner {
+      max-width: var(--container);
+      margin: 0 auto;
+      padding: 100px 24px 60px;
+      width: 100%;
+    }
+
+    /* Sections with background gradients - full width backgrounds */
+    section.why,
+    section.testimonials,
+    section[style*="background"],
+    section#get-started {
+      width: 100%;
+      padding: 0;
+    }
+
+    /* Content inside gradient sections - constrained width */
+    section.why > *,
+    section.testimonials > *,
+    section[style*="background"] > *,
+    section#get-started > * {
+      max-width: var(--container);
+      margin-left: auto;
+      margin-right: auto;
+      padding-left: 24px;
+      padding-right: 24px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    /* Add vertical padding to first and last children only */
+    section.why > *:first-child,
+    section.testimonials > *:first-child,
+    section[style*="background"] > *:first-child,
+    section#get-started > *:first-child {
+      padding-top: 64px;
+    }
+
+    section.why > *:last-child,
+    section.testimonials > *:last-child,
+    section[style*="background"] > *:last-child,
+    section#get-started > *:last-child {
+      padding-bottom: 64px;
+    }
+
+    /* Alternate section backgrounds for visual variety - full width */
+    section:nth-child(even):not(.why):not(.testimonials):not(.hero):not([style*="background"]) {
       background: linear-gradient(180deg, #ffffff, #f8fafc);
     }
 
@@ -797,7 +861,15 @@
       color: #ffffff;
       position: relative;
       overflow: hidden;
-      padding: 80px 24px;
+      width: 100%;
+    }
+
+    .why > *:first-child {
+      padding-top: 80px;
+    }
+
+    .why > *:last-child {
+      padding-bottom: 80px;
     }
 
     .why::before {
@@ -899,6 +971,7 @@
       background: linear-gradient(180deg, #f8fafc, #ffffff);
       position: relative;
       overflow: hidden;
+      width: 100%;
     }
 
     .testimonials::before {
@@ -979,6 +1052,7 @@
       background: linear-gradient(180deg, #f8fafc, #ffffff);
       position: relative;
       overflow: hidden;
+      width: 100%;
     }
 
     #get-started::before {
