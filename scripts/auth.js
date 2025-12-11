@@ -36,36 +36,35 @@ class AuthManager {
             console.log('[Auth] Firebase Auth initialized');
 
             // Check for redirect result (when returning from Google sign-in)
-            try {
-                const result = await this.auth.getRedirectResult();
-                if (result.user) {
-                    console.log('[Auth] Redirect sign-in successful:', result.user.email);
-                    
-                    // Store Google access token for Gmail API access (client-side sync)
-                    // Note: With redirect, we need to get the token from the user object
+            // Only check once per page load to avoid loops
+            if (!window._redirectResultChecked) {
+                window._redirectResultChecked = true;
+                try {
+                    const result = await this.auth.getRedirectResult();
                     if (result.user) {
-                        try {
-                            const token = await result.user.getIdToken();
-                            // For redirect flow, we'll get the Google access token from the credential if available
-                            if (result.credential && result.credential.accessToken) {
-                                window._googleAccessToken = result.credential.accessToken;
-                                // Persist to localStorage so it survives page refreshes
-                                try {
-                                    localStorage.setItem('pc:googleAccessToken', result.credential.accessToken);
-                                    console.log('[Auth] Stored Google access token for Gmail sync (persisted)');
-                                } catch (storageErr) {
-                                    console.warn('[Auth] Could not persist token to localStorage:', storageErr);
-                                }
+                        console.log('[Auth] Redirect sign-in successful:', result.user.email);
+                        
+                        // Store Google access token for Gmail API access (client-side sync)
+                        // Note: With redirect, the credential.accessToken might not be available
+                        // We'll try to get it, but if not available, Gmail sync will use popup re-auth
+                        if (result.credential && result.credential.accessToken) {
+                            window._googleAccessToken = result.credential.accessToken;
+                            // Persist to localStorage so it survives page refreshes
+                            try {
+                                localStorage.setItem('pc:googleAccessToken', result.credential.accessToken);
+                                console.log('[Auth] Stored Google access token for Gmail sync (persisted)');
+                            } catch (storageErr) {
+                                console.warn('[Auth] Could not persist token to localStorage:', storageErr);
                             }
-                        } catch (tokenErr) {
-                            console.warn('[Auth] Could not get access token:', tokenErr);
+                        } else {
+                            console.log('[Auth] No Google access token in redirect result - Gmail sync will use popup if needed');
                         }
                     }
-                }
-            } catch (redirectErr) {
-                // No redirect result or error - this is normal if user hasn't signed in yet
-                if (redirectErr.code !== 'auth/operation-not-allowed') {
-                    console.log('[Auth] No redirect result (normal if not returning from sign-in)');
+                } catch (redirectErr) {
+                    // No redirect result or error - this is normal if user hasn't signed in yet
+                    if (redirectErr.code !== 'auth/operation-not-allowed') {
+                        console.log('[Auth] No redirect result (normal if not returning from sign-in)');
+                    }
                 }
             }
             

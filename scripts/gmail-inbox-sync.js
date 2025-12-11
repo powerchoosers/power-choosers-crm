@@ -18,6 +18,7 @@
   // Track sync state
   let _isSyncing = false;
   let _lastSyncTime = null;
+  let _isReauthenticating = false; // Prevent multiple simultaneous re-auth attempts
   const SYNC_COOLDOWN_MS = 60 * 1000; // 1 minute between syncs
   const MAX_MESSAGES_PER_SYNC = 50;
 
@@ -75,44 +76,63 @@
 
   /**
    * Re-authenticate with Gmail scope if needed
+   * Uses popup to avoid redirect loops (user preference)
    */
   async function reauthenticateWithGmailScope() {
+    // Prevent multiple simultaneous re-authentication attempts
+    if (_isReauthenticating) {
+      console.log('[GmailSync] Re-authentication already in progress, waiting...');
+      // Wait for current re-auth to complete (max 30 seconds)
+      let attempts = 0;
+      while (_isReauthenticating && attempts < 300) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+      // Return the token if it was set during the re-auth
+      if (window._googleAccessToken) {
+        return window._googleAccessToken;
+      }
+      return null;
+    }
+
+    _isReauthenticating = true;
     try {
       const provider = new firebase.auth.GoogleAuthProvider();
       provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
       
-      // Use redirect instead of popup to avoid popup blockers
-      // This will redirect the page, but it's better than being blocked
-      await firebase.auth().currentUser.reauthenticateWithRedirect(provider);
-      console.log('[GmailSync] Redirecting for Gmail reauthentication...');
-      // Page will redirect, so code after this won't execute until return
+      // Use popup instead of redirect to avoid redirect loops
+      // User prefers popup for Gmail sync re-authentication
+      console.log('[GmailSync] Requesting Gmail access via popup...');
+      const result = await firebase.auth().currentUser.reauthenticateWithPopup(provider);
+      
+      const credential = result.credential;
+      if (credential && credential.accessToken) {
+        // Store in both memory and localStorage
+        window._googleAccessToken = credential.accessToken;
+        try {
+          localStorage.setItem('pc:googleAccessToken', credential.accessToken);
+          console.log('[GmailSync] Got Gmail access token via popup reauthentication (persisted)');
+        } catch (storageErr) {
+          console.warn('[GmailSync] Could not persist token:', storageErr);
+        }
+        _isReauthenticating = false;
+        return credential.accessToken;
+      }
+      
+      _isReauthenticating = false;
       return null;
     } catch (error) {
-      // If redirect fails, try popup as fallback
-      if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/popup-blocked') {
-        console.warn('[GmailSync] Redirect not available, trying popup fallback...');
-        try {
-          const result = await firebase.auth().currentUser.reauthenticateWithPopup(provider);
-          const credential = result.credential;
-          if (credential && credential.accessToken) {
-            // Store in both memory and localStorage
-            window._googleAccessToken = credential.accessToken;
-            try {
-              localStorage.setItem('pc:googleAccessToken', credential.accessToken);
-            } catch (storageErr) {
-              console.warn('[GmailSync] Could not persist token:', storageErr);
-            }
-            console.log('[GmailSync] Got Gmail access token via popup reauthentication');
-            return credential.accessToken;
-          }
-        } catch (popupErr) {
-          console.error('[GmailSync] Popup reauthentication also failed:', popupErr);
-          return null;
-        }
-      } else {
-        console.error('[GmailSync] Reauthentication failed:', error);
-        return null;
+      _isReauthenticating = false;
+      console.error('[GmailSync] Popup reauthentication failed:', error);
+      
+      // Provide user-friendly error messages
+      if (error.code === 'auth/popup-closed-by-user') {
+        console.warn('[GmailSync] User closed popup - Gmail sync will not work until authenticated');
+      } else if (error.code === 'auth/popup-blocked') {
+        console.warn('[GmailSync] Popup blocked - please allow popups for this site to enable Gmail sync');
       }
+      
+      return null;
     }
   }
 
