@@ -341,7 +341,7 @@ export default async function handler(req, res) {
             try {
                 // Retry fetching sentences for propagation lag (extend to ~90s per Twilio guidance)
                 let sentencesResponse = [];
-                const maxMs = 90000; const stepMs = 3000; let waited = 0;
+                const maxMs = 45000; const stepMs = 3000; let waited = 0;
                 while (waited <= maxMs) {
                     const resp = await client.intelligence.v2
                         .transcripts(TranscriptSid)

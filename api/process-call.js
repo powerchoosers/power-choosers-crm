@@ -107,12 +107,21 @@ async function processRecordingWithTwilio(recordingUrl, callSid) {
                     languageCode: 'en-US'
                 });
                 
-                // Wait for transcription to complete (Twilio processes asynchronously)
-                await new Promise(resolve => setTimeout(resolve, 10000));
-                
-                const completedTranscription = await client.transcriptions(newTranscription.sid).fetch();
-                transcript = completedTranscription.transcriptionText || '';
-                logger.log('[Process Call] New transcript created:', transcript.substring(0, 100) + '...');
+                // Poll for transcription completion with early exit (max ~30s)
+                const pollMaxMs = 30000;
+                const pollStepMs = 5000;
+                let waitedMs = 0;
+                while (waitedMs <= pollMaxMs) {
+                    const completedTranscription = await client.transcriptions(newTranscription.sid).fetch();
+                    transcript = completedTranscription.transcriptionText || '';
+                    if (transcript) {
+                        logger.log('[Process Call] New transcript created:', transcript.substring(0, 100) + '...');
+                        break;
+                    }
+                    if (waitedMs >= pollMaxMs) break;
+                    await new Promise(resolve => setTimeout(resolve, pollStepMs));
+                    waitedMs += pollStepMs;
+                }
             }
             
             // Generate AI insights using Twilio-based analysis

@@ -21,6 +21,14 @@ import dotenv from 'dotenv';
 // Load environment variables from .env file (for localhost)
 dotenv.config();
 
+// In production, silence console.info/log unless VERBOSE_LOGS is true
+const isProduction = process.env.NODE_ENV === 'production';
+const verboseLogs = process.env.VERBOSE_LOGS === 'true';
+if (isProduction && !verboseLogs) {
+  console.log = () => {};
+  console.info = () => {};
+}
+
 // Simple logging function for Cloud Run cost optimization
 const logLevels = { error: 0, warn: 1, info: 2, debug: 3 };
 const currentLogLevel = logLevels[process.env.LOG_LEVEL || 'info'];
