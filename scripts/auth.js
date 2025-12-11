@@ -48,7 +48,7 @@ class AuthManager {
                 try {
                     const result = await this.auth.getRedirectResult();
                     // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:44',message:'getRedirectResult returned',data:{hasUser:!!result.user,userEmail:result.user?.email,hasCredential:!!result.credential,hasAccessToken:!!result.credential?.accessToken,error:result.error?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:44',message:'getRedirectResult returned',data:{hasUser:!!result.user,userEmail:result.user?.email,hasCredential:!!result.credential,hasAccessToken:!!result.credential?.accessToken,error:result.error?.code,resultType:typeof result,userType:typeof result.user,credentialType:typeof result.credential,resultStringified:JSON.stringify(result).substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
                     // #endregion
                     if (result.user) {
                         console.log('[Auth] Redirect sign-in successful:', result.user.email);
@@ -70,12 +70,19 @@ class AuthManager {
                         }
                     } else {
                         // #region agent log
-                        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:62',message:'getRedirectResult returned no user',data:{resultKeys:Object.keys(result||{}),error:result.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:62',message:'getRedirectResult returned no user',data:{resultKeys:Object.keys(result||{}),error:result.error,errorCode:result.error?.code,errorMessage:result.error?.message,credentialExists:!!result.credential,userExists:!!result.user,currentUrl:window.location.href},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
                         // #endregion
+                        // Check if there's an error in the result
+                        if (result.error) {
+                            console.error('[Auth] Redirect result error:', result.error);
+                            // #region agent log
+                            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:67',message:'Redirect result has error',data:{errorCode:result.error.code,errorMessage:result.error.message,fullError:JSON.stringify(result.error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                            // #endregion
+                        }
                     }
                 } catch (redirectErr) {
                     // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:63',message:'getRedirectResult error',data:{code:redirectErr.code,message:redirectErr.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:72',message:'getRedirectResult exception',data:{code:redirectErr.code,message:redirectErr.message,stack:redirectErr.stack?.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
                     // #endregion
                     // No redirect result or error - this is normal if user hasn't signed in yet
                     if (redirectErr.code !== 'auth/operation-not-allowed') {
@@ -329,7 +336,7 @@ class AuthManager {
 
     async signInWithGoogle() {
         // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:314',message:'signInWithGoogle called',data:{currentUrl:window.location.href},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:337',message:'signInWithGoogle called',data:{currentUrl:window.location.href},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
         // #endregion
         try {
             const provider = new firebase.auth.GoogleAuthProvider();
@@ -339,24 +346,54 @@ class AuthManager {
             // Add Gmail readonly scope for inbox sync (client-side, FREE)
             provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
 
-            // Use redirect instead of popup to avoid popup blockers
-            // The redirect result will be handled in init() when the page loads back
+            // Use popup authentication - more reliable than redirect
+            // Popup works better for both localhost and production without requiring redirect URL configuration
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:325',message:'About to call signInWithRedirect',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:350',message:'About to call signInWithPopup',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
             // #endregion
-            await this.auth.signInWithRedirect(provider);
-            console.log('[Auth] Redirecting to Google sign-in...');
-            // Note: Page will redirect, so code after this won't execute until return
+            const result = await this.auth.signInWithPopup(provider);
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:353',message:'signInWithPopup successful',data:{userEmail:result.user?.email,hasCredential:!!result.credential,hasAccessToken:!!result.credential?.accessToken},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+            // #endregion
+            console.log('[Auth] Sign-in successful:', result.user.email);
+            
+            // Store Google access token for Gmail API access (client-side sync)
+            if (result.credential && result.credential.accessToken) {
+                window._googleAccessToken = result.credential.accessToken;
+                // Persist to localStorage so it survives page refreshes
+                try {
+                    localStorage.setItem('pc:googleAccessToken', result.credential.accessToken);
+                    console.log('[Auth] Stored Google access token for Gmail sync (persisted)');
+                } catch (storageErr) {
+                    console.warn('[Auth] Could not persist token to localStorage:', storageErr);
+                }
+            }
+            
+            // Show success message
+            this.showSuccess('Welcome back!');
+            
+            // Note: onAuthStateChanged will be triggered automatically, which will call handleAuthStateChange
+            // and show the CRM, so we don't need to do anything else here
 
         } catch (error) {
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:330',message:'signInWithRedirect error',data:{code:error.code,message:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:372',message:'signInWithPopup error',data:{code:error.code,message:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
             // #endregion
             console.error('[Auth] Sign-in error:', error);
             
-            if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/popup-blocked') {
-                // Fallback: try redirect if popup fails (though we're already using redirect)
-                this.showError('Sign-in failed. Please try again.');
+            if (error.code === 'auth/popup-closed-by-user') {
+                this.showError('Sign-in cancelled. Please try again.');
+            } else if (error.code === 'auth/popup-blocked') {
+                // If popup is blocked, try redirect as fallback
+                console.log('[Auth] Popup blocked, trying redirect as fallback...');
+                try {
+                    await this.auth.signInWithRedirect(provider);
+                    // Page will redirect, so code after this won't execute
+                } catch (redirectErr) {
+                    console.error('[Auth] Redirect fallback also failed:', redirectErr);
+                    this.showError('Popup blocked and redirect failed. Please allow popups for this site or check your browser settings.');
+                }
             } else {
                 this.showError('Failed to sign in. Please try again.');
             }
