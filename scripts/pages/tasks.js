@@ -1565,7 +1565,7 @@
   // Listen for cross-page task updates and refresh immediately
   function bindUpdates() {
     window.addEventListener('tasksUpdated', async (event) => {
-      const { taskId, deleted, newTaskCreated, nextStepType } = event.detail || {};
+      const { taskId, deleted, newTaskCreated, nextStepType, rescheduled } = event.detail || {};
 
       // CRITICAL FIX: If a task was deleted, clean it up from localStorage immediately
       if (deleted && taskId) {
@@ -1599,6 +1599,45 @@
         }
       }
 
+      // CRITICAL FIX: If a task was rescheduled, force refresh all caches to get updated dueDate/dueTime
+      // This ensures the task appears in its new position and is removed from its old position
+      if (rescheduled && taskId) {
+        console.log('[Tasks] Task rescheduled, forcing refresh of all caches...', taskId);
+        
+        // Remove from BackgroundTasksLoader cache immediately (will be reloaded with fresh data)
+        if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.removeTask === 'function') {
+          try {
+            window.BackgroundTasksLoader.removeTask(taskId);
+            console.log('[Tasks] Removed rescheduled task from BackgroundTasksLoader cache');
+          } catch (e) {
+            console.warn('[Tasks] Failed to remove task from BackgroundTasksLoader:', e);
+          }
+        }
+        
+        // Force reload BackgroundTasksLoader to get fresh data with updated dueDate/dueTime
+        if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
+          try {
+            await window.BackgroundTasksLoader.forceReload();
+            console.log('[Tasks] BackgroundTasksLoader refreshed after reschedule');
+          } catch (e) {
+            console.warn('[Tasks] Failed to refresh BackgroundTasksLoader after reschedule:', e);
+          }
+        }
+        
+        // Invalidate cache to ensure fresh data
+        if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
+          try {
+            await window.CacheManager.invalidate('tasks');
+            console.log('[Tasks] Invalidated tasks cache after reschedule');
+          } catch (e) {
+            console.warn('[Tasks] Failed to invalidate cache after reschedule:', e);
+          }
+        }
+        
+        // Small delay to ensure Firebase update and cache invalidation complete
+        await new Promise(resolve => setTimeout(resolve, 150));
+      }
+
       // CRITICAL FIX: If a new task was created (e.g., next step in sequence), refresh BackgroundTasksLoader
       if (newTaskCreated) {
         console.log('[Tasks] New task created from sequence, refreshing BackgroundTasksLoader...', { nextStepType });
@@ -1623,6 +1662,7 @@
       }
 
       // Rebuild from localStorage + Firebase + LinkedIn tasks
+      // CRITICAL: This will properly sort tasks by new dueDate/dueTime after reschedule
       await loadData();
     });
 

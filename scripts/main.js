@@ -5279,6 +5279,29 @@ class PowerChoosersCRM {
             localTasks = localTasks.filter(t => (t.status || 'pending') !== 'completed');
         } catch (_) { localTasks = []; }
 
+        // CRITICAL FIX: Also check BackgroundTasksLoader cache and filter out completed tasks
+        // This prevents stale completed tasks from BackgroundTasksLoader cache from appearing
+        try {
+            if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.getTasksData === 'function') {
+                const backgroundTasks = window.BackgroundTasksLoader.getTasksData() || [];
+                // Filter out completed tasks and merge with localTasks (prefer localTasks for duplicates)
+                const backgroundTasksMap = new Map();
+                backgroundTasks.forEach(t => {
+                    if (t && t.id && (t.status || 'pending') !== 'completed') {
+                        // Only add if not already in localTasks (localStorage is more recent)
+                        if (!localTasks.some(lt => lt.id === t.id)) {
+                            backgroundTasksMap.set(t.id, t);
+                        }
+                    }
+                });
+                // Add non-duplicate background tasks to localTasks
+                localTasks = [...localTasks, ...Array.from(backgroundTasksMap.values())];
+                console.log('[CRM] Loaded', backgroundTasksMap.size, 'pending tasks from BackgroundTasksLoader for Today\'s Tasks widget');
+            }
+        } catch (e) {
+            console.warn('[CRM] Could not load tasks from BackgroundTasksLoader for Today\'s Tasks widget:', e);
+        }
+
         // Always render immediately from localStorage cache first
         this.renderTodaysTasks(localTasks, parseDateStrict, parseTimeToMinutes, today);
 
@@ -5320,16 +5343,19 @@ class PowerChoosersCRM {
                             
                             const mergedTasks = Array.from(mergedTasksMap.values());
                             
+                            // CRITICAL FIX: Final safety check - ensure no completed tasks are saved to localStorage
+                            const finalMergedTasks = mergedTasks.filter(t => t && t.id && (t.status || 'pending') !== 'completed');
+                            
                             // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
                             try {
                                 const email = getUserEmail();
                                 const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
-                                localStorage.setItem(namespacedKey, JSON.stringify(mergedTasks));
-                                localStorage.setItem('userTasks', JSON.stringify(mergedTasks)); // Legacy key for compatibility
+                                localStorage.setItem(namespacedKey, JSON.stringify(finalMergedTasks));
+                                localStorage.setItem('userTasks', JSON.stringify(finalMergedTasks)); // Legacy key for compatibility
                             } catch (e) {
                                 console.warn('Could not save merged tasks to localStorage cache:', e);
                             }
-                            this.renderTodaysTasks(mergedTasks, parseDateStrict, parseTimeToMinutes, today);
+                            this.renderTodaysTasks(finalMergedTasks, parseDateStrict, parseTimeToMinutes, today);
                             this._tasksLoading = false;
                             return;
                         } else if (email) {
@@ -5377,16 +5403,19 @@ class PowerChoosersCRM {
                             
                             const mergedTasks = Array.from(mergedTasksMap.values());
                             
+                            // CRITICAL FIX: Final safety check - ensure no completed tasks are saved to localStorage
+                            const finalMergedTasks = mergedTasks.filter(t => t && t.id && (t.status || 'pending') !== 'completed');
+                            
                             // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
                             try {
                                 const email = getUserEmail();
                                 const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
-                                localStorage.setItem(namespacedKey, JSON.stringify(mergedTasks));
-                                localStorage.setItem('userTasks', JSON.stringify(mergedTasks)); // Legacy key for compatibility
+                                localStorage.setItem(namespacedKey, JSON.stringify(finalMergedTasks));
+                                localStorage.setItem('userTasks', JSON.stringify(finalMergedTasks)); // Legacy key for compatibility
                             } catch (e) {
                                 console.warn('Could not save merged tasks to localStorage cache:', e);
                             }
-                            this.renderTodaysTasks(mergedTasks, parseDateStrict, parseTimeToMinutes, today);
+                            this.renderTodaysTasks(finalMergedTasks, parseDateStrict, parseTimeToMinutes, today);
                             this._tasksLoading = false;
                             return;
                         }
@@ -5428,22 +5457,31 @@ class PowerChoosersCRM {
                     
                     const mergedTasks = Array.from(allTasksMap.values());
                     
+                    // CRITICAL FIX: Final safety check - ensure no completed tasks are saved to localStorage
+                    const finalMergedTasks = mergedTasks.filter(t => t && t.id && (t.status || 'pending') !== 'completed');
+                    
                     // CRITICAL FIX: Save to both namespaced and legacy keys for compatibility
                     try {
                         const email = getUserEmail();
                         const namespacedKey = email ? `userTasks:${email}` : 'userTasks';
-                        localStorage.setItem(namespacedKey, JSON.stringify(mergedTasks));
-                        localStorage.setItem('userTasks', JSON.stringify(mergedTasks)); // Legacy key for compatibility
+                        localStorage.setItem(namespacedKey, JSON.stringify(finalMergedTasks));
+                        localStorage.setItem('userTasks', JSON.stringify(finalMergedTasks)); // Legacy key for compatibility
         } catch (e) {
                         console.warn('Could not save merged tasks to localStorage cache:', e);
                     }
                     
                     // Re-render with complete merged data
-                    this.renderTodaysTasks(mergedTasks, parseDateStrict, parseTimeToMinutes, today);
+                    this.renderTodaysTasks(finalMergedTasks, parseDateStrict, parseTimeToMinutes, today);
                 }
             } catch (e) {
                 console.warn("Could not load tasks from Firebase for Today's Tasks widget:", e);
+            } finally {
+                // CRITICAL FIX: Always reset loading flag, even if there was an error
+                this._tasksLoading = false;
             }
+        } else {
+            // CRITICAL FIX: Reset loading flag if skipping Firebase
+            this._tasksLoading = false;
         }
     }
     
