@@ -40,19 +40,31 @@
     }
 
     try {
-      // Priority 1: Use stored access token from sign-in (auth.js stores this)
+      // Priority 1: Use stored access token from memory (auth.js stores this)
       if (window._googleAccessToken) {
-        console.log('[GmailSync] Using stored Google access token');
+        console.log('[GmailSync] Using stored Google access token from memory');
         return window._googleAccessToken;
       }
       
-      // Priority 2: Try to get from user object
+      // Priority 2: Try to get from localStorage (persists across page refreshes)
+      try {
+        const persistedToken = localStorage.getItem('pc:googleAccessToken');
+        if (persistedToken) {
+          window._googleAccessToken = persistedToken; // Also restore to memory
+          console.log('[GmailSync] Using persisted Google access token from localStorage');
+          return persistedToken;
+        }
+      } catch (storageErr) {
+        console.warn('[GmailSync] Could not read token from localStorage:', storageErr);
+      }
+      
+      // Priority 3: Try to get from user object (usually not available)
       const accessToken = user.accessToken || user.stsTokenManager?.accessToken;
       if (accessToken) {
         return accessToken;
       }
 
-      // Priority 3: Re-authenticate with Gmail scope
+      // Priority 4: Re-authenticate with Gmail scope (only if token is missing or expired)
       console.log('[GmailSync] Need to re-authenticate for Gmail access');
       return await reauthenticateWithGmailScope();
     } catch (error) {
@@ -69,22 +81,38 @@
       const provider = new firebase.auth.GoogleAuthProvider();
       provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
       
-      // Use popup to avoid losing app state
-      const result = await firebase.auth().currentUser.reauthenticateWithPopup(provider);
-      
-      // Get the access token from the credential
-      const credential = result.credential;
-      if (credential && credential.accessToken) {
-        // Store for future use
-        window._googleAccessToken = credential.accessToken;
-        console.log('[GmailSync] Got Gmail access token via reauthentication');
-        return credential.accessToken;
-      }
-      
+      // Use redirect instead of popup to avoid popup blockers
+      // This will redirect the page, but it's better than being blocked
+      await firebase.auth().currentUser.reauthenticateWithRedirect(provider);
+      console.log('[GmailSync] Redirecting for Gmail reauthentication...');
+      // Page will redirect, so code after this won't execute until return
       return null;
     } catch (error) {
-      console.error('[GmailSync] Reauthentication failed:', error);
-      return null;
+      // If redirect fails, try popup as fallback
+      if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/popup-blocked') {
+        console.warn('[GmailSync] Redirect not available, trying popup fallback...');
+        try {
+          const result = await firebase.auth().currentUser.reauthenticateWithPopup(provider);
+          const credential = result.credential;
+          if (credential && credential.accessToken) {
+            // Store in both memory and localStorage
+            window._googleAccessToken = credential.accessToken;
+            try {
+              localStorage.setItem('pc:googleAccessToken', credential.accessToken);
+            } catch (storageErr) {
+              console.warn('[GmailSync] Could not persist token:', storageErr);
+            }
+            console.log('[GmailSync] Got Gmail access token via popup reauthentication');
+            return credential.accessToken;
+          }
+        } catch (popupErr) {
+          console.error('[GmailSync] Popup reauthentication also failed:', popupErr);
+          return null;
+        }
+      } else {
+        console.error('[GmailSync] Reauthentication failed:', error);
+        return null;
+      }
     }
   }
 
@@ -107,6 +135,14 @@
       if (!response.ok) {
         if (response.status === 401) {
           console.warn('[GmailSync] Token expired, need to re-authenticate');
+          // Clear expired token from storage
+          try {
+            localStorage.removeItem('pc:googleAccessToken');
+            window._googleAccessToken = null;
+            console.log('[GmailSync] Cleared expired token from storage');
+          } catch (storageErr) {
+            console.warn('[GmailSync] Could not clear expired token:', storageErr);
+          }
           return { messages: [], needsReauth: true };
         }
         throw new Error(`Gmail API error: ${response.status}`);
