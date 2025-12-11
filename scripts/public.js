@@ -27,10 +27,15 @@
 
             // Add scrolled class when user has scrolled more than 5px (lowered from 10px)
             if (scrollY > 5) {
-                header.classList.add('scrolled');
-                console.log('[Public.js] Scrolled class added at', scrollY, 'px');
+                if (!header.classList.contains('scrolled')) {
+                    header.classList.add('scrolled');
+                    console.log('[Public.js] Scrolled class added at', scrollY, 'px');
+                }
             } else {
-                header.classList.remove('scrolled');
+                if (header.classList.contains('scrolled')) {
+                    header.classList.remove('scrolled');
+                    console.log('[Public.js] Scrolled class removed at top');
+                }
             }
 
             lastScrollY = scrollY;

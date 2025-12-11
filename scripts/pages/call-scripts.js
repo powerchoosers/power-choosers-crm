@@ -11,6 +11,19 @@
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
   }
+
+  // Size-based gatekeeper opener (5b - Smart Adaptation)
+  function getSizedGateKeeperOpener(accountEmployees) {
+    if (!accountEmployees || accountEmployees < 20) {
+      // Small business - use "power bills"
+      return 'Yeah, your power bills.';
+    } else if (accountEmployees >= 20 && accountEmployees < 200) {
+      // Mid-market - use "electricity bills"
+      return 'Yeah, your electricity bills.';
+    }
+    // Enterprise - use "electric service"
+    return 'Yeah, your electric service.';
+  }
   function dayPart() {
     try {
       const h = new Date().getHours();
@@ -2387,66 +2400,78 @@
     },
     gatekeeper_intro: {
       stage: 'Gatekeeper',
-      text: "<span class=\"tone-marker friendly\">friendly, confident tone</span> {{day.part}}, this is {{agent.first_name}}. <span class=\"pause-indicator\"></span> Just a quick question — how does your company typically handle energy contract renewals? <span class=\"pause-indicator\"></span> Is that something the {{contact.title}} handles, or is {{contact.first_name}} the right person?",
+      text: "{{day.part}}, this is {{agent.first_name}}. I'm calling about {{account.name}}'s power bills. Who handles those there?",
       responses: [
-        { label: "Who should I connect you with?", next: 'gatekeeper_connect_request' },
-        { label: "What is this about?", next: 'gatekeeper_what_about' },
-        { label: "They're busy / Can I take a message?", next: 'gatekeeper_busy' },
-        { label: "They transferred me", next: 'gatekeeper_transferred' },
-        { label: "They decline / block", next: 'gatekeeper_decline' }
+        { label: "That's [name]", next: 'gatekeeper_request_transfer' },
+        { label: 'Power bills?', next: 'gatekeeper_electricity_confusion' },
+        { label: 'What is this about?', next: 'gatekeeper_clarify_purpose' },
+        { label: 'Are you our supplier?', next: 'gatekeeper_clarify_purpose' }
       ]
     },
-    gatekeeper_connect_request: {
-      stage: 'Gatekeeper',
-      text: "<span class=\"tone-marker friendly\">appreciative tone</span> Great, I appreciate that. <span class=\"pause-indicator\"></span> Could you please connect me with the person responsible for utilities or energy contracts?",
+    gatekeeper_electricity_confusion: {
+      stage: 'Gatekeeper - Clarify Bills',
+      text: (function() {
+        const data = getLiveData();
+        const employees = data.account?.employees || 0;
+        return getSizedGateKeeperOpener(employees) + ' Who handles those there?';
+      })(),
       responses: [
-        { label: "They transferred me", next: 'gatekeeper_transferred' },
-        { label: "They need more info", next: 'gatekeeper_what_about' },
-        { label: "They said they're busy", next: 'gatekeeper_busy' },
-        { label: "They declined", next: 'gatekeeper_decline' }
+        { label: "That's [name]", next: 'gatekeeper_request_transfer' },
+        { label: 'What about the bills?', next: 'gatekeeper_clarify_purpose' },
+        { label: 'We have electricity...', next: 'gatekeeper_clarify_purpose' },
+        { label: 'Not sure', next: 'gatekeeper_fallback_clarity' }
       ]
     },
-    gatekeeper_what_about: {
-      stage: 'Gatekeeper',
-      text: "<span class=\"tone-marker confident\">confident, value-focused tone</span> Question for you—when do electricity contract renewals typically happen for your company? Locking in early often saves companies 15-20% on their energy costs. <span class=\"pause-indicator\"></span> Would it be best to speak with the person managing those contracts?",
+    gatekeeper_clarify_purpose: {
+      stage: 'Gatekeeper - Clarify Purpose',
+      text: "Someone who looks at the electricity bills and decides on suppliers or contracts. Who handles that there?",
       responses: [
-        { label: "They'll connect me", next: 'gatekeeper_transferred' },
-        { label: "They need the person's name", next: 'gatekeeper_connect_request' },
-        { label: "They're still busy", next: 'gatekeeper_busy' },
-        { label: "They decline", next: 'gatekeeper_decline' }
+        { label: "That's [name]", next: 'gatekeeper_request_transfer' },
+        { label: 'Still not sure?', next: 'gatekeeper_fallback_clarity' },
+        { label: 'They transferred me', next: 'gatekeeper_request_transfer' }
+      ]
+    },
+    gatekeeper_request_transfer: {
+      stage: 'Gatekeeper - Request Transfer',
+      text: "Perfect. Can you connect me with them please?",
+      responses: [
+        { label: 'They transfer you', next: 'gatekeeper_transferred' },
+        { label: 'They need more info', next: 'gatekeeper_clarify_purpose' },
+        { label: "They're busy", next: 'gatekeeper_busy' },
+        { label: 'They decline', next: 'gatekeeper_decline' }
+      ]
+    },
+    gatekeeper_fallback_clarity: {
+      stage: 'Gatekeeper - Nuclear Clarity',
+      text: "The person who gets the electric bill each month and signs the energy contracts.",
+      responses: [
+        { label: "That's [name]", next: 'gatekeeper_request_transfer' },
+        { label: 'I understand now', next: 'gatekeeper_request_transfer' },
+        { label: "They're not available", next: 'gatekeeper_busy' },
+        { label: "We don't have that person", next: 'gatekeeper_info_capture' }
       ]
     },
     gatekeeper_busy: {
       stage: 'Gatekeeper',
-      text: "<span class=\"tone-marker understanding\">understanding, respectful tone</span> I understand. <span class=\"pause-indicator\"></span> When's usually a good time to reach them to discuss this time-sensitive window?",
+      text: "I understand. When's usually a good time to reach them?",
       responses: [
         { label: "They give a time", next: 'gatekeeper_followup_time' },
         { label: "They prefer voicemail", next: 'gatekeeper_voicemail_offer' },
-        { label: "They want to respect their time", next: 'gatekeeper_respect_time' },
         { label: "They decline", next: 'gatekeeper_decline' }
       ]
     },
     gatekeeper_voicemail_offer: {
       stage: 'Gatekeeper',
-      text: "<span class=\"tone-marker helpful\">helpful tone</span> I can leave a quick voicemail if you'd like; that way they have the details and can call me back if it's relevant.",
+      text: "I can leave a quick voicemail if you'd like; that way they have the details and can call me back if it's relevant.",
       responses: [
         { label: "Yes, leave voicemail", next: 'voicemail' },
         { label: "They give a time instead", next: 'gatekeeper_followup_time' },
         { label: "They decline", next: 'gatekeeper_decline' }
       ]
     },
-    gatekeeper_respect_time: {
-      stage: 'Gatekeeper',
-      text: "<span class=\"tone-marker understanding\">respectful tone</span> Thanks for letting me know. <span class=\"pause-indicator\"></span> I want to respect their time but also make sure they don't miss this. <span class=\"pause-indicator\"></span> When works best?",
-      responses: [
-        { label: "They give a time", next: 'gatekeeper_followup_time' },
-        { label: "They prefer voicemail", next: 'gatekeeper_voicemail_offer' },
-        { label: "They decline", next: 'gatekeeper_decline' }
-      ]
-    },
     gatekeeper_followup_time: {
-      stage: 'Gatekeeper',
-      text: "<span class=\"tone-marker professional\">professional tone</span> Perfect. <span class=\"pause-indicator\"></span> I'll reach out at that time. <span class=\"pause-indicator\"></span> Should I also leave a brief voicemail now so they have context, or just wait until the time you mentioned?",
+      stage: 'Gatekeeper - Scheduled',
+      text: "Perfect. I'll reach out at that time. Should I also leave a brief voicemail now so they have context, or just wait until the time you mentioned?",
       responses: [
         { label: "Leave voicemail now", next: 'voicemail' },
         { label: "Just wait until that time", next: 'gatekeeper_scheduled' },
@@ -2455,27 +2480,34 @@
     },
     gatekeeper_scheduled: {
       stage: 'Gatekeeper - Scheduled',
-      text: "✅ <strong>Follow-up scheduled!</strong><br><br>You've successfully scheduled a call back time. <span class=\"pause-indicator\"></span> Make sure to follow up when you said you would.",
+      text: "✅ <strong>Follow-up scheduled!</strong><br><br>You've successfully scheduled a call back time. Make sure to follow up when you said you would.",
       responses: [
         { label: 'Start New Call', next: 'start' }
       ]
     },
     gatekeeper_transferred: {
-      stage: 'Gatekeeper - Transfer',
-      text: "<span class=\"tone-marker professional\">professional tone</span> <strong>HOLD FOR TRANSFER...</strong><br><br><em>Once connected, immediately transition to your decision maker script.</em>",
+      stage: 'Gatekeeper - Transfer Complete',
+      text: "<strong>HOLD FOR TRANSFER</strong> - You're being connected to the decision maker.",
       responses: [
-        { label: 'Connected to decision maker', next: null }, // Will be set dynamically to currentOpener
-        { label: 'Still gatekeeper / wrong person', next: 'gatekeeper_intro' },
-        { label: 'Transfer failed / hung up', next: 'no_answer' }
+        { label: 'Connected to decision maker', next: 'opening_quick_intro' },
+        { label: 'Wrong person / gatekeeper again', next: 'gatekeeper_intro' },
+        { label: 'Transfer failed', next: 'no_answer' }
       ]
     },
     gatekeeper_decline: {
       stage: 'Gatekeeper - Decline',
-      text: "<span class=\"tone-marker professional\">professional, respectful tone</span> Thanks for your time. <span class=\"pause-indicator\"></span> I'll try again later. <span class=\"pause-indicator\"></span><br><br><em>Note: Consider noting the best time to call back or any alternative contacts if possible.</em>",
+      text: "Thanks for your time. I'll try again later.",
       responses: [
         { label: 'Try again later', next: 'start' },
         { label: 'Leave voicemail instead', next: 'voicemail' },
         { label: 'Start New Call', next: 'start' }
+      ]
+    },
+    gatekeeper_info_capture: {
+      stage: 'Gatekeeper - Info Capture',
+      text: "Sure. What's the best way to reach them? Email or phone?",
+      responses: [
+        { label: 'Shared contact info', next: 'followup_scheduled' }
       ]
     },
     asked_to_speak: {
