@@ -1639,16 +1639,63 @@ class FreeSequenceAutomation {
         </div>`;
     }
 
-    // Resolve contact details using CacheManager
+    // Resolve contact details using CacheManager first, then fetch missing from Firestore
     let contactsMap = new Map();
     if (window.CacheManager) {
       try {
         const cachedContacts = await window.CacheManager.get('contacts');
         if (Array.isArray(cachedContacts)) {
-          cachedContacts.forEach(c => contactsMap.set(c.id, c));
+          cachedContacts.forEach(c => {
+            if (c && c.id) contactsMap.set(c.id, c);
+          });
         }
       } catch (e) {
         console.warn('Failed to load contacts from cache:', e);
+      }
+    }
+
+    // CRITICAL FIX: Fetch missing contacts from Firestore
+    const missingContactIds = members
+      .map(m => m.targetId)
+      .filter(id => !contactsMap.has(id) && id && !id.includes('@')); // Don't fetch if it's already an email
+
+    if (missingContactIds.length > 0 && db) {
+      try {
+        console.log(`[StepsView] Fetching ${missingContactIds.length} missing contacts from Firestore`);
+        // Fetch in batches to avoid query limits
+        const batchSize = 10;
+        for (let i = 0; i < missingContactIds.length; i += batchSize) {
+          const batch = missingContactIds.slice(i, i + batchSize);
+          const promises = batch.map(async (contactId) => {
+            try {
+              // Try 'people' collection first
+              const contactDoc = await db.collection('people').doc(contactId).get();
+              if (contactDoc.exists) {
+                const data = contactDoc.data();
+                return { id: contactId, ...data };
+              }
+              // Try 'contacts' collection as fallback
+              const contactDoc2 = await db.collection('contacts').doc(contactId).get();
+              if (contactDoc2.exists) {
+                const data = contactDoc2.data();
+                return { id: contactId, ...data };
+              }
+              return null;
+            } catch (e) {
+              console.warn(`[StepsView] Failed to fetch contact ${contactId}:`, e);
+              return null;
+            }
+          });
+          const fetchedContacts = await Promise.all(promises);
+          fetchedContacts.forEach(c => {
+            if (c && c.id) {
+              contactsMap.set(c.id, c);
+            }
+          });
+        }
+        console.log(`[StepsView] Fetched ${contactsMap.size} total contacts (${missingContactIds.length} from Firestore)`);
+      } catch (e) {
+        console.error('[StepsView] Error fetching missing contacts:', e);
       }
     }
 
@@ -1749,15 +1796,42 @@ class FreeSequenceAutomation {
 
     // Generate rows
     const rows = pageMembers.map(member => {
-      const contact = contactsMap.get(member.targetId) || {
-        firstName: 'Unknown',
-        lastName: 'Contact',
-        email: member.targetId
-      };
+      // CRITICAL FIX: Better contact resolution with fallbacks
+      let contact = contactsMap.get(member.targetId);
+      
+      // If contact not found, try to extract info from member or use defaults
+      if (!contact) {
+        // Check if targetId is an email address
+        if (member.targetId && member.targetId.includes('@')) {
+          contact = {
+            email: member.targetId,
+            name: member.targetId.split('@')[0],
+            firstName: member.targetId.split('@')[0].split('.')[0],
+            lastName: ''
+          };
+        } else {
+          // Unknown contact - try to get email from member data if available
+          contact = {
+            firstName: 'Unknown',
+            lastName: 'Contact',
+            email: member.email || member.targetId || '',
+            name: 'Unknown Contact'
+          };
+        }
+      }
 
-      const email = contact.email || (member.targetId.includes('@') ? member.targetId : '');
-      const name = contact.firstName ? `${contact.firstName} ${contact.lastName || ''}`.trim() : (contact.name || email || 'Unknown');
-      const company = contact.company || '';
+      // CRITICAL FIX: Ensure email is always populated
+      const email = contact.email || 
+                   (contact.firstName && contact.lastName ? `${contact.firstName.toLowerCase()}.${contact.lastName.toLowerCase()}@unknown.com` : '') ||
+                   (member.targetId && member.targetId.includes('@') ? member.targetId : '') ||
+                   (member.email || '');
+      
+      // CRITICAL FIX: Better name resolution
+      const name = contact.firstName && contact.lastName 
+        ? `${contact.firstName} ${contact.lastName}`.trim()
+        : (contact.name || contact.firstName || contact.email?.split('@')[0] || 'Unknown Contact');
+      
+      const company = contact.company || contact.companyName || '';
       const initials = getInitials(name);
 
       // Find the latest progress for this contact
@@ -1830,22 +1904,77 @@ class FreeSequenceAutomation {
 
               if (nextEmail && nextEmail.scheduledSendTime) {
                 try {
-                  const date = nextEmail.scheduledSendTime.toDate ? nextEmail.scheduledSendTime.toDate() : new Date(nextEmail.scheduledSendTime);
-                  scheduledStr = date.toLocaleString();
+                  // CRITICAL FIX: Better date handling for scheduledSendTime
+                  let date;
+                  if (nextEmail.scheduledSendTime.toDate) {
+                    date = nextEmail.scheduledSendTime.toDate();
+                  } else if (typeof nextEmail.scheduledSendTime === 'number') {
+                    date = new Date(nextEmail.scheduledSendTime);
+                  } else if (typeof nextEmail.scheduledSendTime === 'string') {
+                    date = new Date(nextEmail.scheduledSendTime);
+                  } else {
+                    date = new Date(nextEmail.scheduledSendTime);
+                  }
+                  
+                  if (!isNaN(date.getTime())) {
+                    // Format as MM/DD/YYYY, HH:MM AM/PM
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const year = date.getFullYear();
+                    const hours = date.getHours();
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                    const displayHours = hours % 12 || 12;
+                    scheduledStr = `${month}/${day}/${year}, ${displayHours}:${minutes} ${ampm}`;
+                  } else {
+                    scheduledStr = 'Scheduled';
+                  }
                   nextStepStr += ` <span class="badge" style="background:#e2e3e5; color:#383d41; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-left:4px;">Scheduled</span>`;
                 } catch (e) {
+                  console.warn('[StepsView] Error formatting email scheduledSendTime:', e, nextEmail.scheduledSendTime);
                   scheduledStr = 'Scheduled';
                 }
-              } else if (nextTask && nextTask.dueDate) {
+              } else if (nextTask && (nextTask.dueDate || nextTask.dueTimestamp)) {
                 try {
-                  const date = nextTask.dueDate.toDate ? nextTask.dueDate.toDate() : new Date(nextTask.dueDate);
-                  scheduledStr = date.toLocaleDateString();
+                  // CRITICAL FIX: Better date handling for tasks - check both dueDate and dueTimestamp
+                  let date;
+                  if (nextTask.dueTimestamp) {
+                    // Prefer dueTimestamp (more reliable)
+                    if (typeof nextTask.dueTimestamp === 'number') {
+                      date = new Date(nextTask.dueTimestamp);
+                    } else if (nextTask.dueTimestamp.toDate) {
+                      date = nextTask.dueTimestamp.toDate();
+                    } else {
+                      date = new Date(nextTask.dueTimestamp);
+                    }
+                  } else if (nextTask.dueDate) {
+                    // Parse dueDate string (MM/DD/YYYY format)
+                    if (typeof nextTask.dueDate === 'string' && nextTask.dueDate.includes('/')) {
+                      const [month, day, year] = nextTask.dueDate.split('/').map(n => parseInt(n, 10));
+                      date = new Date(year, month - 1, day);
+                    } else if (nextTask.dueDate.toDate) {
+                      date = nextTask.dueDate.toDate();
+                    } else {
+                      date = new Date(nextTask.dueDate);
+                    }
+                  }
+                  
+                  if (date && !isNaN(date.getTime())) {
+                    // Format as MM/DD/YYYY
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const year = date.getFullYear();
+                    scheduledStr = `${month}/${day}/${year}`;
+                  } else {
+                    scheduledStr = 'Pending';
+                  }
                   nextStepStr += ` <span class="badge" style="background:#e2e3e5; color:#383d41; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-left:4px;">Pending</span>`;
                 } catch (e) {
+                  console.warn('[StepsView] Error formatting task dueDate:', e, nextTask.dueDate, nextTask.dueTimestamp);
                   scheduledStr = 'Pending';
                 }
               } else {
-                // Not yet created/scheduled
+                // Not yet created/scheduled - next step will be created when current step completes
                 scheduledStr = 'Pending';
                 nextStepStr += ` <span class="badge" style="background:#e2e3e5; color:#383d41; padding:2px 8px; border-radius:12px; font-size:0.75rem; margin-left:4px;">Next</span>`;
               }
@@ -1896,11 +2025,35 @@ class FreeSequenceAutomation {
             // Show scheduled time
             if (itemData.scheduledSendTime) {
               try {
-                const date = itemData.scheduledSendTime.toDate ? itemData.scheduledSendTime.toDate() : new Date(itemData.scheduledSendTime);
-                scheduledStr = date.toLocaleString();
+                // CRITICAL FIX: Better date handling for scheduledSendTime
+                let date;
+                if (itemData.scheduledSendTime.toDate) {
+                  date = itemData.scheduledSendTime.toDate();
+                } else if (typeof itemData.scheduledSendTime === 'number') {
+                  date = new Date(itemData.scheduledSendTime);
+                } else {
+                  date = new Date(itemData.scheduledSendTime);
+                }
+                
+                if (!isNaN(date.getTime())) {
+                  // Format as MM/DD/YYYY, HH:MM AM/PM
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const day = String(date.getDate()).padStart(2, '0');
+                  const year = date.getFullYear();
+                  const hours = date.getHours();
+                  const minutes = String(date.getMinutes()).padStart(2, '0');
+                  const ampm = hours >= 12 ? 'PM' : 'AM';
+                  const displayHours = hours % 12 || 12;
+                  scheduledStr = `${month}/${day}/${year}, ${displayHours}:${minutes} ${ampm}`;
+                } else {
+                  scheduledStr = 'Pending';
+                }
               } catch (e) {
-                scheduledStr = '-';
+                console.warn('[StepsView] Error formatting email scheduledSendTime:', e);
+                scheduledStr = 'Pending';
               }
+            } else {
+              scheduledStr = 'Pending';
             }
           } else {
             // Task
@@ -1916,13 +2069,46 @@ class FreeSequenceAutomation {
             }
 
             // Show due date
-            if (itemData.dueDate) {
+            if (itemData.dueDate || itemData.dueTimestamp) {
               try {
-                const date = itemData.dueDate.toDate ? itemData.dueDate.toDate() : new Date(itemData.dueDate);
-                scheduledStr = date.toLocaleDateString();
+                // CRITICAL FIX: Better date handling for tasks - check both dueDate and dueTimestamp
+                let date;
+                if (itemData.dueTimestamp) {
+                  // Prefer dueTimestamp (more reliable)
+                  if (typeof itemData.dueTimestamp === 'number') {
+                    date = new Date(itemData.dueTimestamp);
+                  } else if (itemData.dueTimestamp.toDate) {
+                    date = itemData.dueTimestamp.toDate();
+                  } else {
+                    date = new Date(itemData.dueTimestamp);
+                  }
+                } else if (itemData.dueDate) {
+                  // Parse dueDate string (MM/DD/YYYY format)
+                  if (typeof itemData.dueDate === 'string' && itemData.dueDate.includes('/')) {
+                    const [month, day, year] = itemData.dueDate.split('/').map(n => parseInt(n, 10));
+                    date = new Date(year, month - 1, day);
+                  } else if (itemData.dueDate.toDate) {
+                    date = itemData.dueDate.toDate();
+                  } else {
+                    date = new Date(itemData.dueDate);
+                  }
+                }
+                
+                if (date && !isNaN(date.getTime())) {
+                  // Format as MM/DD/YYYY
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const day = String(date.getDate()).padStart(2, '0');
+                  const year = date.getFullYear();
+                  scheduledStr = `${month}/${day}/${year}`;
+                } else {
+                  scheduledStr = 'Pending';
+                }
               } catch (e) {
-                scheduledStr = '-';
+                console.warn('[StepsView] Error formatting task dueDate:', e);
+                scheduledStr = 'Pending';
               }
+            } else {
+              scheduledStr = 'Pending';
             }
           }
 
@@ -1950,7 +2136,7 @@ class FreeSequenceAutomation {
             </div>
             ${company ? `<div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;">${escapeHtml(company)}</div>` : ''}
           </td>
-          <td><a href="mailto:${escapeHtml(email)}" style="color: var(--text-secondary); text-decoration: none; transition: var(--transition-fast);" onmouseover="this.style.color='var(--text-inverse)'" onmouseout="this.style.color='var(--text-secondary)'">${escapeHtml(email)}</a></td>
+          <td>${email && email.includes('@') ? `<a href="mailto:${escapeHtml(email)}" style="color: var(--text-secondary); text-decoration: none; transition: var(--transition-fast);" onmouseover="this.style.color='var(--text-inverse)'" onmouseout="this.style.color='var(--text-secondary)'">${escapeHtml(email)}</a>` : `<span style="color: var(--text-secondary); font-style: italic;">${escapeHtml(email || 'No email')}</span>`}</td>
           <td>${nextStepStr}</td>
           <td style="color: var(--text-secondary); font-size: 0.9rem;">${scheduledStr}</td>
         </tr>
