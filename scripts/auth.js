@@ -15,6 +15,9 @@ class AuthManager {
     }
 
     async init() {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:17',message:'init() called',data:{initialized:this.initialized,redirectChecked:window._redirectResultChecked},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         if (this.initialized) return;
 
         try {
@@ -39,8 +42,14 @@ class AuthManager {
             // Only check once per page load to avoid loops
             if (!window._redirectResultChecked) {
                 window._redirectResultChecked = true;
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:42',message:'About to call getRedirectResult',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                // #endregion
                 try {
                     const result = await this.auth.getRedirectResult();
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:44',message:'getRedirectResult returned',data:{hasUser:!!result.user,userEmail:result.user?.email,hasCredential:!!result.credential,hasAccessToken:!!result.credential?.accessToken,error:result.error?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                    // #endregion
                     if (result.user) {
                         console.log('[Auth] Redirect sign-in successful:', result.user.email);
                         
@@ -59,8 +68,15 @@ class AuthManager {
                         } else {
                             console.log('[Auth] No Google access token in redirect result - Gmail sync will use popup if needed');
                         }
+                    } else {
+                        // #region agent log
+                        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:62',message:'getRedirectResult returned no user',data:{resultKeys:Object.keys(result||{}),error:result.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                        // #endregion
                     }
                 } catch (redirectErr) {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:63',message:'getRedirectResult error',data:{code:redirectErr.code,message:redirectErr.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                    // #endregion
                     // No redirect result or error - this is normal if user hasn't signed in yet
                     if (redirectErr.code !== 'auth/operation-not-allowed') {
                         console.log('[Auth] No redirect result (normal if not returning from sign-in)');
@@ -80,17 +96,29 @@ class AuthManager {
             }
 
             // Listen for auth state changes
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:83',message:'Setting up onAuthStateChanged listener',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
             this.auth.onAuthStateChanged((user) => {
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:84',message:'onAuthStateChanged fired',data:{hasUser:!!user,userEmail:user?.email,uid:user?.uid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                // #endregion
                 this.handleAuthStateChange(user);
             });
 
         } catch (error) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:87',message:'init() error',data:{error:error.message,stack:error.stack},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+            // #endregion
             console.error('[Auth] Initialization error:', error);
             this.showError('Failed to initialize authentication. Please refresh the page.');
         }
     }
 
     async handleAuthStateChange(user) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:93',message:'handleAuthStateChange entry',data:{hasUser:!!user,userEmail:user?.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       console.log('[Auth] ==> handleAuthStateChange triggered, user:', user ? user.email : 'null');
       this.user = user;
 
@@ -110,7 +138,11 @@ class AuthManager {
         } catch(_) {}
             
             // Check domain restriction (case-insensitive)
-            if (!emailLower.endsWith('@powerchoosers.com')) {
+            const domainCheck = emailLower.endsWith('@powerchoosers.com');
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:113',message:'Domain check result',data:{email:user.email,emailLower,domainCheck},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            // #endregion
+            if (!domainCheck) {
                 console.warn('[Auth] ✗ Unauthorized domain:', user.email);
                 this.showError('Access restricted to Power Choosers employees (@powerchoosers.com)');
                 await this.signOut();
@@ -129,7 +161,13 @@ class AuthManager {
             }
             
             console.log('[Auth] Calling showCRM()...');
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:132',message:'About to call showCRM',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
             await this.showCRM();
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:133',message:'showCRM completed',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
             
             console.log('[Auth] Updating user profile UI...');
             this.updateUserProfile(user);
@@ -139,6 +177,9 @@ class AuthManager {
             
             console.log('[Auth] ✓ Auth flow complete');
         } else {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:142',message:'No user - showing login',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         console.log('[Auth] No user - showing login');
         try {
           if (window.CacheManager && typeof window.CacheManager.invalidateAll === 'function') {
@@ -287,6 +328,9 @@ class AuthManager {
     }
 
     async signInWithGoogle() {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:314',message:'signInWithGoogle called',data:{currentUrl:window.location.href},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+        // #endregion
         try {
             const provider = new firebase.auth.GoogleAuthProvider();
             provider.setCustomParameters({
@@ -297,11 +341,17 @@ class AuthManager {
 
             // Use redirect instead of popup to avoid popup blockers
             // The redirect result will be handled in init() when the page loads back
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:325',message:'About to call signInWithRedirect',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+            // #endregion
             await this.auth.signInWithRedirect(provider);
             console.log('[Auth] Redirecting to Google sign-in...');
             // Note: Page will redirect, so code after this won't execute until return
 
         } catch (error) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:330',message:'signInWithRedirect error',data:{code:error.code,message:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+            // #endregion
             console.error('[Auth] Sign-in error:', error);
             
             if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/popup-blocked') {
@@ -349,6 +399,9 @@ class AuthManager {
     }
 
     async showCRM() {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:393',message:'showCRM() called',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
         console.log('[Auth] showCRM() called');
         const loginOverlay = document.getElementById('login-overlay');
         const crmContent = document.getElementById('crm-content');
@@ -357,12 +410,26 @@ class AuthManager {
         if (loginOverlay) {
             loginOverlay.style.display = 'none';
             console.log('[Auth] Login overlay hidden');
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:400',message:'Login overlay hidden',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
+        } else {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:402',message:'Login overlay not found',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
         }
         
         // Show CRM content
         if (crmContent) {
             crmContent.style.display = 'block';
             console.log('[Auth] CRM content shown');
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:409',message:'CRM content shown',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
+        } else {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:412',message:'CRM content not found',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+            // #endregion
         }
         
         // Load CRM scripts lazily (only once)
