@@ -74,10 +74,10 @@
   async function show(emailId) {
     if (!initDomRefs()) return;
 
-    // CRITICAL: Clean up any existing scheduled email buttons BEFORE loading new email
+    // CRITICAL: Clean up any existing scheduled email buttons and tracking icons BEFORE loading new email
     // This prevents duplicate buttons when navigating between emails
     if (els.actionBar) {
-      const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .generate-btn, .regenerate-btn, .send-now-btn, .qa-btn-send-now, .quick-action-btn.qa-btn-send-now');
+      const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .generate-btn, .regenerate-btn, .send-now-btn, .qa-btn-send-now, .quick-action-btn.qa-btn-send-now, .email-tracking-open-btn, .email-tracking-click-btn, .email-tracking-divider, .email-tracking-icons');
       existingBtns.forEach(btn => btn.remove());
     }
 
@@ -112,11 +112,20 @@
         type: emailData.type || 'received',
         status: emailData.status,
         scheduledSendTime: emailData.scheduledSendTime,
-        aiPrompt: emailData.aiPrompt
+        aiPrompt: emailData.aiPrompt,
+        // Tracking fields for sent emails
+        openCount: emailData.openCount || 0,
+        clickCount: emailData.clickCount || 0,
+        opens: emailData.opens || [],
+        clicks: emailData.clicks || [],
+        isSentEmail: emailData.isSentEmail || emailData.type === 'sent' || emailData.status === 'sent'
       };
 
       // Populate email details
       populateEmailDetails(state.currentEmail);
+
+      // Add tracking icons for sent emails (before scheduled email actions)
+      addTrackingIconsForSentEmail(state.currentEmail);
 
       // Add action buttons for scheduled emails (all statuses)
       if (state.currentEmail.type === 'scheduled') {
@@ -3171,6 +3180,232 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     const existingBtns = els.actionBar.querySelectorAll('.approve-btn, .reject-btn, .generate-btn, .regenerate-btn, .send-now-btn, .qa-btn-send-now, .quick-action-btn.qa-btn-send-now');
     existingBtns.forEach(btn => btn.remove());
     setQuickActionButtonsForSchedule(false);
+  }
+
+  // Show tracking details modal (opens or clicks)
+  function showTrackingDetails(email, type) {
+    if (!email) return;
+
+    const items = type === 'opens' ? (email.opens || []) : (email.clicks || []);
+    const count = type === 'opens' ? (email.openCount || 0) : (email.clickCount || 0);
+    const title = type === 'opens' ? 'Email Open Activity' : 'Email Click Activity';
+    const label = type === 'opens' ? 'open' : 'click';
+
+    if (items.length === 0 && count === 0) {
+      window.crm?.showToast && window.crm.showToast(`No ${label}s recorded for this email yet.`);
+      return;
+    }
+
+    // Create modal content
+    const itemList = items.map((item, index) => {
+      const timestamp = item.timestamp ? new Date(item.timestamp).toLocaleString() : 
+                       item.time ? new Date(item.time).toLocaleString() : 
+                       'Unknown time';
+      const url = item.url || (type === 'clicks' ? 'Unknown URL' : '');
+      const userAgent = item.user_agent || item.userAgent || 'Unknown browser';
+      const ip = item.ip || '';
+
+      return `
+        <div class="tracking-item" style="padding: 12px; border-bottom: 1px solid var(--border-color);">
+          ${type === 'clicks' && url ? `
+            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+              ${escapeHtml(url)}
+            </div>
+          ` : ''}
+          <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 2px;">
+            ${timestamp}
+          </div>
+          ${userAgent !== 'Unknown browser' ? `
+            <div style="font-size: 11px; color: var(--text-tertiary);">
+              ${escapeHtml(userAgent)}
+            </div>
+          ` : ''}
+          ${ip ? `
+            <div style="font-size: 11px; color: var(--text-tertiary);">
+              IP: ${escapeHtml(ip)}
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('') || `<div style="padding: 12px; color: var(--text-secondary);">No detailed ${label} data available.</div>`;
+
+    const modalContent = `
+      <div class="modal-header" style="padding: 20px 20px 0 20px; border-bottom: 1px solid var(--border-color);">
+        <h3 style="margin: 0; color: var(--text-primary);">${title}</h3>
+        <p style="margin: 8px 0 0 0; color: var(--text-secondary); font-size: 14px;">
+          ${count} ${label}${count !== 1 ? 's' : ''} recorded
+        </p>
+      </div>
+      <div class="modal-body" style="padding: 0; max-height: 400px; overflow-y: auto;">
+        ${itemList}
+      </div>
+    `;
+
+    // Show modal using CRM's modal system
+    if (window.crm && typeof window.crm.showModal === 'function') {
+      window.crm.showModal(title, modalContent, {
+        width: '600px',
+        height: '500px'
+      });
+    } else {
+      // Fallback: create simple modal
+      const modal = document.createElement('div');
+      modal.className = 'email-tracking-modal';
+      modal.style.cssText = `
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5); z-index: 10000;
+        display: flex; align-items: center; justify-content: center;
+      `;
+
+      const modalBox = document.createElement('div');
+      modalBox.style.cssText = `
+        background: var(--bg-primary); border-radius: 8px;
+        width: 600px; max-height: 500px; overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      `;
+      modalBox.innerHTML = modalContent;
+
+      modal.appendChild(modalBox);
+      document.body.appendChild(modal);
+
+      // Close on click outside
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          document.body.removeChild(modal);
+        }
+      });
+
+      // Add close button
+      const closeBtn = document.createElement('button');
+      closeBtn.innerHTML = '×';
+      closeBtn.style.cssText = `
+        position: absolute; top: 15px; right: 20px;
+        background: none; border: none; font-size: 24px;
+        color: var(--text-secondary); cursor: pointer;
+      `;
+      closeBtn.onclick = () => document.body.removeChild(modal);
+      modalBox.style.position = 'relative';
+      modalBox.appendChild(closeBtn);
+    }
+  }
+
+  // Add tracking icons (eye and click) for sent emails
+  function addTrackingIconsForSentEmail(email) {
+    if (!els.actionBar || !email) {
+      console.log('[EmailDetail] addTrackingIconsForSentEmail: Missing actionBar or email', { hasActionBar: !!els.actionBar, hasEmail: !!email });
+      return;
+    }
+
+    // Remove any existing tracking icons first
+    const existingTracking = els.actionBar.querySelectorAll('.email-tracking-open-btn, .email-tracking-click-btn, .email-tracking-divider, .email-tracking-icons');
+    existingTracking.forEach(el => el.remove());
+
+    // Check if this is a sent email (multiple ways to detect)
+    // CRITICAL: Check all possible sent email indicators
+    // Note: email.isSentEmail might be true, 'true', or truthy, so check both === true and truthy
+    const isSentEmail = email.isSentEmail === true || 
+                        email.isSentEmail === 'true' ||
+                        (email.isSentEmail && email.isSentEmail !== false) ||
+                        email.type === 'sent' || 
+                        email.emailType === 'sent' ||
+                        email.status === 'sent' ||
+                        (email.type === 'scheduled' && email.status === 'sent');
+
+    console.log('[EmailDetail] addTrackingIconsForSentEmail: Checking email', {
+      emailId: email.id,
+      isSentEmail: email.isSentEmail,
+      type: email.type,
+      emailType: email.emailType,
+      status: email.status,
+      detectedAsSent: isSentEmail,
+      openCount: email.openCount,
+      clickCount: email.clickCount
+    });
+
+    // Only show for sent emails (not received/inbox emails)
+    if (!isSentEmail) {
+      console.log('[EmailDetail] addTrackingIconsForSentEmail: Not a sent email, skipping');
+      return;
+    }
+
+    // Get tracking counts
+    const openCount = email.openCount || 0;
+    const clickCount = email.clickCount || 0;
+    const hasOpens = openCount > 0;
+    const hasClicks = clickCount > 0;
+
+    // Create tracking icons container
+    const trackingContainer = document.createElement('div');
+    trackingContainer.className = 'email-tracking-icons';
+    trackingContainer.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+
+    // Create eye icon (opens) button
+    const openBtn = document.createElement('button');
+    openBtn.className = `quick-action-btn email-tracking-open-btn ${hasOpens ? 'opened' : ''}`;
+    openBtn.title = hasOpens ? `Opened ${openCount} time${openCount !== 1 ? 's' : ''}` : 'Not opened';
+    openBtn.setAttribute('aria-label', hasOpens ? `Opened ${openCount} time${openCount !== 1 ? 's' : ''}` : 'Not opened');
+    openBtn.style.cssText = 'position: relative; background: transparent; border: 1px solid var(--border-light); color: var(--text-primary); padding: 6px; border-radius: var(--border-radius-sm); cursor: pointer; display: flex; align-items: center; justify-content: center;';
+    openBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+      ${hasOpens ? `<span class="tracking-badge" style="position: absolute; top: -4px; right: -4px; background-color: var(--orange-subtle); color: white; font-size: 9px; font-weight: 600; min-width: 14px; height: 14px; border-radius: 7px; display: flex; align-items: center; justify-content: center; padding: 0 3px; border: 1px solid var(--bg-primary);">${openCount}</span>` : ''}
+    `;
+    openBtn.addEventListener('click', () => {
+      showTrackingDetails(email, 'opens');
+    });
+
+    // Create click icon button
+    const clickBtn = document.createElement('button');
+    clickBtn.className = 'quick-action-btn email-tracking-click-btn';
+    clickBtn.title = hasClicks ? `Clicked ${clickCount} time${clickCount !== 1 ? 's' : ''}` : 'Not clicked';
+    clickBtn.setAttribute('aria-label', hasClicks ? `Clicked ${clickCount} time${clickCount !== 1 ? 's' : ''}` : 'Not clicked');
+    clickBtn.style.cssText = 'position: relative; background: transparent; border: 1px solid var(--border-light); color: var(--text-primary); padding: 6px; border-radius: var(--border-radius-sm); cursor: pointer; display: flex; align-items: center; justify-content: center;';
+    clickBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
+        <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/>
+        <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-3.5"/>
+        <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
+      </svg>
+      ${hasClicks ? `<span class="tracking-badge" style="position: absolute; top: -4px; right: -4px; background-color: var(--orange-subtle); color: white; font-size: 9px; font-weight: 600; min-width: 14px; height: 14px; border-radius: 7px; display: flex; align-items: center; justify-content: center; padding: 0 3px; border: 1px solid var(--bg-primary);">${clickCount}</span>` : ''}
+    `;
+    clickBtn.addEventListener('click', () => {
+      showTrackingDetails(email, 'clicks');
+    });
+
+    // Add buttons to container
+    trackingContainer.appendChild(openBtn);
+    trackingContainer.appendChild(clickBtn);
+
+    // Create divider line
+    const divider = document.createElement('div');
+    divider.className = 'email-tracking-divider';
+    divider.style.cssText = 'width: 1px; height: 24px; background-color: var(--border-light); margin: 0 8px;';
+
+    // Insert tracking icons and divider before reply button (or before delete button if no reply button)
+    const replyBtn = els.replyBtn;
+    const forwardBtn = els.forwardBtn;
+    const deleteBtn = els.deleteBtn;
+
+    if (replyBtn) {
+      // Insert before reply button
+      els.actionBar.insertBefore(trackingContainer, replyBtn);
+      els.actionBar.insertBefore(divider, replyBtn);
+    } else if (forwardBtn) {
+      // Insert before forward button
+      els.actionBar.insertBefore(trackingContainer, forwardBtn);
+      els.actionBar.insertBefore(divider, forwardBtn);
+    } else if (deleteBtn) {
+      // Insert before delete button
+      els.actionBar.insertBefore(trackingContainer, deleteBtn);
+      els.actionBar.insertBefore(divider, deleteBtn);
+    } else {
+      // Fallback: append to action bar
+      els.actionBar.appendChild(trackingContainer);
+      els.actionBar.appendChild(divider);
+    }
   }
 
   function enableContactNameLink(contactId) {

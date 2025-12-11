@@ -1408,21 +1408,18 @@
       console.error('[TaskDetail] Could not delete task from Firebase:', e);
     }
 
-    // Show success message
-    if (window.crm && typeof window.crm.showToast === 'function') {
-      window.crm.showToast('Task completed successfully');
-    }
-
-    // Refresh Today's Tasks widget
-    try {
-      if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
-        window.crm.loadTodaysTasks();
+    // CRITICAL FIX: Remove from BackgroundTasksLoader cache FIRST before refreshing widget
+    // This prevents the widget from loading stale data from BackgroundTasksLoader
+    if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.removeTask === 'function') {
+      try {
+        window.BackgroundTasksLoader.removeTask(state.currentTask.id);
+        console.log('[TaskDetail] Removed task from BackgroundTasksLoader cache');
+      } catch (e) {
+        console.warn('[TaskDetail] Could not remove task from BackgroundTasksLoader:', e);
       }
-    } catch (e) {
-      console.warn('Could not refresh Today\'s Tasks widget:', e);
     }
 
-    // CRITICAL FIX: Invalidate cache after task completion to prevent stale data
+    // CRITICAL FIX: Invalidate cache BEFORE refreshing widget to prevent stale data
     try {
       if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
         await window.CacheManager.invalidate('tasks');
@@ -1430,6 +1427,33 @@
       }
     } catch (cacheError) {
       console.warn('[TaskDetail] Failed to invalidate cache:', cacheError);
+    }
+
+    // CRITICAL FIX: Small delay to ensure Firebase deletion and cache invalidation complete
+    // This prevents race condition where loadTodaysTasks() queries Firebase before deletion completes
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // Show success message
+    if (window.crm && typeof window.crm.showToast === 'function') {
+      window.crm.showToast('Task completed successfully');
+    }
+
+    // CRITICAL FIX: Refresh Today's Tasks widget AFTER cache is cleared and Firebase deletion completes
+    try {
+      if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
+        // Force reload BackgroundTasksLoader to ensure fresh data
+        if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
+          try {
+            await window.BackgroundTasksLoader.forceReload();
+            console.log('[TaskDetail] Forced BackgroundTasksLoader reload before refreshing widget');
+          } catch (reloadError) {
+            console.warn('[TaskDetail] Failed to force reload BackgroundTasksLoader:', reloadError);
+          }
+        }
+        window.crm.loadTodaysTasks();
+      }
+    } catch (e) {
+      console.warn('Could not refresh Today\'s Tasks widget:', e);
     }
 
     // Trigger tasks updated event for other components (with taskId for cleanup)
@@ -1441,15 +1465,6 @@
     document.dispatchEvent(new CustomEvent('pc:task-deleted', {
       detail: { taskId: state.currentTask.id, source: 'task-detail' }
     }));
-
-    // CRITICAL FIX: Ensure BackgroundTasksLoader cache is updated immediately
-    if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.removeTask === 'function') {
-      try {
-        window.BackgroundTasksLoader.removeTask(state.currentTask.id);
-      } catch (e) {
-        console.warn('[TaskDetail] Could not remove task from BackgroundTasksLoader:', e);
-      }
-    }
 
     // Navigate to next task instead of going back
     try {
@@ -1867,6 +1882,18 @@
       } catch (_) { }
     };
 
+    // CRITICAL FIX: Remove task from BackgroundTasksLoader cache FIRST to ensure it's removed from old position
+    // This prevents the task from appearing in both old and new positions
+    if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.removeTask === 'function') {
+      try {
+        window.BackgroundTasksLoader.removeTask(task.id);
+        console.log('[TaskDetail] Removed rescheduled task from BackgroundTasksLoader cache');
+      } catch (e) {
+        console.warn('[TaskDetail] Failed to remove task from BackgroundTasksLoader:', e);
+      }
+    }
+
+    // Update localStorage with new dueDate/dueTime
     try {
       const getUserEmail = () => {
         try {
@@ -1880,18 +1907,38 @@
       updateLocalCache('userTasks');
     } catch (_) { }
 
-    if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
-      try { await window.BackgroundTasksLoader.forceReload(); } catch (e) { console.warn('[TaskDetail] Failed to refresh BackgroundTasksLoader after reschedule', e); }
-    }
-
+    // CRITICAL FIX: Invalidate cache BEFORE reloading to ensure fresh data
     if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
-      try { await window.CacheManager.invalidate('tasks'); } catch (_) { }
+      try { 
+        await window.CacheManager.invalidate('tasks');
+        console.log('[TaskDetail] Invalidated tasks cache after reschedule');
+      } catch (_) { }
     }
 
+    // CRITICAL FIX: Force reload BackgroundTasksLoader to get updated task with new dueDate/dueTime
+    // Small delay to ensure Firebase update completes
+    await new Promise(resolve => setTimeout(resolve, 150));
+    
+    if (window.BackgroundTasksLoader && typeof window.BackgroundTasksLoader.forceReload === 'function') {
+      try { 
+        await window.BackgroundTasksLoader.forceReload();
+        console.log('[TaskDetail] BackgroundTasksLoader reloaded after reschedule');
+      } catch (e) { 
+        console.warn('[TaskDetail] Failed to refresh BackgroundTasksLoader after reschedule', e); 
+      }
+    }
+
+    // CRITICAL FIX: Refresh Today's Tasks widget AFTER reload completes
     if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
-      try { window.crm.loadTodaysTasks(); } catch (_) { }
+      try { 
+        // Small delay to ensure BackgroundTasksLoader reload completes
+        setTimeout(() => {
+          window.crm.loadTodaysTasks();
+        }, 100);
+      } catch (_) { }
     }
 
+    // Dispatch events to notify other components
     window.dispatchEvent(new CustomEvent('tasksUpdated', { detail: { taskId: task.id, rescheduled: true } }));
     document.dispatchEvent(new CustomEvent('pc:task-updated', { detail: { id: task.id, changes: { dueDate, dueTime } } }));
 

@@ -241,8 +241,8 @@
 
   // Listen for task updates and reload data
   window.addEventListener('tasksUpdated', async (event) => {
-    const { source, taskId, deleted } = event.detail || {};
-    console.log('[BackgroundTasksLoader] Tasks updated from:', source, deleted ? '(deleted)' : '');
+    const { source, taskId, deleted, newTaskCreated, rescheduled } = event.detail || {};
+    console.log('[BackgroundTasksLoader] Tasks updated from:', source, deleted ? '(deleted)' : '', newTaskCreated ? '(new task)' : '', rescheduled ? '(rescheduled)' : '');
 
     // CRITICAL FIX: If a task was deleted, remove it from local cache immediately
     if (deleted && taskId) {
@@ -259,17 +259,50 @@
       }
     }
 
-    // Invalidate cache and reload from Firestore
+    // CRITICAL FIX: If a task was rescheduled, remove it from cache and force reload
+    // This ensures the task appears in its new position (sorted by new dueDate/dueTime)
+    // and is removed from its old position
+    if (rescheduled && taskId) {
+      try {
+        // Remove the old task from cache (with old dueDate/dueTime)
+        tasksData = tasksData.filter(t => t && t.id !== taskId);
+        console.log('[BackgroundTasksLoader] Removed rescheduled task from cache (will reload with new date):', taskId);
+        
+        // Update cache immediately to remove old position
+        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+          await window.CacheManager.set('tasks', tasksData);
+        }
+      } catch (e) {
+        console.warn('[BackgroundTasksLoader] Could not remove rescheduled task from cache:', e);
+      }
+    }
+
+    // CRITICAL FIX: Only do full reload if a new task was created (need to fetch it)
+    // For deletions, we've already removed from cache, so just invalidate and let forceReload handle it
+    // This prevents race conditions where Firestore deletion hasn't completed yet
+    // For reschedules, we've removed from cache and will reload to get updated dueDate/dueTime
     try {
       if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
         await window.CacheManager.invalidate('tasks');
         console.log('[BackgroundTasksLoader] Cache invalidated');
       }
-      await loadFromFirestore();
+      
+      // Reload from Firestore if a new task was created OR if a task was rescheduled
+      // For reschedules, we need to fetch the updated task with new dueDate/dueTime
+      if (newTaskCreated || rescheduled) {
+        // Small delay for reschedules to ensure Firebase update completes
+        if (rescheduled) {
+          await new Promise(resolve => setTimeout(resolve, 150));
+        }
+        await loadFromFirestore();
+      }
 
-      // Trigger Today's Tasks widget to refresh
+      // Trigger Today's Tasks widget to refresh (but only if not already loading)
       if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
-        window.crm.loadTodaysTasks();
+        // Small delay to ensure Firebase operations complete
+        setTimeout(() => {
+          window.crm.loadTodaysTasks();
+        }, 100);
       }
     } catch (error) {
       console.error('[BackgroundTasksLoader] Error handling tasksUpdated event:', error);
@@ -278,21 +311,25 @@
 
   // CRITICAL FIX: Listen for task deletion events for cross-browser sync
   document.addEventListener('pc:task-deleted', async (event) => {
-    const { taskId } = event.detail || {};
+    const { taskId, source } = event.detail || {};
     if (taskId) {
       try {
         // Remove from local cache
         tasksData = tasksData.filter(t => t && t.id !== taskId);
-        console.log('[BackgroundTasksLoader] Removed deleted task from cache (cross-browser sync):', taskId);
+        console.log('[BackgroundTasksLoader] Removed deleted task from cache (cross-browser sync):', taskId, source ? `from ${source}` : '');
         
         // Update cache
         if (window.CacheManager && typeof window.CacheManager.set === 'function') {
           await window.CacheManager.set('tasks', tasksData);
         }
         
-        // Trigger Today's Tasks widget to refresh
-        if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
-          window.crm.loadTodaysTasks();
+        // CRITICAL FIX: Only trigger refresh if not from task-detail (which handles its own refresh)
+        // This prevents duplicate refreshes and race conditions
+        if (source !== 'task-detail' && window.crm && typeof window.crm.loadTodaysTasks === 'function') {
+          // Small delay to ensure Firebase operations complete
+          setTimeout(() => {
+            window.crm.loadTodaysTasks();
+          }, 100);
         }
       } catch (e) {
         console.warn('[BackgroundTasksLoader] Could not remove deleted task from cache:', e);
@@ -336,6 +373,32 @@
     }
   });
 
+  // Remove a task from the local cache immediately
+  function removeTask(taskId) {
+    if (!taskId) return false;
+    try {
+      const beforeCount = tasksData.length;
+      tasksData = tasksData.filter(t => t && t.id !== taskId);
+      const removed = tasksData.length < beforeCount;
+      
+      if (removed) {
+        console.log('[BackgroundTasksLoader] Removed task from cache:', taskId);
+        
+        // Update cache immediately
+        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+          window.CacheManager.set('tasks', tasksData).catch(e => {
+            console.warn('[BackgroundTasksLoader] Could not update cache after removal:', e);
+          });
+        }
+      }
+      
+      return removed;
+    } catch (e) {
+      console.warn('[BackgroundTasksLoader] Error removing task:', e);
+      return false;
+    }
+  }
+
   // Export public API
   window.BackgroundTasksLoader = {
     getTasksData: () => tasksData,
@@ -354,6 +417,7 @@
         return tasksData;
       }
     },
+    removeTask: removeTask,
     loadMore: loadMoreTasks,
     hasMore: () => hasMoreData,
     getCount: () => tasksData.length,
