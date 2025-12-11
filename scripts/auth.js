@@ -351,7 +351,9 @@ class AuthManager {
             // #region agent log
             fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:350',message:'About to call signInWithPopup',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
             // #endregion
+            console.log('[Auth] Attempting popup authentication...');
             const result = await this.auth.signInWithPopup(provider);
+            console.log('[Auth] Popup authentication completed');
             
             // #region agent log
             fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:353',message:'signInWithPopup successful',data:{userEmail:result.user?.email,hasCredential:!!result.credential,hasAccessToken:!!result.credential?.accessToken},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
@@ -378,9 +380,11 @@ class AuthManager {
 
         } catch (error) {
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:372',message:'signInWithPopup error',data:{code:error.code,message:error.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.js:374',message:'signInWithPopup error',data:{code:error.code,message:error.message,fullError:error.toString()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
             // #endregion
             console.error('[Auth] Sign-in error:', error);
+            console.error('[Auth] Error code:', error.code);
+            console.error('[Auth] Error message:', error.message);
             
             if (error.code === 'auth/popup-closed-by-user') {
                 this.showError('Sign-in cancelled. Please try again.');

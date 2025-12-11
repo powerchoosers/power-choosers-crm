@@ -22,14 +22,24 @@
     try { if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') return window.DataManager.getCurrentUserEmail(); return (window.currentUserEmail || '').toLowerCase(); } catch (_) { return (window.currentUserEmail || '').toLowerCase(); }
   };
 
-  async function loadFromFirestore() {
+  async function loadFromFirestore(preserveExisting = false) {
     if (!window.firebaseDB && !(window.DataManager && typeof window.DataManager.queryWithOwnership === 'function')) {
       console.warn('[BackgroundTasksLoader] firebaseDB not available');
       return;
     }
 
     try {
-      console.log('[BackgroundTasksLoader] Loading tasks...');
+      console.log('[BackgroundTasksLoader] Loading tasks...', preserveExisting ? '(preserving existing)' : '');
+      
+      // CRITICAL FIX: Preserve existing tasks if this is a refresh (not initial load)
+      const existingTasksMap = preserveExisting ? new Map() : null;
+      if (preserveExisting && tasksData.length > 0) {
+        tasksData.forEach(t => {
+          if (t && t.id) existingTasksMap.set(t.id, t);
+        });
+        console.log('[BackgroundTasksLoader] Preserving', existingTasksMap.size, 'existing tasks during reload');
+      }
+      
       if (window.currentUserRole !== 'admin') {
         let newTasks = [];
         if (window.DataManager && typeof window.DataManager.queryWithOwnership === 'function') {
@@ -48,20 +58,58 @@
         }
         // Sort by updatedAt/timestamp desc similar to original
         newTasks.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
-        tasksData = newTasks;
+        
+        // Merge with existing tasks if preserving
+        if (preserveExisting && existingTasksMap) {
+          const newTasksMap = new Map();
+          newTasks.forEach(t => {
+            if (t && t.id) newTasksMap.set(t.id, t);
+          });
+          // Add existing tasks that weren't in the reload
+          existingTasksMap.forEach((task, id) => {
+            if (!newTasksMap.has(id)) {
+              newTasksMap.set(id, task);
+            }
+          });
+          tasksData = Array.from(newTasksMap.values());
+          tasksData.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
+        } else {
+          tasksData = newTasks;
+        }
         lastLoadedDoc = null;
         hasMoreData = false;
       } else {
         // Admin path: original unfiltered query
-        // COST REDUCTION: Load in batches of 100 (smart lazy loading)
+        // COST-EFFECTIVE FIX: Use 200 limit + task preservation to prevent disappearing
+        // Task preservation ensures tasks loaded via loadMore() are kept during cache refresh
+        // 200 is a good balance: covers most use cases while keeping costs reasonable
+        // (500 reads every 3 min = $4.20/month, 200 reads = $1.68/month per admin)
         let query = window.firebaseDB.collection('tasks')
           .orderBy('timestamp', 'desc')
-          .limit(100);
+          .limit(200);
         const snapshot = await query.get();
         const newTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        tasksData = newTasks;
+        
+        // Merge with existing tasks if preserving
+        if (preserveExisting && existingTasksMap) {
+          const newTasksMap = new Map();
+          newTasks.forEach(t => {
+            if (t && t.id) newTasksMap.set(t.id, t);
+          });
+          // Add existing tasks that weren't in the reload (beyond the 500 limit)
+          existingTasksMap.forEach((task, id) => {
+            if (!newTasksMap.has(id)) {
+              newTasksMap.set(id, task);
+            }
+          });
+          tasksData = Array.from(newTasksMap.values());
+          tasksData.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
+        } else {
+          tasksData = newTasks;
+        }
+        
         // Admin pagination
-        if (snapshot.docs.length > 0) { lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1]; hasMoreData = snapshot.docs.length === 100; } else { hasMoreData = false; }
+        if (snapshot.docs.length > 0) { lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1]; hasMoreData = snapshot.docs.length === 200; } else { hasMoreData = false; }
       }
 
       // Pagination handled per role above
@@ -167,7 +215,7 @@
       let query = window.firebaseDB.collection('tasks')
         .orderBy('timestamp', 'desc')
         .startAfter(lastLoadedDoc)
-        .limit(100);
+        .limit(200);
 
       const snapshot = await query.get();
       const newTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -178,7 +226,7 @@
       // Update pagination tracking
       if (snapshot.docs.length > 0) {
         lastLoadedDoc = snapshot.docs[snapshot.docs.length - 1];
-        hasMoreData = snapshot.docs.length === 100;
+        hasMoreData = snapshot.docs.length === 200; // CRITICAL FIX: Match the limit we're using
       } else {
         hasMoreData = false;
       }
@@ -294,7 +342,7 @@
         if (rescheduled) {
           await new Promise(resolve => setTimeout(resolve, 150));
         }
-        await loadFromFirestore();
+        await loadFromFirestore(true); // Preserve existing tasks during refresh
       }
 
       // Trigger Today's Tasks widget to refresh (but only if not already loading)
@@ -355,10 +403,39 @@
         // If cache is older than expiry time, refresh
         if (age > tasksCacheExpiry) {
           console.log('[BackgroundTasksLoader] Cache is stale (age: ' + Math.round(age / 1000) + 's, expiry: ' + Math.round(tasksCacheExpiry / 1000) + 's), refreshing...');
+          
+          // CRITICAL FIX: Preserve existing tasks during refresh to prevent loss
+          const existingTasksMap = new Map();
+          tasksData.forEach(t => {
+            if (t && t.id) existingTasksMap.set(t.id, t);
+          });
+          
           if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
             await window.CacheManager.invalidate('tasks');
           }
-          await loadFromFirestore();
+          await loadFromFirestore(true); // Preserve existing tasks during refresh
+          
+          // Merge new tasks with existing ones (prefer new data, but keep old if new doesn't have it)
+          const newTasksMap = new Map();
+          tasksData.forEach(t => {
+            if (t && t.id) newTasksMap.set(t.id, t);
+          });
+          
+          // Add any existing tasks that weren't in the reload (beyond the initial limit)
+          existingTasksMap.forEach((task, id) => {
+            if (!newTasksMap.has(id)) {
+              newTasksMap.set(id, task);
+            }
+          });
+          
+          tasksData = Array.from(newTasksMap.values());
+          // Re-sort by timestamp
+          tasksData.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
+          
+          // Update cache with merged data
+          if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+            await window.CacheManager.set('tasks', tasksData);
+          }
 
           // Trigger Today's Tasks widget to refresh
           if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
@@ -407,10 +484,40 @@
       // Force cache invalidation and reload
       console.log('[BackgroundTasksLoader] Force reload requested');
       try {
+        // CRITICAL FIX: Preserve existing tasks during reload to prevent loss
+        // Store current tasks before reloading
+        const existingTasksMap = new Map();
+        tasksData.forEach(t => {
+          if (t && t.id) existingTasksMap.set(t.id, t);
+        });
+        
         if (window.CacheManager && typeof window.CacheManager.invalidate === 'function') {
           await window.CacheManager.invalidate('tasks');
         }
-        await loadFromFirestore();
+        await loadFromFirestore(true); // Preserve existing tasks during refresh
+        
+        // Merge new tasks with existing ones (prefer new data, but keep old if new doesn't have it)
+        const newTasksMap = new Map();
+        tasksData.forEach(t => {
+          if (t && t.id) newTasksMap.set(t.id, t);
+        });
+        
+        // Add any existing tasks that weren't in the reload (beyond the initial limit)
+        existingTasksMap.forEach((task, id) => {
+          if (!newTasksMap.has(id)) {
+            newTasksMap.set(id, task);
+          }
+        });
+        
+        tasksData = Array.from(newTasksMap.values());
+        // Re-sort by timestamp
+        tasksData.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
+        
+        // Update cache with merged data
+        if (window.CacheManager && typeof window.CacheManager.set === 'function') {
+          await window.CacheManager.set('tasks', tasksData);
+        }
+        
         return tasksData;
       } catch (error) {
         console.error('[BackgroundTasksLoader] Error during force reload:', error);
