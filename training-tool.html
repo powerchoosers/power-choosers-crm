@@ -1500,11 +1500,11 @@
             },
             hook: {
                 stage: 'Opening',
-                text: '{{day.part}}, is this <span class="badge contact">(contact name)</span>?',
+                text: 'Who picked up?',
                 responses: [
-                    { label: 'Yes, speaking', next: 'opening_quick_intro' },
-                    { label: "Who's calling?", next: 'opening_quick_intro' },
-                    { label: 'Gatekeeper', next: 'gatekeeper_intro' }
+                    { label: 'Decision Maker', next: 'opening_quick_intro' },
+                    { label: 'Gatekeeper', next: 'gatekeeper_intro' },
+                    { label: 'Voicemail', next: 'voicemail' }
                 ]
             },
             // ===== SIX SCENARIOS NATURAL OPENING + TIMING QUALIFICATION =====
@@ -1519,29 +1519,39 @@
                 ]
             },
             opening_industry_context: {
-                stage: 'Opening - Industry Context & Problem Bridge',
-                text: "Perfect. So I work with {{account.industry}} companies on electricity procurement.<br><br><span class=\"pause-indicator\"></span> <em>[PAUSE 1 second - let that land]</em><br><br>And im reaching out because most companies in {{account.city}} are overpaying on electricity...<br><br><span class=\"pause-indicator\"></span><em>[PAUSE]</em><br><br>not because they're doing anything wrong...<br><br>its because the market's set up in a way that makes it really hard to see what's available.<br><br><span class=\"pause-indicator\"></span><em>[PAUSE]</em><br><br>Are you involved in how {{account.name}} handles electricity?",
+                stage: 'Opening - Industry Context & Responsibility',
+                text: "Perfect. So {{contact.first_name}}, I work with {{account.industry}} companies on electricity procurement.<br><br><span class=\"pause-indicator\"></span> <em>[PAUSE 1 second]</em><br><br>Are you responsible for electricity agreements and contract renewals?",
                 responses: [
-                    { label: 'Yeah, somewhat', next: 'timing_qualification' },
-                    { label: 'I handle it', next: 'timing_qualification' },
-                    { label: 'We have a corporate person', next: 'timing_qualification' },
+                    { label: 'Yeah, that\'s me', next: 'urgency_building' },
+                    { label: 'I handle it', next: 'urgency_building' },
+                    { label: 'We have a corporate person', next: 'gatekeeper_route' },
                     { label: "That's someone else", next: 'gatekeeper_route' },
                     { label: 'Not really sure', next: 'clarify_involvement' }
                 ]
             },
-            timing_qualification: {
-                stage: 'Qualification - Contract Timing',
-                text: "Got it. So quick question... have you already extended your agreements past 2026... or is that renewal window still open for you?",
+            urgency_building: {
+                stage: 'Urgency - 2026 Warning & Confidence',
+                text: "Okay great. So I'm not sure if you'd be affected by this but...<br><br><span class=\"pause-indicator\"></span> <em>[PAUSE 1 second]</em><br><br>the writing's kind of on the wall for 2026.<br><br>Businesses I work with have been stressed because they know <span class=\"pause-indicator\"></span> rates are going up next year but don't really have a sound strategy around electricity.<br><br><span class=\"pause-indicator\"></span> <em>[PAUSE 1 second]</em><br><br>Do you feel like you have a solid handle on your energy costs? <span class=\"pause-indicator\"></span><br><br>Or do you feel like you're kind of just winging it?",
                 responses: [
-                    { label: 'Still open / renew before 2026', next: 'discovery_process' },
-                    { label: 'We renew in 2026', next: 'discovery_process' },
-                    { label: 'Not sure when it expires', next: 'discovery_process' },
+                    { label: 'Winging it / somewhere in between', next: 'acknowledge_response' },
+                    { label: 'Solid handle', next: 'acknowledge_response' },
+                    { label: 'Not sure', next: 'acknowledge_response' },
+                    { label: 'We use a broker', next: 'objection_broker_intro' }
+                ]
+            },
+            acknowledge_response: {
+                stage: 'Discovery - Acknowledge',
+                text: "<span class=\"tone-marker understanding\">Acknowledge without judgment</span><br><br>That's actually really common.<br><br><span class=\"pause-indicator\"></span> <em>[PAUSE 1 second]</em><br><br>Have you guys already extended your agreements past 2026... or is that still open?",
+                responses: [
+                    { label: 'Still open / renew before 2026', next: 'renewal_timing' },
+                    { label: 'We renew in 2026', next: 'renewal_timing' },
+                    { label: 'Not sure when it expires', next: 'renewal_timing' },
                     { label: 'We just renewed / locked in', next: 'locked_in_future' }
                 ]
             },
-            discovery_process: {
-                stage: 'Discovery - Current Process',
-                text: "Good. So walk me through it... when you renew... how many quotes do you typically get?",
+            renewal_timing: {
+                stage: 'Discovery - Renewal Timing',
+                text: "Got it, still open.<br><br><span class=\"pause-indicator\"></span> <em>[PAUSE 1-2 seconds]</em><br><br>So walk me through it... when you go to renew... how many quotes do you typically get?",
                 responses: [
                     { label: '2 or 3 quotes', next: 'key_question_confidence' },
                     { label: 'Just current supplier', next: 'key_question_confidence' },
@@ -1755,9 +1765,9 @@
                 stage: 'Clarify - Involvement',
                 text: "No problem. Here's the thing... most {{account.industry}} companies are leaving like {{potential_savings}} on the table a year just from bad timing on their renewal.<br><br>Does that sound like something you'd be involved in... or is that more of a procurement team thing?",
                 responses: [
-                    { label: "That's me", next: 'timing_qualification' },
+                    { label: "That's me", next: 'urgency_building' },
                     { label: "That's [name]", next: 'gatekeeper_route' },
-                    { label: 'Both of us', next: 'timing_qualification' }
+                    { label: 'Both of us', next: 'urgency_building' }
                 ]
             },
             // ===== NEPQ BROKER OBJECTION HANDLING (Per NEPQ Document) =====
