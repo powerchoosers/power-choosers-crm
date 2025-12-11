@@ -35,6 +35,51 @@ class AuthManager {
             
             console.log('[Auth] Firebase Auth initialized');
 
+            // Check for redirect result (when returning from Google sign-in)
+            try {
+                const result = await this.auth.getRedirectResult();
+                if (result.user) {
+                    console.log('[Auth] Redirect sign-in successful:', result.user.email);
+                    
+                    // Store Google access token for Gmail API access (client-side sync)
+                    // Note: With redirect, we need to get the token from the user object
+                    if (result.user) {
+                        try {
+                            const token = await result.user.getIdToken();
+                            // For redirect flow, we'll get the Google access token from the credential if available
+                            if (result.credential && result.credential.accessToken) {
+                                window._googleAccessToken = result.credential.accessToken;
+                                // Persist to localStorage so it survives page refreshes
+                                try {
+                                    localStorage.setItem('pc:googleAccessToken', result.credential.accessToken);
+                                    console.log('[Auth] Stored Google access token for Gmail sync (persisted)');
+                                } catch (storageErr) {
+                                    console.warn('[Auth] Could not persist token to localStorage:', storageErr);
+                                }
+                            }
+                        } catch (tokenErr) {
+                            console.warn('[Auth] Could not get access token:', tokenErr);
+                        }
+                    }
+                }
+            } catch (redirectErr) {
+                // No redirect result or error - this is normal if user hasn't signed in yet
+                if (redirectErr.code !== 'auth/operation-not-allowed') {
+                    console.log('[Auth] No redirect result (normal if not returning from sign-in)');
+                }
+            }
+            
+            // Load persisted Google access token from localStorage if available
+            try {
+                const persistedToken = localStorage.getItem('pc:googleAccessToken');
+                if (persistedToken && !window._googleAccessToken) {
+                    window._googleAccessToken = persistedToken;
+                    console.log('[Auth] Restored Google access token from localStorage');
+                }
+            } catch (storageErr) {
+                console.warn('[Auth] Could not load token from localStorage:', storageErr);
+            }
+
             // Listen for auth state changes
             this.auth.onAuthStateChanged((user) => {
                 this.handleAuthStateChange(user);
@@ -251,25 +296,18 @@ class AuthManager {
             // Add Gmail readonly scope for inbox sync (client-side, FREE)
             provider.addScope('https://www.googleapis.com/auth/gmail.readonly');
 
-            const result = await this.auth.signInWithPopup(provider);
-            console.log('[Auth] Sign-in successful:', result.user.email);
-            
-            // Store Google access token for Gmail API access (client-side sync)
-            if (result.credential && result.credential.accessToken) {
-                window._googleAccessToken = result.credential.accessToken;
-                console.log('[Auth] Stored Google access token for Gmail sync');
-            }
-            
-            // Show success message
-            this.showSuccess('Welcome back!');
+            // Use redirect instead of popup to avoid popup blockers
+            // The redirect result will be handled in init() when the page loads back
+            await this.auth.signInWithRedirect(provider);
+            console.log('[Auth] Redirecting to Google sign-in...');
+            // Note: Page will redirect, so code after this won't execute until return
 
         } catch (error) {
             console.error('[Auth] Sign-in error:', error);
             
-            if (error.code === 'auth/popup-closed-by-user') {
-                this.showError('Sign-in cancelled. Please try again.');
-            } else if (error.code === 'auth/popup-blocked') {
-                this.showError('Popup blocked. Please allow popups for this site.');
+            if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/popup-blocked') {
+                // Fallback: try redirect if popup fails (though we're already using redirect)
+                this.showError('Sign-in failed. Please try again.');
             } else {
                 this.showError('Failed to sign in. Please try again.');
             }
@@ -281,6 +319,16 @@ class AuthManager {
         this.stopTokenRefreshLoop();
         await this.auth.signOut();
         console.log('[Auth] Sign-out successful');
+        
+        // Clear Google access token from storage
+        try {
+          localStorage.removeItem('pc:googleAccessToken');
+          window._googleAccessToken = null;
+          console.log('[Auth] Cleared Google access token');
+        } catch (storageErr) {
+          console.warn('[Auth] Could not clear token from storage:', storageErr);
+        }
+        
         try {
           if (window.CacheManager && typeof window.CacheManager.invalidateAll === 'function') {
             await window.CacheManager.invalidateAll();
@@ -369,7 +417,16 @@ class AuthManager {
 
         if (avatarUrl) {
             // Show profile picture (prefer hosted version), hide fallback
+            // NOTE: Do NOT make the header profile pic editable - it blocks the dropdown button click
             if (profilePic) {
+                // Remove any existing editable container wrapper (in case it was added before)
+                const existingContainer = profilePic.closest('.editable-profile-pic-container');
+                if (existingContainer) {
+                    const parent = existingContainer.parentNode;
+                    parent.insertBefore(profilePic, existingContainer);
+                    parent.removeChild(existingContainer);
+                }
+                
                 profilePic.src = avatarUrl;
                 profilePic.alt = user.displayName || user.email;
                 profilePic.style.display = 'block';
@@ -377,21 +434,9 @@ class AuthManager {
                 if (avatarUrl === user.photoURL && avatarUrl.includes('googleusercontent.com')) {
                     profilePic.src = avatarUrl + '?t=' + Date.now();
                 }
-                // Wrap in editable container if not already wrapped (delay to ensure DOM is ready)
-                // Use multiple attempts to ensure image is loaded and visible
-                const setupPic = (attempt = 0) => {
-                    if (profilePic && profilePic.parentNode && !profilePic.closest('.editable-profile-pic-container')) {
-                        // Check if image is loaded or has src
-                        if (profilePic.complete || profilePic.src) {
-                            this.setupEditableProfilePic(profilePic, avatarUrl, user);
-                        } else if (attempt < 5) {
-                            // Retry if image not loaded yet (max 5 attempts = 500ms)
-                            setTimeout(() => setupPic(attempt + 1), 100);
-                        }
-                    }
-                };
-                setTimeout(() => setupPic(), 50);
+                // Do NOT wrap header pic in editable container - it prevents dropdown from opening
             }
+            // Only make the dropdown profile pic editable (large one)
             if (profilePicLarge) {
                 profilePicLarge.src = avatarUrl;
                 profilePicLarge.alt = user.displayName || user.email;
@@ -446,6 +491,12 @@ class AuthManager {
 
     // Setup editable profile picture with hover effect
     setupEditableProfilePic(imgElement, currentAvatarUrl, user) {
+        // Safety check: Never make the header profile pic editable (it blocks dropdown)
+        if (imgElement.id === 'user-profile-pic') {
+            console.warn('[Auth] Skipping editable setup for header profile pic to preserve dropdown functionality');
+            return;
+        }
+        
         // Skip if already wrapped
         if (imgElement.closest('.editable-profile-pic-container')) {
             return;
@@ -673,16 +724,13 @@ class AuthManager {
         if (this.user) {
             console.log('[Auth] Refreshing profile photo from settings...');
             this.updateUserProfile(this.user);
-            // Re-setup editable containers after refresh
+            // Re-setup editable container for dropdown pic only (not header pic)
             setTimeout(() => {
-                const profilePic = document.getElementById('user-profile-pic');
                 const profilePicLarge = document.getElementById('user-profile-pic-large');
-                if (profilePic && profilePic.src) {
-                    this.setupEditableProfilePic(profilePic, profilePic.src, this.user);
-                }
                 if (profilePicLarge && profilePicLarge.src) {
                     this.setupEditableProfilePic(profilePicLarge, profilePicLarge.src, this.user);
                 }
+                // Do NOT make header pic editable - it blocks dropdown
             }, 100);
         } else {
             console.warn('[Auth] Cannot refresh profile photo - no user logged in');
