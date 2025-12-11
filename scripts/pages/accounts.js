@@ -279,6 +279,33 @@ var console = {
   function persistAccountsColumnOrder(order) { try { localStorage.setItem(ACCOUNTS_COL_STORAGE_KEY, JSON.stringify(order)); } catch (e) { /* noop */ } }
 
   const els = {};
+  let pendingSearchPrefill = null;
+
+  function consumeSearchPrefill(pageKey) {
+    try {
+      const raw = sessionStorage.getItem('pcSearchPrefill');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || parsed.page !== pageKey || !parsed.query) return null;
+      sessionStorage.removeItem('pcSearchPrefill');
+      return parsed.query;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function applyPrefillIfNeeded() {
+    if (!pendingSearchPrefill || !els.quickSearch) return false;
+    const query = pendingSearchPrefill.trim();
+    pendingSearchPrefill = null;
+    if (!query) return false;
+    els.quickSearch.value = query;
+    state.searchMode = true;
+    state.searchQuery = query;
+    state.currentPage = 1;
+    applyFilters();
+    return true;
+  }
 
   // Ensure selection set exists to avoid runtime errors if it was clobbered
   function ensureSelected() {
@@ -311,10 +338,18 @@ var console = {
     els.fName = qs('filter-acct-name');
     els.fIndustry = qs('accounts-filter-industry');
     els.fDomain = qs('filter-domain');
+    els.fContractYear = qs('filter-contract-year');
     els.fHasPhone = qs('filter-acct-has-phone');
 
     els.applyBtn = qs('apply-accounts-filters');
     els.clearBtn = qs('clear-accounts-filters');
+
+    // Capture any prefill coming from Global Search before data loads
+    const prefill = consumeSearchPrefill('accounts');
+    if (prefill) {
+      pendingSearchPrefill = prefill;
+      if (els.quickSearch) els.quickSearch.value = prefill;
+    }
 
     // Add Account button (creates a minimal doc with new fields)
     const addBtn = document.getElementById('add-account-btn');
@@ -620,51 +655,6 @@ var console = {
       });
     }
 
-    // Algolia instant search
-    async function performAlgoliaSearch(query) {
-      if (!window.AlgoliaSearch || !window.AlgoliaSearch.isAvailable()) {
-        console.warn('[Accounts] Algolia not available, falling back to local search');
-        applyFilters();
-        return;
-      }
-
-      try {
-        // Show loading state
-        if (els.tbody) {
-          els.tbody.innerHTML = '<tr><td colspan="20" style="text-align: center; padding: 40px; color: var(--grey-400);">Searching...</td></tr>';
-        }
-
-        // Search with Algolia
-        const results = await window.AlgoliaSearch.searchAccounts(query, {
-          limit: 100,
-          page: 0
-        });
-
-        console.log('[Accounts] Algolia search results:', results.nbHits, 'accounts found');
-
-        // Map Algolia hits to our data format
-        state.filtered = results.hits.map(hit => ({
-          id: hit.objectID,
-          ...hit
-        }));
-        
-        state.currentPage = 1;
-        
-        // Update search UI
-        if (els.quickSearch) {
-          els.quickSearch.style.borderColor = 'var(--orange-primary)';
-          els.quickSearch.placeholder = `Found ${results.nbHits} accounts...`;
-        }
-        
-        render();
-
-      } catch (error) {
-        console.error('[Accounts] Algolia search failed:', error);
-        // Fallback to local search
-        applyFilters();
-      }
-    }
-
     const reFilter = debounce(applyFilters, 200);
 
     [els.fName, els.fIndustry, els.fDomain].forEach((inp) => {
@@ -677,22 +667,14 @@ var console = {
     if (els.applyBtn) els.applyBtn.addEventListener('click', () => { state.currentPage = 1; applyFilters(); });
     if (els.clearBtn) els.clearBtn.addEventListener('click', () => { clearFilters(); state.currentPage = 1; });
     if (els.quickSearch) {
-      els.quickSearch.addEventListener('input', async (e) => {
-        const query = e.target.value.trim();
-        
-        if (query.length >= 2) {
-          // SEARCH MODE: Use Algolia instant search
-          state.searchMode = true;
-          state.searchQuery = query;
-          await performAlgoliaSearch(query);
-        } else if (query.length === 0) {
-          // BROWSE MODE: Back to local filtering
-          state.searchMode = false;
-          state.searchQuery = '';
-          state.currentPage = 1;
-          reFilter();
-        }
-      });
+      const handleQuickSearch = debounce(() => {
+        const query = els.quickSearch.value.trim();
+        state.searchMode = !!query;
+        state.searchQuery = query;
+        state.currentPage = 1;
+        applyFilters();
+      }, 150);
+      els.quickSearch.addEventListener('input', handleQuickSearch);
     }
 
     // Select-all
@@ -959,6 +941,7 @@ var console = {
       state.hasMore = false;
         state.loaded = true;
         render();
+        applyPrefillIfNeeded();
       return; // Don't reload from Firebase/cache again
     }
     
@@ -1044,6 +1027,9 @@ var console = {
         // Re-render to show updated badges
         render();
       });
+
+      // Apply any search prefill from Global Search after data is ready
+      applyPrefillIfNeeded();
       
       // Let the global animation system handle icon animations
       // The MutationObserver in __pcIconAnimator will catch all icons and add fade-in animations
@@ -1254,15 +1240,22 @@ var console = {
     const nameQ = normalize(els.fName ? els.fName.value : '');
     const industryQ = normalize(els.fIndustry ? els.fIndustry.value : '');
     const domainQ = normalize(els.fDomain ? els.fDomain.value : '');
+    const contractYearQ = normalize(els.fContractYear ? els.fContractYear.value : '');
+    const contractYear = /^\d{4}$/.test(contractYearQ) ? contractYearQ : '';
     const mustPhone = !!(els.fHasPhone && els.fHasPhone.checked);
 
     let count = 0;
-    const hasFieldFilters = [nameQ, industryQ, domainQ].some((v) => v) || mustPhone;
+    const hasFieldFilters = [nameQ, industryQ, domainQ, contractYear].some((v) => v) || mustPhone;
     if (els.filterBadge) {
-      count = [nameQ, industryQ, domainQ].filter(Boolean).length + (mustPhone ? 1 : 0);
+      count = [nameQ, industryQ, domainQ, contractYear].filter(Boolean).length + (mustPhone ? 1 : 0);
       if (count > 0) { els.filterBadge.textContent = String(count); els.filterBadge.removeAttribute('hidden'); }
       else { els.filterBadge.setAttribute('hidden', ''); }
     }
+
+    // Ensure pagination/render uses filtered results whenever any filter/search is active
+    const anyFiltersActive = !!q || hasFieldFilters;
+    state.searchMode = anyFiltersActive;
+    state.searchQuery = q;
 
     const qMatch = (str) => !q || normalize(str).includes(q);
     const contains = (needle) => (str) => !needle || normalize(str).includes(needle);
@@ -1276,10 +1269,13 @@ var console = {
       const acctName = a.accountName || a.name || a.companyName || '';
       const hasPhone = !!(a.companyPhone || a.phone || a.primaryPhone || a.mainPhone);
       const domain = a.domain || a.website || a.site || '';
+      const contractDate = coerceDate(a.contractEndDate || a.contractEnd || a.contract_end_date);
+      const contractYearStr = contractDate ? String(contractDate.getFullYear()) : '';
+      const contractDateText = contractDate ? contractDate.toLocaleDateString() : '';
 
       return (
-        qMatch(acctName) || qMatch(a.industry) || qMatch(domain) || qMatch(a.companyPhone) || qMatch(a.phone) || qMatch(a.electricitySupplier) || qMatch(a.benefits) || qMatch(a.painPoints)
-      ) && nameMatch(acctName) && industryMatch(a.industry) && domainMatch(domain) && (!mustPhone || hasPhone);
+        qMatch(acctName) || qMatch(a.industry) || qMatch(domain) || qMatch(a.companyPhone) || qMatch(a.phone) || qMatch(a.electricitySupplier) || qMatch(a.benefits) || qMatch(a.painPoints) || qMatch(contractDateText) || (contractYearStr && qMatch(contractYearStr))
+      ) && nameMatch(acctName) && industryMatch(a.industry) && domainMatch(domain) && (!mustPhone || hasPhone) && (!contractYear || contractYearStr === contractYear);
     });
 
     // Do not reset pagination here. Pagination resets are handled only on user-driven
@@ -1295,6 +1291,7 @@ var console = {
     if (els.fName) els.fName.value = '';
     if (els.fIndustry) els.fIndustry.value = '';
     if (els.fDomain) els.fDomain.value = '';
+    if (els.fContractYear) els.fContractYear.value = '';
     
     if (els.fHasPhone) els.fHasPhone.checked = false;
     if (els.quickSearch) els.quickSearch.value = '';

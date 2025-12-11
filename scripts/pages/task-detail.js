@@ -46,6 +46,153 @@
     return div.innerHTML;
   }
 
+  // ==== Date helpers for Energy & Contract fields ====
+  function parseDateFlexible(s) {
+    if (!s) return null;
+    const str = String(s).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      const parts = str.split('-');
+      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const mdy = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
+    if (mdy) {
+      const d = new Date(parseInt(mdy[3], 10), parseInt(mdy[1], 10) - 1, parseInt(mdy[2], 10));
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const d = new Date(str + 'T00:00:00');
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function toISODate(v) {
+    const d = parseDateFlexible(v);
+    if (!d) return '';
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function toMDY(v) {
+    const d = parseDateFlexible(v);
+    if (!d) return v ? String(v) : '';
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
+  }
+
+  function formatDateInputAsMDY(raw) {
+    const digits = String(raw || '').replace(/[^0-9]/g, '').slice(0, 8);
+    let out = '';
+    if (digits.length >= 1) out = digits.slice(0, 2);
+    if (digits.length >= 3) out = digits.slice(0, 2) + '/' + digits.slice(2, 4);
+    if (digits.length >= 5) out = digits.slice(0, 2) + '/' + digits.slice(2, 4) + '/' + digits.slice(4, 8);
+    return out;
+  }
+
+  // ==== Phone normalization ====
+  function normalizePhone(input) {
+    const raw = (input || '').toString().trim();
+    if (!raw) return '';
+    const digits = raw.replace(/[^\d]/g, '');
+    if (digits.length === 11 && digits.startsWith('1')) {
+      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    }
+    if (digits.length === 10) {
+      return `+1 (${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+    if (/^\+/.test(raw)) return raw;
+    return raw;
+  }
+
+  // ==== SVG icon helpers ====
+  function editIcon() {
+    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>`;
+  }
+
+  function copyIcon() {
+    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+    </svg>`;
+  }
+
+  function trashIcon() {
+    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="3 6 5 6 21 6"/>
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+      <path d="M10 11v6"/>
+      <path d="M14 11v6"/>
+      <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+    </svg>`;
+  }
+
+  function saveIcon() {
+    return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+      <polyline points="17 21 17 13 7 13 7 21"/>
+      <polyline points="7 3 7 8 15 8"/>
+    </svg>`;
+  }
+
+  // ==== Batch update system for individual field edits ====
+  let updateBatch = {};
+  let updateTimeout = null;
+
+  async function processBatchUpdate() {
+    if (Object.keys(updateBatch).length === 0) return;
+    const accountId = state.account?.id;
+    if (!accountId) return;
+
+    try {
+      const db = window.firebaseDB;
+      if (db && typeof db.collection === 'function') {
+        await db.collection('accounts').doc(accountId).update({
+          ...updateBatch,
+          updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date()
+        });
+
+        if (state.account) {
+          Object.assign(state.account, updateBatch);
+        }
+
+        // Update caches
+        if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+          await window.CacheManager.updateRecord('accounts', accountId, state.account);
+        }
+
+        // Dispatch events for other pages
+        try {
+          const ev = new CustomEvent('pc:account-updated', {
+            detail: { id: accountId, changes: { ...updateBatch }, updatedAt: new Date() }
+          });
+          document.dispatchEvent(ev);
+        } catch (_) { }
+
+        // Dispatch energy update events
+        Object.keys(updateBatch).forEach(field => {
+          if (['electricitySupplier', 'annualUsage', 'currentRate', 'contractEndDate'].includes(field)) {
+            try {
+              document.dispatchEvent(new CustomEvent('pc:energy-updated', {
+                detail: { entity: 'account', id: accountId, field, value: updateBatch[field] }
+              }));
+            } catch (_) { }
+          }
+        });
+
+        updateBatch = {};
+        if (window.crm?.showToast) window.crm.showToast('Saved');
+      }
+    } catch (error) {
+      console.error('[TaskDetail] Failed to save account field:', error);
+      window.crm?.showToast && window.crm.showToast('Failed to save');
+    }
+  }
+
   function getApiBaseUrl() {
     try {
       if (window.crm && typeof window.crm.getApiBaseUrl === 'function') {
@@ -1414,7 +1561,7 @@
       try {
         window.BackgroundTasksLoader.removeTask(state.currentTask.id);
         console.log('[TaskDetail] Removed task from BackgroundTasksLoader cache');
-      } catch (e) {
+    } catch (e) {
         console.warn('[TaskDetail] Could not remove task from BackgroundTasksLoader:', e);
       }
     }
@@ -4006,6 +4153,9 @@
         }
       }
     });
+
+    // Setup inline editing for Account Information and Energy & Contract sections
+    setupInlineEditing();
   }
 
   function renderTaskContent() {
@@ -4239,27 +4389,69 @@
           <div class="info-grid">
             <div class="info-row">
               <div class="info-label">COMPANY PHONE</div>
-              <div class="info-value ${!companyPhone ? 'empty' : ''}">${companyPhone ? `<span class="phone-text" data-phone="${escapeHtml(companyPhone)}" data-account-id="${escapeHtml(account.id || '')}" data-account-name="${escapeHtml(accountName || '')}" data-logo-url="${escapeHtml(logoUrl || '')}" data-is-company-phone="true" data-city="${escapeHtml(city || '')}" data-state="${escapeHtml(stateVal || '')}" data-domain="${escapeHtml(domain || '')}">${escapeHtml(companyPhone)}</span>` : '--'}</div>
+              <div class="info-value-wrap" data-field="companyPhone">
+                <span class="info-value-text ${!companyPhone ? 'empty' : ''}">${companyPhone ? `<span class="phone-text" data-phone="${escapeHtml(companyPhone)}" data-account-id="${escapeHtml(account.id || '')}" data-account-name="${escapeHtml(accountName || '')}" data-logo-url="${escapeHtml(logoUrl || '')}" data-is-company-phone="true" data-city="${escapeHtml(city || '')}" data-state="${escapeHtml(stateVal || '')}" data-domain="${escapeHtml(domain || '')}">${escapeHtml(companyPhone)}</span>` : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">INDUSTRY</div>
-              <div class="info-value ${!industry ? 'empty' : ''}">${escapeHtml(industry) || '--'}</div>
+              <div class="info-value-wrap" data-field="industry">
+                <span class="info-value-text ${!industry ? 'empty' : ''}">${escapeHtml(industry) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">EMPLOYEES</div>
-              <div class="info-value ${!employees ? 'empty' : ''}">${escapeHtml(employees) || '--'}</div>
+              <div class="info-value-wrap" data-field="employees">
+                <span class="info-value-text ${!employees ? 'empty' : ''}">${escapeHtml(employees) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">WEBSITE</div>
-              <div class="info-value ${!website ? 'empty' : ''}">${website ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer" class="website-link">${escapeHtml(website)}</a>` : '--'}</div>
+              <div class="info-value-wrap" data-field="website">
+                <span class="info-value-text ${!website ? 'empty' : ''}">${website ? `<a href="${escapeHtml(website)}" target="_blank" rel="noopener noreferrer" class="website-link">${escapeHtml(website)}</a>` : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">CITY</div>
-              <div class="info-value ${!city ? 'empty' : ''}">${escapeHtml(city) || '--'}</div>
+              <div class="info-value-wrap" data-field="city">
+                <span class="info-value-text ${!city ? 'empty' : ''}">${escapeHtml(city) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">STATE</div>
-              <div class="info-value ${!stateVal ? 'empty' : ''}">${escapeHtml(stateVal) || '--'}</div>
+              <div class="info-value-wrap" data-field="state">
+                <span class="info-value-text ${!stateVal ? 'empty' : ''}">${escapeHtml(stateVal) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
           </div>
           ${shortDescription ? `
@@ -4276,19 +4468,47 @@
           <div class="info-grid">
             <div class="info-row">
               <div class="info-label">ELECTRICITY SUPPLIER</div>
-              <div class="info-value ${!electricitySupplier ? 'empty' : ''}">${escapeHtml(electricitySupplier) || '--'}</div>
+              <div class="info-value-wrap" data-field="electricitySupplier">
+                <span class="info-value-text ${!electricitySupplier ? 'empty' : ''}">${escapeHtml(electricitySupplier) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">ANNUAL USAGE</div>
-              <div class="info-value ${!annualUsage ? 'empty' : ''}">${escapeHtml(annualUsage) || '--'}</div>
+              <div class="info-value-wrap" data-field="annualUsage">
+                <span class="info-value-text ${!annualUsage ? 'empty' : ''}">${annualUsage ? escapeHtml(String(annualUsage).replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')) : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">CURRENT RATE</div>
-              <div class="info-value ${!currentRate ? 'empty' : ''}">${escapeHtml(currentRate) || '--'}</div>
+              <div class="info-value-wrap" data-field="currentRate">
+                <span class="info-value-text ${!currentRate ? 'empty' : ''}">${escapeHtml(currentRate) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">CONTRACT END</div>
-              <div class="info-value ${!contractEndDate ? 'empty' : ''}">${escapeHtml(contractEndDate) || '--'}</div>
+              <div class="info-value-wrap" data-field="contractEndDate">
+                <span class="info-value-text ${!contractEndDate ? 'empty' : ''}">${contractEndDate ? escapeHtml(toMDY(contractEndDate)) : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -5738,6 +5958,404 @@
     document._taskDetailContactCreationBound = true;
   }
 
+  // ==== Inline editing functions for Account Information and Energy & Contract ====
+  function setupInlineEditing() {
+    const infoGrids = document.querySelectorAll('#task-detail-page .info-grid');
+    infoGrids.forEach(infoGrid => {
+      if (infoGrid && !infoGrid._bound) {
+        infoGrid.addEventListener('click', async (e) => {
+          const wrap = e.target.closest?.('.info-value-wrap');
+          if (!wrap) return;
+          const field = wrap.getAttribute('data-field');
+          if (!field) return;
+
+          // Edit button: switch to input
+          const editBtn = e.target.closest('.info-edit');
+          if (editBtn) {
+            e.preventDefault();
+            beginEditField(wrap, field);
+            return;
+          }
+
+          // Copy button
+          const copyBtn = e.target.closest('.info-copy');
+          if (copyBtn) {
+            const txt = wrap.querySelector('.info-value-text')?.textContent?.trim() || '';
+            try {
+              await navigator.clipboard?.writeText(txt);
+              if (window.crm?.showToast) window.crm.showToast('Copied');
+            } catch (_) { }
+            return;
+          }
+
+          // Delete button
+          const delBtn = e.target.closest('.info-delete');
+          if (delBtn) {
+            e.preventDefault();
+            await saveField(field, '');
+            updateFieldText(wrap, '');
+            return;
+          }
+        });
+        infoGrid._bound = '1';
+      }
+    });
+  }
+
+  function beginEditField(wrap, field) {
+    const textEl = wrap.querySelector('.info-value-text');
+    if (!textEl) return;
+
+    const currentText = textEl.textContent || '';
+    const isMultiline = false; // No multiline fields in task detail
+    const inputControl = field === 'contractEndDate'
+      ? `<input type="date" class="info-edit-input" value="${escapeHtml(toISODate(currentText))}">`
+      : `<input type="text" class="info-edit-input" value="${escapeHtml(currentText === '--' ? '' : currentText)}">`;
+
+    const inputHtml = `
+      ${inputControl}
+      <div class="info-actions">
+        <button class="icon-btn-sm info-save" title="Save">
+          ${saveIcon()}
+        </button>
+        <button class="icon-btn-sm info-cancel" title="Cancel">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>`;
+
+    wrap.classList.add('editing');
+    textEl.style.display = 'none';
+
+    const actionsEl = wrap.querySelector('.info-actions');
+    if (actionsEl) {
+      actionsEl.remove();
+    }
+
+    const inputWrap = document.createElement('div');
+    inputWrap.className = 'info-input-wrap';
+    inputWrap.innerHTML = inputHtml;
+
+    const input = inputWrap.querySelector('input');
+    const saveBtn = inputWrap.querySelector('.info-save');
+    const cancelBtn = inputWrap.querySelector('.info-cancel');
+
+    if (input && saveBtn && cancelBtn) {
+      wrap.appendChild(inputWrap);
+      input.focus();
+
+      // Live comma formatting for annual usage
+      if (field === 'annualUsage') {
+        const seed = (currentText === '--' ? '' : currentText).replace(/,/g, '');
+        input.value = seed;
+        input.addEventListener('input', (e) => {
+          const el = e.target;
+          const raw = String(el.value || '').replace(/[^0-9]/g, '');
+          const beforeLen = String(el.value || '').length;
+          const caret = el.selectionStart || 0;
+          const formatted = raw.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+          el.value = formatted;
+          const afterLen = formatted.length;
+          const delta = afterLen - beforeLen;
+          const nextCaret = Math.max(0, Math.min(afterLen, caret + delta));
+          try { el.setSelectionRange(nextCaret, nextCaret); } catch (_) { }
+        });
+      }
+
+      // Add supplier suggestions for electricity supplier field
+      if (field === 'electricitySupplier' && window.addSupplierSuggestions) {
+        window.addSupplierSuggestions(input, 'task-supplier-list');
+      }
+
+      // Live MM/DD/YYYY formatting for contract end date (when using text input)
+      if (field === 'contractEndDate' && input.type === 'text') {
+        input.addEventListener('input', () => {
+          const caret = input.selectionStart;
+          const formatted = formatDateInputAsMDY(input.value);
+          input.value = formatted;
+          try {
+            input.selectionStart = input.selectionEnd = Math.min(formatted.length, (caret || formatted.length));
+          } catch (_) { }
+        });
+      }
+
+      // Save handler
+      saveBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await commitEdit(wrap, field, input.value);
+      });
+
+      // Cancel handler
+      cancelBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        cancelEdit(wrap, field, currentText);
+      });
+
+      // Enter/Escape key handler
+      input.addEventListener('keydown', async (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          await commitEdit(wrap, field, input.value);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          cancelEdit(wrap, field, currentText);
+        }
+      });
+    }
+  }
+
+  async function commitEdit(wrap, field, value) {
+    let toSave = value;
+    
+    // Convert contractEndDate to MM/DD/YYYY for storage
+    if (field === 'contractEndDate') {
+      toSave = toMDY(value);
+    }
+    
+    // Normalize phone numbers
+    if (field === 'companyPhone') {
+      toSave = normalizePhone(value);
+    }
+    
+    // If website updated, also compute and persist domain
+    if (field === 'website') {
+      try {
+        const src = String(value || '').trim();
+        let nextDomain = '';
+        if (src) {
+          try {
+            const u = new URL(/^https?:\/\//i.test(src) ? src : `https://${src}`);
+            nextDomain = (u.hostname || '').replace(/^www\./i, '');
+          } catch (_) {
+            nextDomain = src.replace(/^https?:\/\//i, '').split('/')[0].replace(/^www\./i, '');
+          }
+        }
+        if (nextDomain) {
+          await saveField('domain', nextDomain);
+        }
+      } catch (_) { /* noop */ }
+    }
+
+    await saveField(field, toSave);
+    updateFieldText(wrap, toSave);
+
+    // If phone field was updated, refresh click-to-call bindings
+    if (field === 'companyPhone') {
+      try {
+        setTimeout(() => {
+          if (window.ClickToCall && typeof window.ClickToCall.processSpecificPhoneElements === 'function') {
+            window.ClickToCall.processSpecificPhoneElements();
+          }
+        }, 100);
+      } catch (_) { /* noop */ }
+    }
+
+    cancelEdit(wrap, field, toSave);
+  }
+
+  function cancelEdit(wrap, field, originalValue) {
+    const inputWrap = wrap.querySelector('.info-input-wrap');
+    if (inputWrap) {
+      inputWrap.remove();
+    }
+
+    const textEl = wrap.querySelector('.info-value-text');
+    if (textEl) {
+      textEl.style.display = '';
+    }
+
+    wrap.classList.remove('editing');
+    
+    // Restore default actions
+    const actionsEl = wrap.querySelector('.info-actions');
+    if (!actionsEl) {
+      const actions = document.createElement('div');
+      actions.className = 'info-actions';
+      actions.innerHTML = `
+        <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+        <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+        <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+      `;
+      wrap.appendChild(actions);
+    }
+  }
+
+  async function saveField(field, value) {
+    const accountId = state.account?.id;
+    if (!accountId) return;
+
+    // Add to batch instead of immediate write
+    updateBatch[field] = value;
+
+    // Update local state immediately for instant UI feedback
+    if (state.account) {
+      state.account[field] = value;
+    }
+
+    // Clear existing timeout
+    if (updateTimeout) clearTimeout(updateTimeout);
+
+    // Set new timeout for batch update (2 seconds after last edit)
+    updateTimeout = setTimeout(async () => {
+      await processBatchUpdate();
+    }, 2000);
+
+    // Show immediate feedback
+    if (window.crm?.showToast) window.crm.showToast('Saving...');
+  }
+
+  function updateFieldText(wrap, value) {
+    const textEl = wrap.querySelector('.info-value-text');
+    const field = wrap.getAttribute('data-field');
+    if (!textEl) return;
+    
+    const val = value == null ? '' : String(value);
+    
+    if (field === 'website' && val) {
+      const url = /^https?:\/\//i.test(val) ? val : 'https://' + val;
+      textEl.innerHTML = `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="website-link">${escapeHtml(val)}</a>`;
+      textEl.classList.remove('empty');
+    } else if (field === 'contractEndDate') {
+      const pretty = toMDY(val);
+      textEl.textContent = pretty || '--';
+      if (!pretty) textEl.classList.add('empty');
+      else textEl.classList.remove('empty');
+    } else if (field === 'annualUsage' && val) {
+      const numeric = String(val).replace(/[^0-9]/g, '');
+      textEl.textContent = numeric ? numeric.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '--';
+      if (!numeric) textEl.classList.add('empty');
+      else textEl.classList.remove('empty');
+    } else if (field === 'companyPhone') {
+      const display = normalizePhone(val);
+      textEl.textContent = display || '--';
+      if (!display) {
+        textEl.classList.add('empty');
+      } else {
+        textEl.classList.remove('empty');
+        // Re-bind click-to-call
+        try {
+          const phoneSpan = textEl.querySelector('.phone-text');
+          if (phoneSpan && window.ClickToCall) {
+            // Update phone data attributes
+            phoneSpan.setAttribute('data-phone', display);
+            setTimeout(() => {
+              if (window.ClickToCall.processSpecificPhoneElements) {
+                window.ClickToCall.processSpecificPhoneElements();
+              }
+            }, 50);
+          }
+        } catch (_) { }
+      }
+    } else {
+      textEl.textContent = val || '--';
+      if (!val) textEl.classList.add('empty');
+      else textEl.classList.remove('empty');
+    }
+  }
+
+  // CRITICAL FIX: Listen for account updates to refresh account data when updated on account-detail page
+  if (!document._taskDetailAccountUpdateBound) {
+    const onAccountUpdated = async (e) => {
+      const { id, changes } = e.detail || {};
+      if (!id || !state.currentTask) return;
+
+      // Check if this account update is relevant to the current task
+      // Account can be linked via: task.accountId, contact.accountId, or state.account.id
+      const taskAccountId = state.currentTask?.accountId || '';
+      const contactAccountId = state.contact && (state.contact.accountId || state.contact.account_id || '');
+      const stateAccountId = state.account?.id || '';
+
+      // Only refresh if the updated account matches the task's account (any source)
+      if (id === taskAccountId || id === contactAccountId || id === stateAccountId) {
+        console.log('[TaskDetail] Account updated, reloading account data:', id);
+        
+        try {
+          // Reload account data from Firestore to get latest changes
+          if (window.firebaseDB && id) {
+            const accountDoc = await window.firebaseDB.collection('accounts').doc(id).get();
+            if (accountDoc.exists) {
+              const updatedAccount = { id: accountDoc.id, ...accountDoc.data() };
+              state.account = updatedAccount;
+              console.log('[TaskDetail] ✓ Reloaded account data:', updatedAccount.accountName || updatedAccount.name);
+              
+              // Re-render the task page to show updated account information
+              renderTaskPage();
+              
+              // Update cache if available
+              if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+                await window.CacheManager.updateRecord('accounts', id, updatedAccount);
+              }
+              
+              // Update BackgroundAccountsLoader cache if available (best-effort)
+              try {
+                if (window.BackgroundAccountsLoader && typeof window.BackgroundAccountsLoader.getAccountsData === 'function') {
+                  const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+                  const accountIndex = accounts.findIndex(a => a && a.id === id);
+                  if (accountIndex !== -1) {
+                    accounts[accountIndex] = updatedAccount;
+                    console.log('[TaskDetail] Updated account in BackgroundAccountsLoader cache');
+                  }
+                }
+              } catch (e) {
+                console.warn('[TaskDetail] Could not update BackgroundAccountsLoader cache:', e);
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('[TaskDetail] Failed to reload account data after update:', error);
+        }
+      }
+    };
+
+    document.addEventListener('pc:account-updated', onAccountUpdated);
+    document._taskDetailAccountUpdateHandler = onAccountUpdated;
+    document._taskDetailAccountUpdateBound = true;
+
+    // CRITICAL FIX: Also listen for energy-specific updates (contract end date, supplier, etc.)
+    const onEnergyUpdated = async (e) => {
+      const { entity, id, field, value } = e.detail || {};
+      if (entity !== 'account' || !id || !state.currentTask) return;
+
+      // Check if this energy update is relevant to the current task
+      // Account can be linked via: task.accountId, contact.accountId, or state.account.id
+      const taskAccountId = state.currentTask?.accountId || '';
+      const contactAccountId = state.contact && (state.contact.accountId || state.contact.account_id || '');
+      const stateAccountId = state.account?.id || '';
+
+      // Only refresh if the updated account matches the task's account (any source)
+      if (id === taskAccountId || id === contactAccountId || id === stateAccountId) {
+        console.log('[TaskDetail] Energy field updated:', field, 'for account:', id);
+        
+        try {
+          // Reload account data from Firestore to get latest energy fields
+          if (window.firebaseDB && id) {
+            const accountDoc = await window.firebaseDB.collection('accounts').doc(id).get();
+            if (accountDoc.exists) {
+              const updatedAccount = { id: accountDoc.id, ...accountDoc.data() };
+              state.account = updatedAccount;
+              console.log('[TaskDetail] ✓ Reloaded account data after energy update');
+              
+              // Re-render the task page to show updated energy information
+              renderTaskPage();
+              
+              // Update cache if available
+              if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+                await window.CacheManager.updateRecord('accounts', id, updatedAccount);
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('[TaskDetail] Failed to reload account data after energy update:', error);
+        }
+      }
+    };
+
+    document.addEventListener('pc:energy-updated', onEnergyUpdated);
+    document._taskDetailEnergyUpdateHandler = onEnergyUpdated;
+  }
+
   // Public API
   window.TaskDetail = {
     state: state, // Expose state so widgets can access account/contact data
@@ -5843,5 +6461,42 @@
       }
     }
   });
+
+  // CRITICAL FIX: Listen for navigation back from account-detail to refresh account data
+  // This ensures account updates (contract end date, supplier, etc.) are visible immediately
+  if (!document._taskDetailAccountDetailsRestoreBound) {
+    const onAccountDetailsRestore = async (e) => {
+    // Only refresh if we're currently viewing a task with an account
+    if (state.currentTask && state.account?.id) {
+      const accountId = state.account.id;
+      console.log('[TaskDetail] Returning from account-detail, refreshing account data:', accountId);
+      
+      try {
+        // Force reload account data from Firestore (bypass cache to get latest changes)
+        if (window.firebaseDB && accountId) {
+          const accountDoc = await window.firebaseDB.collection('accounts').doc(accountId).get();
+          if (accountDoc.exists) {
+            const updatedAccount = { id: accountDoc.id, ...accountDoc.data() };
+            state.account = updatedAccount;
+            console.log('[TaskDetail] ✓ Reloaded account data after returning from account-detail');
+            
+            // Re-render the task page to show updated account information
+            renderTaskPage();
+            
+            // Update cache with fresh data
+            if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+              await window.CacheManager.updateRecord('accounts', accountId, updatedAccount);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('[TaskDetail] Failed to refresh account data after returning from account-detail:', error);
+      }
+    };
+
+    document.addEventListener('pc:account-details-restore', onAccountDetailsRestore);
+    document._taskDetailAccountDetailsRestoreHandler = onAccountDetailsRestore;
+    document._taskDetailAccountDetailsRestoreBound = true;
+  }
 })();
 

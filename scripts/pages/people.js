@@ -478,6 +478,33 @@
   }
 
   const els = {};
+  let pendingSearchPrefill = null;
+
+  function consumeSearchPrefill(pageKey) {
+    try {
+      const raw = sessionStorage.getItem('pcSearchPrefill');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || parsed.page !== pageKey || !parsed.query) return null;
+      sessionStorage.removeItem('pcSearchPrefill');
+      return parsed.query;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function applyPrefillIfNeeded() {
+    if (!pendingSearchPrefill || !els.quickSearch) return false;
+    const query = pendingSearchPrefill.trim();
+    pendingSearchPrefill = null;
+    if (!query) return false;
+    els.quickSearch.value = query;
+    state.searchMode = true;
+    state.searchQuery = query;
+    state.currentPage = 1;
+    applyFilters();
+    return true;
+  }
 
   function qs(id) {
     // Prefer querying within the People page container to avoid duplicate-ID collisions
@@ -910,6 +937,13 @@
     els.filterBadge = qs('people-filter-count');
     els.quickSearch = qs('people-quick-search');
 
+    // Capture any search prefill coming from Global Search
+    const prefill = consumeSearchPrefill('people');
+    if (prefill) {
+      pendingSearchPrefill = prefill;
+      if (els.quickSearch) els.quickSearch.value = prefill;
+    }
+
     // fields
     els.fTitle = qs('filter-title');
     els.titleChipWrap = qs('filter-title-chip');
@@ -1292,50 +1326,7 @@
       });
     }
 
-    // Algolia instant search
-    async function performAlgoliaSearch(query) {
-      if (!window.AlgoliaSearch || !window.AlgoliaSearch.isAvailable()) {
-        console.warn('[People] Algolia not available, falling back to local search');
-        applyFilters();
-        return;
-      }
-
-      try {
-        // Show loading state
-        if (els.tableBody) {
-          els.tableBody.innerHTML = '<tr><td colspan="20" style="text-align: center; padding: 40px; color: var(--grey-400);">Searching...</td></tr>';
-        }
-
-        // Search with Algolia
-        const results = await window.AlgoliaSearch.searchContacts(query, {
-          limit: 100,
-          page: 0
-        });
-
-        console.log('[People] Algolia search results:', results.nbHits, 'contacts found');
-
-        // Map Algolia hits to our data format
-        state.filtered = results.hits.map(hit => ({
-          id: hit.objectID,
-          ...hit
-        }));
-        
-        state.currentPage = 1;
-        
-        // Update search UI
-        if (els.quickSearch) {
-          els.quickSearch.style.borderColor = 'var(--orange-primary)';
-          els.quickSearch.placeholder = `Found ${results.nbHits} contacts...`;
-        }
-        
-        render();
-
-      } catch (error) {
-        console.error('[People] Algolia search failed:', error);
-        // Fallback to local search
-        applyFilters();
-      }
-    }
+    // Quick search now uses local Firestore-backed data (Algolia removed)
 
     const reFilter = debounce(applyFilters, 200);
 
@@ -1693,21 +1684,14 @@
     if (els.applyBtn) els.applyBtn.addEventListener('click', () => { state.currentPage = 1; applyFilters(); });
     if (els.clearBtn) els.clearBtn.addEventListener('click', () => { clearFilters(); state.currentPage = 1; });
     if (els.quickSearch) {
-      els.quickSearch.addEventListener('input', async (e) => {
-        const query = e.target.value.trim();
-        
-        if (query.length >= 2) {
-          // SEARCH MODE: Use Algolia instant search
-          state.searchMode = true;
-          state.searchQuery = query;
-          await performAlgoliaSearch(query);
-        } else if (query.length === 0) {
-          // BROWSE MODE: Back to local filtering
-          state.searchMode = false;
-          state.searchQuery = '';
-          reFilter();
-        }
-      });
+      const handleQuickSearch = debounce(() => {
+        const query = els.quickSearch.value.trim();
+        state.searchMode = !!query;
+        state.searchQuery = query;
+        state.currentPage = 1;
+        applyFilters();
+      }, 150);
+      els.quickSearch.addEventListener('input', handleQuickSearch);
     }
 
     // Select-all
@@ -1851,6 +1835,7 @@
       state.filtered = state.data.slice();
         state.loaded = true;
         render();
+        applyPrefillIfNeeded();
       return; // Don't reload from Firebase/cache again
     }
     
@@ -2029,6 +2014,9 @@
       }
       
       render();
+
+      // Apply any pending search prefill from Global Search after data is ready
+      applyPrefillIfNeeded();
       
       // Update call status for badges (async, non-blocking)
       updatePeopleCallStatus().then(() => {
@@ -2292,6 +2280,9 @@
     }
 
     const qMatch = (str) => !q || normalize(str).includes(q);
+    const anyFiltersActive = !!q || hasFieldFilters;
+    state.searchMode = anyFiltersActive;
+    state.searchQuery = q;
     const tokenMatch = (tokens) => (str) => {
       if (!tokens || tokens.length === 0) return true;
       const n = normalize(str);
