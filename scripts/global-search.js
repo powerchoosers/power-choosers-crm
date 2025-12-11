@@ -10,6 +10,7 @@
   const MAX_LOADING_MS = 2000; // hard cap: show partial results within 2s
   // Cache last search results for quick lookups (e.g., direct navigation)
   let lastResults = null;
+  let lastQuery = '';
   
   // In-memory cache for search data
   let searchCache = {
@@ -28,6 +29,7 @@
     searchLoading: null,
     searchEmpty: null
   };
+  let stylesInjected = false;
 
   // Initialize search modal and listeners
   function initGlobalSearch() {
@@ -50,7 +52,96 @@
       return;
     }
 
+    injectSearchStyles();
     bindEvents();
+  }
+
+  function injectSearchStyles() {
+    if (stylesInjected) return;
+    stylesInjected = true;
+    const style = document.createElement('style');
+    style.id = 'global-search-enhanced-styles';
+    style.textContent = `
+      .search-results-container .search-category {
+        border-top: 1px solid var(--grey-700, #3a3f45);
+        padding-top: 8px;
+        margin-top: 8px;
+      }
+      .search-results-container .search-category:first-of-type {
+        border-top: none;
+        padding-top: 0;
+        margin-top: 0;
+      }
+      .search-results-container .search-category .category-header {
+        padding: 4px 0 6px;
+        border-bottom: 1px solid var(--grey-700, #3a3f45);
+      }
+      .search-results-container .search-result-item {
+        border-bottom: 1px solid var(--grey-700, #3a3f45);
+        padding: 10px 8px;
+      }
+      .search-results-container .search-result-item:last-child {
+        border-bottom: none;
+      }
+      .search-result-item .result-main {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .search-result-item .result-main-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+      .search-result-item .result-favicon {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        flex-shrink: 0;
+        overflow: hidden;
+      }
+      .search-result-item .result-favicon img {
+        width: 32px;
+        height: 32px;
+        object-fit: cover;
+        display: block;
+      }
+      .search-result-item .result-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+      .search-result-item .result-title,
+      .search-result-item .result-subtitle {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .search-result-item .result-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--orange-subtle, #f08f4a);
+        color: #fff;
+        font-weight: 600;
+        letter-spacing: .5px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        text-transform: uppercase;
+      }
+      .search-result-item .result-actions {
+        gap: 6px;
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   function bindEvents() {
@@ -210,6 +301,7 @@
 
   async function performSearch(query) {
     console.log('[Global Search] performSearch called with:', query);
+    lastQuery = query;
     try {
       const results = await searchAllData(query);
       console.log('[Global Search] Search results:', results);
@@ -755,7 +847,12 @@
 
       html += `
         <div class="search-category">
-          <div class="category-header">${categoryNames[category]} (${items.length})</div>
+          <div class="category-header" style="display:flex; align-items:center; justify-content:space-between;">
+            <div class="category-title">${categoryNames[category]} (${items.length})</div>
+            <button class="search-all-btn btn-text" data-category="${category}" aria-label="Search all ${categoryNames[category]}">
+              Search all &rarr;
+            </button>
+          </div>
           <div class="category-results">
             ${items.map(item => renderResultItem(item)).join('')}
           </div>
@@ -768,12 +865,19 @@
 
   function renderResultItem(item) {
     const actions = getActionsForType(item.type);
+    const { iconHTML, initialsHTML } = buildVisualsForItem(item);
     
     return `
       <div class="search-result-item clickable" data-id="${item.id}" data-type="${item.type}" title="Click to view ${item.title}">
         <div class="result-main">
-          <div class="result-title">${escapeHtml(item.title)}</div>
-          <div class="result-subtitle">${escapeHtml(item.subtitle)}</div>
+          <div class="result-main-left">
+            <div class="result-favicon" aria-hidden="true">${iconHTML}</div>
+            <div class="result-text">
+              <div class="result-title">${escapeHtml(item.title)}</div>
+              <div class="result-subtitle">${escapeHtml(item.subtitle)}</div>
+            </div>
+          </div>
+          ${initialsHTML ? `<div class="result-avatar" aria-hidden="true">${initialsHTML}</div>` : ''}
         </div>
         <div class="result-actions" onclick="event.stopPropagation()">
           ${actions.filter(action => action.key !== 'view').map(action => renderActionButton(action, item)).join('')}
@@ -811,6 +915,11 @@
       btn.addEventListener('click', handleActionClick);
     });
 
+    const searchAllButtons = elements.searchResults.querySelectorAll('.search-all-btn');
+    searchAllButtons.forEach(btn => {
+      btn.addEventListener('click', handleSearchAllClick);
+    });
+
     const resultItems = elements.searchResults.querySelectorAll('.search-result-item.clickable');
     resultItems.forEach(item => {
       item.addEventListener('click', handleResultClick);
@@ -842,6 +951,12 @@
     
     executeAction('view', type, id);
     hideSearchModal();
+  }
+
+  function handleSearchAllClick(e) {
+    e.stopPropagation();
+    const category = e.currentTarget.getAttribute('data-category');
+    searchAllCategory(category);
   }
 
   function executeAction(action, type, id) {
@@ -931,6 +1046,96 @@
       default:
         navigateToItem(type, id);
     }
+  }
+
+  function searchAllCategory(category) {
+    const pageMap = { people: 'people', accounts: 'accounts', deals: 'deals', sequences: 'sequences' };
+    const page = pageMap[category];
+    if (!page) return;
+    const query = (elements.searchInput && elements.searchInput.value ? elements.searchInput.value.trim() : '') || lastQuery || '';
+    if (query) setSearchPrefill(page, query);
+    navigateToPage(page);
+    hideSearchModal();
+  }
+
+  function setSearchPrefill(page, query) {
+    try {
+      sessionStorage.setItem('pcSearchPrefill', JSON.stringify({ page, query, ts: Date.now() }));
+    } catch (_) { /* noop */ }
+  }
+
+  function buildVisualsForItem(item) {
+    const type = item.type;
+    const data = item.data || {};
+    let iconHTML = '';
+    let initialsHTML = '';
+
+    const safe = (v) => (v == null ? '' : String(v));
+
+    const getDomainFrom = (input) => {
+      try {
+        const val = safe(input).trim();
+        if (!val) return '';
+        if (/^https?:\/\//i.test(val)) {
+          const u = new URL(val);
+          return (u.hostname || '').replace(/^www\./i, '');
+        }
+        if (val.includes('@')) {
+          return val.split('@')[1] || '';
+        }
+        return val.replace(/^www\./i, '');
+      } catch (_) { return ''; }
+    };
+
+    const buildFavicon = (logoUrl, domain, size = 32) => {
+      const cleanDomain = getDomainFrom(domain);
+      if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML === 'function') {
+        const html = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl, domain: cleanDomain, size });
+        if (html && String(html).trim()) return html;
+      }
+      if (cleanDomain && window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateFaviconHTML === 'function') {
+        const html = window.__pcFaviconHelper.generateFaviconHTML(cleanDomain, size);
+        if (html && String(html).trim()) return html;
+      }
+      if (cleanDomain) {
+        return `<img src="https://www.google.com/s2/favicons?sz=${size}&domain=${encodeURIComponent(cleanDomain)}" alt="" aria-hidden="true" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" />`;
+      }
+      return `<div style="width:${size}px;height:${size}px;border-radius:6px;background:var(--bg-item,#2f343a);"></div>`;
+    };
+
+    if (type === 'person') {
+      const fullName = safe(item.title);
+      const initials = (() => {
+        const parts = fullName.split(/\s+/).filter(Boolean);
+        if (parts.length > 1) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        if (parts.length === 1) return parts[0][0].toUpperCase();
+        const email = safe(data.email || '').trim();
+        return email ? (email[0] || '').toUpperCase() : '?';
+      })();
+      initialsHTML = escapeHtml(initials || '?');
+
+      const domain =
+        data.companyDomain ||
+        data.domain ||
+        getDomainFrom(data.companyWebsite || data.website || '') ||
+        getDomainFrom(data.email || '');
+      const logoUrl = data.logoUrl || data.logoURL || '';
+      iconHTML = buildFavicon(logoUrl, domain, 32);
+    } else if (type === 'account') {
+      const domain = data.domain || data.website || data.site || '';
+      const logoUrl = data.logoUrl || data.logoURL || '';
+      iconHTML = buildFavicon(logoUrl, domain, 32);
+    } else if (type === 'deal') {
+      const domain = data.accountDomain || data.domain || data.companyDomain || '';
+      const logoUrl = data.logoUrl || data.logoURL || '';
+      iconHTML = buildFavicon(logoUrl, domain, 32);
+    } else if (type === 'sequence') {
+      iconHTML = `<div style="width:32px;height:32px;border-radius:6px;background:var(--grey-700,#3a3f45);display:flex;align-items:center;justify-content:center;">${getCloneIcon()}</div>`;
+    } else {
+      iconHTML = `<div style="width:32px;height:32px;border-radius:6px;background:var(--grey-700,#3a3f45);"></div>`;
+    }
+
+    return { iconHTML, initialsHTML };
   }
 
   function navigateToItem(type, id) {

@@ -210,6 +210,8 @@
     '_taskDetailContactHandlersBound',
     '_taskDetailPhoneHandlersBound',
     '_taskDetailContactCreationBound',
+    '_taskDetailAccountUpdateBound',
+    '_taskDetailAccountDetailsRestoreBound',
     
     // NEW: Email Detail page event listener guards (email-detail.js)
     '_emailDetailSendNowBound'
