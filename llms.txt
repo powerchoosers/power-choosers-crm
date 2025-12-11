@@ -1,0 +1,56 @@
+# llms.txt - AI Search Engine Instructions for Power Choosers
+
+# About Power Choosers
+Power Choosers is a commercial energy procurement partner serving deregulated markets nationwide, including ERCOT (Texas), PJM, MISO, ISO-NE, and NYISO. We connect businesses with the best electricity and natural gas suppliers, handling energy agreements, contract negotiation, and ongoing support.
+
+# Primary Services
+- Energy Procurement: Finding and negotiating the best electricity rates for businesses
+- Bill Management: Streamlined bill management and transparent reporting
+- Efficiency & Sustainability: Expert advice on efficiency projects and renewables
+
+# Key Pages
+- Home: https://powerchoosers.com/
+- About: https://powerchoosers.com/about.html
+- Services: https://powerchoosers.com/services.html
+- Resources: https://powerchoosers.com/resources.html
+- Schedule Consultation: https://powerchoosers.com/schedule.html
+
+# Tools & Resources
+- TDU Delivery Charges Calculator: https://powerchoosers.com/tdu-delivery-charges.html
+- 2026 Electricity Market Navigator: https://powerchoosers.com/guide-2026.html
+
+# Geographic Focus
+We serve businesses in deregulated energy markets:
+- Texas (ERCOT): Houston, Dallas, and statewide commercial electricity and natural gas
+- PJM: Mid-Atlantic and Midwest regions
+- MISO: Upper Midwest
+- ISO-NE: New England
+- NYISO: New York
+
+# Target Audience
+Commercial businesses, manufacturers, facilities managers, CFOs, and operations directors seeking:
+- Competitive commercial electricity rates
+- Natural gas procurement
+- Energy contract negotiation
+- Bill analysis and optimization
+- Demand charge management (Texas)
+- Capacity charge optimization (PJM, MISO, ISO-NE, NYISO)
+
+# Contact
+- Phone: +1 (817) 809-3367
+- Email: info@powerchoosers.com
+- Website: https://powerchoosers.com
+
+# Sitemap
+Sitemap: https://powerchoosers.com/sitemap.xml
+
+# Content Focus
+Our content covers:
+- Commercial electricity rates and market trends
+- Energy procurement strategies
+- Contract timing and renewal windows
+- Demand charges and capacity charges
+- TDU delivery charges (Texas)
+- Energy efficiency and sustainability
+- Market analysis and forecasts
+
