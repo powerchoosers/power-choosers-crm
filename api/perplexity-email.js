@@ -2170,7 +2170,7 @@ ${contractEndLabel ? '- Contract Ends: ' + contractEndLabel : ''}
 
 HISTORICAL CONTEXT:
 ${transcript ? '- Call Notes: ' + transcript : ''}
-${notes ? '- CRM Notes: ' + notes + '\n  IMPORTANT: Use these notes to personalize the email. If notes mention "spoke with [name]", reference that conversation. If notes mention "tried to reach out" or "no answer", you can reference previous attempts to connect. If notes mention current activities, challenges, or interests, weave those naturally into the email. Use notes to make the email feel more personal and context-aware.' : ''}
+${notes ? '- Additional Notes: ' + notes : ''}
 
 INDUSTRY-SPECIFIC CONTEXT:
 ${industryContent ? '- Industry Focus: ' + industryContent.language + '\n- Key Pain Points: ' + industryContent.painPoints.join(', ') + '\n- Average Savings: ' + industryContent.avgSavings + '\n- Key Benefit: ' + industryContent.keyBenefit + '\n- Urgency Drivers: ' + industryContent.urgencyDrivers.join(', ') : ''}

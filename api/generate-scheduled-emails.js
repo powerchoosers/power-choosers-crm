@@ -161,77 +161,6 @@ function inferIndustryFromDescription(description) {
   return '';
 }
 
-// ========== NOTES EXTRACTION ==========
-
-/**
- * Extract relevant context from notes for email personalization
- * Looks for patterns like "spoke with", "no answer", current activities, etc.
- * Transforms negative patterns into actionable context (e.g., "no answer" → "tried to reach out")
- */
-function extractNotesContext(notesText) {
-  if (!notesText || typeof notesText !== 'string') return '';
-  
-  const notes = notesText.trim();
-  if (!notes) return '';
-  
-  // Transform negative patterns into positive context for AI
-  let transformedNotes = notes;
-  
-  // Transform "no answer" patterns into "tried to reach out" context
-  transformedNotes = transformedNotes.replace(
-    /(?:no answer|no response|didn't respond|didn't answer|no reply|unanswered|no call back)/gi,
-    'tried to reach out'
-  );
-  
-  // Extract relevant sentences/phrases
-  const relevantPatterns = [
-    // Conversation mentions (high priority - direct interactions)
-    /(?:spoke|talked|spoke with|talked with|conversation|discussed|mentioned|met with|had a call|had a meeting)[^.!?]*[.!?]/gi,
-    // Contact attempts (including transformed "tried to reach out")
-    /(?:tried to reach out|attempted|reached out|contacted|called|emailed|left voicemail|sent message)[^.!?]*[.!?]/gi,
-    // Current activities/status (high priority - actionable context)
-    /(?:currently|now|recently|just|working on|doing|planning|considering|evaluating|looking into)[^.!?]*[.!?]/gi,
-    // Business context (energy/contract related)
-    /(?:contract|renewal|expires|supplier|rate|energy|electricity|bill|cost|savings)[^.!?]*[.!?]/gi,
-    // Pain points or challenges (important for personalization)
-    /(?:challenge|issue|problem|concern|worry|struggling|difficulty|need|looking for)[^.!?]*[.!?]/gi,
-    // Positive indicators (engagement signals)
-    /(?:interested|open|considering|looking|exploring|evaluating|wants|needs)[^.!?]*[.!?]/gi,
-    // Timeline/urgency indicators
-    /(?:soon|urgent|asap|deadline|timeline|schedule|when|by)[^.!?]*[.!?]/gi
-  ];
-  
-  const extracted = [];
-  for (const pattern of relevantPatterns) {
-    const matches = transformedNotes.match(pattern);
-    if (matches) {
-      extracted.push(...matches);
-    }
-  }
-  
-  // If we found specific patterns, return them with context
-  if (extracted.length > 0) {
-    // Deduplicate and limit to most recent/relevant
-    const unique = [...new Set(extracted.map(s => s.trim()))];
-    // Prioritize conversation mentions and current activities
-    const prioritized = unique.sort((a, b) => {
-      const aPriority = /(?:spoke|talked|conversation|discussed|currently|now|recently)/i.test(a) ? 1 : 0;
-      const bPriority = /(?:spoke|talked|conversation|discussed|currently|now|recently)/i.test(b) ? 1 : 0;
-      return bPriority - aPriority;
-    });
-    return prioritized.slice(0, 5).join(' '); // Limit to 5 most relevant snippets
-  }
-  
-  // If no specific patterns, return recent notes (last 500 chars) if notes are substantial
-  // This captures recent context even if it doesn't match patterns
-  if (transformedNotes.length > 50) {
-    // Return the most recent portion (assumes newer info is at the end)
-    return transformedNotes.slice(-500).trim();
-  }
-  
-  return transformedNotes;
-}
-
 // ========== ANGLE SELECTION SYSTEM ==========
 // Simplified RANDOMIZED_ANGLES_BY_INDUSTRY (matches email-compose-global.js structure)
 const RANDOMIZED_ANGLES_BY_INDUSTRY = {
@@ -853,20 +782,11 @@ export default async function handler(req, res) {
         // Get contact data for personalization
         let contactData = {};
         let accountData = {};
-        let contactNotes = '';
-        let accountNotes = '';
-        
         if (emailData.contactId) {
           try {
             const contactDoc = await db.collection('people').doc(emailData.contactId).get();
             if (contactDoc.exists) {
               contactData = contactDoc.data();
-              
-              // Extract notes from contact
-              if (contactData.notes) {
-                contactNotes = extractNotesContext(contactData.notes);
-                logger.debug('[GenerateScheduledEmails] Extracted contact notes context:', contactNotes.substring(0, 100));
-              }
               
               // Get account data for industry/exemption detection
               const accountId = contactData.accountId || contactData.account_id;
@@ -875,12 +795,6 @@ export default async function handler(req, res) {
                   const accountDoc = await db.collection('accounts').doc(accountId).get();
                   if (accountDoc.exists) {
                     accountData = accountDoc.data();
-                    
-                    // Extract notes from account
-                    if (accountData.notes) {
-                      accountNotes = extractNotesContext(accountData.notes);
-                      logger.debug('[GenerateScheduledEmails] Extracted account notes context:', accountNotes.substring(0, 100));
-                    }
                   }
                 } catch (error) {
                   logger.warn('[GenerateScheduledEmails] Failed to get account data:', error);
@@ -943,17 +857,12 @@ export default async function handler(req, res) {
         
         // Build recipient object used for angle selection + prompt context
         // Include energy supplier and other energy fields from account
-        // Combine notes from contact and account for context
-        const combinedNotes = [contactNotes, accountNotes].filter(Boolean).join('\n\n').trim();
-        
         const recipient = {
           firstName: contactData.firstName || contactData.name || emailData.contactName || 'there',
           company: contactData.company || accountData.companyName || accountData.name || emailData.contactCompany || '',
           title: contactData.role || contactData.title || contactData.job || '',
           industry: recipientIndustry,
           account: accountData,
-          // Include notes for AI personalization (perplexity-email.js will use these)
-          notes: combinedNotes || undefined,
           // Build energy object for email personalization context
           energy: {
             supplier: accountData.electricitySupplier || accountData.electricity_supplier || '',
@@ -962,15 +871,6 @@ export default async function handler(req, res) {
             annualUsage: accountData.annualUsage || accountData.annual_usage || ''
           }
         };
-        
-        // Also add notes to account object for backward compatibility
-        if (combinedNotes && recipient.account) {
-          recipient.account.notes = combinedNotes;
-        }
-        
-        if (combinedNotes) {
-          logger.debug('[GenerateScheduledEmails] Including notes context in recipient:', combinedNotes.substring(0, 150));
-        }
         
         // Extract recently used angles for this contact within this sequence (avoid repeats)
         const usedAngles = [];
