@@ -2160,7 +2160,7 @@ RESEARCH DATA:
 ${linkedinContext ? '- Company LinkedIn: ' + linkedinContext : ''}
 ${websiteContext ? '- Company Website: ' + websiteContext : ''}
 ${contactLinkedinContext ? '- Contact LinkedIn Profile: ' + contactLinkedinContext + ' (use for tenure, career background, recent posts)' : ''}
-${recentActivityContext ? '- Recent Company Activity: ' + recentActivityContext + ' (reference naturally: "I noticed..." or "I saw...")' : ''}
+${recentActivityContext ? '- Recent Company Activity: ' + recentActivityContext + ' (reference naturally through questions, not "I noticed" or "I saw")' : ''}
 ${locationContextData ? '- Regional Energy Market: ' + locationContextData + ' (use for location-specific context)' : ''}
 
 ENERGY DATA:
@@ -2429,33 +2429,33 @@ ${ctaEscalation}
 
 HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Write like a knowledgeable energy expert who researched their company deeply
-- Show you did homework: When you have specific data, use phrases like:
-  * "I noticed ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail]'}" (if account description available)
-  * "I saw ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}" (if recent activity found)
-  * "On your website, I noticed..." (if website context available)
+- Show you did homework: When you have specific data, use QUESTIONS instead of observations:
+  * Ask about ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail]'}: "How is [specific detail] impacting your energy costs?" (if account description available)
+  * Ask about ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}: "With [recent activity], how has that affected your energy planning?" (if recent activity found)
+  * Reference website naturally: "On your website, I see..." → "How are you handling [specific challenge mentioned on website]?" (if website context available)
   * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." (if location context available)
 - Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : '[specific situation]'}..."
-- Include micro-observations: Reference their website, recent posts, industry trends they'd recognize
+- Include micro-observations: Reference their website, recent posts, industry trends they'd recognize through QUESTIONS
 - Vary sentence length: Mix short punchy statements with longer explanatory ones
 - Use conversational connectors: "Here's the thing...", "The reality is...", "What I've found..."
-- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", or other template phrases
-- Show expertise subtly: "In my experience with ${industry || '[industry]'} companies", "I've noticed ${industryContent ? industryContent.painPoints[0] : '[specific trend]'}"
-${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\'ve likely seen..." (if tenure available)' : ''}
-${contactLinkedinContext ? '- Reference contact profile: Use insights from their LinkedIn profile naturally' : ''}
+- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", "I noticed", "I saw", "I read", or other template phrases
+- Show expertise subtly: "In my experience with ${industry || '[industry]'} companies", ask questions about ${industryContent ? industryContent.painPoints[0] : '[specific trend]'}
+${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', how have you seen..." (if tenure available)' : ''}
+${contactLinkedinContext ? '- Reference contact profile: Use insights from their LinkedIn profile naturally through questions' : ''}
 
 EVIDENCE OF RESEARCH (Show You Know Their Business):
-${accountDescription ? '✓ Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally in opening hook' : ''}
-${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements' : ''}
-${websiteContext ? '✓ Use website info: "On your website, I noticed..." to show you visited' : ''}
-${recentActivityContext ? '✓ Use recent activity: "I saw ${company} recently..." + ' + recentActivityContext.substring(0, 60) + '...' : ''}
+${accountDescription ? '✓ Use account description: Ask about "' + accountDescription.substring(0, 100) + '..." naturally in opening hook' : ''}
+${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements through questions' : ''}
+${websiteContext ? '✓ Use website info: Ask about specific challenges mentioned on their website (DO NOT say "I noticed")' : ''}
+${recentActivityContext ? '✓ Use recent activity: Ask "With ' + recentActivityContext.substring(0, 60) + '..., how has that impacted..." (DO NOT say "I saw")' : ''}
 ${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
 ${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
 ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant for context' : ''}
 
 CONVERSATIONAL FLOW PATTERNS:
-✓ GOOD: "I noticed ${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
-✓ GOOD: "Given your role as ${job || '[role]'}, you're probably dealing with ${roleContext?.painPoints[0] || '[pain point]'}. Here's what I've found..."
-✓ GOOD: "${industry || '[Industry]'} companies are facing ${industryContent?.painPoints[0] || '[specific challenge]'}. ${company || '[Company]'} likely sees this in..."
+✓ GOOD: "With ${company} operating in ${industry || '[industry]'}, how are you handling energy costs for facilities like yours?"
+✓ GOOD: "Given your role as ${job || '[role]'}, are you dealing with ${roleContext?.painPoints[0] || '[pain point]'}? Here's what I've found..."
+✓ GOOD: "${industry || '[Industry]'} companies are facing ${industryContent?.painPoints[0] || '[specific challenge]'}. How is ${company || '[Company]'} handling this?"
 ✓ GOOD: "Companies in ${industry || '[industry]'}" (not "your industry")
 ✓ GOOD: "As ${job || '[role]'}" (not "As CEO of a small business")
 ✗ BAD: "I wanted to reach out about..."
@@ -2574,7 +2574,7 @@ ${generationMode === 'direct' ? `
   * Example CTA: "When does your contract renew? That timing difference is usually worth 10-20%."` : ''}
 ${generationMode === 'balanced' ? `
   * Combine observation with specific value proposition
-  * Professional but conversational: "I noticed..." followed by "Here's what I've found..."
+  * Professional but conversational: Ask a question about their situation, then "Here's what I've found..."
   * Balanced approach: Show expertise without being pushy
   * Example CTA: "Question for you—what's your renewal timeline?"` : ''}
 ` : ''}
@@ -2704,7 +2704,7 @@ Generate text for these fields:
 TEMPLATE: General Purpose Email (Manual Input)
 Generate text for these fields:
 - greeting: "Hello ${firstName}," or "Hi ${firstName},"
-- opening_paragraph: CRITICAL - This MUST be based on the user's specific prompt. Read what they typed and create a natural, conversational opening paragraph (2-3 sentences) that directly addresses their question or concern. DO NOT use generic text like "I wanted to reach out about an interesting opportunity." Instead, use their actual words and context. For example, if they mention "rates went down in October but now creeping back up," start with something like "Sean, I noticed rates dipped in October but they're climbing again now..." - Use their specific details, numbers, and concerns from the prompt.
+- opening_paragraph: CRITICAL - This MUST be based on the user's specific prompt. Read what they typed and create a natural, conversational opening paragraph (2-3 sentences) that directly addresses their question or concern. DO NOT use generic text like "I wanted to reach out about an interesting opportunity." DO NOT use "I noticed" or "I saw". Instead, use their actual words and context through QUESTIONS. For example, if they mention "rates went down in October but now creeping back up," start with something like "Sean, rates dipped in October but they're climbing again now. How is that impacting your budget planning?" - Use their specific details, numbers, and concerns from the prompt.
 - sections: Array of 2-5 content points - EACH MUST BE EXACTLY ONE SENTENCE (no multi-sentence items)
 - list_header: Choose a contextual header for the list section based on email content (e.g., "How We Can Help:", "Key Benefits:", "Why This Matters:", "What to Expect:", "Our Approach:")
 - cta_text: Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation, e.g., 'Schedule a Consultation', 'Book Your Free Assessment', 'Let's Schedule Time to Talk'). Vary the wording based on the conversation context but always focus on scheduling.
@@ -2829,7 +2829,7 @@ CRITICAL QUALITY RULES:
   - Market context is DISABLED - DO NOT use generic market statistics like "rates rising 15-25%"
   - DO NOT mention "data center demand" or generic rate increases
   - Focus ONLY on ${company}'s specific situation, industry challenges they face, or operational details
-  - Use phrases like "I noticed ${company} operates..." or "With ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'your facilities'}..."`}
+  - Use questions like "How is ${company} handling operations..." or "With ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'your facilities'}, how are you..." (DO NOT use "I noticed")`}
 - SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
 - MEASURABLE CLAIMS: "save ${marketContext?.typicalClientSavings || '10-20%'}" or "$X annually" NOT "significant savings"
 - COMPLETE SENTENCES: Every sentence must have subject + verb + complete thought. NO incomplete phrases like "within [company]" or "like [company]"
@@ -2845,35 +2845,35 @@ CRITICAL QUALITY RULES:
 
 HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Write like a knowledgeable energy expert who researched ${company || 'their company'} deeply
-- ${marketContext?.enabled ? 'Market context is ENABLED, but still lead with specific observation' : 'Market context is DISABLED - focus on THEIR specific situation only'}
-- Show you did homework: When you have specific data, use phrases like:
-  * "I noticed ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail about their company]'}" ${accountDescription ? '(you have account description - USE THIS)' : ''}
-  * "I saw ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}" ${recentActivityContext ? '(you have recent activity - USE THIS)' : ''}
-  * "On your website, I noticed..." ${websiteContext ? '(you have website context - USE THIS)' : ''}
+- ${marketContext?.enabled ? 'Market context is ENABLED, but still lead with specific question' : 'Market context is DISABLED - focus on THEIR specific situation only'}
+- Show you did homework: When you have specific data, use QUESTIONS instead of observations:
+  * Ask about ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail about their company]'}: "How is [specific detail] affecting your energy costs?" ${accountDescription ? '(you have account description - USE THIS)' : ''}
+  * Ask about ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}: "With [recent activity], how has that impacted your planning?" ${recentActivityContext ? '(you have recent activity - USE THIS)' : ''}
+  * Reference website through questions: "How are you handling [specific challenge from website]?" ${websiteContext ? '(you have website context - USE THIS)' : ''}
   * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." ${city && marketContext?.enabled ? '(you have location)' : '(skip if market context disabled)'}
   ${!marketContext?.enabled ? '* "With ' + (contractEndLabel ? 'your contract ending ' + contractEndLabel : 'your current energy setup') + '..." (use contract timing if available)' : ''}
 - Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : '[specific situation]'}..."
-- Include micro-observations: Reference their website, recent posts, industry trends they'd recognize
+- Include micro-observations: Reference their website, recent posts, industry trends they'd recognize through QUESTIONS
 - Vary sentence length: Mix short punchy statements with longer explanatory ones
 - Use conversational connectors: "Here's the thing...", "The reality is...", "What I've found..."
-- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", "I've been tracking how companies..." or other template phrases
-${marketContext?.enabled ? '- You may reference general market trends, but lead with specific observation first' : '- DO NOT mention generic market statistics - focus on their specific situation'}
-- Show expertise subtly: "In my experience with ${industry || '[industry]'} companies", "I've noticed [specific trend about their company]"
-${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', you\'ve likely seen..." (tenure available)' : ''}
+- Avoid AI patterns: NO "I wanted to reach out", "Hope this email finds you well", "I noticed", "I saw", "I read", "I've been tracking how companies..." or other template phrases
+${marketContext?.enabled ? '- You may reference general market trends, but lead with specific question first' : '- DO NOT mention generic market statistics - focus on their specific situation'}
+- Show expertise subtly: "In my experience with ${industry || '[industry]'} companies", ask questions about [specific trend about their company]
+${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', how have you seen..." (tenure available)' : ''}
 
 EVIDENCE OF RESEARCH (Show You Know Their Business):
 ${accountDescription ? '✓ Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally' : ''}
 ${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements' : ''}
-${websiteContext ? '✓ Use website info: "On your website, I noticed..." to show you visited' : ''}
-${recentActivityContext ? '✓ Use recent activity: "I saw ${company} recently..." + ' + recentActivityContext.substring(0, 60) + '...' : ''}
+${websiteContext ? '✓ Use website info: Ask about specific challenges from their website (DO NOT say "I noticed")' : ''}
+${recentActivityContext ? '✓ Use recent activity: Ask "With ' + recentActivityContext.substring(0, 60) + '..., how has that impacted..." (DO NOT say "I saw")' : ''}
 ${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
 ${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
 ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant' : ''}
 
 CONVERSATIONAL FLOW PATTERNS:
-✓ GOOD: "I noticed ${company} operates in ${industry || '[industry]'}. Energy costs for facilities like yours often..."
-✓ GOOD: "Given your role as ${job || '[role]'}, you're probably dealing with ${roleContext?.painPoints[0] || '[pain point]'}. Here's what I've found..."
-✓ GOOD: "${industry || '[Industry]'} companies are facing [specific challenge]. ${company || '[Company]'} likely sees this in..."
+✓ GOOD: "With ${company} operating in ${industry || '[industry]'}, how are you handling energy costs for facilities like yours?"
+✓ GOOD: "Given your role as ${job || '[role]'}, are you dealing with ${roleContext?.painPoints[0] || '[pain point]'}? Here's what I've found..."
+✓ GOOD: "${industry || '[Industry]'} companies are facing [specific challenge]. How is ${company || '[Company]'} handling this?"
 ✓ GOOD: "Companies in ${industry || '[industry]'}" (not "your industry")
 ✗ BAD: "I wanted to reach out about..."
 ✗ BAD: "I hope this email finds you well..."
@@ -2906,16 +2906,17 @@ OPENING (1-2 sentences):
 Style: ${openingStyle.type}
 ${openingStyle.prompt}
 ${marketContext?.enabled ? `
-Lead with SPECIFIC OBSERVATION about ${company} FIRST, then optionally reference market context:
-- "I noticed ${company} operates in ${city || '[location]'}. With contracts renewing in 2025, you're likely seeing..."
-- "Given ${accountDescription ? accountDescription.substring(0, 60) + '...' : company + '\'s operations'}, energy costs are probably..."
-- "${industry || 'Your industry'} companies like ${company} are facing [specific challenge]. I've noticed..."` : `
-Lead with SPECIFIC OBSERVATION about ${company} - NO generic market statistics:
-- "I noticed ${company} operates ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'with facilities in ' + (city || '[location]')}..."
-- "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : 'your current energy setup'}, you're likely dealing with..."
-- "${company} likely sees energy as [specific to their situation] given [specific detail about their operations]"
-- "Companies with ${industryContent?.painPoints[0] || '[specific pain point]'} typically benefit from early planning"
-DO NOT mention: "rates rising 15-25%", "data center demand", generic market statistics`}
+Lead with SPECIFIC QUESTION about ${company} FIRST, then optionally reference market context:
+- "With ${company} operating in ${city || '[location]'}, how are you handling contracts renewing in 2025?"
+- "Given ${accountDescription ? accountDescription.substring(0, 60) + '...' : company + '\'s operations'}, how are energy costs impacting your budget?"
+- "${industry || 'Your industry'} companies like ${company} are facing [specific challenge]. How are you addressing this?"` : `
+Lead with SPECIFIC QUESTION about ${company} - NO generic market statistics:
+- "With ${company} operating ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'facilities in ' + (city || '[location]')}, how are you handling..."
+- "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : 'your current energy setup'}, how are you planning for..."
+- "How is ${company} handling energy costs given [specific detail about their operations]?"
+- "Companies with ${industryContent?.painPoints[0] || '[specific pain point]'} typically benefit from early planning. Is this on your radar?"
+DO NOT mention: "rates rising 15-25%", "data center demand", generic market statistics
+DO NOT use: "I noticed", "I saw", "I read"`}
 IMPORTANT: Always reference ${company} specifically, not other companies.
 
 VALUE PROPOSITION (1-2 sentences MINIMUM):
@@ -2965,7 +2966,7 @@ ${generationMode === 'direct' ? `
 * Lead with specific insights: "Here's what I found..." "The reality is..."
 * Assertive but respectful - present facts and ask direct questions` : ''}
 ${generationMode === 'balanced' ? `
-* Combine observation + value: "I noticed..." followed by "Here's what I've found..."
+* Combine question + value: Ask about their situation, then "Here's what I've found..."
 * Professional but conversational - show expertise without being pushy` : ''}
 ` : ''}
 
