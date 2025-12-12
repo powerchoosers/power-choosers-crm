@@ -8276,7 +8276,11 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               if (status) status.textContent = 'Preview generated!';
             } else {
               const errorData = await response.json().catch(() => ({}));
-              if (status) status.textContent = errorData.error || 'Generation failed';
+              const errMsg = errorData.error || errorData.message || 'Generation failed';
+              if (status) status.textContent = errMsg;
+              if (window.crm?.showToast) {
+                window.crm.showToast(errMsg, 'error');
+              }
             }
           } catch (error) {
             console.error('AI generation error:', error);
