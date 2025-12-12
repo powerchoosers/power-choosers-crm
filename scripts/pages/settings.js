@@ -779,16 +779,30 @@ class SettingsPage {
                                 ...settingsData,
                                 bridgeToMobile: settingsData.bridgeToMobile === true // Ensure boolean
                             };
+                            // Ensure general object exists and hostedPhotoURL is preserved
+                            if (!this.state.settings.general) {
+                                this.state.settings.general = {};
+                            }
+                            // Restore hostedPhotoURL from localStorage if missing in state
+                            if (!this.state.settings.general.hostedPhotoURL) {
+                                const hostedFromLocalStorage = localStorage.getItem('pc-hosted-photo');
+                                if (hostedFromLocalStorage) {
+                                    this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
+                                    console.log('[Settings] Restored hostedPhotoURL from localStorage after cache load');
+                                }
+                            }
                             // Ensure imageSize is initialized if missing
-                            if (!this.state.settings.emailSignature.imageSize) {
+                            if (!this.state.settings.emailSignature) {
+                                this.state.settings.emailSignature = { text: '', image: null, imageSize: { width: 200, height: 100 } };
+                            } else if (!this.state.settings.emailSignature.imageSize) {
                                 this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
                             }
                             // Persist hosted photo locally for header fallback
-                            const hosted = settingsData?.general?.hostedPhotoURL;
+                            const hosted = settingsData?.general?.hostedPhotoURL || this.state.settings.general.hostedPhotoURL;
                             if (hosted) {
                                 try { localStorage.setItem('pc-hosted-photo', hosted); } catch(_) {}
                             }
-                            console.log('[Settings] Loaded from CacheManager cache', { bridgeToMobile: this.state.settings.bridgeToMobile });
+                            console.log('[Settings] Loaded from CacheManager cache', { bridgeToMobile: this.state.settings.bridgeToMobile, hostedPhotoURL: this.state.settings.general.hostedPhotoURL });
                             // Sync header avatar after cache load
                             if (window.authManager?.refreshProfilePhoto) {
                                 setTimeout(() => window.authManager.refreshProfilePhoto(), 50);
@@ -878,6 +892,18 @@ class SettingsPage {
                                     ...firebaseSettings,
                                     bridgeToMobile: firebaseSettings.bridgeToMobile === true // Ensure boolean
                                 };
+                                // Ensure general object exists and hostedPhotoURL is preserved
+                                if (!this.state.settings.general) {
+                                    this.state.settings.general = {};
+                                }
+                                // Restore hostedPhotoURL from localStorage if missing in state
+                                if (!this.state.settings.general.hostedPhotoURL) {
+                                    const hostedFromLocalStorage = localStorage.getItem('pc-hosted-photo');
+                                    if (hostedFromLocalStorage) {
+                                        this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
+                                        console.log('[Settings] Restored hostedPhotoURL from localStorage after Firebase load (non-admin)');
+                                    }
+                                }
                                 // Ensure emailSignature exists and imageSize is initialized if missing
                                 if (!this.state.settings.emailSignature) {
                                     this.state.settings.emailSignature = { text: '', image: null, imageSize: { width: 200, height: 100 } };
@@ -895,7 +921,7 @@ class SettingsPage {
                                 }
                                 
                                 // Persist hosted photo locally for header fallback
-                                const hosted = firebaseSettings?.general?.hostedPhotoURL;
+                                const hosted = firebaseSettings?.general?.hostedPhotoURL || this.state.settings.general.hostedPhotoURL;
                                 if (hosted) {
                                     try { localStorage.setItem('pc-hosted-photo', hosted); } catch(_) {}
                                 }
@@ -913,13 +939,25 @@ class SettingsPage {
                                 ...firebaseSettings,
                                 bridgeToMobile: firebaseSettings.bridgeToMobile === true // Ensure boolean
                             };
+                            // Ensure general object exists and hostedPhotoURL is preserved
+                            if (!this.state.settings.general) {
+                                this.state.settings.general = {};
+                            }
+                            // Restore hostedPhotoURL from localStorage if missing in state
+                            if (!this.state.settings.general.hostedPhotoURL) {
+                                const hostedFromLocalStorage = localStorage.getItem('pc-hosted-photo');
+                                if (hostedFromLocalStorage) {
+                                    this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
+                                    console.log('[Settings] Restored hostedPhotoURL from localStorage after Firebase load');
+                                }
+                            }
                             // Ensure emailSignature exists and imageSize is initialized if missing
                             if (!this.state.settings.emailSignature) {
                                 this.state.settings.emailSignature = { text: '', image: null, imageSize: { width: 200, height: 100 } };
                             } else if (!this.state.settings.emailSignature.imageSize) {
                                 this.state.settings.emailSignature.imageSize = { width: 200, height: 100 };
                             }
-                            console.log('[Settings] Loaded from Firebase', { bridgeToMobile: this.state.settings.bridgeToMobile });
+                            console.log('[Settings] Loaded from Firebase', { bridgeToMobile: this.state.settings.bridgeToMobile, hostedPhotoURL: this.state.settings.general.hostedPhotoURL });
                             
                             // Cache the settings for future use
                             if (window.CacheManager) {
@@ -1018,23 +1056,41 @@ class SettingsPage {
             // Always check if photoURL changed and re-host if needed
             // BUT: Don't overwrite manually uploaded photos (hostedPhotoURL takes priority)
             if (user.photoURL) {
+                // Ensure general object exists
+                if (!this.state.settings.general) {
+                    this.state.settings.general = {};
+                }
+                
                 const currentPhotoURL = this.state.settings.general.photoURL || '';
-                const hasManualUpload = !!this.state.settings.general.hostedPhotoURL;
+                // Check both state and localStorage for manually uploaded photo
+                const hostedFromState = this.state.settings.general.hostedPhotoURL || '';
+                const hostedFromLocalStorage = localStorage.getItem('pc-hosted-photo') || '';
+                const hasManualUpload = !!(hostedFromState || hostedFromLocalStorage);
+                
+                // If we found hostedPhotoURL in localStorage but not in state, restore it
+                if (hostedFromLocalStorage && !hostedFromState) {
+                    this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
+                    console.log('[Settings] Restored hostedPhotoURL from localStorage:', hostedFromLocalStorage);
+                }
                 
                 // Only auto-host if:
                 // 1. PhotoURL changed AND no manual upload exists, OR
-                // 2. PhotoURL matches but no hosted version exists at all
+                // 2. PhotoURL matches but no hosted version exists at all (and no localStorage backup)
                 if (user.photoURL !== currentPhotoURL && !hasManualUpload) {
                     console.log('[Settings] Google photoURL changed and no manual upload, hosting avatar...');
                     await this.hostGoogleAvatar(user.photoURL);
-                } else if (user.photoURL === currentPhotoURL && !this.state.settings.general.hostedPhotoURL) {
-                    // PhotoURL matches but no hosted version exists, host it
+                } else if (user.photoURL === currentPhotoURL && !hasManualUpload) {
+                    // PhotoURL matches but no hosted version exists anywhere, host it
                     console.log('[Settings] PhotoURL exists but no hosted version, hosting avatar...');
                     await this.hostGoogleAvatar(user.photoURL);
                 } else if (hasManualUpload) {
                     // Manual upload exists - preserve it, just update photoURL for tracking
                     this.state.settings.general.photoURL = user.photoURL;
-                    console.log('[Settings] Manual upload exists, preserving hostedPhotoURL');
+                    // Ensure hostedPhotoURL is set (use localStorage if state is missing)
+                    if (!this.state.settings.general.hostedPhotoURL && hostedFromLocalStorage) {
+                        this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
+                    }
+                    console.log('[Settings] Manual upload exists, preserving hostedPhotoURL:', this.state.settings.general.hostedPhotoURL);
                 }
             }
         } else {

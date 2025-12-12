@@ -226,8 +226,21 @@
         
         const j = await resp.json().catch(() => ({}));
         if (!resp.ok || !j?.token) {
-          try { window.crm?.showToast && window.crm.showToast(`Token error: ${j?.error || ('HTTP ' + resp.status)}`); } catch(_) {}
-          throw new Error(j?.error || `Token HTTP ${resp.status}`);
+          const errorMsg = j?.error || j?.message || `HTTP ${resp.status}`;
+          console.error('[TwilioRTC] Token fetch failed:', {
+            status: resp.status,
+            error: errorMsg,
+            response: j
+          });
+          try { window.crm?.showToast && window.crm.showToast(`Token error: ${errorMsg}`); } catch(_) {}
+          throw new Error(errorMsg);
+        }
+        
+        // Validate token format (JWT should be 3 parts separated by dots)
+        if (!j.token || typeof j.token !== 'string' || j.token.split('.').length !== 3) {
+          console.error('[TwilioRTC] Invalid token format received');
+          try { window.crm?.showToast && window.crm.showToast('Invalid token format from server'); } catch(_) {}
+          throw new Error('Invalid token format');
         }
 
         // Initialize Twilio Device
@@ -283,6 +296,20 @@
           
           // If it's a token-related error, try to refresh immediately
           if (error.code === 20101 || error.code === 31204) {
+            console.error('[TwilioRTC] Token validation error:', {
+              code: error.code,
+              message: error.message,
+              name: error.name
+            });
+            
+            // For 20101 (AccessTokenInvalid), this usually means credentials are wrong
+            if (error.code === 20101) {
+              console.error('[TwilioRTC] CRITICAL: Token is invalid - check Twilio credentials in environment variables');
+              try { 
+                window.crm?.showToast && window.crm.showToast('Twilio authentication failed. Please check server configuration.'); 
+              } catch(_) {}
+            }
+            
             console.debug('[TwilioRTC] Token error detected, attempting immediate refresh...');
             setTimeout(async () => {
               try {
@@ -290,10 +317,18 @@
                 const refreshData = await refreshResp.json().catch(() => ({}));
                 
                 if (refreshResp.ok && refreshData?.token && state.device) {
-                  state.device.updateToken(refreshData.token);
-                  console.debug('[TwilioRTC] Emergency token refresh successful');
+                  // Validate new token before updating
+                  if (refreshData.token.split('.').length === 3) {
+                    state.device.updateToken(refreshData.token);
+                    console.debug('[TwilioRTC] Emergency token refresh successful');
+                  } else {
+                    console.error('[TwilioRTC] Emergency token refresh failed - invalid token format');
+                  }
                 } else {
-                  console.error('[TwilioRTC] Emergency token refresh failed');
+                  console.error('[TwilioRTC] Emergency token refresh failed:', {
+                    status: refreshResp.status,
+                    error: refreshData?.error || refreshData?.message
+                  });
                 }
               } catch (refreshError) {
                 console.error('[TwilioRTC] Emergency token refresh error:', refreshError);
