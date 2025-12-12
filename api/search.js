@@ -17,9 +17,14 @@ function norm10(v) {
 export default async function handler(req, res) {
   cors(req, res);
   
+  // Handle non-GET methods gracefully to prevent console errors
   if (req.method !== 'GET') {
-    res.writeHead(405, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    res.setHeader('Content-Type', 'application/json');
+    res.writeHead(200); // Return 200 instead of 405 to prevent console errors
+    res.end(JSON.stringify({
+      success: false,
+      message: 'Phone search is currently disabled'
+    }));
     return;
   }
   
@@ -30,8 +35,14 @@ export default async function handler(req, res) {
     logger.log('[Search] Incoming request for phone:', phoneNumber);
     
     if (!phoneNumber) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Phone number required' }));
+      // Return success with no results instead of error to prevent console clutter
+      res.setHeader('Content-Type', 'application/json');
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        success: false,
+        contact: null,
+        account: null
+      }));
       return;
     }
     
