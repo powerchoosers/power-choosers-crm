@@ -1213,55 +1213,77 @@ class SettingsPage {
 
             // Save to Firebase first
             if (window.firebaseDB) {
-                
-                // Check if document exists and if employee owns it (for update)
-                let canUpdate = false;
-                if (!isAdmin) {
-                    try {
-                        const existingDoc = await window.firebaseDB.collection('settings').doc(docId).get();
-                        if (existingDoc.exists) {
-                            const existingData = existingDoc.data();
-                            const existingOwnerId = (existingData.ownerId || '').toLowerCase();
-                            const existingUserId = existingData.userId;
-                            if (existingOwnerId === userEmail || existingUserId === userId) {
+                try {
+                    // Admin users can always save to 'user-settings' doc
+                    // Non-admin users can save to their own 'user-settings-{email}' doc
+                    let canUpdate = isAdmin; // Admin can always update
+                    
+                    if (!isAdmin) {
+                        // Check if document exists and if employee owns it (for update)
+                        try {
+                            const existingDoc = await window.firebaseDB.collection('settings').doc(docId).get();
+                            if (existingDoc.exists) {
+                                const existingData = existingDoc.data();
+                                const existingOwnerId = (existingData.ownerId || '').toLowerCase();
+                                const existingUserId = existingData.userId;
+                                if (existingOwnerId === userEmail || existingUserId === userId) {
+                                    canUpdate = true;
+                                } else {
+                                    console.warn('[Settings] Document exists but user does not own it. ownerId:', existingOwnerId, 'userEmail:', userEmail);
+                                }
+                            } else {
+                                // Document doesn't exist, will create (allowed by create rule)
                                 canUpdate = true;
                             }
-                        } else {
-                            // Document doesn't exist, will create (allowed by create rule)
+                        } catch (error) {
+                            console.warn('[Settings] Error checking existing document:', error);
+                            // Try to create anyway - might be a new document
                             canUpdate = true;
                         }
-                    } catch (error) {
-                        console.warn('[Settings] Error checking existing document:', error);
-                        // Try to create anyway
                     }
-                }
-                
-                // Use set() which creates if doesn't exist, updates if it does
-                // Firestore rules will allow this if ownerId/userId matches
-                const settingsToSave = {
-                    ...this.state.settings,
-                    // Ownership fields (required by Firestore rules)
-                    ownerId: userEmail || '',
-                    userId: userId || null,
-                    lastUpdated: new Date().toISOString(),
-                    updatedBy: 'user'
-                };
-                
-                // Ensure bridgeToMobile is explicitly saved (boolean, not undefined)
-                settingsToSave.bridgeToMobile = this.state.settings.bridgeToMobile === true;
-                
-                // CRITICAL: Ensure general.hostedPhotoURL is preserved (manually uploaded photos)
-                // This ensures each agent's uploaded photo is saved per-user
-                if (this.state.settings.general && this.state.settings.general.hostedPhotoURL) {
-                    if (!settingsToSave.general) {
-                        settingsToSave.general = {};
+                    
+                    if (!canUpdate) {
+                        throw new Error('Permission denied: You do not have permission to update this settings document');
                     }
-                    settingsToSave.general.hostedPhotoURL = this.state.settings.general.hostedPhotoURL;
-                    console.log('[Settings] Preserving hostedPhotoURL in saveSettings:', settingsToSave.general.hostedPhotoURL);
+                    
+                    // Use set() which creates if doesn't exist, updates if it does
+                    // Firestore rules will allow this if ownerId/userId matches
+                    const settingsToSave = {
+                        ...this.state.settings,
+                        // Ownership fields (required by Firestore rules)
+                        ownerId: userEmail || '',
+                        userId: userId || null,
+                        lastUpdated: new Date().toISOString(),
+                        updatedBy: 'user'
+                    };
+                    
+                    // Ensure bridgeToMobile is explicitly saved (boolean, not undefined)
+                    settingsToSave.bridgeToMobile = this.state.settings.bridgeToMobile === true;
+                    
+                    // CRITICAL: Ensure general.hostedPhotoURL is preserved (manually uploaded photos)
+                    // This ensures each agent's uploaded photo is saved per-user
+                    if (this.state.settings.general && this.state.settings.general.hostedPhotoURL) {
+                        if (!settingsToSave.general) {
+                            settingsToSave.general = {};
+                        }
+                        settingsToSave.general.hostedPhotoURL = this.state.settings.general.hostedPhotoURL;
+                        console.log('[Settings] Preserving hostedPhotoURL in saveSettings:', settingsToSave.general.hostedPhotoURL);
+                    }
+                    
+                    console.log('[Settings] Attempting to save settings to Firestore:', { docId, isAdmin, userEmail, userId });
+                    await window.firebaseDB.collection('settings').doc(docId).set(settingsToSave, { merge: false });
+                    console.log('[Settings] Successfully saved settings to Firestore');
+                    
+                } catch (firebaseError) {
+                    console.error('[Settings] Firebase save error:', firebaseError);
+                    console.error('[Settings] Error details:', {
+                        code: firebaseError.code,
+                        message: firebaseError.message,
+                        stack: firebaseError.stack
+                    });
+                    // Re-throw to be caught by outer catch block
+                    throw firebaseError;
                 }
-                
-                await window.firebaseDB.collection('settings').doc(docId).set(settingsToSave, { merge: false });
-                
             }
             
             // Also save to localStorage as backup
