@@ -2254,14 +2254,26 @@ You MUST structure the entire email around this primary angle. Do NOT switch to 
     const toneOpenerRule = (templateType === 'cold_email' && toneOpener)
       ? `
 
-TONE OPENER (CRITICAL - FIRST LINE AFTER GREETING - MANDATORY):
-- Your email body MUST begin with this EXACT tone opener: "${toneOpener}"
-- REQUIRED FORMAT: "${toneOpener}[problem awareness question]"
+TONE OPENER (CRITICAL - FIRST LINE AFTER GREETING - REQUIRED STYLE):
+- Your email body MUST begin with a conversational tone opener in this style: "${toneOpener}"
+- SUGGESTED PATTERN: Use a conversational opener that ends with "—" (em dash) or "—" followed by a problem-awareness question
+- EXAMPLES OF VALID OPENERS (you can use these or create similar ones):
+  * "${toneOpener}"
+  * "So here's the thing—"
+  * "Question for you—"
+  * "Let me ask you something—"
+  * "Honestly—"
+  * "Curious—"
+  * "Real talk—"
+  * "Looking at your situation—"
+  * "Here's what I'm seeing—"
+  * "Most people I talk to—"
+- REQUIRED FORMAT: [tone opener][problem awareness question]
 - Example: "${toneOpener}how are you handling [specific issue]?"
-- You MUST use this opener exactly as provided - do not rephrase, shorten, or change it
-- The tone opener goes IMMEDIATELY after the greeting with no other text
-- If you do not include this exact opener, the email will be automatically rejected
-- This is not optional - it is a hard requirement for cold emails`
+- The tone opener must be conversational, direct, and end with "—" (em dash) or similar punctuation
+- It goes IMMEDIATELY after the greeting with proper paragraph spacing
+- You can use the suggested opener above OR create a similar conversational opener that matches this pattern
+- The key is: conversational, direct, ends with "—", followed immediately by a problem-awareness question`
       : '';
 
     // NEPQ structure and guardrails (cold email only)
