@@ -940,6 +940,7 @@
     const clickCount = (isSentEmail) ? (email.clickCount || 0) : 0;
     const hasOpens = openCount > 0;
     const hasClicks = clickCount > 0;
+    const trackingBadgeStyle = 'position: absolute; top: -6px; right: -6px; background-color: var(--orange-primary, var(--orange-subtle, #f18335)); color: #fff; font-size: 10px; font-weight: 600; min-width: 16px; height: 16px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 4px; border: 2px solid var(--bg-card, var(--bg-primary, #1f1f1f));';
     const isStarred = email.starred || false;
 
     return `
@@ -995,16 +996,16 @@
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                   <circle cx="12" cy="12" r="3"/>
                 </svg>
-                ${hasOpens ? `<span class="tracking-badge">${openCount}</span>` : ''}
+                ${hasOpens ? `<span class="tracking-badge" style="${trackingBadgeStyle}">${openCount}</span>` : ''}
               </button>
-              <button class="qa-btn" data-action="clicks" data-email-id="${email.id}" title="${hasClicks ? `Clicked ${clickCount} time${clickCount !== 1 ? 's' : ''}` : 'Not clicked'}" style="position: relative;">
+              <button class="qa-btn ${hasClicks ? 'opened' : ''}" data-action="clicks" data-email-id="${email.id}" title="${hasClicks ? `Clicked ${clickCount} time${clickCount !== 1 ? 's' : ''}` : 'Not clicked'}" style="position: relative;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
                   <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/>
                   <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-3.5"/>
                   <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
                 </svg>
-                ${hasClicks ? `<span class="tracking-badge">${clickCount}</span>` : ''}
+                ${hasClicks ? `<span class="tracking-badge" style="${trackingBadgeStyle}">${clickCount}</span>` : ''}
               </button>
             ` : `
               <button class="qa-btn" data-action="reply" data-email-id="${email.id}" title="Reply">

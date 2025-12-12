@@ -3327,7 +3327,7 @@ class FreeSequenceAutomation {
                   <div class="ai-bar open" aria-hidden="false" style="margin-bottom:12px;">
                     <div class="ai-inner">
                       <div class="ai-row">
-                        <textarea class="ai-prompt input-dark" rows="3" placeholder="Describe the email you want... (tone, goal, offer, CTA)">${escapeHtml(step.data?.aiPrompt || '')}</textarea>
+                        <textarea class="ai-prompt input-dark" rows="3" placeholder="NEPQ guide: Cold emails—tone opener first, problem question tied to their trigger, a brief reason/gap, finish with a low-friction yes/no CTA. Follow-ups—re-surface the problem, add one new consequence or market change, ask a simple qualifying question (no meeting asks). Example: “Ask how the new site impacts demand charges; reason: we usually see surprise ratchets; CTA: is this on your radar this quarter?”">${escapeHtml(step.data?.aiPrompt || '')}</textarea>
                       </div>
                       <div class="ai-row suggestions" role="list">
                         <button class="ai-suggestion" type="button" 
