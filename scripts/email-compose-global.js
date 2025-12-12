@@ -2259,8 +2259,13 @@
     aiBar.innerHTML = `
       <div class="ai-inner">
         <div class="ai-row">
-          <textarea class="ai-prompt input-dark" rows="3" 
-                    placeholder="Describe the email you want... (tone, goal, offer, CTA)"></textarea>
+          <div style="position: relative; width: 100%;">
+            <textarea class="ai-prompt input-dark" rows="3" 
+                      placeholder="Describe your email... For cold emails: use a tone opener (e.g., 'Question for you—'), ask a problem-awareness question tied to their situation, explain why it matters, then end with a low-friction yes/no CTA. For follow-ups: reference the previous email, add new context, ask a simple qualifying question. You can also write freely—the system will guide the output."></textarea>
+            <div class="nepq-tip" style="margin-top: 6px; font-size: 12px; color: var(--text-secondary, #666); line-height: 1.4;">
+              <strong>NEPQ Tip:</strong> Instead of "Mention their new product launch," try "Ask what new operational challenges the product launch has created." Focus on the problem, not just the event!
+            </div>
+          </div>
         </div>
         <div class="ai-row suggestions" role="list">
           ${suggestions.map(s =>

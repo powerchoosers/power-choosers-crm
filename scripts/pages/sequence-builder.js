@@ -1812,8 +1812,8 @@ class FreeSequenceAutomation {
         } else {
           // Unknown contact - try to get email from member data if available
           contact = {
-            firstName: 'Unknown',
-            lastName: 'Contact',
+        firstName: 'Unknown',
+        lastName: 'Contact',
             email: member.email || member.targetId || '',
             name: 'Unknown Contact'
           };
@@ -3327,7 +3327,12 @@ class FreeSequenceAutomation {
                   <div class="ai-bar open" aria-hidden="false" style="margin-bottom:12px;">
                     <div class="ai-inner">
                       <div class="ai-row">
-                        <textarea class="ai-prompt input-dark" rows="3" placeholder="NEPQ guide: Cold emails—tone opener first, problem question tied to their trigger, a brief reason/gap, finish with a low-friction yes/no CTA. Follow-ups—re-surface the problem, add one new consequence or market change, ask a simple qualifying question (no meeting asks). Example: “Ask how the new site impacts demand charges; reason: we usually see surprise ratchets; CTA: is this on your radar this quarter?”">${escapeHtml(step.data?.aiPrompt || '')}</textarea>
+                        <div style="position: relative; width: 100%;">
+                          <textarea class="ai-prompt input-dark" rows="3" placeholder="NEPQ guide: Cold emails—tone opener first, problem question tied to their trigger, a brief reason/gap, finish with a low-friction yes/no CTA. Follow-ups—re-surface the problem, add one new consequence or market change, ask a simple qualifying question (no meeting asks). Example: “Ask how the new site impacts demand charges; reason: we usually see surprise ratchets; CTA: is this on your radar this quarter?”">${escapeHtml(step.data?.aiPrompt || '')}</textarea>
+                          <div class="nepq-tip" style="margin-top: 6px; font-size: 12px; color: var(--text-secondary, #666); line-height: 1.4;">
+                            <strong>NEPQ Tip:</strong> Instead of "Mention their new product launch," try "Ask what new operational challenges the product launch has created." Focus on the problem, not just the event!
+                          </div>
+                        </div>
                       </div>
                       <div class="ai-row suggestions" role="list">
                         <button class="ai-suggestion" type="button" 
@@ -3788,8 +3793,9 @@ class FreeSequenceAutomation {
   function buildFirstEmailIntroPrompt(ctaVariant = true, role = 'all') {
     // Note: ctaVariant and role parameters kept for backward compatibility but not used
     // The system now automatically handles angle-based CTAs in the backend
+    // This prompt follows NEPQ methodology: tone opener → problem question → value/gap → low-friction CTA
 
-    return `Write a cold introduction email that MUST:
+    return `Write a cold introduction email following NEPQ methodology. The system will provide a tone opener that MUST be used exactly as specified.
 
 1. GREETING (RANDOMIZE FOR VARIETY)
    - RANDOMLY choose ONE of these greetings:
@@ -3798,85 +3804,76 @@ class FreeSequenceAutomation {
      * "Hello [contact_first_name],"
    - DO NOT use "Hi [contact_first_name] there," or add extra words
 
-2. OPEN WITH OBSERVATION (CRITICAL - MUST USE RESEARCH)
-   - YOU MUST reference something SPECIFIC about [contact_company] that proves you researched them
-   - REQUIRED: Include at least ONE of these research elements:
-     * Location/facility details: "I noticed [contact_company] operates in [city], [state]..."
-     * Recent activity from LinkedIn: "I saw [contact_company] recently..." (if [contact_linkedin_recent_activity] available)
-     * Website insight: "On your website, I noticed..." (if [company_website] available)
-     * Industry pattern with peer context: "I've been talking to [role]s across [state], and..."
-   - NEVER: "I hope you're well" or "I wanted to reach out" or "I hope this email finds you well"
-   - MUST: Prove you researched - include specific details (location, facility size, operations type, operational model)
+2. TONE OPENER (MANDATORY - SYSTEM PROVIDES THIS)
+   - The system will provide a tone opener (e.g., "Question for you—", "Quick question—", "Most people I talk to—")
+   - This tone opener MUST be the EXACT first words after the greeting
+   - DO NOT rephrase, change, or omit the tone opener
+   - DO NOT put any text before the tone opener
+   - Example structure: "Hi [contact_first_name],\n[Tone Opener] [continue with problem question]"
 
-3. ACKNOWLEDGE THEIR SITUATION (ROLE-SPECIFIC)
-   - For [contact_job_title]: Show you understand what they actually deal with daily
-   - For [company_industry]: Reference industry-specific pain points naturally (not generic)
-   - Use their role language (CFOs care about predictability/budgets, Operations care about uptime/reliability)
+3. PROBLEM-AWARENESS QUESTION (CRITICAL - SECOND SENTENCE)
+   - Immediately after the tone opener, ask a question that connects a trigger event/recent activity to a potential negative business problem
+   - Use research data naturally: reference location, facility details, recent company activity, or industry patterns
+   - Make them think about consequences they may not have considered
+   - Examples:
+     * "Question for you—with [contact_company] expanding into [city], how are you handling the new energy load without triggering demand ratchets?"
+     * "Quick question—as [contact_company] scales up [specific operation], are you seeing delivery charges eat into margins?"
+     * "Most people I talk to—when [role]s at [company_industry] companies add automation, they run into [specific problem]. How are you managing that?"
+   - FORBIDDEN: "I noticed", "I saw", "I read", "I came across" - these trigger sales resistance
+   - Instead: Frame as a question that shows you understand their situation without stating you researched them
+
+4. VALUE/GAP STATEMENT (THIRD SECTION - 1-2 SENTENCES)
+   - Start with "The reason I ask is..." or "Typically, we see..." or "Usually, when..."
+   - Explain WHY you asked the question and introduce the common pain point
+   - Use specific, believable scenarios: "The reason I ask is that when [company_industry] companies add automation, the new load profile often triggers demand ratchets that can spike costs by 30-40% if the contract isn't updated."
+   - Keep it factual and calm - describe what you're seeing in the market, not threats
+   - Tie to timing when relevant: "locking in 6 months early vs 90 days is usually 15-20% difference"
    - Make it about THEM, not about us (don't lead with "We help...")
 
-4. ONE INSIGHT (SPECIFIC, NOT GENERIC) + ONE REAL PAIN SCENARIO
-   - Provide ONE concrete observation about why this matters to them NOW
-   - Use SPECIFIC numbers and timing: "6 months early = 15-20% savings" NOT "thousands annually"
-   - NOT: "Companies save 10-20%" (too generic)
-   - YES: "With 4 facilities in Texas, timing is critical - locking in 6 months out vs 90 days is usually 15-20% difference"
-   - Include timing context: early renewal (6 months) vs late (90 days) = money difference
-   - CRITICAL: Mention the 15-20% savings figure ONLY ONCE in the entire email - do not repeat it multiple times
-   
-   - PAIN LANE (TIE TO TIMING): Use ONE real scenario such as:
-     * Bills doubling on renewal (e.g., going from $800k/year to $1.6M)
-     * Confusing line items/riders on bills that hide negotiable costs
-     * Wrong contract type causing high delivery charges
-   - Explain how locking in 6 months early can prevent bill shocks like a customer going from $800k to $1.6M on renewal
-   - Keep it factual and calm: "I'm seeing a lot of contracts renewing 2x higher than the last term, and teams are scrambling to figure out why" (GOOD)
-   - NOT: "If you don't fix this now, you'll get crushed" (BAD - too fear-based)
-   - Tie pain to timing: One sentence hinting at real pain + one sentence showing timing is how smart teams avoid that outcome
+5. LOW-FRICTION CTA (FINAL SENTENCE - AUTOMATIC)
+   - The system automatically generates angle-specific CTAs
+   - You do NOT need to write a CTA - the system handles this
+   - The CTA will be a simple qualifying question (yes/no style)
+   - Examples the system will use:
+     * "Is this on your radar?"
+     * "Have you already handled this?"
+     * "Is this a priority for this quarter?"
+   - FORBIDDEN: Do NOT ask for meetings, calls, or time blocks ("15 minutes", "schedule a call", "book a meeting")
 
-5. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
+6. FORBIDDEN PHRASES (DO NOT USE - THESE TRIGGER SALES RESISTANCE)
+   - "I saw", "I noticed", "I read", "I came across"
+   - "I hope this email finds you well"
+   - "Just following up"
+   - "My name is..."
+   - "I wanted to reach out/introduce"
+   - "Would you be open to..." (permission-based, weak)
+
+7. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
    - Write like a peer, not a salesperson (conversational, confident, direct)
    - Use contractions: "we're," "don't," "it's," "you're," "I'm"
    - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
    - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy," "dive into," "solution," "at Power Choosers"
    - Sound like: colleague who knows their industry and has talked to others like them
-   - Use casual confidence: "Quick question—" "Real question—" "Out of curiosity—"
    - NO: "Would you be open to..." (permission-based, weak)
    - YES: Ask specific questions that assume conversation is happening
 
-6. CALL TO ACTION (AUTOMATIC - SYSTEM HANDLES THIS)
-   - CRITICAL: The system automatically generates angle-specific CTAs based on the contact's industry and selected angle
-   - You do NOT need to write a CTA - the system will use the angle's opening question as the foundation
-   - Each angle has a built-in structure: [Opening Question] + [Value/Statistic] + [Low-friction closing question]
-   - Examples of angle-based CTAs the system will use:
-     * Timing Strategy: "When does your current electricity contract expire? Worth a 10-minute look?"
-     * Exemption Recovery: "Are you currently claiming electricity exemptions? Most manufacturers leave $75K-$500K on the table. Worth exploring?"
-     * Consolidation: "How many locations are you managing energy for? Consolidating contracts typically means 15-25% savings. Worth a look?"
-   - The system will automatically select and format the appropriate CTA - you don't need to specify one
-   - DO NOT use old CTAs like "If you ever want a second opinion" - the system handles this automatically
-
-7. SUBJECT LINE (SPECIFIC, NOT VAGUE - PERPLEXITY HAS CREATIVE CONTROL)
-   - The system will automatically generate angle-specific subject lines
+8. SUBJECT LINE (AUTOMATIC - SYSTEM HANDLES THIS)
+   - The system automatically generates angle-specific subject lines
    - Each angle inspires unique subject variations (e.g., timing_strategy → "when does your contract expire?")
-   - MUST be specific to their role and the selected angle
-   - Examples: "[FirstName], when does your contract expire?" or "[FirstName], are you claiming exemptions?"
-   - NOT generic: "thoughts on energy planning" or "insight to ease costs" or "thoughts on energy strategy"
-   - Focus on: contract renewal, rate lock timing, budget cycle, facility renewal, exemptions, consolidation
-   - The system will create unique, angle-specific subjects automatically
+   - You do NOT need to write a subject line
 
-8. FORMAT
+9. FORMAT
    - 100-130 words max (scannable, not overwhelming)
    - 2-3 short paragraphs (break up visually)
    - Scannable on mobile (short lines, clear breaks)
-   - One CTA at end (automatically generated by the system based on the selected angle)
+   - Must include at least TWO questions (problem-awareness + CTA)
 
-9. PERSONALIZATION
+10. PERSONALIZATION
    - Include [contact_first_name] naturally in randomized greeting
    - Reference [company_name] specifically (not "your company")
    - For [company_industry], use industry-specific language naturally
    - Reference location if available ([city], [state]) for regional context
-
-10. PROOF OF RESEARCH
-   - Include at least ONE specific detail that proves you researched (not just role description)
-   - Examples: "4 locations across Texas," "24/7 operations," "both electricity and natural gas"
-   - This makes you stand out from generic templates
+   - Use research data naturally in the problem question (location, facility details, recent activity) WITHOUT saying "I noticed" or "I saw"
 
 ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should sound like their peer—a 29-year-old Texas business pro who knows the industry and has talked to others in their situation. Be conversational, confident, and direct.
 
@@ -3884,8 +3881,8 @@ GUARDRAILS (AVOID FAKE FEAR):
 - Only mention scenarios that are typical and believable for companies like [contact_company]. No exaggerated worst-case fear.
 - Describe pains as things you're seeing in the market right now, not predictions or threats.
 - No language like "you'll get crushed" or "you're in trouble"; use calm, factual language about stress, budget pressure, and surprises on bills.
-- GOOD EXAMPLE: "I'm seeing a lot of contracts renewing 2x higher than the last term, and teams are scrambling to figure out why."
-- BAD EXAMPLE: "If you don't fix this now, you'll get crushed by your energy bills."`;
+- GOOD EXAMPLE: "Most people I talk to—when manufacturing companies add automation, they run into demand ratchets that spike costs 30-40% if the contract isn't updated. How are you managing that?"
+- BAD EXAMPLE: "I noticed you added automation. If you don't fix this now, you'll get crushed by your energy bills."`;
   }
 
   // ========== FOLLOW-UP PROMPT BUILDERS ==========
@@ -3893,6 +3890,7 @@ GUARDRAILS (AVOID FAKE FEAR):
   function buildFollowUpValuePrompt(ctaVariant = true, role = 'all', previousAngleId = null, selectedAngle = null, emailPosition = 2) {
     // Note: The system automatically handles angle rotation and CTA escalation in the backend
     // These parameters are for future use when we implement full angle tracking
+    // This prompt follows NEPQ methodology adapted for follow-up emails
 
     return `Write Follow-Up Email #2 (DAY 2 - VALUE ADD WITH ANGLE ROTATION):
 
@@ -3904,59 +3902,57 @@ CRITICAL ANGLE ROTATION RULE:
 - Each angle has a unique opening question and value proposition
 - The system ensures angle diversity across the sequence
 
-FRAMEWORK (2025 Best Practice - Day 2 Follow-Up):
+NEPQ STRUCTURE FOR FOLLOW-UPS:
 1. GREETING (RANDOMIZE): Use "Hi [contact_first_name]," OR "Hey [contact_first_name]," OR "Hello [contact_first_name],"
 
-2. REFERENCE EMAIL 1 + INTRODUCE NEW ANGLE:
-   - CRITICAL: You MUST reference Email #1 naturally in the opening
-   - Use angle-aware transitions based on the previous angle:
-     * If Email 1 was timing_strategy: "On that timing question—there's another factor: [new angle]"
-     * If Email 1 was exemption_recovery: "Beyond exemptions—[new angle] is equally critical"
-     * If Email 1 was consolidation: "On consolidation—[new angle] is the next lever"
-   - Then introduce the NEW angle with specific insight
-   - Make it feel like a natural conversation continuation, not a cold email #2
+2. TONE OPENER (OPTIONAL FOR FOLLOW-UPS - SYSTEM MAY PROVIDE):
+   - If system provides tone opener, use it as first words after greeting
+   - If no tone opener provided, use natural transition: "On that [previous angle] question—" or "Beyond [previous angle]—"
+   - Make it feel like conversation continuation, not a new cold email
 
-3. NEW VALUE/INSIGHT (ANGLE-SPECIFIC) + PAIN EXAMPLE:
-   - Share ONE new insight specific to the NEW angle (NOT generic)
-   - Use the angle's opening question and value proposition from the system
-   - Include ONE specific example of what happens when this angle is ignored:
-     * Timing: Bills doubling on renewal (e.g., $800k to $1.6M)
-     * Consolidation: Fragmented contracts causing chaos
-     * Exemptions: $75K-$500K left on the table
-   - Then contrast with what happens when teams address this angle proactively
-   - Use angle-specific language and statistics
+3. PROBLEM-AWARENESS QUESTION (CRITICAL):
+   - Reference Email #1 naturally, then ask a question about the NEW angle
+   - Connect the new angle to a potential problem they may not have considered
+   - Use angle-aware transitions:
+     * If Email 1 was timing_strategy: "On that timing question—how are you handling [new angle problem]?"
+     * If Email 1 was exemption_recovery: "Beyond exemptions—are you also looking at [new angle problem]?"
+     * If Email 1 was consolidation: "On consolidation—what about [new angle problem]?"
+   - Make it a question that makes them think, not a statement
 
-4. MEDIUM-STRENGTH CTA (ESCALATION FROM EMAIL 1):
-   - Email 1 used: Soft discovery question (e.g., "Worth a 10-minute look?")
-   - Email 2 should use: Medium-strength ask (e.g., "Can I pull a quick analysis for you?")
-   - Structure: Reference previous + Value + Medium ask
-   - DO NOT use the same CTA as Email 1
-   - DO NOT use one-word CTAs like "Interested?" (that's for Email 3)
-   - The system will provide the appropriate CTA based on the selected angle
+4. VALUE/GAP STATEMENT (1-2 SENTENCES):
+   - Start with "The reason I ask is..." or "Typically, we see..." or "Usually, when..."
+   - Explain why the new angle matters and what happens when it's ignored
+   - Use specific examples: bills doubling, fragmented contracts, exemptions left on table
+   - Keep it factual and calm - describe market patterns, not threats
 
-5. SUBJECT LINE (MUST BE DIFFERENT FROM EMAIL 1):
-   - Email 1 used: "[FirstName], [angle] question?"
-   - Email 2 should use: "re: [previous angle keyword]—[new angle keyword]"
-   - Example: "re: contract timing—consolidation question"
-   - Use "re:" prefix to show continuation
-   - MUST be unique from Email 1's subject
+5. LOW-FRICTION CTA (MEDIUM-STRENGTH):
+   - Email 1 used: Soft discovery question
+   - Email 2 should use: Medium-strength qualifying question
+   - Examples: "Is this something you've already mapped out?" or "Have you looked at this angle yet?"
+   - DO NOT ask for meetings or time blocks ("15 minutes", "schedule a call")
+   - The system will provide angle-specific CTA guidance
+   - Must be a simple yes/no or status check question
 
-KEY DIFFERENCES FROM INTRO:
-- SHORTER: 70-100 words (slightly shorter than intro, but longer than Email 3)
-- NEW ANGLE: Must use a different angle than Email 1
-- REFERENCE EMAIL 1: Must acknowledge the previous email naturally
-- MEDIUM CTA: Stronger than Email 1, but not as strong as Email 3
+6. FORBIDDEN PHRASES (DO NOT USE):
+   - "I saw", "I noticed", "I read", "I came across"
+   - "I hope this email finds you well"
+   - "Just following up" or "Just checking in"
+   - "My name is..."
+   - "I wanted to reach out/introduce"
+   - "Didn't see my last email..." (too defensive)
+   - "Wanted to follow up" (too salesy)
+
+7. SUBJECT LINE (AUTOMATIC - SYSTEM HANDLES THIS):
+   - The system automatically generates angle-specific subject lines
+   - Will be different from Email 1
+
+KEY REQUIREMENTS:
+- Must include at least TWO questions (problem-awareness + CTA)
+- SHORTER: 70-100 words
+- NEW ANGLE: Must use different angle than Email 1
 - CONVERSATION CONTINUATION: Feels like ongoing dialogue, not cold email
 
 TONE: 29-year-old Texas professional, genuinely helpful, peer-to-peer, conversational continuation
-
-AVOID:
-- "Didn't see my last email..." (too defensive)
-- "Just checking in..." (too generic)
-- "Wanted to follow up" (too salesy)
-- Repeating Email 1's exact angle or content
-- Using the same subject line as Email 1
-- One-word CTAs ("Interested?", "Thoughts?")
 
 LENGTH: 70-100 words max
 PURPOSE: Continue conversation with new angle, escalate engagement
@@ -3965,18 +3961,14 @@ GUARDRAILS (AVOID FAKE FEAR):
 - Only mention scenarios that are typical and believable for companies like [contact_company]. No exaggerated worst-case fear.
 - Describe pains as things you're seeing in the market right now, not predictions or threats.
 - No language like "you'll get crushed" or "you're in trouble"; use calm, factual language about stress, budget pressure, and surprises on bills.
-- GOOD EXAMPLE: "I'm seeing a lot of contracts renewing 2x higher than the last term, and teams are scrambling to figure out why."
-- BAD EXAMPLE: "If you don't fix this now, you'll get crushed by your energy bills."
-
-ANGLE TRANSITION EXAMPLES:
-- Email 1 (timing_strategy) → Email 2 (consolidation): "On that timing question—there's another factor: consolidating across your sites could add another 15% savings."
-- Email 1 (exemption_recovery) → Email 2 (timing_strategy): "Beyond exemptions—renewal timing is equally critical. Teams that lock in 6 months early avoid the 10-20% increases we're seeing."
-- Email 1 (consolidation) → Email 2 (demand_efficiency): "On consolidation—demand charge optimization is the next lever. Most teams can reduce demand charges by 12-20% before even renewing rates."`;
+- GOOD EXAMPLE: "On that timing question—are you also looking at how consolidation could add another 15% savings? The reason I ask is that most teams with multiple locations leave money on the table by managing contracts separately."
+- BAD EXAMPLE: "I noticed you have multiple locations. If you don't consolidate, you'll get crushed by fragmented contracts."`;
   }
 
   function buildFollowUpCuriosityPrompt(ctaVariant = true, role = 'all', angle1Id = null, angle2Id = null, selectedAngle = null, emailPosition = 3) {
     // Note: The system automatically handles angle rotation and CTA escalation in the backend
     // These parameters are for future use when we implement full angle tracking
+    // This prompt follows NEPQ methodology adapted for final follow-up emails
 
     return `Write Follow-Up Email #3 (DAY 5 - FINAL ASK WITH URGENCY):
 
@@ -3985,134 +3977,137 @@ CONTEXT: This is 5 days after intro, 3 days after Email #2. Still no response. T
 CRITICAL ANGLE ROTATION RULE:
 - The system will automatically select a DIFFERENT angle than Emails #1 and #2
 - DO NOT repeat angles from Email #1 or Email #2
-- This is the final email - use urgency and specific time commitment
+- This is the final email - use urgency but maintain NEPQ structure
 - The system ensures all 3 emails use different angles
 
-FRAMEWORK (2025 Best Practice - Day 5 Final Follow-Up):
+NEPQ STRUCTURE FOR FINAL FOLLOW-UP:
 1. GREETING (RANDOMIZE): Use "Hi [contact_first_name]," OR "Hey [contact_first_name]," OR "Hello [contact_first_name],"
 
-2. URGENCY + REFERENCE PREVIOUS EMAILS:
-   - CRITICAL: Create urgency around timing (rate lock windows, renewal deadlines)
-   - Reference that this is your final attempt before pausing
-   - Acknowledge the previous emails naturally:
-     * "I've sent a couple notes on [angle1] and [angle2]..."
-     * "Following up on the timing and consolidation angles I raised..."
+2. TONE OPENER (OPTIONAL - SYSTEM MAY PROVIDE):
+   - If system provides tone opener, use it as first words after greeting
+   - If no tone opener, use natural urgency transition: "One last thought—" or "Final note—"
+
+3. URGENCY QUESTION (PROBLEM-AWARENESS):
+   - Create urgency around timing (rate lock windows, renewal deadlines) through a QUESTION
+   - Reference previous emails naturally: "I've sent a couple notes on [angle1] and [angle2]..."
+   - Ask about timing/urgency: "With rate lock windows tightening by end of month, how are you planning to handle [new angle]?"
    - Make it feel like a final, respectful attempt, not aggressive
 
-3. CONSOLIDATE VALUE + NEW ANGLE:
-   - Briefly reference what you've covered:
-     * "[Angle1 insight]"
-     * "[Angle2 insight]"
-     * "[Angle3 insight] - NEW for this email"
+4. VALUE/GAP STATEMENT (1-2 SENTENCES):
+   - Briefly consolidate what you've covered: "[Angle1 insight], [Angle2 insight], and [Angle3 insight - NEW]"
+   - Explain why timing matters: "The reason I ask is that teams that wait lose 10-20% on renewals when windows close"
    - Keep it concise - this is the SHORTEST email of the 3
-   - Focus on the NEW angle (Angle 3) with specific insight
    - Use urgency language: "rate lock windows tightening", "renewal deadlines approaching"
 
-4. HARD ASK CTA (STRONGEST OF ALL 3):
+5. LOW-FRICTION CTA (FINAL ATTEMPT - STILL A QUESTION):
    - Email 1 used: Soft discovery question
-   - Email 2 used: Medium-strength ask
-   - Email 3 should use: HARD ask with specific time options
-   - Structure: "I can do [Day] [Time] or [Day] [Time] for a 10-minute analysis."
-   - Include alternative close: "If neither works, when are you available?"
-   - DO NOT use one-word CTAs like "Interested?" (too weak for final email)
-   - DO NOT use permission-based language ("Would you be open to...")
-   - The system will provide time options based on meeting preferences
+   - Email 2 used: Medium-strength qualifying question
+   - Email 3 should use: Final qualifying question with urgency
+   - Structure: "Is this worth a quick look before the window closes?" or "Is this something you want to explore before [deadline]?"
+   - DO NOT ask for specific time blocks or meetings ("15 minutes", "schedule a call", "book a meeting")
+   - Keep it as a simple yes/no or priority question
+   - Alternative: "Is this a priority for this quarter, or something to revisit later?"
 
-5. SUBJECT LINE (URGENCY + DIFFERENT FROM EMAILS 1-2):
-   - Email 1 used: "[FirstName], [angle] question?"
-   - Email 2 used: "re: [angle1]—[angle2]"
-   - Email 3 should use: "Last attempt—[urgency message]"
-   - Examples:
-     * "Last attempt—rate lock window closing"
-     * "Final note—renewal timing window"
-     * "One last thought—rate timing"
-   - MUST be unique from Emails 1-2
-   - Create urgency without being pushy
+6. FORBIDDEN PHRASES (DO NOT USE):
+   - "I saw", "I noticed", "I read", "I came across"
+   - "I hope this email finds you well"
+   - "Just following up" or "Just checking in" or "Just wanted to follow up again"
+   - "My name is..."
+   - "I wanted to reach out/introduce"
+   - "Would you be open to..." (permission-based, weak)
+   - "Can I do [Day] [Time] or [Day] [Time]..." (high-friction meeting ask)
 
-KEY DIFFERENCES FROM EMAILS 1-2:
-- SHORTEST: 60-80 words (urgency requires brevity)
-- NEW ANGLE: Must use a different angle than Emails 1-2
+7. SUBJECT LINE (AUTOMATIC - SYSTEM HANDLES THIS):
+   - The system automatically generates angle-specific subject lines
+   - Will be different from Emails 1-2
+
+KEY REQUIREMENTS:
+- Must include at least TWO questions (urgency/problem-awareness + CTA)
+- SHORTEST: 60-80 words
+- NEW ANGLE: Must use different angle than Emails 1-2
 - URGENCY: Reference timing windows, deadlines, market conditions
-- HARD CTA: Specific time options, not vague questions
 - FINAL ATTEMPT: Acknowledge this is the last email before pause
 - CONSOLIDATION: Briefly reference all 3 angles covered
 
 TONE: Respectful urgency, peer-to-peer, final attempt (not aggressive)
 
-AVOID:
-- "Just wanted to follow up again..." (too weak)
-- One-word CTAs ("Interested?", "Thoughts?") - too weak for final email
-- Repeating exact content from Emails 1-2
-- Using the same subject line as Emails 1-2
-- Being pushy or aggressive (respectful urgency, not desperation)
-- Permission-based language ("Would you be open to...")
-
 LENGTH: 60-80 words max (SHORTEST of all 3 emails)
-PURPOSE: Final attempt with urgency, consolidate value, hard ask with time options
+PURPOSE: Final attempt with urgency, consolidate value, low-friction qualifying question
 
 GUARDRAILS (AVOID FAKE FEAR):
 - Only mention scenarios that are typical and believable for companies like [contact_company]. No exaggerated worst-case fear.
 - Describe pains as things you're seeing in the market right now, not predictions or threats.
 - No language like "you'll get crushed" or "you're in trouble"; use calm, factual language about stress, budget pressure, and surprises on bills.
-- GOOD EXAMPLE: "Rate lock windows are tightening by end of month. I'm seeing teams that wait lose 10-20% on renewals."
-- BAD EXAMPLE: "If you don't fix this now, you'll get crushed by your energy bills."
-
-FINAL EMAIL STRUCTURE:
-Paragraph 1 (Urgency + Reference):
-"[FirstName], rate lock windows are tightening by end of this month.
-
-I've sent a couple notes on [angle1] and [angle2]. Here's one more angle: [angle3]."
-
-Paragraph 2 (Value + Hard Ask):
-"I can do a quick 10-minute analysis covering all three angles:
-• [Angle1 insight]
-• [Angle2 insight]
-• [Angle3 insight]
-
-Can you do Thursday 2-3pm or Friday 10-11am? If not, when works better?"
-
-CRITICAL: This is the FINAL email. Make it count with urgency, value consolidation, and a hard ask.`;
+- GOOD EXAMPLE: "One last thought—with rate lock windows tightening by end of month, how are you planning to handle consolidation? The reason I ask is that teams that wait lose 10-20% when windows close. Is this worth a quick look before the deadline?"
+- BAD EXAMPLE: "I noticed you haven't responded. If you don't fix this now, you'll get crushed. Can you do Thursday 2-3pm or Friday 10-11am?"`;
   }
 
   function buildNurtureValuePrompt() {
     return `Write a nurture email focused on STAYING TOP-OF-MIND with genuine value.
 
 KEY PRINCIPLE: This is NOT a sales email. This is "I'm sharing something useful" email.
+Follow NEPQ principles: Use questions, avoid salesy language, keep it conversational.
 
-STRUCTURE:
-1. NO SUBJECT CHANGE - reference previous conversation naturally
-2. SHORT INTRO - 1 sentence
-3. INSIGHT OR RESOURCE - share 1 valuable thing (stat, article, case study, tip)
-4. WHY IT MATTERS - 1 sentence on why this is relevant to THEM specifically
-5. SOFT TOUCH - "thought you'd want to see this" or "saw this and thought of your situation"
-6. LIGHT CTA - "let me know if this sparks ideas" or "happy to discuss if you want"
+NEPQ STRUCTURE FOR NURTURE:
+1. GREETING (RANDOMIZE): Use "Hi [contact_first_name]," OR "Hey [contact_first_name]," OR "Hello [contact_first_name],"
 
-VALUE IDEAS:
-- Market data: "X% of companies in [industry] facing Y trend"
-- Case study: "Company similar to yours handled this by..."
-- Stat: "Latest research shows [relevant finding]"
-- Tip: "One thing I've noticed with companies like yours..."
-- Article: "Came across this, thought it might be useful"
+2. TONE OPENER (OPTIONAL - SYSTEM MAY PROVIDE):
+   - If system provides tone opener, use it
+   - If no tone opener, use natural transition: "Quick question—" or "Out of curiosity—"
+
+3. PROBLEM-AWARENESS QUESTION:
+   - Ask about a relevant trend or challenge: "Are you seeing [trend] in your market?"
+   - Connect to their industry/role: "With [industry trend], how is that impacting [their situation]?"
+   - Make it conversational, not pitchy
+
+4. VALUE/GAP STATEMENT (1-2 SENTENCES):
+   - Share ONE valuable insight (stat, article, case study, tip)
+   - Start with "The reason I ask is..." or "I'm seeing..." or "Typically..."
+   - Explain why it matters to THEM specifically
+   - Keep it factual and helpful
+
+5. LOW-FRICTION CTA (QUALIFYING QUESTION):
+   - End with a simple question: "Is this on your radar?" or "Have you seen this trend?"
+   - Alternative: "Worth a quick look?" or "Is this relevant for you right now?"
+   - DO NOT ask for meetings or time blocks
+   - Keep it as a simple yes/no or status check
+
+6. FORBIDDEN PHRASES (DO NOT USE):
+   - "I saw", "I noticed", "I read", "I came across"
+   - "I hope this email finds you well"
+   - "Just following up" or "Just checking in"
+   - "My name is..."
+   - "I wanted to reach out/introduce"
+   - "Thought you'd want to see this" (too generic - use question instead)
+
+VALUE IDEAS (FRAME AS QUESTIONS):
+- Market data: "Are you seeing X% of companies in [industry] facing Y trend?"
+- Case study: "Have you seen how companies similar to yours handled [situation]?"
+- Stat: "Are you tracking that latest research shows [relevant finding]?"
+- Tip: "Have you considered [insight] for companies like yours?"
 
 FOR ENERGY INDUSTRY:
-- Share Q4 energy market trends
+- Share Q4 energy market trends as a question
 - Reference upcoming contract renewal season timing
 - Share budget planning insight
 - Mention industry rate changes
 
-TONE: Helpful professional, not salesy
+TONE: Helpful professional, peer-to-peer, conversational
 
 EMAIL DETAILS:
 - To: [contact_name] at [company_name]
 - Industry: [company_industry]
 
-LENGTH: 50-75 words max`;
+KEY REQUIREMENTS:
+- Must include at least TWO questions (problem-awareness + CTA)
+- LENGTH: 50-75 words max`;
   }
 
   function buildPostConvoRecapPrompt() {
     return `Write a follow-up email AFTER a phone conversation.
 
 This is NOT cold anymore. You've talked. Now document and move forward.
+Maintain conversational tone, avoid salesy phrases.
 
 STRUCTURE:
 1. WARM OPENING - thank them for their time, mention something specific they said
@@ -4135,7 +4130,13 @@ NEXT STEPS OPTIONS:
 - "Let's schedule 20 min next week to walk through market options"
 - "I'll pull market data specific to your facilities and send Tuesday"
 
-TONE: Grateful, professional, action-oriented
+FORBIDDEN PHRASES (DO NOT USE):
+- "I hope this email finds you well"
+- "Just following up"
+- "I wanted to reach out"
+- "My name is..."
+
+TONE: Grateful, professional, action-oriented, conversational
 
 EMAIL DETAILS:
 - To: [contact_name] at [company_name]
@@ -4147,6 +4148,7 @@ LENGTH: 80-120 words max`;
     return `Write an email requesting a recent energy bill copy.
 
 KEY PRINCIPLE: Make it EASY and LOW-PRESSURE. You need ONE recent bill from the last 6 months to show real savings.
+Use conversational tone, avoid salesy phrases.
 
 STRUCTURE:
 1. WARM REFERENCE - mention recent conversation naturally
@@ -4179,7 +4181,13 @@ REASSURANCE:
 - "Data kept completely confidential"
 - "Just comparing against current market rates"
 
-TONE: Low pressure, professional, helpful
+FORBIDDEN PHRASES (DO NOT USE):
+- "I hope this email finds you well"
+- "Just following up"
+- "I wanted to reach out"
+- "My name is..."
+
+TONE: Low pressure, professional, helpful, conversational
 
 EMAIL DETAILS:
 - To: [contact_name] at [company_name]
@@ -4192,6 +4200,7 @@ LENGTH: 80-100 words max`;
     return `Write a closing email with a clear, strong call-to-action.
 
 KEY PRINCIPLE: Move from exploration to decision. Be confident and specific.
+Use conversational tone, avoid salesy phrases.
 
 STRUCTURE:
 1. CONTEXT REMINDER - briefly reference the journey
@@ -4213,11 +4222,13 @@ AVOID (Weak CTAs):
 - "Would you be interested in discussing further?"
 - "Feel free to reach out if you have questions"
 - "We should probably talk next week"
+
 VALUE REMINDER:
 - 15-20% savings based on current market
 - Locked-in rates = budget certainty
 - Simplified process vs. current supplier
 - Better terms because shopping early
+
 TIMELINE:
 - "I can have quotes by [SPECIFIC DATE]"
 - "Let's schedule [SPECIFIC DAY/TIME], 30 min"
@@ -4226,7 +4237,13 @@ TIMELINE:
 BACKUP CTA:
 Always give one option back: "If [MAIN] doesn't work, [ALTERNATIVE]"
 
-TONE: Confident, specific, not pushy. You know what should happen next.
+FORBIDDEN PHRASES (DO NOT USE):
+- "I hope this email finds you well"
+- "Just following up"
+- "I wanted to reach out"
+- "My name is..."
+
+TONE: Confident, specific, not pushy, conversational. You know what should happen next.
 
 EMAIL DETAILS:
 - To: [contact_name] at [company_name]
@@ -4243,6 +4260,7 @@ DO NOT:
 - Challenge them or doubt them
 - Go hard on sales
 - Repeat your initial pitch
+- Use salesy phrases
 
 DO:
 - Acknowledge their position positively
@@ -4250,12 +4268,11 @@ DO:
 - Ask consultative question that makes them think
 - Leave door open for future
 
-STRUCTURE:
+NEPQ STRUCTURE FOR OBJECTION HANDLING:
 1. VALIDATION - "That's great you've got a setup that works"
-2. OBSERVATION - "What I'm seeing this quarter though is..."
-3. QUESTION - ask something about their process/decision-making
-4. INSIGHT - 1 thing they might not be considering
-5. SOFT OFFER - "Would it be worth a quick look?" or "Worth staying connected?"
+2. PROBLEM-AWARENESS QUESTION - ask something about their process/decision-making
+3. VALUE/GAP STATEMENT - 1 thing they might not be considering
+4. LOW-FRICTION CTA - simple qualifying question
 
 QUESTION EXAMPLES:
 - "How often do you review if your current rates are still competitive?"
@@ -4263,12 +4280,23 @@ QUESTION EXAMPLES:
 - "Does your current supplier give you transparency into market rates?"
 - "Have you run a competitive analysis recently?"
 
-INSIGHT EXAMPLES:
-- "Most companies I talk to don't realize renewal timing costs them 15-20%"
-- "Lock-in timing is when you actually save money—not just best price"
-- "Your supplier probably doesn't tell you when rate changes are coming"
+VALUE/GAP STATEMENT EXAMPLES:
+- "The reason I ask is that most companies I talk to don't realize renewal timing costs them 15-20%"
+- "Typically, lock-in timing is when you actually save money—not just best price"
+- "Usually, suppliers don't tell you when rate changes are coming"
 
-TONE: Respectful, consultative, peer-to-peer
+LOW-FRICTION CTA EXAMPLES:
+- "Is this worth a quick look?" or "Worth staying connected?"
+- "Is this something you track, or more of a set-it-and-forget-it approach?"
+
+FORBIDDEN PHRASES (DO NOT USE):
+- "I saw", "I noticed", "I read", "I came across"
+- "I hope this email finds you well"
+- "Just following up"
+- "I wanted to reach out"
+- "My name is..."
+
+TONE: Respectful, consultative, peer-to-peer, conversational
 
 GOAL: Keep relationship alive, position for future renewal when they DO shop
 
@@ -4276,13 +4304,16 @@ EMAIL DETAILS:
 - To: [contact_name] at [company_name]
 - Role: [contact_job_title]
 
-LENGTH: 70-100 words max`;
+KEY REQUIREMENTS:
+- Must include at least TWO questions (problem-awareness + CTA)
+- LENGTH: 70-100 words max`;
   }
 
   function buildObjectionInterestedPrompt() {
     return `Write an email response to a prospect showing genuine interest (asked questions, wants more info).
 
 THIS IS HIGH INTENT - move fast but stay professional.
+Use conversational tone, avoid salesy phrases.
 
 STRUCTURE:
 1. ENTHUSIASM - acknowledge their interest (not over the top)
@@ -4306,7 +4337,13 @@ NEXT STEP - Be specific:
 - "Send me your current bill and I'll have a preliminary analysis to you by [DATE]"
 - "Let's schedule a brief call this week—I'm available [OPTIONS]"
 
-TONE: Helpful, professional, moving momentum forward
+FORBIDDEN PHRASES (DO NOT USE):
+- "I hope this email finds you well"
+- "Just following up"
+- "I wanted to reach out"
+- "My name is..."
+
+TONE: Helpful, professional, moving momentum forward, conversational
 
 GOAL: Convert interest into action (meeting, data sharing, etc.)
 
@@ -4324,6 +4361,7 @@ DO NOT:
 - Try to convince them they're wrong
 - Go harder on sales
 - Get defensive
+- Use salesy phrases
 
 DO:
 - Thank them professionally
@@ -4334,7 +4372,7 @@ DO:
 STRUCTURE:
 1. RESPECT - "I appreciate you being direct"
 2. BRIEF REASON - "I get it, you've got things dialed in"
-3. STAY CURIOUS - "One question though..."
+3. STAY CURIOUS - "One question though..." (optional problem-awareness question)
 4. FINAL OFFER - "If anything changes..." or "When [event] happens..."
 5. GRACEFUL EXIT - leave them with your info for future
 
@@ -4354,7 +4392,13 @@ FINAL OFFER:
 - "Feel free to reach out when you're ready to shop"
 - "Happy to be a resource down the line"
 
-TONE: Professional, respectful, genuine
+FORBIDDEN PHRASES (DO NOT USE):
+- "I hope this email finds you well"
+- "Just following up"
+- "I wanted to reach out"
+- "My name is..."
+
+TONE: Professional, respectful, genuine, conversational
 
 GOAL: Not force the sale, but stay in their orbit for when they DO need you
 
@@ -4372,6 +4416,7 @@ LENGTH: 60-90 words max`;
     return `Write BREAKUP EMAIL (DAY 20+ - FINAL LAST CHANCE):
 
 CONTEXT: Final email in sequence. Give them a clear out or last chance to engage.
+Use conversational tone, avoid salesy phrases.
 
 FRAMEWORK (2025 Best Practice - Breakup Email):
 1. GREETING (RANDOMIZE): Use "Hi [contact_first_name]," OR "Hey [contact_first_name]," OR "Hello [contact_first_name],"
@@ -4402,10 +4447,16 @@ KEY PRINCIPLES:
 - No guilt trips, no FOMO tactics
 - Professional and classy exit
 
-TONE: Respectful, professional, genuine, not desperate
+FORBIDDEN PHRASES (DO NOT USE):
+- "I hope this email finds you well"
+- "Just following up"
+- "I wanted to reach out"
+- "My name is..."
+- "This is my last email..." (sounds desperate)
+
+TONE: Respectful, professional, genuine, not desperate, conversational
 
 AVOID:
-- "This is my last email..." (sounds desperate)
 - Guilt trips or FOMO tactics
 - Being passive-aggressive
 - "I'm shocked you haven't responded..."
@@ -8204,12 +8255,12 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
 
             // Build account data once so we can send it for preview
             let account = null;
-            if (selectedContact.account || selectedContact.account_id) {
-              const accountId = selectedContact.account?.id || selectedContact.account_id;
-              if (window.BackgroundAccountsLoader) {
-                const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
-                account = accounts.find(a => a.id === accountId) || null;
-              }
+                  if (selectedContact.account || selectedContact.account_id) {
+                    const accountId = selectedContact.account?.id || selectedContact.account_id;
+                    if (window.BackgroundAccountsLoader) {
+                      const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+                      account = accounts.find(a => a.id === accountId) || null;
+                    }
             }
             if (!account && selectedContact.account) {
               account = selectedContact.account;
