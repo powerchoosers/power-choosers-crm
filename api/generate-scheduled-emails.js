@@ -89,37 +89,87 @@ function validateNepqContent(subject, text, toneOpener) {
     errors.push('Contains forbidden salesy phrasing (I saw/noticed/read, hope this finds you well, just following up, my name is, wanted to reach out).');
   }
 
-  // Tone opener must appear near the start
+  // Tone opener must appear near the start (pattern-based validation for hybrid approach)
   if (toneOpener) {
-    // Clean the tone opener for comparison (remove trailing punctuation)
+    // Helper function to check if text has a valid tone opener pattern
+    const hasValidToneOpenerPattern = (text) => {
+      if (!text || typeof text !== 'string') return false;
+      
+      const lower = text.toLowerCase().trim();
+      // Remove any leading newlines/whitespace for cleaner matching
+      const cleanText = lower.replace(/^\s+/, '');
+      
+      // Check for known valid openers (check first 150 chars to be safe)
+      const textStart = cleanText.substring(0, 150);
+      const knownOpeners = [
+        "let me ask you something", "so here's the thing", "honestly", "looking at your situation",
+        "question for you", "here's what i'm seeing", "most people i talk to", "from what i'm hearing",
+        "i've found that teams like yours", "curious", "real talk", "you ever considered",
+        "did you know", "here's something most teams miss", "ever think about", "quick question",
+        "real question", "here's the thing", "so here's what", "let me ask", "quick thought"
+      ];
+      
+      // Check if any known opener appears near the start
+      const hasKnownOpener = knownOpeners.some(opener => {
+        const idx = textStart.indexOf(opener);
+        return idx !== -1 && idx < 100; // Must be within first 100 chars
+      });
+      if (hasKnownOpener) return true;
+      
+      // Pattern-based check: conversational opener ending with — or — followed by question
+      // Pattern: short phrase (2-6 words) ending with em dash or dash, followed by question
+      const openerPattern = /^(so|here's|let me|question|honestly|curious|real talk|looking at|most people|from what|i've found|you ever|did you|ever think|quick|real)\s+[^—\n]{0,40}[—\-]\s*[^?]*\?/i;
+      if (openerPattern.test(textStart)) return true;
+      
+      // Also check for simple conversational patterns (phrases ending with dash)
+      const simplePatterns = [
+        /^(so|here's|let me|question|honestly|curious|real talk)\s+/i,
+        /^[a-z\s]{2,30}[—\-]\s*[a-z]/i  // Short phrase ending with dash
+      ];
+      return simplePatterns.some(pattern => pattern.test(textStart));
+    };
+    
+    // Check if body has a valid tone opener pattern (not just exact match)
+    const greetingMatch = body.match(/^(Hi|Hello|Hey)\s+[^\n]*,?\n?/i);
+    const bodyAfterGreeting = greetingMatch ? body.slice(greetingMatch[0].length).trim() : body;
+    const hasValidOpener = hasValidToneOpenerPattern(bodyAfterGreeting);
+    
+    // Also check for exact match (for backward compatibility)
     const cleanToneOpener = toneOpener.replace(/[—\-]+$/, '').trim();
     const openerIdx = body.toLowerCase().indexOf(cleanToneOpener.toLowerCase());
 
-    if (openerIdx === -1) {
+    if (!hasValidOpener && openerIdx === -1) {
       // Auto-insert the tone opener if missing (fallback mechanism)
-      const greetingMatch = body.match(/^(Hi|Hello|Hey)\s+[^\n]*,?\n?/i);
       // #region agent log
-      const logData1 = {location:'generate-scheduled-emails.js:94',message:'Tone opener missing - checking greeting',data:{hasGreeting:!!greetingMatch,bodyPreview:body.substring(0,150),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+      const logData1 = {location:'generate-scheduled-emails.js:133',message:'Tone opener missing - checking greeting',data:{hasGreeting:!!greetingMatch,bodyPreview:body.substring(0,150),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
       fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData1)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData1))});
       // #endregion
       if (greetingMatch) {
         const greeting = greetingMatch[0];
         const restOfBody = body.slice(greeting.length).trim();
-        // CRITICAL FIX: Check if tone opener already exists in restOfBody (even if slightly different format)
-        const cleanToneOpenerForCheck = toneOpener.replace(/[—\-]+$/, '').trim().toLowerCase();
-        const restLower = restOfBody.toLowerCase();
-        // If tone opener already exists in the body (even after greeting), don't insert again
-        if (restLower.includes(cleanToneOpenerForCheck)) {
+        
+        // Check if a valid tone opener pattern exists (using pattern-based validation)
+        const hasValidOpenerPattern = hasValidToneOpenerPattern(restOfBody);
+        
+        if (hasValidOpenerPattern) {
           // #region agent log
-          const logData2 = {location:'generate-scheduled-emails.js:103',message:'Tone opener already exists in body, skipping auto-insert',data:{toneOpener:toneOpener?.substring(0,30),restPreview:restOfBody.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+          const logData2 = {location:'generate-scheduled-emails.js:127',message:'Valid tone opener pattern already exists in body, skipping auto-insert',data:{restPreview:restOfBody.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
           fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData2)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData2))});
           // #endregion
-          // Don't modify body - it already has the tone opener
+          // Don't modify body - it already has a valid tone opener
+          // BUT ensure proper line break after greeting for paragraph spacing
+          if (!greeting.endsWith('\n\n') && !greeting.endsWith('\n')) {
+            body = greeting.trim() + '\n\n' + restOfBody;
+          } else if (greeting.endsWith('\n') && !greeting.endsWith('\n\n')) {
+            body = greeting.trim() + '\n' + restOfBody;
+          }
         } else {
           const bodyBefore = body;
-          body = greeting + (greeting.endsWith('\n') ? '' : '\n') + toneOpener + ' ' + restOfBody;
+          // FIX: Ensure proper paragraph spacing - greeting needs double newline, then tone opener, then space before content
+          const cleanGreeting = greeting.trim();
+          body = cleanGreeting + '\n\n' + toneOpener + ' ' + restOfBody;
           // #region agent log
-          const logData3 = {location:'generate-scheduled-emails.js:108',message:'Tone opener AUTO-INSERTED',data:{bodyBefore:bodyBefore.substring(0,150),bodyAfter:body.substring(0,200),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+          const logData3 = {location:'generate-scheduled-emails.js:123',message:'Tone opener AUTO-INSERTED',data:{bodyBefore:bodyBefore.substring(0,150),bodyAfter:body.substring(0,200),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
           fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData3)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData3))});
           // #endregion
         }
@@ -127,8 +177,8 @@ function validateNepqContent(subject, text, toneOpener) {
       } else {
         errors.push(`Tone opener missing: "${toneOpener}" must be the first line after the greeting.`);
       }
-    } else if (openerIdx > 200) { // Increased tolerance from 160 to 200
-      errors.push(`Tone opener is too far down the email. It must start immediately after the greeting: "${toneOpener}".`);
+    } else if (!hasValidOpener && openerIdx > 200) { // Increased tolerance from 160 to 200
+      errors.push(`Tone opener missing or too far down. The email must start with a conversational opener (like "${toneOpener}") immediately after the greeting.`);
     }
   }
 
