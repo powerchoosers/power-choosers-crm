@@ -3430,42 +3430,65 @@
           startLiveCallTimer(card, twilioCallSid || callId);
           // Populate in-call contact display (keep header title simple)
           try {
-            // Only resolve phone meta if we don't already have context with name/company
-            // This prevents losing the name when navigating away before call connects
+            // Check if we have existing context - look for IDs, names, or company info
+            // This prevents losing context when navigating away before call connects
             const hasExistingContext = currentCallContext && (
+              currentCallContext.accountId ||
+              currentCallContext.contactId ||
               currentCallContext.name || 
               currentCallContext.contactName ||
               currentCallContext.company || 
               currentCallContext.accountName
             );
             
+            console.debug('[Phone] Call accept - hasExistingContext:', hasExistingContext, 'currentCallContext:', currentCallContext);
+            
             let meta = {};
             if (!hasExistingContext) {
               // Only resolve if we don't have context - prevents DOM lookup after navigation
-              meta = await resolvePhoneMeta(number).catch(() => ({}));
+              console.debug('[Phone] No existing context, resolving phone meta for:', number);
+              meta = await resolvePhoneMeta(number).catch((err) => {
+                console.warn('[Phone] Failed to resolve phone meta:', err);
+                return {};
+              });
+            } else {
+              console.debug('[Phone] Using existing context, skipping phone meta resolution');
             }
             
             // Merge call context data with resolved meta to ensure company info is preserved
             // ALWAYS prefer existing context over resolved meta to preserve names after navigation
             const mergedMeta = {
               ...meta,
+              // Always merge context if it exists, preserving all fields
               ...(currentCallContext && {
+                // Preserve IDs first (these are the most reliable identifiers)
+                contactId: currentCallContext.contactId || meta.contactId || null,
+                accountId: currentCallContext.accountId || meta.accountId || null,
                 // Always prefer existing context over resolved meta to preserve names after navigation
-                name: currentCallContext.name || currentCallContext.contactName || meta.name,
-                account: currentCallContext.company || currentCallContext.accountName || meta.account,
-                company: currentCallContext.company || currentCallContext.accountName || meta.company,
+                name: currentCallContext.name || currentCallContext.contactName || meta.name || '',
+                account: currentCallContext.company || currentCallContext.accountName || meta.account || '',
+                company: currentCallContext.company || currentCallContext.accountName || meta.company || '',
+                accountName: currentCallContext.accountName || meta.accountName || '',
+                contactName: currentCallContext.contactName || meta.contactName || '',
                 // In company mode, prefer account context only to avoid contact contamination
-                city: currentCallContext.isCompanyPhone ? (currentCallContext.city || '') : (currentCallContext.city || meta.city),
-                state: currentCallContext.isCompanyPhone ? (currentCallContext.state || '') : (currentCallContext.state || meta.state),
+                city: currentCallContext.isCompanyPhone ? (currentCallContext.city || meta.city || '') : (currentCallContext.city || meta.city || ''),
+                state: currentCallContext.isCompanyPhone ? (currentCallContext.state || meta.state || '') : (currentCallContext.state || meta.state || ''),
                 // Always preserve domain from context - needed for favicon fallback
-                domain: currentCallContext.domain || meta.domain,
+                domain: currentCallContext.domain || meta.domain || '',
                 // Preserve logoUrl from context even if empty - prevents favicon from being cleared
                 // Only use meta.logoUrl if currentCallContext doesn't have domain for fallback
-                logoUrl: (currentCallContext.logoUrl !== undefined) ? currentCallContext.logoUrl : meta.logoUrl
+                logoUrl: (currentCallContext.logoUrl !== undefined && currentCallContext.logoUrl !== null) ? currentCallContext.logoUrl : (meta.logoUrl || ''),
+                // Preserve phone type and other flags
+                isCompanyPhone: currentCallContext.isCompanyPhone !== undefined ? currentCallContext.isCompanyPhone : (meta.isCompanyPhone || false),
+                phoneType: currentCallContext.phoneType || meta.phoneType || null
               })
             };
+            
+            console.debug('[Phone] Merged meta for contact display:', mergedMeta);
             setContactDisplay(mergedMeta, number);
-          } catch(_) {}
+          } catch(err) {
+            console.error('[Phone] Error setting contact display on call accept:', err);
+          }
           // Update call status to connected using same call ID
           updateCallStatus(number, 'connected', callStartTime, 0, twilioCallSid || callId);
           // Immediately notify account detail to refresh recent calls (so it appears without reload)
@@ -4881,20 +4904,23 @@
       currentCallContext.suggestedContactId = null;
       currentCallContext.suggestedContactName = '';
       
-      // Set new context
-      currentCallContext.accountId = ctx.accountId || null;
-      currentCallContext.accountName = ctx.accountName || null;
-      currentCallContext.contactId = ctx.contactId || null;
-      currentCallContext.contactName = ctx.contactName || null;
-      if (ctx.company) currentCallContext.company = ctx.company;
-      if (ctx.name) currentCallContext.name = ctx.name;
-      if (ctx.city) currentCallContext.city = ctx.city;
-      if (ctx.state) currentCallContext.state = ctx.state;
-      if (ctx.domain) currentCallContext.domain = ctx.domain;
-      if (ctx.logoUrl) currentCallContext.logoUrl = ctx.logoUrl;
-      if (ctx.isCompanyPhone !== undefined) currentCallContext.isCompanyPhone = ctx.isCompanyPhone;
-      if (ctx.suggestedContactId) currentCallContext.suggestedContactId = ctx.suggestedContactId;
-      if (ctx.suggestedContactName) currentCallContext.suggestedContactName = ctx.suggestedContactName;
+      // Set new context - preserve all fields including empty strings and nulls
+      // Use explicit checks to preserve empty strings (which are falsy but valid)
+      currentCallContext.accountId = (ctx.accountId !== undefined && ctx.accountId !== null) ? ctx.accountId : null;
+      currentCallContext.accountName = (ctx.accountName !== undefined && ctx.accountName !== null) ? ctx.accountName : null;
+      currentCallContext.contactId = (ctx.contactId !== undefined && ctx.contactId !== null) ? ctx.contactId : null;
+      currentCallContext.contactName = (ctx.contactName !== undefined && ctx.contactName !== null) ? ctx.contactName : null;
+      currentCallContext.company = (ctx.company !== undefined) ? ctx.company : '';
+      currentCallContext.name = (ctx.name !== undefined) ? ctx.name : '';
+      currentCallContext.city = (ctx.city !== undefined) ? ctx.city : '';
+      currentCallContext.state = (ctx.state !== undefined) ? ctx.state : '';
+      currentCallContext.domain = (ctx.domain !== undefined) ? ctx.domain : '';
+      currentCallContext.logoUrl = (ctx.logoUrl !== undefined) ? ctx.logoUrl : '';
+      currentCallContext.isCompanyPhone = (ctx.isCompanyPhone !== undefined) ? ctx.isCompanyPhone : false;
+      currentCallContext.suggestedContactId = (ctx.suggestedContactId !== undefined && ctx.suggestedContactId !== null) ? ctx.suggestedContactId : null;
+      currentCallContext.suggestedContactName = (ctx.suggestedContactName !== undefined) ? ctx.suggestedContactName : '';
+      // Preserve phoneType if provided
+      if (ctx.phoneType !== undefined) currentCallContext.phoneType = ctx.phoneType;
       
       console.debug('[Phone Widget] Call context updated:', currentCallContext);
       console.log('[Phone Widget][DEBUG] setCallContext called with:', {
