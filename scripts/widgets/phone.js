@@ -1009,23 +1009,29 @@
             if (resp && resp.ok) {
               const j = await resp.json().catch(() => ({}));
               if (j) {
-                let c = j.contact || (Array.isArray(j.contacts) && j.contacts[0]) || j.person || ((j.name || j.title || j.email) ? j : null);
-                let a = j.account || (Array.isArray(j.accounts) && j.accounts[0]) || j.company || ((j.company || j.accountName || j.domain) ? j : null);
-                if (c || a) {
-                  const resolved = {
-                    ...meta,
-                    name: (c && (c.name || ((c.firstName||c.first_name||'') + ' ' + (c.lastName||c.last_name||'')).trim())) || '',
-                    account: (a && (a.name || a.accountName || a.company || '')) || (c && (c.account || c.company || '')) || '',
-                    title: (c && (c.title || c.jobTitle || c.job_title)) || '',
-                    city: (c && c.city) || (a && a.city) || '',
-                    state: (c && c.state) || (a && a.state) || '',
-                    domain: (c && (c.domain || (c.email||'').split('@')[1])) || (a && (a.domain || a.website)) || '',
-                    logoUrl: (a && a.logoUrl) || '',
-                    contactId: (c && (c.id || c.contactId || c._id)) || null,
-                    accountId: (a && (a.id || a.accountId || a._id)) || null
-                  };
-                  console.debug('[Phone] Resolved metadata (memoized route):', { url, resolved });
-                  return resolved;
+                // Skip disabled endpoints
+                if (j.success === false && j.disabled) {
+                  console.debug('[Phone] Memoized route is disabled, invalidating memo');
+                  window.__pcPhoneSearchRoute = null;
+                } else {
+                  let c = j.contact || (Array.isArray(j.contacts) && j.contacts[0]) || j.person || ((j.name || j.title || j.email) ? j : null);
+                  let a = j.account || (Array.isArray(j.accounts) && j.accounts[0]) || j.company || ((j.company || j.accountName || j.domain) ? j : null);
+                  if (c || a) {
+                    const resolved = {
+                      ...meta,
+                      name: (c && (c.name || ((c.firstName||c.first_name||'') + ' ' + (c.lastName||c.last_name||'')).trim())) || '',
+                      account: (a && (a.name || a.accountName || a.company || '')) || (c && (c.account || c.company || '')) || '',
+                      title: (c && (c.title || c.jobTitle || c.job_title)) || '',
+                      city: (c && c.city) || (a && a.city) || '',
+                      state: (c && c.state) || (a && a.state) || '',
+                      domain: (c && (c.domain || (c.email||'').split('@')[1])) || (a && (a.domain || a.website)) || '',
+                      logoUrl: (a && a.logoUrl) || '',
+                      contactId: (c && (c.id || c.contactId || c._id)) || null,
+                      accountId: (a && (a.id || a.accountId || a._id)) || null
+                    };
+                    console.debug('[Phone] Resolved metadata (memoized route):', { url, resolved });
+                    return resolved;
+                  }
                 }
               }
             } else {
@@ -1037,13 +1043,13 @@
         // Try multiple likely routes and payloads to avoid 404s when backend changes
         async function tryFetches() {
           const routes = [];
-          // GET variants
+          // GET variants (try these first - they're the primary working endpoints)
           candidates.forEach(p => {
             routes.push({ url: `${base}/api/search?phone=${encodeURIComponent(p)}`, method: 'GET' });
             routes.push({ url: `${base}/api/contacts/search?phone=${encodeURIComponent(p)}`, method: 'GET' });
             routes.push({ url: `${base}/api/v1/search?phone=${encodeURIComponent(p)}`, method: 'GET' });
           });
-          // POST variants
+          // POST variants (try these second - some may be disabled)
           const bodies = candidates.map(p => ([
             { phone: p },
             { e164: (p.length===10?`+1${p}`:(p.startsWith('1')&&p.length===11?`+${p}`:`+${p}`)) },
@@ -1055,9 +1061,20 @@
           for (const r of routes) {
             try {
               const resp = await fetch(r.url, r.method === 'POST' ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(r.body) } : undefined);
-              if (!resp || !resp.ok) { continue; }
+              if (!resp || !resp.ok) { 
+                console.debug('[Phone] Search route failed:', r.url, resp.status);
+                continue; 
+              }
               const j = await resp.json().catch(() => ({}));
-              if (!j) continue;
+              if (!j) {
+                console.debug('[Phone] Search route returned no JSON:', r.url);
+                continue;
+              }
+              // Skip disabled endpoints (they return success: false with message)
+              if (j.success === false && j.disabled) {
+                console.debug('[Phone] Search route is disabled:', r.url);
+                continue;
+              }
               // Accept several shapes
               // { contact, account }
               let c = j.contact || null;
