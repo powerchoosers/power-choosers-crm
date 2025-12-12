@@ -3339,15 +3339,15 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
 
     // Create tracking icons container
     const trackingContainer = document.createElement('div');
-    trackingContainer.className = 'email-tracking-icons';
-    trackingContainer.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+    trackingContainer.className = 'email-tracking-icons qa-actions';
+    trackingContainer.style.cssText = 'display: inline-flex; align-items: center; gap: 8px;';
 
     // Create eye icon (opens) button
     const openBtn = document.createElement('button');
     openBtn.className = `quick-action-btn email-tracking-open-btn ${hasOpens ? 'opened' : ''}`;
     openBtn.title = hasOpens ? `Opened ${openCount} time${openCount !== 1 ? 's' : ''}` : 'Not opened';
     openBtn.setAttribute('aria-label', hasOpens ? `Opened ${openCount} time${openCount !== 1 ? 's' : ''}` : 'Not opened');
-    openBtn.style.cssText = 'position: relative; background: transparent; border: 1px solid var(--border-light); color: var(--text-primary); padding: 6px; border-radius: var(--border-radius-sm); cursor: pointer; display: flex; align-items: center; justify-content: center;';
+    openBtn.style.cssText = 'position: relative; width: 36px; height: 36px; min-width: 36px; min-height: 36px; padding: 0;';
     openBtn.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -3364,7 +3364,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     clickBtn.className = `quick-action-btn email-tracking-click-btn ${hasClicks ? 'opened' : ''}`;
     clickBtn.title = hasClicks ? `Clicked ${clickCount} time${clickCount !== 1 ? 's' : ''}` : 'Not clicked';
     clickBtn.setAttribute('aria-label', hasClicks ? `Clicked ${clickCount} time${clickCount !== 1 ? 's' : ''}` : 'Not clicked');
-    clickBtn.style.cssText = 'position: relative; background: transparent; border: 1px solid var(--border-light); color: var(--text-primary); padding: 6px; border-radius: var(--border-radius-sm); cursor: pointer; display: flex; align-items: center; justify-content: center;';
+    clickBtn.style.cssText = 'position: relative; width: 36px; height: 36px; min-width: 36px; min-height: 36px; padding: 0;';
     clickBtn.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/>
@@ -3385,7 +3385,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     // Create divider line
     const divider = document.createElement('div');
     divider.className = 'email-tracking-divider';
-    divider.style.cssText = 'width: 1px; height: 24px; background-color: var(--border-light); margin: 0 8px;';
+    divider.style.cssText = 'width: 1px; height: 36px; background-color: var(--border-light); margin: 0 8px; align-self: center;';
 
     // Insert tracking icons and divider before reply button (or before delete button if no reply button)
     const replyBtn = els.replyBtn;

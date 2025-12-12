@@ -8202,86 +8202,37 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               ? substituteBracketTokensInPrompt(prompt, selectedContact)
               : prompt;
 
-            const response = await fetch(`${base}/api/perplexity-email`, {
+            // Build account data once so we can send it for preview
+            let account = null;
+            if (selectedContact.account || selectedContact.account_id) {
+              const accountId = selectedContact.account?.id || selectedContact.account_id;
+              if (window.BackgroundAccountsLoader) {
+                const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
+                account = accounts.find(a => a.id === accountId) || null;
+              }
+            }
+            if (!account && selectedContact.account) {
+              account = selectedContact.account;
+            }
+
+            const emailPayload = {
+              aiMode: mode,
+              aiPrompt: substitutedPrompt,
+              contactName: selectedContact.full_name || selectedContact.name || '',
+              contactCompany: selectedContact.company || selectedContact.accountName || '',
+              contactData: selectedContact,
+              accountData: account || {},
+              stepIndex: typeof step?.order === 'number' ? step.order : (typeof step?.sequenceIndex === 'number' ? step.sequenceIndex : 0),
+              stepType: step?.type || step?.template || '',
+              template: step?.template || ''
+            };
+
+            const response = await fetch(`${base}/api/generate-scheduled-emails`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                prompt: substitutedPrompt,
-                mode: mode,
-                recipient: (() => {
-                  // Build enriched recipient object with account data
-                  const recipient = {
-                    name: selectedContact.full_name || selectedContact.name || '',
-                    firstName: selectedContact.first_name || selectedContact.firstName || (selectedContact.name?.split(' ')[0] || ''),
-                    lastName: selectedContact.last_name || selectedContact.lastName || (selectedContact.name?.split(' ').slice(1).join(' ') || ''),
-                    company: selectedContact.company || selectedContact.accountName || '',
-                    email: selectedContact.email || '',
-                    title: selectedContact.title || selectedContact.job || selectedContact.role || '',
-                    linkedin: selectedContact.linkedin || selectedContact.linkedinUrl || '',
-                    linkedinUrl: selectedContact.linkedin || selectedContact.linkedinUrl || '',
-                    seniority: selectedContact.seniority || '',
-                    department: selectedContact.department || '',
-                    industry: selectedContact.industry || selectedContact.account?.industry || ''
-                  };
-
-                  // Add account data if available
-                  if (selectedContact.account || selectedContact.account_id) {
-                    const accountId = selectedContact.account?.id || selectedContact.account_id;
-                    // Try to get account from cache
-                    let account = null;
-                    if (window.BackgroundAccountsLoader) {
-                      const accounts = window.BackgroundAccountsLoader.getAccountsData() || [];
-                      account = accounts.find(a => a.id === accountId) || null;
-                    }
-
-                    if (account) {
-                      recipient.account = {
-                        id: account.id,
-                        name: account.accountName || account.name || '',
-                        industry: account.industry || '',
-                        domain: account.domain || account.website || '',
-                        city: account.city || account.billingCity || account.locationCity || '',
-                        state: account.state || account.billingState || account.region || '',
-                        shortDescription: account.shortDescription || account.short_desc || account.descriptionShort || account.description || '',
-                        linkedin: account.linkedin || account.linkedinUrl || account.companyLinkedin || '',
-                        linkedinUrl: account.linkedin || account.linkedinUrl || account.companyLinkedin || '',
-                        employees: account.employees || account.companyEmployees || null,
-                        squareFootage: account.squareFootage || account.square_footage || account.companySquareFootage || null,
-                        occupancyPct: account.occupancyPct || account.occupancy_pct || account.companyOccupancyPct || null,
-                        annualUsage: account.annualUsage || account.annualKilowattUsage || account.annual_usage || '',
-                        electricitySupplier: account.electricitySupplier || '',
-                        currentRate: account.currentRate || '',
-                        contractEndDate: account.contractEndDate || account.contractEnd || account.contract_end_date || ''
-                      };
-
-                      recipient.energy = {
-                        supplier: account.electricitySupplier || '',
-                        currentRate: account.currentRate || '',
-                        usage: account.annualUsage || '',
-                        contractEnd: account.contractEndDate || account.contractEnd || ''
-                      };
-
-                      // Set industry from account if not already set
-                      if (!recipient.industry && account.industry) {
-                        recipient.industry = account.industry;
-                      }
-                    }
-                  }
-
-                  // Also include account data directly from contact if present
-                  if (selectedContact.account) {
-                    recipient.account = { ...selectedContact.account };
-                    if (selectedContact.account.industry && !recipient.industry) {
-                      recipient.industry = selectedContact.account.industry;
-                    }
-                  }
-
-                  return recipient;
-                })(),
-                senderName: senderFirst || ' ',
-                marketContext: marketContext,
-                meetingPreferences: meetingPreferences,
-                industrySegmentation: industrySegmentation
+                preview: true,
+                emailData: emailPayload
               })
             });
 
@@ -8292,21 +8243,9 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               const previewBodyEl = card.querySelector('.preview-body');
               const previewSubjectEl = card.querySelector('.preview-subject');
 
-              // Format the result similar to email-compose-global.js
-              let html = '';
-              let subject = '';
-
-              if (result.templateType) {
-                // HTML template format
-                const formatted = formatTemplatedEmail(result.output || result, selectedContact, result.templateType);
-                subject = formatted.subject;
-                html = formatted.html;
-              } else {
-                // Standard format
-                const formatted = formatGeneratedEmail(result.output || result, selectedContact, mode);
-                subject = formatted.subject;
-                html = formatted.html;
-              }
+              // Use server-side preview (same as production generation)
+              const subject = result.subject || 'Email subject';
+              const html = result.html || (result.text ? `<p style="margin:0 0 16px 0; color:#222;">${String(result.text).replace(/\n/g, '<br>')}</p>` : '<p>Email content</p>');
 
               // Get signature for preview
               const stepId = card.getAttribute('data-id');

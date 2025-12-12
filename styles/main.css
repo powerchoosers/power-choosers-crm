@@ -17914,6 +17914,35 @@ input.row-select[type="checkbox"]:focus-visible {
     align-items: center;
 }
 
+/* Keep tracking badges consistent outside the table (email detail) */
+.email-tracking-icons .tracking-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: var(--orange-primary, var(--orange-subtle, #f18335)) !important;
+    background-color: var(--orange-primary, var(--orange-subtle, #f18335)) !important;
+    color: #fff !important;
+    font-size: 10px;
+    font-weight: 600;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid var(--bg-card, var(--bg-primary, #1f1f1f)) !important;
+    z-index: 2;
+}
+
+/* Fill tracking buttons when they have data (opened state) */
+.email-tracking-icons .quick-action-btn.opened,
+.email-tracking-icons .qa-btn.opened {
+    background: var(--orange-primary, var(--orange-subtle, #f18335)) !important;
+    border-color: var(--orange-primary, var(--orange-subtle, #f18335)) !important;
+    color: #fff !important;
+}
+
 .tracking-icon {
     position: relative;
     display: flex;
