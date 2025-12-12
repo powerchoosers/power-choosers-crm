@@ -3334,6 +3334,9 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
     const hasOpens = openCount > 0;
     const hasClicks = clickCount > 0;
 
+    // Shared badge styling to keep corners consistent with redesigned list
+    const trackingBadgeStyle = 'position: absolute; top: -6px; right: -6px; background: var(--orange-primary, var(--orange-subtle, #f18335)) !important; background-color: var(--orange-primary, var(--orange-subtle, #f18335)) !important; color: #fff !important; font-size: 10px; font-weight: 600; min-width: 16px; height: 16px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 4px; border: 2px solid var(--bg-card, var(--bg-primary, #1f1f1f)); z-index: 2;';
+
     // Create tracking icons container
     const trackingContainer = document.createElement('div');
     trackingContainer.className = 'email-tracking-icons';
@@ -3350,7 +3353,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
         <circle cx="12" cy="12" r="3"/>
       </svg>
-      ${hasOpens ? `<span class="tracking-badge" style="position: absolute; top: -4px; right: -4px; background-color: var(--orange-subtle); color: white; font-size: 9px; font-weight: 600; min-width: 14px; height: 14px; border-radius: 7px; display: flex; align-items: center; justify-content: center; padding: 0 3px; border: 1px solid var(--bg-primary);">${openCount}</span>` : ''}
+      ${hasOpens ? `<span class="tracking-badge" style="${trackingBadgeStyle}">${openCount}</span>` : ''}
     `;
     openBtn.addEventListener('click', () => {
       showTrackingDetails(email, 'opens');
@@ -3358,7 +3361,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
 
     // Create click icon button
     const clickBtn = document.createElement('button');
-    clickBtn.className = 'quick-action-btn email-tracking-click-btn';
+    clickBtn.className = `quick-action-btn email-tracking-click-btn ${hasClicks ? 'opened' : ''}`;
     clickBtn.title = hasClicks ? `Clicked ${clickCount} time${clickCount !== 1 ? 's' : ''}` : 'Not clicked';
     clickBtn.setAttribute('aria-label', hasClicks ? `Clicked ${clickCount} time${clickCount !== 1 ? 's' : ''}` : 'Not clicked');
     clickBtn.style.cssText = 'position: relative; background: transparent; border: 1px solid var(--border-light); color: var(--text-primary); padding: 6px; border-radius: var(--border-radius-sm); cursor: pointer; display: flex; align-items: center; justify-content: center;';
@@ -3369,7 +3372,7 @@ Content: ${emailThreadContext.content.substring(0, 500)}${emailThreadContext.con
         <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-3.5"/>
         <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>
       </svg>
-      ${hasClicks ? `<span class="tracking-badge" style="position: absolute; top: -4px; right: -4px; background-color: var(--orange-subtle); color: white; font-size: 9px; font-weight: 600; min-width: 14px; height: 14px; border-radius: 7px; display: flex; align-items: center; justify-content: center; padding: 0 3px; border: 1px solid var(--bg-primary);">${clickCount}</span>` : ''}
+      ${hasClicks ? `<span class="tracking-badge" style="${trackingBadgeStyle}">${clickCount}</span>` : ''}
     `;
     clickBtn.addEventListener('click', () => {
       showTrackingDetails(email, 'clicks');

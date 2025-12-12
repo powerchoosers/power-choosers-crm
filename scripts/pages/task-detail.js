@@ -6466,31 +6466,32 @@
   // This ensures account updates (contract end date, supplier, etc.) are visible immediately
   if (!document._taskDetailAccountDetailsRestoreBound) {
     const onAccountDetailsRestore = async (e) => {
-    // Only refresh if we're currently viewing a task with an account
-    if (state.currentTask && state.account?.id) {
-      const accountId = state.account.id;
-      console.log('[TaskDetail] Returning from account-detail, refreshing account data:', accountId);
-      
-      try {
-        // Force reload account data from Firestore (bypass cache to get latest changes)
-        if (window.firebaseDB && accountId) {
-          const accountDoc = await window.firebaseDB.collection('accounts').doc(accountId).get();
-          if (accountDoc.exists) {
-            const updatedAccount = { id: accountDoc.id, ...accountDoc.data() };
-            state.account = updatedAccount;
-            console.log('[TaskDetail] ✓ Reloaded account data after returning from account-detail');
-            
-            // Re-render the task page to show updated account information
-            renderTaskPage();
-            
-            // Update cache with fresh data
-            if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
-              await window.CacheManager.updateRecord('accounts', accountId, updatedAccount);
+      // Only refresh if we're currently viewing a task with an account
+      if (state.currentTask && state.account?.id) {
+        const accountId = state.account.id;
+        console.log('[TaskDetail] Returning from account-detail, refreshing account data:', accountId);
+        
+        try {
+          // Force reload account data from Firestore (bypass cache to get latest changes)
+          if (window.firebaseDB && accountId) {
+            const accountDoc = await window.firebaseDB.collection('accounts').doc(accountId).get();
+            if (accountDoc.exists) {
+              const updatedAccount = { id: accountDoc.id, ...accountDoc.data() };
+              state.account = updatedAccount;
+              console.log('[TaskDetail] ✓ Reloaded account data after returning from account-detail');
+              
+              // Re-render the task page to show updated account information
+              renderTaskPage();
+              
+              // Update cache with fresh data
+              if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+                await window.CacheManager.updateRecord('accounts', accountId, updatedAccount);
+              }
             }
           }
+        } catch (error) {
+          console.warn('[TaskDetail] Failed to refresh account data after returning from account-detail:', error);
         }
-      } catch (error) {
-        console.warn('[TaskDetail] Failed to refresh account data after returning from account-detail:', error);
       }
     };
 
