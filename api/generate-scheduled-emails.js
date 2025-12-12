@@ -137,14 +137,14 @@ async function generatePreviewEmail(emailData) {
   // Detect industry (same priority as main flow)
   let recipientIndustry = accountData.industry || contactData.industry || '';
   if (!recipientIndustry && (emailData.contactCompany || contactData.company)) {
-    recipientIndustry = inferIndustryFromCompanyName(emailData.contactCompany || contactData.company);
+    recipientIndustry = IndustryDetection.inferIndustryFromCompanyName(emailData.contactCompany || contactData.company);
   }
   if (!recipientIndustry) {
     const accountDesc = accountData.shortDescription || accountData.short_desc ||
       accountData.descriptionShort || accountData.description ||
       accountData.companyDescription || accountData.accountDescription || '';
     if (accountDesc) {
-      recipientIndustry = inferIndustryFromDescription(accountDesc);
+      recipientIndustry = IndustryDetection.inferIndustryFromDescription(accountDesc);
     }
   }
   if (!recipientIndustry) recipientIndustry = 'Default';
@@ -397,100 +397,10 @@ async function generatePreviewEmail(emailData) {
   return { ok: true, generatedContent, toneOpener };
 }
 
-// ========== INDUSTRY DETECTION FUNCTIONS ==========
-
-// Infer industry from company name
-function inferIndustryFromCompanyName(companyName) {
-  if (!companyName) return '';
-  
-  const name = String(companyName).toLowerCase();
-  
-  // Manufacturing
-  if (/\b(manufacturing|manufacturer|industrial|factory|plant|fabrication|production|assembly)\b/i.test(name)) {
-    return 'Manufacturing';
-  }
-  
-  // Hospitality
-  if (/\b(hotel|inn|motel|resort|lodge|restaurant|cafe|dining|hospitality)\b/i.test(name)) {
-    return 'Hospitality';
-  }
-  
-  // Healthcare
-  if (/\b(hospital|clinic|medical|healthcare|health\s*care|physician|doctor|dental|pharmacy)\b/i.test(name)) {
-    return 'Healthcare';
-  }
-  
-  // Retail
-  if (/\b(retail|store|shop|market|outlet|merchandise|boutique)\b/i.test(name)) {
-    return 'Retail';
-  }
-  
-  // Logistics/Transportation
-  if (/\b(logistics|transportation|warehouse|shipping|freight|delivery|distribution|trucking)\b/i.test(name)) {
-    return 'Logistics';
-  }
-  
-  // Data Center
-  if (/\b(data\s*center|datacenter|server|hosting|cloud|colo)\b/i.test(name)) {
-    return 'DataCenter';
-  }
-  
-  // Nonprofit
-  if (/\b(nonprofit|non-profit|charity|foundation|501c3|501\(c\)\(3\))\b/i.test(name)) {
-    return 'Nonprofit';
-  }
-  
-  return '';
-}
-
-// Infer industry from account description
-function inferIndustryFromDescription(description) {
-  if (!description) return '';
-  
-  const desc = String(description).toLowerCase();
-  
-  // Hospitality
-  if (/\b(hotel|inn|motel|resort|lodge|accommodation|hospitality|guest|room|booking|stay)\b/i.test(desc)) {
-    return 'Hospitality';
-  }
-  
-  // Restaurant/Food
-  if (/\b(restaurant|cafe|dining|food|beverage|menu|cuisine|chef)\b/i.test(desc)) {
-    return 'Hospitality';
-  }
-  
-  // Manufacturing
-  if (/\b(manufacturing|production|factory|plant|industrial|assembly|fabrication)\b/i.test(desc)) {
-    return 'Manufacturing';
-  }
-  
-  // Healthcare
-  if (/\b(hospital|clinic|medical|healthcare|patient|treatment|diagnosis|surgery)\b/i.test(desc)) {
-    return 'Healthcare';
-  }
-  
-  // Retail
-  if (/\b(retail|store|merchandise|shopping|customer|product|sale)\b/i.test(desc)) {
-    return 'Retail';
-  }
-  
-  // Logistics
-  if (/\b(logistics|warehouse|shipping|distribution|freight|transportation|delivery)\b/i.test(desc)) {
-    return 'Logistics';
-  }
-  
-  // Data Center
-  if (/\b(data\s*center|server|hosting|cloud|infrastructure|computing)\b/i.test(desc)) {
-    return 'DataCenter';
-  }
-  
-  // Nonprofit
-  if (/\b(nonprofit|charity|foundation|mission|donation|volunteer)\b/i.test(desc)) {
-    return 'Nonprofit';
-  }
-  
-  return '';
-}
+// ========== INDUSTRY DETECTION ==========
+// NOTE: Industry detection functions are now imported from _industry-detection.js
+// to ensure consistency across all email generation flows (preview, scheduled, compose).
+// The shared module includes comprehensive patterns for all industries.
 
 // ========== ANGLE SELECTION SYSTEM ==========
 // Simplified RANDOMIZED_ANGLES_BY_INDUSTRY (matches email-compose-global.js structure)
