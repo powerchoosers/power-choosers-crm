@@ -5,6 +5,18 @@ import logger from '../_logger.js';
 export default async function handler(req, res) {
     cors(req, res);
     
+    // FEATURE DISABLED: Twilio Lookup API deactivated by user
+    // Return success response to prevent console errors
+    res.setHeader('Content-Type', 'application/json');
+    res.writeHead(200);
+    res.end(JSON.stringify({
+        success: false,
+        disabled: true,
+        message: 'Phone lookup feature is currently disabled'
+    }));
+    return;
+    
+    /* DISABLED CODE - Uncomment when ready to re-enable
     if (req.method !== 'POST') {
         res.writeHead(405, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Method not allowed' }));
@@ -91,4 +103,5 @@ export default async function handler(req, res) {
             code: error.code || 'UNKNOWN'
         }));
     }
+    */
 };
