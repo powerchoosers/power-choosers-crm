@@ -1521,7 +1521,7 @@ const coldEmailSchema = {
         opening_hook: { type: "string", description: "Problem-aware opening about industry challenge or market condition (1-2 sentences, NO statistics)" },
         value_proposition: { type: "string", description: "How we help with specific measurable value (include percentages or dollar amounts)" },
         social_proof_optional: { type: "string", description: "Brief credibility with real outcomes (optional, 1 sentence)" },
-        cta_text: { type: "string", description: "Call-to-action button text for scheduling (flexible wording but must be about scheduling a meeting/consultation, e.g., 'Schedule Your Free Assessment', 'Book a Consultation', 'Explore Your Savings Potential')" },
+        cta_text: { type: "string", description: "Low-friction CTA - use qualifying questions for cold emails (e.g., 'Is this on your radar?', 'Have you already handled this?') or meeting requests for follow-ups (e.g., 'Schedule Your Free Assessment', 'Book a Consultation')" },
         cta_type: { type: "string", description: "CTA pattern used: qualifying_question, soft_ask_with_context, value_question, timing_question, or direct_meeting" },
         closing: { type: "string", description: "Closing line like 'Best regards,' or 'Cheers,' followed by sender's first name on new line" }
       },
@@ -2255,15 +2255,13 @@ You MUST structure the entire email around this primary angle. Do NOT switch to 
       ? `
 
 TONE OPENER (CRITICAL - FIRST LINE AFTER GREETING - MANDATORY):
-- The opening_hook MUST start with this EXACT phrase: "${toneOpener}"
-- This is NOT optional - it MUST be the first words after the greeting
-- Example structure:
-  greeting: "Hi ${firstName},"
-  opening_hook: "${toneOpener} [continue with angle-specific content]"
-- DO NOT put any text before this opener
-- DO NOT rephrase or change the opener
-- Use this opener ONLY ONCE at the very start of the body, then continue naturally
-- If you don't use this exact opener, the email will be rejected`
+- Your email body MUST begin with this EXACT tone opener: "${toneOpener}"
+- REQUIRED FORMAT: "${toneOpener}[problem awareness question]"
+- Example: "${toneOpener}how are you handling [specific issue]?"
+- You MUST use this opener exactly as provided - do not rephrase, shorten, or change it
+- The tone opener goes IMMEDIATELY after the greeting with no other text
+- If you do not include this exact opener, the email will be automatically rejected
+- This is not optional - it is a hard requirement for cold emails`
       : '';
 
     // NEPQ structure and guardrails (cold email only)
@@ -2338,7 +2336,7 @@ Generate text for these fields:
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: MUST be exactly "Hello ${firstName}," - Use ONLY the first name "${firstName}", NEVER use the full name. This is mandatory.
-- opening_hook: Start with SPECIFIC problem awareness or market condition (1-2 sentences). ${accountDescription ? 'Use the saved company description as INTERNAL CONTEXT ONLY (do NOT copy it word-for-word). You may reference ONE short detail from it in natural language, but do NOT open the email by restating their full marketing description or mission statement.' : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
+- opening_hook: MUST begin with the tone opener "${toneOpener}", then continue with problem awareness (1-2 sentences total). ${accountDescription ? 'Use the saved company description as INTERNAL CONTEXT ONLY (do NOT copy it word-for-word). You may reference ONE short detail from it in natural language, but do NOT open the email by restating their full marketing description or mission statement.' : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
   * Retail: Multiple locations, unpredictable costs, seasonal demand

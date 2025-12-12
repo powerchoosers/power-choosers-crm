@@ -69,11 +69,11 @@ function validateGeneratedContent(html, text, subject) {
 // ========== NEPQ VALIDATION ==========
 // Guardrails to keep generations aligned with NEPQ rules
 function validateNepqContent(subject, text, toneOpener) {
-  const body = (text || '').toString();
+  let body = (text || '').toString();
   const lower = body.toLowerCase();
   const errors = [];
 
-  // Forbidden phrases that trigger “old model” sales tone
+  // Forbidden phrases that trigger "old model" sales tone
   const forbidden = [
     /\bi\s+(saw|noticed|read|came across)\b/i,
     /hope this email finds you well/i,
@@ -87,10 +87,22 @@ function validateNepqContent(subject, text, toneOpener) {
 
   // Tone opener must appear near the start
   if (toneOpener) {
-    const openerIdx = body.indexOf(toneOpener);
+    // Clean the tone opener for comparison (remove trailing punctuation)
+    const cleanToneOpener = toneOpener.replace(/[—\-]+$/, '').trim();
+    const openerIdx = body.toLowerCase().indexOf(cleanToneOpener.toLowerCase());
+
     if (openerIdx === -1) {
-      errors.push(`Tone opener missing: "${toneOpener}" must be the first line after the greeting.`);
-    } else if (openerIdx > 160) {
+      // Auto-insert the tone opener if missing (fallback mechanism)
+      const greetingMatch = body.match(/^(Hi|Hello|Hey)\s+[^\n]*,?\n?/i);
+      if (greetingMatch) {
+        const greeting = greetingMatch[0];
+        const restOfBody = body.slice(greeting.length).trim();
+        body = greeting + (greeting.endsWith('\n') ? '' : '\n') + toneOpener + ' ' + restOfBody;
+        logger.log(`[NEPQ] Auto-inserted missing tone opener: "${toneOpener}"`);
+      } else {
+        errors.push(`Tone opener missing: "${toneOpener}" must be the first line after the greeting.`);
+      }
+    } else if (openerIdx > 200) { // Increased tolerance from 160 to 200
       errors.push(`Tone opener is too far down the email. It must start immediately after the greeting: "${toneOpener}".`);
     }
   }
@@ -120,7 +132,8 @@ function validateNepqContent(subject, text, toneOpener) {
 
   return {
     isValid: errors.length === 0,
-    reason: errors.join(' ')
+    reason: errors.join(' '),
+    modifiedBody: body // Return the potentially modified body
   };
 }
 
@@ -383,6 +396,18 @@ async function generatePreviewEmail(emailData) {
   );
   if (!nepqValidation.isValid) {
     throw new Error(nepqValidation.reason || 'Failed NEPQ validation');
+  }
+
+  // Use the potentially modified body from validation
+  if (nepqValidation.modifiedBody && nepqValidation.modifiedBody !== generatedContent.text) {
+    generatedContent.text = nepqValidation.modifiedBody;
+    // Rebuild HTML if needed
+    if (generatedContent.html) {
+      generatedContent.html = generatedContent.html.replace(
+        /<p[^>]*>[\s\S]*?<\/p>/,
+        `<p style="margin:0 0 16px 0; color:#222;">${generatedContent.text.replace(/\n/g, '<br>')}</p>`
+      );
+    }
   }
 
   const validation = validateGeneratedContent(
@@ -1440,6 +1465,18 @@ export default async function handler(req, res) {
         if (!nepqValidation.isValid) {
           await markGenerationInvalid(nepqValidation.reason);
           return;
+        }
+
+        // Use the potentially modified body from validation
+        if (nepqValidation.modifiedBody && nepqValidation.modifiedBody !== generatedContent.text) {
+          generatedContent.text = nepqValidation.modifiedBody;
+          // Rebuild HTML content
+          if (generatedContent.html) {
+            const paragraphs = generatedContent.text.split('\n\n').filter(p => p.trim());
+            generatedContent.html = paragraphs
+              .map(p => `<p style="margin:0 0 16px 0; color:#222;">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
+              .join('');
+          }
         }
 
         // CRITICAL: Validate generated content before saving
