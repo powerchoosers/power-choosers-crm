@@ -2266,6 +2266,21 @@ TONE OPENER (CRITICAL - FIRST LINE AFTER GREETING - MANDATORY):
 - If you don't use this exact opener, the email will be rejected`
       : '';
 
+    // NEPQ structure and guardrails (cold email only)
+    const nepqRules = templateType === 'cold_email' ? `
+
+NEPQ STRUCTURE (MANDATORY FOR COLD EMAILS):
+- Opening hook: FIRST sentence after greeting must be the tone opener above.
+- Second sentence: Ask a problem-awareness question that ties a trigger/recent activity to a potential negative business issue (make them think).
+- Value/Gap statement: 1–2 sentences starting with "The reason I ask is..." or "Typically, we see..." that explain why you asked and what can go wrong.
+- Low-friction CTA: End with a simple qualifying question (yes/no style). Examples: "Is this on your radar?" / "Have you already handled this?" / "Is this a priority for this quarter?"
+
+FORBIDDEN LANGUAGE (DO NOT USE):
+- "I saw", "I noticed", "I read", "hope this email finds you well", "just following up", "my name is", "I wanted to reach out/introduce"
+- Do not pitch meetings/time blocks ("15 minutes", "book a call", "schedule a meeting"). Keep CTA a qualifying question.
+- Do not pitch our company/services; stay focused on their potential problem.
+` : '';
+
     const basePrompt = `${whoWeAre || 'You are generating TEXT CONTENT ONLY for Power Choosers email templates.'}
 
 SENDER: ${senderName}
@@ -2275,6 +2290,8 @@ We handle all HTML/CSS styling on our end.
 ${recipientContext}
 
 ${angleContextBlock}
+
+${nepqRules}
 
 ${conditionalRules}
 

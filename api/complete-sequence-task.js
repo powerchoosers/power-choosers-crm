@@ -71,6 +71,28 @@ export default async function handler(req, res) {
 
         logAlways(`Task is part of sequence ${task.sequenceId}, step ${task.stepIndex}`);
 
+        // CRITICAL FIX: Check if contact is still a member of the sequence before creating next step
+        // This prevents creating next steps for contacts that were removed from the sequence
+        const contactId = task.contactId;
+        if (contactId) {
+            const memberQuery = await db.collection('sequenceMembers')
+                .where('sequenceId', '==', task.sequenceId)
+                .where('targetId', '==', contactId)
+                .limit(1)
+                .get();
+
+            if (memberQuery.empty) {
+                logAlways(`Contact ${contactId} is no longer a member of sequence ${task.sequenceId}, skipping next step creation`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    message: 'Contact removed from sequence - no next step created'
+                }));
+                return;
+            }
+            logAlways(`Contact ${contactId} is still a member of sequence ${task.sequenceId}, proceeding with next step`);
+        }
+
         // Load the sequence
         const sequenceDoc = await db.collection('sequences').doc(task.sequenceId).get();
 

@@ -66,6 +66,64 @@ function validateGeneratedContent(html, text, subject) {
   return { isValid: true, reason: null };
 }
 
+// ========== NEPQ VALIDATION ==========
+// Guardrails to keep generations aligned with NEPQ rules
+function validateNepqContent(subject, text, toneOpener) {
+  const body = (text || '').toString();
+  const lower = body.toLowerCase();
+  const errors = [];
+
+  // Forbidden phrases that trigger “old model” sales tone
+  const forbidden = [
+    /\bi\s+(saw|noticed|read|came across)\b/i,
+    /hope this email finds you well/i,
+    /just following up/i,
+    /\bmy name is\b/i,
+    /wanted to (reach out|introduce)/i
+  ];
+  if (forbidden.some(rx => rx.test(body))) {
+    errors.push('Contains forbidden salesy phrasing (I saw/noticed/read, hope this finds you well, just following up, my name is, wanted to reach out).');
+  }
+
+  // Tone opener must appear near the start
+  if (toneOpener) {
+    const openerIdx = body.indexOf(toneOpener);
+    if (openerIdx === -1) {
+      errors.push(`Tone opener missing: "${toneOpener}" must be the first line after the greeting.`);
+    } else if (openerIdx > 160) {
+      errors.push(`Tone opener is too far down the email. It must start immediately after the greeting: "${toneOpener}".`);
+    }
+  }
+
+  // Conversational questions: require at least two
+  const questionCount = (body.match(/\?/g) || []).length;
+  if (questionCount < 2) {
+    errors.push('Email must include at least two questions (problem-awareness + low-friction CTA).');
+  }
+
+  // High-friction CTAs (avoid scheduling asks)
+  const highFriction = [
+    /\b15\s*minutes?\b/i,
+    /\b30\s*minutes?\b/i,
+    /schedule (a )?(call|meeting)/i,
+    /book (a )?(call|meeting)/i
+  ];
+  if (highFriction.some(rx => rx.test(lower))) {
+    errors.push('CTA appears high-friction (asks to schedule time). Use a simple qualifying question instead.');
+  }
+
+  // Subject spamminess (avoid pitchy words)
+  const spammySubjects = [/save/i, /free/i, /% off/i, /deal/i];
+  if (subject && spammySubjects.some(rx => rx.test(subject))) {
+    errors.push('Subject sounds like a pitch (contains save/free/% off/deal).');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    reason: errors.join(' ')
+  };
+}
+
 // ========== INDUSTRY DETECTION FUNCTIONS ==========
 
 // Infer industry from company name
@@ -1164,6 +1222,17 @@ export default async function handler(req, res) {
           exemption_type: accountData?.taxExemptStatus || null
         };
         
+        // NEPQ validation to enforce structure and tone opener usage
+        const nepqValidation = validateNepqContent(
+          generatedContent.subject,
+          generatedContent.text,
+          toneOpener
+        );
+        if (!nepqValidation.isValid) {
+          await markGenerationInvalid(nepqValidation.reason);
+          return;
+        }
+
         // CRITICAL: Validate generated content before saving
         // Detect malformed AI generations that should not be sent
         const validation = validateGeneratedContent(
