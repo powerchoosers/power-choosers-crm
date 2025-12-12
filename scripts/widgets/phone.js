@@ -985,11 +985,83 @@
   const WIDGET_ID = 'phone-widget';
   // OLD: const CALL_NOTIFY_ID = 'incoming-call-notification'; - REMOVED (using ToastManager now)
 
-  async function resolvePhoneMeta(number) {
+  async function resolvePhoneMeta(number, preserveContext = null) {
     const digits = (number || '').replace(/\D/g, '');
     const e164 = digits && digits.length === 10 ? `+1${digits}` : (digits && digits.startsWith('1') && digits.length === 11 ? `+${digits}` : (String(number||'').startsWith('+') ? String(number) : ''));
     const candidates = Array.from(new Set([digits, e164.replace(/\D/g,'')] )).filter(Boolean);
-    const meta = { number, name: '', account: '', title: '', city: '', state: '', domain: '', logoUrl: '', contactId: null, accountId: null, callerIdImage: null };
+    
+    // CRITICAL: If we have existing context with IDs/names, preserve it and only enrich missing fields
+    // This prevents CRM lookup from overwriting context that was set by click-to-call
+    // ALWAYS prefer preserveContext if it has data, even if currentCallContext is empty
+    // Also check for stored programmatic context on the input element (set before input.value assignment)
+    let storedProgrammaticContext = null;
+    try {
+      const card = document.getElementById(WIDGET_ID);
+      if (card) {
+        const input = card.querySelector('.phone-display');
+        if (input && input._programmaticContext) {
+          storedProgrammaticContext = input._programmaticContext;
+          // If we found stored context and currentCallContext is empty, restore it immediately
+          if (storedProgrammaticContext && (!currentCallContext || !currentCallContext.accountId) && !currentCallContext?.contactId && !currentCallContext?.name && !currentCallContext?.company) {
+            console.debug('[Phone] resolvePhoneMeta: Restoring context from stored programmatic context');
+            currentCallContext = {
+              number: storedProgrammaticContext.number || '',
+              name: storedProgrammaticContext.name || '',
+              company: storedProgrammaticContext.company || '',
+              accountId: storedProgrammaticContext.accountId || null,
+              accountName: storedProgrammaticContext.company || null,
+              contactId: storedProgrammaticContext.contactId || null,
+              contactName: storedProgrammaticContext.name || '',
+              city: storedProgrammaticContext.city || '',
+              state: storedProgrammaticContext.state || '',
+              domain: storedProgrammaticContext.domain || '',
+              logoUrl: storedProgrammaticContext.logoUrl || '',
+              isCompanyPhone: storedProgrammaticContext.isCompanyPhone || false,
+              isActive: true
+            };
+          }
+        }
+      }
+    } catch(_) {}
+    
+    // Check if preserveContext is an empty object (has keys but no data) - treat as null
+    const preserveContextHasData = preserveContext && (
+      preserveContext.accountId || preserveContext.contactId || 
+      preserveContext.name || preserveContext.company || preserveContext.accountName
+    );
+    
+    const existingContext = preserveContextHasData
+      ? preserveContext 
+      : (storedProgrammaticContext && (storedProgrammaticContext.accountId || storedProgrammaticContext.contactId || storedProgrammaticContext.name || storedProgrammaticContext.company))
+        ? storedProgrammaticContext
+        : (currentCallContext && (currentCallContext.accountId || currentCallContext.contactId || currentCallContext.name || currentCallContext.company || currentCallContext.accountName))
+          ? currentCallContext
+          : null;
+    const hasExistingContext = !!(existingContext && (
+      existingContext.accountId || existingContext.contactId || 
+      existingContext.name || existingContext.contactName || 
+      existingContext.company || existingContext.accountName
+    ));
+    
+    const meta = { 
+      number, 
+      name: hasExistingContext ? (existingContext.name || existingContext.contactName || '') : '', 
+      account: hasExistingContext ? (existingContext.company || existingContext.accountName || '') : '', 
+      title: '', 
+      city: hasExistingContext ? (existingContext.city || '') : '', 
+      state: hasExistingContext ? (existingContext.state || '') : '', 
+      domain: hasExistingContext ? (existingContext.domain || '') : '', 
+      logoUrl: hasExistingContext ? (existingContext.logoUrl || '') : '', 
+      contactId: hasExistingContext ? (existingContext.contactId || null) : null, 
+      accountId: hasExistingContext ? (existingContext.accountId || null) : null, 
+      callerIdImage: null 
+    };
+    
+    // If we already have context, skip CRM lookup to prevent overwriting
+    if (hasExistingContext) {
+      return meta;
+    }
+    
     try {
       // App-provided resolver if available
       if (window.crm && typeof window.crm.resolvePhoneMeta === 'function') {
@@ -1008,32 +1080,34 @@
             const resp = await fetch(url, opt);
             if (resp && resp.ok) {
               const j = await resp.json().catch(() => ({}));
-              if (j) {
-                // Skip disabled endpoints
-                if (j.success === false && j.disabled) {
-                  console.debug('[Phone] Memoized route is disabled, invalidating memo');
-                  window.__pcPhoneSearchRoute = null;
-                } else {
-                  let c = j.contact || (Array.isArray(j.contacts) && j.contacts[0]) || j.person || ((j.name || j.title || j.email) ? j : null);
-                  let a = j.account || (Array.isArray(j.accounts) && j.accounts[0]) || j.company || ((j.company || j.accountName || j.domain) ? j : null);
-                  if (c || a) {
-                    const resolved = {
-                      ...meta,
-                      name: (c && (c.name || ((c.firstName||c.first_name||'') + ' ' + (c.lastName||c.last_name||'')).trim())) || '',
-                      account: (a && (a.name || a.accountName || a.company || '')) || (c && (c.account || c.company || '')) || '',
-                      title: (c && (c.title || c.jobTitle || c.job_title)) || '',
-                      city: (c && c.city) || (a && a.city) || '',
-                      state: (c && c.state) || (a && a.state) || '',
-                      domain: (c && (c.domain || (c.email||'').split('@')[1])) || (a && (a.domain || a.website)) || '',
-                      logoUrl: (a && a.logoUrl) || '',
-                      contactId: (c && (c.id || c.contactId || c._id)) || null,
-                      accountId: (a && (a.id || a.accountId || a._id)) || null
-                    };
-                    console.debug('[Phone] Resolved metadata (memoized route):', { url, resolved });
-                    return resolved;
+                  if (j) {
+                    // Skip disabled endpoints
+                    if (j.success === false && j.disabled) {
+                      console.debug('[Phone] Memoized route is disabled, invalidating memo');
+                      window.__pcPhoneSearchRoute = null;
+                    } else {
+                      let c = j.contact || (Array.isArray(j.contacts) && j.contacts[0]) || j.person || ((j.name || j.title || j.email) ? j : null);
+                      let a = j.account || (Array.isArray(j.accounts) && j.accounts[0]) || j.company || ((j.company || j.accountName || j.domain) ? j : null);
+                      if (c || a) {
+                        // Merge CRM results with existing context (preserve existing context fields)
+                        const resolved = {
+                          ...meta, // This already has existing context if preserveContext was passed
+                          // Only overwrite fields that are empty in existing context
+                          name: meta.name || (c && (c.name || ((c.firstName||c.first_name||'') + ' ' + (c.lastName||c.last_name||'')).trim())) || '',
+                          account: meta.account || (a && (a.name || a.accountName || a.company || '')) || (c && (c.account || c.company || '')) || '',
+                          title: meta.title || (c && (c.title || c.jobTitle || c.job_title)) || '',
+                          city: meta.city || (c && c.city) || (a && a.city) || '',
+                          state: meta.state || (c && c.state) || (a && a.state) || '',
+                          domain: meta.domain || (c && (c.domain || (c.email||'').split('@')[1])) || (a && (a.domain || a.website)) || '',
+                          logoUrl: meta.logoUrl || (a && a.logoUrl) || '',
+                          contactId: meta.contactId || (c && (c.id || c.contactId || c._id)) || null,
+                          accountId: meta.accountId || (a && (a.id || a.accountId || a._id)) || null
+                        };
+                        console.debug('[Phone] Resolved metadata (memoized route):', { url, resolved });
+                        return resolved;
+                      }
+                    }
                   }
-                }
-              }
             } else {
               // Invalidate memo on failure
               window.__pcPhoneSearchRoute = null;
@@ -1089,17 +1163,19 @@
               if (!c && (j.name || j.title || j.email)) c = j;
               if (!a && (j.company || j.accountName || j.domain)) a = j;
               if (c || a) {
+                // Merge CRM results with existing context (preserve existing context fields)
                 const resolved = {
-                  ...meta,
-                  name: (c && (c.name || ((c.firstName||c.first_name||'') + ' ' + (c.lastName||c.last_name||'')).trim())) || '',
-                  account: (a && (a.name || a.accountName || a.company || '')) || (c && (c.account || c.company || '')) || '',
-                  title: (c && (c.title || c.jobTitle || c.job_title)) || '',
-                  city: (c && c.city) || (a && a.city) || '',
-                  state: (c && c.state) || (a && a.state) || '',
-                  domain: (c && (c.domain || (c.email||'').split('@')[1])) || (a && (a.domain || a.website)) || '',
-                  logoUrl: (a && a.logoUrl) || '',
-                  contactId: (c && (c.id || c.contactId || c._id)) || null,
-                  accountId: (a && (a.id || a.accountId || a._id)) || null
+                  ...meta, // This already has existing context if preserveContext was passed
+                  // Only overwrite fields that are empty in existing context
+                  name: meta.name || (c && (c.name || ((c.firstName||c.first_name||'') + ' ' + (c.lastName||c.last_name||'')).trim())) || '',
+                  account: meta.account || (a && (a.name || a.accountName || a.company || '')) || (c && (c.account || c.company || '')) || '',
+                  title: meta.title || (c && (c.title || c.jobTitle || c.job_title)) || '',
+                  city: meta.city || (c && c.city) || (a && a.city) || '',
+                  state: meta.state || (c && c.state) || (a && a.state) || '',
+                  domain: meta.domain || (c && (c.domain || (c.email||'').split('@')[1])) || (a && (a.domain || a.website)) || '',
+                  logoUrl: meta.logoUrl || (a && a.logoUrl) || '',
+                  contactId: meta.contactId || (c && (c.id || c.contactId || c._id)) || null,
+                  accountId: meta.accountId || (a && (a.id || a.accountId || a._id)) || null
                 };
                 console.debug('[Phone] Resolved metadata from CRM (flex routes):', { route: r.url, resolved });
                 // Remember a winning route to reduce future attempts
@@ -1118,7 +1194,9 @@
           return null;
         }
         const found = await tryFetches();
-        if (found) return found;
+        if (found) {
+          return found;
+        }
         
         // Twilio caller ID lookup disabled by user (feature deactivated in Twilio console)
         // Skipping Twilio lookup to avoid unnecessary API calls and console errors
@@ -1226,9 +1304,12 @@
       const domain = isCompanyPhone
         ? ((currentCallContext && currentCallContext.domain) || (meta && meta.domain) || '')
         : ((meta && meta.domain) || (currentCallContext && currentCallContext.domain) || '');
-      const logoUrl = isCompanyPhone
-        ? ((currentCallContext && currentCallContext.logoUrl) || (meta && meta.logoUrl) || '')
-        : ((meta && meta.logoUrl) || (currentCallContext && currentCallContext.logoUrl) || '');
+      // CRITICAL: Always prioritize currentCallContext.logoUrl to prevent flickering
+      // Only use meta.logoUrl if currentCallContext doesn't have one
+      // This prevents the logo from being cleared when setContactDisplay is called multiple times
+      const logoUrl = (currentCallContext && currentCallContext.logoUrl) 
+        ? currentCallContext.logoUrl
+        : (meta && meta.logoUrl) || '';
       
       const displayNumber = number || (currentCallContext && currentCallContext.number) || '';
       
@@ -1267,34 +1348,49 @@
       const avatarWrap = box.querySelector('.contact-avatar');
       if (avatarWrap) {
         if (isCompanyPhone) {
-          // Absolute priority: explicit logoUrl provided by the page/widget
-          if (logoUrl) {
+          // CRITICAL: Prevent flickering by checking if logo URL hasn't changed
+          const existingImg = avatarWrap.querySelector('.company-favicon');
+          const existingSrc = existingImg ? existingImg.src : '';
+          const newSrc = logoUrl || '';
+          
+          // Only update if the logo URL has actually changed
+          // If newSrc is empty but we have an existing logo, preserve it (prevents flickering on call connect)
+          if (newSrc && existingSrc !== newSrc) {
+            // Absolute priority: explicit logoUrl provided by the page/widget
             try {
               avatarWrap.innerHTML = `<img class="company-favicon" src="${logoUrl}" alt="" aria-hidden="true" referrerpolicy="no-referrer" loading="lazy">`;
             } catch(_) { /* noop */ }
-          } else if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') {
-            // Helper will try multiple favicon sources; fallback to accounts icon if it fails
-            const html = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: '', domain, size: 28 });
-            if (html && html.indexOf('company-favicon') !== -1) {
-              avatarWrap.innerHTML = html;
-            } else if (domain && typeof window.__pcFaviconHelper.generateFaviconHTML === 'function') {
+          } else if (!newSrc && existingImg && existingSrc) {
+            // New logoUrl is empty but we have an existing logo - preserve it to prevent flickering
+            // Don't update the DOM, just skip the logo rendering logic
+            // Continue with the rest of the function (name/sub updates, animations, etc.)
+          } else if (!newSrc && !existingImg) {
+            // No logo and no existing image - try fallbacks
+            if (window.__pcFaviconHelper && typeof window.__pcFaviconHelper.generateCompanyIconHTML==='function') {
+              // Helper will try multiple favicon sources; fallback to accounts icon if it fails
+              const html = window.__pcFaviconHelper.generateCompanyIconHTML({ logoUrl: '', domain, size: 28 });
+              if (html && html.indexOf('company-favicon') !== -1) {
+                avatarWrap.innerHTML = html;
+              } else if (domain && typeof window.__pcFaviconHelper.generateFaviconHTML === 'function') {
+                avatarWrap.innerHTML = window.__pcFaviconHelper.generateFaviconHTML(domain, 28);
+              } else if (typeof window.__pcAccountsIcon === 'function') {
+                avatarWrap.innerHTML = window.__pcAccountsIcon();
+              }
+            } else if (domain && window.__pcFaviconHelper) {
               avatarWrap.innerHTML = window.__pcFaviconHelper.generateFaviconHTML(domain, 28);
+            } else if (domain) {
+              // Helper not available: fall back to direct favicon URL
+              const src = favicon || (domain ? `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}` : '');
+              if (src) {
+                avatarWrap.innerHTML = `<img class="company-favicon" src="${src}" alt="" aria-hidden="true" referrerpolicy="no-referrer" loading="lazy">`;
+              } else if (typeof window.__pcAccountsIcon === 'function') {
+                avatarWrap.innerHTML = window.__pcAccountsIcon();
+              }
             } else if (typeof window.__pcAccountsIcon === 'function') {
               avatarWrap.innerHTML = window.__pcAccountsIcon();
             }
-          } else if (domain && window.__pcFaviconHelper) {
-            avatarWrap.innerHTML = window.__pcFaviconHelper.generateFaviconHTML(domain, 28);
-          } else if (domain) {
-            // Helper not available: fall back to direct favicon URL
-            const src = favicon || (domain ? `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(domain)}` : '');
-            if (src) {
-              avatarWrap.innerHTML = `<img class="company-favicon" src="${src}" alt="" aria-hidden="true" referrerpolicy="no-referrer" loading="lazy">`;
-          } else if (typeof window.__pcAccountsIcon === 'function') {
-            avatarWrap.innerHTML = window.__pcAccountsIcon();
           }
-          } else if (typeof window.__pcAccountsIcon === 'function') {
-            avatarWrap.innerHTML = window.__pcAccountsIcon();
-          }
+          // If logoUrl is empty but we have an existing image, don't clear it (prevents flickering)
         } else {
           // Individual contact: render initials avatar (letter glyphs)
           const initials = (function(){
@@ -3240,28 +3336,87 @@
       // Disable suggested-contact lookup during typing (keep context from source page only)
       input.addEventListener('input', () => {
         const value = input.value || '';
+        
+        // CRITICAL: Skip context clearing if this input matches the current call context number
+        // This indicates it's a programmatic set from callNumber, not user typing
+        // Check if we have context data (IDs, names, company) even if isActive isn't set yet
+        const normalizedValue = value.replace(/\D/g, '');
+        const normalizedContextNumber = (currentCallContext?.number || '').replace(/\D/g, '');
+        // Check for stored programmatic context on the input element (set before input.value assignment)
+        const storedContext = input._programmaticContext;
+        const normalizedStoredNumber = (storedContext?.number || '').replace(/\D/g, '');
+        const hasContextData = !!(currentCallContext && (
+          currentCallContext.accountId || currentCallContext.contactId || 
+          currentCallContext.name || currentCallContext.company || currentCallContext.accountName
+        ));
+        const hasStoredContextData = !!(storedContext && (
+          storedContext.accountId || storedContext.contactId || 
+          storedContext.name || storedContext.company
+        ));
+        // Check both currentCallContext and stored programmatic context
+        const isProgrammaticSet = (normalizedValue === normalizedContextNumber && hasContextData) ||
+                                  (normalizedValue === normalizedStoredNumber && hasStoredContextData);
+        
+        if (isProgrammaticSet) {
+          console.debug('[Phone] Input event from programmatic set - preserving context');
+          // If we have stored context but currentCallContext was cleared, restore it
+          if (hasStoredContextData && !hasContextData && storedContext) {
+            console.debug('[Phone] Restoring context from stored programmatic context');
+            currentCallContext = {
+              number: storedContext.number || '',
+              name: storedContext.name || '',
+              company: storedContext.company || '',
+              accountId: storedContext.accountId || null,
+              accountName: storedContext.company || null,
+              contactId: storedContext.contactId || null,
+              contactName: storedContext.name || '',
+              city: storedContext.city || '',
+              state: storedContext.state || '',
+              domain: storedContext.domain || '',
+              logoUrl: storedContext.logoUrl || '',
+              isCompanyPhone: storedContext.isCompanyPhone || false,
+              isActive: true
+            };
+          }
+          // Clear the stored context after using it
+          if (input._programmaticContext) {
+            delete input._programmaticContext;
+          }
+          return;
+        }
+        
         if (!value.trim()) {
           try { clearContactDisplay(); } catch(_) {}
           // Also clear the context when input is cleared
-          currentCallContext = {
-            number: '',
-            name: '',
-            company: '',
-            accountId: null,
-            accountName: null,
-            contactId: null,
-            contactName: '',
-            city: '',
-            state: '',
-            domain: '',
-            logoUrl: '',
-            isCompanyPhone: false,
-            isActive: false
-          };
+          // BUT: Don't clear if a call is in progress
+          if (!isCallInProgress) {
+            currentCallContext = {
+              number: '',
+              name: '',
+              company: '',
+              accountId: null,
+              accountName: null,
+              contactId: null,
+              contactName: '',
+              city: '',
+              state: '',
+              domain: '',
+              logoUrl: '',
+              isCompanyPhone: false,
+              isActive: false
+            };
+          }
         }
         // When user starts typing a new number, clear stale context from previous calls
         // This ensures manual entry doesn't show old company info
-        if (value.trim() && currentCallContext.isActive === false) {
+        // BUT: Don't clear context if a call is currently in progress (isCallInProgress)
+        // CRITICAL: Also don't clear if the input value matches the current context number
+        // This prevents clearing context when callNumber programmatically sets the input value
+        // Reuse normalizedValue and normalizedContextNumber already declared above
+        const valueMatchesContext = normalizedValue && normalizedContextNumber && normalizedValue === normalizedContextNumber;
+        // Reuse hasContextData already declared above
+        
+        if (value.trim() && currentCallContext.isActive === false && !isCallInProgress && !valueMatchesContext && !hasContextData) {
           console.debug('[Phone] User typing new number - clearing stale context');
           currentCallContext = {
             number: '',
@@ -3281,8 +3436,9 @@
         }
         
         // Also clear context if user is typing a different number than what's in context
+        // BUT: Don't clear context if a call is currently in progress
         if (value.trim() && currentCallContext.isActive && currentCallContext.number && 
-            currentCallContext.number !== value.trim()) {
+            currentCallContext.number !== value.trim() && !isCallInProgress) {
           console.debug('[Phone] User typing different number - clearing existing context');
           currentCallContext = {
             number: '',
@@ -3382,14 +3538,38 @@
         const selectedCallerId = getSelectedPhoneNumber();
         console.debug('[Phone] Using caller ID:', selectedCallerId);
         
+        // Verify TwiML App configuration before making call
+        const base = (window.API_BASE_URL || '').replace(/\/$/, '');
+        const expectedVoiceUrl = `${base}/api/twilio/voice`;
+        console.debug('[Phone] Expected TwiML App Voice URL:', expectedVoiceUrl);
+        console.debug('[Phone] Make sure your TwiML App (configured in TWILIO_TWIML_APP_SID) has Voice URL set to:', expectedVoiceUrl);
+        
         // Make the call with recording enabled via TwiML app
         // Pass From parameter so TwiML webhook can use it as callerId
-        currentCall = await device.connect({
-          params: {
-            To: number,
-            From: selectedCallerId  // Pass selected Twilio number as caller ID
+        try {
+          currentCall = await device.connect({
+            params: {
+              To: number,
+              From: selectedCallerId  // Pass selected Twilio number as caller ID
+            }
+          });
+          console.debug('[Phone] Browser call initiated successfully via TwiML App');
+        } catch (connectError) {
+          console.error('[Phone] device.connect() failed:', connectError);
+          console.error('[Phone] Error details:', {
+            message: connectError?.message,
+            code: connectError?.code,
+            name: connectError?.name,
+            stack: connectError?.stack
+          });
+          // Check if error suggests wrong TwiML App URL
+          if (connectError?.message?.includes('external') || connectError?.message?.includes('url') || connectError?.message?.includes('webhook')) {
+            console.error('[Phone] ERROR: TwiML App Voice URL may be misconfigured!');
+            console.error('[Phone] Please verify in Twilio Console that your TwiML App Voice URL points to:', expectedVoiceUrl);
+            try { window.crm?.showToast && window.crm.showToast('TwiML App configuration error - check console'); } catch(_) {}
           }
-        });
+          throw connectError;
+        }
         // Store outbound connection globally for unified cleanup paths
         try { TwilioRTC.state.connection = currentCall; } catch(_) {}
         
@@ -3432,55 +3612,90 @@
           try {
             // Check if we have existing context - look for IDs, names, or company info
             // This prevents losing context when navigating away before call connects
-            const hasExistingContext = currentCallContext && (
+            // CRITICAL: Check for context data (IDs, names, company) even if isActive isn't set yet
+            // This ensures we preserve context that was set by click-to-call before the call connects
+            const hasExistingContext = !!(currentCallContext && (
               currentCallContext.accountId ||
               currentCallContext.contactId ||
               currentCallContext.name || 
               currentCallContext.contactName ||
               currentCallContext.company || 
               currentCallContext.accountName
-            );
+            ));
             
             console.debug('[Phone] Call accept - hasExistingContext:', hasExistingContext, 'currentCallContext:', currentCallContext);
             
             let meta = {};
+            // CRITICAL: Capture context snapshot BEFORE async operations to prevent it from being cleared
+            const contextSnapshot = hasExistingContext ? {
+              ...currentCallContext,
+              accountId: currentCallContext.accountId || null,
+              contactId: currentCallContext.contactId || null,
+              name: currentCallContext.name || currentCallContext.contactName || '',
+              contactName: currentCallContext.contactName || '',
+              company: currentCallContext.company || currentCallContext.accountName || '',
+              accountName: currentCallContext.accountName || '',
+              city: currentCallContext.city || '',
+              state: currentCallContext.state || '',
+              domain: currentCallContext.domain || '',
+              logoUrl: currentCallContext.logoUrl || '',
+              isCompanyPhone: currentCallContext.isCompanyPhone || false
+            } : null;
+            
             if (!hasExistingContext) {
               // Only resolve if we don't have context - prevents DOM lookup after navigation
               console.debug('[Phone] No existing context, resolving phone meta for:', number);
-              meta = await resolvePhoneMeta(number).catch((err) => {
+              // Pass contextSnapshot (or currentCallContext if snapshot is null) to preserve any context that might exist
+              meta = await resolvePhoneMeta(number, contextSnapshot || currentCallContext).catch((err) => {
                 console.warn('[Phone] Failed to resolve phone meta:', err);
                 return {};
               });
             } else {
               console.debug('[Phone] Using existing context, skipping phone meta resolution');
+              // Use the context snapshot to build meta for display
+              if (contextSnapshot) {
+                meta = {
+                  name: contextSnapshot.name || contextSnapshot.contactName || '',
+                  account: contextSnapshot.company || contextSnapshot.accountName || '',
+                  company: contextSnapshot.company || contextSnapshot.accountName || '',
+                  city: contextSnapshot.city || '',
+                  state: contextSnapshot.state || '',
+                  domain: contextSnapshot.domain || '',
+                  logoUrl: contextSnapshot.logoUrl || '',
+                  contactId: contextSnapshot.contactId || null,
+                  accountId: contextSnapshot.accountId || null
+                };
+              }
             }
             
             // Merge call context data with resolved meta to ensure company info is preserved
             // ALWAYS prefer existing context over resolved meta to preserve names after navigation
+            // Use contextSnapshot if available (captured before async operations), otherwise fall back to currentCallContext
+            const contextToMerge = contextSnapshot || currentCallContext;
             const mergedMeta = {
               ...meta,
               // Always merge context if it exists, preserving all fields
-              ...(currentCallContext && {
+              ...(contextToMerge && {
                 // Preserve IDs first (these are the most reliable identifiers)
-                contactId: currentCallContext.contactId || meta.contactId || null,
-                accountId: currentCallContext.accountId || meta.accountId || null,
+                contactId: contextToMerge.contactId || meta.contactId || null,
+                accountId: contextToMerge.accountId || meta.accountId || null,
                 // Always prefer existing context over resolved meta to preserve names after navigation
-                name: currentCallContext.name || currentCallContext.contactName || meta.name || '',
-                account: currentCallContext.company || currentCallContext.accountName || meta.account || '',
-                company: currentCallContext.company || currentCallContext.accountName || meta.company || '',
-                accountName: currentCallContext.accountName || meta.accountName || '',
-                contactName: currentCallContext.contactName || meta.contactName || '',
+                name: contextToMerge.name || contextToMerge.contactName || meta.name || '',
+                account: contextToMerge.company || contextToMerge.accountName || meta.account || '',
+                company: contextToMerge.company || contextToMerge.accountName || meta.company || '',
+                accountName: contextToMerge.accountName || meta.accountName || '',
+                contactName: contextToMerge.contactName || meta.contactName || '',
                 // In company mode, prefer account context only to avoid contact contamination
-                city: currentCallContext.isCompanyPhone ? (currentCallContext.city || meta.city || '') : (currentCallContext.city || meta.city || ''),
-                state: currentCallContext.isCompanyPhone ? (currentCallContext.state || meta.state || '') : (currentCallContext.state || meta.state || ''),
+                city: contextToMerge.isCompanyPhone ? (contextToMerge.city || meta.city || '') : (contextToMerge.city || meta.city || ''),
+                state: contextToMerge.isCompanyPhone ? (contextToMerge.state || meta.state || '') : (contextToMerge.state || meta.state || ''),
                 // Always preserve domain from context - needed for favicon fallback
-                domain: currentCallContext.domain || meta.domain || '',
+                domain: contextToMerge.domain || meta.domain || '',
                 // Preserve logoUrl from context even if empty - prevents favicon from being cleared
-                // Only use meta.logoUrl if currentCallContext doesn't have domain for fallback
-                logoUrl: (currentCallContext.logoUrl !== undefined && currentCallContext.logoUrl !== null) ? currentCallContext.logoUrl : (meta.logoUrl || ''),
+                // Only use meta.logoUrl if contextToMerge doesn't have domain for fallback
+                logoUrl: (contextToMerge.logoUrl !== undefined && contextToMerge.logoUrl !== null) ? contextToMerge.logoUrl : (meta.logoUrl || ''),
                 // Preserve phone type and other flags
-                isCompanyPhone: currentCallContext.isCompanyPhone !== undefined ? currentCallContext.isCompanyPhone : (meta.isCompanyPhone || false),
-                phoneType: currentCallContext.phoneType || meta.phoneType || null
+                isCompanyPhone: contextToMerge.isCompanyPhone !== undefined ? contextToMerge.isCompanyPhone : (meta.isCompanyPhone || false),
+                phoneType: contextToMerge.phoneType || meta.phoneType || null
               })
             };
             
@@ -4245,7 +4460,8 @@
       if (!hasExistingContext) {
         try {
           console.debug('[Phone] Manual call - resolving phone metadata for:', normalized.value);
-          const freshMeta = await resolvePhoneMeta(normalized.value).catch(() => ({}));
+          // Pass currentCallContext to preserve any context that might exist
+          const freshMeta = await resolvePhoneMeta(normalized.value, currentCallContext).catch(() => ({}));
           
           // Update current call context with fresh data from CRM/Twilio
           currentCallContext = {
@@ -4757,7 +4973,6 @@
       isActive: !!autoTrigger || !!currentCallContext.isActive
     };
     currentCallContext = nextContext;
-    
     console.debug('[Phone Widget] Call context set in callNumber:', currentCallContext);
     console.debug('[Phone Widget] Attribution snapshot:', {
       accountId: currentCallContext.accountId,
@@ -4765,6 +4980,42 @@
       contactId: currentCallContext.contactId,
       contactName: currentCallContext.contactName
     });
+    
+    // Open phone widget if not already open
+    const wasClosed = !document.getElementById(WIDGET_ID);
+    if (wasClosed) {
+      openPhone();
+    }
+    
+    // Get the card element (it should exist now, either from openPhone() or already in DOM)
+    let card = document.getElementById(WIDGET_ID);
+    
+    // CRITICAL: Store context snapshot on input element AFTER openPhone() to ensure it exists
+    // This allows the input handler to detect programmatic sets even if currentCallContext is cleared
+    if (card) {
+      const input = card.querySelector('.phone-display');
+      if (input && (nextContext.accountId || nextContext.contactId || nextContext.name || nextContext.company)) {
+        // Store a snapshot of the context on the input element
+        input._programmaticContext = {
+          number: nextContext.number,
+          name: nextContext.name || nextContext.contactName || '',
+          company: nextContext.company || nextContext.accountName || '',
+          accountId: nextContext.accountId || null,
+          contactId: nextContext.contactId || null,
+          city: nextContext.city || '',
+          state: nextContext.state || '',
+          domain: nextContext.domain || '',
+          logoUrl: nextContext.logoUrl || '',
+          isCompanyPhone: nextContext.isCompanyPhone || false
+        };
+        // Clear the snapshot after a short delay to allow input event to fire
+        setTimeout(() => {
+          if (input._programmaticContext) {
+            delete input._programmaticContext;
+          }
+        }, 100);
+      }
+    }
     
     // Update the widget display with the new context
     try {
@@ -4784,13 +5035,7 @@
       console.warn('[Phone Widget] Failed to update contact display:', e);
     }
     
-    // Open phone widget if not already open
-    if (!document.getElementById(WIDGET_ID)) {
-      openPhone();
-    }
-    
     // Populate number immediately and optionally auto-trigger call within user gesture
-    const card = document.getElementById(WIDGET_ID);
     if (card) {
       const input = card.querySelector('.phone-display');
       if (input) {
@@ -4800,8 +5045,10 @@
       // Auto-trigger call only if explicitly requested and conditions are met
       // Do NOT require contactName for auto-trigger (some contexts may not provide it)
       if (number && autoTrigger) {
-        const callBtn = card.querySelector('.call-btn-start');
-        if (callBtn && !isCallInProgress) {
+        // If widget was just opened, wait a bit for DOM to settle before looking for button
+        const findAndClickButton = () => {
+          const callBtn = card.querySelector('.call-btn-start');
+          if (callBtn && !isCallInProgress) {
           // Final safety check before auto-triggering for non-click-to-call only
           const finalCheck = now - lastCallCompleted;
           if (!isClickToCall && finalCheck < CALLBACK_COOLDOWN) {
@@ -4816,8 +5063,22 @@
           // upon successful connection (see placeBrowserCall 'accept' handler).
           // Click immediately to preserve user gesture for mic permission
           callBtn.click();
+          } else {
+            console.warn('[Phone] Auto-trigger blocked - call already in progress or button not found');
+          }
+        };
+        
+        // If widget was just opened, wait for DOM to settle before looking for button
+        if (wasClosed) {
+          // Use requestAnimationFrame to wait for DOM to be ready
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              findAndClickButton();
+            });
+          });
         } else {
-          console.warn('[Phone] Auto-trigger blocked - call already in progress or button not found');
+          // Widget was already open, button should be available immediately
+          findAndClickButton();
         }
       } else {
         console.debug('[Phone] Not auto-triggering call - user must click Call button');

@@ -74,7 +74,7 @@
           tasksData = Array.from(newTasksMap.values());
           tasksData.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
         } else {
-          tasksData = newTasks;
+        tasksData = newTasks;
         }
         lastLoadedDoc = null;
         hasMoreData = false;
@@ -105,7 +105,7 @@
           tasksData = Array.from(newTasksMap.values());
           tasksData.sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
         } else {
-          tasksData = newTasks;
+        tasksData = newTasks;
         }
         
         // Admin pagination
@@ -349,7 +349,7 @@
       if (window.crm && typeof window.crm.loadTodaysTasks === 'function') {
         // Small delay to ensure Firebase operations complete
         setTimeout(() => {
-          window.crm.loadTodaysTasks();
+        window.crm.loadTodaysTasks();
         }, 100);
       }
     } catch (error) {
@@ -376,7 +376,7 @@
         if (source !== 'task-detail' && window.crm && typeof window.crm.loadTodaysTasks === 'function') {
           // Small delay to ensure Firebase operations complete
           setTimeout(() => {
-            window.crm.loadTodaysTasks();
+          window.crm.loadTodaysTasks();
           }, 100);
         }
       } catch (e) {

@@ -390,7 +390,17 @@ class SettingsPage {
             // BUT: Don't overwrite manually uploaded photos (hostedPhotoURL takes priority)
             if (user.photoURL) {
                 const currentPhotoURL = this.state.settings.general.photoURL || '';
-                const hasManualUpload = !!this.state.settings.general.hostedPhotoURL;
+                // Check both state AND localStorage for manually uploaded photo
+                // This is critical because ensureGoogleUserData() runs before loadSettings() completes
+                const hostedFromState = this.state.settings.general.hostedPhotoURL || '';
+                const hostedFromLocalStorage = localStorage.getItem('pc-hosted-photo') || '';
+                const hasManualUpload = !!(hostedFromState || hostedFromLocalStorage);
+                
+                // If we found hostedPhotoURL in localStorage but not in state, restore it
+                if (hostedFromLocalStorage && !hostedFromState) {
+                    this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
+                    console.log('[Settings] Restored hostedPhotoURL from localStorage in ensureGoogleUserData:', hostedFromLocalStorage);
+                }
                 
                 // Only auto-host if:
                 // 1. PhotoURL changed AND no manual upload exists, OR
@@ -398,14 +408,18 @@ class SettingsPage {
                 if (user.photoURL !== currentPhotoURL && !hasManualUpload) {
                     console.log('[Settings] Google photoURL changed and no manual upload, hosting avatar...');
                     await this.hostGoogleAvatar(user.photoURL);
-                } else if (user.photoURL === currentPhotoURL && !this.state.settings.general.hostedPhotoURL) {
+                } else if (user.photoURL === currentPhotoURL && !hasManualUpload) {
                     // PhotoURL matches but no hosted version exists, host it
                     console.log('[Settings] PhotoURL exists but no hosted version in ensureGoogleUserData, hosting avatar...');
                     await this.hostGoogleAvatar(user.photoURL);
                 } else if (hasManualUpload) {
                     // Manual upload exists - preserve it, just update photoURL for tracking
                     this.state.settings.general.photoURL = user.photoURL;
-                    console.log('[Settings] Manual upload exists, preserving hostedPhotoURL');
+                    // Ensure hostedPhotoURL is set (use localStorage if state is missing)
+                    if (!this.state.settings.general.hostedPhotoURL && hostedFromLocalStorage) {
+                        this.state.settings.general.hostedPhotoURL = hostedFromLocalStorage;
+                    }
+                    console.log('[Settings] Manual upload exists, preserving hostedPhotoURL:', this.state.settings.general.hostedPhotoURL);
                 }
             }
             
@@ -875,7 +889,6 @@ class SettingsPage {
                     if (settingsDoc && settingsDoc.exists) {
                         const firebaseSettings = settingsDoc.data();
                         
-                        
                         // Check ownership for non-admin users (only for legacy 'user-settings' doc)
                         if (!isAdmin() && docId === 'user-settings') {
                             const email = getUserEmail();
@@ -1104,6 +1117,18 @@ class SettingsPage {
         // Check if photoURL changed - if it's different from stored photoURL, force re-host
         const currentPhotoURL = this.state.settings.general.photoURL || '';
         const photoChanged = googlePhotoURL !== currentPhotoURL;
+        
+        // Check for manually uploaded photo (in state or localStorage)
+        // This prevents overwriting user-uploaded photos with Google's photo
+        const hostedFromState = this.state.settings.general.hostedPhotoURL || '';
+        const hostedFromLocalStorage = localStorage.getItem('pc-hosted-photo') || '';
+        const hasManualUpload = !!(hostedFromState || hostedFromLocalStorage);
+        
+        // CRITICAL: Never overwrite manually uploaded photos unless explicitly forced
+        if (hasManualUpload && !forceRefresh) {
+            console.log('[Settings] Manual upload exists, skipping Google avatar hosting to preserve user upload');
+            return;
+        }
         
         // Only skip if hostedPhotoURL exists AND photo hasn't changed AND not forcing refresh
         if (this.state.settings.general.hostedPhotoURL && !photoChanged && !forceRefresh) {
