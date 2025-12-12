@@ -70,7 +70,8 @@ function validateGeneratedContent(html, text, subject) {
 // Guardrails to keep generations aligned with NEPQ rules
 function validateNepqContent(subject, text, toneOpener) {
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:71',message:'validateNepqContent ENTRY',data:{subject:subject?.substring(0,50),textLength:text?.length||0,toneOpener:toneOpener?.substring(0,30)||null,textPreview:text?.substring(0,100)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  const logData = {location:'generate-scheduled-emails.js:71',message:'validateNepqContent ENTRY',data:{subject:subject?.substring(0,50),textLength:text?.length||0,toneOpener:toneOpener?.substring(0,30)||null,textPreview:text?.substring(0,100)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData))});
   // #endregion
   let body = (text || '').toString();
   const lower = body.toLowerCase();
@@ -98,16 +99,30 @@ function validateNepqContent(subject, text, toneOpener) {
       // Auto-insert the tone opener if missing (fallback mechanism)
       const greetingMatch = body.match(/^(Hi|Hello|Hey)\s+[^\n]*,?\n?/i);
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:94',message:'Tone opener missing - checking greeting',data:{hasGreeting:!!greetingMatch,bodyPreview:body.substring(0,150),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      const logData1 = {location:'generate-scheduled-emails.js:94',message:'Tone opener missing - checking greeting',data:{hasGreeting:!!greetingMatch,bodyPreview:body.substring(0,150),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData1)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData1))});
       // #endregion
       if (greetingMatch) {
         const greeting = greetingMatch[0];
         const restOfBody = body.slice(greeting.length).trim();
-        const bodyBefore = body;
-        body = greeting + (greeting.endsWith('\n') ? '' : '\n') + toneOpener + ' ' + restOfBody;
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:100',message:'Tone opener AUTO-INSERTED',data:{bodyBefore:bodyBefore.substring(0,150),bodyAfter:body.substring(0,200),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
+        // CRITICAL FIX: Check if tone opener already exists in restOfBody (even if slightly different format)
+        const cleanToneOpenerForCheck = toneOpener.replace(/[—\-]+$/, '').trim().toLowerCase();
+        const restLower = restOfBody.toLowerCase();
+        // If tone opener already exists in the body (even after greeting), don't insert again
+        if (restLower.includes(cleanToneOpenerForCheck)) {
+          // #region agent log
+          const logData2 = {location:'generate-scheduled-emails.js:103',message:'Tone opener already exists in body, skipping auto-insert',data:{toneOpener:toneOpener?.substring(0,30),restPreview:restOfBody.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData2)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData2))});
+          // #endregion
+          // Don't modify body - it already has the tone opener
+        } else {
+          const bodyBefore = body;
+          body = greeting + (greeting.endsWith('\n') ? '' : '\n') + toneOpener + ' ' + restOfBody;
+          // #region agent log
+          const logData3 = {location:'generate-scheduled-emails.js:108',message:'Tone opener AUTO-INSERTED',data:{bodyBefore:bodyBefore.substring(0,150),bodyAfter:body.substring(0,200),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData3)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData3))});
+          // #endregion
+        }
         logger.log(`[NEPQ] Auto-inserted missing tone opener: "${toneOpener}"`);
       } else {
         errors.push(`Tone opener missing: "${toneOpener}" must be the first line after the greeting.`);
@@ -146,7 +161,8 @@ function validateNepqContent(subject, text, toneOpener) {
     modifiedBody: body // Return the potentially modified body
   };
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:133',message:'validateNepqContent EXIT',data:{isValid:result.isValid,errorsCount:errors.length,bodyModified:result.modifiedBody!==text,bodyLength:result.modifiedBody?.length||0,bodyPreview:result.modifiedBody?.substring(0,150)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  const logData4 = {location:'generate-scheduled-emails.js:133',message:'validateNepqContent EXIT',data:{isValid:result.isValid,errorsCount:errors.length,bodyModified:result.modifiedBody!==text,bodyLength:result.modifiedBody?.length||0,bodyPreview:result.modifiedBody?.substring(0,150)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData4)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData4))});
   // #endregion
   return result;
 }
@@ -415,20 +431,23 @@ async function generatePreviewEmail(emailData) {
   // Use the potentially modified body from validation
   if (nepqValidation.modifiedBody && nepqValidation.modifiedBody !== generatedContent.text) {
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:402',message:'Applying modifiedBody (preview path)',data:{textBefore:generatedContent.text.substring(0,150),textAfter:nepqValidation.modifiedBody.substring(0,150),htmlBeforeLength:generatedContent.html?.length||0,htmlBeforePreview:generatedContent.html?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    const logData5 = {location:'generate-scheduled-emails.js:432',message:'Applying modifiedBody (preview path)',data:{textBefore:generatedContent.text.substring(0,150),textAfter:nepqValidation.modifiedBody.substring(0,150),htmlBeforeLength:generatedContent.html?.length||0,htmlBeforePreview:generatedContent.html?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData5)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData5))});
     // #endregion
     generatedContent.text = nepqValidation.modifiedBody;
     // Rebuild HTML completely from the modified text (avoid duplication)
     if (generatedContent.html) {
       const paragraphs = generatedContent.text.split('\n\n').filter(p => p.trim());
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:406',message:'Rebuilding HTML from text',data:{paragraphsCount:paragraphs.length,paragraphsPreview:paragraphs.map(p=>p.substring(0,50))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      const logData6 = {location:'generate-scheduled-emails.js:438',message:'Rebuilding HTML from text',data:{paragraphsCount:paragraphs.length,paragraphsPreview:paragraphs.map(p=>p.substring(0,50))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData6)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData6))});
       // #endregion
       generatedContent.html = paragraphs
         .map(p => `<p style="margin:0 0 16px 0; color:#222;">${p.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>`)
         .join('');
       // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:409',message:'HTML rebuilt (preview path)',data:{htmlAfterLength:generatedContent.html.length,htmlAfterPreview:generatedContent.html.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      const logData7 = {location:'generate-scheduled-emails.js:442',message:'HTML rebuilt (preview path)',data:{htmlAfterLength:generatedContent.html.length,htmlAfterPreview:generatedContent.html.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData7)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData7))});
       // #endregion
     }
   }
@@ -1493,20 +1512,23 @@ export default async function handler(req, res) {
         // Use the potentially modified body from validation
         if (nepqValidation.modifiedBody && nepqValidation.modifiedBody !== generatedContent.text) {
           // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:1471',message:'Applying modifiedBody (scheduled path)',data:{textBefore:generatedContent.text.substring(0,150),textAfter:nepqValidation.modifiedBody.substring(0,150),htmlBeforeLength:generatedContent.html?.length||0,htmlBeforePreview:generatedContent.html?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          const logData8 = {location:'generate-scheduled-emails.js:1512',message:'Applying modifiedBody (scheduled path)',data:{textBefore:generatedContent.text.substring(0,150),textAfter:nepqValidation.modifiedBody.substring(0,150),htmlBeforeLength:generatedContent.html?.length||0,htmlBeforePreview:generatedContent.html?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData8)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData8))});
           // #endregion
           generatedContent.text = nepqValidation.modifiedBody;
           // Rebuild HTML content completely (avoid duplication)
           if (generatedContent.html) {
             const paragraphs = generatedContent.text.split('\n\n').filter(p => p.trim());
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:1475',message:'Rebuilding HTML from text (scheduled path)',data:{paragraphsCount:paragraphs.length,paragraphsPreview:paragraphs.map(p=>p.substring(0,50))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+            const logData9 = {location:'generate-scheduled-emails.js:1518',message:'Rebuilding HTML from text (scheduled path)',data:{paragraphsCount:paragraphs.length,paragraphsPreview:paragraphs.map(p=>p.substring(0,50))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData9)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData9))});
             // #endregion
             generatedContent.html = paragraphs
               .map(p => `<p style="margin:0 0 16px 0; color:#222;">${p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>`)
               .join('');
             // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:1478',message:'HTML rebuilt (scheduled path)',data:{htmlAfterLength:generatedContent.html.length,htmlAfterPreview:generatedContent.html.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            const logData10 = {location:'generate-scheduled-emails.js:1522',message:'HTML rebuilt (scheduled path)',data:{htmlAfterLength:generatedContent.html.length,htmlAfterPreview:generatedContent.html.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData10)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData10))});
             // #endregion
           }
         }
