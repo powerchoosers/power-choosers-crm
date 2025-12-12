@@ -1139,23 +1139,24 @@ class SettingsPage {
             };
             this.state.settings.aiTemplates = aiTemplateFields;
 
+            // Get user email and determine docId (needed for both Firebase and cache)
+            const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
+              ? window.DataManager.getCurrentUserEmail()
+              : ((window.currentUserEmail || '').toLowerCase());
+            
+            const user = window.firebase && window.firebase.auth ? window.firebase.auth().currentUser : null;
+            const userId = user ? user.uid : null;
+            
+            // Use per-user doc ID so each employee has their own settings
+            // Admin uses 'user-settings' (legacy), employees use 'user-settings-{email}'
+            const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
+              ? window.DataManager.isCurrentUserAdmin()
+              : (window.currentUserRole === 'admin');
+            
+            const docId = isAdmin ? 'user-settings' : `user-settings-${userEmail}`;
+
             // Save to Firebase first
             if (window.firebaseDB) {
-                // Get user email for ownership (required by Firestore rules)
-                const userEmail = (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function')
-                  ? window.DataManager.getCurrentUserEmail()
-                  : ((window.currentUserEmail || '').toLowerCase());
-                
-                const user = firebase.auth().currentUser;
-                const userId = user ? user.uid : null;
-                
-                // Use per-user doc ID so each employee has their own settings
-                // Admin uses 'user-settings' (legacy), employees use 'user-settings-{email}'
-                const isAdmin = (window.DataManager && typeof window.DataManager.isCurrentUserAdmin === 'function')
-                  ? window.DataManager.isCurrentUserAdmin()
-                  : (window.currentUserRole === 'admin');
-                
-                const docId = isAdmin ? 'user-settings' : `user-settings-${userEmail}`;
                 
                 // Check if document exists and if employee owns it (for update)
                 let canUpdate = false;
