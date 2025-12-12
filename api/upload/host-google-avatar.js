@@ -15,28 +15,50 @@ export const config = {
 };
 
 export default async function handler(req, res) {
+  // Handle CORS preflight
   if (cors(req, res)) return;
 
+  // Set CORS headers for all responses (cors() already did this, but ensure they persist)
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://powerchoosers.com',
+    'https://www.powerchoosers.com',
+    'https://power-choosers-crm-792458658491.us-south1.run.app'
+  ];
+
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Vary', 'Origin');
+
   if (req.method !== 'POST') {
-    return res.writeHead(405, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Method not allowed' }));
-return;
+    res.setHeader('Content-Type', 'application/json');
+    res.writeHead(405);
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
   }
 
   try {
     const { googlePhotoURL } = req.body || {};
 
     if (!googlePhotoURL) {
-      return res.writeHead(400, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'No Google photo URL provided' }));
-return;
+      res.setHeader('Content-Type', 'application/json');
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: 'No Google photo URL provided' }));
+      return;
     }
 
     // Validate it's a Google URL
     if (!googlePhotoURL.includes('googleusercontent.com') && !googlePhotoURL.includes('ggpht.com')) {
-      return res.writeHead(400, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Invalid Google photo URL' }));
-return;
+      res.setHeader('Content-Type', 'application/json');
+      res.writeHead(400);
+      res.end(JSON.stringify({ error: 'Invalid Google photo URL' }));
+      return;
     }
 
     // Download the image from Google (server-side, no CORS issues)
@@ -45,9 +67,10 @@ return;
     
     if (!googleResponse.ok) {
       logger.error('[GoogleAvatar] Failed to download from Google:', googleResponse.status);
-      return res.writeHead(500, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Failed to download Google photo' }));
-return;
+      res.setHeader('Content-Type', 'application/json');
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: 'Failed to download Google photo' }));
+      return;
     }
 
     // Convert to base64
@@ -66,40 +89,45 @@ return;
     });
 
     if (!imgurResponse.ok) {
-      logger.error('[GoogleAvatar] Imgur upload failed:', await imgurResponse.text());
-      return res.writeHead(500, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Failed to upload to hosting service' }));
-return;
+      const errorText = await imgurResponse.text().catch(() => 'Unknown error');
+      logger.error('[GoogleAvatar] Imgur upload failed:', errorText);
+      res.setHeader('Content-Type', 'application/json');
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: 'Failed to upload to hosting service' }));
+      return;
     }
 
     const imgurResult = await imgurResponse.json();
     
     if (!imgurResult.success) {
-      logger.error('[GoogleAvatar] Imgur API error:', imgurResult.data.error);
-      return res.writeHead(500, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ error: 'Image hosting service error' }));
-return;
+      logger.error('[GoogleAvatar] Imgur API error:', imgurResult.data?.error || 'Unknown error');
+      res.setHeader('Content-Type', 'application/json');
+      res.writeHead(500);
+      res.end(JSON.stringify({ error: 'Image hosting service error' }));
+      return;
     }
 
     const imageUrl = imgurResult.data.link;
     logger.log('[GoogleAvatar] Avatar hosted successfully:', imageUrl);
 
-    return res.writeHead(200, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({
+    res.setHeader('Content-Type', 'application/json');
+    res.writeHead(200);
+    res.end(JSON.stringify({
       success: true,
       imageUrl: imageUrl,
       message: 'Google avatar hosted successfully'
     }));
-return;
+    return;
 
   } catch (error) {
     logger.error('[GoogleAvatar] Error:', error);
-    return res.writeHead(500, { 'Content-Type': 'application/json' });
-res.end(JSON.stringify({ 
+    res.setHeader('Content-Type', 'application/json');
+    res.writeHead(500);
+    res.end(JSON.stringify({ 
       error: 'Internal server error', 
       message: error.message 
     }));
-return;
+    return;
   }
 }
 
