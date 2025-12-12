@@ -51,6 +51,9 @@ class PowerChoosersCRM {
         // Email automation
         this.emailAutomationInterval = null;
         
+        // Email generation listener
+        this._emailGenerationUnsubscribe = null;
+        
         this.init();
         
         // PRE-LOAD ESSENTIAL DATA THEN LOAD WIDGETS
@@ -150,6 +153,9 @@ class PowerChoosersCRM {
         if (window.location.hostname === 'localhost' || localStorage.getItem('debug-memory') === 'true') {
             this.startMemoryMonitoring();
         }
+        
+        // Start listening for background email generation
+        this.startEmailGenerationListener();
     }
 
     // Initialize dashboard data and widgets in correct order
@@ -161,6 +167,102 @@ class PowerChoosersCRM {
         
         // STEP 2: Now load widgets that depend on this data
         this.loadDashboardWidgets();
+    }
+    
+    // Listen for background email generation (cron jobs)
+    startEmailGenerationListener() {
+        // Guard: Prevent duplicate listeners
+        if (this._emailGenerationUnsubscribe) {
+            console.log('[CRM] Email generation listener already active, skipping');
+            return;
+        }
+        
+        if (!window.firebaseDB || !window.firebaseDB.collection) {
+            console.warn('[CRM] Firestore not initialized, skipping email generation listener');
+            return;
+        }
+        
+        // Track which emails we've already notified about (to avoid duplicates)
+        const notifiedEmailIds = new Set();
+        
+        // Get current user email for filtering
+        const getUserEmail = () => {
+            try {
+                if (window.DataManager && typeof window.DataManager.getCurrentUserEmail === 'function') {
+                    return window.DataManager.getCurrentUserEmail();
+                }
+                return (window.currentUserEmail || '').toLowerCase();
+            } catch (_) {
+                return (window.currentUserEmail || '').toLowerCase();
+            }
+        };
+        
+        const userEmail = getUserEmail();
+        if (!userEmail) {
+            console.warn('[CRM] No user email found, skipping email generation listener');
+            return;
+        }
+        
+        console.log('[CRM] Starting email generation listener for:', userEmail);
+        
+        // Listen for emails with status 'pending_approval' that were recently generated
+        // Only show notifications for emails generated in the last 5 minutes
+        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+        
+        const emailsQuery = window.firebaseDB.collection('emails')
+            .where('type', '==', 'scheduled')
+            .where('status', '==', 'pending_approval')
+            .where('generatedAt', '>=', fiveMinutesAgo)
+            .orderBy('generatedAt', 'desc')
+            .limit(50); // Limit to recent emails only
+        
+        this._emailGenerationUnsubscribe = emailsQuery.onSnapshot((snapshot) => {
+            try {
+                snapshot.docChanges().forEach((change) => {
+                    // Only process new documents (not modifications or deletions)
+                    if (change.type !== 'added') return;
+                    
+                    const emailData = change.doc.data();
+                    const emailId = change.doc.id;
+                    
+                    // Skip if we've already notified about this email
+                    if (notifiedEmailIds.has(emailId)) return;
+                    
+                    // Only notify for emails owned by current user
+                    const emailOwner = (emailData.ownerId || emailData.assignedTo || '').toLowerCase();
+                    if (emailOwner !== userEmail.toLowerCase()) return;
+                    
+                    // Only notify if email was just generated (within last 2 minutes)
+                    const generatedAt = emailData.generatedAt;
+                    if (!generatedAt) return;
+                    
+                    const twoMinutesAgo = Date.now() - (2 * 60 * 1000);
+                    if (generatedAt < twoMinutesAgo) return;
+                    
+                    // Mark as notified
+                    notifiedEmailIds.add(emailId);
+                    
+                    // Clean up old IDs (keep only last 100 to prevent memory leak)
+                    if (notifiedEmailIds.size > 100) {
+                        const firstId = notifiedEmailIds.values().next().value;
+                        notifiedEmailIds.delete(firstId);
+                    }
+                    
+                    // Show notification
+                    if (window.ToastManager && typeof window.ToastManager.showEmailGeneratedNotification === 'function') {
+                        window.ToastManager.showEmailGeneratedNotification({
+                            contactName: emailData.contactName || null,
+                            subject: emailData.subject || 'Email ready for review',
+                            sequenceName: emailData.sequenceName || null
+                        });
+                    }
+                });
+            } catch (error) {
+                console.error('[CRM] Error in email generation listener:', error);
+            }
+        }, (error) => {
+            console.warn('[CRM] Email generation listener error:', error);
+        });
     }
     
     // Load dashboard widgets after data is ready
@@ -465,6 +567,19 @@ class PowerChoosersCRM {
     }
     
     // Clean up page-specific memory on navigation
+    // Cleanup email generation listener
+    stopEmailGenerationListener() {
+        if (this._emailGenerationUnsubscribe) {
+            try {
+                this._emailGenerationUnsubscribe();
+                this._emailGenerationUnsubscribe = null;
+                console.log('[CRM] Stopped email generation listener');
+            } catch (error) {
+                console.warn('[CRM] Error stopping email generation listener:', error);
+            }
+        }
+    }
+    
     cleanupPageMemory(previousPage) {
         console.log('[CRM] Cleaning up memory for:', previousPage);
         
