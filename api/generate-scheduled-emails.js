@@ -124,6 +124,279 @@ function validateNepqContent(subject, text, toneOpener) {
   };
 }
 
+// ========== PREVIEW GENERATION (NO WRITES) ==========
+async function generatePreviewEmail(emailData) {
+  if (!emailData || typeof emailData !== 'object') {
+    throw new Error('Missing emailData for preview');
+  }
+
+  // Pull contact/account data from payload (no Firestore lookups for preview)
+  const contactData = emailData.contactData || {};
+  const accountData = emailData.accountData || {};
+
+  // Detect industry (same priority as main flow)
+  let recipientIndustry = accountData.industry || contactData.industry || '';
+  if (!recipientIndustry && (emailData.contactCompany || contactData.company)) {
+    recipientIndustry = inferIndustryFromCompanyName(emailData.contactCompany || contactData.company);
+  }
+  if (!recipientIndustry) {
+    const accountDesc = accountData.shortDescription || accountData.short_desc ||
+      accountData.descriptionShort || accountData.description ||
+      accountData.companyDescription || accountData.accountDescription || '';
+    if (accountDesc) {
+      recipientIndustry = inferIndustryFromDescription(accountDesc);
+    }
+  }
+  if (!recipientIndustry) recipientIndustry = 'Default';
+
+  // Build recipient object (mirrors production generation path)
+  const recipient = {
+    firstName: contactData.firstName || contactData.first_name || contactData.name || emailData.contactName || 'there',
+    company: contactData.company || accountData.companyName || accountData.name || emailData.contactCompany || '',
+    title: contactData.role || contactData.title || contactData.job || '',
+    industry: recipientIndustry,
+    account: accountData,
+    energy: {
+      supplier: accountData.electricitySupplier || accountData.electricity_supplier || '',
+      currentRate: accountData.currentRate || accountData.current_rate || '',
+      contractEnd: accountData.contractEndDate || accountData.contract_end_date || '',
+      annualUsage: accountData.annualUsage || accountData.annual_usage || ''
+    },
+    notes: contactData.notes || ''
+  };
+
+  // Recent angles (optional, to avoid repeats)
+  const usedAngles = Array.isArray(emailData.previousAngles) ? emailData.previousAngles.filter(Boolean) : [];
+
+  // Select angle + tone opener
+  const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient, usedAngles);
+  const toneOpener = selectRandomToneOpener(selectedAngle?.id);
+
+  const aiMode = (emailData.aiMode || '').toLowerCase() === 'html' ? 'html' : 'standard';
+  const isColdStep = (
+    emailData.stepType === 'intro' ||
+    emailData.template === 'first-email-intro' ||
+    String(emailData.aiMode || '').toLowerCase() === 'cold-email' ||
+    emailData.stepIndex === 0 ||
+    emailData.stepIndex === undefined
+  );
+  const emailPosition = typeof emailData.stepIndex === 'number' ? emailData.stepIndex + 1 : 1;
+
+  const baseUrl = (process.env.PUBLIC_BASE_URL && process.env.PUBLIC_BASE_URL.replace(/\/$/, ''))
+    || 'http://localhost:3000';
+
+  const perplexityResponse = await fetch(`${baseUrl}/api/perplexity-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      prompt: emailData.aiPrompt || 'Write a professional follow-up email',
+      mode: aiMode,
+      templateType: 'cold_email',
+      recipient: recipient,
+      selectedAngle: selectedAngle,
+      toneOpener: toneOpener,
+      senderName: 'Lewis Patterson',
+      emailPosition: emailPosition,
+      previousAngles: usedAngles
+    })
+  });
+
+  if (!perplexityResponse.ok) {
+    throw new Error(`Perplexity email API error: ${perplexityResponse.status}`);
+  }
+
+  const perplexityResult = await perplexityResponse.json();
+  if (!perplexityResult.ok) {
+    throw new Error(`Perplexity email API failed: ${perplexityResult.error || 'Unknown error'}`);
+  }
+
+  let htmlContent = '';
+  let textContent = '';
+
+  if (aiMode === 'html') {
+    const outputData = perplexityResult.output || {};
+    htmlContent = buildColdEmailHtmlTemplate(outputData, recipient);
+    textContent = buildTextVersionFromHtml(htmlContent);
+  } else {
+    // Standard mode: reuse production logic
+    const raw = String(perplexityResult.output || '').trim();
+    let jsonData = null;
+    try {
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (match) jsonData = JSON.parse(match[0]);
+    } catch (e) {
+      jsonData = null;
+    }
+
+    let subject = emailData.subject || 'Energy update';
+    let bodyText = raw;
+
+    const enforceFirstNameOnly = (greeting) => {
+      if (!greeting || typeof greeting !== 'string') return greeting;
+      const firstName = recipient.firstName || '';
+      if (!firstName) return greeting;
+      const greetingPattern = /^(Hi|Hello|Hey|Dear)\s+([^,]+),/i;
+      const match = greeting.match(greetingPattern);
+      if (match) {
+        const salutation = match[1];
+        const namePart = match[2].trim();
+        if (namePart !== firstName && namePart.toLowerCase().includes(firstName.toLowerCase())) {
+          return `${salutation} ${firstName},`;
+        }
+        if (namePart !== firstName) return `${salutation} ${firstName},`;
+      }
+      return greeting;
+    };
+
+    if (jsonData && typeof jsonData === 'object') {
+      if (jsonData.subject) subject = jsonData.subject;
+      const parts = [];
+      if (jsonData.greeting) {
+        const cleanedGreeting = enforceFirstNameOnly(jsonData.greeting);
+        parts.push(cleanedGreeting);
+      }
+      if (jsonData.paragraph1) parts.push(jsonData.paragraph1);
+      if (jsonData.paragraph2) parts.push(jsonData.paragraph2);
+      if (jsonData.paragraph3) parts.push(jsonData.paragraph3);
+      if (jsonData.closing) {
+        parts.push(jsonData.closing);
+      } else {
+        const senderFirstName = 'Lewis';
+        parts.push(`Best regards,\n${senderFirstName}`);
+      }
+      bodyText = parts.join('\n\n') || raw;
+    }
+
+    if (isColdStep && selectedAngle) {
+      const firstNameForSubject = recipient.firstName || contactData.firstName || emailData.contactName || '';
+      const companyForSubject = recipient.company || emailData.contactCompany || '';
+      const angleSubjects = {
+        timing_strategy: [
+          `${firstNameForSubject}, when does your contract expire?`,
+          `${firstNameForSubject}, rate lock timing question`,
+          `${companyForSubject} renewal timing question`,
+          `${firstNameForSubject}, contract renewal window?`
+        ],
+        exemption_recovery: [
+          `${firstNameForSubject}, are you claiming exemptions?`,
+          `${firstNameForSubject}, tax exemption question`,
+          `${companyForSubject} exemption recovery question`,
+          `${firstNameForSubject}, electricity exemptions?`
+        ],
+        consolidation: [
+          `${firstNameForSubject}, how many locations are you managing?`,
+          `${firstNameForSubject}, multi-site energy question`,
+          `${companyForSubject} consolidation opportunity?`,
+          `${firstNameForSubject}, multiple locations?`
+        ],
+        demand_efficiency: [
+          `${firstNameForSubject}, optimizing before renewal?`,
+          `${firstNameForSubject}, consumption efficiency question`,
+          `${companyForSubject} pre-renewal optimization?`,
+          `${firstNameForSubject}, efficiency before renewal?`
+        ],
+        operational_continuity: [
+          `${firstNameForSubject}, peak demand handling?`,
+          `${firstNameForSubject}, uptime vs savings?`,
+          `${companyForSubject} operational continuity question`,
+          `${firstNameForSubject}, demand charge question?`
+        ],
+        mission_funding: [
+          `${firstNameForSubject}, redirecting funds to mission?`,
+          `${companyForSubject} mission funding question`,
+          `${firstNameForSubject}, vendor cost question?`,
+          `${firstNameForSubject}, program funding?`
+        ],
+        budget_stability: [
+          `${firstNameForSubject}, locking in energy costs?`,
+          `${companyForSubject} budget stability question`,
+          `${firstNameForSubject}, cost predictability?`,
+          `${firstNameForSubject}, budget volatility?`
+        ],
+        operational_simplicity: [
+          `${firstNameForSubject}, managing multiple suppliers?`,
+          `${companyForSubject} vendor consolidation question`,
+          `${firstNameForSubject}, unified billing?`,
+          `${firstNameForSubject}, supplier management?`
+        ],
+        cost_control: [
+          `${firstNameForSubject}, energy cost predictability?`,
+          `${companyForSubject} budget planning question`,
+          `${firstNameForSubject}, rate volatility?`,
+          `${firstNameForSubject}, cost control?`
+        ],
+        operational_efficiency: [
+          `${firstNameForSubject}, energy costs impacting efficiency?`,
+          `${companyForSubject} operational efficiency question`,
+          `${firstNameForSubject}, cost reduction opportunity?`
+        ],
+        data_governance: [
+          `${firstNameForSubject}, visibility into energy usage?`,
+          `${companyForSubject} energy reporting question`,
+          `${firstNameForSubject}, centralized metering?`
+        ]
+      };
+      const angleId = selectedAngle.id || 'timing_strategy';
+      const subjects = angleSubjects[angleId] || angleSubjects.timing_strategy;
+      subject = subjects[Math.floor(Math.random() * subjects.length)];
+    } else if (isColdStep) {
+      const roleForSubject = recipient.title || '';
+      const firstNameForSubject = recipient.firstName || contactData.firstName || emailData.contactName || '';
+      const companyForSubject = recipient.company || emailData.contactCompany || '';
+      subject = getRandomIntroSubject(roleForSubject, firstNameForSubject, companyForSubject);
+    }
+
+    const escapeHtml = (str) => String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    const paragraphs = bodyText
+      .split(/\n\n+/)
+      .map(p => p.trim())
+      .filter(Boolean);
+
+    htmlContent = paragraphs
+      .map(p => `<p style="margin:0 0 16px 0; color:#222;">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
+      .join('');
+
+    textContent = bodyText;
+    emailData.generatedSubject = subject;
+  }
+
+  const generatedContent = {
+    subject: emailData.generatedSubject || 'Follow-up Email',
+    html: htmlContent,
+    text: textContent,
+    angle_used: selectedAngle?.id || null,
+    exemption_type: accountData?.taxExemptStatus || null,
+    tone_opener: toneOpener || null
+  };
+
+  // NEPQ + content validation
+  const nepqValidation = validateNepqContent(
+    generatedContent.subject,
+    generatedContent.text,
+    toneOpener
+  );
+  if (!nepqValidation.isValid) {
+    throw new Error(nepqValidation.reason || 'Failed NEPQ validation');
+  }
+
+  const validation = validateGeneratedContent(
+    generatedContent.html,
+    generatedContent.text,
+    generatedContent.subject
+  );
+  if (!validation.isValid) {
+    throw new Error(validation.reason || 'Failed content validation');
+  }
+
+  return { ok: true, generatedContent, toneOpener };
+}
+
 // ========== INDUSTRY DETECTION FUNCTIONS ==========
 
 // Infer industry from company name
@@ -672,10 +945,36 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { immediate = false, emailId = null } = req.body || {};
+    const { immediate = false, emailId = null, preview = false, emailData: previewEmailData = null } = req.body || {};
     
     logger.debug('[GenerateScheduledEmails] Starting generation process, immediate:', immediate, 'emailId:', emailId);
     logger.debug('[GenerateScheduledEmails] Perplexity API key present:', !!process.env.PERPLEXITY_API_KEY);
+    
+    // Preview mode: reuse full generation logic but skip all Firestore reads/writes
+    if (preview) {
+      try {
+        const result = await generatePreviewEmail(previewEmailData || {});
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          preview: true,
+          subject: result.generatedContent.subject,
+          html: result.generatedContent.html,
+          text: result.generatedContent.text,
+          angle_used: result.generatedContent.angle_used,
+          exemption_type: result.generatedContent.exemption_type,
+          tone_opener: result.toneOpener || result.generatedContent.tone_opener || null
+        }));
+      } catch (error) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: false,
+          preview: true,
+          error: error.message || 'Preview generation failed'
+        }));
+      }
+      return;
+    }
     
     let scheduledEmailsSnapshot;
     
