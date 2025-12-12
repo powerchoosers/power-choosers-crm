@@ -1068,30 +1068,9 @@
         const found = await tryFetches();
         if (found) return found;
         
-        // If no contact found, try Twilio caller ID lookup
-        try {
-          const callerLookup = await fetch(`${base}/api/twilio/caller-lookup`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phoneNumber: number })
-          });
-          if (callerLookup.ok) {
-            const lookupData = await callerLookup.json();
-            if (lookupData.success && lookupData.data) {
-              const data = lookupData.data;
-              meta.name = data.callerName || '';
-              meta.carrier = data.carrier || '';
-              meta.countryCode = data.countryCode || '';
-              meta.nationalFormat = data.nationalFormat || '';
-              if (data.carrier && data.carrier.name) {
-                meta.carrierName = data.carrier.name;
-                meta.carrierType = data.carrier.type;
-              }
-            }
-          }
-        } catch (lookupError) {
-          console.warn('[Phone] Caller ID lookup failed:', lookupError);
-        }
+        // Twilio caller ID lookup disabled by user (feature deactivated in Twilio console)
+        // Skipping Twilio lookup to avoid unnecessary API calls and console errors
+        // CRM search results above should be sufficient for existing contacts/accounts
       }
     } catch (_) {}
     return meta;
