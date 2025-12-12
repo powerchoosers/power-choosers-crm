@@ -145,50 +145,88 @@
 
   async function processBatchUpdate() {
     if (Object.keys(updateBatch).length === 0) return;
-    const accountId = state.account?.id;
-    if (!accountId) return;
 
     try {
       const db = window.firebaseDB;
-      if (db && typeof db.collection === 'function') {
-        await db.collection('accounts').doc(accountId).update({
-          ...updateBatch,
-          updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date()
-        });
+      if (!db || typeof db.collection !== 'function') return;
 
-        if (state.account) {
-          Object.assign(state.account, updateBatch);
-        }
+      // Process account updates
+      if (updateBatch.account) {
+        for (const [accountId, fields] of Object.entries(updateBatch.account)) {
+          if (!accountId || !fields || Object.keys(fields).length === 0) continue;
 
-        // Update caches
-        if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
-          await window.CacheManager.updateRecord('accounts', accountId, state.account);
-        }
-
-        // Dispatch events for other pages
-        try {
-          const ev = new CustomEvent('pc:account-updated', {
-            detail: { id: accountId, changes: { ...updateBatch }, updatedAt: new Date() }
+          await db.collection('accounts').doc(accountId).update({
+            ...fields,
+            updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date()
           });
-          document.dispatchEvent(ev);
-        } catch (_) { }
 
-        // Dispatch energy update events
-        Object.keys(updateBatch).forEach(field => {
-          if (['electricitySupplier', 'annualUsage', 'currentRate', 'contractEndDate'].includes(field)) {
-            try {
-              document.dispatchEvent(new CustomEvent('pc:energy-updated', {
-                detail: { entity: 'account', id: accountId, field, value: updateBatch[field] }
-              }));
-            } catch (_) { }
+          // Update local state
+          if (state.account && state.account.id === accountId) {
+            Object.assign(state.account, fields);
           }
-        });
 
-        updateBatch = {};
-        if (window.crm?.showToast) window.crm.showToast('Saved');
+          // Update caches
+          if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+            const accountData = state.account && state.account.id === accountId ? state.account : { id: accountId, ...fields };
+            await window.CacheManager.updateRecord('accounts', accountId, accountData);
+          }
+
+          // Dispatch events for other pages
+          try {
+            const ev = new CustomEvent('pc:account-updated', {
+              detail: { id: accountId, changes: { ...fields }, updatedAt: new Date() }
+            });
+            document.dispatchEvent(ev);
+          } catch (_) { }
+
+          // Dispatch energy update events
+          Object.keys(fields).forEach(field => {
+            if (['electricitySupplier', 'annualUsage', 'currentRate', 'contractEndDate'].includes(field)) {
+              try {
+                document.dispatchEvent(new CustomEvent('pc:energy-updated', {
+                  detail: { entity: 'account', id: accountId, field, value: fields[field] }
+                }));
+              } catch (_) { }
+            }
+          });
+        }
       }
+
+      // Process contact updates
+      if (updateBatch.contact) {
+        for (const [contactId, fields] of Object.entries(updateBatch.contact)) {
+          if (!contactId || !fields || Object.keys(fields).length === 0) continue;
+
+          await db.collection('contacts').doc(contactId).update({
+            ...fields,
+            updatedAt: window.firebase?.firestore?.FieldValue?.serverTimestamp() || new Date()
+          });
+
+          // Update local state
+          if (state.contact && state.contact.id === contactId) {
+            Object.assign(state.contact, fields);
+          }
+
+          // Update caches
+          if (window.CacheManager && typeof window.CacheManager.updateRecord === 'function') {
+            const contactData = state.contact && state.contact.id === contactId ? state.contact : { id: contactId, ...fields };
+            await window.CacheManager.updateRecord('contacts', contactId, contactData);
+          }
+
+          // Dispatch events for other pages
+          try {
+            const ev = new CustomEvent('pc:contact-updated', {
+              detail: { id: contactId, changes: { ...fields }, updatedAt: new Date() }
+            });
+            document.dispatchEvent(ev);
+          } catch (_) { }
+        }
+      }
+
+      updateBatch = {};
+      if (window.crm?.showToast) window.crm.showToast('Saved');
     } catch (error) {
-      console.error('[TaskDetail] Failed to save account field:', error);
+      console.error('[TaskDetail] Failed to save field:', error);
       window.crm?.showToast && window.crm.showToast('Failed to save');
     }
   }
@@ -4690,27 +4728,69 @@
           <div class="info-grid">
             <div class="info-row">
               <div class="info-label">EMAIL</div>
-              <div class="info-value ${!email ? 'empty' : ''}">${email ? `<span class="email-text" data-email="${escapeHtml(email)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}">${escapeHtml(email)}</span>` : '--'}</div>
+              <div class="info-value-wrap" data-field="email" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}">
+                <span class="info-value-text ${!email ? 'empty' : ''}">${email ? `<span class="email-text" data-email="${escapeHtml(email)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}">${escapeHtml(email)}</span>` : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">${phoneType.toUpperCase()}</div>
-              <div class="info-value ${!primaryPhone ? 'empty' : ''}">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-company-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-phone-type="${phoneType}">${escapeHtml(primaryPhone)}</span>` : '--'}</div>
+              <div class="info-value-wrap" data-field="phone" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}" data-phone-type="${phoneType}">
+                <span class="info-value-text ${!primaryPhone ? 'empty' : ''}">${primaryPhone ? `<span class="phone-text" data-phone="${escapeHtml(primaryPhone)}" data-contact-name="${escapeHtml(contactName)}" data-contact-id="${escapeHtml(contactId || '')}" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-company-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-phone-type="${phoneType}">${escapeHtml(primaryPhone)}</span>` : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">COMPANY PHONE</div>
-              <div class="info-value ${!companyPhone ? 'empty' : ''}">${companyPhone ? `<span class="phone-text" data-phone="${escapeHtml(companyPhone)}" data-contact-name="" data-contact-id="" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-company-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-is-company-phone="true">${escapeHtml(companyPhone)}</span>` : '--'}</div>
+              <div class="info-value-wrap" data-field="companyPhone" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!companyPhone ? 'empty' : ''}">${companyPhone ? `<span class="phone-text" data-phone="${escapeHtml(companyPhone)}" data-contact-name="" data-contact-id="" data-account-id="${escapeHtml(linkedAccount?.id || '')}" data-account-name="${escapeHtml(companyName || '')}" data-company-name="${escapeHtml(companyName || '')}" data-logo-url="${escapeHtml(linkedAccount?.logoUrl || '')}" data-city="${escapeHtml(finalCity || '')}" data-state="${escapeHtml(finalState || '')}" data-domain="${escapeHtml(domain || '')}" data-is-company-phone="true">${escapeHtml(companyPhone)}</span>` : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">CITY</div>
-              <div class="info-value ${!city ? 'empty' : ''}">${escapeHtml(city) || '--'}</div>
+              <div class="info-value-wrap" data-field="city" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}">
+                <span class="info-value-text ${!city ? 'empty' : ''}">${escapeHtml(city) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">STATE</div>
-              <div class="info-value ${!stateVal ? 'empty' : ''}">${escapeHtml(stateVal) || '--'}</div>
+              <div class="info-value-wrap" data-field="state" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}">
+                <span class="info-value-text ${!stateVal ? 'empty' : ''}">${escapeHtml(stateVal) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">INDUSTRY</div>
-              <div class="info-value ${!industry ? 'empty' : ''}">${escapeHtml(industry) || '--'}</div>
+              <div class="info-value-wrap" data-field="industry" data-entity="contact" data-entity-id="${escapeHtml(contactId || '')}">
+                <span class="info-value-text ${!industry ? 'empty' : ''}">${escapeHtml(industry) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -4722,19 +4802,47 @@
           <div class="info-grid">
             <div class="info-row">
               <div class="info-label">ELECTRICITY SUPPLIER</div>
-              <div class="info-value ${!electricitySupplier ? 'empty' : ''}">${escapeHtml(electricitySupplier) || '--'}</div>
+              <div class="info-value-wrap" data-field="electricitySupplier" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!electricitySupplier ? 'empty' : ''}">${escapeHtml(electricitySupplier) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">ANNUAL USAGE</div>
-              <div class="info-value ${!annualUsage ? 'empty' : ''}">${escapeHtml(annualUsage) || '--'}</div>
+              <div class="info-value-wrap" data-field="annualUsage" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!annualUsage ? 'empty' : ''}">${annualUsage ? escapeHtml(String(annualUsage).replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')) : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">CURRENT RATE</div>
-              <div class="info-value ${!currentRate ? 'empty' : ''}">${escapeHtml(currentRate) || '--'}</div>
+              <div class="info-value-wrap" data-field="currentRate" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!currentRate ? 'empty' : ''}">${escapeHtml(currentRate) || '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
             <div class="info-row">
               <div class="info-label">CONTRACT END</div>
-              <div class="info-value ${!contractEndDate ? 'empty' : ''}">${escapeHtml(contractEndDate) || '--'}</div>
+              <div class="info-value-wrap" data-field="contractEndDate" data-entity="account" data-entity-id="${escapeHtml(linkedAccount?.id || '')}">
+                <span class="info-value-text ${!contractEndDate ? 'empty' : ''}">${contractEndDate ? escapeHtml(toMDY(contractEndDate)) : '--'}</span>
+                <div class="info-actions">
+                  <button class="icon-btn-sm info-edit" title="Edit">${editIcon()}</button>
+                  <button class="icon-btn-sm info-copy" title="Copy">${copyIcon()}</button>
+                  <button class="icon-btn-sm info-delete" title="Delete">${trashIcon()}</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -6182,16 +6290,36 @@
     }
   }
 
-  async function saveField(field, value) {
-    const accountId = state.account?.id;
-    if (!accountId) return;
+  async function saveField(field, value, entity = 'account', entityId = null) {
+    // Determine entity ID from parameter or state
+    let id = entityId;
+    if (!id) {
+      if (entity === 'account') {
+        id = state.account?.id;
+      } else if (entity === 'contact') {
+        id = state.contact?.id;
+      }
+    }
+    
+    if (!id) {
+      console.warn('[TaskDetail] Cannot save field: no entity ID for', entity);
+      return;
+    }
 
-    // Add to batch instead of immediate write
-    updateBatch[field] = value;
+    // Store entity type and ID with the batch update
+    if (!updateBatch[entity]) {
+      updateBatch[entity] = {};
+    }
+    if (!updateBatch[entity][id]) {
+      updateBatch[entity][id] = {};
+    }
+    updateBatch[entity][id][field] = value;
 
     // Update local state immediately for instant UI feedback
-    if (state.account) {
+    if (entity === 'account' && state.account && state.account.id === id) {
       state.account[field] = value;
+    } else if (entity === 'contact' && state.contact && state.contact.id === id) {
+      state.contact[field] = value;
     }
 
     // Clear existing timeout
@@ -6227,7 +6355,7 @@
       textEl.textContent = numeric ? numeric.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '--';
       if (!numeric) textEl.classList.add('empty');
       else textEl.classList.remove('empty');
-    } else if (field === 'companyPhone') {
+    } else if (field === 'companyPhone' || field === 'phone') {
       const display = normalizePhone(val);
       textEl.textContent = display || '--';
       if (!display) {
@@ -6248,6 +6376,16 @@
           }
         } catch (_) { }
       }
+    } else if (field === 'email' && val) {
+      // For email fields, preserve the email-text span structure
+      const emailSpan = textEl.querySelector('.email-text');
+      if (emailSpan) {
+        emailSpan.textContent = val;
+        emailSpan.setAttribute('data-email', val);
+      } else {
+        textEl.innerHTML = `<span class="email-text" data-email="${escapeHtml(val)}">${escapeHtml(val)}</span>`;
+      }
+      textEl.classList.remove('empty');
     } else {
       textEl.textContent = val || '--';
       if (!val) textEl.classList.add('empty');

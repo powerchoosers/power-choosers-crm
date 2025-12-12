@@ -200,8 +200,25 @@
       e.preventDefault();
       e.stopPropagation();
       
+      // Check if phone widget is available - with retry for timing issues
+      let widgetAvailable = false;
+      let retries = 0;
+      const maxRetries = 3;
+      
+      while (retries < maxRetries && !widgetAvailable) {
+        widgetAvailable = !!(window.Widgets && typeof window.Widgets.callNumber === 'function');
+        if (!widgetAvailable && retries < maxRetries - 1) {
+          // Wait a bit for widget to load (only on first attempts)
+          const start = Date.now();
+          while (Date.now() - start < 50) { /* busy wait */ }
+          retries++;
+        } else {
+          break;
+        }
+      }
+      
       // Use the phone widget to make the call
-      if (window.Widgets && typeof window.Widgets.callNumber === 'function') {
+      if (widgetAvailable) {
         // Mark the exact time of the user click to prove a fresh gesture
         try { window.Widgets._lastClickToCallAt = Date.now(); } catch(_) {}
         
@@ -216,13 +233,27 @@
         
         // Always auto-trigger for click-to-call, but mark it as a user-initiated click
         if (DEBUG_CLICK_TO_CALL) console.debug('[ClickToCall] User clicked phone number - auto-triggering call');
-        window.Widgets.callNumber(cleanPhone, contactName, true, 'click-to-call');
+        try {
+          window.Widgets.callNumber(cleanPhone, contactName, true, 'click-to-call');
+        } catch (callError) {
+          console.error('[ClickToCall] Error calling window.Widgets.callNumber:', callError);
+          // Show user-friendly error instead of falling back to tel: link
+          try { 
+            window.crm?.showToast && window.crm.showToast('Phone widget error - please try again'); 
+          } catch(_) {}
+        }
       } else {
-        console.warn('Phone widget not available');
-        // Fallback to tel: link
-        const telLink = document.createElement('a');
-        telLink.href = `tel:${cleanPhone}`;
-        telLink.click();
+        console.error('[ClickToCall] Phone widget not available after retries', {
+          hasWidgets: !!window.Widgets,
+          hasCallNumber: !!(window.Widgets && typeof window.Widgets.callNumber),
+          retries: retries
+        });
+        // DO NOT fallback to tel: link - show error instead
+        try { 
+          window.crm?.showToast && window.crm.showToast('Phone widget not loaded - please refresh the page'); 
+        } catch(_) {
+          alert('Phone widget not available. Please refresh the page and try again.');
+        }
       }
     });
     
