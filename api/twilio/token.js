@@ -66,7 +66,38 @@ export default async function handler(req, res) {
       return;
     }
     
-    // Create access token
+    // Validate credential format (basic checks)
+    if (!accountSid.startsWith('AC') || accountSid.length < 32) {
+      logger.error('[TwilioAuth] Invalid Account SID format', { accountSid: accountSid?.substring(0, 5) + '...' });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Invalid Account SID format',
+        message: 'Account SID should start with AC and be at least 32 characters'
+      }));
+      return;
+    }
+    
+    if (!apiKeySid.startsWith('SK') || apiKeySid.length < 32) {
+      logger.error('[TwilioAuth] Invalid API Key SID format', { apiKeySid: apiKeySid?.substring(0, 5) + '...' });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Invalid API Key SID format',
+        message: 'API Key SID should start with SK and be at least 32 characters'
+      }));
+      return;
+    }
+    
+    if (!appSid.startsWith('AP') || appSid.length < 32) {
+      logger.error('[TwilioAuth] Invalid TwiML App SID format', { appSid: appSid?.substring(0, 5) + '...' });
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Invalid TwiML App SID format',
+        message: 'TwiML App SID should start with AP and be at least 32 characters'
+      }));
+      return;
+    }
+    
+    // Create access token with explicit expiration (1 hour)
     const AccessToken = twilio.jwt.AccessToken;
     const VoiceGrant = AccessToken.VoiceGrant;
     
@@ -74,7 +105,10 @@ export default async function handler(req, res) {
       accountSid,
       apiKeySid,
       apiKeySecret,
-      { identity: identity }
+      { 
+        identity: identity,
+        ttl: 3600 // 1 hour expiration
+      }
     );
     
     // Grant voice capabilities
@@ -85,12 +119,20 @@ export default async function handler(req, res) {
     
     token.addGrant(voiceGrant);
     
-    logger.debug('[TwilioAuth] Token generated successfully', { identity });
+    const tokenJwt = token.toJwt();
+    
+    logger.debug('[TwilioAuth] Token generated successfully', { 
+      identity,
+      accountSidPrefix: accountSid.substring(0, 5),
+      apiKeySidPrefix: apiKeySid.substring(0, 5),
+      appSidPrefix: appSid.substring(0, 5),
+      tokenLength: tokenJwt.length
+    });
     
     // Always return JSON
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      token: token.toJwt(),
+      token: tokenJwt,
       identity: identity
     }));
     return;
