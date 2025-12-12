@@ -8325,6 +8325,15 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               }
 
               if (status) status.textContent = 'Preview generated!';
+              
+              // Show email generation notification
+              if (window.ToastManager) {
+                window.ToastManager.showEmailGeneratedNotification({
+                  contactName: emailPayload.contactName || null,
+                  subject: subject,
+                  sequenceName: state.currentSequence?.name || null
+                });
+              }
             } else {
               const errorData = await response.json().catch(() => ({}));
               const errMsg = errorData.error || errorData.message || 'Generation failed';

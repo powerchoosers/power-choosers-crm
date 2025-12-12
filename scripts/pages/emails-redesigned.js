@@ -2411,8 +2411,14 @@
       const result = await response.json();
       console.log('[EmailsPage] Generated scheduled emails:', result);
 
-      // Show success message
-      if (window.crm && window.crm.showToast) {
+      // Show email generation notification
+      if (window.ToastManager && result.success && result.count > 0) {
+        window.ToastManager.showEmailGeneratedNotification({
+          count: result.count,
+          message: result.count === 1 ? 'Email ready for review' : `${result.count} emails ready for review`
+        });
+      } else if (window.crm && window.crm.showToast) {
+        // Fallback to simple toast if ToastManager not available
         window.crm.showToast(`Generated ${result.count || 0} scheduled emails`);
       }
 
