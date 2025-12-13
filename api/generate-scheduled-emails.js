@@ -35,6 +35,11 @@ function validateGeneratedContent(html, text, subject) {
     { pattern: /\[city\]|\[state\]/i, reason: 'Unfilled placeholder: location' },
     { pattern: /\{\{[a-z_]+\}\}/i, reason: 'Unfilled mustache placeholder' },
     
+    // Invalid recent activity mentions (when no activity exists)
+    { pattern: /no recent (public )?activity (showing up|available|found)/i, reason: 'Invalid mention of "no recent activity" - sounds like placeholder text' },
+    { pattern: /with no recent (public )?activity/i, reason: 'Invalid mention of "no recent activity" - sounds like placeholder text' },
+    { pattern: /no recent public activity showing up/i, reason: 'Invalid mention of "no recent public activity" - sounds like placeholder text' },
+    
     // Other meta patterns
     { pattern: /recipient details:/i, reason: 'AI listing required details' },
     { pattern: /company information:/i, reason: 'AI listing required info' },
