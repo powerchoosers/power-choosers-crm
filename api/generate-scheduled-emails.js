@@ -16,6 +16,41 @@ function debugLog(data) {
   }
 }
 
+// ========== EM DASH REMOVAL ==========
+// Remove em dashes from email content and replace with commas or natural flow
+function removeEmDashes(text) {
+  if (!text) return text;
+  const before = String(text);
+  const hasEmDash = /[—–]/.test(before);
+  const after = before
+    // Replace em dash (—) and en dash (–) at end of phrases with comma or nothing
+    .replace(/(\w+)\s*[—–]\s+/g, '$1, ')  // "Curious—" → "Curious, "
+    .replace(/(\w+)\s*[—–]$/g, '$1')      // "Curious—" at end → "Curious"
+    .replace(/\s*[—–]\s+/g, ', ');        // Any remaining dashes → comma
+  
+  // #region agent log
+  if (hasEmDash) {
+    const logDataEmDash = {
+      location: 'generate-scheduled-emails.js:removeEmDashes',
+      message: 'Em dash removal applied',
+      data: {
+        beforePreview: before.substring(0, 200),
+        afterPreview: after.substring(0, 200),
+        hadEmDash: hasEmDash,
+        emDashCount: (before.match(/[—–]/g) || []).length
+      },
+      timestamp: Date.now(),
+      sessionId: 'debug-session',
+      runId: 'run1',
+      hypothesisId: 'I'
+    };
+    debugLog(logDataEmDash);
+  }
+  // #endregion
+  
+  return after;
+}
+
 // ========== BAD GENERATION DETECTION ==========
 
 /**
@@ -355,7 +390,7 @@ async function generatePreviewEmail(emailData) {
   if (aiMode === 'html') {
     const outputData = perplexityResult.output || {};
     htmlContent = buildColdEmailHtmlTemplate(outputData, recipient);
-    textContent = buildTextVersionFromHtml(htmlContent);
+    textContent = removeEmDashes(buildTextVersionFromHtml(htmlContent)); // Remove em dashes from text version
   } else {
     // Standard mode: reuse production logic
     const raw = String(perplexityResult.output || '').trim();
@@ -368,7 +403,7 @@ async function generatePreviewEmail(emailData) {
     }
 
     let subject = emailData.subject || 'Energy update';
-    let bodyText = raw;
+    let bodyText = removeEmDashes(raw); // Remove em dashes from full body text
 
     const enforceFirstNameOnly = (greeting) => {
       if (!greeting || typeof greeting !== 'string') return greeting;
@@ -501,7 +536,7 @@ async function generatePreviewEmail(emailData) {
       .map(p => `<p style="margin:0 0 16px 0; color:#222;">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
       .join('');
 
-    textContent = bodyText;
+    textContent = removeEmDashes(bodyText); // Ensure em dashes are removed from final text
     emailData.generatedSubject = subject;
   }
 
@@ -530,7 +565,7 @@ async function generatePreviewEmail(emailData) {
     const logData5 = {location:'generate-scheduled-emails.js:530',message:'Applying modifiedBody (preview path)',data:{textBefore:generatedContent.text.substring(0,150),textAfter:nepqValidation.modifiedBody.substring(0,150),htmlBeforeLength:generatedContent.html?.length||0,htmlBeforePreview:generatedContent.html?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
     debugLog(logData5);
     // #endregion
-    generatedContent.text = nepqValidation.modifiedBody;
+    generatedContent.text = removeEmDashes(nepqValidation.modifiedBody); // Remove em dashes from modified body
     // Rebuild HTML completely from the modified text (avoid duplication)
     if (generatedContent.html) {
       const paragraphs = generatedContent.text.split('\n\n').filter(p => p.trim());
@@ -1414,7 +1449,7 @@ export default async function handler(req, res) {
           // HTML mode: use the same cold email HTML template as Cloud Run / preview
           const outputData = perplexityResult.output || {};
           htmlContent = buildColdEmailHtmlTemplate(outputData, recipient);
-          textContent = buildTextVersionFromHtml(htmlContent);
+          textContent = removeEmDashes(buildTextVersionFromHtml(htmlContent)); // Remove em dashes from text version
         } else {
           // Standard mode: parse JSON-style output and build a simple NEPQ email body
           const raw = String(perplexityResult.output || '').trim();
@@ -1430,7 +1465,7 @@ export default async function handler(req, res) {
           }
 
           let subject = emailData.subject || 'Energy update';
-          let bodyText = raw;
+          let bodyText = removeEmDashes(raw); // Remove em dashes from full body text
           
           // Helper: Enforce first name only in greeting (not full name)
           // Matches real email rules: "Hello Kurt," NOT "Hello Kurt Lacoste,"
@@ -1598,7 +1633,7 @@ export default async function handler(req, res) {
             .map(p => `<p style="margin:0 0 16px 0; color:#222;">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
             .join('');
 
-          textContent = bodyText;
+          textContent = removeEmDashes(bodyText); // Ensure em dashes are removed from final text
           
           // Replace subject in generatedContent below
           emailData.generatedSubject = subject;
@@ -1641,7 +1676,7 @@ export default async function handler(req, res) {
           const logData8b = {location:'generate-scheduled-emails.js:1642',message:'Applying modifiedBody (scheduled path)',data:{textBefore:generatedContent.text.substring(0,150),textAfter:nepqValidation.modifiedBody.substring(0,150),htmlBeforeLength:generatedContent.html?.length||0,htmlBeforePreview:generatedContent.html?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
           debugLog(logData8b);
           // #endregion
-          generatedContent.text = nepqValidation.modifiedBody;
+          generatedContent.text = removeEmDashes(nepqValidation.modifiedBody); // Remove em dashes from modified body
           // Rebuild HTML content completely (avoid duplication)
           if (generatedContent.html) {
             const paragraphs = generatedContent.text.split('\n\n').filter(p => p.trim());
@@ -1780,10 +1815,10 @@ function buildColdEmailHtmlTemplate(data, recipient) {
   const senderTitle = 'Energy Strategist';
   const senderCompany = 'Power Choosers';
   
-  // Clean data fields (remove citations)
+  // Clean data fields (remove citations and em dashes)
   const cleanField = (field) => {
     if (!field) return '';
-    return String(field).replace(/\[\d+\]/g, '').trim();
+    return removeEmDashes(String(field).replace(/\[\d+\]/g, '').trim());
   };
   
   // Helper: Enforce first name only in greeting (not full name)
