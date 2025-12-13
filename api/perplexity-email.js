@@ -2441,7 +2441,7 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Write like a knowledgeable energy expert who researched their company deeply
 - Show you did homework: When you have specific data, use QUESTIONS instead of observations:
   * Ask about ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail]'}: "How is [specific detail] impacting your energy costs?" (if account description available)
-  * Ask about ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}: "With [recent activity], how has that affected your energy planning?" (if recent activity found)
+  ${recentActivityContext ? '* Ask about ' + recentActivityContext.substring(0, 60) + '...: "With [recent activity], how has that affected your energy planning?" (if recent activity found)' : '* DO NOT mention recent activity, recent news, or recent public activity - there is none available'}
   * Reference website naturally: "On your website, I see..." → "How are you handling [specific challenge mentioned on website]?" (if website context available)
   * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." (if location context available)
 - Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : '[specific situation]'}..."
@@ -2454,13 +2454,15 @@ ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', how 
 ${contactLinkedinContext ? '- Reference contact profile: Use insights from their LinkedIn profile naturally through questions' : ''}
 
 EVIDENCE OF RESEARCH (Show You Know Their Business):
-${accountDescription ? '✓ Use account description: Ask about "' + accountDescription.substring(0, 100) + '..." naturally in opening hook' : ''}
+${accountDescription ? '✓ PRIORITY: Use account description: Ask about "' + accountDescription.substring(0, 100) + '..." naturally in opening hook - this is your PRIMARY hook when no recent activity' : ''}
 ${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements through questions' : ''}
-${websiteContext ? '✓ Use website info: Ask about specific challenges mentioned on their website (DO NOT say "I noticed")' : ''}
-${recentActivityContext ? '✓ Use recent activity: Ask "With ' + recentActivityContext.substring(0, 60) + '..., how has that impacted..." (DO NOT say "I saw")' : ''}
+${websiteContext ? '✓ PRIORITY: Use website info: Ask about specific challenges mentioned on their website (DO NOT say "I noticed") - strong alternative when no recent activity' : ''}
+${recentActivityContext ? '✓ Use recent activity: Ask "With ' + recentActivityContext.substring(0, 60) + '..., how has that impacted..." (DO NOT say "I saw")' : '✗ DO NOT mention recent activity, recent news, recent public activity, or "no recent activity" - there is none available. INSTEAD, use account description, website context, contract timing, or industry-specific questions'}
 ${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
+${contractEndLabel ? '✓ PRIORITY: Use contract timing: "With your contract ending ' + contractEndLabel + '..." - strong hook when no recent activity' : ''}
 ${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
 ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant for context' : ''}
+${industry ? '✓ Use industry context: Reference ' + industry + ' industry challenges naturally through questions' : ''}
 
 CONVERSATIONAL FLOW PATTERNS:
 ✓ GOOD: "With ${company} operating in ${industry || '[industry]'}, how are you handling energy costs for facilities like yours?"
@@ -2857,11 +2859,11 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Write like a knowledgeable energy expert who researched ${company || 'their company'} deeply
 - ${marketContext?.enabled ? 'Market context is ENABLED, but still lead with specific question' : 'Market context is DISABLED - focus on THEIR specific situation only'}
 - Show you did homework: When you have specific data, use QUESTIONS instead of observations:
-  * Ask about ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail about their company]'}: "How is [specific detail] affecting your energy costs?" ${accountDescription ? '(you have account description - USE THIS)' : ''}
-  * Ask about ${recentActivityContext ? recentActivityContext.substring(0, 60) + '...' : '[recent activity]'}: "With [recent activity], how has that impacted your planning?" ${recentActivityContext ? '(you have recent activity - USE THIS)' : ''}
-  * Reference website through questions: "How are you handling [specific challenge from website]?" ${websiteContext ? '(you have website context - USE THIS)' : ''}
-  * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." ${city && marketContext?.enabled ? '(you have location)' : '(skip if market context disabled)'}
-  ${!marketContext?.enabled ? '* "With ' + (contractEndLabel ? 'your contract ending ' + contractEndLabel : 'your current energy setup') + '..." (use contract timing if available)' : ''}
+  ${accountDescription ? '* PRIORITY: Ask about ' + accountDescription.substring(0, 80) + '...: "How is [specific detail] affecting your energy costs?" (you have account description - USE THIS as primary hook)' : '* Ask about [specific detail about their company]: "How is [specific detail] affecting your energy costs?"'}
+  ${recentActivityContext ? '* Ask about ' + recentActivityContext.substring(0, 60) + '...: "With [recent activity], how has that impacted your planning?" (you have recent activity - USE THIS)' : '* DO NOT mention recent activity, recent news, or recent public activity - there is none available. Use account description, website, or contract timing instead'}
+  ${websiteContext ? '* PRIORITY: Reference website through questions: "How are you handling [specific challenge from website]?" (you have website context - USE THIS as strong alternative)' : '* Reference website through questions: "How are you handling [specific challenge from website]?" (if available)'}
+  ${city && marketContext?.enabled ? '* "Given ' + city + '\'s energy market conditions..." (you have location)' : ''}
+  ${contractEndLabel && !marketContext?.enabled ? '* PRIORITY: "With your contract ending ' + contractEndLabel + '..." (use contract timing - strong hook when no recent activity)' : ''}
 - Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : '[specific situation]'}..."
 - Include micro-observations: Reference their website, recent posts, industry trends they'd recognize through QUESTIONS
 - Vary sentence length: Mix short punchy statements with longer explanatory ones
@@ -2872,13 +2874,15 @@ ${marketContext?.enabled ? '- You may reference general market trends, but lead 
 ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', how have you seen..." (tenure available)' : ''}
 
 EVIDENCE OF RESEARCH (Show You Know Their Business):
-${accountDescription ? '✓ Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally' : ''}
+${accountDescription ? '✓ PRIORITY: Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally - this is your PRIMARY hook when no recent activity' : ''}
 ${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements' : ''}
-${websiteContext ? '✓ Use website info: Ask about specific challenges from their website (DO NOT say "I noticed")' : ''}
-${recentActivityContext ? '✓ Use recent activity: Ask "With ' + recentActivityContext.substring(0, 60) + '..., how has that impacted..." (DO NOT say "I saw")' : ''}
+${websiteContext ? '✓ PRIORITY: Use website info: Ask about specific challenges from their website (DO NOT say "I noticed") - strong alternative when no recent activity' : ''}
+${recentActivityContext ? '✓ Use recent activity: Ask "With ' + recentActivityContext.substring(0, 60) + '..., how has that impacted..." (DO NOT say "I saw")' : '✗ DO NOT mention recent activity, recent news, recent public activity, or "no recent activity" - there is none available. INSTEAD, use account description, website context, contract timing, or industry-specific questions'}
 ${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
+${contractEndLabel ? '✓ PRIORITY: Use contract timing: "With your contract ending ' + contractEndLabel + '..." - strong hook when no recent activity' : ''}
 ${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
 ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant' : ''}
+${industry ? '✓ Use industry context: Reference ' + industry + ' industry challenges naturally through questions' : ''}
 
 CONVERSATIONAL FLOW PATTERNS:
 ✓ GOOD: "With ${company} operating in ${industry || '[industry]'}, how are you handling energy costs for facilities like yours?"
