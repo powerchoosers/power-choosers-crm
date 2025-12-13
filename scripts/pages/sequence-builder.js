@@ -3328,7 +3328,7 @@ class FreeSequenceAutomation {
                     <div class="ai-inner">
                       <div class="ai-row">
                         <div style="position: relative; width: 100%;">
-                          <textarea class="ai-prompt input-dark" rows="3" placeholder="NEPQ guide: Cold emails—tone opener first, problem question tied to their trigger, a brief reason/gap, finish with a low-friction yes/no CTA. Follow-ups—re-surface the problem, add one new consequence or market change, ask a simple qualifying question (no meeting asks). Example: “Ask how the new site impacts demand charges; reason: we usually see surprise ratchets; CTA: is this on your radar this quarter?”">${escapeHtml(step.data?.aiPrompt || '')}</textarea>
+                          <textarea class="ai-prompt input-dark" rows="3" placeholder="NEPQ guide: Cold emails - tone opener first, problem question tied to their trigger, a brief reason/gap, finish with a low-friction yes/no CTA. Follow-ups - re-surface the problem, add one new consequence or market change, ask a simple qualifying question (no meeting asks). Example: "Ask how the new site impacts demand charges; reason: we usually see surprise ratchets; CTA: is this on your radar this quarter?"">${escapeHtml(step.data?.aiPrompt || '')}</textarea>
                           <div class="nepq-tip" style="margin-top: 6px; font-size: 12px; color: var(--text-secondary, #666); line-height: 1.4;">
                             <strong>NEPQ Tip:</strong> Instead of "Mention their new product launch," try "Ask what new operational challenges the product launch has created." Focus on the problem, not just the event!
                           </div>
@@ -3669,22 +3669,22 @@ class FreeSequenceAutomation {
     },
     {
       id: 'discovery-question',
-      text: 'Out of curiosity—when you renew your contract, do you shop around or just renew what you had?',
+      text: 'Out of curiosity, when you renew your contract, do you shop around or just renew what you had?',
       role: 'all'
     },
     {
       id: 'timing-insight',
-      text: 'Quick question—are you locking in 6 months early or waiting closer to renewal?',
+      text: 'Quick question, are you locking in 6 months early or waiting closer to renewal?',
       role: 'all'
     },
     {
       id: 'timeline-risk',
-      text: 'Question for you—what\'s your renewal timeline? That timing difference is usually worth 15-20%.',
+      text: 'Question for you, what\'s your renewal timeline? That timing difference is usually worth 15-20%.',
       role: 'finance'
     },
     {
       id: 'problem-validation',
-      text: 'Real question—does energy cost predictability matter for your budget planning?',
+      text: 'Real question, does energy cost predictability matter for your budget planning?',
       role: 'finance'
     }
   ];
@@ -3720,7 +3720,7 @@ class FreeSequenceAutomation {
     },
     {
       id: 'peer-reference',
-      text: 'I\'ve seen companies like yours do [X]—worth exploring?',
+      text: 'I\'ve seen companies like yours do [X], worth exploring?',
       role: 'all'
     },
     {
@@ -3739,7 +3739,7 @@ class FreeSequenceAutomation {
   const FOLLOWUP_CTA_VARIANTS_STEP3 = [
     {
       id: 'timing-question',
-      text: 'Quick question—when you renew, do you shop 6 months early?',
+      text: 'Quick question, when you renew, do you shop 6 months early?',
       role: 'all'
     },
     {
@@ -3795,7 +3795,7 @@ class FreeSequenceAutomation {
     // The system now automatically handles angle-based CTAs in the backend
     // This prompt follows NEPQ methodology: tone opener → problem question → value/gap → low-friction CTA
 
-    return `Write a cold introduction email following NEPQ methodology. The system will provide a tone opener that MUST be used exactly as specified.
+    return `Write a cold introduction email following NEPQ methodology. Start with a conversational opener (any style - see options below). Vary the opener across emails to avoid template sameness.
 
 1. GREETING (RANDOMIZE FOR VARIETY)
    - RANDOMLY choose ONE of these greetings:
@@ -3804,21 +3804,29 @@ class FreeSequenceAutomation {
      * "Hello [contact_first_name],"
    - DO NOT use "Hi [contact_first_name] there," or add extra words
 
-2. TONE OPENER (MANDATORY - SYSTEM PROVIDES THIS)
-   - The system will provide a tone opener (e.g., "Question for you—", "Quick question—", "Most people I talk to—")
-   - This tone opener MUST be the EXACT first words after the greeting
-   - DO NOT rephrase, change, or omit the tone opener
-   - DO NOT put any text before the tone opener
-   - Example structure: "Hi [contact_first_name],\n[Tone Opener] [continue with problem question]"
+2. TONE OPENER (OPTIONAL - VARIED STYLES)
+   - Start with ANY conversational opener that sounds natural and human (not templated)
+   - Choose from these styles (VARY across emails - don't repeat the same one):
+     * Soft curiosity: "Curious if you're seeing...", "Wonder if you've noticed...", "Wondering how you're handling..."
+     * Confused/disarmed: "I was looking at your site and wasn't sure...", "Not sure if you've already handled...", "Quick question that might be off base..."
+     * Peer/observational: "Usually when I talk to [role], they mention...", "Most teams I work with are dealing with...", "From what I'm seeing with [industry] companies..."
+     * Direct: "Are you currently handling [X]?", "Quick question, when you renew, do you...", "How are you managing [specific challenge]?"
+   - If the system provides a tone opener, you can use it OR choose a different conversational style
+   - The key is: conversational, direct, sounds like a real person (not a template)
+   - Vary the opener across emails - do NOT repeat the same one
+   - Example structures:
+     * "Hi [contact_first_name],\nCurious if you're seeing [problem] with [situation]?"
+     * "Hey [contact_first_name],\nHow are you handling [challenge] for [specific context]?"
+     * "Hello [contact_first_name],\nMost teams I work with are dealing with [issue]. How is [contact_company] managing that?"
 
 3. PROBLEM-AWARENESS QUESTION (CRITICAL - SECOND SENTENCE)
-   - Immediately after the tone opener, ask a question that connects a trigger event/recent activity to a potential negative business problem
+   - Immediately after the opener, ask a question that connects a trigger event/recent activity to a potential negative business problem
    - Use research data naturally: reference location, facility details, recent company activity, or industry patterns
    - Make them think about consequences they may not have considered
-   - Examples:
-     * "Question for you—with [contact_company] expanding into [city], how are you handling the new energy load without triggering demand ratchets?"
-     * "Quick question—as [contact_company] scales up [specific operation], are you seeing delivery charges eat into margins?"
-     * "Most people I talk to—when [role]s at [company_industry] companies add automation, they run into [specific problem]. How are you managing that?"
+   - Examples (note: these use varied openers, not just "Question for you"):
+     * "Curious if you're seeing demand ratchets with [contact_company] expanding into [city], how are you handling the new energy load?"
+     * "How are you managing delivery charges as [contact_company] scales up [specific operation]? Most teams I work with see those eat into margins."
+     * "Usually when [role]s at [company_industry] companies add automation, they run into [specific problem]. How is [contact_company] managing that?"
    - FORBIDDEN: "I noticed", "I saw", "I read", "I came across" - these trigger sales resistance
    - Instead: Frame as a question that shows you understand their situation without stating you researched them
 
@@ -3875,13 +3883,13 @@ class FreeSequenceAutomation {
    - Reference location if available ([city], [state]) for regional context
    - Use research data naturally in the problem question (location, facility details, recent activity) WITHOUT saying "I noticed" or "I saw"
 
-ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should sound like their peer—a 29-year-old Texas business pro who knows the industry and has talked to others in their situation. Be conversational, confident, and direct.
+ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should sound like their peer - a 29-year-old Texas business pro who knows the industry and has talked to others in their situation. Be conversational, confident, and direct.
 
 GUARDRAILS (AVOID FAKE FEAR):
 - Only mention scenarios that are typical and believable for companies like [contact_company]. No exaggerated worst-case fear.
 - Describe pains as things you're seeing in the market right now, not predictions or threats.
 - No language like "you'll get crushed" or "you're in trouble"; use calm, factual language about stress, budget pressure, and surprises on bills.
-- GOOD EXAMPLE: "Most people I talk to—when manufacturing companies add automation, they run into demand ratchets that spike costs 30-40% if the contract isn't updated. How are you managing that?"
+- GOOD EXAMPLE: "Most people I talk to, when manufacturing companies add automation, they run into demand ratchets that spike costs 30-40% if the contract isn't updated. How are you managing that?"
 - BAD EXAMPLE: "I noticed you added automation. If you don't fix this now, you'll get crushed by your energy bills."`;
   }
 
@@ -3907,16 +3915,16 @@ NEPQ STRUCTURE FOR FOLLOW-UPS:
 
 2. TONE OPENER (OPTIONAL FOR FOLLOW-UPS - SYSTEM MAY PROVIDE):
    - If system provides tone opener, use it as first words after greeting
-   - If no tone opener provided, use natural transition: "On that [previous angle] question—" or "Beyond [previous angle]—"
+   - If no tone opener provided, use natural transition: "On that [previous angle] question," or "Beyond [previous angle],"
    - Make it feel like conversation continuation, not a new cold email
 
 3. PROBLEM-AWARENESS QUESTION (CRITICAL):
    - Reference Email #1 naturally, then ask a question about the NEW angle
    - Connect the new angle to a potential problem they may not have considered
    - Use angle-aware transitions:
-     * If Email 1 was timing_strategy: "On that timing question—how are you handling [new angle problem]?"
-     * If Email 1 was exemption_recovery: "Beyond exemptions—are you also looking at [new angle problem]?"
-     * If Email 1 was consolidation: "On consolidation—what about [new angle problem]?"
+     * If Email 1 was timing_strategy: "On that timing question, how are you handling [new angle problem]?"
+     * If Email 1 was exemption_recovery: "Beyond exemptions, are you also looking at [new angle problem]?"
+     * If Email 1 was consolidation: "On consolidation, what about [new angle problem]?"
    - Make it a question that makes them think, not a statement
 
 4. VALUE/GAP STATEMENT (1-2 SENTENCES):
@@ -3961,7 +3969,7 @@ GUARDRAILS (AVOID FAKE FEAR):
 - Only mention scenarios that are typical and believable for companies like [contact_company]. No exaggerated worst-case fear.
 - Describe pains as things you're seeing in the market right now, not predictions or threats.
 - No language like "you'll get crushed" or "you're in trouble"; use calm, factual language about stress, budget pressure, and surprises on bills.
-- GOOD EXAMPLE: "On that timing question—are you also looking at how consolidation could add another 15% savings? The reason I ask is that most teams with multiple locations leave money on the table by managing contracts separately."
+- GOOD EXAMPLE: "On that timing question, are you also looking at how consolidation could add another 15% savings? The reason I ask is that most teams with multiple locations leave money on the table by managing contracts separately."
 - BAD EXAMPLE: "I noticed you have multiple locations. If you don't consolidate, you'll get crushed by fragmented contracts."`;
   }
 
@@ -3985,7 +3993,7 @@ NEPQ STRUCTURE FOR FINAL FOLLOW-UP:
 
 2. TONE OPENER (OPTIONAL - SYSTEM MAY PROVIDE):
    - If system provides tone opener, use it as first words after greeting
-   - If no tone opener, use natural urgency transition: "One last thought—" or "Final note—"
+   - If no tone opener, use natural urgency transition: "One last thought," or "Final note,"
 
 3. URGENCY QUESTION (PROBLEM-AWARENESS):
    - Create urgency around timing (rate lock windows, renewal deadlines) through a QUESTION
@@ -4038,7 +4046,7 @@ GUARDRAILS (AVOID FAKE FEAR):
 - Only mention scenarios that are typical and believable for companies like [contact_company]. No exaggerated worst-case fear.
 - Describe pains as things you're seeing in the market right now, not predictions or threats.
 - No language like "you'll get crushed" or "you're in trouble"; use calm, factual language about stress, budget pressure, and surprises on bills.
-- GOOD EXAMPLE: "One last thought—with rate lock windows tightening by end of month, how are you planning to handle consolidation? The reason I ask is that teams that wait lose 10-20% when windows close. Is this worth a quick look before the deadline?"
+- GOOD EXAMPLE: "One last thought, with rate lock windows tightening by end of month, how are you planning to handle consolidation? The reason I ask is that teams that wait lose 10-20% when windows close. Is this worth a quick look before the deadline?"
 - BAD EXAMPLE: "I noticed you haven't responded. If you don't fix this now, you'll get crushed. Can you do Thursday 2-3pm or Friday 10-11am?"`;
   }
 
@@ -4053,7 +4061,7 @@ NEPQ STRUCTURE FOR NURTURE:
 
 2. TONE OPENER (OPTIONAL - SYSTEM MAY PROVIDE):
    - If system provides tone opener, use it
-   - If no tone opener, use natural transition: "Quick question—" or "Out of curiosity—"
+   - If no tone opener, use natural transition: "Quick question," or "Out of curiosity,"
 
 3. PROBLEM-AWARENESS QUESTION:
    - Ask about a relevant trend or challenge: "Are you seeing [trend] in your market?"
@@ -4118,7 +4126,7 @@ STRUCTURE:
 6. CLOSING - low pressure, confident
 
 RECAP EXAMPLE:
-"Thanks for the call this morning. I really appreciated how you broke down the timing challenge—especially the part about renewals hitting during peak season."
+"Thanks for the call this morning. I really appreciated how you broke down the timing challenge, especially the part about renewals hitting during peak season."
 
 KEY TAKEAWAYS (bullet format):
 - Need: Lock in rates earlier to avoid peak-season markup
@@ -4177,7 +4185,7 @@ IMPORTANT PICKUP RULES:
 - If pickup is offered, be specific: "I can arrange to pick it up [specific day] afternoon"
 
 REASSURANCE:
-- "This is just for analysis—no commitment"
+- "This is just for analysis, no commitment"
 - "Data kept completely confidential"
 - "Just comparing against current market rates"
 
@@ -4282,7 +4290,7 @@ QUESTION EXAMPLES:
 
 VALUE/GAP STATEMENT EXAMPLES:
 - "The reason I ask is that most companies I talk to don't realize renewal timing costs them 15-20%"
-- "Typically, lock-in timing is when you actually save money—not just best price"
+- "Typically, lock-in timing is when you actually save money, not just best price"
 - "Usually, suppliers don't tell you when rate changes are coming"
 
 LOW-FRICTION CTA EXAMPLES:
@@ -4335,7 +4343,7 @@ If they ask "Who else have you worked with?"
 NEXT STEP - Be specific:
 - "Can we lock in 20 min Tuesday at [TIME] to walk through your specific situation?"
 - "Send me your current bill and I'll have a preliminary analysis to you by [DATE]"
-- "Let's schedule a brief call this week—I'm available [OPTIONS]"
+- "Let's schedule a brief call this week, I'm available [OPTIONS]"
 
 FORBIDDEN PHRASES (DO NOT USE):
 - "I hope this email finds you well"
