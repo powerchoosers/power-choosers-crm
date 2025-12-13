@@ -6,6 +6,20 @@ import { cors } from './_cors.js';
 import * as IndustryDetection from './_industry-detection.js';
 import logger from './_logger.js';
 import { db } from './_firebase.js';
+import fs from 'fs';
+import path from 'path';
+
+// Debug logging helper - writes directly to file
+const DEBUG_LOG_PATH = path.join(process.cwd(), '.cursor', 'debug.log');
+function debugLog(data) {
+  try {
+    const logLine = JSON.stringify(data) + '\n';
+    fs.appendFileSync(DEBUG_LOG_PATH, logLine, 'utf8');
+  } catch (err) {
+    // Fallback to console if file write fails
+    console.log('[DEBUG]', JSON.stringify(data));
+  }
+}
 
 // ========== SUBJECT LINE VARIANTS ==========
 // Multiple subject line options that randomly select to reduce template-like appearance
@@ -3188,8 +3202,8 @@ CRITICAL: Use these EXACT meeting times in your CTA.
     });
     
     // #region agent log
-    const logDataPerplexity = {location:'perplexity-email.js:3189',message:'System prompt built',data:{hasToneOpenerRule:systemPrompt.includes('TONE OPENER'),toneOpenerProvided:toneOpener?.substring(0,30)||null,angleId:selectedAngle?.id||null,templateType:templateType||null,systemPromptLength:systemPrompt.length,systemPromptPreview:systemPrompt.substring(0,500)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logDataPerplexity)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logDataPerplexity))});
+    const logDataPerplexity = {location:'perplexity-email.js:3201',message:'System prompt built',data:{hasToneOpenerRule:systemPrompt.includes('TONE OPENER'),toneOpenerProvided:toneOpener?.substring(0,30)||null,angleId:selectedAngle?.id||null,templateType:templateType||null,systemPromptLength:systemPrompt.length,systemPromptPreview:systemPrompt.substring(0,500)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
+    debugLog(logDataPerplexity);
     // #endregion
     
     const fullSystemPrompt = dateContext + systemPrompt;
