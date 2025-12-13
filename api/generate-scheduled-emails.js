@@ -1,6 +1,20 @@
 import { db } from './_firebase.js';
 import * as IndustryDetection from './_industry-detection.js';
 import logger from './_logger.js';
+import fs from 'fs';
+import path from 'path';
+
+// Debug logging helper - writes directly to file
+const DEBUG_LOG_PATH = path.join(process.cwd(), '.cursor', 'debug.log');
+function debugLog(data) {
+  try {
+    const logLine = JSON.stringify(data) + '\n';
+    fs.appendFileSync(DEBUG_LOG_PATH, logLine, 'utf8');
+  } catch (err) {
+    // Fallback to console if file write fails
+    console.log('[DEBUG]', JSON.stringify(data));
+  }
+}
 
 // ========== BAD GENERATION DETECTION ==========
 
@@ -75,8 +89,8 @@ function validateGeneratedContent(html, text, subject) {
 // Guardrails to keep generations aligned with NEPQ rules
 function validateNepqContent(subject, text, toneOpener) {
   // #region agent log
-  const logData = {location:'generate-scheduled-emails.js:71',message:'validateNepqContent ENTRY',data:{subject:subject?.substring(0,50),textLength:text?.length||0,toneOpener:toneOpener?.substring(0,30)||null,textPreview:text?.substring(0,100)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData))});
+  const logData = {location:'generate-scheduled-emails.js:76',message:'validateNepqContent ENTRY',data:{subject:subject?.substring(0,50),textLength:text?.length||0,toneOpener:toneOpener?.substring(0,30)||null,textPreview:text?.substring(0,100)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+  debugLog(logData);
   // #endregion
   let body = (text || '').toString();
   const lower = body.toLowerCase();
@@ -154,8 +168,8 @@ function validateNepqContent(subject, text, toneOpener) {
     const hasValidOpener = hasValidToneOpenerPattern(bodyAfterGreeting);
     
     // #region agent log
-    const logDataTone = {location:'generate-scheduled-emails.js:154',message:'Tone opener pattern check',data:{hasGreeting:!!greetingMatch,bodyAfterGreetingPreview:bodyAfterGreeting.substring(0,150),hasValidOpener:hasValidOpener,toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logDataTone)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logDataTone))});
+    const logDataTone = {location:'generate-scheduled-emails.js:160',message:'Tone opener pattern check',data:{hasGreeting:!!greetingMatch,bodyAfterGreetingPreview:bodyAfterGreeting.substring(0,150),hasValidOpener:hasValidOpener,toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+    debugLog(logDataTone);
     // #endregion
     
     // Also check for exact match (for backward compatibility)
@@ -166,8 +180,8 @@ function validateNepqContent(subject, text, toneOpener) {
     if (!hasValidOpener && openerIdx === -1) {
       // Only auto-insert if NO conversational opener detected at all
       // #region agent log
-      const logData1 = {location:'generate-scheduled-emails.js:133',message:'Tone opener missing - checking greeting',data:{hasGreeting:!!greetingMatch,bodyPreview:body.substring(0,150),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData1)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData1))});
+      const logData1 = {location:'generate-scheduled-emails.js:184',message:'Tone opener missing - checking greeting',data:{hasGreeting:!!greetingMatch,bodyPreview:body.substring(0,150),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+      debugLog(logData1);
       // #endregion
       if (greetingMatch) {
         const greeting = greetingMatch[0];
@@ -178,8 +192,8 @@ function validateNepqContent(subject, text, toneOpener) {
         
         if (hasValidOpenerPattern) {
           // #region agent log
-          const logData2 = {location:'generate-scheduled-emails.js:127',message:'Valid tone opener pattern already exists in body, skipping auto-insert',data:{restPreview:restOfBody.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData2)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData2))});
+          const logData2 = {location:'generate-scheduled-emails.js:196',message:'Valid tone opener pattern already exists in body, skipping auto-insert',data:{restPreview:restOfBody.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+          debugLog(logData2);
           // #endregion
           // Body already has a good opener - just ensure proper spacing
           if (!greeting.endsWith('\n\n') && !greeting.endsWith('\n')) {
@@ -200,8 +214,8 @@ function validateNepqContent(subject, text, toneOpener) {
             const bodyBefore = body;
             body = cleanGreeting + '\n\n' + (toneOpener || 'Quick question') + ' ' + restOfBody;
             // #region agent log
-            const logData3 = {location:'generate-scheduled-emails.js:123',message:'Tone opener AUTO-INSERTED (body too short)',data:{bodyBefore:bodyBefore.substring(0,150),bodyAfter:body.substring(0,200),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData3)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData3))});
+            const logData3 = {location:'generate-scheduled-emails.js:218',message:'Tone opener AUTO-INSERTED (body too short)',data:{bodyBefore:bodyBefore.substring(0,150),bodyAfter:body.substring(0,200),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+            debugLog(logData3);
             // #endregion
             logger.log(`[NEPQ] Auto-inserted missing tone opener: "${toneOpener || 'Quick question'}"`);
           }
@@ -243,8 +257,8 @@ function validateNepqContent(subject, text, toneOpener) {
     modifiedBody: body // Return the potentially modified body
   };
   // #region agent log
-  const logData4 = {location:'generate-scheduled-emails.js:133',message:'validateNepqContent EXIT',data:{isValid:result.isValid,errorsCount:errors.length,bodyModified:result.modifiedBody!==text,bodyLength:result.modifiedBody?.length||0,bodyPreview:result.modifiedBody?.substring(0,150)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData4)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData4))});
+  const logData4 = {location:'generate-scheduled-emails.js:244',message:'validateNepqContent EXIT',data:{isValid:result.isValid,errorsCount:errors.length,bodyModified:result.modifiedBody!==text,bodyLength:result.modifiedBody?.length||0,bodyPreview:result.modifiedBody?.substring(0,150)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+  debugLog(logData4);
   // #endregion
   return result;
 }
@@ -513,23 +527,23 @@ async function generatePreviewEmail(emailData) {
   // Use the potentially modified body from validation
   if (nepqValidation.modifiedBody && nepqValidation.modifiedBody !== generatedContent.text) {
     // #region agent log
-    const logData5 = {location:'generate-scheduled-emails.js:432',message:'Applying modifiedBody (preview path)',data:{textBefore:generatedContent.text.substring(0,150),textAfter:nepqValidation.modifiedBody.substring(0,150),htmlBeforeLength:generatedContent.html?.length||0,htmlBeforePreview:generatedContent.html?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
-    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData5)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData5))});
+    const logData5 = {location:'generate-scheduled-emails.js:530',message:'Applying modifiedBody (preview path)',data:{textBefore:generatedContent.text.substring(0,150),textAfter:nepqValidation.modifiedBody.substring(0,150),htmlBeforeLength:generatedContent.html?.length||0,htmlBeforePreview:generatedContent.html?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+    debugLog(logData5);
     // #endregion
     generatedContent.text = nepqValidation.modifiedBody;
     // Rebuild HTML completely from the modified text (avoid duplication)
     if (generatedContent.html) {
       const paragraphs = generatedContent.text.split('\n\n').filter(p => p.trim());
       // #region agent log
-      const logData6 = {location:'generate-scheduled-emails.js:438',message:'Rebuilding HTML from text',data:{paragraphsCount:paragraphs.length,paragraphsPreview:paragraphs.map(p=>p.substring(0,50))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData6)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData6))});
+      const logData6 = {location:'generate-scheduled-emails.js:538',message:'Rebuilding HTML from text',data:{paragraphsCount:paragraphs.length,paragraphsPreview:paragraphs.map(p=>p.substring(0,50))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+      debugLog(logData6);
       // #endregion
       generatedContent.html = paragraphs
         .map(p => `<p style="margin:0 0 16px 0; color:#222;">${p.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>`)
         .join('');
       // #region agent log
-      const logData7 = {location:'generate-scheduled-emails.js:442',message:'HTML rebuilt (preview path)',data:{htmlAfterLength:generatedContent.html.length,htmlAfterPreview:generatedContent.html.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
-      fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData7)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData7))});
+      const logData7 = {location:'generate-scheduled-emails.js:545',message:'HTML rebuilt (preview path)',data:{htmlAfterLength:generatedContent.html.length,htmlAfterPreview:generatedContent.html.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+      debugLog(logData7);
       // #endregion
     }
   }
@@ -1323,8 +1337,8 @@ export default async function handler(req, res) {
         const toneOpener = selectRandomToneOpener(selectedAngle?.id);
         
         // #region agent log
-        const logData5 = {location:'generate-scheduled-emails.js:1317',message:'Angle and tone opener selected',data:{angleId:selectedAngle?.id||null,angleOpeningTemplate:selectedAngle?.openingTemplate?.substring(0,50)||null,toneOpener:toneOpener?.substring(0,30)||null,industry:recipientIndustry,usedAngles:usedAngles},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData5)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData5))});
+        const logData5 = {location:'generate-scheduled-emails.js:531',message:'Angle and tone opener selected',data:{angleId:selectedAngle?.id||null,angleOpeningTemplate:selectedAngle?.openingTemplate?.substring(0,50)||null,toneOpener:toneOpener?.substring(0,30)||null,industry:recipientIndustry,usedAngles:usedAngles},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+        debugLog(logData5);
         // #endregion
         
         logger.debug(`[GenerateScheduledEmails] Selected angle: ${selectedAngle?.id}, tone: ${toneOpener}, industry: ${recipientIndustry}`);
@@ -1385,8 +1399,8 @@ export default async function handler(req, res) {
         const perplexityResult = await perplexityResponse.json();
         
         // #region agent log
-        const logData6 = {location:'generate-scheduled-emails.js:1380',message:'AI response received',data:{ok:perplexityResult.ok,hasOutput:!!perplexityResult.output,outputType:typeof perplexityResult.output,subject:perplexityResult.output?.subject?.substring(0,50)||null,openingHook:perplexityResult.output?.opening_hook?.substring(0,100)||null,ctaText:perplexityResult.output?.cta_text?.substring(0,100)||null,greeting:perplexityResult.output?.greeting?.substring(0,50)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData6)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData6))});
+        const logData6 = {location:'generate-scheduled-emails.js:539',message:'AI response received',data:{ok:perplexityResult.ok,hasOutput:!!perplexityResult.output,outputType:typeof perplexityResult.output,subject:perplexityResult.output?.subject?.substring(0,50)||null,openingHook:perplexityResult.output?.opening_hook?.substring(0,100)||null,ctaText:perplexityResult.output?.cta_text?.substring(0,100)||null,greeting:perplexityResult.output?.greeting?.substring(0,50)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
+        debugLog(logData6);
         // #endregion
         
         if (!perplexityResult.ok) {
@@ -1600,8 +1614,8 @@ export default async function handler(req, res) {
         };
         
         // #region agent log
-        const logData7 = {location:'generate-scheduled-emails.js:1592',message:'Before NEPQ validation',data:{subject:generatedContent.subject?.substring(0,50)||null,textLength:generatedContent.text?.length||0,textPreview:generatedContent.text?.substring(0,200)||'',toneOpener:toneOpener?.substring(0,30)||null,angleId:selectedAngle?.id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData7)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData7))});
+        const logData7 = {location:'generate-scheduled-emails.js:546',message:'Before NEPQ validation',data:{subject:generatedContent.subject?.substring(0,50)||null,textLength:generatedContent.text?.length||0,textPreview:generatedContent.text?.substring(0,200)||'',toneOpener:toneOpener?.substring(0,30)||null,angleId:selectedAngle?.id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
+        debugLog(logData7);
         // #endregion
         
         // NEPQ validation to enforce structure and tone opener usage
@@ -1612,8 +1626,8 @@ export default async function handler(req, res) {
         );
         
         // #region agent log
-        const logData8 = {location:'generate-scheduled-emails.js:1600',message:'After NEPQ validation',data:{isValid:nepqValidation.isValid,reason:nepqValidation.reason?.substring(0,100)||null,bodyModified:nepqValidation.modifiedBody!==generatedContent.text,originalLength:generatedContent.text?.length||0,modifiedLength:nepqValidation.modifiedBody?.length||0,modifiedPreview:nepqValidation.modifiedBody?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData8)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData8))});
+        const logData8 = {location:'generate-scheduled-emails.js:1630',message:'After NEPQ validation',data:{isValid:nepqValidation.isValid,reason:nepqValidation.reason?.substring(0,100)||null,bodyModified:nepqValidation.modifiedBody!==generatedContent.text,originalLength:generatedContent.text?.length||0,modifiedLength:nepqValidation.modifiedBody?.length||0,modifiedPreview:nepqValidation.modifiedBody?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
+        debugLog(logData8);
         // #endregion
         
         if (!nepqValidation.isValid) {
@@ -1624,23 +1638,23 @@ export default async function handler(req, res) {
         // Use the potentially modified body from validation
         if (nepqValidation.modifiedBody && nepqValidation.modifiedBody !== generatedContent.text) {
           // #region agent log
-          const logData8 = {location:'generate-scheduled-emails.js:1512',message:'Applying modifiedBody (scheduled path)',data:{textBefore:generatedContent.text.substring(0,150),textAfter:nepqValidation.modifiedBody.substring(0,150),htmlBeforeLength:generatedContent.html?.length||0,htmlBeforePreview:generatedContent.html?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData8)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData8))});
+          const logData8b = {location:'generate-scheduled-emails.js:1642',message:'Applying modifiedBody (scheduled path)',data:{textBefore:generatedContent.text.substring(0,150),textAfter:nepqValidation.modifiedBody.substring(0,150),htmlBeforeLength:generatedContent.html?.length||0,htmlBeforePreview:generatedContent.html?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
+          debugLog(logData8b);
           // #endregion
           generatedContent.text = nepqValidation.modifiedBody;
           // Rebuild HTML content completely (avoid duplication)
           if (generatedContent.html) {
             const paragraphs = generatedContent.text.split('\n\n').filter(p => p.trim());
             // #region agent log
-            const logData9 = {location:'generate-scheduled-emails.js:1518',message:'Rebuilding HTML from text (scheduled path)',data:{paragraphsCount:paragraphs.length,paragraphsPreview:paragraphs.map(p=>p.substring(0,50))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData9)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData9))});
+            const logData9 = {location:'generate-scheduled-emails.js:1650',message:'Rebuilding HTML from text (scheduled path)',data:{paragraphsCount:paragraphs.length,paragraphsPreview:paragraphs.map(p=>p.substring(0,50))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
+            debugLog(logData9);
             // #endregion
             generatedContent.html = paragraphs
               .map(p => `<p style="margin:0 0 16px 0; color:#222;">${p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>`)
               .join('');
             // #region agent log
-            const logData10 = {location:'generate-scheduled-emails.js:1522',message:'HTML rebuilt (scheduled path)',data:{htmlAfterLength:generatedContent.html.length,htmlAfterPreview:generatedContent.html.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
-            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData10)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData10))});
+            const logData10 = {location:'generate-scheduled-emails.js:1657',message:'HTML rebuilt (scheduled path)',data:{htmlAfterLength:generatedContent.html.length,htmlAfterPreview:generatedContent.html.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+            debugLog(logData10);
             // #endregion
           }
         }
@@ -1648,8 +1662,8 @@ export default async function handler(req, res) {
         // CRITICAL: Validate generated content before saving
         // Detect malformed AI generations that should not be sent
         // #region agent log
-        const logData11 = {location:'generate-scheduled-emails.js:1645',message:'Before content validation',data:{htmlLength:generatedContent.html?.length||0,textLength:generatedContent.text?.length||0,subject:generatedContent.subject?.substring(0,50)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData11)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData11))});
+        const logData11 = {location:'generate-scheduled-emails.js:1666',message:'Before content validation',data:{htmlLength:generatedContent.html?.length||0,textLength:generatedContent.text?.length||0,subject:generatedContent.subject?.substring(0,50)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
+        debugLog(logData11);
         // #endregion
         
         const validation = validateGeneratedContent(
@@ -1659,8 +1673,8 @@ export default async function handler(req, res) {
         );
         
         // #region agent log
-        const logData12 = {location:'generate-scheduled-emails.js:1652',message:'After content validation',data:{isValid:validation.isValid,reason:validation.reason?.substring(0,100)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData12)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData12))});
+        const logData12 = {location:'generate-scheduled-emails.js:1677',message:'After content validation',data:{isValid:validation.isValid,reason:validation.reason?.substring(0,100)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
+        debugLog(logData12);
         // #endregion
         
         if (!validation.isValid) {
