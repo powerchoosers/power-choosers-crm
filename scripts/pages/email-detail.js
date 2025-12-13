@@ -279,23 +279,55 @@
       // Helper: ensure closing line breaks for common sign-offs (helps manual single-break cases)
       const applyClosingBreaks = (html) => {
         if (!html) return html;
-        // Insert breaks after common sign-offs even inside <p>/<div>
+        let out = html;
+        
+        // CRITICAL FIX: First convert any remaining \n characters to <br> (handles cases where \n wasn't converted)
+        // This is especially important for scheduled emails where closing might have \n
+        out = out.replace(/(Best regards,)\s*\\?n\s*([A-Z][a-z]+)/gi, '$1<br>$2');
+        out = out.replace(/(Regards,)\s*\\?n\s*([A-Z][a-z]+)/gi, '$1<br>$2');
+        out = out.replace(/(Thanks,)\s*\\?n\s*([A-Z][a-z]+)/gi, '$1<br>$2');
+        out = out.replace(/(Thank you,)\s*\\?n\s*([A-Z][a-z]+)/gi, '$1<br>$2');
+        out = out.replace(/(Cheers,)\s*\\?n\s*([A-Z][a-z]+)/gi, '$1<br>$2');
+        
+        // Also handle literal newline characters (not escaped) in HTML text content
+        // This catches cases where \n is in the actual text content
+        out = out.replace(/(Best regards,)\s*\n\s*([A-Z][a-z]+)/gi, '$1<br>$2');
+        out = out.replace(/(Regards,)\s*\n\s*([A-Z][a-z]+)/gi, '$1<br>$2');
+        out = out.replace(/(Thanks,)\s*\n\s*([A-Z][a-z]+)/gi, '$1<br>$2');
+        out = out.replace(/(Thank you,)\s*\n\s*([A-Z][a-z]+)/gi, '$1<br>$2');
+        out = out.replace(/(Cheers,)\s*\n\s*([A-Z][a-z]+)/gi, '$1<br>$2');
+        
+        // Insert breaks after common sign-offs even inside <p>/<div> (if not already followed by <br>)
         const patterns = [
           /(Best regards,)\s*(<\/p>|<\/div>|$)/gi,
           /(Regards,)\s*(<\/p>|<\/div>|$)/gi,
           /(Thanks,)\s*(<\/p>|<\/div>|$)/gi,
           /(Thank you,)\s*(<\/p>|<\/div>|$)/gi,
           /(Cheers,)\s*(<\/p>|<\/div>|$)/gi,
-          /(Best regards,)\s*(?!<br>)/gi,
-          /(Regards,)\s*(?!<br>)/gi,
-          /(Thanks,)\s*(?!<br>)/gi,
-          /(Thank you,)\s*(?!<br>)/gi,
-          /(Cheers,)\s*(?!<br>)/gi,
+          /(Best regards,)\s*(?!<br>)(?![A-Z][a-z]+)/gi,
+          /(Regards,)\s*(?!<br>)(?![A-Z][a-z]+)/gi,
+          /(Thanks,)\s*(?!<br>)(?![A-Z][a-z]+)/gi,
+          /(Thank you,)\s*(?!<br>)(?![A-Z][a-z]+)/gi,
+          /(Cheers,)\s*(?!<br>)(?![A-Z][a-z]+)/gi,
         ];
-        let out = html;
         patterns.forEach(re => {
-          out = out.replace(re, '$1<br><br>');
+          out = out.replace(re, (match, signoff, after) => {
+            // If followed by closing tag or end, add break
+            if (after === '</p>' || after === '</div>' || after === '') {
+              return signoff + '<br><br>' + (after || '');
+            }
+            // If not followed by <br> or name, add break
+            return signoff + '<br><br>';
+          });
         });
+        
+        // CRITICAL FIX: Handle "Best regards,Name" pattern (no space, no break) - convert to proper format
+        out = out.replace(/(Best regards,)([A-Z][a-z]+)/gi, '$1<br>$2');
+        out = out.replace(/(Regards,)([A-Z][a-z]+)/gi, '$1<br>$2');
+        out = out.replace(/(Thanks,)([A-Z][a-z]+)/gi, '$1<br>$2');
+        out = out.replace(/(Thank you,)([A-Z][a-z]+)/gi, '$1<br>$2');
+        out = out.replace(/(Cheers,)([A-Z][a-z]+)/gi, '$1<br>$2');
+        
         return out;
       };
 
@@ -557,6 +589,23 @@
       };
 
       contentHtml = ensureSignatureSpacing(contentHtml);
+
+      // CRITICAL FIX: For scheduled emails, ensure all \n characters in HTML are converted to <br>
+      // This handles cases where \n wasn't properly converted during HTML generation
+      if (email.type === 'scheduled' && contentHtml) {
+        // Convert any remaining literal \n characters to <br> (but not inside HTML tags)
+        // This regex finds \n that's not part of an HTML tag or attribute
+        // Match \n between text content (not inside tags)
+        contentHtml = contentHtml.replace(/([^>])\n([^<])/g, '$1<br>$2');
+        // Also handle \n at end of text nodes before closing tags
+        contentHtml = contentHtml.replace(/([^>])\n(\s*<\/[^>]+>)/g, '$1<br>$2');
+        // Handle \n inside paragraph tags (common case for closing)
+        contentHtml = contentHtml.replace(/(<p[^>]*>)([^<]*)\n([^<]*)(<\/p>)/gi, (match, open, before, after, close) => {
+          // Convert \n to <br> inside paragraph content
+          const content = (before + '\n' + after).replace(/\n/g, '<br>');
+          return open + content + close;
+        });
+      }
 
       // Apply closing line break heuristic (helps manual emails where "Best regards,Name" collapses)
       contentHtml = applyClosingBreaks(contentHtml);
