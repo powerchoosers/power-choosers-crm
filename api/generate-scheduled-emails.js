@@ -127,7 +127,10 @@ function validateNepqContent(subject, text, toneOpener) {
   const logData = {location:'generate-scheduled-emails.js:76',message:'validateNepqContent ENTRY',data:{subject:subject?.substring(0,50),textLength:text?.length||0,toneOpener:toneOpener?.substring(0,30)||null,textPreview:text?.substring(0,100)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
   debugLog(logData);
   // #endregion
-  let body = (text || '').toString();
+  // CRITICAL: Remove em dashes from body text BEFORE validation
+  let body = removeEmDashes((text || '').toString());
+  // CRITICAL: Remove em dashes from tone opener if it has any (use local variable)
+  const cleanToneOpener = toneOpener ? removeEmDashes(toneOpener) : null;
   const lower = body.toLowerCase();
   const errors = [];
 
@@ -145,7 +148,8 @@ function validateNepqContent(subject, text, toneOpener) {
 
   // Tone opener pattern check - OPTIONAL, not mandatory
   // The email should start with ANY conversational opener that sounds human
-  if (toneOpener) {
+  // Use the already-sanitized cleanToneOpener
+  if (cleanToneOpener) {
     // Helper function to check if text has a valid conversational opener pattern
     const hasValidToneOpenerPattern = (text) => {
       if (!text || typeof text !== 'string') return false;
@@ -203,19 +207,18 @@ function validateNepqContent(subject, text, toneOpener) {
     const hasValidOpener = hasValidToneOpenerPattern(bodyAfterGreeting);
     
     // #region agent log
-    const logDataTone = {location:'generate-scheduled-emails.js:160',message:'Tone opener pattern check',data:{hasGreeting:!!greetingMatch,bodyAfterGreetingPreview:bodyAfterGreeting.substring(0,150),hasValidOpener:hasValidOpener,toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+    const logDataTone = {location:'generate-scheduled-emails.js:208',message:'Tone opener pattern check',data:{hasGreeting:!!greetingMatch,bodyAfterGreetingPreview:bodyAfterGreeting.substring(0,150),hasValidOpener:hasValidOpener,toneOpener:cleanToneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
     debugLog(logDataTone);
     // #endregion
     
-    // Also check for exact match (for backward compatibility)
-    const cleanToneOpener = toneOpener.replace(/[—\-]+$/, '').trim(); // Remove trailing dashes if present
-    const openerIdx = body.toLowerCase().indexOf(cleanToneOpener.toLowerCase());
+    // Also check for exact match (for backward compatibility) - use already-sanitized cleanToneOpener
+    const openerIdx = cleanToneOpener ? body.toLowerCase().indexOf(cleanToneOpener.toLowerCase()) : -1;
 
     // Tone opener is optional but recommended - check if email starts with conversational element
     if (!hasValidOpener && openerIdx === -1) {
       // Only auto-insert if NO conversational opener detected at all
       // #region agent log
-      const logData1 = {location:'generate-scheduled-emails.js:184',message:'Tone opener missing - checking greeting',data:{hasGreeting:!!greetingMatch,bodyPreview:body.substring(0,150),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+      const logData1 = {location:'generate-scheduled-emails.js:220',message:'Tone opener missing - checking greeting',data:{hasGreeting:!!greetingMatch,bodyPreview:body.substring(0,150),toneOpener:cleanToneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
       debugLog(logData1);
       // #endregion
       if (greetingMatch) {
@@ -247,12 +250,14 @@ function validateNepqContent(subject, text, toneOpener) {
           } else if (restOfBody.length < 20) {
             // Body is empty or too short - definitely needs opener
             const bodyBefore = body;
-            body = cleanGreeting + '\n\n' + (toneOpener || 'Quick question') + ' ' + restOfBody;
+            // CRITICAL: Use the already-sanitized cleanToneOpener (or sanitize fallback)
+            const openerToInsert = cleanToneOpener || removeEmDashes('Quick question');
+            body = cleanGreeting + '\n\n' + openerToInsert + ' ' + restOfBody;
             // #region agent log
-            const logData3 = {location:'generate-scheduled-emails.js:218',message:'Tone opener AUTO-INSERTED (body too short)',data:{bodyBefore:bodyBefore.substring(0,150),bodyAfter:body.substring(0,200),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+            const logData3 = {location:'generate-scheduled-emails.js:256',message:'Tone opener AUTO-INSERTED (body too short)',data:{bodyBefore:bodyBefore.substring(0,150),bodyAfter:body.substring(0,200),toneOpener:openerToInsert?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
             debugLog(logData3);
             // #endregion
-            logger.log(`[NEPQ] Auto-inserted missing tone opener: "${toneOpener || 'Quick question'}"`);
+            logger.log(`[NEPQ] Auto-inserted missing tone opener: "${openerToInsert}"`);
           }
         }
       }
@@ -344,7 +349,8 @@ async function generatePreviewEmail(emailData) {
 
   // Select angle + tone opener
   const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient, usedAngles);
-  const toneOpener = selectRandomToneOpener(selectedAngle?.id);
+  // CRITICAL: Remove any em dashes from tone opener immediately after selection
+  const toneOpener = removeEmDashes(selectRandomToneOpener(selectedAngle?.id));
 
   const aiMode = (emailData.aiMode || '').toLowerCase() === 'html' ? 'html' : 'standard';
   const isColdStep = (
@@ -1369,10 +1375,11 @@ export default async function handler(req, res) {
         
         // Select angle based on industry/role/exemption status with memory + news boosts
         const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient, usedAngles);
-        const toneOpener = selectRandomToneOpener(selectedAngle?.id);
+        // CRITICAL: Remove any em dashes from tone opener immediately after selection
+        const toneOpener = removeEmDashes(selectRandomToneOpener(selectedAngle?.id));
         
         // #region agent log
-        const logData5 = {location:'generate-scheduled-emails.js:531',message:'Angle and tone opener selected',data:{angleId:selectedAngle?.id||null,angleOpeningTemplate:selectedAngle?.openingTemplate?.substring(0,50)||null,toneOpener:toneOpener?.substring(0,30)||null,industry:recipientIndustry,usedAngles:usedAngles},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+        const logData5 = {location:'generate-scheduled-emails.js:1377',message:'Angle and tone opener selected',data:{angleId:selectedAngle?.id||null,angleOpeningTemplate:selectedAngle?.openingTemplate?.substring(0,50)||null,toneOpener:toneOpener?.substring(0,30)||null,industry:recipientIndustry,usedAngles:usedAngles},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
         debugLog(logData5);
         // #endregion
         
