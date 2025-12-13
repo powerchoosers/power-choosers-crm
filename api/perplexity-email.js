@@ -2254,33 +2254,25 @@ You MUST structure the entire email around this primary angle. Do NOT switch to 
     const toneOpenerRule = (templateType === 'cold_email' && toneOpener)
       ? `
 
-TONE OPENER (CRITICAL - FIRST LINE AFTER GREETING - REQUIRED STYLE):
-- Your email body MUST begin with a conversational tone opener in this style: "${toneOpener}"
-- SUGGESTED PATTERN: Use a conversational opener that ends with "—" (em dash) or "—" followed by a problem-awareness question
-- EXAMPLES OF VALID OPENERS (you can use these or create similar ones):
-  * "${toneOpener}"
-  * "So here's the thing—"
-  * "Question for you—"
-  * "Let me ask you something—"
-  * "Honestly—"
-  * "Curious—"
-  * "Real talk—"
-  * "Looking at your situation—"
-  * "Here's what I'm seeing—"
-  * "Most people I talk to—"
-- REQUIRED FORMAT: [tone opener][problem awareness question]
-- Example: "${toneOpener}how are you handling [specific issue]?"
-- The tone opener must be conversational, direct, and end with "—" (em dash) or similar punctuation
-- It goes IMMEDIATELY after the greeting with proper paragraph spacing
-- You can use the suggested opener above OR create a similar conversational opener that matches this pattern
-- The key is: conversational, direct, ends with "—", followed immediately by a problem-awareness question`
+TONE OPENER OPTIONAL STYLE (Not Mandatory - Choose One Approach):
+- Start with a conversational, curious approach (one of these styles):
+  Option A: Soft opener - "Curious if you're seeing...", "Wonder if you've noticed...", "Wondering how you're handling..."
+  Option B: Confused/disarmed opener - "I was looking at your site and wasn't sure...", "Not sure if you've already handled...", "Quick question that might be off base..."
+  Option C: Peer/observational opener - "Usually when I talk to [role], they mention...", "Most teams I work with are dealing with...", "From what I'm seeing with [industry] companies..."
+  Option D: Direct opener - "Are you currently handling [X]?", "How are you managing [specific challenge]?", "When you renew, do you...", "Quick question, when you renew, do you..."
+- You do NOT need to use "${toneOpener}" specifically. Any conversational opener works if it:
+  1. Sounds like a real person (not a template)
+  2. Opens with a genuine question or curiosity (not a statement)
+  3. Avoids salesy language ("I noticed", "I saw", "Hope this finds you")
+- Vary the opener across emails - do NOT repeat the same one
+- The opener should go immediately after the greeting with proper paragraph spacing`
       : '';
 
     // NEPQ structure and guardrails (cold email only)
     const nepqRules = templateType === 'cold_email' ? `
 
 NEPQ STRUCTURE (MANDATORY FOR COLD EMAILS):
-- Opening hook: FIRST sentence after greeting must be the tone opener above.
+- Opening hook: FIRST sentence after greeting should start with a conversational opener (any style - see tone opener options above). This can be a soft curiosity question, direct question, or peer observation - vary it across emails.
 - Second sentence: Ask a problem-awareness question that ties a trigger/recent activity to a potential negative business issue (make them think).
 - Value/Gap statement: 1–2 sentences starting with "The reason I ask is..." or "Typically, we see..." that explain why you asked and what can go wrong.
 - Low-friction CTA: End with a simple qualifying question (yes/no style). Examples: "Is this on your radar?" / "Have you already handled this?" / "Is this a priority for this quarter?"
@@ -2348,7 +2340,7 @@ Generate text for these fields:
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: MUST be exactly "Hello ${firstName}," - Use ONLY the first name "${firstName}", NEVER use the full name. This is mandatory.
-- opening_hook: MUST begin with the tone opener "${toneOpener}", then continue with problem awareness (1-2 sentences total). ${accountDescription ? 'Use the saved company description as INTERNAL CONTEXT ONLY (do NOT copy it word-for-word). You may reference ONE short detail from it in natural language, but do NOT open the email by restating their full marketing description or mission statement.' : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
+- opening_hook: Start with ANY conversational opener (not required to use "${toneOpener}" specifically). Choose from: soft curiosity ("Curious if...", "Wonder if..."), direct questions ("Are you...", "How are you..."), or peer observations ("Usually when...", "Most teams..."). Then continue with problem awareness (1-2 sentences total). ${accountDescription ? 'Use the saved company description as INTERNAL CONTEXT ONLY (do NOT copy it word-for-word). You may reference ONE short detail from it in natural language, but do NOT open the email by restating their full marketing description or mission statement.' : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
   * Retail: Multiple locations, unpredictable costs, seasonal demand
@@ -2391,7 +2383,7 @@ ${(() => {
   * CTA STRENGTH: MEDIUM - Reference previous + Value ask
   * MUST reference Email #1 naturally: "On that ${angleCta.opening.toLowerCase()} question..."
   * Structure: [Reference Email 1] + [New Angle Insight] + [Medium-strength ask]
-  * Example: "On that ${angleCta.opening.toLowerCase()}—${angleCta.value}.\n\n${closingQuestion}"`;
+  * Example: "On that ${angleCta.opening.toLowerCase()} question, ${angleCta.value}.\n\n${closingQuestion}"`;
     } else if (emailPosition >= 3) {
       // Email 3+: Hard ask with time options
       closingQuestion = 'Can you do Thursday 2-3pm or Friday 10-11am? If not, when works better?';
@@ -2588,7 +2580,7 @@ ${generationMode === 'balanced' ? `
   * Combine observation with specific value proposition
   * Professional but conversational: Ask a question about their situation, then "Here's what I've found..."
   * Balanced approach: Show expertise without being pushy
-  * Example CTA: "Question for you—what's your renewal timeline?"` : ''}
+  * Example CTA: "Question for you, what's your renewal timeline?"` : ''}
 ` : ''}
 
 SUBJECT LINE RULES (CRITICAL - PERPLEXITY HAS CREATIVE CONTROL):
@@ -2602,14 +2594,14 @@ ${emailPosition === 1 ? `
   * Focus: Discovery question specific to the angle` : ''}
 ${emailPosition === 2 ? `
   * EMAIL #2: Reference format with "re:" prefix
-  * Pattern: "re: [previous angle keyword]—[new angle keyword]"
-  * Examples: "re: contract timing—consolidation question", "re: exemptions—timing question"
+  * Pattern: "re: [previous angle keyword] [new angle keyword]"
+  * Examples: "re: contract timing consolidation question", "re: exemptions timing question"
   * Focus: Show continuation, reference previous email naturally
   * MUST use "re:" prefix to indicate follow-up` : ''}
 ${emailPosition >= 3 ? `
   * EMAIL #${emailPosition}: Urgency format
-  * Pattern: "Last attempt—[urgency message]" or "Final note—[angle keyword]"
-  * Examples: "Last attempt—rate lock window closing", "Final note—renewal timing", "One last thought—rate timing"
+  * Pattern: "Last attempt [urgency message]" or "Final note [angle keyword]"
+  * Examples: "Last attempt rate lock window closing", "Final note renewal timing", "One last thought rate timing"
   * Focus: Create urgency without being pushy, acknowledge final attempt
   * MUST be different from Emails 1-2` : ''}
 - Base your subject on the selected angle, but be creative:
@@ -2788,7 +2780,7 @@ CRITICAL: Return ONLY valid JSON with brief, friendly acknowledgment. No busines
   }
 
   // Standard text mode (existing logic)
-  const identity = whoWeAre || `You are ${senderName}, an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates. Write in first person ("we"/"I"). Do NOT use brand-first openers like "At Power Choosers," or "Power Choosers helps" — prefer "We help" or "I help".
+  const identity = whoWeAre || `You are ${senderName}, an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates. Write in first person ("we"/"I"). Do NOT use brand-first openers like "At Power Choosers," or "Power Choosers helps" - prefer "We help" or "I help".
 
 CONTEXT USAGE RULES:
 ${contractEndLabel ? '- The recipient\'s contract ends ' + contractEndLabel + ' - YOU MUST REFERENCE THIS' : ''}
@@ -2947,10 +2939,10 @@ CTA (ASSERTIVE, NOT PERMISSION-BASED):
 ${ctaPattern ? 'Use assertive question pattern: "' + ctaPattern.template + '"' : 'Create an assertive qualifying question'}
 - ASSERTIVE PATTERNS (use these - they assume conversation is happening):
   * "When does your current contract renew? And how often do you typically review your rates?"
-  * "Question for you—are you locking in 6 months early or waiting closer to renewal?"
-  * "Out of curiosity—when you renew your contract, do you shop around or just renew what you had?"
-  * "Question for you—what's your renewal timeline? That timing difference is usually worth 10-20%."
-  * "Real question—does energy cost predictability matter for your budget planning?" (for finance roles)
+  * "Question for you, are you locking in 6 months early or waiting closer to renewal?"
+  * "Out of curiosity, when you renew your contract, do you shop around or just renew what you had?"
+  * "Question for you, what's your renewal timeline? That timing difference is usually worth 10-20%."
+  * "Real question, does energy cost predictability matter for your budget planning?" (for finance roles)
 - FORBIDDEN PERMISSION-BASED PATTERNS (DO NOT USE):
   * "Would you be open to a conversation?" (asking permission, weak)
   * "Are you interested in learning more?" (permission-based)
@@ -3004,7 +2996,7 @@ TONE: Write like a 29-year-old Texas business pro - conversational, confident, d
 - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
 - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy"
 - Sound like: colleague who knows their industry and has talked to others like them
-- Use casual confidence: "Real question—" "Out of curiosity—" "Question for you—"
+- Use casual confidence: "Real question," "Out of curiosity," "Question for you," (use commas, not em dashes)
 `;
 
     return { 
@@ -3194,6 +3186,12 @@ CRITICAL: Use these EXACT meeting times in your CTA.
       emailPosition,
       previousAngles
     });
+    
+    // #region agent log
+    const logDataPerplexity = {location:'perplexity-email.js:3189',message:'System prompt built',data:{hasToneOpenerRule:systemPrompt.includes('TONE OPENER'),toneOpenerProvided:toneOpener?.substring(0,30)||null,angleId:selectedAngle?.id||null,templateType:templateType||null,systemPromptLength:systemPrompt.length,systemPromptPreview:systemPrompt.substring(0,500)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logDataPerplexity)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logDataPerplexity))});
+    // #endregion
+    
     const fullSystemPrompt = dateContext + systemPrompt;
     
     // Call Perplexity API
