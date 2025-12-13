@@ -94,9 +94,10 @@ function validateNepqContent(subject, text, toneOpener) {
     errors.push('Contains forbidden salesy phrasing (I saw/noticed/read, hope this finds you well, just following up, my name is, wanted to reach out).');
   }
 
-  // Tone opener must appear near the start (pattern-based validation for hybrid approach)
+  // Tone opener pattern check - OPTIONAL, not mandatory
+  // The email should start with ANY conversational opener that sounds human
   if (toneOpener) {
-    // Helper function to check if text has a valid tone opener pattern
+    // Helper function to check if text has a valid conversational opener pattern
     const hasValidToneOpenerPattern = (text) => {
       if (!text || typeof text !== 'string') return false;
       
@@ -104,14 +105,20 @@ function validateNepqContent(subject, text, toneOpener) {
       // Remove any leading newlines/whitespace for cleaner matching
       const cleanText = lower.replace(/^\s+/, '');
       
-      // Check for known valid openers (check first 150 chars to be safe)
-      const textStart = cleanText.substring(0, 150);
+      // Check for ANY conversational opener pattern (not a fixed list)
+      // Valid patterns: soft curiosity, direct questions, peer observations
+      const textStart = cleanText.substring(0, 100);
+      
+      // Soft curiosity starters
+      const softCuriosityPattern = /^(curious|wondering|wonder if|not sure|quick question about|question:|are you|how are you|do you|when you)/i;
+      
+      // Peer/observation starters (without "I noticed/saw")
+      const peerPattern = /^(usually|most teams|from what|ive found|tend to see)/i;
+      
+      // Known conversational openers (kept for compatibility, not required)
       const knownOpeners = [
-        "let me ask you something", "so here's the thing", "honestly", "looking at your situation",
-        "question for you", "here's what i'm seeing", "most people i talk to", "from what i'm hearing",
-        "i've found that teams like yours", "curious", "real talk", "you ever considered",
-        "did you know", "here's something most teams miss", "ever think about", "quick question",
-        "real question", "here's the thing", "so here's what", "let me ask", "quick thought"
+        "let me ask", "so here's", "honestly", "looking at", "here's what", "most people",
+        "from what", "real talk", "quick question"
       ];
       
       // Check if any known opener appears near the start
@@ -121,15 +128,22 @@ function validateNepqContent(subject, text, toneOpener) {
       });
       if (hasKnownOpener) return true;
       
-      // Pattern-based check: conversational opener ending with — or — followed by question
-      // Pattern: short phrase (2-6 words) ending with em dash or dash, followed by question
-      const openerPattern = /^(so|here's|let me|question|honestly|curious|real talk|looking at|most people|from what|i've found|you ever|did you|ever think|quick|real)\s+[^—\n]{0,40}[—\-]\s*[^?]*\?/i;
+      // Check for soft curiosity pattern
+      if (softCuriosityPattern.test(textStart)) return true;
+      
+      // Check for peer/observation pattern
+      if (peerPattern.test(textStart)) return true;
+      
+      // Pattern-based check: conversational opener (NO em dashes required)
+      // Pattern: short phrase (2-6 words) followed by question or natural flow
+      // Openers can flow naturally without punctuation separators
+      const openerPattern = /^(so|here's|let me|question|honestly|curious|real talk|looking at|most people|from what|i've found|you ever|did you|ever think|quick|real|are you|how are you|do you|when you|wondering|wonder if|not sure|out of curiosity)\s+[^?]{0,60}\?/i;
       if (openerPattern.test(textStart)) return true;
       
-      // Also check for simple conversational patterns (phrases ending with dash)
+      // Also check for simple conversational patterns (no dash required)
       const simplePatterns = [
-        /^(so|here's|let me|question|honestly|curious|real talk)\s+/i,
-        /^[a-z\s]{2,30}[—\-]\s*[a-z]/i  // Short phrase ending with dash
+        /^(so|here's|let me|question|honestly|curious|real talk|are you|how are you|do you|wondering|wonder if|out of curiosity)\s+/i,
+        /^[a-z\s]{2,40}\?/i  // Direct question
       ];
       return simplePatterns.some(pattern => pattern.test(textStart));
     };
@@ -139,12 +153,18 @@ function validateNepqContent(subject, text, toneOpener) {
     const bodyAfterGreeting = greetingMatch ? body.slice(greetingMatch[0].length).trim() : body;
     const hasValidOpener = hasValidToneOpenerPattern(bodyAfterGreeting);
     
+    // #region agent log
+    const logDataTone = {location:'generate-scheduled-emails.js:154',message:'Tone opener pattern check',data:{hasGreeting:!!greetingMatch,bodyAfterGreetingPreview:bodyAfterGreeting.substring(0,150),hasValidOpener:hasValidOpener,toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logDataTone)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logDataTone))});
+    // #endregion
+    
     // Also check for exact match (for backward compatibility)
-    const cleanToneOpener = toneOpener.replace(/[—\-]+$/, '').trim();
+    const cleanToneOpener = toneOpener.replace(/[—\-]+$/, '').trim(); // Remove trailing dashes if present
     const openerIdx = body.toLowerCase().indexOf(cleanToneOpener.toLowerCase());
 
+    // Tone opener is optional but recommended - check if email starts with conversational element
     if (!hasValidOpener && openerIdx === -1) {
-      // Auto-insert the tone opener if missing (fallback mechanism)
+      // Only auto-insert if NO conversational opener detected at all
       // #region agent log
       const logData1 = {location:'generate-scheduled-emails.js:133',message:'Tone opener missing - checking greeting',data:{hasGreeting:!!greetingMatch,bodyPreview:body.substring(0,150),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
       fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData1)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData1))});
@@ -153,7 +173,7 @@ function validateNepqContent(subject, text, toneOpener) {
         const greeting = greetingMatch[0];
         const restOfBody = body.slice(greeting.length).trim();
         
-        // Check if a valid tone opener pattern exists (using pattern-based validation)
+        // Check if a valid conversational opener pattern exists
         const hasValidOpenerPattern = hasValidToneOpenerPattern(restOfBody);
         
         if (hasValidOpenerPattern) {
@@ -161,29 +181,36 @@ function validateNepqContent(subject, text, toneOpener) {
           const logData2 = {location:'generate-scheduled-emails.js:127',message:'Valid tone opener pattern already exists in body, skipping auto-insert',data:{restPreview:restOfBody.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
           fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData2)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData2))});
           // #endregion
-          // Don't modify body - it already has a valid tone opener
-          // BUT ensure proper line break after greeting for paragraph spacing
+          // Body already has a good opener - just ensure proper spacing
           if (!greeting.endsWith('\n\n') && !greeting.endsWith('\n')) {
             body = greeting.trim() + '\n\n' + restOfBody;
           } else if (greeting.endsWith('\n') && !greeting.endsWith('\n\n')) {
             body = greeting.trim() + '\n' + restOfBody;
           }
         } else {
-          const bodyBefore = body;
-          // FIX: Ensure proper paragraph spacing - greeting needs double newline, then tone opener, then space before content
+          // No opener detected - auto-insert ONE conversational opener (any style)
+          // We'll insert a simple version and let the AI's original phrasing take precedence
           const cleanGreeting = greeting.trim();
-          body = cleanGreeting + '\n\n' + toneOpener + ' ' + restOfBody;
-          // #region agent log
-          const logData3 = {location:'generate-scheduled-emails.js:123',message:'Tone opener AUTO-INSERTED',data:{bodyBefore:bodyBefore.substring(0,150),bodyAfter:body.substring(0,200),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData3)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData3))});
-          // #endregion
+          // Only insert if body is too short or completely lacks any opener pattern
+          if (restOfBody.length > 20 && !restOfBody.match(/^\w+\s+\w+\s*\?/i)) {
+            // Body has content but no question - might need opener
+            body = cleanGreeting + '\n\n' + restOfBody;
+          } else if (restOfBody.length < 20) {
+            // Body is empty or too short - definitely needs opener
+            const bodyBefore = body;
+            body = cleanGreeting + '\n\n' + (toneOpener || 'Quick question') + ' ' + restOfBody;
+            // #region agent log
+            const logData3 = {location:'generate-scheduled-emails.js:123',message:'Tone opener AUTO-INSERTED (body too short)',data:{bodyBefore:bodyBefore.substring(0,150),bodyAfter:body.substring(0,200),toneOpener:toneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData3)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData3))});
+            // #endregion
+            logger.log(`[NEPQ] Auto-inserted missing tone opener: "${toneOpener || 'Quick question'}"`);
+          }
         }
-        logger.log(`[NEPQ] Auto-inserted missing tone opener: "${toneOpener}"`);
-      } else {
-        errors.push(`Tone opener missing: "${toneOpener}" must be the first line after the greeting.`);
       }
-    } else if (!hasValidOpener && openerIdx > 200) { // Increased tolerance from 160 to 200
-      errors.push(`Tone opener missing or too far down. The email must start with a conversational opener (like "${toneOpener}") immediately after the greeting.`);
+      // Removed error - tone opener is now optional
+    } else if (!hasValidOpener && openerIdx > 200) {
+      // Optional warning (not an error) - body should start with conversational element, but it's not mandatory
+      // logger.warn(`Email may benefit from opening with a conversational question instead of a statement`);
     }
   }
 
@@ -633,7 +660,7 @@ const RANDOMIZED_ANGLES_BY_INDUSTRY = {
         id: 'operational_continuity',
         weight: 0.25,
         primaryMessage: 'uptime guarantee',
-        openingTemplate: 'What\'s more critical—energy savings or guaranteed uptime?',
+        openingTemplate: 'What\'s more critical, energy savings or guaranteed uptime?',
         primaryValue: 'Predictable costs without operational disruption'
       }
     ]
@@ -892,39 +919,48 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
 
 // Select random tone opener (angle-aware)
 function selectRandomToneOpener(angleId = null) {
-  // Universal openers (work for any angle)
+  // Universal openers (work for any angle) - NO em dashes, use natural flow
   const universal = [
-    "Let me ask you something—",
-    "So here's the thing—",
-    "Honestly—",
-    "Looking at your situation—",
-    "Question for you—",
-    "Here's what I'm seeing—",
-    "Most people I talk to—",
-    "From what I'm hearing—",
-    "I've found that teams like yours—",
-    "Curious—",
-    "Real talk—"
+    "Let me ask you something",
+    "So here's the thing",
+    "Honestly",
+    "Looking at your situation",
+    "Question for you",
+    "Here's what I'm seeing",
+    "Most people I talk to",
+    "From what I'm hearing",
+    "I've found that teams like yours",
+    "Curious",
+    "Real talk",
+    "Curious if you're seeing",
+    "Wonder if you've noticed",
+    "Wondering how you're handling",
+    "Are you currently handling",
+    "How are you managing",
+    "Not sure if you've already handled",
+    "Quick question that might be off base",
+    "Out of curiosity",
+    "Real question"
   ];
 
-  // Angle-specific openers (for NEW concepts only)
+  // Angle-specific openers (for NEW concepts only) - NO em dashes
   const angleSpecific = {
     exemption_recovery: [
-      "You ever considered—",
-      "Did you know—",
-      "Here's something most teams miss—"
+      "You ever considered",
+      "Did you know",
+      "Here's something most teams miss"
     ],
     mission_funding: [
-      "You ever considered—",
-      "Ever think about—"
+      "You ever considered",
+      "Ever think about"
     ],
     consolidation: [
-      "Curious—",
-      "Quick question—"
+      "Curious",
+      "Quick question"
     ],
     timing_strategy: [
-      "Quick question—",
-      "Real question—"
+      "Quick question",
+      "Real question"
     ]
   };
 
@@ -1286,6 +1322,11 @@ export default async function handler(req, res) {
         const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient, usedAngles);
         const toneOpener = selectRandomToneOpener(selectedAngle?.id);
         
+        // #region agent log
+        const logData5 = {location:'generate-scheduled-emails.js:1317',message:'Angle and tone opener selected',data:{angleId:selectedAngle?.id||null,angleOpeningTemplate:selectedAngle?.openingTemplate?.substring(0,50)||null,toneOpener:toneOpener?.substring(0,30)||null,industry:recipientIndustry,usedAngles:usedAngles},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData5)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData5))});
+        // #endregion
+        
         logger.debug(`[GenerateScheduledEmails] Selected angle: ${selectedAngle?.id}, tone: ${toneOpener}, industry: ${recipientIndustry}`);
         logger.debug(`[GenerateScheduledEmails] Angle details:`, {
             id: selectedAngle?.id,
@@ -1342,6 +1383,11 @@ export default async function handler(req, res) {
         }
         
         const perplexityResult = await perplexityResponse.json();
+        
+        // #region agent log
+        const logData6 = {location:'generate-scheduled-emails.js:1380',message:'AI response received',data:{ok:perplexityResult.ok,hasOutput:!!perplexityResult.output,outputType:typeof perplexityResult.output,subject:perplexityResult.output?.subject?.substring(0,50)||null,openingHook:perplexityResult.output?.opening_hook?.substring(0,100)||null,ctaText:perplexityResult.output?.cta_text?.substring(0,100)||null,greeting:perplexityResult.output?.greeting?.substring(0,50)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData6)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData6))});
+        // #endregion
         
         if (!perplexityResult.ok) {
           throw new Error(`Perplexity email API failed: ${perplexityResult.error || 'Unknown error'}`);
@@ -1553,12 +1599,23 @@ export default async function handler(req, res) {
           exemption_type: accountData?.taxExemptStatus || null
         };
         
+        // #region agent log
+        const logData7 = {location:'generate-scheduled-emails.js:1592',message:'Before NEPQ validation',data:{subject:generatedContent.subject?.substring(0,50)||null,textLength:generatedContent.text?.length||0,textPreview:generatedContent.text?.substring(0,200)||'',toneOpener:toneOpener?.substring(0,30)||null,angleId:selectedAngle?.id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData7)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData7))});
+        // #endregion
+        
         // NEPQ validation to enforce structure and tone opener usage
         const nepqValidation = validateNepqContent(
           generatedContent.subject,
           generatedContent.text,
           toneOpener
         );
+        
+        // #region agent log
+        const logData8 = {location:'generate-scheduled-emails.js:1600',message:'After NEPQ validation',data:{isValid:nepqValidation.isValid,reason:nepqValidation.reason?.substring(0,100)||null,bodyModified:nepqValidation.modifiedBody!==generatedContent.text,originalLength:generatedContent.text?.length||0,modifiedLength:nepqValidation.modifiedBody?.length||0,modifiedPreview:nepqValidation.modifiedBody?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData8)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData8))});
+        // #endregion
+        
         if (!nepqValidation.isValid) {
           await markGenerationInvalid(nepqValidation.reason);
           return;
@@ -1590,11 +1647,21 @@ export default async function handler(req, res) {
 
         // CRITICAL: Validate generated content before saving
         // Detect malformed AI generations that should not be sent
+        // #region agent log
+        const logData11 = {location:'generate-scheduled-emails.js:1645',message:'Before content validation',data:{htmlLength:generatedContent.html?.length||0,textLength:generatedContent.text?.length||0,subject:generatedContent.subject?.substring(0,50)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData11)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData11))});
+        // #endregion
+        
         const validation = validateGeneratedContent(
           generatedContent.html, 
           generatedContent.text, 
           generatedContent.subject
         );
+        
+        // #region agent log
+        const logData12 = {location:'generate-scheduled-emails.js:1652',message:'After content validation',data:{isValid:validation.isValid,reason:validation.reason?.substring(0,100)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(logData12)}).catch(()=>{console.log('[DEBUG]',JSON.stringify(logData12))});
+        // #endregion
         
         if (!validation.isValid) {
           await markGenerationInvalid(validation.reason);
@@ -1739,7 +1806,7 @@ function buildColdEmailHtmlTemplate(data, recipient) {
   const rawGreeting = cleanField(data.greeting) || `Hi ${firstName},`;
   const greeting = enforceFirstNameOnly(rawGreeting);
   const openingHook = cleanField(data.opening_hook) || `I tried reaching you earlier but couldn't connect. I wanted to share some important information about energy cost trends that could significantly impact ${company}.`;
-  const valueProposition = cleanField(data.value_proposition) || (industry ? `Most ${industry} companies like ${company} see 10-20% savings through competitive procurement. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>` : 'Most businesses see 10-20% savings through competitive procurement and efficiency solutions. The process is handled end-to-end—analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>');
+  const valueProposition = cleanField(data.value_proposition) || (industry ? `Most ${industry} companies like ${company} see 10-20% savings through competitive procurement. The process is handled end-to-end: analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>` : 'Most businesses see 10-20% savings through competitive procurement and efficiency solutions. The process is handled end-to-end: analyzing bills, negotiating with suppliers, and managing the switch. <strong>Zero cost to you.</strong>');
   const socialProof = cleanField(data.social_proof_optional) || '';
   const ctaText = cleanField(data.cta_text) || 'Explore Your Savings Potential';
   
@@ -1813,7 +1880,7 @@ function buildColdEmailHtmlTemplate(data, recipient) {
     <div class="cta-container">
       <a href="https://powerchoosers.com/schedule" class="cta-btn">${ctaText}</a>
       <div style="margin-top:8px;font-size:14px;color:#dc2626;opacity:0.83;">
-        Quick 15-minute call to discuss your options—no obligation.
+        Quick 15-minute call to discuss your options, no obligation.
       </div>
     </div>
     <div class="signature">
