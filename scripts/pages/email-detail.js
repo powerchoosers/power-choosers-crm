@@ -732,6 +732,37 @@
         els.emailContent.classList.remove('sent-email-preview');
       }
 
+      // #region agent log - Frontend email content display
+      if (email.type === 'scheduled' || email.status === 'pending_approval') {
+        const frontendLog2 = {
+          location: 'email-detail.js:735',
+          message: 'Email content being displayed',
+          data: {
+            emailId: email.id,
+            emailType: email.type,
+            emailStatus: email.status,
+            subject: email.subject?.substring(0, 100) || null,
+            rawTextPreview: rawText?.substring(0, 300) || null,
+            rawHtmlPreview: rawHtml?.substring(0, 300) || null,
+            contentHtmlPreview: contentHtml?.substring(0, 500) || null,
+            hasEmDash: /[—–]/.test(rawText || rawHtml || contentHtml || ''),
+            emDashLocations: (rawText || rawHtml || contentHtml || '').match(/[—–]/g)?.length || 0,
+            toneOpener: email.tone_opener || null,
+            angleUsed: email.angle_used || null
+          },
+          timestamp: Date.now(),
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'H'
+        };
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(frontendLog2)
+        }).catch(() => console.log('[DEBUG]', JSON.stringify(frontendLog2)));
+      }
+      // #endregion
+      
       els.emailContent.innerHTML = contentHtml;
 
       // CRITICAL: For sent emails, strip white/light backgrounds from ALL child elements
