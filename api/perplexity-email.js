@@ -662,6 +662,16 @@ function removeCitationBrackets(text) {
     .trim();
 }
 
+// Remove em dashes from opening hooks and replace with commas or natural flow
+function removeEmDashes(text) {
+  if (!text) return text;
+  return String(text)
+    // Replace em dash (—) and en dash (–) at end of phrases with comma or nothing
+    .replace(/(\w+)\s*[—–]\s+/g, '$1, ')  // "Curious—" → "Curious, "
+    .replace(/(\w+)\s*[—–]$/g, '$1')      // "Curious—" at end → "Curious"
+    .replace(/\s*[—–]\s+/g, ', ');        // Any remaining dashes → comma
+}
+
 // Industry/size-aware post-processor to avoid generic "your industry" and inaccurate size references
 function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory, job }) {
   if (!text) return text;
@@ -3434,10 +3444,10 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         };
         
         if (jsonData.greeting) jsonData.greeting = sanitizePercentages(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.greeting, personalizeCtx))));
-        if (jsonData.opening_hook) jsonData.opening_hook = sanitizePercentages(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx))));
+        if (jsonData.opening_hook) jsonData.opening_hook = removeEmDashes(sanitizePercentages(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.opening_hook, personalizeCtx)))));
         if (jsonData.value_proposition) jsonData.value_proposition = sanitizePercentages(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.value_proposition, personalizeCtx))));
         if (jsonData.social_proof_optional) jsonData.social_proof_optional = sanitizePercentages(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.social_proof_optional, personalizeCtx))));
-        if (jsonData.cta_text) jsonData.cta_text = sanitizePercentages(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.cta_text, personalizeCtx))));
+        if (jsonData.cta_text) jsonData.cta_text = removeEmDashes(sanitizePercentages(removeCitationBrackets(deSalesify(personalizeIndustryAndSize(jsonData.cta_text, personalizeCtx)))));
         
         // Clean all other string fields in jsonData to remove citations
         Object.keys(jsonData).forEach(key => {
