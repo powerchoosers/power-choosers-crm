@@ -2092,9 +2092,16 @@ async function buildSystemPrompt({
   }
 
   // For prompt brevity, summarize to ~220 chars without destroying saved description
+  // CRITICAL: Truncate company description to prevent "description dumping" in emails
+  // Only use first sentence, max 80 chars - this is for CONTEXT ONLY, not to copy into email
   if (accountDescription) {
     const trimmed = accountDescription.replace(/\s+/g, ' ').trim();
-    accountDescription = trimmed.length > 220 ? trimmed.slice(0, 217) + '…' : trimmed;
+    // Get first sentence only (split on period, exclamation, or question mark)
+    const firstSentence = trimmed.split(/[.!?]/)[0].trim();
+    // Cap at 80 characters
+    accountDescription = firstSentence.length > 80 
+      ? firstSentence.substring(0, 77) + '...' 
+      : firstSentence;
   }
   
   // Format contract end date
@@ -2171,7 +2178,7 @@ ${tenure ? '- Tenure: ' + tenure + ' in current role (use naturally: "In your ' 
 ${r.seniority ? '- Seniority Level: ' + r.seniority : ''}
 ${r.department ? '- Department: ' + r.department : ''}
 ${industry ? '- Industry: ' + industry : ''}
-${accountDescription ? '- Company Description: ' + accountDescription : ''}
+${accountDescription ? '- Business Focus (CONTEXT ONLY - DO NOT COPY INTO EMAIL): ' + accountDescription : ''}
 ${city && state ? '- Location: ' + city + ', ' + state : ''}
 
 OPERATIONAL DETAILS:
@@ -2226,7 +2233,7 @@ COMPANY-SPECIFIC DATA USAGE EXAMPLES:
 ${energy.supplier ? '- Current Supplier: "With ' + energy.supplier + ' as your current supplier, you may be missing competitive rates..."' : ''}
 ${energy.currentRate ? '- Current Rate: "At ' + energy.currentRate + '/kWh, there\'s likely room for improvement..."' : ''}
 ${contractEndLabel ? '- Contract Timing: "With your contract ending ' + contractEndLabel + ', timing is critical..."' : ''}
-${accountDescription ? '- Company Description: "As ' + accountDescription + ', energy costs are likely a significant expense..."' : ''}
+${accountDescription ? '- Business Focus (CONTEXT ONLY): "' + accountDescription + '" - Use this for context, but DO NOT copy it into the email. Instead, reference ONE short detail naturally.' : ''}
 ${industryContent ? '- Industry Focus: "Manufacturing companies like ' + company + ' typically face ' + industryContent.painPoints[0] + '..."' : ''}
 ${companySizeContext && companySizeContext.size === 'large' ? '- Size Context: "As a large ' + (industry || 'company') + ', ' + companySizeContext.focus + ' is key..."' : ''}
 ${companySizeContext && companySizeContext.size !== 'large' ? '- Industry Context: "As a ' + (industry || 'company') + ', ' + companySizeContext.focus + ' is key..." (NEVER say "small company" or "small business" - use industry instead)' : ''}
@@ -2284,6 +2291,7 @@ TONE OPENER OPTIONAL STYLE (Not Mandatory - Choose One Approach):
   Option B: Confused/disarmed opener - "I was looking at your site and wasn't sure...", "Not sure if you've already handled...", "Quick question that might be off base..."
   Option C: Peer/observational opener - "Usually when I talk to [role], they mention...", "Most teams I work with are dealing with...", "From what I'm seeing with [industry] companies..."
   Option D: Direct opener - "Are you currently handling [X]?", "How are you managing [specific challenge]?", "When you renew, do you...", "Quick question, when you renew, do you..."
+- **CRITICAL: NEVER use em dashes (—) or en dashes (–) after tone openers. Use commas or natural flow. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"). This is mandatory.**
 - You do NOT need to use "${toneOpener}" specifically. Any conversational opener works if it:
   1. Sounds like a real person (not a template)
   2. Opens with a genuine question or curiosity (not a statement)
@@ -2297,12 +2305,14 @@ TONE OPENER OPTIONAL STYLE (Not Mandatory - Choose One Approach):
 
 NEPQ STRUCTURE (MANDATORY FOR COLD EMAILS):
 - Opening hook: FIRST sentence after greeting should start with a conversational opener (any style - see tone opener options above). This can be a soft curiosity question, direct question, or peer observation - vary it across emails.
+- **CRITICAL PUNCTUATION: NEVER use em dashes (—) or en dashes (–) in the opening hook. Use commas or natural flow. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"). This is mandatory.**
 - Second sentence: Ask a problem-awareness question that ties a trigger/recent activity to a potential negative business issue (make them think).
 - Value/Gap statement: 1–2 sentences starting with "The reason I ask is..." or "Typically, we see..." that explain why you asked and what can go wrong.
 - Low-friction CTA: End with a simple qualifying question (yes/no style). Examples: "Is this on your radar?" / "Have you already handled this?" / "Is this a priority for this quarter?"
 
 FORBIDDEN LANGUAGE (DO NOT USE):
 - "I saw", "I noticed", "I read", "hope this email finds you well", "just following up", "my name is", "I wanted to reach out/introduce"
+- **Em dashes (—) or en dashes (–) in opening hooks or tone openers - use commas instead**
 - Do not pitch meetings/time blocks ("15 minutes", "book a call", "schedule a meeting"). Keep CTA a qualifying question.
 - Do not pitch our company/services; stay focused on their potential problem.
 ` : '';
@@ -2364,7 +2374,8 @@ Generate text for these fields:
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: MUST be exactly "Hello ${firstName}," - Use ONLY the first name "${firstName}", NEVER use the full name. This is mandatory.
-- opening_hook: Start with ANY conversational opener (not required to use "${toneOpener}" specifically). Choose from: soft curiosity ("Curious if...", "Wonder if..."), direct questions ("Are you...", "How are you..."), or peer observations ("Usually when...", "Most teams..."). Then continue with problem awareness (1-2 sentences total). ${accountDescription ? 'Use the saved company description as INTERNAL CONTEXT ONLY (do NOT copy it word-for-word). You may reference ONE short detail from it in natural language, but do NOT open the email by restating their full marketing description or mission statement.' : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
+- opening_hook: Start with ANY conversational opener (not required to use "${toneOpener}" specifically). Choose from: soft curiosity ("Curious if...", "Wonder if..."), direct questions ("Are you...", "How are you..."), or peer observations ("Usually when...", "Most teams..."). Then continue with problem awareness (1-2 sentences total). ${accountDescription ? '**CRITICAL - DO NOT COPY COMPANY DESCRIPTION**: The "Business Focus" above is for YOUR context ONLY. Do NOT restate it in the email body. Instead, reference ONE specific, relevant detail in a natural way. GOOD: "Most restaurant chains I work with are dealing with..." BAD: "With company being a family-owned restaurant specializing in thin-crust pizzas..." Keep company references SHORT (1-2 words), never the full "About Us" section.' : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
+  **CRITICAL PUNCTUATION RULE: NEVER use em dashes (—) or en dashes (–) in the opening_hook. Use commas or natural flow instead. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"), "Real question, " (NOT "Real question—"). This is mandatory - em dashes will be rejected.**
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
   * Retail: Multiple locations, unpredictable costs, seasonal demand
@@ -2456,7 +2467,7 @@ ${ctaEscalation}
 HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Write like a knowledgeable energy expert who researched their company deeply
 - Show you did homework: When you have specific data, use QUESTIONS instead of observations:
-  * Ask about ${accountDescription ? accountDescription.substring(0, 80) + '...' : '[specific detail]'}: "How is [specific detail] impacting your energy costs?" (if account description available)
+  * Ask about ${accountDescription ? 'ONE short detail from "' + accountDescription + '"' : '[specific detail]'}: "How is [specific detail] impacting your energy costs?" (if business focus available - DO NOT copy the full description)
   ${recentActivityContext ? '* Ask about ' + recentActivityContext.substring(0, 60) + '...: "With [recent activity], how has that affected your energy planning?" (if recent activity found)' : '* DO NOT mention recent activity, recent news, or recent public activity - there is none available'}
   * Reference website naturally: "On your website, I see..." → "How are you handling [specific challenge mentioned on website]?" (if website context available)
   * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." (if location context available)
@@ -2470,7 +2481,7 @@ ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', how 
 ${contactLinkedinContext ? '- Reference contact profile: Use insights from their LinkedIn profile naturally through questions' : ''}
 
 EVIDENCE OF RESEARCH (Show You Know Their Business):
-${accountDescription ? '✓ PRIORITY: Use account description: Ask about "' + accountDescription.substring(0, 100) + '..." naturally in opening hook - this is your PRIMARY hook when no recent activity' : ''}
+${accountDescription ? '✓ PRIORITY: Use business focus for context only: Reference ONE short detail from "' + accountDescription + '" naturally in opening hook - DO NOT copy the full description. This is your PRIMARY hook when no recent activity.' : ''}
 ${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements through questions' : ''}
 ${websiteContext ? '✓ PRIORITY: Use website info: Ask about specific challenges mentioned on their website (DO NOT say "I noticed") - strong alternative when no recent activity' : ''}
 ${recentActivityContext ? '✓ Use recent activity: Ask "With ' + recentActivityContext.substring(0, 60) + '..., how has that impacted..." (DO NOT say "I saw")' : '✗ DO NOT mention recent activity, recent news, recent public activity, or "no recent activity" - there is none available. INSTEAD, use account description, website context, contract timing, or industry-specific questions'}
@@ -3021,6 +3032,7 @@ TONE: Write like a 29-year-old Texas business pro - conversational, confident, d
 - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy"
 - Sound like: colleague who knows their industry and has talked to others like them
 - Use casual confidence: "Real question," "Out of curiosity," "Question for you," (use commas, not em dashes)
+- **CRITICAL: NEVER use em dashes (—) or en dashes (–) after conversational phrases. Always use commas or natural flow. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"). This is mandatory and will be rejected if violated.**
 `;
 
     return { 
