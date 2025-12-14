@@ -157,11 +157,13 @@ function validateNepqContent(subject, text, toneOpener) {
     errors.push('Contains forbidden salesy phrasing (I saw/noticed/read, hope this finds you well, just following up, my name is, wanted to reach out).');
   }
 
-  // Tone opener pattern check - OPTIONAL, not mandatory
+  // Tone opener pattern check - CREATIVE FREEDOM APPROACH
   // The email should start with ANY conversational opener that sounds human
+  // The tone opener is provided as INSPIRATION only - we check for natural conversational patterns, not exact matches
   // Use the already-sanitized cleanToneOpener
   if (cleanToneOpener) {
     // Helper function to check if text has a valid conversational opener pattern
+    // This accepts ANY natural conversational opener, not just the selected tone opener
     const hasValidToneOpenerPattern = (text) => {
       if (!text || typeof text !== 'string') return false;
       
@@ -225,7 +227,9 @@ function validateNepqContent(subject, text, toneOpener) {
     // Also check for exact match (for backward compatibility) - use already-sanitized cleanToneOpener
     const openerIdx = cleanToneOpener ? body.toLowerCase().indexOf(cleanToneOpener.toLowerCase()) : -1;
 
-    // Tone opener is optional but recommended - check if email starts with conversational element
+    // Tone opener validation - CREATIVE FREEDOM: We accept ANY natural conversational opener
+    // The selected tone opener is inspiration only - we don't require exact matching
+    // Only auto-insert if NO conversational opener detected at all
     if (!hasValidOpener && openerIdx === -1) {
       // Only auto-insert if NO conversational opener detected at all
       // #region agent log
@@ -1109,6 +1113,7 @@ function selectRandomizedAngle(industry, manualAngleOverride, accountData, usedA
 // Select random tone opener (angle-aware)
 function selectRandomToneOpener(angleId = null) {
   // Universal openers (work for any angle) - NO em dashes, use natural flow
+  // REMOVED "Wondering how you're handling" - it's forbidden and overused
   const universal = [
     "Let me ask you something",
     "So here's the thing",
@@ -1123,13 +1128,19 @@ function selectRandomToneOpener(angleId = null) {
     "Real talk",
     "Curious if you're seeing",
     "Wonder if you've noticed",
-    "Wondering how you're handling",
     "Are you currently handling",
     "How are you managing",
     "Not sure if you've already handled",
     "Quick question that might be off base",
     "Out of curiosity",
-    "Real question"
+    "Real question",
+    "Usually when I talk to",
+    "Most teams I work with",
+    "From what I'm seeing",
+    "I was looking at",
+    "Quick question",
+    "Are you seeing",
+    "How are you handling"
   ];
 
   // Angle-specific openers (for NEW concepts only) - NO em dashes
@@ -1974,7 +1985,14 @@ export default async function handler(req, res) {
         };
         
         // #region agent log
-        const logData7 = {location:'generate-scheduled-emails.js:546',message:'Before NEPQ validation',data:{subject:generatedContent.subject?.substring(0,50)||null,textLength:generatedContent.text?.length||0,textPreview:generatedContent.text?.substring(0,200)||'',toneOpener:toneOpener?.substring(0,30)||null,angleId:selectedAngle?.id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
+        // Extract the actual opener used in the generated email
+        const bodyAfterGreeting = (generatedContent.text || '').replace(/^(Hi|Hey|Hello)\s+[^,\n]+,?\s*/i, '').trim();
+        const actualOpener = bodyAfterGreeting.substring(0, 50);
+        const usesSelectedOpener = toneOpener ? actualOpener.toLowerCase().includes(toneOpener.toLowerCase().substring(0, 10)) : false;
+        const isCuriousIf = /^curious if/i.test(bodyAfterGreeting);
+        const isWonderingHow = /^wondering how/i.test(bodyAfterGreeting);
+        
+        const logData7 = {location:'generate-scheduled-emails.js:1984',message:'Before NEPQ validation - Opener variety check',data:{subject:generatedContent.subject?.substring(0,50)||null,textLength:generatedContent.text?.length||0,textPreview:generatedContent.text?.substring(0,200)||'',selectedToneOpener:toneOpener?.substring(0,30)||null,actualOpener:actualOpener,usesSelectedOpener,isCuriousIf,isWonderingHow,angleId:selectedAngle?.id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'};
         debugLog(logData7);
         // #endregion
         
