@@ -2369,11 +2369,22 @@ TONE OPENER OPTIONAL STYLE (Not Mandatory - Choose One Approach):
   Option C: Peer/observational opener - "Usually when I talk to [role], they mention...", "Most teams I work with are dealing with...", "From what I'm seeing with [industry] companies..."
   Option D: Direct opener - "Are you currently handling [X]?", "How are you managing [specific challenge]?", "When you renew, do you...", "Quick question, when you renew, do you..."
 - **CRITICAL: NEVER use em dashes (—) or en dashes (–) after tone openers. Use commas or natural flow. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"). This is mandatory.**
-- You do NOT need to use "${toneOpener}" specifically. Any conversational opener works if it:
-  1. Sounds like a real person (not a template)
-  2. Opens with a genuine question or curiosity (not a statement)
-  3. Avoids salesy language ("I noticed", "I saw", "Hope this finds you")
-- Vary the opener across emails - do NOT repeat the same one
+- **STRONG PREFERENCE: Use "${toneOpener}" as your opener style, but rephrase it naturally. For example:**
+  * If toneOpener is "Real talk" → Start with "Real talk, " or "Real question, " or similar direct style
+  * If toneOpener is "Honestly" → Start with "Honestly, " or "Real question, " or similar honest style
+  * If toneOpener is "Curious" → Start with "Curious if..." or "Curious, " or similar curiosity style
+  * If toneOpener is "Are you currently handling" → Start with "Are you..." or "How are you..." or similar direct question style
+  * If toneOpener is "Out of curiosity" → Start with "Out of curiosity, " or "Quick question, " or similar casual style
+- **VARY YOUR OPENER STYLE**: Do NOT always use "Wondering how..." - this is overused. Instead, vary between:
+  * Direct questions: "Are you...", "How are you...", "When does..."
+  * Soft curiosity: "Curious if...", "Wonder if...", "Quick question..."
+  * Peer observations: "Most teams...", "Usually when...", "From what I'm seeing..."
+  * Honest/direct: "Real talk, ", "Honestly, ", "Real question, "
+- The opener must:
+  1. Sound like a real person (not a template)
+  2. Open with a genuine question or curiosity (not a statement)
+  3. Avoid salesy language ("I noticed", "I saw", "Hope this finds you")
+- Vary the opener across emails - do NOT repeat "Wondering how..." every time
 - The opener should go immediately after the greeting with proper paragraph spacing`
       : '';
 
@@ -2383,9 +2394,11 @@ TONE OPENER OPTIONAL STYLE (Not Mandatory - Choose One Approach):
 NEPQ STRUCTURE (MANDATORY FOR COLD EMAILS):
 - Opening hook: FIRST sentence after greeting should start with a conversational opener (any style - see tone opener options above). This can be a soft curiosity question, direct question, or peer observation - vary it across emails.
 - **CRITICAL PUNCTUATION: NEVER use em dashes (—) or en dashes (–) in the opening hook. Use commas or natural flow. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"). This is mandatory.**
-- Second sentence: Ask a problem-awareness question that ties a trigger/recent activity to a potential negative business issue (make them think).
+- **CRITICAL: You MUST include at least TWO questions in the email:**
+  1. Problem-awareness question: Ask about a specific challenge/problem (can be in opening hook or second sentence)
+  2. Low-friction CTA question: End with a simple qualifying question (yes/no style). Examples: "Is this on your radar?" / "Have you already handled this?" / "Is this a priority for this quarter?" / "When does your contract expire?" / "How many locations are you managing?"
 - Value/Gap statement: 1–2 sentences starting with "The reason I ask is..." or "Typically, we see..." that explain why you asked and what can go wrong.
-- Low-friction CTA: End with a simple qualifying question (yes/no style). Examples: "Is this on your radar?" / "Have you already handled this?" / "Is this a priority for this quarter?"
+- **MANDATORY**: The email MUST end with a qualifying question (the CTA). Without this second question, the email will be rejected.
 
 FORBIDDEN LANGUAGE (DO NOT USE):
 - "I saw", "I noticed", "I read", "hope this email finds you well", "just following up", "my name is", "I wanted to reach out/introduce"
@@ -2451,7 +2464,12 @@ Generate text for these fields:
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: MUST be exactly "Hello ${firstName}," - Use ONLY the first name "${firstName}", NEVER use the full name. This is mandatory.
-- opening_hook: Start with ANY conversational opener (not required to use "${toneOpener}" specifically). Choose from: soft curiosity ("Curious if...", "Wonder if..."), direct questions ("Are you...", "How are you..."), or peer observations ("Usually when...", "Most teams..."). Then continue with problem awareness (1-2 sentences total). ${selectedAngle && typeof selectedAngle === 'object' ? `**CRITICAL - USE THE SELECTED ANGLE**: This email MUST focus on "${selectedAngle.primaryMessage || selectedAngle.label || 'the selected angle'}". ${selectedAngle.id === 'demand_efficiency' ? 'You CAN mention demand charges since this angle is about demand efficiency.' : 'DO NOT mention "demand charges" or "delivery charges" - this angle is NOT about demand. Focus on ' + (selectedAngle.primaryMessage || selectedAngle.label) + ' instead. For example, if angle is "timing_strategy", focus on contract renewal timing. If angle is "cost_control", focus on rising electricity costs or budget pressure. If angle is "exemption_recovery", focus on tax exemptions. If angle is "consolidation", focus on multi-location management.'} ${selectedAngle.openingTemplate ? 'Use this angle\'s opening pattern as inspiration: "' + selectedAngle.openingTemplate + '"' : ''}` : '**DO NOT default to "demand charges"** - vary the pain points you mention.'} ${accountDescription ? `**CRITICAL - DO NOT USE THE BUSINESS FOCUS TEXT**: The "Business Focus" (${accountDescription}) is ONLY for you to understand their business type. DO NOT copy it, quote it, or reference it directly in the email. Instead, use industry-specific language naturally. GOOD: "Most ${industryLower || 'manufacturing'} companies I work with..." or "Companies like ${company} typically..." BAD: "${accountDescription}..." or "As a ${accountDescription}..." or any variation that includes the business focus text.` : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
+- opening_hook: **VARY YOUR OPENER - DO NOT ALWAYS USE "Wondering how..."** Start with a conversational opener that matches the toneOpener style "${toneOpener}". Vary between:
+  * Direct questions: "Are you...", "How are you...", "When does..." (use when toneOpener is direct)
+  * Soft curiosity: "Curious if...", "Wonder if...", "Quick question..." (use when toneOpener is curious)
+  * Peer observations: "Most teams...", "Usually when...", "From what I'm seeing..." (use when toneOpener is observational)
+  * Honest/direct: "Real talk, ", "Honestly, ", "Real question, " (use when toneOpener is honest/direct)
+  **CRITICAL**: Do NOT default to "Wondering how [company] is handling..." - this is overused. Use the toneOpener style "${toneOpener}" as inspiration and create a natural variation. Then continue with problem awareness (1-2 sentences total). ${selectedAngle && typeof selectedAngle === 'object' ? `**CRITICAL - USE THE SELECTED ANGLE**: This email MUST focus on "${selectedAngle.primaryMessage || selectedAngle.label || 'the selected angle'}". ${selectedAngle.id === 'demand_efficiency' ? 'You CAN mention demand charges since this angle is about demand efficiency.' : 'DO NOT mention "demand charges" or "delivery charges" - this angle is NOT about demand. Focus on ' + (selectedAngle.primaryMessage || selectedAngle.label) + ' instead. For example, if angle is "timing_strategy", focus on contract renewal timing. If angle is "cost_control", focus on rising electricity costs or budget pressure. If angle is "exemption_recovery", focus on tax exemptions. If angle is "consolidation", focus on multi-location management.'} ${selectedAngle.openingTemplate ? 'Use this angle\'s opening pattern as inspiration: "' + selectedAngle.openingTemplate + '"' : ''}` : '**DO NOT default to "demand charges"** - vary the pain points you mention.'} ${accountDescription ? `**CRITICAL - DO NOT USE THE BUSINESS FOCUS TEXT**: The "Business Focus" (${accountDescription}) is ONLY for you to understand their business type. DO NOT copy it, quote it, or reference it directly in the email. Instead, use industry-specific language naturally. GOOD: "Most ${industryLower || 'manufacturing'} companies I work with..." or "Companies like ${company} typically..." BAD: "${accountDescription}..." or "As a ${accountDescription}..." or any variation that includes the business focus text.` : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
   **CRITICAL PUNCTUATION RULE: NEVER use em dashes (—) or en dashes (–) in the opening_hook. Use commas or natural flow instead. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"), "Real question, " (NOT "Real question—"). This is mandatory - em dashes will be rejected.**
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
@@ -3601,13 +3619,16 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3530','message':'Angle usage in generated email','data':{angleId,angleFocus,company:recipient?.company,openingHookPreview:openingHookText.substring(0,150),hasDemandCharges,shouldHaveDemandCharges:angleId==='demand_efficiency'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
         }
         
-        // Log angle usage for debugging
+        // Log angle usage and opener variety for debugging
         if (selectedAngle && typeof selectedAngle === 'object') {
           const angleId = selectedAngle.id || null;
           const angleFocus = selectedAngle.primaryMessage || selectedAngle.label || null;
           const openingHookText = jsonData.opening_hook || '';
           const hasDemandCharges = /(demand charges|delivery charges)/i.test(openingHookText);
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3530','message':'Angle usage in generated email','data':{angleId,angleFocus,company:recipient?.company,openingHookPreview:openingHookText.substring(0,150),hasDemandCharges,shouldHaveDemandCharges:angleId==='demand_efficiency'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
+          const hasWonderingHow = /^wondering how/i.test(openingHookText.trim());
+          const selectedToneOpener = req.body?.toneOpener || null;
+          const usesSelectedOpener = selectedToneOpener && openingHookText.toLowerCase().includes(selectedToneOpener.toLowerCase().substring(0, 10));
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3530','message':'Angle and opener usage in generated email','data':{angleId,angleFocus,company:recipient?.company,openingHookPreview:openingHookText.substring(0,150),hasDemandCharges,shouldHaveDemandCharges:angleId==='demand_efficiency',selectedToneOpener,usesSelectedOpener,hasWonderingHow,openerVariety:hasWonderingHow?'low (defaulting to Wondering how)':'good (varied)'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
         }
         
         // Helper function to sanitize percentages and fix "Default" references
