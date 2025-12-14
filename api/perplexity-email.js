@@ -2375,7 +2375,20 @@ TONE OPENER OPTIONAL STYLE (Not Mandatory - Choose One Approach):
   * If toneOpener is "Curious" → Start with "Curious if..." or "Curious, " or similar curiosity style
   * If toneOpener is "Are you currently handling" → Start with "Are you..." or "How are you..." or similar direct question style
   * If toneOpener is "Out of curiosity" → Start with "Out of curiosity, " or "Quick question, " or similar casual style
-- **VARY YOUR OPENER STYLE**: Do NOT always use "Wondering how..." - this is overused. Instead, vary between:
+- **FORBIDDEN OPENER**: "Wondering how [company] is handling..." is STRICTLY FORBIDDEN. This pattern is overused and sounds templated. DO NOT use it.
+- **MANDATORY**: You MUST use the toneOpener style "${toneOpener}" as your opener. Match its style:
+  * If toneOpener is "Real talk" → Start with "Real talk, " or "Real question, " (direct/honest style)
+  * If toneOpener is "Honestly" → Start with "Honestly, " or "Real question, " (honest style)
+  * If toneOpener is "Curious" → Start with "Curious if..." or "Curious, " (curiosity style)
+  * If toneOpener is "Are you currently handling" → Start with "Are you..." or "How are you..." (direct question style)
+  * If toneOpener is "Out of curiosity" → Start with "Out of curiosity, " or "Quick question, " (casual style)
+  * If toneOpener is "I've found that teams like you" → Start with "Most teams..." or "Usually when..." (peer observation style)
+  * If toneOpener is "Looking at your situation" → Start with "Looking at..." or "From what I'm seeing..." (observational style)
+  * If toneOpener is "From what I'm hearing" → Start with "From what I'm hearing..." or "Most teams..." (peer observation style)
+  * If toneOpener is "So here's the thing" → Start with "So here's the thing, " or "Real talk, " (direct style)
+  * If toneOpener is "Question for you" → Start with "Question for you, " or "Quick question, " (direct question style)
+  * If toneOpener is "How are you managing" → Start with "How are you..." or "Are you..." (direct question style)
+- **VARY YOUR OPENER STYLE**: Use different opener styles across emails:
   * Direct questions: "Are you...", "How are you...", "When does..."
   * Soft curiosity: "Curious if...", "Wonder if...", "Quick question..."
   * Peer observations: "Most teams...", "Usually when...", "From what I'm seeing..."
@@ -2384,7 +2397,7 @@ TONE OPENER OPTIONAL STYLE (Not Mandatory - Choose One Approach):
   1. Sound like a real person (not a template)
   2. Open with a genuine question or curiosity (not a statement)
   3. Avoid salesy language ("I noticed", "I saw", "Hope this finds you")
-- Vary the opener across emails - do NOT repeat "Wondering how..." every time
+  4. NEVER start with "Wondering how [company] is handling..." - this is FORBIDDEN
 - The opener should go immediately after the greeting with proper paragraph spacing`
       : '';
 
@@ -2464,12 +2477,22 @@ Generate text for these fields:
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: MUST be exactly "Hello ${firstName}," - Use ONLY the first name "${firstName}", NEVER use the full name. This is mandatory.
-- opening_hook: **VARY YOUR OPENER - DO NOT ALWAYS USE "Wondering how..."** Start with a conversational opener that matches the toneOpener style "${toneOpener}". Vary between:
-  * Direct questions: "Are you...", "How are you...", "When does..." (use when toneOpener is direct)
-  * Soft curiosity: "Curious if...", "Wonder if...", "Quick question..." (use when toneOpener is curious)
-  * Peer observations: "Most teams...", "Usually when...", "From what I'm seeing..." (use when toneOpener is observational)
-  * Honest/direct: "Real talk, ", "Honestly, ", "Real question, " (use when toneOpener is honest/direct)
-  **CRITICAL**: Do NOT default to "Wondering how [company] is handling..." - this is overused. Use the toneOpener style "${toneOpener}" as inspiration and create a natural variation. Then continue with problem awareness (1-2 sentences total). ${selectedAngle && typeof selectedAngle === 'object' ? `**CRITICAL - USE THE SELECTED ANGLE**: This email MUST focus on "${selectedAngle.primaryMessage || selectedAngle.label || 'the selected angle'}". ${selectedAngle.id === 'demand_efficiency' ? 'You CAN mention demand charges since this angle is about demand efficiency.' : 'DO NOT mention "demand charges" or "delivery charges" - this angle is NOT about demand. Focus on ' + (selectedAngle.primaryMessage || selectedAngle.label) + ' instead. For example, if angle is "timing_strategy", focus on contract renewal timing. If angle is "cost_control", focus on rising electricity costs or budget pressure. If angle is "exemption_recovery", focus on tax exemptions. If angle is "consolidation", focus on multi-location management.'} ${selectedAngle.openingTemplate ? 'Use this angle\'s opening pattern as inspiration: "' + selectedAngle.openingTemplate + '"' : ''}` : '**DO NOT default to "demand charges"** - vary the pain points you mention.'} ${accountDescription ? `**CRITICAL - DO NOT USE THE BUSINESS FOCUS TEXT**: The "Business Focus" (${accountDescription}) is ONLY for you to understand their business type. DO NOT copy it, quote it, or reference it directly in the email. Instead, use industry-specific language naturally. GOOD: "Most ${industryLower || 'manufacturing'} companies I work with..." or "Companies like ${company} typically..." BAD: "${accountDescription}..." or "As a ${accountDescription}..." or any variation that includes the business focus text.` : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
+- opening_hook: **MANDATORY OPENER STYLE - USE toneOpener "${toneOpener}"**
+  **FORBIDDEN**: "Wondering how [company] is handling..." is STRICTLY FORBIDDEN. This pattern is overused and will be rejected.
+  **MANDATORY**: You MUST match the toneOpener style "${toneOpener}":
+  * If toneOpener is "Real talk" → Start with "Real talk, " or "Real question, "
+  * If toneOpener is "Honestly" → Start with "Honestly, " or "Real question, "
+  * If toneOpener is "Curious" → Start with "Curious if..." or "Curious, "
+  * If toneOpener is "Are you currently handling" → Start with "Are you..." or "How are you..."
+  * If toneOpener is "Out of curiosity" → Start with "Out of curiosity, " or "Quick question, "
+  * If toneOpener is "I've found that teams like you" → Start with "Most teams..." or "Usually when..."
+  * If toneOpener is "Looking at your situation" → Start with "Looking at..." or "From what I'm seeing..."
+  * If toneOpener is "From what I'm hearing" → Start with "From what I'm hearing..." or "Most teams..."
+  * If toneOpener is "So here's the thing" → Start with "So here's the thing, " or "Real talk, "
+  * If toneOpener is "Question for you" → Start with "Question for you, " or "Quick question, "
+  * If toneOpener is "How are you managing" → Start with "How are you..." or "Are you..."
+  * If toneOpener is "Not sure if you've already han" → Start with "Not sure if..." or "Quick question..."
+  **CRITICAL**: If you use "Wondering how..." the email will be rejected. Use the toneOpener style "${toneOpener}" instead. Then continue with problem awareness (1-2 sentences total). ${selectedAngle && typeof selectedAngle === 'object' ? `**CRITICAL - USE THE SELECTED ANGLE**: This email MUST focus on "${selectedAngle.primaryMessage || selectedAngle.label || 'the selected angle'}". ${selectedAngle.id === 'demand_efficiency' ? 'You CAN mention demand charges since this angle is about demand efficiency.' : 'DO NOT mention "demand charges" or "delivery charges" - this angle is NOT about demand. Focus on ' + (selectedAngle.primaryMessage || selectedAngle.label) + ' instead. For example, if angle is "timing_strategy", focus on contract renewal timing. If angle is "cost_control", focus on rising electricity costs or budget pressure. If angle is "exemption_recovery", focus on tax exemptions. If angle is "consolidation", focus on multi-location management.'} ${selectedAngle.openingTemplate ? 'Use this angle\'s opening pattern as inspiration: "' + selectedAngle.openingTemplate + '"' : ''}` : '**DO NOT default to "demand charges"** - vary the pain points you mention.'} ${accountDescription ? `**CRITICAL - DO NOT USE THE BUSINESS FOCUS TEXT**: The "Business Focus" (${accountDescription}) is ONLY for you to understand their business type. DO NOT copy it, quote it, or reference it directly in the email. Instead, use industry-specific language naturally. GOOD: "Most ${industryLower || 'manufacturing'} companies I work with..." or "Companies like ${company} typically..." BAD: "${accountDescription}..." or "As a ${accountDescription}..." or any variation that includes the business focus text.` : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
   **CRITICAL PUNCTUATION RULE: NEVER use em dashes (—) or en dashes (–) in the opening_hook. Use commas or natural flow instead. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"), "Real question, " (NOT "Real question—"). This is mandatory - em dashes will be rejected.**
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
@@ -3557,6 +3580,62 @@ CRITICAL: Use these EXACT meeting times in your CTA.
             } else {
               jsonData.cta_text = 'When does your current energy contract expire?';
             }
+          }
+        }
+        
+        // Validate and fix "Wondering how..." overuse in opening_hook
+        if (templateType === 'cold_email' && jsonData.opening_hook && toneOpener) {
+          const openingHookLower = jsonData.opening_hook.toLowerCase().trim();
+          const hasWonderingHow = /^wondering how/i.test(openingHookLower);
+          
+          if (hasWonderingHow) {
+            // Replace "Wondering how..." with tone opener style
+            logger.warn('[Validation] "Wondering how..." detected, replacing with tone opener style:', toneOpener);
+            
+            // Extract the question part after "Wondering how [company] is handling..."
+            const wonderingMatch = jsonData.opening_hook.match(/^wondering how [^?]+\?/i);
+            const questionPart = wonderingMatch ? wonderingMatch[0].replace(/^wondering how /i, '') : '';
+            
+            // Convert tone opener to natural opener
+            let naturalOpener = '';
+            const toneOpenerLower = toneOpener.toLowerCase();
+            if (toneOpenerLower.includes('real talk')) {
+              naturalOpener = 'Real talk, ';
+            } else if (toneOpenerLower.includes('honestly')) {
+              naturalOpener = 'Honestly, ';
+            } else if (toneOpenerLower.includes('curious')) {
+              naturalOpener = 'Curious if ';
+            } else if (toneOpenerLower.includes('are you') || toneOpenerLower.includes('how are you')) {
+              naturalOpener = questionPart ? 'Are you ' + questionPart.replace(/^[^ ]+ /, '') : 'Are you handling ';
+            } else if (toneOpenerLower.includes('out of curiosity')) {
+              naturalOpener = 'Out of curiosity, ';
+            } else if (toneOpenerLower.includes('question for you')) {
+              naturalOpener = 'Question for you, ';
+            } else if (toneOpenerLower.includes('most teams') || toneOpenerLower.includes('usually')) {
+              naturalOpener = 'Most teams ';
+            } else if (toneOpenerLower.includes('from what')) {
+              naturalOpener = 'From what I\'m hearing, ';
+            } else if (toneOpenerLower.includes('looking at')) {
+              naturalOpener = 'Looking at your situation, ';
+            } else if (toneOpenerLower.includes('so here')) {
+              naturalOpener = 'So here\'s the thing, ';
+            } else if (toneOpenerLower.includes('not sure')) {
+              naturalOpener = 'Not sure if ';
+            } else {
+              naturalOpener = 'Curious if ';
+            }
+            
+            // Rebuild opening hook with natural opener
+            if (questionPart) {
+              jsonData.opening_hook = naturalOpener + questionPart;
+            } else {
+              // Fallback: use tone opener directly
+              const restOfHook = jsonData.opening_hook.replace(/^wondering how [^?]+\?/i, '').trim();
+              jsonData.opening_hook = naturalOpener + restOfHook;
+            }
+            
+            // Log the replacement
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3586','message':'Wondering how replacement applied','data':{originalPreview:jsonData.opening_hook.substring(0,100),replacedWith:naturalOpener,toneOpener},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'})}).catch(()=>{});
           }
         }
         
