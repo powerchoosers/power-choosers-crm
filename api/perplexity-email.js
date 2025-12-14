@@ -2093,15 +2093,61 @@ async function buildSystemPrompt({
 
   // For prompt brevity, summarize to ~220 chars without destroying saved description
   // CRITICAL: Truncate company description to prevent "description dumping" in emails
-  // Only use first sentence, max 80 chars - this is for CONTEXT ONLY, not to copy into email
+  // Extract key business type words only (not full sentences) - this is for CONTEXT ONLY, not to copy into email
   if (accountDescription) {
     const trimmed = accountDescription.replace(/\s+/g, ' ').trim();
     // Get first sentence only (split on period, exclamation, or question mark)
     const firstSentence = trimmed.split(/[.!?]/)[0].trim();
-    // Cap at 80 characters
-    accountDescription = firstSentence.length > 80 
-      ? firstSentence.substring(0, 77) + '...' 
-      : firstSentence;
+    
+    // Instead of truncating with "...", extract key business type words
+    // Look for patterns like "contract manufacturing", "restaurant chain", "manufacturing company"
+    const businessTypePatterns = [
+      /(contract\s+manufacturing|manufacturing\s+company|manufacturer)/i,
+      /(restaurant\s+chain|restaurant|dining)/i,
+      /(retail\s+chain|retailer|retail)/i,
+      /(healthcare|hospital|clinic|medical)/i,
+      /(logistics|warehouse|distribution|shipping)/i,
+      /(data\s+center|hosting|cloud)/i,
+      /(construction|contractor|builder)/i,
+      /(education|school|university|college)/i
+    ];
+    
+    let businessType = '';
+    for (const pattern of businessTypePatterns) {
+      const match = firstSentence.match(pattern);
+      if (match) {
+        businessType = match[0].toLowerCase();
+        break;
+      }
+    }
+    
+    // If no pattern found, try to extract first 2-3 key words (avoiding articles, prepositions)
+    if (!businessType && firstSentence.length > 0) {
+      const words = firstSentence.split(/\s+/).filter(w => 
+        w.length > 3 && 
+        !/^(the|a|an|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|could|should|may|might|can|this|that|these|those|with|from|for|about|into|onto|upon|over|under|above|below|between|among|during|before|after|since|until|while|when|where|why|how|what|which|who|whom|whose)$/i.test(w)
+      );
+      businessType = words.slice(0, 3).join(' ').toLowerCase();
+    }
+    
+    // Cap at 50 characters, truncate at word boundary (no "...")
+    if (businessType.length > 50) {
+      const words = businessType.split(/\s+/);
+      let result = '';
+      for (const word of words) {
+        if ((result + ' ' + word).length <= 50) {
+          result = result ? result + ' ' + word : word;
+        } else {
+          break;
+        }
+      }
+      accountDescription = result || businessType.substring(0, 50).trim();
+    } else {
+      accountDescription = businessType || '';
+    }
+    
+    // Log what we're passing to the AI
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2105','message':'Account description processing','data':{company,originalLength:trimmed.length,originalPreview:trimmed.substring(0,100),processedDescription:accountDescription,hasDescription:!!accountDescription},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'J'})}).catch(()=>{});
   }
   
   // Format contract end date
@@ -2374,7 +2420,7 @@ Generate text for these fields:
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: MUST be exactly "Hello ${firstName}," - Use ONLY the first name "${firstName}", NEVER use the full name. This is mandatory.
-- opening_hook: Start with ANY conversational opener (not required to use "${toneOpener}" specifically). Choose from: soft curiosity ("Curious if...", "Wonder if..."), direct questions ("Are you...", "How are you..."), or peer observations ("Usually when...", "Most teams..."). Then continue with problem awareness (1-2 sentences total). ${accountDescription ? '**CRITICAL - DO NOT COPY COMPANY DESCRIPTION**: The "Business Focus" above is for YOUR context ONLY. Do NOT restate it in the email body. Instead, reference ONE specific, relevant detail in a natural way. GOOD: "Most restaurant chains I work with are dealing with..." BAD: "With company being a family-owned restaurant specializing in thin-crust pizzas..." Keep company references SHORT (1-2 words), never the full "About Us" section.' : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
+- opening_hook: Start with ANY conversational opener (not required to use "${toneOpener}" specifically). Choose from: soft curiosity ("Curious if...", "Wonder if..."), direct questions ("Are you...", "How are you..."), or peer observations ("Usually when...", "Most teams..."). Then continue with problem awareness (1-2 sentences total). ${accountDescription ? `**CRITICAL - DO NOT USE THE BUSINESS FOCUS TEXT**: The "Business Focus" (${accountDescription}) is ONLY for you to understand their business type. DO NOT copy it, quote it, or reference it directly in the email. Instead, use industry-specific language naturally. GOOD: "Most ${industry || 'manufacturing'} companies I work with..." or "Companies like ${company} typically..." BAD: "${accountDescription}..." or "As a ${accountDescription}..." or any variation that includes the business focus text.` : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
   **CRITICAL PUNCTUATION RULE: NEVER use em dashes (—) or en dashes (–) in the opening_hook. Use commas or natural flow instead. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"), "Real question, " (NOT "Real question—"). This is mandatory - em dashes will be rejected.**
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
@@ -2467,7 +2513,7 @@ ${ctaEscalation}
 HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Write like a knowledgeable energy expert who researched their company deeply
 - Show you did homework: When you have specific data, use QUESTIONS instead of observations:
-  * Ask about ${accountDescription ? 'ONE short detail from "' + accountDescription + '"' : '[specific detail]'}: "How is [specific detail] impacting your energy costs?" (if business focus available - DO NOT copy the full description)
+  * Ask about their business type naturally: "How are ${industry || 'manufacturing'} companies like ${company} handling energy costs?" (DO NOT mention the business focus text - use industry/company name instead)
   ${recentActivityContext ? '* Ask about ' + recentActivityContext.substring(0, 60) + '...: "With [recent activity], how has that affected your energy planning?" (if recent activity found)' : '* DO NOT mention recent activity, recent news, or recent public activity - there is none available'}
   * Reference website naturally: "On your website, I see..." → "How are you handling [specific challenge mentioned on website]?" (if website context available)
   * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." (if location context available)
@@ -2481,7 +2527,7 @@ ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', how 
 ${contactLinkedinContext ? '- Reference contact profile: Use insights from their LinkedIn profile naturally through questions' : ''}
 
 EVIDENCE OF RESEARCH (Show You Know Their Business):
-${accountDescription ? '✓ PRIORITY: Use business focus for context only: Reference ONE short detail from "' + accountDescription + '" naturally in opening hook - DO NOT copy the full description. This is your PRIMARY hook when no recent activity.' : ''}
+${accountDescription ? '✓ PRIORITY: Use business focus for context only: The business focus (' + accountDescription + ') tells you their business type. Use industry-specific language (e.g., "manufacturing companies", "restaurant chains") but DO NOT mention the business focus text itself. This is your PRIMARY hook when no recent activity.' : ''}
 ${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements through questions' : ''}
 ${websiteContext ? '✓ PRIORITY: Use website info: Ask about specific challenges mentioned on their website (DO NOT say "I noticed") - strong alternative when no recent activity' : ''}
 ${recentActivityContext ? '✓ Use recent activity: Ask "With ' + recentActivityContext.substring(0, 60) + '..., how has that impacted..." (DO NOT say "I saw")' : '✗ DO NOT mention recent activity, recent news, recent public activity, or "no recent activity" - there is none available. INSTEAD, use account description, website context, contract timing, or industry-specific questions'}
@@ -2886,7 +2932,7 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Write like a knowledgeable energy expert who researched ${company || 'their company'} deeply
 - ${marketContext?.enabled ? 'Market context is ENABLED, but still lead with specific question' : 'Market context is DISABLED - focus on THEIR specific situation only'}
 - Show you did homework: When you have specific data, use QUESTIONS instead of observations:
-  ${accountDescription ? '* PRIORITY: Ask about ' + accountDescription.substring(0, 80) + '...: "How is [specific detail] affecting your energy costs?" (you have account description - USE THIS as primary hook)' : '* Ask about [specific detail about their company]: "How is [specific detail] affecting your energy costs?"'}
+  ${accountDescription ? '* PRIORITY: Use business focus for context: The business focus tells you their business type. Ask about their industry-specific challenges (e.g., "How are manufacturing companies like ' + company + ' handling energy costs?") but DO NOT mention the business focus text itself.' : '* Ask about [specific detail about their company]: "How is [specific detail] affecting your energy costs?"'}
   ${recentActivityContext ? '* Ask about ' + recentActivityContext.substring(0, 60) + '...: "With [recent activity], how has that impacted your planning?" (you have recent activity - USE THIS)' : '* DO NOT mention recent activity, recent news, or recent public activity - there is none available. Use account description, website, or contract timing instead'}
   ${websiteContext ? '* PRIORITY: Reference website through questions: "How are you handling [specific challenge from website]?" (you have website context - USE THIS as strong alternative)' : '* Reference website through questions: "How are you handling [specific challenge from website]?" (if available)'}
   ${city && marketContext?.enabled ? '* "Given ' + city + '\'s energy market conditions..." (you have location)' : ''}
