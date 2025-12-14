@@ -2420,9 +2420,9 @@ ${angleValue ? '- Primary value proposition: "' + angleValue + '"' : ''}
   * **Direct questions**: "Are you...", "How are you...", "When does...", "What's your approach to..."
   * **Soft curiosity**: "Curious if...", "Wonder if...", "Quick question..."
   * **Peer observations**: "Most teams...", "Usually when...", "From what I'm seeing...", "I've found that..."
-  * **Honest/direct**: "Real talk, ", "Honestly, ", "So here's the thing, "
+  * **Honest/direct**: "Honestly, ", "So here's the thing, " (REMOVED "Real talk" - not professional enough for corporate America)
   * **Disarmed/confused**: "Not sure if...", "Quick question that might be off base..."
-- **STYLISTIC INSPIRATION**: The tone opener "${toneOpener}" suggests a ${toneOpener.toLowerCase().includes('curious') ? 'curiosity' : toneOpener.toLowerCase().includes('real talk') || toneOpener.toLowerCase().includes('honestly') ? 'direct/honest' : toneOpener.toLowerCase().includes('most') || toneOpener.toLowerCase().includes('teams') ? 'peer observation' : toneOpener.toLowerCase().includes('question') ? 'direct question' : 'conversational'} style. Feel free to rephrase it naturally or use a different but similar style.
+- **STYLISTIC INSPIRATION**: The tone opener "${toneOpener}" suggests a ${toneOpener.toLowerCase().includes('curious') ? 'curiosity' : toneOpener.toLowerCase().includes('honestly') ? 'direct/honest' : toneOpener.toLowerCase().includes('most') || toneOpener.toLowerCase().includes('teams') ? 'peer observation' : toneOpener.toLowerCase().includes('question') ? 'direct question' : 'conversational'} style. Feel free to rephrase it naturally or use a different but similar style.
 - **NATURALNESS OVER MATCHING**: The goal is natural, human-sounding openers that vary across emails. Don't force-match the tone opener if a different natural phrasing works better.
 - The opener must:
   1. Sound like a real person (not a template)
@@ -2514,7 +2514,7 @@ Generate text for these fields:
   **FORBIDDEN**: "Wondering how [company] is handling..." is STRICTLY FORBIDDEN. This pattern is overused and will be rejected.
   **CREATIVE FREEDOM**: You have full creative freedom to craft a natural, conversational opener. The tone opener "${toneOpener}" is provided as INSPIRATION - use it as a stylistic guide, not a template. Feel free to rephrase it naturally or use a different but similar style.
   **VARIETY IS CRITICAL**: Vary your opener style across emails. Mix between:
-  * If toneOpener is "Real talk" → Start with "Real talk, " or "Real question, "
+  * (REMOVED "Real talk" - not professional enough for corporate America)
   * If toneOpener is "Honestly" → Start with "Honestly, " or "Real question, "
   * If toneOpener is "Curious" → Start with "Curious if..." or "Curious, "
   * If toneOpener is "Are you currently handling" → Start with "Are you..." or "How are you..."
@@ -2522,7 +2522,7 @@ Generate text for these fields:
   * If toneOpener is "I've found that teams like you" → Start with "Most teams..." or "Usually when..."
   * If toneOpener is "Looking at your situation" → Start with "Looking at..." or "From what I'm seeing..."
   * If toneOpener is "From what I'm hearing" → Start with "From what I'm hearing..." or "Most teams..."
-  * If toneOpener is "So here's the thing" → Start with "So here's the thing, " or "Real talk, "
+  * If toneOpener is "So here's the thing" → Start with "So here's the thing, " or "Honestly, "
   * If toneOpener is "Question for you" → Start with "Question for you, " or "Quick question, "
   * If toneOpener is "How are you managing" → Start with "How are you..." or "Are you..."
   * If toneOpener is "Not sure if you've already han" → Start with "Not sure if..." or "Quick question..."
@@ -3634,9 +3634,8 @@ CRITICAL: Use these EXACT meeting times in your CTA.
             // Convert tone opener to natural opener
             let naturalOpener = '';
             const toneOpenerLower = toneOpener.toLowerCase();
-            if (toneOpenerLower.includes('real talk')) {
-              naturalOpener = 'Real talk, ';
-            } else if (toneOpenerLower.includes('honestly')) {
+            // REMOVED "real talk" - not professional enough for corporate America
+            if (toneOpenerLower.includes('honestly')) {
               naturalOpener = 'Honestly, ';
             } else if (toneOpenerLower.includes('curious')) {
               naturalOpener = 'Curious if ';

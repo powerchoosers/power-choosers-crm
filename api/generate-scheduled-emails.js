@@ -182,9 +182,10 @@ function validateNepqContent(subject, text, toneOpener) {
       const peerPattern = /^(usually|most teams|from what|ive found|tend to see)/i;
       
       // Known conversational openers (kept for compatibility, not required)
+      // REMOVED "real talk" - not professional enough for corporate America
       const knownOpeners = [
         "let me ask", "so here's", "honestly", "looking at", "here's what", "most people",
-        "from what", "real talk", "quick question"
+        "from what", "quick question"
       ];
       
       // Check if any known opener appears near the start
@@ -203,12 +204,14 @@ function validateNepqContent(subject, text, toneOpener) {
       // Pattern-based check: conversational opener (NO em dashes required)
       // Pattern: short phrase (2-6 words) followed by question or natural flow
       // Openers can flow naturally without punctuation separators
-      const openerPattern = /^(so|here's|let me|question|honestly|curious|real talk|looking at|most people|from what|i've found|you ever|did you|ever think|quick|real|are you|how are you|do you|when you|wondering|wonder if|not sure|out of curiosity)\s+[^?]{0,60}\?/i;
+      // REMOVED "real talk" from pattern - not professional enough for corporate America
+      const openerPattern = /^(so|here's|let me|question|honestly|curious|looking at|most people|from what|i've found|you ever|did you|ever think|quick|are you|how are you|do you|when you|wondering|wonder if|not sure|out of curiosity)\s+[^?]{0,60}\?/i;
       if (openerPattern.test(textStart)) return true;
       
       // Also check for simple conversational patterns (no dash required)
       const simplePatterns = [
-        /^(so|here's|let me|question|honestly|curious|real talk|are you|how are you|do you|wondering|wonder if|out of curiosity)\s+/i,
+        // REMOVED "real talk" from pattern - not professional enough for corporate America
+        /^(so|here's|let me|question|honestly|curious|are you|how are you|do you|wondering|wonder if|out of curiosity)\s+/i,
         /^[a-z\s]{2,40}\?/i  // Direct question
       ];
       return simplePatterns.some(pattern => pattern.test(textStart));
@@ -468,9 +471,8 @@ async function generatePreviewEmail(emailData) {
           // Convert tone opener to natural opener
           let naturalOpener = '';
           const toneOpenerLower = toneOpener.toLowerCase();
-          if (toneOpenerLower.includes('real talk')) {
-            naturalOpener = 'Real talk, ';
-          } else if (toneOpenerLower.includes('honestly')) {
+          // REMOVED "real talk" - not professional enough for corporate America
+          if (toneOpenerLower.includes('honestly')) {
             naturalOpener = 'Honestly, ';
           } else if (toneOpenerLower.includes('curious')) {
             naturalOpener = 'Curious if ';
@@ -539,9 +541,8 @@ async function generatePreviewEmail(emailData) {
           // Convert tone opener to natural opener
           let naturalOpener = '';
           const toneOpenerLower = toneOpener.toLowerCase();
-          if (toneOpenerLower.includes('real talk')) {
-            naturalOpener = 'Real talk, ';
-          } else if (toneOpenerLower.includes('honestly')) {
+          // REMOVED "real talk" - not professional enough for corporate America
+          if (toneOpenerLower.includes('honestly')) {
             naturalOpener = 'Honestly, ';
           } else if (toneOpenerLower.includes('curious')) {
             naturalOpener = 'Curious if ';
@@ -1125,7 +1126,6 @@ function selectRandomToneOpener(angleId = null) {
     "From what I'm hearing",
     "I've found that teams like yours",
     "Curious",
-    "Real talk",
     "Curious if you're seeing",
     "Wonder if you've noticed",
     "Are you currently handling",
@@ -1681,9 +1681,8 @@ export default async function handler(req, res) {
                 // Convert tone opener to natural opener
                 let naturalOpener = '';
                 const toneOpenerLower = toneOpener.toLowerCase();
-                if (toneOpenerLower.includes('real talk')) {
-                  naturalOpener = 'Real talk, ';
-                } else if (toneOpenerLower.includes('honestly')) {
+                // REMOVED "real talk" - not professional enough for corporate America
+                if (toneOpenerLower.includes('honestly')) {
                   naturalOpener = 'Honestly, ';
                 } else if (toneOpenerLower.includes('curious')) {
                   naturalOpener = 'Curious if ';
@@ -1754,9 +1753,8 @@ export default async function handler(req, res) {
                 // Convert tone opener to natural opener
                 let naturalOpener = '';
                 const toneOpenerLower = toneOpener.toLowerCase();
-                if (toneOpenerLower.includes('real talk')) {
-                  naturalOpener = 'Real talk, ';
-                } else if (toneOpenerLower.includes('honestly')) {
+                // REMOVED "real talk" - not professional enough for corporate America
+                if (toneOpenerLower.includes('honestly')) {
                   naturalOpener = 'Honestly, ';
                 } else if (toneOpenerLower.includes('curious')) {
                   naturalOpener = 'Curious if ';
@@ -1822,9 +1820,8 @@ export default async function handler(req, res) {
                 // Convert tone opener to natural opener
                 let naturalOpener = '';
                 const toneOpenerLower = toneOpener.toLowerCase();
-                if (toneOpenerLower.includes('real talk')) {
-                  naturalOpener = 'Real talk, ';
-                } else if (toneOpenerLower.includes('honestly')) {
+                // REMOVED "real talk" - not professional enough for corporate America
+                if (toneOpenerLower.includes('honestly')) {
                   naturalOpener = 'Honestly, ';
                 } else if (toneOpenerLower.includes('curious')) {
                   naturalOpener = 'Curious if ';
