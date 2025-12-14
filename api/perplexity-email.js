@@ -2257,7 +2257,7 @@ RESEARCH DATA:
 ${linkedinContext ? '- Company LinkedIn: ' + linkedinContext : ''}
 ${websiteContext ? '- Company Website: ' + websiteContext : ''}
 ${contactLinkedinContext ? '- Contact LinkedIn Profile: ' + contactLinkedinContext + ' (use for tenure, career background, recent posts)' : ''}
-${recentActivityContext ? '- Recent Company Activity: ' + recentActivityContext + ' (reference naturally through questions, not "I noticed" or "I saw")' : ''}
+${recentActivityContext ? '- Recent Company Activity: ' + recentActivityContext + ' (reference naturally through questions, not "I noticed" or "I saw"). IMPORTANT: If activity mentions "new" facilities/offices, verify timing - if it\'s from 2022 or earlier, frame as "your [location] facility" not "new facility" to avoid sounding outdated.' : ''}
 ${locationContextData ? '- Regional Energy Market: ' + locationContextData + ' (use for location-specific context)' : ''}
 
 ENERGY DATA:
@@ -2339,13 +2339,24 @@ ${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo')
       const angleValue = selectedAngle.primaryValue || '';
       angleContextBlock = `
 
-PRIMARY ANGLE FOR THIS EMAIL (CRITICAL - USE THIS AS YOUR LENS):
+PRIMARY ANGLE FOR THIS EMAIL (CRITICAL - USE THIS AS YOUR LENS - DO NOT IGNORE):
 - Angle ID: ${angleId}
 - Focus: ${angleFocus}
 ${angleOpening ? '- Example opening pattern: "' + angleOpening + '"' : ''}
 ${angleValue ? '- Primary value proposition: "' + angleValue + '"' : ''}
 
-You MUST structure the entire email around this primary angle. Do NOT switch to a different generic angle (for example, generic contract timing) unless it clearly matches this focus. Keep the problem framing, examples, and value proposition aligned with this angle.`;
+**MANDATORY ANGLE USAGE:**
+- You MUST structure the ENTIRE email around this specific angle (${angleFocus})
+- The opening_hook MUST focus on this angle's specific problem/challenge
+- DO NOT default to generic "demand charges" or "delivery charges" unless the angle is specifically about demand efficiency
+- If angle is "timing_strategy" → focus on contract renewal timing, early renewal benefits, renewal windows
+- If angle is "cost_control" → focus on rising electricity costs, budget pressure, cost predictability
+- If angle is "exemption_recovery" → focus on tax exemptions, unclaimed exemptions, exemption certificates
+- If angle is "consolidation" → focus on multi-location management, contract consolidation, unified billing
+- If angle is "demand_efficiency" → THEN you can mention demand charges, but ONLY if this is the angle
+- If angle is "operational_simplicity" → focus on time spent managing energy, vendor complexity, procurement burden
+
+**DO NOT** mention "demand charges" or "delivery charges" unless the angle is specifically about demand efficiency. Use the angle's focus instead.`;
     }
 
     const toneOpenerRule = (templateType === 'cold_email' && toneOpener)
@@ -2440,7 +2451,7 @@ Generate text for these fields:
 TEMPLATE: Cold Email Outreach
 Generate text for these fields:
 - greeting: MUST be exactly "Hello ${firstName}," - Use ONLY the first name "${firstName}", NEVER use the full name. This is mandatory.
-- opening_hook: Start with ANY conversational opener (not required to use "${toneOpener}" specifically). Choose from: soft curiosity ("Curious if...", "Wonder if..."), direct questions ("Are you...", "How are you..."), or peer observations ("Usually when...", "Most teams..."). Then continue with problem awareness (1-2 sentences total). ${accountDescription ? `**CRITICAL - DO NOT USE THE BUSINESS FOCUS TEXT**: The "Business Focus" (${accountDescription}) is ONLY for you to understand their business type. DO NOT copy it, quote it, or reference it directly in the email. Instead, use industry-specific language naturally. GOOD: "Most ${industry || 'manufacturing'} companies I work with..." or "Companies like ${company} typically..." BAD: "${accountDescription}..." or "As a ${accountDescription}..." or any variation that includes the business focus text.` : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
+- opening_hook: Start with ANY conversational opener (not required to use "${toneOpener}" specifically). Choose from: soft curiosity ("Curious if...", "Wonder if..."), direct questions ("Are you...", "How are you..."), or peer observations ("Usually when...", "Most teams..."). Then continue with problem awareness (1-2 sentences total). ${selectedAngle && typeof selectedAngle === 'object' ? `**CRITICAL - USE THE SELECTED ANGLE**: This email MUST focus on "${selectedAngle.primaryMessage || selectedAngle.label || 'the selected angle'}". ${selectedAngle.id === 'demand_efficiency' ? 'You CAN mention demand charges since this angle is about demand efficiency.' : 'DO NOT mention "demand charges" or "delivery charges" - this angle is NOT about demand. Focus on ' + (selectedAngle.primaryMessage || selectedAngle.label) + ' instead. For example, if angle is "timing_strategy", focus on contract renewal timing. If angle is "cost_control", focus on rising electricity costs or budget pressure. If angle is "exemption_recovery", focus on tax exemptions. If angle is "consolidation", focus on multi-location management.'} ${selectedAngle.openingTemplate ? 'Use this angle\'s opening pattern as inspiration: "' + selectedAngle.openingTemplate + '"' : ''}` : '**DO NOT default to "demand charges"** - vary the pain points you mention.'} ${accountDescription ? `**CRITICAL - DO NOT USE THE BUSINESS FOCUS TEXT**: The "Business Focus" (${accountDescription}) is ONLY for you to understand their business type. DO NOT copy it, quote it, or reference it directly in the email. Instead, use industry-specific language naturally. GOOD: "Most ${industryLower || 'manufacturing'} companies I work with..." or "Companies like ${company} typically..." BAD: "${accountDescription}..." or "As a ${accountDescription}..." or any variation that includes the business focus text.` : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
   **CRITICAL PUNCTUATION RULE: NEVER use em dashes (—) or en dashes (–) in the opening_hook. Use commas or natural flow instead. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"), "Real question, " (NOT "Real question—"). This is mandatory - em dashes will be rejected.**
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
@@ -2451,16 +2462,18 @@ Generate text for these fields:
 IMPORTANT:
 - Always reference ${company} specifically.
 - Use qualitative language (rising, increasing, higher) NOT percentages (15-25%, 20-30%) in the opening hook.
+- For demand charges and cost impacts, use CONDITIONAL language: "can increase demand charges and push costs higher if the contract structure no longer matches your new load profile" (NOT "demand charges that eat 20-30% more into budgets").
+- FACILITY TIMING: If referencing facilities/offices, be careful with "new" - if the activity is from 2022 or earlier, use "your [location] facility" instead of "new facility" to avoid sounding outdated.
 - Keep it natural and conversational.
 - NEVER mention company size ("small company", "small business") - focus on role, industry, and operational challenges instead.
 - NEVER start the email by restating their full "About us" description (for example, "Safety Vision is a leading provider of..."). Instead, summarize their situation in plain, conversational language tied to energy costs.
-- value_proposition: How we help (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) SPECIFIC measurable value: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X annually", "helped similar companies achieve Y". Include role-specific benefits:
+- value_proposition: How we help (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) CONDITIONAL value language (NOT unverified specific percentages). Use conditional language like "can reduce costs", "often gives more optionality", "may help avoid renewal risk" instead of asserting specific percentages as facts. Only use specific percentages if you have verified data. Include role-specific benefits:
   * CFOs: Budget predictability, cost reduction, risk mitigation
   * Facilities Managers: Operational efficiency, maintenance cost reduction
   * Procurement Managers: Vendor management, contract optimization
   * Operations Managers: Cost control, efficiency improvements
-Example: "We help manufacturing companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs while reducing procurement complexity." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK. Statistics ARE allowed here (value prop only), just not in opening_hook.
-- social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional). Use specific outcomes: "We recently helped [similar company] reduce energy costs by 18%", "Our clients in [industry] typically save $X annually", "Companies like [company] have achieved 15-20% savings". Be specific and credible. NEVER use vague phrases like "similar companies" or "many businesses".
+Example: "We help manufacturing companies secure better rates before contracts expire. Early renewal often gives more optionality and can reduce renewal risk compared with waiting until the last window." Be concrete, not vague. NEVER end with incomplete phrase like "within [company]". ALWAYS include a complete value proposition - never skip this field. THIS FIELD IS MANDATORY - NEVER LEAVE BLANK. Use conditional language ("can", "often", "may") for unverified claims - do NOT assert specific percentages as facts unless you have verified data.
+- social_proof_optional: Brief credibility statement IF relevant (1 sentence, optional). Use conditional language for outcomes: "We've helped [similar company] reduce energy costs", "Our clients in [industry] often see cost reductions", "Companies like [company] have achieved savings". Only use specific percentages if you have verified data. NEVER use vague phrases like "similar companies" or "many businesses".
 ${(() => {
   const angleCta = getAngleCta(selectedAngle);
   if (angleCta && templateType === 'cold_email') {
@@ -2497,16 +2510,34 @@ ${(() => {
     }
     
     return `
-- cta_text: CRITICAL - You MUST use this angle-specific CTA as your foundation: "${angleCta.full}"
-  * This is MANDATORY - you cannot use any other CTA
-  * You have CREATIVE CONTROL to rephrase it naturally, but MUST include:
-    1. The core opening question: "${angleCta.opening}"
-    2. A value/statistic: "${angleCta.value}" (you may rephrase this)
-    3. A closing based on email position (see below)
+- cta_text: **CREATIVE CTA BUTTON TEXT** - Create button text (2-5 words) that NATURALLY FLOWS from the email content above
+  * **CRITICAL**: This is BUTTON TEXT, not a question. Keep it short (2-5 words), action-oriented, and compelling
+  * **MUST align with the selected angle**: "${angleCta.opening}" (use this as inspiration, but be creative)
+  * **MUST match the email's opening hook**: Your button text should reference or build on the problem/challenge mentioned in opening_hook
+  * **MUST match the email's value proposition**: Reference the value/benefit you mentioned in value_proposition
+  * **MUST match the industry**: ${industryLower ? `For ${industryLower} companies, use industry-specific language` : 'Use industry-appropriate language'}
+  * **CREATIVE FREEDOM**: You can rephrase, combine, or create variations - the angle is your GUIDE, not a template
+  * **Button text examples** (2-5 words, action-oriented):
+    - If angle is "timing_strategy" → "Check Renewal Timing" or "Review Contract Window" or "Explore Early Renewal"
+    - If angle is "cost_control" → "Review Energy Costs" or "Explore Savings" or "Check Budget Impact"
+    - If angle is "exemption_recovery" → "Check Exemptions" or "Review Tax Savings" or "Explore Refunds"
+    - If angle is "consolidation" → "Review Locations" or "Explore Consolidation" or "Check Multi-Site Savings"
+    - If opening_hook mentions "contract renewal" → "Review Renewal Options" or "Check Contract Timing"
+    - If opening_hook mentions "rising costs" → "Explore Savings" or "Review Energy Costs"
+    - If opening_hook mentions "multiple locations" → "Review Locations" or "Explore Consolidation"
+  * **Keep it short**: 2-5 words maximum, action-oriented, no question marks
 ${ctaEscalation}
-  * Keep total length under 30 words for Email 1-2, 40 words for Email 3+
-  * MUST be a complete sentence with proper ending punctuation
-  * MUST end with a question mark (?)
+  * **BUTTON TEXT REQUIREMENTS**:
+    - Keep it SHORT: 2-5 words maximum
+    - Action-oriented: Use verbs like "Check", "Review", "Explore", "Get Started"
+    - NO question marks: This is button text, not a question
+    - Examples: "Check Renewal Timing", "Review Energy Costs", "Explore Savings", "Get Started"
+  * **Industry-specific CTAs**:
+    ${industryLower === 'manufacturing' ? '- Manufacturing: Focus on production efficiency, equipment reliability, energy-intensive operations (e.g., "How are you handling energy costs for your production floor?")' : ''}
+    ${industryLower === 'healthcare' ? '- Healthcare: Focus on budget constraints, patient care continuity (e.g., "How are rising electricity costs affecting your budget for patient care?")' : ''}
+    ${industryLower === 'retail' ? '- Retail: Focus on multiple locations, seasonal demand (e.g., "How are you managing energy costs across your locations?")' : ''}
+    ${industryLower === 'hospitality' ? '- Hospitality: Focus on guest comfort, operational costs (e.g., "How are you balancing guest comfort with energy costs?")' : ''}
+    ${industryLower === 'education' ? '- Education: Focus on facility maintenance, budget optimization (e.g., "How are you handling energy costs while maintaining facility quality?")' : ''}
   * FORBIDDEN CTAs - DO NOT use these phrases:
     - "If you ever want a second opinion on your setup"
     - "I can spend 10 minutes looking at your situation"
@@ -2518,12 +2549,35 @@ ${ctaEscalation}
 `;
   } else if (ctaPattern) {
     return `
-- cta_text: Customize this pattern: "${ctaPattern.template}". Keep under 12 words. MUST be complete sentence with proper ending punctuation. NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .).
+- cta_text: **CREATIVE CTA GENERATION** - Create a call-to-action that NATURALLY FLOWS from the email content above
+  * **Use this pattern as inspiration**: "${ctaPattern.template}" (but be creative - rephrase it naturally)
+  * **MUST match the email's opening hook**: Your CTA should reference or build on the problem/challenge mentioned in opening_hook
+  * **MUST match the email's value proposition**: Reference the value/benefit you mentioned in value_proposition
+  * **MUST match the industry**: ${industryLower ? `For ${industryLower} companies, use industry-specific language` : 'Use industry-appropriate language'}
+  * **MUST match the role**: ${job ? `For ${job} roles, focus on role-specific concerns (e.g., ${job.toLowerCase().includes('cfo') || job.toLowerCase().includes('finance') ? 'budget planning, cost predictability' : job.toLowerCase().includes('facilities') || job.toLowerCase().includes('operations') ? 'facility operations, renewal timing' : 'role-specific challenges'})` : ''}
+  * **CREATIVE FREEDOM**: You can rephrase, combine, or create variations - the pattern is your GUIDE, not a template
+  * **Natural flow**: The CTA should feel like a natural continuation of the email, not a disconnected ask
+  * Keep under 15 words
+  * MUST be complete sentence with proper ending punctuation
+  * NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .)
 - cta_type: Return "${ctaPattern.type}"
 `;
   } else {
     return `
-- cta_text: Create a professional call-to-action question (under 12 words, ending with proper punctuation).
+- cta_text: **CREATIVE CTA GENERATION** - Create a call-to-action that NATURALLY FLOWS from the email content above
+  * **MUST match the email's opening hook**: Your CTA should reference or build on the problem/challenge mentioned in opening_hook
+  * **MUST match the email's value proposition**: Reference the value/benefit you mentioned in value_proposition
+  * **MUST match the industry**: ${industryLower ? `For ${industryLower} companies, use industry-specific language` : 'Use industry-appropriate language'}
+  * **MUST match the selected angle**: ${selectedAngle && typeof selectedAngle === 'object' ? `Focus on "${selectedAngle.primaryMessage || selectedAngle.label}" - use "${selectedAngle.openingTemplate || 'the angle\'s opening question'}" as inspiration` : 'Use angle-appropriate language'}
+  * **CREATIVE FREEDOM**: Create a natural, conversational question that flows from the email content
+  * **Natural flow**: The CTA should feel like a natural continuation of the email, not a disconnected ask
+  * **Examples**:
+    - If email talks about contract renewal → "When does your contract expire?"
+    - If email talks about rising costs → "How are you handling budget pressure from rising rates?"
+    - If email talks about multiple locations → "How many facilities are you managing energy for?"
+  * Keep under 15 words
+  * MUST be complete sentence with proper ending punctuation
+  * NEVER cut off mid-sentence. ALWAYS end with proper punctuation (? or .)
 - cta_type: Return "qualifying"
 `;
   }
@@ -2569,7 +2623,7 @@ CONVERSATIONAL FLOW PATTERNS:
 
 KNOWLEDGE DEMONSTRATION:
 - Reference specific operational details: ${accountDescription ? '"As ' + accountDescription.substring(0, 80) + '..."' : 'Company-specific details'}
-- Mention industry-specific challenges: ${industryContent ? 'VARY the pain points you mention - do NOT always default to "load demand" or "delivery charges". Use different pain points from this list: ' + industryContent.painPoints.join(', ') + '. Examples: rising electricity costs, budget pressure, contract timing, rate volatility, bill complexity, renewal surprises. Mix it up - not every email should mention load/demand.' : 'Industry pain points - VARY them (not always load/demand)'} (not generic "operational costs")
+- Mention industry-specific challenges: ${selectedAngle && typeof selectedAngle === 'object' ? `**USE THE SELECTED ANGLE'S FOCUS**: This email is about "${selectedAngle.primaryMessage || selectedAngle.label}". ${selectedAngle.id === 'demand_efficiency' ? 'You CAN mention demand/delivery charges since this angle is about demand efficiency.' : 'DO NOT mention "demand charges" or "delivery charges" - focus on the angle\'s specific challenge instead: ' + (selectedAngle.primaryMessage || selectedAngle.label) + '. For example: timing_strategy → contract renewal timing, early renewal windows; cost_control → rising electricity costs, budget pressure; exemption_recovery → tax exemptions, unclaimed exemptions; consolidation → multi-location management, unified billing.'}` : ''} ${industryContent ? 'VARY the pain points you mention - do NOT always default to "load demand" or "delivery charges". Use different pain points from this list: ' + industryContent.painPoints.join(', ') + '. Examples: rising electricity costs, budget pressure, contract timing, rate volatility, bill complexity, renewal surprises. Mix it up - not every email should mention load/demand.' : 'Industry pain points - VARY them (not always load/demand)'} (not generic "operational costs")
 - Show understanding of their role's pain points: ${roleContext?.painPoints.join(', ') || '[role pain points]'}
 ${locationContextData ? '- Include location context: ' + locationContextData.substring(0, 80) + '...' : ''}
 ${contractEndLabel ? '- Reference contract timing: "With your contract ending ' + contractEndLabel + '..."' : ''}
@@ -2593,7 +2647,7 @@ CRITICAL QUALITY RULES:
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
 - EMAIL LENGTH: Keep total email body 90-130 words (research optimal range)
 - CTA LENGTH: CTAs should be 8-12 words maximum
-- VALUE PROP MUST: Include HOW we help AND WHAT results (e.g., "We help [industry] companies secure better rates before contracts expire. Clients typically save ${marketContext?.typicalClientSavings || '10-20%'}.")
+- VALUE PROP MUST: Include HOW we help AND WHAT results using CONDITIONAL language (e.g., "We help [industry] companies secure better rates before contracts expire. Early renewal often gives more optionality and can reduce renewal risk.") Do NOT assert specific percentages as facts unless you have verified data.
 - MOBILE OPTIMIZATION: Keep paragraphs short (2-3 sentences max), use clear CTA placement, optimize for mobile preview text (52% of emails opened on mobile)
 - LENGTH VALIDATION: If email exceeds 130 words, prioritize: greeting + opening hook + value prop + CTA only
 - COMPANY DATA USAGE: MUST use current supplier, rate, contract timing, recent achievements when available
@@ -2676,7 +2730,7 @@ ${generationMode === 'direct' ? `
   * Lead with specific insights and concrete value upfront
   * Use confident language: "Here's what I found..." "The reality is..."
   * Assertive but respectful: Present facts and ask direct questions
-  * Example CTA: "When does your contract renew? That timing difference is usually worth 10-20%."` : ''}
+  * Example CTA: "When does your contract renew? Early renewal often gives more optionality compared with waiting."` : ''}
 ${generationMode === 'balanced' ? `
   * Combine observation with specific value proposition
   * Professional but conversational: Ask a question about their situation, then "Here's what I've found..."
@@ -2894,7 +2948,7 @@ ${marketContext?.enabled ? `
 KEY CONTEXT:
 - Electricity rates rising ${marketContext.rateIncrease || '15-25%'} ${marketContext.marketInsights || 'due to data center demand'}
 - Companies with contracts ending ${marketContext.renewalYears || '2025-2026'} face higher renewal rates
-- Early renewals save ${marketContext.earlyRenewalSavings || '20-30%'} vs. waiting` : ''}`;
+- Early renewals often give more optionality and can reduce renewal risk compared with waiting` : ''}`;
 
   const outputFormat = `
 OUTPUT FORMAT (JSON):
@@ -2927,6 +2981,7 @@ GREETING (MANDATORY - MUST BE FIRST LINE):
 ✓ Greeting must be on its own line with blank line after
 
 CRITICAL QUALITY RULES:
+${selectedAngle && typeof selectedAngle === 'object' ? `- **USE THE SELECTED ANGLE**: This email MUST focus on "${selectedAngle.primaryMessage || selectedAngle.label}". ${selectedAngle.id === 'demand_efficiency' ? 'You CAN mention demand charges since this angle is about demand efficiency.' : 'DO NOT mention "demand charges" or "delivery charges" - focus on ' + (selectedAngle.primaryMessage || selectedAngle.label) + ' instead. For example: timing_strategy → contract renewal timing; cost_control → rising electricity costs/budget pressure; exemption_recovery → tax exemptions; consolidation → multi-location management.'}` : '- DO NOT default to "demand charges" - vary the pain points you mention.'}
 - OBSERVATION-BASED OPENING: MUST start with SPECIFIC observation about ${company || 'their company'}, NOT generic market facts
   ${marketContext?.enabled ? `
   - Market context is ENABLED - you may reference general market trends if relevant
@@ -3036,25 +3091,47 @@ VALUE PROPOSITION (1-2 sentences MINIMUM):
 - ALWAYS include a complete value proposition - never skip this field
 - THIS FIELD IS MANDATORY - NEVER LEAVE BLANK
 
-CTA (ASSERTIVE, NOT PERMISSION-BASED):
-${ctaPattern ? 'Use assertive question pattern: "' + ctaPattern.template + '"' : 'Create an assertive qualifying question'}
-- ASSERTIVE PATTERNS (use these - they assume conversation is happening):
-  * "When does your current contract renew? And how often do you typically review your rates?"
-  * "Question for you, are you locking in 6 months early or waiting closer to renewal?"
-  * "Out of curiosity, when you renew your contract, do you shop around or just renew what you had?"
-  * "Question for you, what's your renewal timeline? That timing difference is usually worth 10-20%."
-  * "Real question, does energy cost predictability matter for your budget planning?" (for finance roles)
-- FORBIDDEN PERMISSION-BASED PATTERNS (DO NOT USE):
-  * "Would you be open to a conversation?" (asking permission, weak)
-  * "Are you interested in learning more?" (permission-based)
-  * "Would you like to schedule a call?" (meeting request too early)
-  * "Open to discussing your energy setup?" (permission-based)
-- MUST: Assume the conversation is happening - don't ask for permission to talk
-- YES: Ask specific question about their contract, timing, or process
-- Role-specific CTAs:
-  * Finance roles (CFO, Controller): Focus on predictability, budget cycles, timing
-  * Operations roles: Focus on renewal timing, early lock-in, facility operations
-  * Executive roles: Focus on contract timing, strategic planning
+CTA (CREATIVE, CONTENT-ALIGNED, NOT PERMISSION-BASED):
+**CRITICAL**: Your CTA MUST naturally flow from the email content you just wrote above. It should feel like a natural continuation, not a disconnected ask.
+
+- **MUST match the opening hook**: Reference the problem/challenge you mentioned in the opening (e.g., if you mentioned "contract renewal timing", ask about their renewal timeline)
+- **MUST match the value proposition**: Reference the value/benefit you mentioned (e.g., if you mentioned "early renewal gives more optionality", ask about their renewal timing)
+- **MUST match the industry**: ${industryLower ? `For ${industryLower} companies, use industry-specific language and challenges` : 'Use industry-appropriate language'}
+- **MUST match the selected angle**: ${selectedAngle && typeof selectedAngle === 'object' ? `Focus on "${selectedAngle.primaryMessage || selectedAngle.label}" - use "${selectedAngle.openingTemplate || 'the angle\'s opening question'}" as inspiration, but be creative` : 'Use angle-appropriate language'}
+- **MUST match the role**: ${job ? `For ${job} roles, focus on role-specific concerns` : ''}
+
+**CREATIVE FREEDOM**:
+- You have FULL CREATIVE CONTROL to create a natural, conversational question
+- The angle and pattern are GUIDES, not templates - rephrase, combine, or create variations
+- Make it feel like a real person asking a genuine question, not a sales script
+- Examples of creative variations:
+  ${selectedAngle && typeof selectedAngle === 'object' && selectedAngle.id === 'timing_strategy' ? '  * "When does your contract expire? Early renewal often gives more optionality compared with waiting."' : ''}
+  ${selectedAngle && typeof selectedAngle === 'object' && selectedAngle.id === 'cost_control' ? '  * "How are you handling budget pressure from rising electricity costs?"' : ''}
+  ${selectedAngle && typeof selectedAngle === 'object' && selectedAngle.id === 'exemption_recovery' ? '  * "Are you currently claiming electricity exemptions? Most manufacturers leave $75K-$500K unclaimed."' : ''}
+  ${selectedAngle && typeof selectedAngle === 'object' && selectedAngle.id === 'consolidation' ? '  * "How many facilities are you managing energy for? Consolidating contracts typically means 10-20% savings."' : ''}
+  * If email talks about contract renewal → "When does your contract expire?"
+  * If email talks about rising costs → "How are you handling budget pressure from rising rates?"
+  * If email talks about multiple locations → "How many facilities are you managing energy for?"
+
+**ASSERTIVE PATTERNS** (use these styles - they assume conversation is happening):
+- Direct questions: "When does your current contract renew?"
+- Discovery questions: "How are you handling [specific challenge from email]?"
+- Timing questions: "Are you locking in 6 months early or waiting closer to renewal?"
+- Value questions: "Does [value from email] matter for your [role-specific concern]?"
+
+**FORBIDDEN PERMISSION-BASED PATTERNS** (DO NOT USE):
+- "Would you be open to a conversation?" (asking permission, weak)
+- "Are you interested in learning more?" (permission-based)
+- "Would you like to schedule a call?" (meeting request too early)
+- "Open to discussing your energy setup?" (permission-based)
+
+**Industry-specific CTA guidance**:
+${industryLower === 'manufacturing' ? '- Manufacturing: Focus on production efficiency, equipment reliability, energy-intensive operations (e.g., "How are you handling energy costs for your production floor?")' : ''}
+${industryLower === 'healthcare' ? '- Healthcare: Focus on budget constraints, patient care continuity (e.g., "How are rising electricity costs affecting your budget for patient care?")' : ''}
+${industryLower === 'retail' ? '- Retail: Focus on multiple locations, seasonal demand (e.g., "How are you managing energy costs across your locations?")' : ''}
+${industryLower === 'hospitality' ? '- Hospitality: Focus on guest comfort, operational costs (e.g., "How are you balancing guest comfort with energy costs?")' : ''}
+${industryLower === 'education' ? '- Education: Focus on facility maintenance, budget optimization (e.g., "How are you handling energy costs while maintaining facility quality?")' : ''}
+
 - Keep under 15 words
 - Complete sentence with proper punctuation (? or .)
 - MUST be complete sentence with proper ending punctuation
@@ -3513,6 +3590,26 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           sizeCategory,
           job: recipient?.title || recipient?.job || recipient?.role || null
         };
+        
+        // Log angle usage for debugging (selectedAngle is passed in req.body, not recipient)
+        const selectedAngleFromBody = req.body?.selectedAngle;
+        if (selectedAngleFromBody && typeof selectedAngleFromBody === 'object') {
+          const angleId = selectedAngleFromBody.id || null;
+          const angleFocus = selectedAngleFromBody.primaryMessage || selectedAngleFromBody.label || null;
+          const openingHookText = jsonData.opening_hook || '';
+          const hasDemandCharges = /(demand charges|delivery charges)/i.test(openingHookText);
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3530','message':'Angle usage in generated email','data':{angleId,angleFocus,company:recipient?.company,openingHookPreview:openingHookText.substring(0,150),hasDemandCharges,shouldHaveDemandCharges:angleId==='demand_efficiency'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
+        }
+        
+        // Log angle usage for debugging
+        if (selectedAngle && typeof selectedAngle === 'object') {
+          const angleId = selectedAngle.id || null;
+          const angleFocus = selectedAngle.primaryMessage || selectedAngle.label || null;
+          const openingHookText = jsonData.opening_hook || '';
+          const hasDemandCharges = /(demand charges|delivery charges)/i.test(openingHookText);
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3530','message':'Angle usage in generated email','data':{angleId,angleFocus,company:recipient?.company,openingHookPreview:openingHookText.substring(0,150),hasDemandCharges,shouldHaveDemandCharges:angleId==='demand_efficiency'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'K'})}).catch(()=>{});
+        }
+        
         // Helper function to sanitize percentages and fix "Default" references
         const sanitizePercentages = (text) => {
           if (!text) return text;

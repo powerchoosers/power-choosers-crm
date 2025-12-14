@@ -41,6 +41,21 @@ export function inferIndustryFromCompanyName(companyName) {
     return 'Nonprofit';
   }
 
+  // Education
+  if (/\b(school|university|college|education|educational|academy|institute)\b/i.test(name)) {
+    return 'Education';
+  }
+
+  // Construction
+  if (/\b(construction|contractor|builder|contracting)\b/i.test(name)) {
+    return 'Construction';
+  }
+
+  // Government / Public
+  if (/\b(government|municipality|municipal|public|state|county|federal|agency)\b/i.test(name)) {
+    return 'Government';
+  }
+
   return '';
 }
 
@@ -87,6 +102,21 @@ export function inferIndustryFromDescription(description) {
   // Nonprofit
   if (/\b(nonprofit|charity|foundation|mission|donation|volunteer)\b/i.test(desc)) {
     return 'Nonprofit';
+  }
+
+  // Education
+  if (/\b(school|university|college|education|student|learning|institution)\b/i.test(desc)) {
+    return 'Education';
+  }
+
+  // Construction
+  if (/\b(construction|contractor|builder|contracting|building)\b/i.test(desc)) {
+    return 'Construction';
+  }
+
+  // Government
+  if (/\b(government|municipality|public|state|county|federal|agency)\b/i.test(desc)) {
+    return 'Government';
   }
 
   return '';
