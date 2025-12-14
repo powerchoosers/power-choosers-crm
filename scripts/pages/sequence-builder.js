@@ -3804,20 +3804,34 @@ class FreeSequenceAutomation {
      * "Hello [contact_first_name],"
    - DO NOT use "Hi [contact_first_name] there," or add extra words
 
-2. TONE OPENER (OPTIONAL - VARIED STYLES)
-   - Start with ANY conversational opener that sounds natural and human (not templated)
-   - Choose from these styles (VARY across emails - don't repeat the same one):
-     * Soft curiosity: "Curious if you're seeing...", "Wonder if you've noticed...", "Wondering how you're handling..."
-     * Confused/disarmed: "I was looking at your site and wasn't sure...", "Not sure if you've already handled...", "Quick question that might be off base..."
-     * Peer/observational: "Usually when I talk to [role], they mention...", "Most teams I work with are dealing with...", "From what I'm seeing with [industry] companies..."
-     * Direct: "Are you currently handling [X]?", "Quick question, when you renew, do you...", "How are you managing [specific challenge]?"
-   - If the system provides a tone opener, you can use it OR choose a different conversational style
+2. TONE OPENER (MANDATORY - USE SYSTEM-PROVIDED STYLE)
+   - **FORBIDDEN**: "Wondering how [company] is handling..." is STRICTLY FORBIDDEN. This pattern is overused and sounds templated. DO NOT use it.
+   - **MANDATORY**: You MUST use the tone opener style provided by the system. Match its style:
+     * If toneOpener is "Real talk" → Start with "Real talk, " or "Real question, " (direct/honest style)
+     * If toneOpener is "Honestly" → Start with "Honestly, " or "Real question, " (honest style)
+     * If toneOpener is "Curious" → Start with "Curious if..." or "Curious, " (curiosity style)
+     * If toneOpener is "Are you currently handling" → Start with "Are you..." or "How are you..." (direct question style)
+     * If toneOpener is "Out of curiosity" → Start with "Out of curiosity, " or "Quick question, " (casual style)
+     * If toneOpener is "I've found that teams like you" → Start with "Most teams..." or "Usually when..." (peer observation style)
+     * If toneOpener is "Looking at your situation" → Start with "Looking at..." or "From what I'm seeing..." (observational style)
+     * If toneOpener is "From what I'm hearing" → Start with "From what I'm hearing..." or "Most teams..." (peer observation style)
+     * If toneOpener is "So here's the thing" → Start with "So here's the thing, " or "Real talk, " (direct style)
+     * If toneOpener is "Question for you" → Start with "Question for you, " or "Quick question, " (direct question style)
+     * If toneOpener is "How are you managing" → Start with "How are you..." or "Are you..." (direct question style)
+     * If toneOpener is "Not sure if you've already han" → Start with "Not sure if..." or "Quick question..." (disarmed style)
+   - **VARY YOUR OPENER STYLE**: Use different opener styles across emails:
+     * Direct questions: "Are you...", "How are you...", "When does..."
+     * Soft curiosity: "Curious if...", "Wonder if...", "Quick question..."
+     * Peer observations: "Most teams...", "Usually when...", "From what I'm seeing..."
+     * Honest/direct: "Real talk, ", "Honestly, ", "Real question, "
    - The key is: conversational, direct, sounds like a real person (not a template)
-   - Vary the opener across emails - do NOT repeat the same one
-   - Example structures:
+   - Vary the opener across emails - do NOT repeat "Wondering how..." every time
+   - Example structures (note: NO "Wondering how..."):
      * "Hi [contact_first_name],\nCurious if you're seeing [problem] with [situation]?"
      * "Hey [contact_first_name],\nHow are you handling [challenge] for [specific context]?"
      * "Hello [contact_first_name],\nMost teams I work with are dealing with [issue]. How is [contact_company] managing that?"
+     * "Hi [contact_first_name],\nReal talk, are you seeing [problem] with [situation]?"
+     * "Hey [contact_first_name],\nFrom what I'm hearing, [role]s at [company_industry] companies are dealing with [issue]. How is [contact_company] handling that?"
 
 3. PROBLEM-AWARENESS QUESTION (CRITICAL - SECOND SENTENCE)
    - Immediately after the opener, ask a question that connects a trigger event/recent activity to a potential negative business problem
@@ -3849,6 +3863,7 @@ class FreeSequenceAutomation {
    - FORBIDDEN: Do NOT ask for meetings, calls, or time blocks ("15 minutes", "schedule a call", "book a meeting")
 
 6. FORBIDDEN PHRASES (DO NOT USE - THESE TRIGGER SALES RESISTANCE)
+   - **"Wondering how [company] is handling..."** - STRICTLY FORBIDDEN (overused, templated)
    - "I saw", "I noticed", "I read", "I came across"
    - "I hope this email finds you well"
    - "Just following up"
@@ -3874,7 +3889,9 @@ class FreeSequenceAutomation {
    - 100-130 words max (scannable, not overwhelming)
    - 2-3 short paragraphs (break up visually)
    - Scannable on mobile (short lines, clear breaks)
-   - Must include at least TWO questions (problem-awareness + CTA)
+   - **MANDATORY**: Must include at least TWO questions (problem-awareness + CTA). The email will be rejected if missing either question.
+     * Problem-awareness question: MUST be in opening hook or second sentence (e.g., "Are you seeing higher costs?", "How are you handling [challenge]?", "When does your contract expire?")
+     * Low-friction CTA question: MUST be at the end (e.g., "Is this on your radar?", "Have you already handled this?", "When does your contract expire?")
 
 10. PERSONALIZATION
    - Include [contact_first_name] naturally in randomized greeting
@@ -3913,10 +3930,13 @@ CRITICAL ANGLE ROTATION RULE:
 NEPQ STRUCTURE FOR FOLLOW-UPS:
 1. GREETING (RANDOMIZE): Use "Hi [contact_first_name]," OR "Hey [contact_first_name]," OR "Hello [contact_first_name],"
 
-2. TONE OPENER (OPTIONAL FOR FOLLOW-UPS - SYSTEM MAY PROVIDE):
+2. TONE OPENER (MANDATORY - USE SYSTEM-PROVIDED STYLE):
+   - **FORBIDDEN**: "Wondering how [company] is handling..." is STRICTLY FORBIDDEN. This pattern is overused and sounds templated.
+   - **MANDATORY**: You MUST use the tone opener style provided by the system (same mapping as Email 1)
    - If system provides tone opener, use it as first words after greeting
    - If no tone opener provided, use natural transition: "On that [previous angle] question," or "Beyond [previous angle],"
    - Make it feel like conversation continuation, not a new cold email
+   - Vary the opener - do NOT repeat "Wondering how..." every time
 
 3. PROBLEM-AWARENESS QUESTION (CRITICAL):
    - Reference Email #1 naturally, then ask a question about the NEW angle
@@ -3942,6 +3962,7 @@ NEPQ STRUCTURE FOR FOLLOW-UPS:
    - Must be a simple yes/no or status check question
 
 6. FORBIDDEN PHRASES (DO NOT USE):
+   - **"Wondering how [company] is handling..."** - STRICTLY FORBIDDEN (overused, templated)
    - "I saw", "I noticed", "I read", "I came across"
    - "I hope this email finds you well"
    - "Just following up" or "Just checking in"
@@ -3955,7 +3976,9 @@ NEPQ STRUCTURE FOR FOLLOW-UPS:
    - Will be different from Email 1
 
 KEY REQUIREMENTS:
-- Must include at least TWO questions (problem-awareness + CTA)
+- **MANDATORY**: Must include at least TWO questions (problem-awareness + CTA). The email will be rejected if missing either question.
+  * Problem-awareness question: MUST be in opening hook or second sentence
+  * Low-friction CTA question: MUST be at the end
 - SHORTER: 70-100 words
 - NEW ANGLE: Must use different angle than Email 1
 - CONVERSATION CONTINUATION: Feels like ongoing dialogue, not cold email
@@ -3991,9 +4014,12 @@ CRITICAL ANGLE ROTATION RULE:
 NEPQ STRUCTURE FOR FINAL FOLLOW-UP:
 1. GREETING (RANDOMIZE): Use "Hi [contact_first_name]," OR "Hey [contact_first_name]," OR "Hello [contact_first_name],"
 
-2. TONE OPENER (OPTIONAL - SYSTEM MAY PROVIDE):
+2. TONE OPENER (MANDATORY - USE SYSTEM-PROVIDED STYLE):
+   - **FORBIDDEN**: "Wondering how [company] is handling..." is STRICTLY FORBIDDEN. This pattern is overused and sounds templated.
+   - **MANDATORY**: You MUST use the tone opener style provided by the system (same mapping as Email 1)
    - If system provides tone opener, use it as first words after greeting
    - If no tone opener, use natural urgency transition: "One last thought," or "Final note,"
+   - Vary the opener - do NOT repeat "Wondering how..." every time
 
 3. URGENCY QUESTION (PROBLEM-AWARENESS):
    - Create urgency around timing (rate lock windows, renewal deadlines) through a QUESTION
@@ -4017,6 +4043,7 @@ NEPQ STRUCTURE FOR FINAL FOLLOW-UP:
    - Alternative: "Is this a priority for this quarter, or something to revisit later?"
 
 6. FORBIDDEN PHRASES (DO NOT USE):
+   - **"Wondering how [company] is handling..."** - STRICTLY FORBIDDEN (overused, templated)
    - "I saw", "I noticed", "I read", "I came across"
    - "I hope this email finds you well"
    - "Just following up" or "Just checking in" or "Just wanted to follow up again"
@@ -4030,7 +4057,9 @@ NEPQ STRUCTURE FOR FINAL FOLLOW-UP:
    - Will be different from Emails 1-2
 
 KEY REQUIREMENTS:
-- Must include at least TWO questions (urgency/problem-awareness + CTA)
+- **MANDATORY**: Must include at least TWO questions (urgency/problem-awareness + CTA). The email will be rejected if missing either question.
+  * Problem-awareness question: MUST be in opening hook or second sentence
+  * Low-friction CTA question: MUST be at the end
 - SHORTEST: 60-80 words
 - NEW ANGLE: Must use different angle than Emails 1-2
 - URGENCY: Reference timing windows, deadlines, market conditions
