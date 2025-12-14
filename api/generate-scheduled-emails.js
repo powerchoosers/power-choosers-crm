@@ -2050,8 +2050,30 @@ export default async function handler(req, res) {
 
         // CRITICAL: Validate generated content before saving
         // Detect malformed AI generations that should not be sent
+        
+        // Calculate word count for improvement verification
+        const calculateWordCount = (text) => {
+          if (!text) return 0;
+          const cleanText = text.replace(/<[^>]+>/g, '').replace(/\n/g, ' ').trim();
+          return cleanText.split(/\s+/).filter(w => w.length > 0).length;
+        };
+        const bodyWordCount = calculateWordCount(generatedContent.text);
+        const hasContractUrgency = generatedContent.text?.toLowerCase().includes('contract') && 
+          (generatedContent.text?.toLowerCase().includes('expire') || 
+           generatedContent.text?.toLowerCase().includes('renewal') ||
+           generatedContent.text?.toLowerCase().includes('months'));
+        const hasDynamicSavings = /(8-12%|10-15%|12-18%|12-20%|15-25%|8-15%)/.test(generatedContent.text || '');
+        const hasAngleValueProp = selectedAngle?.id && generatedContent.text?.toLowerCase().includes(
+          selectedAngle.id === 'timing_strategy' ? 'early' :
+          selectedAngle.id === 'exemption_recovery' ? 'exemption' :
+          selectedAngle.id === 'consolidation' ? 'consolidat' :
+          selectedAngle.id === 'demand_efficiency' ? 'consumption' :
+          selectedAngle.id === 'cost_control' ? 'volatility' :
+          selectedAngle.id === 'operational_simplicity' ? 'simplif' : ''
+        );
+        
         // #region agent log
-        const logData11 = {location:'generate-scheduled-emails.js:1666',message:'Before content validation',data:{htmlLength:generatedContent.html?.length||0,textLength:generatedContent.text?.length||0,subject:generatedContent.subject?.substring(0,50)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
+        const logData11 = {location:'generate-scheduled-emails.js:1666',message:'Before content validation',data:{htmlLength:generatedContent.html?.length||0,textLength:generatedContent.text?.length||0,bodyWordCount:bodyWordCount,subject:generatedContent.subject?.substring(0,50)||null,hasContractUrgency:hasContractUrgency,hasDynamicSavings:hasDynamicSavings,hasAngleValueProp:hasAngleValueProp,angleId:selectedAngle?.id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
         debugLog(logData11);
         // #endregion
         
