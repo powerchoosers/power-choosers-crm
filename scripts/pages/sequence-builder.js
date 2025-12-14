@@ -3811,7 +3811,7 @@ class FreeSequenceAutomation {
      * Direct questions: "Are you...", "How are you...", "When does...", "What's your approach to..."
      * Soft curiosity: "Curious if...", "Wonder if...", "Quick question..."
      * Peer observations: "Most teams...", "Usually when...", "From what I'm seeing...", "I've found that..."
-     * Honest/direct: "Real talk, ", "Honestly, ", "So here's the thing, "
+     * Honest/direct: "Honestly, ", "So here's the thing, " (REMOVED "Real talk" - not professional enough for corporate America)
      * Disarmed/confused: "Not sure if...", "Quick question that might be off base..."
    - **NATURALNESS OVER MATCHING**: The goal is natural, human-sounding openers that vary across emails. Don't force-match the tone opener if a different natural phrasing works better.
    - The key is: conversational, direct, sounds like a real person (not a template)
@@ -3820,7 +3820,7 @@ class FreeSequenceAutomation {
      * "Hi [contact_first_name],\nCurious if you're seeing [problem] with [situation]?"
      * "Hey [contact_first_name],\nHow are you handling [challenge] for [specific context]?"
      * "Hello [contact_first_name],\nMost teams I work with are dealing with [issue]. How is [contact_company] managing that?"
-     * "Hi [contact_first_name],\nReal talk, are you seeing [problem] with [situation]?"
+     * "Hi [contact_first_name],\nHonestly, are you seeing [problem] with [situation]?"
      * "Hey [contact_first_name],\nFrom what I'm hearing, [role]s at [company_industry] companies are dealing with [issue]. How is [contact_company] handling that?"
 
 3. PROBLEM-AWARENESS QUESTION (CRITICAL - SECOND SENTENCE)
