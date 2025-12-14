@@ -446,7 +446,69 @@ async function generatePreviewEmail(emailData) {
         const cleanedGreeting = enforceFirstNameOnly(jsonData.greeting);
         parts.push(cleanedGreeting);
       }
-      if (jsonData.paragraph1) parts.push(jsonData.paragraph1);
+      
+      // CRITICAL: Replace "Wondering how..." in paragraph1 if present (preview path)
+      let paragraph1 = jsonData.paragraph1 || '';
+      if (paragraph1 && toneOpener) {
+        const paragraph1Lower = paragraph1.toLowerCase().trim();
+        const hasWonderingHow = /^wondering how/i.test(paragraph1Lower);
+        
+        if (hasWonderingHow) {
+          // Replace "Wondering how..." with tone opener style
+          logger.warn('[Validation] "Wondering how..." detected in paragraph1 (preview), replacing with tone opener style:', toneOpener);
+          
+          // Extract the question part after "Wondering how [company] is handling..."
+          const wonderingMatch = paragraph1.match(/^wondering how [^?]+\?/i);
+          const questionPart = wonderingMatch ? wonderingMatch[0].replace(/^wondering how /i, '') : '';
+          
+          // Convert tone opener to natural opener
+          let naturalOpener = '';
+          const toneOpenerLower = toneOpener.toLowerCase();
+          if (toneOpenerLower.includes('real talk')) {
+            naturalOpener = 'Real talk, ';
+          } else if (toneOpenerLower.includes('honestly')) {
+            naturalOpener = 'Honestly, ';
+          } else if (toneOpenerLower.includes('curious')) {
+            naturalOpener = 'Curious if ';
+          } else if (toneOpenerLower.includes('are you') || toneOpenerLower.includes('how are you')) {
+            naturalOpener = questionPart ? 'Are you ' + questionPart.replace(/^[^ ]+ /, '') : 'Are you handling ';
+          } else if (toneOpenerLower.includes('out of curiosity')) {
+            naturalOpener = 'Out of curiosity, ';
+          } else if (toneOpenerLower.includes('question for you')) {
+            naturalOpener = 'Question for you, ';
+          } else if (toneOpenerLower.includes('most teams') || toneOpenerLower.includes('usually')) {
+            naturalOpener = 'Most teams ';
+          } else if (toneOpenerLower.includes('from what')) {
+            naturalOpener = 'From what I\'m hearing, ';
+          } else if (toneOpenerLower.includes('looking at')) {
+            naturalOpener = 'Looking at your situation, ';
+          } else if (toneOpenerLower.includes('so here')) {
+            naturalOpener = 'So here\'s the thing, ';
+          } else if (toneOpenerLower.includes('not sure')) {
+            naturalOpener = 'Not sure if ';
+          } else if (toneOpenerLower.includes('ive found') || toneOpenerLower.includes('teams like')) {
+            naturalOpener = 'Most teams ';
+          } else {
+            naturalOpener = 'Curious if ';
+          }
+          
+          // Rebuild paragraph1 with natural opener
+          if (questionPart) {
+            paragraph1 = naturalOpener + questionPart;
+          } else {
+            // Fallback: use tone opener directly
+            const restOfParagraph = paragraph1.replace(/^wondering how [^?]+\?/i, '').trim();
+            paragraph1 = naturalOpener + restOfParagraph;
+          }
+          
+          // #region agent log
+          const logDataReplace = {location:'generate-scheduled-emails.js:449',message:'Wondering how replacement applied (preview standard mode)','data':{originalPreview:jsonData.paragraph1?.substring(0,100)||'',replacedWith:naturalOpener,toneOpener,paragraph1Preview:paragraph1.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'};
+          debugLog(logDataReplace);
+          // #endregion
+        }
+      }
+      
+      if (paragraph1) parts.push(paragraph1);
       if (jsonData.paragraph2) parts.push(jsonData.paragraph2);
       if (jsonData.paragraph3) parts.push(jsonData.paragraph3);
       if (jsonData.closing) {
@@ -456,6 +518,67 @@ async function generatePreviewEmail(emailData) {
         parts.push(`Best regards,\n${senderFirstName}`);
       }
       bodyText = parts.join('\n\n') || raw;
+      
+      // CRITICAL: Replace "Wondering how..." in bodyText if present (preview path, after joining)
+      if (bodyText && toneOpener) {
+        const bodyTextLower = bodyText.toLowerCase();
+        const hasWonderingHow = /^wondering how/i.test(bodyTextLower.trim()) || /\n\nwondering how/i.test(bodyTextLower);
+        
+        if (hasWonderingHow) {
+          // Replace "Wondering how..." with tone opener style
+          logger.warn('[Validation] "Wondering how..." detected in bodyText (preview), replacing with tone opener style:', toneOpener);
+          
+          // Extract the question part after "Wondering how [company] is handling..."
+          const wonderingMatch = bodyText.match(/(?:^|\n\n)wondering how [^?]+\?/i);
+          const questionPart = wonderingMatch ? wonderingMatch[0].replace(/(?:^|\n\n)wondering how /i, '') : '';
+          
+          // Convert tone opener to natural opener
+          let naturalOpener = '';
+          const toneOpenerLower = toneOpener.toLowerCase();
+          if (toneOpenerLower.includes('real talk')) {
+            naturalOpener = 'Real talk, ';
+          } else if (toneOpenerLower.includes('honestly')) {
+            naturalOpener = 'Honestly, ';
+          } else if (toneOpenerLower.includes('curious')) {
+            naturalOpener = 'Curious if ';
+          } else if (toneOpenerLower.includes('are you') || toneOpenerLower.includes('how are you')) {
+            naturalOpener = questionPart ? 'Are you ' + questionPart.replace(/^[^ ]+ /, '') : 'Are you handling ';
+          } else if (toneOpenerLower.includes('out of curiosity')) {
+            naturalOpener = 'Out of curiosity, ';
+          } else if (toneOpenerLower.includes('question for you')) {
+            naturalOpener = 'Question for you, ';
+          } else if (toneOpenerLower.includes('most teams') || toneOpenerLower.includes('usually')) {
+            naturalOpener = 'Most teams ';
+          } else if (toneOpenerLower.includes('from what')) {
+            naturalOpener = 'From what I\'m hearing, ';
+          } else if (toneOpenerLower.includes('looking at')) {
+            naturalOpener = 'Looking at your situation, ';
+          } else if (toneOpenerLower.includes('so here')) {
+            naturalOpener = 'So here\'s the thing, ';
+          } else if (toneOpenerLower.includes('not sure')) {
+            naturalOpener = 'Not sure if ';
+          } else if (toneOpenerLower.includes('ive found') || toneOpenerLower.includes('teams like')) {
+            naturalOpener = 'Most teams ';
+          } else {
+            naturalOpener = 'Curious if ';
+          }
+          
+          // Rebuild bodyText with natural opener
+          if (questionPart) {
+            bodyText = bodyText.replace(/(?:^|\n\n)wondering how [^?]+\?/i, (match) => {
+              return match.replace(/wondering how /i, naturalOpener);
+            });
+          } else {
+            // Fallback: replace the pattern directly
+            bodyText = bodyText.replace(/(?:^|\n\n)wondering how [^?]+\?/i, naturalOpener);
+          }
+          
+          // #region agent log
+          const logDataReplace = {location:'generate-scheduled-emails.js:520',message:'Wondering how replacement applied (preview after join)','data':{originalPreview:parts.join('\n\n').substring(0,100),replacedWith:naturalOpener,toneOpener,bodyTextPreview:bodyText.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'};
+          debugLog(logDataReplace);
+          // #endregion
+        }
+      }
     }
 
     if (isColdStep && selectedAngle) {
@@ -1529,7 +1652,69 @@ export default async function handler(req, res) {
               const cleanedGreeting = enforceFirstNameOnly(jsonData.greeting, contactData);
               parts.push(cleanedGreeting);
             }
-            if (jsonData.paragraph1) parts.push(jsonData.paragraph1);
+            
+            // CRITICAL: Replace "Wondering how..." in paragraph1 if present
+            let paragraph1 = jsonData.paragraph1 || '';
+            if (paragraph1 && toneOpener) {
+              const paragraph1Lower = paragraph1.toLowerCase().trim();
+              const hasWonderingHow = /^wondering how/i.test(paragraph1Lower);
+              
+              if (hasWonderingHow) {
+                // Replace "Wondering how..." with tone opener style
+                logger.warn('[Validation] "Wondering how..." detected in paragraph1, replacing with tone opener style:', toneOpener);
+                
+                // Extract the question part after "Wondering how [company] is handling..."
+                const wonderingMatch = paragraph1.match(/^wondering how [^?]+\?/i);
+                const questionPart = wonderingMatch ? wonderingMatch[0].replace(/^wondering how /i, '') : '';
+                
+                // Convert tone opener to natural opener
+                let naturalOpener = '';
+                const toneOpenerLower = toneOpener.toLowerCase();
+                if (toneOpenerLower.includes('real talk')) {
+                  naturalOpener = 'Real talk, ';
+                } else if (toneOpenerLower.includes('honestly')) {
+                  naturalOpener = 'Honestly, ';
+                } else if (toneOpenerLower.includes('curious')) {
+                  naturalOpener = 'Curious if ';
+                } else if (toneOpenerLower.includes('are you') || toneOpenerLower.includes('how are you')) {
+                  naturalOpener = questionPart ? 'Are you ' + questionPart.replace(/^[^ ]+ /, '') : 'Are you handling ';
+                } else if (toneOpenerLower.includes('out of curiosity')) {
+                  naturalOpener = 'Out of curiosity, ';
+                } else if (toneOpenerLower.includes('question for you')) {
+                  naturalOpener = 'Question for you, ';
+                } else if (toneOpenerLower.includes('most teams') || toneOpenerLower.includes('usually')) {
+                  naturalOpener = 'Most teams ';
+                } else if (toneOpenerLower.includes('from what')) {
+                  naturalOpener = 'From what I\'m hearing, ';
+                } else if (toneOpenerLower.includes('looking at')) {
+                  naturalOpener = 'Looking at your situation, ';
+                } else if (toneOpenerLower.includes('so here')) {
+                  naturalOpener = 'So here\'s the thing, ';
+                } else if (toneOpenerLower.includes('not sure')) {
+                  naturalOpener = 'Not sure if ';
+                } else if (toneOpenerLower.includes('ive found') || toneOpenerLower.includes('teams like')) {
+                  naturalOpener = 'Most teams ';
+                } else {
+                  naturalOpener = 'Curious if ';
+                }
+                
+                // Rebuild paragraph1 with natural opener
+                if (questionPart) {
+                  paragraph1 = naturalOpener + questionPart;
+                } else {
+                  // Fallback: use tone opener directly
+                  const restOfParagraph = paragraph1.replace(/^wondering how [^?]+\?/i, '').trim();
+                  paragraph1 = naturalOpener + restOfParagraph;
+                }
+                
+                // #region agent log
+                const logDataReplace = {location:'generate-scheduled-emails.js:1532',message:'Wondering how replacement applied (standard mode)','data':{originalPreview:jsonData.paragraph1?.substring(0,100)||'',replacedWith:naturalOpener,toneOpener,paragraph1Preview:paragraph1.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'};
+                debugLog(logDataReplace);
+                // #endregion
+              }
+            }
+            
+            if (paragraph1) parts.push(paragraph1);
             if (jsonData.paragraph2) parts.push(jsonData.paragraph2);
             if (jsonData.paragraph3) parts.push(jsonData.paragraph3);
             // Ensure closing is always added (Best regards, + sender name)
@@ -1541,12 +1726,134 @@ export default async function handler(req, res) {
               parts.push(`Best regards,\n${senderFirstName}`);
             }
             bodyText = parts.join('\n\n') || raw;
+            
+            // CRITICAL: Replace "Wondering how..." in bodyText if present (scheduled path, after joining)
+            if (bodyText && toneOpener) {
+              const bodyTextLower = bodyText.toLowerCase();
+              const hasWonderingHow = /^wondering how/i.test(bodyTextLower.trim()) || /\n\nwondering how/i.test(bodyTextLower);
+              
+              if (hasWonderingHow) {
+                // Replace "Wondering how..." with tone opener style
+                logger.warn('[Validation] "Wondering how..." detected in bodyText (scheduled), replacing with tone opener style:', toneOpener);
+                
+                // Extract the question part after "Wondering how [company] is handling..."
+                const wonderingMatch = bodyText.match(/(?:^|\n\n)wondering how [^?]+\?/i);
+                const questionPart = wonderingMatch ? wonderingMatch[0].replace(/(?:^|\n\n)wondering how /i, '') : '';
+                
+                // Convert tone opener to natural opener
+                let naturalOpener = '';
+                const toneOpenerLower = toneOpener.toLowerCase();
+                if (toneOpenerLower.includes('real talk')) {
+                  naturalOpener = 'Real talk, ';
+                } else if (toneOpenerLower.includes('honestly')) {
+                  naturalOpener = 'Honestly, ';
+                } else if (toneOpenerLower.includes('curious')) {
+                  naturalOpener = 'Curious if ';
+                } else if (toneOpenerLower.includes('are you') || toneOpenerLower.includes('how are you')) {
+                  naturalOpener = questionPart ? 'Are you ' + questionPart.replace(/^[^ ]+ /, '') : 'Are you handling ';
+                } else if (toneOpenerLower.includes('out of curiosity')) {
+                  naturalOpener = 'Out of curiosity, ';
+                } else if (toneOpenerLower.includes('question for you')) {
+                  naturalOpener = 'Question for you, ';
+                } else if (toneOpenerLower.includes('most teams') || toneOpenerLower.includes('usually')) {
+                  naturalOpener = 'Most teams ';
+                } else if (toneOpenerLower.includes('from what')) {
+                  naturalOpener = 'From what I\'m hearing, ';
+                } else if (toneOpenerLower.includes('looking at')) {
+                  naturalOpener = 'Looking at your situation, ';
+                } else if (toneOpenerLower.includes('so here')) {
+                  naturalOpener = 'So here\'s the thing, ';
+                } else if (toneOpenerLower.includes('not sure')) {
+                  naturalOpener = 'Not sure if ';
+                } else if (toneOpenerLower.includes('ive found') || toneOpenerLower.includes('teams like')) {
+                  naturalOpener = 'Most teams ';
+                } else {
+                  naturalOpener = 'Curious if ';
+                }
+                
+                // Rebuild bodyText with natural opener
+                if (questionPart) {
+                  bodyText = bodyText.replace(/(?:^|\n\n)wondering how [^?]+\?/i, (match) => {
+                    return match.replace(/wondering how /i, naturalOpener);
+                  });
+                } else {
+                  // Fallback: replace the pattern directly
+                  bodyText = bodyText.replace(/(?:^|\n\n)wondering how [^?]+\?/i, naturalOpener);
+                }
+                
+                // #region agent log
+                const logDataReplace = {location:'generate-scheduled-emails.js:1667',message:'Wondering how replacement applied (scheduled after join)','data':{originalPreview:parts.join('\n\n').substring(0,100),replacedWith:naturalOpener,toneOpener,bodyTextPreview:bodyText.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'};
+                debugLog(logDataReplace);
+                // #endregion
+              }
+            }
           }
           else {
             const looksLikeJson = /"subject"\s*:\s*/i.test(raw) || /"greeting"\s*:\s*/i.test(raw);
             if (looksLikeJson) {
               await markGenerationInvalid('Malformed JSON output (raw fields present)');
               return;
+            }
+            
+            // CRITICAL: Replace "Wondering how..." in raw text if present (standard mode, non-JSON)
+            if (bodyText && toneOpener) {
+              const bodyTextLower = bodyText.toLowerCase().trim();
+              const hasWonderingHow = /^wondering how/i.test(bodyTextLower) || /\n\nwondering how/i.test(bodyTextLower);
+              
+              if (hasWonderingHow) {
+                // Replace "Wondering how..." with tone opener style
+                logger.warn('[Validation] "Wondering how..." detected in raw body text, replacing with tone opener style:', toneOpener);
+                
+                // Extract the question part after "Wondering how [company] is handling..."
+                const wonderingMatch = bodyText.match(/(?:^|\n\n)wondering how [^?]+\?/i);
+                const questionPart = wonderingMatch ? wonderingMatch[0].replace(/(?:^|\n\n)wondering how /i, '') : '';
+                
+                // Convert tone opener to natural opener
+                let naturalOpener = '';
+                const toneOpenerLower = toneOpener.toLowerCase();
+                if (toneOpenerLower.includes('real talk')) {
+                  naturalOpener = 'Real talk, ';
+                } else if (toneOpenerLower.includes('honestly')) {
+                  naturalOpener = 'Honestly, ';
+                } else if (toneOpenerLower.includes('curious')) {
+                  naturalOpener = 'Curious if ';
+                } else if (toneOpenerLower.includes('are you') || toneOpenerLower.includes('how are you')) {
+                  naturalOpener = questionPart ? 'Are you ' + questionPart.replace(/^[^ ]+ /, '') : 'Are you handling ';
+                } else if (toneOpenerLower.includes('out of curiosity')) {
+                  naturalOpener = 'Out of curiosity, ';
+                } else if (toneOpenerLower.includes('question for you')) {
+                  naturalOpener = 'Question for you, ';
+                } else if (toneOpenerLower.includes('most teams') || toneOpenerLower.includes('usually')) {
+                  naturalOpener = 'Most teams ';
+                } else if (toneOpenerLower.includes('from what')) {
+                  naturalOpener = 'From what I\'m hearing, ';
+                } else if (toneOpenerLower.includes('looking at')) {
+                  naturalOpener = 'Looking at your situation, ';
+                } else if (toneOpenerLower.includes('so here')) {
+                  naturalOpener = 'So here\'s the thing, ';
+                } else if (toneOpenerLower.includes('not sure')) {
+                  naturalOpener = 'Not sure if ';
+                } else if (toneOpenerLower.includes('ive found') || toneOpenerLower.includes('teams like')) {
+                  naturalOpener = 'Most teams ';
+                } else {
+                  naturalOpener = 'Curious if ';
+                }
+                
+                // Rebuild bodyText with natural opener
+                if (questionPart) {
+                  bodyText = bodyText.replace(/(?:^|\n\n)wondering how [^?]+\?/i, (match) => {
+                    return match.replace(/wondering how /i, naturalOpener);
+                  });
+                } else {
+                  // Fallback: replace the pattern directly
+                  bodyText = bodyText.replace(/(?:^|\n\n)wondering how [^?]+\?/i, naturalOpener);
+                }
+                
+                // #region agent log
+                const logDataReplace = {location:'generate-scheduled-emails.js:1550',message:'Wondering how replacement applied (standard mode raw text)','data':{originalPreview:raw.substring(0,100),replacedWith:naturalOpener,toneOpener,bodyTextPreview:bodyText.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'};
+                debugLog(logDataReplace);
+                // #endregion
+              }
             }
           }
 
