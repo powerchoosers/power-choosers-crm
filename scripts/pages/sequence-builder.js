@@ -3806,16 +3806,17 @@ class FreeSequenceAutomation {
 
 2. TONE OPENER (CREATIVE FREEDOM WITH VARIETY)
    - **FORBIDDEN**: "Wondering how [company] is handling..." is STRICTLY FORBIDDEN. This pattern is overused and sounds templated. DO NOT use it.
-   - **CREATIVE FREEDOM**: You have full creative freedom to craft a natural, conversational opener. The tone opener provided by the system is INSPIRATION only - use it as a stylistic guide, not a template. Feel free to rephrase it naturally or use a different but similar style.
-   - **VARIETY IS CRITICAL**: Vary your opener style across emails. Mix between these approaches:
+   - **FORBIDDEN REPETITION**: Do NOT default to "Quick question" every time. This is overused and makes all emails sound the same. Vary your opener style.
+   - **USE THE TONE OPENER STYLE**: The tone opener provided by the system is INSPIRATION - use it as a stylistic guide and try to match its style, not ignore it. Don't default to "Quick question" when a different tone opener is provided.
+   - **VARIETY IS CRITICAL**: Vary your opener style across emails. Mix between these approaches (DO NOT use "Quick question" repeatedly):
      * Direct questions: "Are you...", "How are you...", "When does...", "What's your approach to..."
-     * Soft curiosity: "Curious if...", "Wonder if...", "Quick question..."
-     * Peer observations: "Most teams...", "Usually when...", "From what I'm seeing...", "I've found that..."
+     * Soft curiosity: "Curious if...", "Wonder if...", "Curious, " (use "Quick question" sparingly - it's overused)
+     * Peer observations: "Most teams...", "Usually when...", "From what I'm seeing...", "I've found that...", "Most people I talk to..."
      * Honest/direct: "Honestly, ", "So here's the thing, " (REMOVED "Real talk" - not professional enough for corporate America)
-     * Disarmed/confused: "Not sure if...", "Quick question that might be off base..."
-   - **NATURALNESS OVER MATCHING**: The goal is natural, human-sounding openers that vary across emails. Don't force-match the tone opener if a different natural phrasing works better.
+     * Disarmed/confused: "Not sure if...", "Quick question that might be off base..." (only this specific variation, not generic "Quick question")
+   - **NATURALNESS OVER MATCHING**: The goal is natural, human-sounding openers that vary across emails. Use the tone opener style as your guide, but don't force-match it if a different natural phrasing works better. Just don't default to "Quick question".
    - The key is: conversational, direct, sounds like a real person (not a template)
-   - Vary the opener across emails - do NOT repeat the same pattern every time
+   - Vary the opener across emails - do NOT repeat "Quick question" or any other opener pattern every time
    - Example structures (note: NO "Wondering how..."):
      * "Hi [contact_first_name],\nCurious if you're seeing [problem] with [situation]?"
      * "Hey [contact_first_name],\nHow are you handling [challenge] for [specific context]?"
