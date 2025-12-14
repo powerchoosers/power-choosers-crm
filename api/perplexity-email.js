@@ -2415,20 +2415,21 @@ ${angleValue ? '- Primary value proposition: "' + angleValue + '"' : ''}
 **OPENING HOOK - CREATIVE FREEDOM WITH VARIETY**:
 - **CRITICAL: NEVER use em dashes (—) or en dashes (–) in the opening hook. Use commas or natural flow.**
 - **FORBIDDEN OPENER**: "Wondering how [company] is handling..." is STRICTLY FORBIDDEN. This pattern is overused and sounds templated.
-- **CREATIVE FREEDOM**: You have full creative freedom to craft a natural, conversational opener. The tone opener "${toneOpener}" is provided as INSPIRATION only - use it as a stylistic guide, not a template.
-- **VARIETY IS CRITICAL**: Vary your opener style across emails. Mix between these approaches:
+- **FORBIDDEN REPETITION**: Do NOT default to "Quick question" every time. This is overused and makes all emails sound the same. Vary your opener style.
+- **CREATIVE FREEDOM**: You have full creative freedom to craft a natural, conversational opener. The tone opener "${toneOpener}" is provided as INSPIRATION - use it as a stylistic guide and try to match its style, not ignore it.
+- **VARIETY IS CRITICAL**: Vary your opener style across emails. Mix between these approaches (DO NOT use "Quick question" repeatedly):
   * **Direct questions**: "Are you...", "How are you...", "When does...", "What's your approach to..."
-  * **Soft curiosity**: "Curious if...", "Wonder if...", "Quick question..."
-  * **Peer observations**: "Most teams...", "Usually when...", "From what I'm seeing...", "I've found that..."
-  * **Honest/direct**: "Honestly, ", "So here's the thing, " (REMOVED "Real talk" - not professional enough for corporate America)
-  * **Disarmed/confused**: "Not sure if...", "Quick question that might be off base..."
-- **STYLISTIC INSPIRATION**: The tone opener "${toneOpener}" suggests a ${toneOpener.toLowerCase().includes('curious') ? 'curiosity' : toneOpener.toLowerCase().includes('honestly') ? 'direct/honest' : toneOpener.toLowerCase().includes('most') || toneOpener.toLowerCase().includes('teams') ? 'peer observation' : toneOpener.toLowerCase().includes('question') ? 'direct question' : 'conversational'} style. Feel free to rephrase it naturally or use a different but similar style.
-- **NATURALNESS OVER MATCHING**: The goal is natural, human-sounding openers that vary across emails. Don't force-match the tone opener if a different natural phrasing works better.
+  * **Soft curiosity**: "Curious if...", "Wonder if...", "Curious, " (use "Quick question" sparingly - it's overused)
+  * **Peer observations**: "Most teams...", "Usually when...", "From what I'm seeing...", "I've found that...", "Most people I talk to..."
+  * **Honest/direct**: "Honestly, ", "So here's the thing, "
+  * **Disarmed/confused**: "Not sure if...", "Quick question that might be off base..." (only use this specific variation, not generic "Quick question")
+- **USE THE TONE OPENER STYLE**: The tone opener "${toneOpener}" suggests a ${toneOpener.toLowerCase().includes('curious') ? 'curiosity' : toneOpener.toLowerCase().includes('honestly') ? 'direct/honest' : toneOpener.toLowerCase().includes('most') || toneOpener.toLowerCase().includes('teams') || toneOpener.toLowerCase().includes('people') ? 'peer observation' : toneOpener.toLowerCase().includes('question') ? 'direct question' : toneOpener.toLowerCase().includes('so here') ? 'direct/honest' : 'conversational'} style. Try to match this style rather than defaulting to "Quick question".
+- **NATURALNESS OVER MATCHING**: The goal is natural, human-sounding openers that vary across emails. Don't force-match the tone opener if a different natural phrasing works better, but also don't ignore it and default to "Quick question".
 - The opener must:
   1. Sound like a real person (not a template)
   2. Open with a genuine question or curiosity (not a statement)
   3. Avoid salesy language ("I noticed", "I saw", "Hope this finds you")
-  4. Vary from previous emails - don't repeat the same opener pattern
+  4. Vary from previous emails - don't repeat "Quick question" or any other opener pattern
 - The opener should go immediately after the greeting with proper paragraph spacing`
       : '';
 
@@ -2513,21 +2514,14 @@ Generate text for these fields:
 - opening_hook: **CREATIVE OPENER - VARY YOUR STYLE** (toneOpener "${toneOpener}" is stylistic inspiration only)
   **FORBIDDEN**: "Wondering how [company] is handling..." is STRICTLY FORBIDDEN. This pattern is overused and will be rejected.
   **CREATIVE FREEDOM**: You have full creative freedom to craft a natural, conversational opener. The tone opener "${toneOpener}" is provided as INSPIRATION - use it as a stylistic guide, not a template. Feel free to rephrase it naturally or use a different but similar style.
-  **VARIETY IS CRITICAL**: Vary your opener style across emails. Mix between:
-  * (REMOVED "Real talk" - not professional enough for corporate America)
-  * If toneOpener is "Honestly" → Start with "Honestly, " or "Real question, "
-  * If toneOpener is "Curious" → Start with "Curious if..." or "Curious, "
-  * If toneOpener is "Are you currently handling" → Start with "Are you..." or "How are you..."
-  * If toneOpener is "Out of curiosity" → Start with "Out of curiosity, " or "Quick question, "
-  * If toneOpener is "I've found that teams like you" → Start with "Most teams..." or "Usually when..."
-  * If toneOpener is "Looking at your situation" → Start with "Looking at..." or "From what I'm seeing..."
-  * If toneOpener is "From what I'm hearing" → Start with "From what I'm hearing..." or "Most teams..."
-  * If toneOpener is "So here's the thing" → Start with "So here's the thing, " or "Honestly, "
-  * If toneOpener is "Question for you" → Start with "Question for you, " or "Quick question, "
-  * If toneOpener is "How are you managing" → Start with "How are you..." or "Are you..."
-  * If toneOpener is "Not sure if you've already han" → Start with "Not sure if..." or "Quick question..."
+  **VARIETY IS CRITICAL**: Vary your opener style across emails. Mix between (DO NOT use "Quick question" repeatedly):
+  * Direct questions: "Are you...", "How are you...", "When does...", "What's your approach to..."
+  * Soft curiosity: "Curious if...", "Wonder if...", "Curious, " (use "Quick question" sparingly - it's overused)
+  * Peer observations: "Most teams...", "Usually when...", "From what I'm seeing...", "I've found that...", "Most people I talk to..."
+  * Honest/direct: "Honestly, ", "So here's the thing, "
+  * Disarmed/confused: "Not sure if...", "Quick question that might be off base..." (only this specific variation, not generic "Quick question")
   **FORBIDDEN**: "Wondering how..." is STRICTLY FORBIDDEN - it's overused and templated.
-  **NATURALNESS OVER MATCHING**: The goal is natural, human-sounding openers that vary across emails. Don't force-match the tone opener if a different natural phrasing works better. Then continue with problem awareness (1-2 sentences total). ${selectedAngle && typeof selectedAngle === 'object' ? `**CRITICAL - USE THE SELECTED ANGLE**: This email MUST focus on "${selectedAngle.primaryMessage || selectedAngle.label || 'the selected angle'}". ${selectedAngle.id === 'demand_efficiency' ? 'You CAN mention demand charges since this angle is about demand efficiency.' : 'DO NOT mention "demand charges" or "delivery charges" - this angle is NOT about demand. Focus on ' + (selectedAngle.primaryMessage || selectedAngle.label) + ' instead. For example, if angle is "timing_strategy", focus on contract renewal timing. If angle is "cost_control", focus on rising electricity costs or budget pressure. If angle is "exemption_recovery", focus on tax exemptions. If angle is "consolidation", focus on multi-location management.'} ${selectedAngle.openingTemplate ? 'Use this angle\'s opening pattern as inspiration: "' + selectedAngle.openingTemplate + '"' : ''}` : '**DO NOT default to "demand charges"** - vary the pain points you mention.'} ${accountDescription ? `**CRITICAL - DO NOT USE THE BUSINESS FOCUS TEXT**: The "Business Focus" (${accountDescription}) is ONLY for you to understand their business type. DO NOT copy it, quote it, or reference it directly in the email. Instead, use industry-specific language naturally. GOOD: "Most ${industryLower || 'manufacturing'} companies I work with..." or "Companies like ${company} typically..." BAD: "${accountDescription}..." or "As a ${accountDescription}..." or any variation that includes the business focus text.` : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
+  **NATURALNESS OVER MATCHING**: The goal is natural, human-sounding openers that vary across emails. Use the tone opener style as your guide, but don't force-match it if a different natural phrasing works better. Just don't default to "Quick question". Then continue with problem awareness (1-2 sentences total). ${selectedAngle && typeof selectedAngle === 'object' ? `**CRITICAL - USE THE SELECTED ANGLE**: This email MUST focus on "${selectedAngle.primaryMessage || selectedAngle.label || 'the selected angle'}". ${selectedAngle.id === 'demand_efficiency' ? 'You CAN mention demand charges since this angle is about demand efficiency.' : 'DO NOT mention "demand charges" or "delivery charges" - this angle is NOT about demand. Focus on ' + (selectedAngle.primaryMessage || selectedAngle.label) + ' instead. For example, if angle is "timing_strategy", focus on contract renewal timing. If angle is "cost_control", focus on rising electricity costs or budget pressure. If angle is "exemption_recovery", focus on tax exemptions. If angle is "consolidation", focus on multi-location management.'} ${selectedAngle.openingTemplate ? 'Use this angle\'s opening pattern as inspiration: "' + selectedAngle.openingTemplate + '"' : ''}` : '**DO NOT default to "demand charges"** - vary the pain points you mention.'} ${accountDescription ? `**CRITICAL - DO NOT USE THE BUSINESS FOCUS TEXT**: The "Business Focus" (${accountDescription}) is ONLY for you to understand their business type. DO NOT copy it, quote it, or reference it directly in the email. Instead, use industry-specific language naturally. GOOD: "Most ${industryLower || 'manufacturing'} companies I work with..." or "Companies like ${company} typically..." BAD: "${accountDescription}..." or "As a ${accountDescription}..." or any variation that includes the business focus text.` : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
   **CRITICAL PUNCTUATION RULE: NEVER use em dashes (—) or en dashes (–) in the opening_hook. Use commas or natural flow instead. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"), "Real question, " (NOT "Real question—"). This is mandatory - em dashes will be rejected.**
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
