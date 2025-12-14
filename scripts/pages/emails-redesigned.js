@@ -2410,7 +2410,7 @@
 
       const result = await response.json();
       console.log('[EmailsPage] Generated scheduled emails:', result);
-      
+
       // #region agent log - Frontend API response
       const frontendLog1 = {
         location: 'emails-redesigned.js:2411',
