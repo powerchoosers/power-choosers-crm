@@ -694,6 +694,19 @@ async function generatePreviewEmail(emailData) {
     tone_opener: toneOpener || null
   };
 
+  // #region agent log
+  // Extract the actual opener used in the generated email (standard mode)
+  const bodyAfterGreetingStandard = (generatedContent.text || '').replace(/^(Hi|Hey|Hello)\s+[^,\n]+,?\s*/i, '').trim();
+  const actualOpenerStandard = bodyAfterGreetingStandard.substring(0, 50);
+  const usesSelectedOpenerStandard = toneOpener ? actualOpenerStandard.toLowerCase().includes(toneOpener.toLowerCase().substring(0, 10)) : false;
+  const isCuriousIfStandard = /^curious if/i.test(bodyAfterGreetingStandard);
+  const isWonderingHowStandard = /^wondering how/i.test(bodyAfterGreetingStandard);
+  const isQuickQuestionStandard = /^quick question/i.test(bodyAfterGreetingStandard);
+  
+  const logDataStandard = {location:'generate-scheduled-emails.js:697',message:'Standard mode - Opener variety check',data:{subject:generatedContent.subject?.substring(0,50)||null,textLength:generatedContent.text?.length||0,textPreview:generatedContent.text?.substring(0,200)||'',selectedToneOpener:toneOpener?.substring(0,30)||null,actualOpener:actualOpenerStandard,usesSelectedOpener:usesSelectedOpenerStandard,isCuriousIf:isCuriousIfStandard,isWonderingHow:isWonderingHowStandard,isQuickQuestion:isQuickQuestionStandard,angleId:selectedAngle?.id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'};
+  debugLog(logDataStandard);
+  // #endregion
+
   // NEPQ + content validation
   const nepqValidation = validateNepqContent(
     generatedContent.subject,
@@ -1988,8 +2001,9 @@ export default async function handler(req, res) {
         const usesSelectedOpener = toneOpener ? actualOpener.toLowerCase().includes(toneOpener.toLowerCase().substring(0, 10)) : false;
         const isCuriousIf = /^curious if/i.test(bodyAfterGreeting);
         const isWonderingHow = /^wondering how/i.test(bodyAfterGreeting);
+        const isQuickQuestion = /^quick question/i.test(bodyAfterGreeting);
         
-        const logData7 = {location:'generate-scheduled-emails.js:1984',message:'Before NEPQ validation - Opener variety check',data:{subject:generatedContent.subject?.substring(0,50)||null,textLength:generatedContent.text?.length||0,textPreview:generatedContent.text?.substring(0,200)||'',selectedToneOpener:toneOpener?.substring(0,30)||null,actualOpener:actualOpener,usesSelectedOpener,isCuriousIf,isWonderingHow,angleId:selectedAngle?.id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'};
+        const logData7 = {location:'generate-scheduled-emails.js:1984',message:'Before NEPQ validation - Opener variety check',data:{subject:generatedContent.subject?.substring(0,50)||null,textLength:generatedContent.text?.length||0,textPreview:generatedContent.text?.substring(0,200)||'',selectedToneOpener:toneOpener?.substring(0,30)||null,actualOpener:actualOpener,usesSelectedOpener,isCuriousIf,isWonderingHow,isQuickQuestion,angleId:selectedAngle?.id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'};
         debugLog(logData7);
         // #endregion
         
