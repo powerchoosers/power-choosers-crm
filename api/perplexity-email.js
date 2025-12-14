@@ -3122,6 +3122,13 @@ IMPORTANT: The closing field must include a newline between "Best regards," and 
     const coldEmailRules = `
 EMAIL TYPE: Cold Email (Never Spoke Before)
 
+⚠️ CRITICAL WORD COUNT REQUIREMENT (MANDATORY - CHECK THIS FIRST):
+- Email body (greeting + opening + value prop + CTA, excluding closing): 50-90 words MAXIMUM
+- This is NOT a guideline - it is a HARD REQUIREMENT. Emails over 90 words will be rejected.
+- Count your words carefully. Keep it short. Do NOT write long paragraphs.
+- Scanability beats completeness. Use 1-sentence paragraphs where possible.
+- If you exceed 90 words, cut content - remove fluff, combine sentences, be more concise.
+
 GREETING (MANDATORY - MUST BE FIRST LINE):
 ✓ Start with "Hi ${firstName || 'there'},"
 ✓ NEVER skip the greeting
@@ -3189,22 +3196,25 @@ CONVERSATIONAL FLOW PATTERNS:
 ✗ BAD: "I hope this email finds you well..."
 ✗ BAD: "I'm reaching out because..."
 
-PARAGRAPH STRUCTURE (CRITICAL):
-Paragraph 1 (Opening Hook - 1-2 sentences):
+PARAGRAPH STRUCTURE (CRITICAL - MUST STAY UNDER 90 WORDS TOTAL):
+Paragraph 1 (Opening Hook - 1-2 sentences, ~15-25 words):
 - Industry-specific problem or market condition
 - Reference ${company} specifically
 - Use qualitative language (rising, increasing, higher) NOT percentages
 - NO statistics in opening hook
+- Keep it concise - this is part of your 90-word limit
 
-Paragraph 2 (Value Proposition - 2-3 sentences):
+Paragraph 2 (Value Proposition - 1-2 sentences, ~20-30 words):
 - How Power Choosers helps
 - SPECIFIC measurable value: "save 10-20%", "reduce costs by $X"
 - Include both HOW we help AND WHAT results
+- Be brief - you're running out of words
 
-Paragraph 3 (CTA - 1 sentence):
+Paragraph 3 (CTA - 1 sentence, ~8-12 words):
 - Qualifying question or soft ask
 - Under 12 words
 - Complete sentence with proper punctuation
+- Final reminder: TOTAL must be 50-90 words including greeting
 
 FORMATTING REQUIREMENTS:
 - Use EXACTLY TWO line breaks between each paragraph
@@ -3315,9 +3325,11 @@ ${suggestedSubject ? `SUGGESTED SUBJECT: "${suggestedSubject}" (use this pattern
 - NO numbers or percentages
 - Role-specific: Controllers/CFO = "budget question", Operations = "facility renewal timing"
 
-WORD COUNT TARGETS (CRITICAL):
+⚠️ WORD COUNT TARGETS (CRITICAL - REINFORCEMENT):
 - Email body (greeting + opening + value prop + CTA, excluding closing): 50-90 words MAXIMUM
-- This is NOT a guideline. Keep it short. Do NOT write long paragraphs.
+- This is a HARD REQUIREMENT - emails over 90 words will be rejected
+- Count your words before finishing. If over 90, cut content immediately.
+- Keep it short. Do NOT write long paragraphs.
 - Scanability beats completeness. Use 1-sentence paragraphs where possible.
 - TOTAL LENGTH: 60-90 words for body content (scannable, not overwhelming - 2-3 short paragraphs)
 CTA LENGTH: 8-15 words maximum, must be complete and assertive
