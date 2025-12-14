@@ -225,10 +225,12 @@ async function setPerplexityCache(cacheKey, result, cacheType = 'perplexity-rese
     }
 }
 
-async function researchCompanyInfo(companyName, industry) {
+async function researchCompanyInfo(companyName, industry, additionalContext = {}) {
   if (!companyName) return null;
   
-  const cacheKey = `${companyName}_${industry || ''}`;
+  // Build cache key with additional context to avoid confusion between similar company names
+  const contextKey = additionalContext.domain || additionalContext.location || '';
+  const cacheKey = `${companyName}_${industry || ''}_${contextKey}`;
   
   // Check Firestore cache first (persistent across restarts)
   const firestoreCache = await getPerplexityCache(cacheKey, 'company-research');
@@ -244,7 +246,33 @@ async function researchCompanyInfo(companyName, industry) {
   }
   
   try {
-    const researchPrompt = `Research ${companyName}${industry ? ', a ' + industry + ' company' : ''}.
+    // Build disambiguation context
+    const disambiguationParts = [];
+    if (additionalContext.domain) {
+      disambiguationParts.push(`website: ${additionalContext.domain}`);
+    }
+    if (additionalContext.location) {
+      disambiguationParts.push(`location: ${additionalContext.location}`);
+    }
+    if (additionalContext.accountDescription) {
+      // Use first 50 chars of description for disambiguation
+      const descPreview = additionalContext.accountDescription.substring(0, 50).trim();
+      if (descPreview) {
+        disambiguationParts.push(`description: ${descPreview}`);
+      }
+    }
+    const disambiguationContext = disambiguationParts.length > 0 
+      ? ` Additional context to distinguish this company: ${disambiguationParts.join(', ')}.` 
+      : '';
+    
+    // CRITICAL: Add explicit disambiguation for companies with similar names
+    const disambiguationWarning = companyName.toLowerCase().includes('meta') && !companyName.toLowerCase().includes('tech')
+      ? ' IMPORTANT: This is NOT Meta (Facebook/Meta Platforms). This is a different company. Do NOT confuse with Meta Platforms Inc. or Facebook.'
+      : companyName.toLowerCase().includes('meta') && companyName.toLowerCase().includes('tech')
+      ? ' IMPORTANT: This is Meta Tech Industries (a precision machine shop/manufacturing company), NOT Meta Platforms Inc. (Facebook). Do NOT confuse with Meta Platforms or Facebook.'
+      : '';
+    
+    const researchPrompt = `Research ${companyName}${industry ? ', a ' + industry + ' company' : ''}.${disambiguationContext}${disambiguationWarning}
 Provide a concise 2-paragraph description (2-3 sentences per paragraph) covering:
 - What they do and business focus
 - Facilities/operations, footprint, relevant energy context (usage intensity, locations, hours)
@@ -513,10 +541,12 @@ async function researchContactLinkedIn(linkedinUrl, contactName, companyName) {
   }
 }
 
-async function researchRecentCompanyActivity(companyName, industry, city, state) {
+async function researchRecentCompanyActivity(companyName, industry, city, state, additionalContext = {}) {
   if (!companyName) return null;
   
-  const cacheKey = `${companyName}_${industry || ''}_${city || ''}`;
+  // Build cache key with additional context to avoid confusion
+  const contextKey = additionalContext.domain || '';
+  const cacheKey = `${companyName}_${industry || ''}_${city || ''}_${state || ''}_${contextKey}`;
   
   // Check Firestore cache first
   const firestoreCache = await getPerplexityCache(cacheKey, 'recent-activity');
@@ -532,7 +562,14 @@ async function researchRecentCompanyActivity(companyName, industry, city, state)
   }
   
   try {
-    const activityPrompt = `Research recent news, announcements, or activity for ${companyName}${industry ? ', a ' + industry + ' company' : ''}${city && state ? ' in ' + city + ', ' + state : ''}.
+    // CRITICAL: Add explicit disambiguation for companies with similar names
+    const disambiguationWarning = companyName.toLowerCase().includes('meta') && !companyName.toLowerCase().includes('tech')
+      ? ' IMPORTANT: This is NOT Meta (Facebook/Meta Platforms). This is a different company. Do NOT confuse with Meta Platforms Inc. or Facebook.'
+      : companyName.toLowerCase().includes('meta') && companyName.toLowerCase().includes('tech')
+      ? ' IMPORTANT: This is Meta Tech Industries (a precision machine shop/manufacturing company), NOT Meta Platforms Inc. (Facebook). Do NOT confuse with Meta Platforms or Facebook.'
+      : '';
+    
+    const activityPrompt = `Research recent news, announcements, or activity for ${companyName}${industry ? ', a ' + industry + ' company' : ''}${city && state ? ' in ' + city + ', ' + state : ''}.${disambiguationWarning}
     Look for:
     - Recent expansion, new facilities, or growth announcements
     - Funding rounds, acquisitions, or major investments
@@ -2039,9 +2076,17 @@ async function buildSystemPrompt({
     
     const linkedinUrl = r.account?.linkedin || r.account?.linkedinUrl || null;
     const domain = r.account?.domain || r.account?.website || null;
+    const location = city && state ? `${city}, ${state}` : (city || state || '');
+    
+    // Pass additional context to help disambiguate similar company names
+    const additionalContext = {
+      domain: domain,
+      location: location,
+      accountDescription: accountDescription // Even if empty, pass it for consistency
+    };
     
     researchPromises.push(
-      researchCompanyInfo(company, industry).then(result => ({ type: 'company', data: result })),
+      researchCompanyInfo(company, industry, additionalContext).then(result => ({ type: 'company', data: result })),
       researchLinkedInCompany(linkedinUrl, company).then(result => ({ type: 'companyLinkedin', data: result })),
       scrapeCompanyWebsite(domain, company).then(result => ({ type: 'website', data: result }))
     );
@@ -2066,8 +2111,13 @@ async function buildSystemPrompt({
 
   // Recent company activity research
   if (company) {
+    const domain = r.account?.domain || r.account?.website || null;
+    const additionalContext = {
+      domain: domain,
+      accountDescription: accountDescription
+    };
     researchPromises.push(
-      researchRecentCompanyActivity(company, industry, city, state).then(result => ({ type: 'recentActivity', data: result }))
+      researchRecentCompanyActivity(company, industry, city, state, additionalContext).then(result => ({ type: 'recentActivity', data: result }))
     );
   }
 
@@ -2434,7 +2484,9 @@ ${nepqRules}
 
 ${conditionalRules}
 
-Use web search to personalize content about ${company || 'the recipient'}.`;
+Use web search to personalize content about ${company || 'the recipient'}. 
+
+**CRITICAL COMPANY NAME DISAMBIGUATION**: If the company name is "${company}", make absolutely sure you are researching and referencing the CORRECT company. Do NOT confuse companies with similar names (e.g., "Meta Tech Industries" is a precision machine shop in Houston, NOT Meta Platforms/Facebook). Always verify you are referencing the correct company based on the industry, location, and business description provided.`;
 
     // Template-specific instructions
     const templateInstructions = {
