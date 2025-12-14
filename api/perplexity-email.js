@@ -662,14 +662,24 @@ function removeCitationBrackets(text) {
     .trim();
 }
 
-// Remove em dashes from opening hooks and replace with commas or natural flow
+// Remove em dashes and hyphens from opening hooks and replace with commas or natural flow
 function removeEmDashes(text) {
   if (!text) return text;
   return String(text)
     // Replace em dash (—) and en dash (–) at end of phrases with comma or nothing
     .replace(/(\w+)\s*[—–]\s+/g, '$1, ')  // "Curious—" → "Curious, "
     .replace(/(\w+)\s*[—–]$/g, '$1')      // "Curious—" at end → "Curious"
-    .replace(/\s*[—–]\s+/g, ', ');        // Any remaining dashes → comma
+    .replace(/\s*[—–]\s+/g, ', ')         // Any remaining dashes → comma
+    // Replace compound adjectives with hyphens (e.g., "higher-than-expected" → "higher than expected")
+    .replace(/(\w+)-(\w+)-(\w+)/g, '$1 $2 $3')  // "higher-than-expected" → "higher than expected"
+    .replace(/(\w+)-(\w+)/g, (match, p1, p2) => {
+      // Only replace if it's a compound adjective pattern, not regular hyphenated words
+      const compoundPatterns = ['higher-than', 'lower-than', 'more-than', 'less-than', 'better-than', 'worse-than', 'longer-than', 'shorter-than'];
+      if (compoundPatterns.some(p => match.toLowerCase().includes(p))) {
+        return `${p1} ${p2}`;
+      }
+      return match; // Keep other hyphens (e.g., "energy-intensive", "24/7")
+    });
 }
 
 // Industry/size-aware post-processor to avoid generic "your industry" and inaccurate size references
@@ -685,7 +695,11 @@ function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory,
     .replace(/\bI help Default\b/gi, 'I help companies')
     .replace(/\bhelp Default\b/gi, 'help companies')
     .replace(/\bfor Default\b/gi, 'for companies')
-    .replace(/\bwith Default\b/gi, 'with companies');
+    .replace(/\bwith Default\b/gi, 'with companies')
+    .replace(/\bin Default\b/gi, '')  // Remove "in Default" entirely
+    .replace(/\bDefault\b/gi, '')      // Remove standalone "Default" word
+    .replace(/\s+/g, ' ')              // Clean up extra spaces
+    .trim();
 
   // Replace generic "your industry" with specific industry when available
   if (industry && industry !== 'Default' && /your industry/i.test(out)) {
@@ -1964,6 +1978,12 @@ async function buildSystemPrompt({
   const job = r.title || r.job || r.role || '';
   // Normalize industry using shared detection helpers when missing
   let industry = r.industry || '';
+  // Filter out "Default" - treat it as empty/unknown industry
+  if (industry === 'Default' || industry === 'default') {
+    industry = '';
+  }
+  // Normalize industry to lowercase for consistent usage in prompts (avoid "Manufacturing" vs "manufacturing")
+  const industryLower = industry ? industry.toLowerCase() : '';
   const energy = r.energy || {};
   const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 1000);
   const notes = [r.notes, r.account?.notes].filter(Boolean).join('\n').slice(0, 500);
@@ -2538,10 +2558,10 @@ ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevan
 ${industry ? '✓ Use industry context: Reference ' + industry + ' industry challenges naturally through questions' : ''}
 
 CONVERSATIONAL FLOW PATTERNS:
-✓ GOOD: "With ${company} operating in ${industry || '[industry]'}, how are you handling energy costs for facilities like yours?"
+✓ GOOD: "With ${company} operating in ${industryLower || '[industry]'}, how are you handling energy costs for facilities like yours?"
 ✓ GOOD: "Given your role as ${job || '[role]'}, are you dealing with ${roleContext?.painPoints[0] || '[pain point]'}? Here's what I've found..."
-✓ GOOD: "${industry || '[Industry]'} companies are facing ${industryContent?.painPoints[0] || '[specific challenge]'}. How is ${company || '[Company]'} handling this?"
-✓ GOOD: "Companies in ${industry || '[industry]'}" (not "your industry")
+✓ GOOD: "${industryLower ? industryLower.charAt(0).toUpperCase() + industryLower.slice(1) : '[Industry]'} companies are facing ${industryContent?.painPoints[0] || '[specific challenge]'}. How is ${company || '[Company]'} handling this?"
+✓ GOOD: "Companies in ${industryLower || '[industry]'}" (not "your industry")
 ✓ GOOD: "As ${job || '[role]'}" (not "As CEO of a small business")
 ✗ BAD: "I wanted to reach out about..."
 ✗ BAD: "I hope this email finds you well..."
@@ -2549,7 +2569,7 @@ CONVERSATIONAL FLOW PATTERNS:
 
 KNOWLEDGE DEMONSTRATION:
 - Reference specific operational details: ${accountDescription ? '"As ' + accountDescription.substring(0, 80) + '..."' : 'Company-specific details'}
-- Mention industry-specific challenges: ${industryContent ? industryContent.painPoints.join(', ') : 'Industry pain points'} (not generic "operational costs")
+- Mention industry-specific challenges: ${industryContent ? 'VARY the pain points you mention - do NOT always default to "load demand" or "delivery charges". Use different pain points from this list: ' + industryContent.painPoints.join(', ') + '. Examples: rising electricity costs, budget pressure, contract timing, rate volatility, bill complexity, renewal surprises. Mix it up - not every email should mention load/demand.' : 'Industry pain points - VARY them (not always load/demand)'} (not generic "operational costs")
 - Show understanding of their role's pain points: ${roleContext?.painPoints.join(', ') || '[role pain points]'}
 ${locationContextData ? '- Include location context: ' + locationContextData.substring(0, 80) + '...' : ''}
 ${contractEndLabel ? '- Reference contract timing: "With your contract ending ' + contractEndLabel + '..."' : ''}

@@ -17,16 +17,27 @@ function debugLog(data) {
 }
 
 // ========== EM DASH REMOVAL ==========
-// Remove em dashes from email content and replace with commas or natural flow
+// Remove em dashes and hyphens from email content and replace with commas or natural flow
 function removeEmDashes(text) {
   if (!text) return text;
   const before = String(text);
   const hasEmDash = /[—–]/.test(before);
+  const hasHyphens = /(\w+)-(\w+)-(\w+)/.test(before); // Compound adjectives like "higher-than-expected"
   const after = before
     // Replace em dash (—) and en dash (–) at end of phrases with comma or nothing
     .replace(/(\w+)\s*[—–]\s+/g, '$1, ')  // "Curious—" → "Curious, "
     .replace(/(\w+)\s*[—–]$/g, '$1')      // "Curious—" at end → "Curious"
-    .replace(/\s*[—–]\s+/g, ', ');        // Any remaining dashes → comma
+    .replace(/\s*[—–]\s+/g, ', ')         // Any remaining dashes → comma
+    // Replace compound adjectives with hyphens (e.g., "higher-than-expected" → "higher than expected")
+    .replace(/(\w+)-(\w+)-(\w+)/g, '$1 $2 $3')  // "higher-than-expected" → "higher than expected"
+    .replace(/(\w+)-(\w+)/g, (match, p1, p2) => {
+      // Only replace if it's a compound adjective pattern, not regular hyphenated words
+      const compoundPatterns = ['higher-than', 'lower-than', 'more-than', 'less-than', 'better-than', 'worse-than', 'longer-than', 'shorter-than'];
+      if (compoundPatterns.some(p => match.toLowerCase().includes(p))) {
+        return `${p1} ${p2}`;
+      }
+      return match; // Keep other hyphens (e.g., "energy-intensive", "24/7")
+    });
   
   // #region agent log
   if (hasEmDash) {
