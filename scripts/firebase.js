@@ -56,6 +56,35 @@
   try {
     if (window.firebase) {
       window.firebaseDB = window.firebase.firestore();
+      
+      // Enable Firebase persistence for offline caching and reduced Firestore reads
+      // This improves performance and reduces costs by caching data locally
+      try {
+        window.firebaseDB.enablePersistence()
+          .then(() => {
+            // Persistence enabled successfully - data will be cached locally
+            // console.log('[Firebase] Persistence enabled - faster loads and reduced costs');
+          })
+          .catch(err => {
+            // Handle common persistence errors gracefully
+            if (err.code === 'failed-precondition') {
+              // Multiple tabs open - only one tab can have persistence enabled
+              // This is expected behavior, not an error
+              // console.log('[Firebase] Persistence unavailable: Multiple tabs open (expected)');
+            } else if (err.code === 'unimplemented') {
+              // Browser doesn't support persistence (e.g., some mobile browsers)
+              // Falls back to network-only mode - still works fine
+              // console.log('[Firebase] Persistence not supported in this browser (falls back to network)');
+            } else {
+              // Other errors - log but don't break the app
+              console.warn('[Firebase] Persistence setup warning:', err.message);
+            }
+          });
+      } catch (e) {
+        // Fallback if enablePersistence itself throws (shouldn't happen, but be safe)
+        console.warn('[Firebase] Persistence initialization error:', e);
+      }
+      
       // Quick connectivity smoke test (non-blocking, with ownership filter for employees)
       try {
         const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
