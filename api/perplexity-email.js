@@ -2242,10 +2242,64 @@ async function buildSystemPrompt({
   
   // Determine role category for variant selection
   const roleCategory = !job ? 'default' :
-                      /ceo|president|owner|founder|executive|chief/i.test(job) ? 'ceo' :
+                      /ceo|president|owner|founder|executive|chief/i.test(job) ? 'executive' :
                       /finance|cfo|controller|accounting|treasurer/i.test(job) ? 'finance' :
                       /operations|facilities|logistics|maintenance|procurement/i.test(job) ? 'operations' :
                       'default';
+  
+  // Get dynamic savings range by industry + role
+  function getDynamicSavingsRange(industry, roleCategory) {
+    const SAVINGS_BY_INDUSTRY_ROLE = {
+      'Manufacturing': {
+        'Finance': '15-25%', // Budget-focused, high impact
+        'Operations': '12-20%', // Efficiency-focused
+        'Executive': '10-20%',
+        'Default': '12-20%'
+      },
+      'Retail': {
+        'Finance': '12-20%',
+        'Operations': '10-18%',
+        'Executive': '12-18%',
+        'Default': '10-18%'
+      },
+      'Healthcare': {
+        'Finance': '10-15%', // Constrained budgets
+        'Operations': '8-12%', // Uptime priority over cost
+        'Executive': '10-15%',
+        'Default': '10-15%'
+      },
+      'Nonprofit': {
+        'Finance': '8-15%', // Smaller margins but material
+        'Operations': '8-12%',
+        'Executive': '8-15%',
+        'Default': '8-15%'
+      },
+      'Hospitality': {
+        'Finance': '12-18%',
+        'Operations': '10-15%',
+        'Executive': '12-18%',
+        'Default': '12-18%'
+      },
+      'Education': {
+        'Finance': '10-15%',
+        'Operations': '8-12%',
+        'Executive': '10-15%',
+        'Default': '10-15%'
+      },
+      'Default': {
+        'Finance': '10-20%',
+        'Operations': '10-20%',
+        'Executive': '10-20%',
+        'Default': '10-20%'
+      }
+    };
+    
+    const industryKey = industry || 'Default';
+    const industryConfig = SAVINGS_BY_INDUSTRY_ROLE[industryKey] || SAVINGS_BY_INDUSTRY_ROLE.Default;
+    return industryConfig[roleCategory] || industryConfig.Default;
+  }
+  
+  const dynamicSavingsRange = getDynamicSavingsRange(industry, roleCategory);
   
   // Get email generation mode (random selection for variety)
   const generationMode = getRandomGenerationMode();
@@ -2314,6 +2368,15 @@ ENERGY DATA:
 ${energy.supplier ? '- Current Supplier: ' + energy.supplier : ''}
 ${energy.currentRate ? '- Current Rate: ' + energy.currentRate + '/kWh' : ''}
 ${contractEndLabel ? '- Contract Ends: ' + contractEndLabel : ''}
+${energy.contractEnd ? (() => {
+  const today = new Date();
+  const contractEndDate = new Date(energy.contractEnd);
+  const daysUntilExpiry = Math.floor((contractEndDate - today) / (1000 * 60 * 60 * 24));
+  const monthsUntilExpiry = Math.floor(daysUntilExpiry / 30);
+  const urgencyLevel = daysUntilExpiry < 60 ? 'CRITICAL' : daysUntilExpiry < 180 ? 'HIGH' : monthsUntilExpiry < 12 ? 'MEDIUM' : 'LOW';
+  const isIdealRenewalWindow = monthsUntilExpiry >= 4 && monthsUntilExpiry <= 8;
+  return `\n## CONTRACT RENEWAL CONTEXT (CRITICAL)\nTheir current contract ends ${contractEndLabel}. This is ~${monthsUntilExpiry} months away (${daysUntilExpiry} days). Urgency: ${urgencyLevel}.\n${isIdealRenewalWindow ? 'IDEAL renewal window (4-8 months out) - perfect timing for early renewal.' : 'Renewal Strategy: ' + (monthsUntilExpiry < 4 ? 'URGENT - emphasize cost lock-in before rate increases' : 'Reference timing advantage and planning benefits') + '.'}\nKEY MESSAGE: ${monthsUntilExpiry < 4 ? 'Emphasize cost lock-in and avoiding rate increases.' : monthsUntilExpiry <= 8 ? 'Emphasize early renewal benefits and better terms.' : 'Emphasize planning advantage and strategic timing.'}`;
+})() : ''}
 
 HISTORICAL CONTEXT:
 ${transcript ? '- Call Notes: ' + transcript : ''}
@@ -2321,6 +2384,7 @@ ${notes ? '- Additional Notes: ' + notes : ''}
 
 INDUSTRY-SPECIFIC CONTEXT:
 ${industryContent ? '- Industry Focus: ' + industryContent.language + '\n- Key Pain Points: ' + industryContent.painPoints.join(', ') + '\n- Average Savings: ' + industryContent.avgSavings + '\n- Key Benefit: ' + industryContent.keyBenefit + '\n- Urgency Drivers: ' + industryContent.urgencyDrivers.join(', ') : ''}
+${dynamicSavingsRange ? `\n## TYPICAL SAVINGS FOR THEIR ROLE\nCompanies in similar roles and industries (${industry || 'their industry'} - ${roleCategory} role) typically see ${dynamicSavingsRange} savings. Use this as your concrete value claim instead of generic "10-20%".` : ''}
 
 COMPANY SIZE CONTEXT (USE FOR FOCUS/PROACH ONLY - NEVER SAY "SMALL COMPANY"):
 - Focus Area: ${companySizeContext.focus}
@@ -2406,7 +2470,21 @@ ${angleValue ? '- Primary value proposition: "' + angleValue + '"' : ''}
 - If angle is "demand_efficiency" → THEN you can mention demand charges, but ONLY if this is the angle
 - If angle is "operational_simplicity" → focus on time spent managing energy, vendor complexity, procurement burden
 
-**DO NOT** mention "demand charges" or "delivery charges" unless the angle is specifically about demand efficiency. Use the angle's focus instead.`;
+**DO NOT** mention "demand charges" or "delivery charges" unless the angle is specifically about demand efficiency. Use the angle's focus instead.
+
+## ANGLE VALUE LOCK (CRITICAL - NON-NEGOTIABLE)
+${(() => {
+  const angleValueProps = {
+    timing_strategy: "The key message: locking in rates 6 months early typically yields better terms than waiting until 30-60 days before expiry.",
+    exemption_recovery: "The key message: many businesses leave significant electricity tax exemptions unclaimed—often $75K-500K over 4 years.",
+    consolidation: "The key message: managing multiple locations on separate contracts means lost consolidation savings—typically 10-20%.",
+    demand_efficiency: "The key message: optimizing consumption BEFORE renewal shopping gives negotiating leverage and measurable savings.",
+    cost_control: "The key message: fixing cost volatility means locking fixed rates and predictable budgets.",
+    operational_simplicity: "The key message: simplifying energy procurement reduces time spent managing vendors and contracts."
+  };
+  const valueProp = angleValueProps[angleId] || '';
+  return valueProp ? `${valueProp}\nDO NOT deviate from this message. Every sentence should reinforce it.` : '';
+})()}`;
     }
 
     const toneOpenerRule = (templateType === 'cold_email' && toneOpener)
@@ -3237,7 +3315,11 @@ ${suggestedSubject ? `SUGGESTED SUBJECT: "${suggestedSubject}" (use this pattern
 - NO numbers or percentages
 - Role-specific: Controllers/CFO = "budget question", Operations = "facility renewal timing"
 
-TOTAL LENGTH: 100-130 words (scannable, not overwhelming - 2-3 short paragraphs)
+WORD COUNT TARGETS (CRITICAL):
+- Email body (greeting + opening + value prop + CTA, excluding closing): 50-90 words MAXIMUM
+- This is NOT a guideline. Keep it short. Do NOT write long paragraphs.
+- Scanability beats completeness. Use 1-sentence paragraphs where possible.
+- TOTAL LENGTH: 60-90 words for body content (scannable, not overwhelming - 2-3 short paragraphs)
 CTA LENGTH: 8-15 words maximum, must be complete and assertive
 TONE: Write like a 29-year-old Texas business pro - conversational, confident, direct, peer-to-peer
 - Use contractions: "we're," "don't," "it's," "you're," "I'm"
