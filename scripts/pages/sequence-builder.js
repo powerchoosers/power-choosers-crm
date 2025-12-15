@@ -3790,115 +3790,33 @@ class FreeSequenceAutomation {
   }
 
   // Build improved first email introduction prompt with dynamic CTA
+  // Build improved first email introduction prompt - "Scannable" style (50-70 words)
   function buildFirstEmailIntroPrompt(ctaVariant = true, role = 'all') {
-    // Note: ctaVariant and role parameters kept for backward compatibility but not used
-    // The system now automatically handles angle-based CTAs in the backend
-    // This prompt follows NEPQ methodology: tone opener → problem question → value/gap → low-friction CTA
+    return `Write a "Scannable" cold email (Option 2 style). 
+Target length: 50-65 words total.
 
-    return `Write a cold introduction email following NEPQ methodology. Start with a conversational opener (any style - see options below). Vary the opener across emails to avoid template sameness.
+STRUCTURE:
+1. Greeting (Hi [Name],)
+2. Opening Hook (1 sentence): Reference a specific observation about [company] or [industry] challenge.
+3. [LINE BREAK]
+4. Value Prop (1-2 sentences): How we help [industry] companies avoid [problem] and save [amount].
+5. [LINE BREAK]
+6. Low-Friction CTA (1 short question): Ask for interest, not a meeting.
 
-1. GREETING (RANDOMIZE FOR VARIETY)
-   - RANDOMLY choose ONE of these greetings:
-     * "Hi [contact_first_name],"
-     * "Hey [contact_first_name],"
-     * "Hello [contact_first_name],"
-   - DO NOT use "Hi [contact_first_name] there," or add extra words
+TONE:
+- Direct, peer-to-peer, zero fluff.
+- Visuals: Use white space. It should read in 8 seconds on a mobile phone.
 
-2. TONE OPENER (CREATIVE FREEDOM WITH VARIETY)
-   - **FORBIDDEN**: "Wondering how [company] is handling..." is STRICTLY FORBIDDEN. This pattern is overused and sounds templated. DO NOT use it.
-   - **FORBIDDEN REPETITION**: Do NOT default to "Quick question" every time. This is overused and makes all emails sound the same. Vary your opener style.
-   - **USE THE TONE OPENER STYLE**: The tone opener provided by the system is INSPIRATION - use it as a stylistic guide and try to match its style, not ignore it. Don't default to "Quick question" when a different tone opener is provided.
-   - **VARIETY IS CRITICAL**: Vary your opener style across emails. Mix between these approaches (DO NOT use "Quick question" repeatedly):
-     * Direct questions: "Are you...", "How are you...", "When does...", "What's your approach to..."
-     * Soft curiosity: "Curious if...", "Wonder if...", "Curious, " (use "Quick question" sparingly - it's overused)
-     * Peer observations: "Most teams...", "Usually when...", "From what I'm seeing...", "I've found that...", "Most people I talk to..."
-     * Honest/direct: "Honestly, ", "So here's the thing, " (REMOVED "Real talk" - not professional enough for corporate America)
-     * Disarmed/confused: "Not sure if...", "Quick question that might be off base..." (only this specific variation, not generic "Quick question")
-   - **NATURALNESS OVER MATCHING**: The goal is natural, human-sounding openers that vary across emails. Use the tone opener style as your guide, but don't force-match it if a different natural phrasing works better. Just don't default to "Quick question".
-   - The key is: conversational, direct, sounds like a real person (not a template)
-   - Vary the opener across emails - do NOT repeat "Quick question" or any other opener pattern every time
-   - Example structures (note: NO "Wondering how..."):
-     * "Hi [contact_first_name],\nCurious if you're seeing [problem] with [situation]?"
-     * "Hey [contact_first_name],\nHow are you handling [challenge] for [specific context]?"
-     * "Hello [contact_first_name],\nMost teams I work with are dealing with [issue]. How is [contact_company] managing that?"
-     * "Hi [contact_first_name],\nHonestly, are you seeing [problem] with [situation]?"
-     * "Hey [contact_first_name],\nFrom what I'm hearing, [role]s at [company_industry] companies are dealing with [issue]. How is [contact_company] handling that?"
+CTA EXAMPLES:
+- "Is this on your radar?"
+- "Worth a brief chat?"
+- "Are you open to seeing how?"
 
-3. PROBLEM-AWARENESS QUESTION (CRITICAL - SECOND SENTENCE)
-   - Immediately after the opener, ask a question that connects a trigger event/recent activity to a potential negative business problem
-   - Use research data naturally: reference location, facility details, recent company activity, or industry patterns
-   - Make them think about consequences they may not have considered
-   - Examples (note: these use varied openers, not just "Question for you"):
-     * "Curious if you're seeing demand ratchets with [contact_company] expanding into [city], how are you handling the new energy load?"
-     * "How are you managing delivery charges as [contact_company] scales up [specific operation]? Most teams I work with see those eat into margins."
-     * "Usually when [role]s at [company_industry] companies add automation, they run into [specific problem]. How is [contact_company] managing that?"
-   - FORBIDDEN: "I noticed", "I saw", "I read", "I came across" - these trigger sales resistance
-   - Instead: Frame as a question that shows you understand their situation without stating you researched them
-
-4. VALUE/GAP STATEMENT (THIRD SECTION - 1-2 SENTENCES)
-   - Start with "The reason I ask is..." or "Typically, we see..." or "Usually, when..."
-   - Explain WHY you asked the question and introduce the common pain point
-   - Use specific, believable scenarios: "The reason I ask is that when [company_industry] companies add automation, the new load profile often triggers demand ratchets that can spike costs by 30-40% if the contract isn't updated."
-   - Keep it factual and calm - describe what you're seeing in the market, not threats
-   - Tie to timing when relevant: "locking in 6 months early vs 90 days is usually 15-20% difference"
-   - Make it about THEM, not about us (don't lead with "We help...")
-
-5. LOW-FRICTION CTA (FINAL SENTENCE - AUTOMATIC)
-   - The system automatically generates angle-specific CTAs
-   - You do NOT need to write a CTA - the system handles this
-   - The CTA will be a simple qualifying question (yes/no style)
-   - Examples the system will use:
-     * "Is this on your radar?"
-     * "Have you already handled this?"
-     * "Is this a priority for this quarter?"
-   - FORBIDDEN: Do NOT ask for meetings, calls, or time blocks ("15 minutes", "schedule a call", "book a meeting")
-
-6. FORBIDDEN PHRASES (DO NOT USE - THESE TRIGGER SALES RESISTANCE)
-   - **"Wondering how [company] is handling..."** - STRICTLY FORBIDDEN (overused, templated)
-   - "I saw", "I noticed", "I read", "I came across"
-   - "I hope this email finds you well"
-   - "Just following up"
-   - "My name is..."
-   - "I wanted to reach out/introduce"
-   - "Would you be open to..." (permission-based, weak)
-
-7. TONE REQUIREMENTS (YOUR VOICE - 29-YEAR-OLD TEXAS BUSINESS PRO)
-   - Write like a peer, not a salesperson (conversational, confident, direct)
-   - Use contractions: "we're," "don't," "it's," "you're," "I'm"
-   - Vary sentence length: Short. Medium sentence. Longer explanation when needed.
-   - AVOID corporate jargon: "stabilize expenses," "leverage," "optimize," "streamline," "unleash," "synergy," "dive into," "solution," "at Power Choosers"
-   - Sound like: colleague who knows their industry and has talked to others like them
-   - NO: "Would you be open to..." (permission-based, weak)
-   - YES: Ask specific questions that assume conversation is happening
-
-8. SUBJECT LINE (AUTOMATIC - SYSTEM HANDLES THIS)
-   - The system automatically generates angle-specific subject lines
-   - Each angle inspires unique subject variations (e.g., timing_strategy → "when does your contract expire?")
-   - You do NOT need to write a subject line
-
-9. FORMAT
-   - 100-130 words max (scannable, not overwhelming)
-   - 2-3 short paragraphs (break up visually)
-   - Scannable on mobile (short lines, clear breaks)
-   - **MANDATORY**: Must include at least TWO questions (problem-awareness + CTA). The email will be rejected if missing either question.
-     * Problem-awareness question: MUST be in opening hook or second sentence (e.g., "Are you seeing higher costs?", "How are you handling [challenge]?", "When does your contract expire?")
-     * Low-friction CTA question: MUST be at the end (e.g., "Is this on your radar?", "Have you already handled this?", "When does your contract expire?")
-
-10. PERSONALIZATION
-   - Include [contact_first_name] naturally in randomized greeting
-   - Reference [company_name] specifically (not "your company")
-   - For [company_industry], use industry-specific language naturally
-   - Reference location if available ([city], [state]) for regional context
-   - Use research data naturally in the problem question (location, facility details, recent activity) WITHOUT saying "I noticed" or "I saw"
-
-ABSOLUTELY AVOID sounding like ChatGPT or a generic email template. You should sound like their peer - a 29-year-old Texas business pro who knows the industry and has talked to others in their situation. Be conversational, confident, and direct.
-
-GUARDRAILS (AVOID FAKE FEAR):
-- Only mention scenarios that are typical and believable for companies like [contact_company]. No exaggerated worst-case fear.
-- Describe pains as things you're seeing in the market right now, not predictions or threats.
-- No language like "you'll get crushed" or "you're in trouble"; use calm, factual language about stress, budget pressure, and surprises on bills.
-- GOOD EXAMPLE: "Most people I talk to, when manufacturing companies add automation, they run into demand ratchets that spike costs 30-40% if the contract isn't updated. How are you managing that?"
-- BAD EXAMPLE: "I noticed you added automation. If you don't fix this now, you'll get crushed by your energy bills."`;
+AVOID:
+- "I hope this finds you well"
+- Long paragraphs
+- Asking for "15 minutes"
+`;
   }
 
   // ========== FOLLOW-UP PROMPT BUILDERS ==========
