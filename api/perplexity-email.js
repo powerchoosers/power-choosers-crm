@@ -3076,8 +3076,8 @@ You must adjust your vocabulary based on the recipient's role and industry.
 **2. IF RECIPIENT IS INDUSTRIAL / MANUFACTURING / DATA CENTER (Facility Dir, Plant Mgr):**
 - **Tone:** Technical authority. Insider.
 - **Focus:** Operational impact, load profiles, demand response, efficiency.
-- **Use:** Technical terms correctly (Load Factor, 4CP, Demand Ratchets, kVA).
-- **Keywords:** "Uptime," "Coincident Peaks," "Load profile," "TDU charges."
+- **Use:** Technical terms correctly (Load Factor, Demand Ratchets, kVA). Use "Peak Demand" or "Peak Demand Charges" instead of "4CP" for clarity.
+- **Keywords:** "Uptime," "Peak Demand," "Load profile," "TDU charges."
 
 **3. IF RECIPIENT IS FINANCE (CFO, Controller):**
 - **Tone:** Financial risk manager. Direct.
