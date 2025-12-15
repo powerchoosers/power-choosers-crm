@@ -3103,13 +3103,23 @@ OUTPUT FORMAT (JSON):
 {
   "subject": "[Your subject line]",
   "greeting": "Hi ${firstName || 'there'},",
-  "paragraph1": "[Opening paragraph with context - 1-2 sentences, ~15-25 words]",
+  "paragraph1": "[Opening paragraph with context - 1 sentence WITH A QUESTION, ~15-25 words]",
   "paragraph2": "[Main message paragraph - 1-2 sentences about value, ~20-30 words]",
-  "paragraph3": "[Call to action paragraph - 1 sentence, ~8-12 words]",
+  "paragraph3": "[Call to action paragraph - 1 sentence WITH A QUESTION, ~8-12 words]",
   "closing": "Best regards,\\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
 }
 
-⚠️ CRITICAL: TOTAL word count (greeting + paragraph1 + paragraph2 + paragraph3) must be 50-90 words MAXIMUM. Count carefully.
+⚠️ CRITICAL REQUIREMENTS:
+1. TOTAL word count (greeting + paragraph1 + paragraph2 + paragraph3) must be 50-70 words MAXIMUM. Count carefully.
+2. paragraph1 MUST end with a question mark (?) - this is the problem-awareness question
+3. paragraph3 MUST end with a question mark (?) - this is the low-friction CTA question
+4. You MUST have exactly TWO question marks total. Without both, the email will be rejected.
+
+EXAMPLE STRUCTURE:
+paragraph1: "Noticed Cypress is navigating shifting rates in Leander. How are you handling that?" (18 words, ends with ?)
+paragraph2: "Manufacturers typically lock in 6 months early to secure a 10-20% drop before hikes hit." (18 words, no question)
+paragraph3: "Is this something you're currently looking into?" (7 words, ends with ?)
+Total: ~45 words with 2 questions ✓
 
 CRITICAL: Return ONLY valid JSON. Each paragraph should be a separate field. Do not include any text outside the JSON structure.
 IMPORTANT: The closing field must include a newline between "Best regards," and the sender name (e.g., "Best regards,\\nLewis").`;
