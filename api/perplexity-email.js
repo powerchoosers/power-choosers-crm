@@ -3124,38 +3124,41 @@ IMPORTANT: The closing field must include a newline between "Best regards," and 
     const coldEmailRules = `
 EMAIL TYPE: Cold Email (Never Spoke Before)
 
-## ABSOLUTELY CRITICAL - SECTION WORD LIMITS (HARD ENFORCED - CHECK FIRST)
+## ABSOLUTELY CRITICAL - SECTION WORD LIMITS (HARD ENFORCED)
 
 **Greeting:** 2 words MAX
   Example: "Hi Greg,"
 
 **Opening Hook:** 15-20 words EXACTLY
-  Rule: Problem statement OR relevance to their situation
-  NO statistics, NO percentages, NO company names in hook
-  Structure: "Problem + relevant context" = 1 sentence
-  Example: "When electricity contracts renew in 2025, rates typically jump."
-  STOP immediately when you hit 20 words - do not continue
+  Rule: One sentence problem statement or context.
+  Structure: "Problem + relevant context"
+  Example: "Noticed Cypress is navigating shifting rates in Leander."
+  STOP immediately when you hit 20 words - do not continue.
 
-**Value Proposition:** 30-35 words EXACTLY
-  Rule: How you help + specific savings range
-  Structure: "We help + specific benefit + typical savings"
-  Example: "We help companies lock fixed rates before renewal. Most clients save 12-18% on annual energy costs."
-  STOP immediately when you hit 35 words - do not continue
+**Value Proposition:** 20-30 words EXACTLY
+  Rule: One sentence solution + specific outcome.
+  Example: "Manufacturers typically lock in 6 months early to secure a 10-20% drop before hikes hit."
+  STOP immediately when you hit 30 words - do not continue.
 
-**CTA:** 10-12 words EXACTLY
-  Rule: Qualifying question for cold emails ONLY (no meeting requests)
-  Examples:
-    - "Is cost predictability something you're focusing on?" (9 words ✓)
-    - "How are you handling energy cost volatility?" (8 words ✓)
-    - "When does your contract renew?" (5 words ✓)
-  STOP immediately when you hit 12 words - do not continue
+**CTA:** 8-12 words EXACTLY
+  Rule: Low-friction interest question (No meeting asks).
+  Example: "Is this something you're currently looking into?"
+  STOP immediately when you hit 12 words - do not continue.
 
-**Total Email:** 70-90 words ONLY
-  Structure: Greeting (2) + Hook (17) + Value (32) + CTA (11) = 62-65 words ✓
+**Total Email:** 50-70 words MAXIMUM
+  Structure: Greeting (2) + Hook (18) + Value (25) + CTA (10) = ~55 words.
 
-CRITICAL RULES:
+## VISUAL STRUCTURE (MANDATORY)
+- **Scannable Format:** Use "Micro-Paragraphs".
+- **Spacing:** The Opening Hook, Value Proposition, and CTA must each be separated by a double line break.
+- **NO Walls of Text:** Do not combine the Hook and Value into one paragraph.
+- **Visual Check:** It should look like a text message on a phone screen.
+
+CRITICAL QUALITY RULES:
+${selectedAngle && typeof selectedAngle === 'object' ? `- **USE THE SELECTED ANGLE**: Focus on "${selectedAngle.primaryMessage || selectedAngle.label}".` : '- Vary pain points.'}
+- **NO SIZE ASSUMPTIONS**: Never use "small company".
+- **NATURAL LANGUAGE**: Write like a peer (internal memo style).
 ✅ Stop sentences immediately when you hit the word limit
-✅ Combine thoughts into one concise sentence if needed
 ✅ Use active voice (reduce passive constructions)
 ✅ Cut ALL adjectives except critical ones
 ✅ NO "I think", "I believe", "It might be"
@@ -3381,11 +3384,12 @@ TONE: Write like a 29-year-old Texas business pro - conversational, confident, d
 ## ABSOLUTELY CRITICAL - SECTION WORD LIMITS (READ FIRST)
 
 GREETING: "Hi [FirstName]," (2 words)
-OPENING: 15-20 words - problem statement only, no stats
-VALUE: 30-35 words - how you help + savings %
-CTA: 10-12 words - qualifying question (cold) or meeting offer (warm)
-TOTAL: 70-90 words for cold email body
+OPENING: 15-20 words - single sentence context.
+VALUE: 20-30 words - single sentence value.
+CTA: 8-12 words - soft interest question.
+TOTAL: 50-70 words maximum.
 
+VISUALS: Use line breaks between EVERY section. Make it look like a text message format.
 DO NOT EXCEED THESE LIMITS. If you do, your email fails validation.
 
 ` : '';
@@ -3844,20 +3848,20 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           
           logger.log('[Cold Email Validation]', { greetingCount, hookCount, valueCount, ctaCount, totalCount });
           
-          // ENFORCE SECTION LIMITS - AGGRESSIVE TRUNCATION
+          // ENFORCE SECTION LIMITS - AGGRESSIVE TRUNCATION (50-70 word target)
           if (hookCount > 22) {
             logger.warn(`[Fix] Opening hook too long: ${hookCount} words, truncating to 20...`);
             const words = String(jsonData.opening_hook).split(/\s+/);
-            jsonData.opening_hook = words.slice(0, 20).join(' ').replace(/[,;]\s*$/, '').replace(/\s+$/, '') + (words[19]?.endsWith('?') || words[19]?.endsWith('.') ? '' : '?');
+            jsonData.opening_hook = words.slice(0, 20).join(' ').replace(/[,;]\s*$/, '').replace(/\s+$/, '') + (words[19]?.endsWith('?') || words[19]?.endsWith('.') ? '' : '.');
           }
           
-          if (valueCount > 40) {
-            logger.warn(`[Fix] Value proposition too long: ${valueCount} words, truncating to 35...`);
+          if (valueCount > 32) {
+            logger.warn(`[Fix] Value proposition too long: ${valueCount} words, truncating to 30...`);
             const words = String(jsonData.value_proposition).split(/\s+/);
-            jsonData.value_proposition = words.slice(0, 35).join(' ').replace(/[,;]\s*$/, '').replace(/\s+$/, '') + '.';
+            jsonData.value_proposition = words.slice(0, 30).join(' ').replace(/[,;]\s*$/, '').replace(/\s+$/, '') + '.';
           }
           
-          if (ctaCount > 15) {
+          if (ctaCount > 14) {
             logger.warn(`[Fix] CTA too long: ${ctaCount} words, truncating to 12...`);
             const words = String(jsonData.cta_text).split(/\s+/);
             jsonData.cta_text = words.slice(0, 12).join(' ').replace(/[,;]\s*$/, '').replace(/\s+$/, '') + (words[11]?.endsWith('?') ? '' : '?');
@@ -3867,10 +3871,10 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           const finalTotal = countWords(jsonData.greeting) + countWords(jsonData.opening_hook) + 
                              countWords(jsonData.value_proposition) + countWords(jsonData.cta_text);
           
-          logger.log('[Cold Email Final]', { wordCount: finalTotal, target: '70-90 words' });
+          logger.log('[Cold Email Final]', { wordCount: finalTotal, target: '50-70 words' });
           
-          // LAST RESORT: If still over 95, remove value prop social proof clause
-          if (finalTotal > 95) {
+          // LAST RESORT: If still over 75, remove value prop social proof clause
+          if (finalTotal > 75) {
             logger.warn(`[Final Fix] Email still long (${finalTotal}), aggressive trim...`);
             // Remove "Most clients save X%" if present
             jsonData.value_proposition = jsonData.value_proposition
@@ -3879,7 +3883,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
               .replace(/\s+$/, '');
           }
           
-          if (finalTotal < 60) {
+          if (finalTotal < 45) {
             logger.warn(`[Alert] Email still short (${finalTotal}), may need manual review`);
           }
         }
