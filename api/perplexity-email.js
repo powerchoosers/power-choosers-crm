@@ -26,30 +26,28 @@ function debugLog(data) {
 const SUBJECT_LINE_VARIANTS = {
   'cold-email': {
     ceo: [
-      '[contact_name], contract timing question',
-      '[contact_name], energy renewal strategy',
-      '[contact_name], rate lock opportunity',
-      '[contact_name], energy budget question',
-      '[company] contract renewal timing'
+      '[contact_name], ERCOT 2026 risk?',
+      '[company] energy budget vs. market',
+      'Rate volatility strategy for [company]',
+      '[contact_name], quick question on margins'
     ],
     finance: [
-      '[contact_name], budget question about energy renewal',
-      '[contact_name], rate lock timing question',
-      '[contact_name], cost predictability question',
-      '[contact_name], energy budget cycle question'
+      '[contact_name], 4CP cost mitigation?',
+      'Sales tax audit for [company] meters',
+      'ERCOT forward curves vs. budget',
+      '[contact_name], rate lock timing check'
     ],
     operations: [
-      '[contact_name], facility renewal timing question',
-      '[contact_name], energy operations question',
-      '[contact_name], facility rate lock timing',
-      '[company] facility renewal timing'
+      '4CP alert strategy for [company]?',
+      'Peak load management at [company]',
+      '[contact_name], TDU delivery charge audit',
+      'Facility power reliability question'
     ],
     default: [
-      '[contact_name], contract timing question',
-      '[contact_name], energy renewal timing',
-      '[contact_name], rate lock timing question',
-      '[company] contract renewal question',
-      '[contact_name], energy renewal strategy'
+      '[contact_name], question on ERCOT rates',
+      'Energy strategy for [company]',
+      'Cost mitigation / [company]',
+      '[contact_name], rate lock window?'
     ]
   }
 };
@@ -79,59 +77,40 @@ function getRandomSubjectLine(type = 'cold-email', role = 'default', firstName =
 // Structure: [Opening Question] + [Value/Statistic] + [Low-friction closing question]
 const angleCtaMap = {
   'timing_strategy': {
-    opening: 'When does your current electricity contract expire?',
-    value: '10-20% better rates when locking in 6 months early',
-    full: 'When does your current electricity contract expire?\n\nWorth a 10-minute look?'
+    opening: 'The 2026 ERCOT capacity cliff is already pushing forward curves higher.',
+    value: 'Locking in 12-24 months early is currently saving clients 15-20% vs. waiting for the renewal window.',
+    full: 'Futures are rising due to the 2026 capacity cliff. Are you floating or fixed right now?',
+    angleId: 'timing_strategy'
   },
   'exemption_recovery': {
-    opening: 'Are you currently claiming electricity exemptions on your production facilities?',
-    value: '$75K-$500K in unclaimed exemptions over 4 years',
-    full: 'Are you currently claiming electricity exemptions on your production facilities?\n\nMost manufacturers leave $75K-$500K on the table. Worth exploring?'
+    opening: 'We find that 40% of Texas manufacturers are overpaying sales tax on electricity.',
+    value: 'A Predominant Use Study often uncovers $75k+ in refunds you can claim immediately.',
+    full: 'We find 40% of manufacturers overpay sales tax. Have you filed a Predominant Use Study in the last 4 years?',
+    angleId: 'exemption_recovery'
   },
   'consolidation': {
-    opening: 'How many locations are you managing energy for?',
-    value: '15-25% savings by consolidating all locations',
-    full: 'How many locations are you managing energy for?\n\nConsolidating contracts typically means 15-25% savings. Worth a look?'
+    opening: 'Managing individual renewals for multiple meters is a recipe for missed windows and variable rates.',
+    value: 'Consolidating to a single master agreement prevents "orphan meters" from rolling onto 2x variable rates.',
+    full: 'Managing multiple meters individually usually leads to missed renewals. Have you looked at a master agreement?',
+    angleId: 'consolidation'
   },
   'demand_efficiency': {
-    opening: 'Are you optimizing consumption before you renew your contract?',
-    value: '12-20% consumption reduction before rate shopping',
-    full: 'Are you optimizing consumption before you renew your contract?\n\n12-20% reduction before rate shopping can mean massive savings. Worth a conversation?'
-  },
-  'operational_continuity': {
-    opening: 'How do you currently handle energy during peak demand periods?',
-    value: 'Demand charges are often 40-60% of the bill',
-    full: 'How do you currently handle energy during peak demand periods?\n\nDemand charges are often 40-60% of the bill. Worth addressing?'
-  },
-  'mission_funding': {
-    opening: 'How are you making sure more funding goes to your mission, not vendors?',
-    value: '10-20% savings redirected to programs',
-    full: 'How are you making sure more funding goes to your mission, not vendors?\n\n10-20% savings redirected to programs. Worth exploring?'
-  },
-  'budget_stability': {
-    opening: 'When budgeting for energy, are you locking in costs or dealing with volatility?',
-    value: 'Fixed costs for better program planning',
-    full: 'When budgeting for energy, are you locking in costs or dealing with volatility?\n\nFixed costs for better program planning. Worth a conversation?'
-  },
-  'operational_simplicity': {
-    opening: 'Are you managing multiple energy suppliers or contracts?',
-    value: 'Single vendor, unified billing',
-    full: 'Are you managing multiple energy suppliers or contracts?\n\nSingle vendor, unified billing. Worth a look?'
+    opening: 'For industrial facilities, 4CP (Four Coincident Peaks) charges can make up 30% of your delivery cost.',
+    value: 'Curtailing usage during just 4 critical hours a year can drop your TDU charges by thousands.',
+    full: '4CP charges are likely 30% of your delivery bill. Do you have a notification system for peak days?',
+    angleId: 'demand_efficiency'
   },
   'cost_control': {
-    opening: 'Does energy cost predictability matter for your budget planning?',
-    value: '10-20% savings with predictable costs',
-    full: 'Does energy cost predictability matter for your budget planning?\n\n10-20% savings with predictable costs. Worth exploring?'
+    opening: 'Volatility in the Texas market is making budget predictability nearly impossible for unmanaged accounts.',
+    value: 'A strategic hedging layer can flatten your spend regardless of weather events.',
+    full: 'Market volatility is killing budget predictability. Are you 100% exposed to index pricing right now?',
+    angleId: 'cost_control'
   },
-  'operational_efficiency': {
-    opening: 'Are energy costs impacting your operational efficiency?',
-    value: '10-18% cost reduction',
-    full: 'Are energy costs impacting your operational efficiency?\n\n10-18% cost reduction. Worth a conversation?'
-  },
-  'data_governance': {
-    opening: 'Do you have visibility into energy usage across your facilities?',
-    value: 'Centralized metering and reporting',
-    full: 'Do you have visibility into energy usage across your facilities?\n\nCentralized metering and reporting. Worth exploring?'
+  'operational_simplicity': {
+    opening: 'Managing multiple energy suppliers creates administrative overhead and missed optimization opportunities.',
+    value: 'Single vendor, unified billing, and consolidated reporting simplify operations.',
+    full: 'Are you managing multiple suppliers? A master agreement could simplify this.',
+    angleId: 'operational_simplicity'
   }
 };
 
@@ -3083,7 +3062,34 @@ CRITICAL: Return ONLY valid JSON with brief, friendly acknowledgment. No busines
   }
 
   // Standard text mode (existing logic)
-  const identity = whoWeAre || `You are ${senderName}, an Energy Strategist at Power Choosers, a company that helps businesses secure lower electricity and natural gas rates. Write in first person ("we"/"I"). Do NOT use brand-first openers like "At Power Choosers," or "Power Choosers helps" - prefer "We help" or "I help".
+  const identity = whoWeAre || `You are ${senderName}, a Senior Energy Strategist in Fort Worth, Texas. You are a market expert who speaks peer-to-peer.
+
+**YOUR MENTAL MODEL (ADAPTIVE EXPERTISE):**
+You must adjust your vocabulary based on the recipient's role and industry.
+
+**1. IF RECIPIENT IS HOSPITALITY / RETAIL / OFFICE (Owner, GM, Office Manager):**
+- **Tone:** Business-savvy but accessible. Helpful peer.
+- **Focus:** Bottom line, "getting this off your plate," budget certainty, protecting margins.
+- **Avoid:** Heavy jargon (Heat rates, spark spreads, 4CP).
+- **Keywords:** "Operating expenses," "Budget protection," "Bill audit," "Simplicity."
+
+**2. IF RECIPIENT IS INDUSTRIAL / MANUFACTURING / DATA CENTER (Facility Dir, Plant Mgr):**
+- **Tone:** Technical authority. Insider.
+- **Focus:** Operational impact, load profiles, demand response, efficiency.
+- **Use:** Technical terms correctly (Load Factor, 4CP, Demand Ratchets, kVA).
+- **Keywords:** "Uptime," "Coincident Peaks," "Load profile," "TDU charges."
+
+**3. IF RECIPIENT IS FINANCE (CFO, Controller):**
+- **Tone:** Financial risk manager. Direct.
+- **Focus:** Risk mitigation, variance, EBITDA impact, forecasting.
+- **Keywords:** "Forward curves," "Futures," "Risk mitigation," "Fixed vs Float."
+
+**THE TEXAS CONTEXT (ALWAYS APPLY):**
+- Mention **ERCOT** volatility (it's the common enemy).
+- Mention **TDU Delivery Charges** (Oncor/CenterPoint) only if relevant to cost increases.
+- Write like you are trying to save them from making a costly mistake, not just selling a contract.
+
+Write in first person ("we"/"I"). Do NOT use brand-first openers like "At Power Choosers," or "Power Choosers helps" - prefer "We help" or "I help".
 
 CONTEXT USAGE RULES:
 ${contractEndLabel ? '- The recipient\'s contract ends ' + contractEndLabel + ' - YOU MUST REFERENCE THIS' : ''}
@@ -3111,9 +3117,9 @@ OUTPUT FORMAT (JSON):
 
 ⚠️ CRITICAL REQUIREMENTS:
 1. TOTAL word count (greeting + paragraph1 + paragraph2 + paragraph3) must be 50-70 words MAXIMUM. Count carefully.
-2. paragraph1 MUST end with a question mark (?) - this is the problem-awareness question
-3. paragraph3 MUST end with a question mark (?) - this is the low-friction CTA question
-4. You MUST have exactly TWO question marks total. Without both, the email will be rejected.
+2. At least ONE question mark (?) is required somewhere in the email (preferably in paragraph1 or paragraph3)
+3. Natural, conversational tone is preferred - don't force questions if they don't fit naturally
+4. Value-verification questions work well in the CTA (e.g., "Are you currently floating or fixed on your index?")
 
 EXAMPLE STRUCTURE:
 paragraph1: "Noticed Cypress is navigating shifting rates in Leander. How are you handling that?" (18 words, ends with ?)
@@ -3150,20 +3156,26 @@ EMAIL TYPE: Cold Email (Never Spoke Before)
   Example: "Manufacturers typically lock in 6 months early to secure a 10-20% drop before hikes hit."
   STOP immediately when you hit 30 words - do not continue.
 
-**CTA:** 8-12 words EXACTLY
-  Rule: Low-friction interest question (No meeting asks).
-  Example: "Is this something you're currently looking into?"
-  STOP immediately when you hit 12 words - do not continue.
+**CTA:** 8-15 words EXACTLY
+  Rule: Direct, value-verification question (No meeting asks).
+  - BAD: "Is this on your radar?" (Too passive)
+  - GOOD (General): "Are you open to a quick audit to check for hidden riders?"
+  - GOOD (Industrial): "Do you have an updated 4CP strategy for this summer?"
+  - GOOD (Finance): "Are you currently floating or fixed on your index?"
+  - GOOD (Owner): "Has anyone reviewed your rate structure since the market shifted?"
+  STOP immediately when you hit 15 words - do not continue.
 
 **Total Email:** 50-70 words MAXIMUM
   Structure: Greeting (2) + Hook (18) + Value (25) + CTA (10) = ~55 words.
 
-## MANDATORY: TWO QUESTIONS REQUIRED
-- **Question 1 (Problem-Awareness):** MUST be in the Opening Hook (15-20 words). Ask about a specific challenge/problem they might be facing.
-  Example: "Noticed Cypress is navigating shifting rates in Leander. How are you handling that?"
-- **Question 2 (Low-Friction CTA):** MUST be at the end (8-12 words). Simple qualifying question.
-  Example: "Is this something you're currently looking into?"
-- **CRITICAL:** The email MUST have exactly TWO question marks (?). One in the hook, one in the CTA. Without both, the email will be rejected.
+## QUESTIONS (Natural Tone - At Least 1 Required)
+- **Preferred:** Include a problem-awareness question in the Opening Hook (15-20 words) OR a qualifying question in the CTA (8-15 words)
+- **Minimum:** At least ONE question mark (?) is required somewhere in the email
+- **Examples:**
+  - Opening Hook: "Noticed Cypress is navigating shifting rates in Leander. How are you handling that?"
+  - CTA: "Are you currently floating or fixed on your index?"
+  - Or both: One in hook, one in CTA (natural flow)
+- **CRITICAL:** The email MUST have at least ONE question mark (?). Natural, conversational tone is preferred over forcing multiple questions.
 
 ## VISUAL STRUCTURE (MANDATORY)
 - **Scannable Format:** Use "Micro-Paragraphs".
@@ -3408,10 +3420,10 @@ TOTAL: 50-70 words maximum.
 
 VISUALS: Use line breaks between EVERY section. Make it look like a text message format.
 
-MANDATORY: You MUST include TWO questions:
-1. Problem-awareness question in the Opening Hook (15-20 words)
-2. Low-friction CTA question at the end (8-12 words)
-Without both questions, your email will be rejected.
+QUESTIONS: Include at least ONE question somewhere in the email (preferably in Opening Hook or CTA).
+- Natural, conversational tone is preferred
+- Value-verification questions work well (e.g., "Are you currently floating or fixed on your index?")
+- Don't force multiple questions if one flows naturally
 
 DO NOT EXCEED THESE LIMITS. If you do, your email fails validation.
 
