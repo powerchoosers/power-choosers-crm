@@ -3792,37 +3792,48 @@ class FreeSequenceAutomation {
   // Build improved first email introduction prompt with dynamic CTA
   // Build improved first email introduction prompt - "Scannable" style (50-70 words)
   function buildFirstEmailIntroPrompt(ctaVariant = true, role = 'all') {
-    return `Write a "Scannable" cold email (Option 2 style). 
-Target length: 50-65 words total.
+    return `Write a "Scannable" cold email with Texas market context.
+Target length: 50-70 words total.
 
 STRUCTURE:
 1. Greeting (Hi [Name],)
-2. Opening Hook (1 sentence WITH A QUESTION): Reference a specific observation about [company] or [industry] challenge, then ask about it.
-   Example: "Noticed Cypress is navigating shifting rates in Leander. How are you handling that?"
+2. Opening Hook (15-20 words): Reference a specific observation about [company] or [industry] challenge, then ask about it.
+   Example: "I noticed Cypress is navigating shifting rates in Leander. How are you handling that?"
+   Example: "Given the recent volatility in ERCOT, how are you managing contract renewals?"
 3. [LINE BREAK]
-4. Value Prop (1-2 sentences): How we help [industry] companies avoid [problem] and save [amount].
+4. Value Prop (20-30 words): How we help [industry] companies avoid [problem] and save [amount].
+   Use Texas-specific context: ERCOT volatility, 4CP charges, TDU delivery costs, forward curves.
 5. [LINE BREAK]
-6. Low-Friction CTA (1 short question): Ask for interest, not a meeting.
-   Example: "Is this something you're currently looking into?"
+6. CTA (8-15 words): Direct, value-verification question (not passive).
+   Example: "Are you currently floating or fixed on your index?" (Finance)
+   Example: "Do you have an updated 4CP strategy for this summer?" (Industrial)
+   Example: "Has anyone reviewed your rate structure since the market shifted?" (Owner)
+   Example: "Are you open to a quick audit to check for hidden riders?" (General)
 
-CRITICAL: You MUST include TWO questions total:
-- Question 1: In the Opening Hook (problem-awareness)
-- Question 2: In the CTA (low-friction ask)
-Without both questions, the email will be rejected.
+QUESTIONS: Include at least ONE question somewhere in the email (preferably in Opening Hook or CTA).
+- Natural, conversational tone is preferred
+- Value-verification questions work well
+- Don't force multiple questions if one flows naturally
 
-TONE:
-- Direct, peer-to-peer, zero fluff.
-- Visuals: Use white space. It should read in 8 seconds on a mobile phone.
+TONE (Adaptive by Role):
+- Hospitality/Retail/Owner: Business-savvy, accessible. Focus: Bottom line, budget certainty, protecting margins. Avoid heavy jargon.
+- Industrial/Manufacturing: Technical authority. Use: Load Factor, Demand Ratchets, TDU charges. Focus: Operational impact.
+- Finance: Financial risk manager. Use: Forward curves, Futures, Risk mitigation, Fixed vs Float. Focus: EBITDA impact.
 
-CTA EXAMPLES:
-- "Is this on your radar?"
-- "Worth a brief chat?"
-- "Are you open to seeing how?"
+TEXAS CONTEXT (ALWAYS APPLY):
+- Mention ERCOT volatility (it's the common enemy)
+- Mention TDU Delivery Charges (Oncor/CenterPoint) only if relevant to cost increases
+- Write like you're trying to save them from making a costly mistake, not just selling a contract
+
+VISUALS:
+- Use white space. It should read in 8 seconds on a mobile phone.
+- Double line breaks between sections for scannable format.
 
 AVOID:
-- "I hope this finds you well"
+- "Hope this email finds you well"
 - Long paragraphs
-- Asking for "15 minutes"
+- Scheduling asks ("15 minutes", "schedule a call", "book a meeting")
+- Passive CTAs like "Is this on your radar?" (too weak)
 `;
   }
 
