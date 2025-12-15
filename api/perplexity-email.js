@@ -3148,6 +3148,13 @@ EMAIL TYPE: Cold Email (Never Spoke Before)
 **Total Email:** 50-70 words MAXIMUM
   Structure: Greeting (2) + Hook (18) + Value (25) + CTA (10) = ~55 words.
 
+## MANDATORY: TWO QUESTIONS REQUIRED
+- **Question 1 (Problem-Awareness):** MUST be in the Opening Hook (15-20 words). Ask about a specific challenge/problem they might be facing.
+  Example: "Noticed Cypress is navigating shifting rates in Leander. How are you handling that?"
+- **Question 2 (Low-Friction CTA):** MUST be at the end (8-12 words). Simple qualifying question.
+  Example: "Is this something you're currently looking into?"
+- **CRITICAL:** The email MUST have exactly TWO question marks (?). One in the hook, one in the CTA. Without both, the email will be rejected.
+
 ## VISUAL STRUCTURE (MANDATORY)
 - **Scannable Format:** Use "Micro-Paragraphs".
 - **Spacing:** The Opening Hook, Value Proposition, and CTA must each be separated by a double line break.
@@ -3390,6 +3397,12 @@ CTA: 8-12 words - soft interest question.
 TOTAL: 50-70 words maximum.
 
 VISUALS: Use line breaks between EVERY section. Make it look like a text message format.
+
+MANDATORY: You MUST include TWO questions:
+1. Problem-awareness question in the Opening Hook (15-20 words)
+2. Low-friction CTA question at the end (8-12 words)
+Without both questions, your email will be rejected.
+
 DO NOT EXCEED THESE LIMITS. If you do, your email fails validation.
 
 ` : '';
