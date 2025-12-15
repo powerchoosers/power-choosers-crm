@@ -289,36 +289,40 @@ function validateNepqContent(subject, text, toneOpener) {
   // Conversational questions: require at least two
   const questionCount = (body.match(/\?/g) || []).length;
   // #region agent log
-  const logDataQuestions = {location:'generate-scheduled-emails.js:290',message:'Question count check',data:{questionCount:questionCount,bodyPreview:body.substring(0,200),questionsFound:body.match(/\?/g)||[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
+  const logDataQuestions = {location:'generate-scheduled-emails.js:290',message:'Question count check',data:{questionCount:questionCount,bodyPreview:body.substring(0,200),questionsFound:body.match(/\?/g)||[],bodyLength:body.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
   debugLog(logDataQuestions);
   // #endregion
   
-  // Auto-fix: If only 1 question, add a problem-awareness question to the hook
+  // Auto-fix: If only 1 question found, add a problem-awareness question to the hook
   if (questionCount === 1) {
-    // Check if the question is at the end (likely CTA) - need to add one to the hook
-    const lastQuestionIndex = body.lastIndexOf('?');
-    const bodyBeforeLastQuestion = body.substring(0, lastQuestionIndex);
-    const bodyAfterLastQuestion = body.substring(lastQuestionIndex + 1);
-    
-    // If the question is in the last 30% of the body, it's likely the CTA - add problem-awareness question
-    if (lastQuestionIndex > body.length * 0.7) {
-      // Find where the hook ends (after greeting, before value prop)
-      const greetingMatch = body.match(/^(Hi|Hello|Hey)\s+[^\n]+,?\n?\n?/i);
-      if (greetingMatch) {
-        const afterGreeting = body.slice(greetingMatch[0].length).trim();
-        const firstSentenceEnd = afterGreeting.match(/^[^.!?]+[.!?]/);
-        if (firstSentenceEnd && !firstSentenceEnd[0].includes('?')) {
-          // Add a question to the first sentence after greeting
-          const firstSentence = firstSentenceEnd[0].trim();
-          const restOfHook = afterGreeting.slice(firstSentenceEnd[0].length).trim();
-          // Convert statement to question
-          const questionVersion = firstSentence.replace(/\.$/, '?').replace(/^([A-Z])/, (m, c) => c.toLowerCase());
-          body = greetingMatch[0] + questionVersion + ' ' + restOfHook;
-          // #region agent log
-          const logDataAutoFix = {location:'generate-scheduled-emails.js:298',message:'Auto-fixed: Added problem-awareness question to hook',data:{originalFirstSentence:firstSentence,newQuestionVersion:questionVersion,questionCountAfter:(body.match(/\?/g)||[]).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
-          debugLog(logDataAutoFix);
-          // #endregion
+    const greetingMatch = body.match(/^(Hi|Hello|Hey)\s+[^\n]+,?\n?\n?/i);
+    if (greetingMatch) {
+      const greeting = greetingMatch[0];
+      const afterGreeting = body.slice(greeting.length).trim();
+      
+      // Check if first sentence after greeting is a statement (no question mark)
+      const firstSentenceMatch = afterGreeting.match(/^([^.!?\n]+)([.!?])/);
+      if (firstSentenceMatch && !firstSentenceMatch[0].includes('?')) {
+        // Convert first sentence to a question
+        const firstSentence = firstSentenceMatch[1].trim();
+        const punctuation = firstSentenceMatch[2];
+        const restOfBody = afterGreeting.slice(firstSentenceMatch[0].length).trim();
+        
+        // Simple conversion: add "How are you handling" or "Are you seeing" prefix, or convert to question
+        let questionVersion = firstSentence;
+        if (!questionVersion.toLowerCase().startsWith('how') && !questionVersion.toLowerCase().startsWith('are you') && !questionVersion.toLowerCase().startsWith('when')) {
+          // Try to convert statement to question
+          questionVersion = 'How are you handling ' + firstSentence.toLowerCase().replace(/^the\s+/, '').replace(/\.$/, '') + '?';
+        } else {
+          questionVersion = firstSentence + '?';
         }
+        
+        body = greeting + questionVersion + (restOfBody ? '\n\n' + restOfBody : '');
+        
+        // #region agent log
+        const logDataAutoFix = {location:'generate-scheduled-emails.js:305',message:'Auto-fixed: Added problem-awareness question to hook',data:{originalFirstSentence:firstSentence,newQuestionVersion:questionVersion,questionCountAfter:(body.match(/\?/g)||[]).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
+        debugLog(logDataAutoFix);
+        // #endregion
       }
     }
   }
@@ -328,7 +332,7 @@ function validateNepqContent(subject, text, toneOpener) {
   if (finalQuestionCount < 2) {
     errors.push('Email must include at least two questions (problem-awareness + low-friction CTA).');
     // #region agent log
-    const logDataQuestionError = {location:'generate-scheduled-emails.js:312',message:'Validation failed - missing questions after auto-fix',data:{questionCount:finalQuestionCount,required:2,bodyPreview:body.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
+    const logDataQuestionError = {location:'generate-scheduled-emails.js:320',message:'Validation failed - missing questions after auto-fix',data:{questionCount:finalQuestionCount,required:2,bodyPreview:body.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
     debugLog(logDataQuestionError);
     // #endregion
   }
