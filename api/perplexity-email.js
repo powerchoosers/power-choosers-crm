@@ -2615,7 +2615,7 @@ IMPORTANT:
 - Keep it natural and conversational.
 - NEVER mention company size ("small company", "small business") - focus on role, industry, and operational challenges instead.
 - NEVER start the email by restating their full "About us" description (for example, "Safety Vision is a leading provider of..."). Instead, summarize their situation in plain, conversational language tied to energy costs.
-- value_proposition: How we help (1-2 sentences MINIMUM). MUST include BOTH: (1) HOW we help, AND (2) CONDITIONAL value language (NOT unverified specific percentages). Use conditional language like "can reduce costs", "often gives more optionality", "may help avoid renewal risk" instead of asserting specific percentages as facts. Only use specific percentages if you have verified data. Include role-specific benefits:
+- value_proposition: How we help (1-2 sentences, ~20-30 words - part of 90-word total). MUST include BOTH: (1) HOW we help, AND (2) CONDITIONAL value language (NOT unverified specific percentages). Use conditional language like "can reduce costs", "often gives more optionality", "may help avoid renewal risk" instead of asserting specific percentages as facts. Only use specific percentages if you have verified data. Include role-specific benefits. Keep it brief - remember the 90-word total limit:
   * CFOs: Budget predictability, cost reduction, risk mitigation
   * Facilities Managers: Operational efficiency, maintenance cost reduction
   * Procurement Managers: Vendor management, contract optimization
@@ -3103,11 +3103,13 @@ OUTPUT FORMAT (JSON):
 {
   "subject": "[Your subject line]",
   "greeting": "Hi ${firstName || 'there'},",
-  "paragraph1": "[Opening paragraph with context - 2-3 sentences]",
-  "paragraph2": "[Main message paragraph - 3-4 sentences about value and next steps]",
-  "paragraph3": "[Call to action paragraph - clear question or request]",
+  "paragraph1": "[Opening paragraph with context - 1-2 sentences, ~15-25 words]",
+  "paragraph2": "[Main message paragraph - 1-2 sentences about value, ~20-30 words]",
+  "paragraph3": "[Call to action paragraph - 1 sentence, ~8-12 words]",
   "closing": "Best regards,\\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
 }
+
+⚠️ CRITICAL: TOTAL word count (greeting + paragraph1 + paragraph2 + paragraph3) must be 50-90 words MAXIMUM. Count carefully.
 
 CRITICAL: Return ONLY valid JSON. Each paragraph should be a separate field. Do not include any text outside the JSON structure.
 IMPORTANT: The closing field must include a newline between "Best regards," and the sender name (e.g., "Best regards,\\nLewis").`;
@@ -3122,12 +3124,43 @@ IMPORTANT: The closing field must include a newline between "Best regards," and 
     const coldEmailRules = `
 EMAIL TYPE: Cold Email (Never Spoke Before)
 
-⚠️ CRITICAL WORD COUNT REQUIREMENT (MANDATORY - CHECK THIS FIRST):
-- Email body (greeting + opening + value prop + CTA, excluding closing): 50-90 words MAXIMUM
-- This is NOT a guideline - it is a HARD REQUIREMENT. Emails over 90 words will be rejected.
-- Count your words carefully. Keep it short. Do NOT write long paragraphs.
-- Scanability beats completeness. Use 1-sentence paragraphs where possible.
-- If you exceed 90 words, cut content - remove fluff, combine sentences, be more concise.
+## ABSOLUTELY CRITICAL - SECTION WORD LIMITS (HARD ENFORCED - CHECK FIRST)
+
+**Greeting:** 2 words MAX
+  Example: "Hi Greg,"
+
+**Opening Hook:** 15-20 words EXACTLY
+  Rule: Problem statement OR relevance to their situation
+  NO statistics, NO percentages, NO company names in hook
+  Structure: "Problem + relevant context" = 1 sentence
+  Example: "When electricity contracts renew in 2025, rates typically jump."
+  STOP immediately when you hit 20 words - do not continue
+
+**Value Proposition:** 30-35 words EXACTLY
+  Rule: How you help + specific savings range
+  Structure: "We help + specific benefit + typical savings"
+  Example: "We help companies lock fixed rates before renewal. Most clients save 12-18% on annual energy costs."
+  STOP immediately when you hit 35 words - do not continue
+
+**CTA:** 10-12 words EXACTLY
+  Rule: Qualifying question for cold emails ONLY (no meeting requests)
+  Examples:
+    - "Is cost predictability something you're focusing on?" (9 words ✓)
+    - "How are you handling energy cost volatility?" (8 words ✓)
+    - "When does your contract renew?" (5 words ✓)
+  STOP immediately when you hit 12 words - do not continue
+
+**Total Email:** 70-90 words ONLY
+  Structure: Greeting (2) + Hook (17) + Value (32) + CTA (11) = 62-65 words ✓
+
+CRITICAL RULES:
+✅ Stop sentences immediately when you hit the word limit
+✅ Combine thoughts into one concise sentence if needed
+✅ Use active voice (reduce passive constructions)
+✅ Cut ALL adjectives except critical ones
+✅ NO "I think", "I believe", "It might be"
+✅ NO "As you may know", "You probably", "Most companies"
+✅ If you exceed any field limit, your email FAILS validation
 
 GREETING (MANDATORY - MUST BE FIRST LINE):
 ✓ Start with "Hi ${firstName || 'there'},"
@@ -3239,7 +3272,7 @@ DO NOT mention: "rates rising 15-25%", "data center demand", generic market stat
 DO NOT use: "I noticed", "I saw", "I read"`}
 IMPORTANT: Always reference ${company} specifically, not other companies.
 
-VALUE PROPOSITION (1-2 sentences MINIMUM):
+VALUE PROPOSITION (1-2 sentences, ~20-30 words - part of 90-word total):
 - Explain how Power Choosers helps with SPECIFIC MEASURABLE VALUE
 - MUST include: (1) What we do, (2) Concrete numbers: "save ${marketContext?.typicalClientSavings || '10-20%'}", "reduce costs by $X", "clients typically see Y"
 - Reference: ${accountDescription ? '"' + accountDescription + '"' : 'their business type'}
@@ -3248,6 +3281,7 @@ VALUE PROPOSITION (1-2 sentences MINIMUM):
 - NEVER end with incomplete phrases or "within [company name]"
 - ALWAYS include a complete value proposition - never skip this field
 - THIS FIELD IS MANDATORY - NEVER LEAVE BLANK
+- REMEMBER: Keep it brief - you're part of a 90-word total limit
 
 CTA (CREATIVE, CONTENT-ALIGNED, NOT PERMISSION-BASED):
 **CRITICAL**: Your CTA MUST naturally flow from the email content you just wrote above. It should feel like a natural continuation, not a disconnected ask.
@@ -3342,8 +3376,22 @@ TONE: Write like a 29-year-old Texas business pro - conversational, confident, d
 - **CRITICAL: NEVER use em dashes (—) or en dashes (–) after conversational phrases. Always use commas or natural flow. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"). This is mandatory and will be rejected if violated.**
 `;
 
+    // WORD COUNT MUST BE FIRST - highest priority (add before everything else)
+    const wordLimitSection = templateType === 'cold_email' ? `
+## ABSOLUTELY CRITICAL - SECTION WORD LIMITS (READ FIRST)
+
+GREETING: "Hi [FirstName]," (2 words)
+OPENING: 15-20 words - problem statement only, no stats
+VALUE: 30-35 words - how you help + savings %
+CTA: 10-12 words - qualifying question (cold) or meeting offer (warm)
+TOTAL: 70-90 words for cold email body
+
+DO NOT EXCEED THESE LIMITS. If you do, your email fails validation.
+
+` : '';
+    
     return { 
-      prompt: [identity, recipientContext, coldEmailRules, outputFormat].join('\n\n'),
+      prompt: [wordLimitSection, identity, recipientContext, coldEmailRules, outputFormat].join('\n\n'),
       researchData: researchData,
       openingStyle: openingStyle?.type || null
     };
@@ -3781,23 +3829,58 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           }
         }
         
-        // Validate email length for cold emails (90-130 words optimal)
+        // AGGRESSIVE WORD COUNT ENFORCEMENT FOR COLD EMAILS
         if (templateType === 'cold_email') {
-          const fullEmail = `${jsonData.greeting || ''} ${jsonData.opening_hook || ''} ${jsonData.value_proposition || ''} ${jsonData.cta_text || ''}`.trim();
-          const wordCount = fullEmail.split(/\s+/).length;
           
-          if (wordCount > 150) {
-            logger.warn(`[Validation] Email too long (${wordCount} words), optimizing...`);
-            // Only remove social proof if present
-            if (jsonData.social_proof_optional) {
-              jsonData.social_proof_optional = '';
-            }
-          } else if (wordCount < 80) {
-            logger.warn(`[Validation] Email too short (${wordCount} words), expanding value proposition...`);
-            // Only expand if value prop is very short
-            if (jsonData.value_proposition && jsonData.value_proposition.length < 40) {
-              jsonData.value_proposition = `${jsonData.value_proposition} Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs.`;
-            }
+          // Helper: Count words in a string
+          const countWords = (str) => str ? String(str).split(/\s+/).filter(w => w.length > 0).length : 0;
+          
+          // Count each section independently
+          const greetingCount = countWords(jsonData.greeting);
+          const hookCount = countWords(jsonData.opening_hook);
+          const valueCount = countWords(jsonData.value_proposition);
+          const ctaCount = countWords(jsonData.cta_text);
+          const totalCount = greetingCount + hookCount + valueCount + ctaCount;
+          
+          logger.log('[Cold Email Validation]', { greetingCount, hookCount, valueCount, ctaCount, totalCount });
+          
+          // ENFORCE SECTION LIMITS - AGGRESSIVE TRUNCATION
+          if (hookCount > 22) {
+            logger.warn(`[Fix] Opening hook too long: ${hookCount} words, truncating to 20...`);
+            const words = String(jsonData.opening_hook).split(/\s+/);
+            jsonData.opening_hook = words.slice(0, 20).join(' ').replace(/[,;]\s*$/, '').replace(/\s+$/, '') + (words[19]?.endsWith('?') || words[19]?.endsWith('.') ? '' : '?');
+          }
+          
+          if (valueCount > 40) {
+            logger.warn(`[Fix] Value proposition too long: ${valueCount} words, truncating to 35...`);
+            const words = String(jsonData.value_proposition).split(/\s+/);
+            jsonData.value_proposition = words.slice(0, 35).join(' ').replace(/[,;]\s*$/, '').replace(/\s+$/, '') + '.';
+          }
+          
+          if (ctaCount > 15) {
+            logger.warn(`[Fix] CTA too long: ${ctaCount} words, truncating to 12...`);
+            const words = String(jsonData.cta_text).split(/\s+/);
+            jsonData.cta_text = words.slice(0, 12).join(' ').replace(/[,;]\s*$/, '').replace(/\s+$/, '') + (words[11]?.endsWith('?') ? '' : '?');
+          }
+          
+          // Calculate final count after truncation
+          const finalTotal = countWords(jsonData.greeting) + countWords(jsonData.opening_hook) + 
+                             countWords(jsonData.value_proposition) + countWords(jsonData.cta_text);
+          
+          logger.log('[Cold Email Final]', { wordCount: finalTotal, target: '70-90 words' });
+          
+          // LAST RESORT: If still over 95, remove value prop social proof clause
+          if (finalTotal > 95) {
+            logger.warn(`[Final Fix] Email still long (${finalTotal}), aggressive trim...`);
+            // Remove "Most clients save X%" if present
+            jsonData.value_proposition = jsonData.value_proposition
+              .replace(/Most clients save[^.]*\.?/i, '')
+              .replace(/Clients typically[^.]*\.?/i, '')
+              .replace(/\s+$/, '');
+          }
+          
+          if (finalTotal < 60) {
+            logger.warn(`[Alert] Email still short (${finalTotal}), may need manual review`);
           }
         }
         
