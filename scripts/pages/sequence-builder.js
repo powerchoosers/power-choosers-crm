@@ -3797,11 +3797,18 @@ Target length: 50-65 words total.
 
 STRUCTURE:
 1. Greeting (Hi [Name],)
-2. Opening Hook (1 sentence): Reference a specific observation about [company] or [industry] challenge.
+2. Opening Hook (1 sentence WITH A QUESTION): Reference a specific observation about [company] or [industry] challenge, then ask about it.
+   Example: "Noticed Cypress is navigating shifting rates in Leander. How are you handling that?"
 3. [LINE BREAK]
 4. Value Prop (1-2 sentences): How we help [industry] companies avoid [problem] and save [amount].
 5. [LINE BREAK]
 6. Low-Friction CTA (1 short question): Ask for interest, not a meeting.
+   Example: "Is this something you're currently looking into?"
+
+CRITICAL: You MUST include TWO questions total:
+- Question 1: In the Opening Hook (problem-awareness)
+- Question 2: In the CTA (low-friction ask)
+Without both questions, the email will be rejected.
 
 TONE:
 - Direct, peer-to-peer, zero fluff.
