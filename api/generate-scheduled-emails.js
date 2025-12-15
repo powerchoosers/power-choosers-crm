@@ -146,15 +146,15 @@ function validateNepqContent(subject, text, toneOpener) {
   const errors = [];
 
   // Forbidden phrases that trigger "old model" sales tone
+  // NOTE: Removed "I noticed/saw/read" ban - AI needs to be able to say "I noticed you opened a new facility"
   const forbidden = [
-    /\bi\s+(saw|noticed|read|came across)\b/i,
     /hope this email finds you well/i,
     /just following up/i,
     /\bmy name is\b/i,
     /wanted to (reach out|introduce)/i
   ];
   if (forbidden.some(rx => rx.test(body))) {
-    errors.push('Contains forbidden salesy phrasing (I saw/noticed/read, hope this finds you well, just following up, my name is, wanted to reach out).');
+    errors.push('Contains forbidden salesy phrasing (hope this finds you well, just following up, my name is, wanted to reach out).');
   }
 
   // Tone opener pattern check - CREATIVE FREEDOM APPROACH
@@ -308,11 +308,11 @@ function validateNepqContent(subject, text, toneOpener) {
         const punctuation = firstSentenceMatch[2];
         const restOfBody = afterGreeting.slice(firstSentenceMatch[0].length).trim();
         
-        // Simple conversion: add "How are you handling" or "Are you seeing" prefix, or convert to question
+        // Smart conversion: add ERCOT context and convert to question
         let questionVersion = firstSentence;
         if (!questionVersion.toLowerCase().startsWith('how') && !questionVersion.toLowerCase().startsWith('are you') && !questionVersion.toLowerCase().startsWith('when')) {
-          // Try to convert statement to question
-          questionVersion = 'How are you handling ' + firstSentence.toLowerCase().replace(/^the\s+/, '').replace(/\.$/, '') + '?';
+          // Try to convert statement to question with ERCOT context
+          questionVersion = 'Given the recent volatility in ERCOT, how are you handling ' + firstSentence.toLowerCase().replace(/^the\s+/, '').replace(/\.$/, '') + '?';
         } else {
           questionVersion = firstSentence + '?';
         }
@@ -329,20 +329,28 @@ function validateNepqContent(subject, text, toneOpener) {
   
   // Re-check question count after auto-fix
   const finalQuestionCount = (body.match(/\?/g) || []).length;
-  if (finalQuestionCount < 2) {
-    errors.push('Email must include at least two questions (problem-awareness + low-friction CTA).');
+  if (finalQuestionCount === 0) {
+    errors.push('Email must include at least one question (problem-awareness or qualifying CTA).');
     // #region agent log
-    const logDataQuestionError = {location:'generate-scheduled-emails.js:320',message:'Validation failed - missing questions after auto-fix',data:{questionCount:finalQuestionCount,required:2,bodyPreview:body.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
+    const logDataQuestionError = {location:'generate-scheduled-emails.js:332',message:'Validation failed - no questions found',data:{questionCount:finalQuestionCount,required:1,bodyPreview:body.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
     debugLog(logDataQuestionError);
+    // #endregion
+  } else if (finalQuestionCount === 1) {
+    // Warning only - allow 1 question for natural tone
+    // #region agent log
+    const logDataQuestionWarning = {location:'generate-scheduled-emails.js:338',message:'NEPQ: Only one question detected; allowed for natural tone',data:{questionCount:finalQuestionCount,bodyPreview:body.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
+    debugLog(logDataQuestionWarning);
     // #endregion
   }
 
-  // High-friction CTAs (avoid scheduling asks)
+  // High-friction CTAs (avoid scheduling asks, but allow "worth a look")
   const highFriction = [
     /\b15\s*minutes?\b/i,
     /\b30\s*minutes?\b/i,
-    /schedule (a )?(call|meeting)/i,
-    /book (a )?(call|meeting)/i
+    /\bschedule\b.*\b(call|meeting)\b/i,
+    /\bbook\b.*\b(call|meeting)\b/i,
+    /\bcalendar\b/i,
+    /\btime on (your|the) calendar\b/i
   ];
   if (highFriction.some(rx => rx.test(lower))) {
     errors.push('CTA appears high-friction (asks to schedule time). Use a simple qualifying question instead.');
