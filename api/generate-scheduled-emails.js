@@ -2124,9 +2124,11 @@ export default async function handler(req, res) {
           selectedAngle.id === 'cost_control' ? 'volatility' :
           selectedAngle.id === 'operational_simplicity' ? 'simplif' : ''
         );
+        const has4CP = /\b4CP\b/i.test(generatedContent.text || '') || /\bfour coincident peaks\b/i.test(generatedContent.text || '');
+        const hasPeakDemand = /peak demand/i.test(generatedContent.text || '');
         
         // #region agent log
-        const logData11 = {location:'generate-scheduled-emails.js:1666',message:'Before content validation',data:{htmlLength:generatedContent.html?.length||0,textLength:generatedContent.text?.length||0,bodyWordCount:bodyWordCount,subject:generatedContent.subject?.substring(0,50)||null,hasContractUrgency:hasContractUrgency,hasDynamicSavings:hasDynamicSavings,hasAngleValueProp:hasAngleValueProp,angleId:selectedAngle?.id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
+        const logData11 = {location:'generate-scheduled-emails.js:1666',message:'Before content validation',data:{htmlLength:generatedContent.html?.length||0,textLength:generatedContent.text?.length||0,bodyWordCount:bodyWordCount,subject:generatedContent.subject?.substring(0,50)||null,hasContractUrgency:hasContractUrgency,hasDynamicSavings:hasDynamicSavings,hasAngleValueProp:hasAngleValueProp,angleId:selectedAngle?.id||null,has4CP:has4CP,hasPeakDemand:hasPeakDemand,industry:recipient.industry||'unknown'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
         debugLog(logData11);
         // #endregion
         
