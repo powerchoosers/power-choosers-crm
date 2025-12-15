@@ -32,13 +32,13 @@ const SUBJECT_LINE_VARIANTS = {
       '[contact_name], quick question on margins'
     ],
     finance: [
-      '[contact_name], 4CP cost mitigation?',
+      '[contact_name], peak demand cost mitigation?',
       'Sales tax audit for [company] meters',
       'ERCOT forward curves vs. budget',
       '[contact_name], rate lock timing check'
     ],
     operations: [
-      '4CP alert strategy for [company]?',
+      'Peak demand strategy for [company]?',
       'Peak load management at [company]',
       '[contact_name], TDU delivery charge audit',
       'Facility power reliability question'
@@ -95,9 +95,9 @@ const angleCtaMap = {
     angleId: 'consolidation'
   },
   'demand_efficiency': {
-    opening: 'For industrial facilities, 4CP (Four Coincident Peaks) charges can make up 30% of your delivery cost.',
-    value: 'Curtailing usage during just 4 critical hours a year can drop your TDU charges by thousands.',
-    full: '4CP charges are likely 30% of your delivery bill. Do you have a notification system for peak days?',
+    opening: 'For many Texas businesses, peak demand charges can quietly make up 30% of your delivery bill.',
+    value: 'Curtailing usage during just a few critical hours a year can drop your TDU charges by thousands.',
+    full: 'Peak demand charges are rising. Do you have a notification system for peak days?',
     angleId: 'demand_efficiency'
   },
   'cost_control': {
@@ -3070,8 +3070,8 @@ You must adjust your vocabulary based on the recipient's role and industry.
 **1. IF RECIPIENT IS HOSPITALITY / RETAIL / OFFICE (Owner, GM, Office Manager):**
 - **Tone:** Business-savvy but accessible. Helpful peer.
 - **Focus:** Bottom line, "getting this off your plate," budget certainty, protecting margins.
-- **Avoid:** Heavy jargon (Heat rates, spark spreads, 4CP).
-- **Keywords:** "Operating expenses," "Budget protection," "Bill audit," "Simplicity."
+- **Avoid:** Heavy jargon (Heat rates, spark spreads, 4CP) - Use "Peak Demand" instead.
+- **Keywords:** "Operating expenses," "Budget protection," "Bill audit," "Simplicity," "Peak charges."
 
 **2. IF RECIPIENT IS INDUSTRIAL / MANUFACTURING / DATA CENTER (Facility Dir, Plant Mgr):**
 - **Tone:** Technical authority. Insider.
@@ -3160,7 +3160,7 @@ EMAIL TYPE: Cold Email (Never Spoke Before)
   Rule: Direct, value-verification question (No meeting asks).
   - BAD: "Is this on your radar?" (Too passive)
   - GOOD (General): "Are you open to a quick audit to check for hidden riders?"
-  - GOOD (Industrial): "Do you have an updated 4CP strategy for this summer?"
+  - GOOD (Industrial): "Do you have an updated peak demand strategy for this summer?"
   - GOOD (Finance): "Are you currently floating or fixed on your index?"
   - GOOD (Owner): "Has anyone reviewed your rate structure since the market shifted?"
   STOP immediately when you hit 15 words - do not continue.
