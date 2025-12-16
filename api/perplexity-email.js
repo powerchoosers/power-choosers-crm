@@ -2565,14 +2565,14 @@ ${job?.toLowerCase().includes('operations') || job?.toLowerCase().includes('mana
 ${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo') ? (company ? '- Executive: "As President of ' + company + ', you understand the importance of managing operational costs..."' : '- Executive: "As President, you understand the importance of managing operational costs..."') : ''}
 `;
 
-  // Recipient context
-  const recipientContext = {
+  // Recipient context (summary object for optional debugging; avoid clashing with the string `recipientContext` above)
+  const recipientContextSummary = {
     firstName,
     company,
     industry,
     accountDescription: accountDescription ? accountDescription.substring(0, 50) + '...' : 'none',
     researchData: researchData ? 'found' : 'none'
-  });
+  };
 
   // For HTML mode, return text-only prompts based on template type
   if (mode === 'html') {
