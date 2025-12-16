@@ -8323,6 +8323,10 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               template: step?.template || ''
             };
 
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'sequence-builder.js:preview-generate-standard',message:'Preview generate (standard/html) payload summary',data:{mode:emailPayload.aiMode,stepIndex:emailPayload.stepIndex,stepType:emailPayload.stepType,template:emailPayload.template,hasAccountIndustry:!!emailPayload.accountData?.industry,hasContactIndustry:!!emailPayload.contactData?.industry,hasAccountDesc:!!(emailPayload.accountData?.shortDescription||emailPayload.accountData?.short_desc||emailPayload.accountData?.descriptionShort||emailPayload.accountData?.description),promptLength:String(emailPayload.aiPrompt||'').length,promptHasContractExpire:/when does your contract expire|contract expire|renewal window/i.test(String(emailPayload.aiPrompt||''))},timestamp:Date.now(),sessionId:'debug-session',runId:'cta-1',hypothesisId:'CTA-PROMPT'})}).catch(()=>{});
+            // #endregion
+
             const response = await fetch(`${base}/api/generate-scheduled-emails`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
