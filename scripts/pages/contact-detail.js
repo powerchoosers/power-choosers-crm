@@ -6636,8 +6636,69 @@
         const memberDoc = await db.collection('sequenceMembers').doc(memberDocId).get();
         const memberData = memberDoc.data();
         const sequenceId = memberData?.sequenceId;
+        // Get contactId from state or memberData
+        const contactId = state.contact?.id || memberData?.targetId || '';
 
         await db.collection('sequenceMembers').doc(memberDocId).delete();
+
+        // CRITICAL: Delete all sequence tasks for this contact/sequence combination
+        if (contactId && sequenceId) {
+          try {
+            const tasksSnapshot = await db.collection('tasks')
+              .where('contactId', '==', contactId)
+              .where('sequenceId', '==', sequenceId)
+              .where('isSequenceTask', '==', true)
+              .get();
+            
+            if (!tasksSnapshot.empty) {
+              const taskIds = [];
+              tasksSnapshot.forEach(doc => {
+                taskIds.push(doc.id);
+              });
+              
+              // Delete tasks in batches (Firestore batch limit is 500)
+              for (let i = 0; i < taskIds.length; i += 500) {
+                const taskBatch = db.batch();
+                const chunk = taskIds.slice(i, i + 500);
+                chunk.forEach(taskId => {
+                  taskBatch.delete(db.collection('tasks').doc(taskId));
+                });
+                await taskBatch.commit();
+              }
+              
+              console.log(`[ContactDetail] Deleted ${taskIds.length} sequence task(s) for contact ${contactId} in sequence ${sequenceId}`);
+              
+              // Clean up caches
+              taskIds.forEach(taskId => {
+                // Remove from BackgroundTasksLoader cache
+                try {
+                  if (window.BackgroundTasksLoader?.getTasksData) {
+                    const tasks = window.BackgroundTasksLoader.getTasksData() || [];
+                    const idx = tasks.findIndex(t => t.id === taskId);
+                    if (idx >= 0) tasks.splice(idx, 1);
+                  }
+                } catch (_) { /* best-effort cache cleanup */ }
+                
+                // Delete from CacheManager cache
+                try {
+                  if (window.CacheManager?.deleteRecord) {
+                    window.CacheManager.deleteRecord('tasks', taskId).catch(() => {});
+                  }
+                } catch (_) { /* ignore cache errors */ }
+                
+                // Dispatch task-deleted event for UI updates
+                try {
+                  document.dispatchEvent(new CustomEvent('pc:task-deleted', {
+                    detail: { taskId, source: 'contact-detail' }
+                  }));
+                } catch (_) { /* ignore event errors */ }
+              });
+            }
+          } catch (taskDeleteError) {
+            console.warn(`[ContactDetail] Failed to delete sequence tasks for contact ${contactId} in sequence ${sequenceId}:`, taskDeleteError);
+            // Continue even if task deletion fails
+          }
+        }
 
         // Decrement sequence stats.active count if we have the sequenceId
         if (sequenceId && window.firebase?.firestore?.FieldValue) {
