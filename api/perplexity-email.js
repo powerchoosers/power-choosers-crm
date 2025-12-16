@@ -4247,7 +4247,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         }
         
         // Fix "[name]'s company" pattern - replace with actual company name
-        const companyName = recipient?.company || '';
+        // Reuse companyName from above (line 4007)
         const firstName = recipient?.firstName || '';
         if (companyName && firstName) {
           const firstNameCompanyPattern = new RegExp(`\\b${firstName}'s company\\b`, 'gi');
