@@ -4,7 +4,6 @@
 
 import { cors } from './_cors.js';
 import * as IndustryDetection from './_industry-detection.js';
-import logger from './_logger.js';
 import { db } from './_firebase.js';
 import fs from 'fs';
 import path from 'path';
@@ -181,12 +180,11 @@ async function getPerplexityCache(cacheKey, cacheType = 'perplexity-research') {
             const CACHE_DURATION_MS = 48 * 60 * 60 * 1000; // 48 hours
             
             if (cacheAge < CACHE_DURATION_MS && data.result) {
-                logger.log(`[Perplexity Cache] Hit for ${cacheType} (age: ${Math.round(cacheAge / 1000 / 60)} minutes)`);
                 return data.result;
             }
         }
     } catch (err) {
-        logger.warn(`[Perplexity Cache] Read error (non-critical): ${err.message}`);
+        // Cache read error (non-critical)
     }
     return null;
 }
@@ -200,7 +198,7 @@ async function setPerplexityCache(cacheKey, result, cacheType = 'perplexity-rese
             source: 'perplexity'
         });
     } catch (err) {
-        logger.warn(`[Perplexity Cache] Write error (non-critical): ${err.message}`);
+        // Cache write error (non-critical)
     }
 }
 
@@ -220,7 +218,6 @@ async function researchCompanyInfo(companyName, industry, additionalContext = {}
   
   // Check in-memory cache (session-level)
   if (companyResearchCache.has(cacheKey)) {
-    logger.log(`[Research] Using in-memory cached info for ${companyName}`);
     return companyResearchCache.get(cacheKey);
   }
   
@@ -272,7 +269,6 @@ Keep it factual, specific, and useful for an energy cost discussion.`;
     });
     
     if (!response.ok) {
-      logger.error(`[Research] API error: ${response.status}`);
       return null;
     }
     
@@ -280,14 +276,12 @@ Keep it factual, specific, and useful for an energy cost discussion.`;
     const description = data.choices?.[0]?.message?.content || null;
     
     if (description) {
-      logger.log(`[Research] Found info for ${companyName}`);
       companyResearchCache.set(cacheKey, description); // In-memory cache
       await setPerplexityCache(cacheKey, description, 'company-research'); // Firestore cache
     }
     
     return description;
   } catch (error) {
-    logger.error('[Research] Company research failed:', error);
     return null;
   }
 }
@@ -298,7 +292,6 @@ async function saveAccountDescription(accountId, description) {
   try {
     const { db } = await import('./_firebase.js');
     if (!db) {
-      logger.warn('[Research] Firestore not available, skipping save');
       return false;
     }
     
@@ -310,12 +303,9 @@ async function saveAccountDescription(accountId, description) {
     
     await db.collection('accounts').doc(accountId).update(updateData);
     
-    logger.log(`[Research] Saved description for account ${accountId}`);
-    
     // Return the saved data so we can notify the frontend
     return { id: accountId, description, timestamp: updateData.descriptionUpdatedAt };
   } catch (error) {
-    logger.error('[Research] Failed to save description:', error);
     return false;
   }
 }
@@ -323,7 +313,6 @@ async function saveAccountDescription(accountId, description) {
 async function researchLinkedInCompany(linkedinUrl, companyName) {
   // Graceful handling: return null if no LinkedIn URL
   if (!linkedinUrl) {
-    logger.log(`[LinkedIn] No LinkedIn URL for ${companyName}`);
     return null;
   }
   
@@ -338,7 +327,6 @@ async function researchLinkedInCompany(linkedinUrl, companyName) {
   
   // Check in-memory cache
   if (linkedinResearchCache.has(cacheKey)) {
-    logger.log(`[LinkedIn] Using in-memory cached data for ${companyName}`);
     return linkedinResearchCache.get(cacheKey);
   }
   
@@ -366,7 +354,6 @@ async function researchLinkedInCompany(linkedinUrl, companyName) {
     });
     
     if (!response.ok) {
-      logger.error(`[LinkedIn] API error: ${response.status}`);
       return null;
     }
     
@@ -374,14 +361,12 @@ async function researchLinkedInCompany(linkedinUrl, companyName) {
     const linkedinData = data.choices?.[0]?.message?.content || null;
     
     if (linkedinData) {
-      logger.log(`[LinkedIn] Found data for ${companyName}`);
       linkedinResearchCache.set(cacheKey, linkedinData);
       await setPerplexityCache(cacheKey, linkedinData, 'linkedin-company');
     }
     
     return linkedinData;
   } catch (error) {
-    logger.error('[LinkedIn] Research failed:', error);
     return null; // Graceful failure
   }
 }
@@ -389,7 +374,6 @@ async function researchLinkedInCompany(linkedinUrl, companyName) {
 async function scrapeCompanyWebsite(domain, companyName) {
   // Graceful handling: return null if no domain
   if (!domain) {
-    logger.log(`[Web Scrape] No domain for ${companyName}`);
     return null;
   }
   
@@ -408,7 +392,6 @@ async function scrapeCompanyWebsite(domain, companyName) {
     
     // Check in-memory cache
     if (websiteResearchCache.has(cacheKey)) {
-      logger.log(`[Web Scrape] Using in-memory cached data for ${companyName}`);
       return websiteResearchCache.get(cacheKey);
     }
     
@@ -435,7 +418,6 @@ async function scrapeCompanyWebsite(domain, companyName) {
     });
     
     if (!response.ok) {
-      logger.error(`[Web Scrape] API error: ${response.status}`);
       return null;
     }
     
@@ -443,21 +425,18 @@ async function scrapeCompanyWebsite(domain, companyName) {
     const websiteData = data.choices?.[0]?.message?.content || null;
     
     if (websiteData) {
-      logger.log(`[Web Scrape] Found data for ${companyName}`);
       websiteResearchCache.set(cacheKey, websiteData);
       await setPerplexityCache(cacheKey, websiteData, 'website-research');
     }
     
     return websiteData;
   } catch (error) {
-    logger.error('[Web Scrape] Website analysis failed:', error);
     return null; // Graceful failure
   }
 }
 
 async function researchContactLinkedIn(linkedinUrl, contactName, companyName) {
   if (!linkedinUrl) {
-    logger.log(`[Contact LinkedIn] No LinkedIn URL for ${contactName}`);
     return null;
   }
   
@@ -472,7 +451,6 @@ async function researchContactLinkedIn(linkedinUrl, contactName, companyName) {
   
   // Check in-memory cache
   if (contactLinkedinCache.has(cacheKey)) {
-    logger.log(`[Contact LinkedIn] Using in-memory cached data for ${contactName}`);
     return contactLinkedinCache.get(cacheKey);
   }
   
@@ -500,7 +478,6 @@ async function researchContactLinkedIn(linkedinUrl, contactName, companyName) {
     });
     
     if (!response.ok) {
-      logger.error(`[Contact LinkedIn] API error: ${response.status}`);
       return null;
     }
     
@@ -508,14 +485,12 @@ async function researchContactLinkedIn(linkedinUrl, contactName, companyName) {
     const contactData = data.choices?.[0]?.message?.content || null;
     
     if (contactData) {
-      logger.log(`[Contact LinkedIn] Found data for ${contactName}`);
       contactLinkedinCache.set(cacheKey, contactData);
       await setPerplexityCache(cacheKey, contactData, 'contact-linkedin');
     }
     
     return contactData;
   } catch (error) {
-    logger.error('[Contact LinkedIn] Research failed:', error);
     return null;
   }
 }
@@ -536,7 +511,6 @@ async function researchRecentCompanyActivity(companyName, industry, city, state,
   
   // Check in-memory cache
   if (recentActivityCache.has(cacheKey)) {
-    logger.log(`[Recent Activity] Using in-memory cached data for ${companyName}`);
     return recentActivityCache.get(cacheKey);
   }
   
@@ -574,7 +548,6 @@ async function researchRecentCompanyActivity(companyName, industry, city, state,
     });
     
     if (!response.ok) {
-      logger.error(`[Recent Activity] API error: ${response.status}`);
       return null;
     }
     
@@ -583,7 +556,6 @@ async function researchRecentCompanyActivity(companyName, industry, city, state,
     
     // Only cache if we found actual activity
     if (activityData && !activityData.toLowerCase().includes('no recent') && !activityData.toLowerCase().includes('unable to find')) {
-      logger.log(`[Recent Activity] Found activity for ${companyName}`);
       recentActivityCache.set(cacheKey, activityData);
       await setPerplexityCache(cacheKey, activityData, 'recent-activity');
       return activityData;
@@ -591,7 +563,6 @@ async function researchRecentCompanyActivity(companyName, industry, city, state,
     
     return null;
   } catch (error) {
-    logger.error('[Recent Activity] Research failed:', error);
     return null;
   }
 }
@@ -610,7 +581,6 @@ async function researchLocationContext(city, state, industry) {
   
   // Check in-memory cache
   if (locationContextCache.has(cacheKey)) {
-    logger.log(`[Location Context] Using in-memory cached data for ${city}, ${state}`);
     return locationContextCache.get(cacheKey);
   }
   
@@ -638,7 +608,6 @@ async function researchLocationContext(city, state, industry) {
     });
     
     if (!response.ok) {
-      logger.error(`[Location Context] API error: ${response.status}`);
       return null;
     }
     
@@ -646,14 +615,12 @@ async function researchLocationContext(city, state, industry) {
     const locationData = data.choices?.[0]?.message?.content || null;
     
     if (locationData) {
-      logger.log(`[Location Context] Found data for ${city}, ${state}`);
       locationContextCache.set(cacheKey, locationData);
       await setPerplexityCache(cacheKey, locationData, 'location-context');
     }
     
     return locationData;
   } catch (error) {
-    logger.error('[Location Context] Research failed:', error);
     return null;
   }
 }
@@ -820,7 +787,6 @@ function analyzeManualPrompt(prompt) {
     }
   };
   
-  logger.log('[Prompt Analysis] Extracted context:', analysis);
   return analysis;
   }
   
@@ -962,7 +928,6 @@ function generateDynamicFields(templateType, promptAnalysis, recipient) {
     });
   }
   
-  logger.log('[Dynamic Fields] Generated fields:', dynamicFields);
   return dynamicFields;
 }
 
@@ -1029,7 +994,6 @@ function getTemplateType(prompt) {
   for (const [templateType, patterns] of Object.entries(flexiblePatterns)) {
     for (const pattern of patterns) {
       if (pattern.test(promptLower)) {
-        logger.log(`[Template Detection] Matched "${templateType}" for prompt: "${prompt}"`);
         return templateType;
       }
     }
@@ -1046,12 +1010,10 @@ function getTemplateType(prompt) {
   };
   
   if (promptMap[prompt]) {
-    logger.log(`[Template Detection] Exact match "${promptMap[prompt]}" for prompt: "${prompt}"`);
     return promptMap[prompt];
   }
   
   // Default to general template for unrecognized prompts
-  logger.log(`[Template Detection] Using "general" template for prompt: "${prompt}"`);
   return 'general';
 }
 
@@ -1656,7 +1618,6 @@ function getTemplateSchema(templateType, dynamicFields = []) {
       };
     });
     
-    logger.log('[Schema Enhancement] Added dynamic fields:', dynamicFields.map(f => f.name));
     return enhancedSchema;
   }
   
@@ -2003,8 +1964,6 @@ async function buildSystemPrompt({
   const energy = r.energy || {};
   const transcript = (r.transcript || r.callTranscript || r.latestTranscript || '').toString().slice(0, 1000);
   const notes = [r.notes, r.account?.notes].filter(Boolean).join('\n').slice(0, 500);
-  // Debug log to see what account data is available
-  logger.debug('[Debug] Full account data for', company, ':', JSON.stringify(r.account, null, 2));
   
   // Clean and sanitize account description - check multiple possible field names
   let accountDescription = (r.account?.shortDescription || r.account?.short_desc || r.account?.descriptionShort || r.account?.description || r.account?.companyDescription || r.account?.accountDescription || '')
@@ -2051,8 +2010,6 @@ async function buildSystemPrompt({
   
   // Company research (only if no description exists)
   if (!accountDescription && company) {
-    logger.log(`[Research] No description for ${company}, starting enhanced research...`);
-    
     const linkedinUrl = r.account?.linkedin || r.account?.linkedinUrl || null;
     const domain = r.account?.domain || r.account?.website || null;
     const location = city && state ? `${city}, ${state}` : (city || state || '');
@@ -2406,8 +2363,8 @@ ${job?.toLowerCase().includes('operations') || job?.toLowerCase().includes('mana
 ${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo') ? '- Executive: "As President of ' + company + ', you understand the importance of managing operational costs..."' : ''}
 `;
 
-  // Debug log for recipient context
-  logger.debug(`[Debug] Recipient context for ${firstName} at ${company}:`, {
+  // Recipient context
+  const recipientContext = {
     firstName,
     company,
     industry,
@@ -2578,7 +2535,14 @@ Generate text for these fields:
   * Honest/direct: "Honestly, ", "So here's the thing, "
   * Disarmed/confused: "Not sure if...", "Quick question that might be off base..." (only this specific variation, not generic "Quick question")
   **FORBIDDEN**: "Wondering how..." is STRICTLY FORBIDDEN - it's overused and templated.
-  **NATURALNESS OVER MATCHING**: The goal is natural, human-sounding openers that vary across emails. Use the tone opener style as your guide, but don't force-match it if a different natural phrasing works better. Just don't default to "Quick question". Then continue with problem awareness (1-2 sentences total). ${selectedAngle && typeof selectedAngle === 'object' ? `**CRITICAL - USE THE SELECTED ANGLE**: This email MUST focus on "${selectedAngle.primaryMessage || selectedAngle.label || 'the selected angle'}". ${selectedAngle.id === 'demand_efficiency' ? 'You CAN mention demand charges since this angle is about demand efficiency.' : 'DO NOT mention "demand charges" or "delivery charges" - this angle is NOT about demand. Focus on ' + (selectedAngle.primaryMessage || selectedAngle.label) + ' instead. For example, if angle is "timing_strategy", focus on contract renewal timing. If angle is "cost_control", focus on rising electricity costs or budget pressure. If angle is "exemption_recovery", focus on tax exemptions. If angle is "consolidation", focus on multi-location management.'} ${selectedAngle.openingTemplate ? 'Use this angle\'s opening pattern as inspiration: "' + selectedAngle.openingTemplate + '"' : ''}` : '**DO NOT default to "demand charges"** - vary the pain points you mention.'} ${accountDescription ? `**CRITICAL - DO NOT USE THE BUSINESS FOCUS TEXT**: The "Business Focus" (${accountDescription}) is ONLY for you to understand their business type. DO NOT copy it, quote it, or reference it directly in the email. Instead, use industry-specific language naturally. GOOD: "Most ${industryLower || 'manufacturing'} companies I work with..." or "Companies like ${company} typically..." BAD: "${accountDescription}..." or "As a ${accountDescription}..." or any variation that includes the business focus text.` : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
+  **NATURALNESS OVER MATCHING**: The goal is natural, human-sounding openers that vary across emails. Use the tone opener style as your guide, but don't force-match it if a different natural phrasing works better. Just don't default to "Quick question". Then continue with problem awareness (1-2 sentences total).
+  
+  **PERSONALIZATION PRIORITY FOR OPENING HOOK**:
+  1. **If you have research data** (recentActivityContext, linkedinContext, websiteContext): Reference specific details through questions (e.g., "With your recent expansion in [City], how are you handling..."). DO NOT say "I noticed" - use questions.
+  2. **If no research but you have accountDescription**: Use the business type naturally (e.g., "How are manufacturing companies like [company] handling..."). DO NOT copy the description text verbatim - it sounds like an encyclopedia.
+  3. **If no research and no description**: Use industry-specific challenges (e.g., "How are [industry] companies handling rising energy costs?").
+  
+  ${selectedAngle && typeof selectedAngle === 'object' ? `**CRITICAL - USE THE SELECTED ANGLE**: This email MUST focus on "${selectedAngle.primaryMessage || selectedAngle.label || 'the selected angle'}". ${selectedAngle.id === 'demand_efficiency' ? 'You CAN mention demand charges since this angle is about demand efficiency.' : 'DO NOT mention "demand charges" or "delivery charges" - this angle is NOT about demand. Focus on ' + (selectedAngle.primaryMessage || selectedAngle.label) + ' instead. For example, if angle is "timing_strategy", focus on contract renewal timing. If angle is "cost_control", focus on rising electricity costs or budget pressure. If angle is "exemption_recovery", focus on tax exemptions. If angle is "consolidation", focus on multi-location management.'} ${selectedAngle.openingTemplate ? 'Use this angle\'s opening pattern as inspiration: "' + selectedAngle.openingTemplate + '"' : ''}` : '**DO NOT default to "demand charges"** - vary the pain points you mention.'} ${accountDescription ? `**CRITICAL - DO NOT USE THE BUSINESS FOCUS TEXT**: The "Business Focus" (${accountDescription}) is ONLY for you to understand their business type. DO NOT copy it, quote it, or reference it directly in the email. Instead, use industry-specific language naturally. GOOD: "Most ${industryLower || 'manufacturing'} companies I work with..." or "Companies like ${company} typically..." BAD: "${accountDescription}..." or "As a ${accountDescription}..." or any variation that includes the business focus text.` : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
   **CRITICAL PUNCTUATION RULE: NEVER use em dashes (—) or en dashes (–) in the opening_hook. Use commas or natural flow instead. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"), "Real question, " (NOT "Real question—"). This is mandatory - em dashes will be rejected.**
   * Manufacturing: Production downtime, equipment reliability, energy-intensive operations
   * Healthcare: Budget constraints, regulatory compliance, patient care continuity
@@ -2727,16 +2691,23 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', how have you seen..." (if tenure available)' : ''}
 ${contactLinkedinContext ? '- Reference contact profile: Use insights from their LinkedIn profile naturally through questions' : ''}
 
+PERSONALIZATION PRIORITY (CRITICAL - Follow This Order):
+1. **INTERNET RESEARCH (HIGHEST PRIORITY)**: If you have recentActivityContext, linkedinContext, or websiteContext, USE THESE FIRST. Reference specific details naturally through questions (e.g., "With your recent expansion in [City], how has that affected..."). DO NOT say "I noticed" or "I saw" - use questions instead.
+
+2. **COMPANY DESCRIPTION (SECOND PRIORITY)**: If no research data is available, use accountDescription naturally. DO NOT copy it verbatim or make it sound like an encyclopedia entry. Instead, extract the business type and use industry-specific language (e.g., "manufacturing companies like [company]" not "As a leading provider of manufacturing services...").
+
+3. **INDUSTRY INFORMATION (FINAL FALLBACK)**: If no research and no description, use industry-specific challenges and pain points. Reference their industry naturally through questions.
+
 EVIDENCE OF RESEARCH (Show You Know Their Business):
-${accountDescription ? '✓ PRIORITY: Use business focus for context only: The business focus (' + accountDescription + ') tells you their business type. Use industry-specific language (e.g., "manufacturing companies", "restaurant chains") but DO NOT mention the business focus text itself. This is your PRIMARY hook when no recent activity.' : ''}
-${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements through questions' : ''}
-${websiteContext ? '✓ PRIORITY: Use website info: Ask about specific challenges mentioned on their website (DO NOT say "I noticed") - strong alternative when no recent activity' : ''}
-${recentActivityContext ? '✓ Use recent activity: Ask "With ' + recentActivityContext.substring(0, 60) + '..., how has that impacted..." (DO NOT say "I saw")' : '✗ DO NOT mention recent activity, recent news, recent public activity, or "no recent activity" - there is none available. INSTEAD, use account description, website context, contract timing, or industry-specific questions'}
+${recentActivityContext ? '✓ **PRIORITY 1**: Use recent activity: Ask "With ' + recentActivityContext.substring(0, 60) + '..., how has that impacted..." (DO NOT say "I saw") - USE THIS FIRST' : ''}
+${linkedinContext ? '✓ **PRIORITY 1**: Use company LinkedIn: Reference recent company posts or announcements through questions - USE THIS FIRST' : ''}
+${websiteContext ? '✓ **PRIORITY 1**: Use website info: Ask about specific challenges mentioned on their website (DO NOT say "I noticed") - USE THIS FIRST' : ''}
+${accountDescription ? '✓ **PRIORITY 2**: Use business focus naturally (NOT encyclopedia style): The business focus tells you their business type. Use industry-specific language (e.g., "manufacturing companies", "restaurant chains") but DO NOT mention the business focus text itself. Use this when no research data is available.' : ''}
 ${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
-${contractEndLabel ? '✓ PRIORITY: Use contract timing: "With your contract ending ' + contractEndLabel + '..." - strong hook when no recent activity' : ''}
+${contractEndLabel ? '✓ Use contract timing: "With your contract ending ' + contractEndLabel + '..." - strong hook when no research data' : ''}
 ${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
 ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant for context' : ''}
-${industry ? '✓ Use industry context: Reference ' + industry + ' industry challenges naturally through questions' : ''}
+${industry ? '✓ **PRIORITY 3**: Use industry context: Reference ' + industry + ' industry challenges naturally through questions - Use this when no research and no description available' : ''}
 
 CONVERSATIONAL FLOW PATTERNS:
 ✓ GOOD: "With ${company} operating in ${industryLower || '[industry]'}, how are you handling energy costs for facilities like yours?"
@@ -2780,6 +2751,8 @@ CRITICAL QUALITY RULES:
 - COMPANY DATA USAGE: MUST use current supplier, rate, contract timing, recent achievements when available
 
 FORBIDDEN PHRASES (TWO-TIER APPROACH):
+- **CRITICAL - NEVER use "4CP" or "Four Coincident Peaks"**: Always use "Peak Demand" or "Peak Demand Charges" instead. This applies to ALL industries and roles, including technical ones. Food production, manufacturing, and industrial facilities should see accessible "Peak Demand" terminology.
+
 TIER 1 - OPENING HOOK (NO statistics allowed):
 - "I've been tracking how [industry] companies..."
 - "Recently helped another [industry] company..."
@@ -3076,8 +3049,9 @@ You must adjust your vocabulary based on the recipient's role and industry.
 **2. IF RECIPIENT IS INDUSTRIAL / MANUFACTURING / DATA CENTER (Facility Dir, Plant Mgr):**
 - **Tone:** Technical authority. Insider.
 - **Focus:** Operational impact, load profiles, demand response, efficiency.
-- **Use:** Technical terms correctly (Load Factor, Demand Ratchets, kVA). Use "Peak Demand" or "Peak Demand Charges" instead of "4CP" for clarity.
-- **Keywords:** "Uptime," "Peak Demand," "Load profile," "TDU charges."
+- **Use:** Technical terms correctly (Load Factor, Demand Ratchets, kVA).
+- **CRITICAL - NEVER use "4CP" or "Four Coincident Peaks"**: Always use "Peak Demand" or "Peak Demand Charges" instead. Even technical recipients benefit from clear, accessible language. Food production, manufacturing, and industrial facilities should see "Peak Demand" terminology.
+- **Keywords:** "Uptime," "Peak Demand," "Peak Demand Charges," "Load profile," "TDU charges."
 
 **3. IF RECIPIENT IS FINANCE (CFO, Controller):**
 - **Tone:** Financial risk manager. Direct.
@@ -3227,11 +3201,18 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Write like a knowledgeable energy expert who researched ${company || 'their company'} deeply
 - ${marketContext?.enabled ? 'Market context is ENABLED, but still lead with specific question' : 'Market context is DISABLED - focus on THEIR specific situation only'}
 - Show you did homework: When you have specific data, use QUESTIONS instead of observations:
-  ${accountDescription ? '* PRIORITY: Use business focus for context: The business focus tells you their business type. Ask about their industry-specific challenges (e.g., "How are manufacturing companies like ' + company + ' handling energy costs?") but DO NOT mention the business focus text itself.' : '* Ask about [specific detail about their company]: "How is [specific detail] affecting your energy costs?"'}
-  ${recentActivityContext ? '* Ask about ' + recentActivityContext.substring(0, 60) + '...: "With [recent activity], how has that impacted your planning?" (you have recent activity - USE THIS)' : '* DO NOT mention recent activity, recent news, or recent public activity - there is none available. Use account description, website, or contract timing instead'}
-  ${websiteContext ? '* PRIORITY: Reference website through questions: "How are you handling [specific challenge from website]?" (you have website context - USE THIS as strong alternative)' : '* Reference website through questions: "How are you handling [specific challenge from website]?" (if available)'}
+  
+  **PERSONALIZATION PRIORITY FOR OPENING HOOK**:
+  1. **If you have research data** (recentActivityContext, linkedinContext, websiteContext): Reference specific details through questions (e.g., "With your recent expansion in [City], how are you handling..."). DO NOT say "I noticed" - use questions.
+  2. **If no research but you have accountDescription**: Use the business type naturally (e.g., "How are manufacturing companies like [company] handling..."). DO NOT copy the description text verbatim - it sounds like an encyclopedia.
+  3. **If no research and no description**: Use industry-specific challenges (e.g., "How are [industry] companies handling rising energy costs?").
+  
+  ${recentActivityContext ? '* **PRIORITY 1**: Ask about ' + recentActivityContext.substring(0, 60) + '...: "With [recent activity], how has that impacted your planning?" (you have recent activity - USE THIS FIRST)' : ''}
+  ${linkedinContext ? '* **PRIORITY 1**: Reference company LinkedIn through questions: "How are you handling [challenge from LinkedIn post]?" (you have LinkedIn context - USE THIS FIRST)' : ''}
+  ${websiteContext ? '* **PRIORITY 1**: Reference website through questions: "How are you handling [specific challenge from website]?" (you have website context - USE THIS FIRST)' : ''}
+  ${accountDescription ? '* **PRIORITY 2**: Use business focus naturally (NOT encyclopedia style): The business focus tells you their business type. Ask about their industry-specific challenges (e.g., "How are manufacturing companies like ' + company + ' handling energy costs?") but DO NOT mention the business focus text itself. Use this when no research data is available.' : '* Ask about [specific detail about their company]: "How is [specific detail] affecting your energy costs?"'}
   ${city && marketContext?.enabled ? '* "Given ' + city + '\'s energy market conditions..." (you have location)' : ''}
-  ${contractEndLabel && !marketContext?.enabled ? '* PRIORITY: "With your contract ending ' + contractEndLabel + '..." (use contract timing - strong hook when no recent activity)' : ''}
+  ${contractEndLabel && !marketContext?.enabled ? '* Use contract timing: "With your contract ending ' + contractEndLabel + '..." (strong hook when no research data)' : ''}
 - Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : '[specific situation]'}..."
 - Include micro-observations: Reference their website, recent posts, industry trends they'd recognize through QUESTIONS
 - Vary sentence length: Mix short punchy statements with longer explanatory ones
@@ -3241,16 +3222,23 @@ ${marketContext?.enabled ? '- You may reference general market trends, but lead 
 - Show expertise subtly: "In my experience with ${industry || '[industry]'} companies", ask questions about [specific trend about their company]
 ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', how have you seen..." (tenure available)' : ''}
 
+PERSONALIZATION PRIORITY (CRITICAL - Follow This Order):
+1. **INTERNET RESEARCH (HIGHEST PRIORITY)**: If you have recentActivityContext, linkedinContext, or websiteContext, USE THESE FIRST. Reference specific details naturally through questions (e.g., "With your recent expansion in [City], how has that affected..."). DO NOT say "I noticed" or "I saw" - use questions instead.
+
+2. **COMPANY DESCRIPTION (SECOND PRIORITY)**: If no research data is available, use accountDescription naturally. DO NOT copy it verbatim or make it sound like an encyclopedia entry. Instead, extract the business type and use industry-specific language (e.g., "manufacturing companies like [company]" not "As a leading provider of manufacturing services...").
+
+3. **INDUSTRY INFORMATION (FINAL FALLBACK)**: If no research and no description, use industry-specific challenges and pain points. Reference their industry naturally through questions.
+
 EVIDENCE OF RESEARCH (Show You Know Their Business):
-${accountDescription ? '✓ PRIORITY: Use account description: Reference "' + accountDescription.substring(0, 100) + '..." naturally - this is your PRIMARY hook when no recent activity' : ''}
-${linkedinContext ? '✓ Use company LinkedIn: Reference recent company posts or announcements' : ''}
-${websiteContext ? '✓ PRIORITY: Use website info: Ask about specific challenges from their website (DO NOT say "I noticed") - strong alternative when no recent activity' : ''}
-${recentActivityContext ? '✓ Use recent activity: Ask "With ' + recentActivityContext.substring(0, 60) + '..., how has that impacted..." (DO NOT say "I saw")' : '✗ DO NOT mention recent activity, recent news, recent public activity, or "no recent activity" - there is none available. INSTEAD, use account description, website context, contract timing, or industry-specific questions'}
+${recentActivityContext ? '✓ **PRIORITY 1**: Use recent activity: Ask "With ' + recentActivityContext.substring(0, 60) + '..., how has that impacted..." (DO NOT say "I saw") - USE THIS FIRST' : ''}
+${linkedinContext ? '✓ **PRIORITY 1**: Use company LinkedIn: Reference recent company posts or announcements through questions - USE THIS FIRST' : ''}
+${websiteContext ? '✓ **PRIORITY 1**: Use website info: Ask about specific challenges from their website (DO NOT say "I noticed") - USE THIS FIRST' : ''}
+${accountDescription ? '✓ **PRIORITY 2**: Use account description naturally (NOT encyclopedia style): Reference the business type (e.g., "manufacturing companies like ' + company + '") but DO NOT mention the description text itself. Use this when no research data is available.' : ''}
 ${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
-${contractEndLabel ? '✓ PRIORITY: Use contract timing: "With your contract ending ' + contractEndLabel + '..." - strong hook when no recent activity' : ''}
+${contractEndLabel ? '✓ Use contract timing: "With your contract ending ' + contractEndLabel + '..." - strong hook when no research data' : ''}
 ${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
 ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant' : ''}
-${industry ? '✓ Use industry context: Reference ' + industry + ' industry challenges naturally through questions' : ''}
+${industry ? '✓ **PRIORITY 3**: Use industry context: Reference ' + industry + ' industry challenges naturally through questions - Use this when no research and no description available' : ''}
 
 CONVERSATIONAL FLOW PATTERNS:
 ✓ GOOD: "With ${company} operating in ${industry || '[industry]'}, how are you handling energy costs for facilities like yours?"
@@ -3540,7 +3528,6 @@ export default async function handler(req, res) {
   try {
     const apiKey = process.env.PERPLEXITY_API_KEY;
     if (!apiKey) {
-      logger.error('[Perplexity] Missing PERPLEXITY_API_KEY');
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Missing API key' }));
       return;
@@ -3566,7 +3553,6 @@ export default async function handler(req, res) {
     // Detect template type for both HTML and standard modes
     const templateType = getTemplateType(prompt);
     
-    logger.log('[Perplexity] Template type:', templateType, 'for prompt:', prompt);
     
     // Build system prompt with TODAY context and suggested meeting times
     const today = new Date();
@@ -3687,7 +3673,6 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         data = await response.json();
       } catch (fallbackErr) {
         const msg = data?.error?.message || data?.detail || 'API error';
-        logger.error('[Perplexity] API error and fallback failed:', msg, fallbackErr);
         return res.writeHead(500, { 'Content-Type': 'application/json' })
           .end(JSON.stringify({ error: 'API error', detail: msg }));
       }
@@ -3696,19 +3681,15 @@ CRITICAL: Use these EXACT meeting times in your CTA.
     let content = data?.choices?.[0]?.message?.content || '';
     const citations = data?.citations || [];
     
-    logger.log('[Perplexity] Response received, length:', content.length);
-    
     // For HTML mode, return parsed JSON with template type
     if (mode === 'html' && content) {
       try {
         const jsonData = JSON.parse(content);
-        logger.log('[Perplexity] Parsed JSON for template:', templateType);
         
         // Validate value proposition completeness for cold emails
         if (templateType === 'cold_email' && jsonData.value_proposition) {
           const incomplete = /\b(within|like|such as|including)\s+[A-Z][^.!?]*$/i.test(jsonData.value_proposition);
           if (incomplete) {
-            logger.warn('[Validation] Incomplete value prop detected, fixing...');
             jsonData.value_proposition = jsonData.value_proposition.replace(
               /\b(within|like|such as|including)\s+[A-Z][^.!?]*$/i,
               `secure better energy rates before contracts expire. Clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual costs.`
@@ -3720,21 +3701,18 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         if (templateType === 'cold_email' && jsonData.cta_text) {
           const incompleteCTA = /would you be open to a quick$/i.test(jsonData.cta_text);
           if (incompleteCTA) {
-            logger.warn('[Validation] Incomplete CTA detected, fixing...');
             jsonData.cta_text = 'Would you be open to discussing your current energy setup?';
           }
         }
         
         // Validate missing value propositions for cold emails
         if (templateType === 'cold_email' && (!jsonData.value_proposition || jsonData.value_proposition.trim() === '')) {
-          logger.warn('[Validation] Missing value proposition detected, adding default...');
           const industry = recipient?.industry || 'businesses';
           jsonData.value_proposition = `We help ${industry} companies secure better rates before contracts expire. Our clients typically save ${marketContext?.typicalClientSavings || '10-20%'} on annual energy costs.`;
         }
         
         // Validate missing opening_hook for cold emails
         if (templateType === 'cold_email' && (!jsonData.opening_hook || jsonData.opening_hook.trim() === '')) {
-          logger.warn('[Validation] Missing opening_hook detected, adding default...');
           const company = recipient?.company || 'Companies';
           jsonData.opening_hook = `${company} are likely facing rising electricity costs with contracts renewing in 2025.`;
         }
@@ -3776,17 +3754,10 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           }
           
           if (hasMultipleQuestions || hasMeetingRequest || hasTimeSlot || hasOldCta || (shouldUseAngleCta && !hasAngleCta)) {
-            logger.warn('[Validation] Invalid or missing angle-based CTA detected, replacing...', {
-              hasOldCta,
-              hasAngleCta,
-              shouldUseAngleCta: !!shouldUseAngleCta,
-              currentCta: jsonData.cta_text
-            });
             // Use angle-based CTA if available
             if (shouldUseAngleCta) {
               const angleCta = getAngleCta(selectedAngle);
               jsonData.cta_text = angleCta.full;
-              logger.log('[Validation] Replaced with angle-based CTA:', angleCta.full);
             } else {
               jsonData.cta_text = 'When does your current energy contract expire?';
             }
@@ -3800,7 +3771,6 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           
           if (hasWonderingHow) {
             // Replace "Wondering how..." with tone opener style
-            logger.warn('[Validation] "Wondering how..." detected, replacing with tone opener style:', toneOpener);
             
             // Extract the question part after "Wondering how [company] is handling..."
             const wonderingMatch = jsonData.opening_hook.match(/^wondering how [^?]+\?/i);
@@ -3852,7 +3822,6 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         if (templateType === 'cold_email' && jsonData.opening_hook) {
           const hasStatistics = /\d+[-–]\d+%|\d+%|save \$\d+|reduce costs by|15-25%|20-30%|10-20%|data center.*\d+%|rates up \d+%/i.test(jsonData.opening_hook);
           if (hasStatistics) {
-            logger.warn('[Validation] Statistics detected in opening_hook:', jsonData.opening_hook);
             // Strip out the statistics but keep the sentence structure
             jsonData.opening_hook = jsonData.opening_hook
               .replace(/\d+[-–]\d+%/g, 'significantly')
@@ -3864,7 +3833,6 @@ CRITICAL: Use these EXACT meeting times in your CTA.
               .replace(/15-25%/gi, 'significantly')
               .replace(/20-30%/gi, 'considerably')
               .replace(/10-20%/gi, 'substantially');
-            logger.warn('[Validation] Fixed opening_hook:', jsonData.opening_hook);
           }
         }
         
@@ -3881,23 +3849,18 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           const ctaCount = countWords(jsonData.cta_text);
           const totalCount = greetingCount + hookCount + valueCount + ctaCount;
           
-          logger.log('[Cold Email Validation]', { greetingCount, hookCount, valueCount, ctaCount, totalCount });
-          
           // ENFORCE SECTION LIMITS - AGGRESSIVE TRUNCATION (50-70 word target)
           if (hookCount > 22) {
-            logger.warn(`[Fix] Opening hook too long: ${hookCount} words, truncating to 20...`);
             const words = String(jsonData.opening_hook).split(/\s+/);
             jsonData.opening_hook = words.slice(0, 20).join(' ').replace(/[,;]\s*$/, '').replace(/\s+$/, '') + (words[19]?.endsWith('?') || words[19]?.endsWith('.') ? '' : '.');
           }
           
           if (valueCount > 32) {
-            logger.warn(`[Fix] Value proposition too long: ${valueCount} words, truncating to 30...`);
             const words = String(jsonData.value_proposition).split(/\s+/);
             jsonData.value_proposition = words.slice(0, 30).join(' ').replace(/[,;]\s*$/, '').replace(/\s+$/, '') + '.';
           }
           
           if (ctaCount > 14) {
-            logger.warn(`[Fix] CTA too long: ${ctaCount} words, truncating to 12...`);
             const words = String(jsonData.cta_text).split(/\s+/);
             jsonData.cta_text = words.slice(0, 12).join(' ').replace(/[,;]\s*$/, '').replace(/\s+$/, '') + (words[11]?.endsWith('?') ? '' : '?');
           }
@@ -3906,11 +3869,8 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           const finalTotal = countWords(jsonData.greeting) + countWords(jsonData.opening_hook) + 
                              countWords(jsonData.value_proposition) + countWords(jsonData.cta_text);
           
-          logger.log('[Cold Email Final]', { wordCount: finalTotal, target: '50-70 words' });
-          
           // LAST RESORT: If still over 75, remove value prop social proof clause
           if (finalTotal > 75) {
-            logger.warn(`[Final Fix] Email still long (${finalTotal}), aggressive trim...`);
             // Remove "Most clients save X%" if present
             jsonData.value_proposition = jsonData.value_proposition
               .replace(/Most clients save[^.]*\.?/i, '')
@@ -3918,9 +3878,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
               .replace(/\s+$/, '');
           }
           
-          if (finalTotal < 45) {
-            logger.warn(`[Alert] Email still short (${finalTotal}), may need manual review`);
-          }
+          // Email length validation complete
         }
         
         // Final language polishing: de-salesify and personalize industry/size
@@ -3995,7 +3953,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         }));
       } catch (e) {
         // Fallback for HTML mode: return plain text content so frontend can render standard email
-        logger.warn('[Perplexity] JSON parse failed for HTML mode; returning plain text output fallback');
+        // JSON parse failed for HTML mode; returning plain text output fallback
         res.writeHead(200, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ 
           ok: true,
@@ -4028,7 +3986,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
     }));
     
   } catch (e) {
-    logger.error('[Perplexity] Handler error:', e);
+    // Handler error
     res.writeHead(500, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ error: 'Failed to generate email', message: e.message }));
   }

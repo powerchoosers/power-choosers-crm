@@ -1,20 +1,5 @@
 import { db } from './_firebase.js';
 import * as IndustryDetection from './_industry-detection.js';
-import logger from './_logger.js';
-import fs from 'fs';
-import path from 'path';
-
-// Debug logging helper - writes directly to file
-const DEBUG_LOG_PATH = path.join(process.cwd(), '.cursor', 'debug.log');
-function debugLog(data) {
-  try {
-    const logLine = JSON.stringify(data) + '\n';
-    fs.appendFileSync(DEBUG_LOG_PATH, logLine, 'utf8');
-  } catch (err) {
-    // Fallback to console if file write fails
-    console.log('[DEBUG]', JSON.stringify(data));
-  }
-}
 
 // ========== EM DASH REMOVAL ==========
 // Remove em dashes and hyphens from email content and replace with commas or natural flow
@@ -38,26 +23,6 @@ function removeEmDashes(text) {
       }
       return match; // Keep other hyphens (e.g., "energy-intensive", "24/7")
     });
-  
-  // #region agent log
-  if (hasEmDash) {
-    const logDataEmDash = {
-      location: 'generate-scheduled-emails.js:removeEmDashes',
-      message: 'Em dash removal applied',
-      data: {
-        beforePreview: before.substring(0, 200),
-        afterPreview: after.substring(0, 200),
-        hadEmDash: hasEmDash,
-        emDashCount: (before.match(/[—–]/g) || []).length
-      },
-      timestamp: Date.now(),
-      sessionId: 'debug-session',
-      runId: 'run1',
-      hypothesisId: 'I'
-    };
-    debugLog(logDataEmDash);
-  }
-  // #endregion
   
   return after;
 }
@@ -134,10 +99,6 @@ function validateGeneratedContent(html, text, subject) {
 // ========== NEPQ VALIDATION ==========
 // Guardrails to keep generations aligned with NEPQ rules
 function validateNepqContent(subject, text, toneOpener) {
-  // #region agent log
-  const logData = {location:'generate-scheduled-emails.js:76',message:'validateNepqContent ENTRY',data:{subject:subject?.substring(0,50),textLength:text?.length||0,toneOpener:toneOpener?.substring(0,30)||null,textPreview:text?.substring(0,100)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-  debugLog(logData);
-  // #endregion
   // CRITICAL: Remove em dashes from body text BEFORE validation
   let body = removeEmDashes((text || '').toString());
   // CRITICAL: Remove em dashes from tone opener if it has any (use local variable)
@@ -222,11 +183,6 @@ function validateNepqContent(subject, text, toneOpener) {
     const bodyAfterGreeting = greetingMatch ? body.slice(greetingMatch[0].length).trim() : body;
     const hasValidOpener = hasValidToneOpenerPattern(bodyAfterGreeting);
     
-    // #region agent log
-    const logDataTone = {location:'generate-scheduled-emails.js:208',message:'Tone opener pattern check',data:{hasGreeting:!!greetingMatch,bodyAfterGreetingPreview:bodyAfterGreeting.substring(0,150),hasValidOpener:hasValidOpener,toneOpener:cleanToneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-    debugLog(logDataTone);
-    // #endregion
-    
     // Also check for exact match (for backward compatibility) - use already-sanitized cleanToneOpener
     const openerIdx = cleanToneOpener ? body.toLowerCase().indexOf(cleanToneOpener.toLowerCase()) : -1;
 
@@ -234,11 +190,6 @@ function validateNepqContent(subject, text, toneOpener) {
     // The selected tone opener is inspiration only - we don't require exact matching
     // Only auto-insert if NO conversational opener detected at all
     if (!hasValidOpener && openerIdx === -1) {
-      // Only auto-insert if NO conversational opener detected at all
-      // #region agent log
-      const logData1 = {location:'generate-scheduled-emails.js:220',message:'Tone opener missing - checking greeting',data:{hasGreeting:!!greetingMatch,bodyPreview:body.substring(0,150),toneOpener:cleanToneOpener?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-      debugLog(logData1);
-      // #endregion
       if (greetingMatch) {
         const greeting = greetingMatch[0];
         const restOfBody = body.slice(greeting.length).trim();
@@ -247,10 +198,6 @@ function validateNepqContent(subject, text, toneOpener) {
         const hasValidOpenerPattern = hasValidToneOpenerPattern(restOfBody);
         
         if (hasValidOpenerPattern) {
-          // #region agent log
-          const logData2 = {location:'generate-scheduled-emails.js:196',message:'Valid tone opener pattern already exists in body, skipping auto-insert',data:{restPreview:restOfBody.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-          debugLog(logData2);
-          // #endregion
           // Body already has a good opener - just ensure proper spacing
           if (!greeting.endsWith('\n\n') && !greeting.endsWith('\n')) {
             body = greeting.trim() + '\n\n' + restOfBody;
@@ -271,11 +218,6 @@ function validateNepqContent(subject, text, toneOpener) {
             // CRITICAL: Use the already-sanitized cleanToneOpener (or sanitize fallback)
             const openerToInsert = cleanToneOpener || removeEmDashes('Quick question');
             body = cleanGreeting + '\n\n' + openerToInsert + ' ' + restOfBody;
-            // #region agent log
-            const logData3 = {location:'generate-scheduled-emails.js:256',message:'Tone opener AUTO-INSERTED (body too short)',data:{bodyBefore:bodyBefore.substring(0,150),bodyAfter:body.substring(0,200),toneOpener:openerToInsert?.substring(0,30)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-            debugLog(logData3);
-            // #endregion
-            logger.log(`[NEPQ] Auto-inserted missing tone opener: "${openerToInsert}"`);
           }
         }
       }
@@ -288,10 +230,6 @@ function validateNepqContent(subject, text, toneOpener) {
 
   // Conversational questions: require at least two
   const questionCount = (body.match(/\?/g) || []).length;
-  // #region agent log
-  const logDataQuestions = {location:'generate-scheduled-emails.js:290',message:'Question count check',data:{questionCount:questionCount,bodyPreview:body.substring(0,200),questionsFound:body.match(/\?/g)||[],bodyLength:body.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
-  debugLog(logDataQuestions);
-  // #endregion
   
   // Auto-fix: If only 1 question found, add a problem-awareness question to the hook
   if (questionCount === 1) {
@@ -318,11 +256,6 @@ function validateNepqContent(subject, text, toneOpener) {
         }
         
         body = greeting + questionVersion + (restOfBody ? '\n\n' + restOfBody : '');
-        
-        // #region agent log
-        const logDataAutoFix = {location:'generate-scheduled-emails.js:305',message:'Auto-fixed: Added problem-awareness question to hook',data:{originalFirstSentence:firstSentence,newQuestionVersion:questionVersion,questionCountAfter:(body.match(/\?/g)||[]).length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
-        debugLog(logDataAutoFix);
-        // #endregion
       }
     }
   }
@@ -331,16 +264,8 @@ function validateNepqContent(subject, text, toneOpener) {
   const finalQuestionCount = (body.match(/\?/g) || []).length;
   if (finalQuestionCount === 0) {
     errors.push('Email must include at least one question (problem-awareness or qualifying CTA).');
-    // #region agent log
-    const logDataQuestionError = {location:'generate-scheduled-emails.js:332',message:'Validation failed - no questions found',data:{questionCount:finalQuestionCount,required:1,bodyPreview:body.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
-    debugLog(logDataQuestionError);
-    // #endregion
   } else if (finalQuestionCount === 1) {
     // Warning only - allow 1 question for natural tone
-    // #region agent log
-    const logDataQuestionWarning = {location:'generate-scheduled-emails.js:338',message:'NEPQ: Only one question detected; allowed for natural tone',data:{questionCount:finalQuestionCount,bodyPreview:body.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};
-    debugLog(logDataQuestionWarning);
-    // #endregion
   }
 
   // High-friction CTAs (avoid scheduling asks, but allow "worth a look")
@@ -367,10 +292,6 @@ function validateNepqContent(subject, text, toneOpener) {
     reason: errors.join(' '),
     modifiedBody: body // Return the potentially modified body
   };
-  // #region agent log
-  const logData4 = {location:'generate-scheduled-emails.js:244',message:'validateNepqContent EXIT',data:{isValid:result.isValid,errorsCount:errors.length,bodyModified:result.modifiedBody!==text,bodyLength:result.modifiedBody?.length||0,bodyPreview:result.modifiedBody?.substring(0,150)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
-  debugLog(logData4);
-  // #endregion
   return result;
 }
 
@@ -515,7 +436,6 @@ async function generatePreviewEmail(emailData) {
         
         if (hasWonderingHow) {
           // Replace "Wondering how..." with tone opener style
-          logger.warn('[Validation] "Wondering how..." detected in paragraph1 (preview), replacing with tone opener style:', toneOpener);
           
           // Extract the question part after "Wondering how [company] is handling..."
           const wonderingMatch = paragraph1.match(/^wondering how [^?]+\?/i);
@@ -559,11 +479,6 @@ async function generatePreviewEmail(emailData) {
             const restOfParagraph = paragraph1.replace(/^wondering how [^?]+\?/i, '').trim();
             paragraph1 = naturalOpener + restOfParagraph;
           }
-          
-          // #region agent log
-          const logDataReplace = {location:'generate-scheduled-emails.js:449',message:'Wondering how replacement applied (preview standard mode)','data':{originalPreview:jsonData.paragraph1?.substring(0,100)||'',replacedWith:naturalOpener,toneOpener,paragraph1Preview:paragraph1.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'};
-          debugLog(logDataReplace);
-          // #endregion
         }
       }
       
@@ -585,7 +500,6 @@ async function generatePreviewEmail(emailData) {
         
         if (hasWonderingHow) {
           // Replace "Wondering how..." with tone opener style
-          logger.warn('[Validation] "Wondering how..." detected in bodyText (preview), replacing with tone opener style:', toneOpener);
           
           // Extract the question part after "Wondering how [company] is handling..."
           const wonderingMatch = bodyText.match(/(?:^|\n\n)wondering how [^?]+\?/i);
@@ -630,11 +544,6 @@ async function generatePreviewEmail(emailData) {
             // Fallback: replace the pattern directly
             bodyText = bodyText.replace(/(?:^|\n\n)wondering how [^?]+\?/i, naturalOpener);
           }
-          
-          // #region agent log
-          const logDataReplace = {location:'generate-scheduled-emails.js:520',message:'Wondering how replacement applied (preview after join)','data':{originalPreview:parts.join('\n\n').substring(0,100),replacedWith:naturalOpener,toneOpener,bodyTextPreview:bodyText.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'};
-          debugLog(logDataReplace);
-          // #endregion
         }
       }
     }
@@ -747,19 +656,6 @@ async function generatePreviewEmail(emailData) {
     tone_opener: toneOpener || null
   };
 
-  // #region agent log
-  // Extract the actual opener used in the generated email (standard mode)
-  const bodyAfterGreetingStandard = (generatedContent.text || '').replace(/^(Hi|Hey|Hello)\s+[^,\n]+,?\s*/i, '').trim();
-  const actualOpenerStandard = bodyAfterGreetingStandard.substring(0, 50);
-  const usesSelectedOpenerStandard = toneOpener ? actualOpenerStandard.toLowerCase().includes(toneOpener.toLowerCase().substring(0, 10)) : false;
-  const isCuriousIfStandard = /^curious if/i.test(bodyAfterGreetingStandard);
-  const isWonderingHowStandard = /^wondering how/i.test(bodyAfterGreetingStandard);
-  const isQuickQuestionStandard = /^quick question/i.test(bodyAfterGreetingStandard);
-  
-  const logDataStandard = {location:'generate-scheduled-emails.js:697',message:'Standard mode - Opener variety check',data:{subject:generatedContent.subject?.substring(0,50)||null,textLength:generatedContent.text?.length||0,textPreview:generatedContent.text?.substring(0,200)||'',selectedToneOpener:toneOpener?.substring(0,30)||null,actualOpener:actualOpenerStandard,usesSelectedOpener:usesSelectedOpenerStandard,isCuriousIf:isCuriousIfStandard,isWonderingHow:isWonderingHowStandard,isQuickQuestion:isQuickQuestionStandard,angleId:selectedAngle?.id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'};
-  debugLog(logDataStandard);
-  // #endregion
-
   // NEPQ + content validation
   const nepqValidation = validateNepqContent(
     generatedContent.subject,
@@ -772,25 +668,13 @@ async function generatePreviewEmail(emailData) {
 
   // Use the potentially modified body from validation
   if (nepqValidation.modifiedBody && nepqValidation.modifiedBody !== generatedContent.text) {
-    // #region agent log
-    const logData5 = {location:'generate-scheduled-emails.js:530',message:'Applying modifiedBody (preview path)',data:{textBefore:generatedContent.text.substring(0,150),textAfter:nepqValidation.modifiedBody.substring(0,150),htmlBeforeLength:generatedContent.html?.length||0,htmlBeforePreview:generatedContent.html?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
-    debugLog(logData5);
-    // #endregion
     generatedContent.text = removeEmDashes(nepqValidation.modifiedBody); // Remove em dashes from modified body
     // Rebuild HTML completely from the modified text (avoid duplication)
     if (generatedContent.html) {
       const paragraphs = generatedContent.text.split('\n\n').filter(p => p.trim());
-      // #region agent log
-      const logData6 = {location:'generate-scheduled-emails.js:538',message:'Rebuilding HTML from text',data:{paragraphsCount:paragraphs.length,paragraphsPreview:paragraphs.map(p=>p.substring(0,50))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
-      debugLog(logData6);
-      // #endregion
       generatedContent.html = paragraphs
         .map(p => `<p style="margin:0 0 16px 0; color:#222;">${p.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>`)
         .join('');
-      // #region agent log
-      const logData7 = {location:'generate-scheduled-emails.js:545',message:'HTML rebuilt (preview path)',data:{htmlAfterLength:generatedContent.html.length,htmlAfterPreview:generatedContent.html.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
-      debugLog(logData7);
-      // #endregion
     }
   }
 
@@ -1258,7 +1142,6 @@ export default async function handler(req, res) {
 
   // Ensure Firebase Admin is initialized with credentials
   if (!db) {
-    logger.error('[GenerateScheduledEmails] Firestore not initialized. Missing Firebase service account env vars.');
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: false,
@@ -1269,7 +1152,6 @@ export default async function handler(req, res) {
 
   // Check for Perplexity API key
   if (!process.env.PERPLEXITY_API_KEY) {
-    logger.error('[GenerateScheduledEmails] CRITICAL: PERPLEXITY_API_KEY environment variable is not set!');
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: false,
@@ -1280,9 +1162,6 @@ export default async function handler(req, res) {
 
   try {
     const { immediate = false, emailId = null, preview = false, emailData: previewEmailData = null } = req.body || {};
-    
-    logger.debug('[GenerateScheduledEmails] Starting generation process, immediate:', immediate, 'emailId:', emailId);
-    logger.debug('[GenerateScheduledEmails] Perplexity API key present:', !!process.env.PERPLEXITY_API_KEY);
     
     // Preview mode: reuse full generation logic but skip all Firestore reads/writes
     if (preview) {
@@ -1358,7 +1237,6 @@ export default async function handler(req, res) {
         size: 1
       };
       
-      logger.debug('[GenerateScheduledEmails] Generating specific email:', emailId);
     } else {
       // Calculate time range for emails to generate
       const now = Date.now();
@@ -1377,8 +1255,6 @@ export default async function handler(req, res) {
         endTime = startTime + (24 * 60 * 60 * 1000); // 24 hours
       }
       
-      logger.debug('[GenerateScheduledEmails] Time range:', { startTime, endTime, immediate, now });
-      
       // Query for scheduled emails that need generation
       // Use >= and <= to include boundary times
       // Limit to 40 emails per run to stay under 50 RPM rate limit (Tier 0)
@@ -1393,7 +1269,6 @@ export default async function handler(req, res) {
     }
     
     if (scheduledEmailsSnapshot.empty) {
-      logger.debug('[GenerateScheduledEmails] No emails to generate');
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         success: true, 
@@ -1402,9 +1277,6 @@ export default async function handler(req, res) {
       }));
       return;
     }
-    
-    logger.debug('[GenerateScheduledEmails] Found', scheduledEmailsSnapshot.size, 'emails to generate');
-    logger.debug('[GenerateScheduledEmails] Rate limit: 50 RPM (Tier 0) - processing in batches');
     
     let generatedCount = 0;
     const errors = [];
@@ -1420,22 +1292,17 @@ export default async function handler(req, res) {
       const batchEnd = Math.min(batchStart + BATCH_SIZE, docs.length);
       const batch = docs.slice(batchStart, batchEnd);
       
-      logger.debug(`[GenerateScheduledEmails] Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}/${Math.ceil(docs.length / BATCH_SIZE)} (${batch.length} emails)`);
-      
       // Process batch in parallel (10 at a time)
       await Promise.all(batch.map(async (emailDoc) => {
       try {
         const emailData = emailDoc.data();
-        logger.debug('[GenerateScheduledEmails] Processing email:', emailDoc.id);
         
         // Helper to mark a generation as invalid and schedule retry/stop
         const markGenerationInvalid = async (reason) => {
-          logger.warn(`[GenerateScheduledEmails] ⚠️ BAD GENERATION for ${emailDoc.id}: ${reason}`);
           const attempts = (emailData.generationAttempts || 0) + 1;
           const maxAttempts = 3;
           
           if (attempts >= maxAttempts) {
-            logger.error(`[GenerateScheduledEmails] ❌ Email ${emailDoc.id} failed ${attempts} times, marking as permanent error`);
             await emailDoc.ref.update({
               status: 'generation_failed',
               lastGenerationAttempt: Date.now(),
@@ -1488,13 +1355,13 @@ export default async function handler(req, res) {
                     accountData = accountDoc.data();
                   }
                 } catch (error) {
-                  logger.warn('[GenerateScheduledEmails] Failed to get account data:', error);
+                  // Failed to get account data
                 }
               }
-            }
-          } catch (error) {
-            logger.warn('[GenerateScheduledEmails] Failed to get contact data:', error);
           }
+        } catch (error) {
+          // Failed to get contact data
+        }
         }
         
         // Get previous sequence emails for context
@@ -1519,7 +1386,7 @@ export default async function handler(req, res) {
               };
             });
           } catch (error) {
-            logger.warn('[GenerateScheduledEmails] Failed to get previous emails:', error);
+            // Failed to get previous emails
           }
         }
         
@@ -1589,19 +1456,6 @@ export default async function handler(req, res) {
         // CRITICAL: Remove any em dashes from tone opener immediately after selection
         const toneOpener = removeEmDashes(selectRandomToneOpener(selectedAngle?.id));
         
-        // #region agent log
-        const logData5 = {location:'generate-scheduled-emails.js:1377',message:'Angle and tone opener selected',data:{angleId:selectedAngle?.id||null,angleOpeningTemplate:selectedAngle?.openingTemplate?.substring(0,50)||null,toneOpener:toneOpener?.substring(0,30)||null,industry:recipientIndustry,usedAngles:usedAngles},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
-        debugLog(logData5);
-        // #endregion
-        
-        logger.debug(`[GenerateScheduledEmails] Selected angle: ${selectedAngle?.id}, tone: ${toneOpener}, industry: ${recipientIndustry}`);
-        logger.debug(`[GenerateScheduledEmails] Angle details:`, {
-            id: selectedAngle?.id,
-            openingTemplate: selectedAngle?.openingTemplate,
-            primaryValue: selectedAngle?.primaryValue,
-            primaryMessage: selectedAngle?.primaryMessage
-          });
-        
         // Decide AI mode for this email based on sequence configuration.
         // Default to "standard" so the body matches NEPQ-style plain emails
         // unless the step explicitly requested HTML generation.
@@ -1650,11 +1504,6 @@ export default async function handler(req, res) {
         }
         
         const perplexityResult = await perplexityResponse.json();
-        
-        // #region agent log
-        const logData6 = {location:'generate-scheduled-emails.js:539',message:'AI response received',data:{ok:perplexityResult.ok,hasOutput:!!perplexityResult.output,outputType:typeof perplexityResult.output,subject:perplexityResult.output?.subject?.substring(0,50)||null,openingHook:perplexityResult.output?.opening_hook?.substring(0,100)||null,ctaText:perplexityResult.output?.cta_text?.substring(0,100)||null,greeting:perplexityResult.output?.greeting?.substring(0,50)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
-        debugLog(logData6);
-        // #endregion
         
         if (!perplexityResult.ok) {
           throw new Error(`Perplexity email API failed: ${perplexityResult.error || 'Unknown error'}`);
@@ -1738,7 +1587,6 @@ export default async function handler(req, res) {
               
               if (hasWonderingHow) {
                 // Replace "Wondering how..." with tone opener style
-                logger.warn('[Validation] "Wondering how..." detected in paragraph1, replacing with tone opener style:', toneOpener);
                 
                 // Extract the question part after "Wondering how [company] is handling..."
                 const wonderingMatch = paragraph1.match(/^wondering how [^?]+\?/i);
@@ -1780,14 +1628,9 @@ export default async function handler(req, res) {
                 } else {
                   // Fallback: use tone opener directly
                   const restOfParagraph = paragraph1.replace(/^wondering how [^?]+\?/i, '').trim();
-                  paragraph1 = naturalOpener + restOfParagraph;
-                }
-                
-                // #region agent log
-                const logDataReplace = {location:'generate-scheduled-emails.js:1532',message:'Wondering how replacement applied (standard mode)','data':{originalPreview:jsonData.paragraph1?.substring(0,100)||'',replacedWith:naturalOpener,toneOpener,paragraph1Preview:paragraph1.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'};
-                debugLog(logDataReplace);
-                // #endregion
+                paragraph1 = naturalOpener + restOfParagraph;
               }
+            }
             }
             
             if (paragraph1) parts.push(paragraph1);
@@ -1810,7 +1653,6 @@ export default async function handler(req, res) {
               
               if (hasWonderingHow) {
                 // Replace "Wondering how..." with tone opener style
-                logger.warn('[Validation] "Wondering how..." detected in bodyText (scheduled), replacing with tone opener style:', toneOpener);
                 
                 // Extract the question part after "Wondering how [company] is handling..."
                 const wonderingMatch = bodyText.match(/(?:^|\n\n)wondering how [^?]+\?/i);
@@ -1852,15 +1694,10 @@ export default async function handler(req, res) {
                     return match.replace(/wondering how /i, naturalOpener);
                   });
                 } else {
-                  // Fallback: replace the pattern directly
-                  bodyText = bodyText.replace(/(?:^|\n\n)wondering how [^?]+\?/i, naturalOpener);
-                }
-                
-                // #region agent log
-                const logDataReplace = {location:'generate-scheduled-emails.js:1667',message:'Wondering how replacement applied (scheduled after join)','data':{originalPreview:parts.join('\n\n').substring(0,100),replacedWith:naturalOpener,toneOpener,bodyTextPreview:bodyText.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'};
-                debugLog(logDataReplace);
-                // #endregion
+                // Fallback: replace the pattern directly
+                bodyText = bodyText.replace(/(?:^|\n\n)wondering how [^?]+\?/i, naturalOpener);
               }
+            }
             }
           }
           else {
@@ -1877,7 +1714,6 @@ export default async function handler(req, res) {
               
               if (hasWonderingHow) {
                 // Replace "Wondering how..." with tone opener style
-                logger.warn('[Validation] "Wondering how..." detected in raw body text, replacing with tone opener style:', toneOpener);
                 
                 // Extract the question part after "Wondering how [company] is handling..."
                 const wonderingMatch = bodyText.match(/(?:^|\n\n)wondering how [^?]+\?/i);
@@ -1919,15 +1755,10 @@ export default async function handler(req, res) {
                     return match.replace(/wondering how /i, naturalOpener);
                   });
                 } else {
-                  // Fallback: replace the pattern directly
-                  bodyText = bodyText.replace(/(?:^|\n\n)wondering how [^?]+\?/i, naturalOpener);
-                }
-                
-                // #region agent log
-                const logDataReplace = {location:'generate-scheduled-emails.js:1550',message:'Wondering how replacement applied (standard mode raw text)','data':{originalPreview:raw.substring(0,100),replacedWith:naturalOpener,toneOpener,bodyTextPreview:bodyText.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'L'};
-                debugLog(logDataReplace);
-                // #endregion
+                // Fallback: replace the pattern directly
+                bodyText = bodyText.replace(/(?:^|\n\n)wondering how [^?]+\?/i, naturalOpener);
               }
+            }
             }
           }
 
@@ -2047,30 +1878,12 @@ export default async function handler(req, res) {
           exemption_type: accountData?.taxExemptStatus || null
         };
         
-        // #region agent log
-        // Extract the actual opener used in the generated email
-        const bodyAfterGreeting = (generatedContent.text || '').replace(/^(Hi|Hey|Hello)\s+[^,\n]+,?\s*/i, '').trim();
-        const actualOpener = bodyAfterGreeting.substring(0, 50);
-        const usesSelectedOpener = toneOpener ? actualOpener.toLowerCase().includes(toneOpener.toLowerCase().substring(0, 10)) : false;
-        const isCuriousIf = /^curious if/i.test(bodyAfterGreeting);
-        const isWonderingHow = /^wondering how/i.test(bodyAfterGreeting);
-        const isQuickQuestion = /^quick question/i.test(bodyAfterGreeting);
-        
-        const logData7 = {location:'generate-scheduled-emails.js:1984',message:'Before NEPQ validation - Opener variety check',data:{subject:generatedContent.subject?.substring(0,50)||null,textLength:generatedContent.text?.length||0,textPreview:generatedContent.text?.substring(0,200)||'',selectedToneOpener:toneOpener?.substring(0,30)||null,actualOpener:actualOpener,usesSelectedOpener,isCuriousIf,isWonderingHow,isQuickQuestion,angleId:selectedAngle?.id||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'M'};
-        debugLog(logData7);
-        // #endregion
-        
         // NEPQ validation to enforce structure and tone opener usage
         const nepqValidation = validateNepqContent(
           generatedContent.subject,
           generatedContent.text,
           toneOpener
         );
-        
-        // #region agent log
-        const logData8 = {location:'generate-scheduled-emails.js:1630',message:'After NEPQ validation',data:{isValid:nepqValidation.isValid,reason:nepqValidation.reason?.substring(0,100)||null,bodyModified:nepqValidation.modifiedBody!==generatedContent.text,originalLength:generatedContent.text?.length||0,modifiedLength:nepqValidation.modifiedBody?.length||0,modifiedPreview:nepqValidation.modifiedBody?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
-        debugLog(logData8);
-        // #endregion
         
         if (!nepqValidation.isValid) {
           await markGenerationInvalid(nepqValidation.reason);
@@ -2079,25 +1892,13 @@ export default async function handler(req, res) {
 
         // Use the potentially modified body from validation
         if (nepqValidation.modifiedBody && nepqValidation.modifiedBody !== generatedContent.text) {
-          // #region agent log
-          const logData8b = {location:'generate-scheduled-emails.js:1642',message:'Applying modifiedBody (scheduled path)',data:{textBefore:generatedContent.text.substring(0,150),textAfter:nepqValidation.modifiedBody.substring(0,150),htmlBeforeLength:generatedContent.html?.length||0,htmlBeforePreview:generatedContent.html?.substring(0,200)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
-          debugLog(logData8b);
-          // #endregion
           generatedContent.text = removeEmDashes(nepqValidation.modifiedBody); // Remove em dashes from modified body
           // Rebuild HTML content completely (avoid duplication)
           if (generatedContent.html) {
             const paragraphs = generatedContent.text.split('\n\n').filter(p => p.trim());
-            // #region agent log
-            const logData9 = {location:'generate-scheduled-emails.js:1650',message:'Rebuilding HTML from text (scheduled path)',data:{paragraphsCount:paragraphs.length,paragraphsPreview:paragraphs.map(p=>p.substring(0,50))},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
-            debugLog(logData9);
-            // #endregion
             generatedContent.html = paragraphs
               .map(p => `<p style="margin:0 0 16px 0; color:#222;">${p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</p>`)
               .join('');
-            // #region agent log
-            const logData10 = {location:'generate-scheduled-emails.js:1657',message:'HTML rebuilt (scheduled path)',data:{htmlAfterLength:generatedContent.html.length,htmlAfterPreview:generatedContent.html.substring(0,300)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'};
-            debugLog(logData10);
-            // #endregion
           }
         }
         
@@ -2124,39 +1925,16 @@ export default async function handler(req, res) {
           selectedAngle.id === 'cost_control' ? 'volatility' :
           selectedAngle.id === 'operational_simplicity' ? 'simplif' : ''
         );
-        const has4CP = /\b4CP\b/i.test(generatedContent.text || '') || /\bfour coincident peaks\b/i.test(generatedContent.text || '');
-        const hasPeakDemand = /peak demand/i.test(generatedContent.text || '');
-        
-        // #region agent log
-        const logData11 = {location:'generate-scheduled-emails.js:1666',message:'Before content validation',data:{htmlLength:generatedContent.html?.length||0,textLength:generatedContent.text?.length||0,bodyWordCount:bodyWordCount,subject:generatedContent.subject?.substring(0,50)||null,hasContractUrgency:hasContractUrgency,hasDynamicSavings:hasDynamicSavings,hasAngleValueProp:hasAngleValueProp,angleId:selectedAngle?.id||null,has4CP:has4CP,hasPeakDemand:hasPeakDemand,industry:recipient.industry||'unknown'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
-        debugLog(logData11);
-        // #endregion
-        
         const validation = validateGeneratedContent(
           generatedContent.html, 
           generatedContent.text, 
           generatedContent.subject
         );
         
-        // #region agent log
-        const logData12 = {location:'generate-scheduled-emails.js:1677',message:'After content validation',data:{isValid:validation.isValid,reason:validation.reason?.substring(0,100)||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'};
-        debugLog(logData12);
-        // #endregion
-        
         if (!validation.isValid) {
           await markGenerationInvalid(validation.reason);
           return;
         }
-        
-        // Enhanced debug logging
-          const ctaType = perplexityResult.output?.cta_type || perplexityResult.metadata?.cta_type || 'unknown';
-        logger.debug(`[GenerateScheduledEmails] Generated email details:`, {
-            subject: generatedContent.subject,
-            angleUsed: generatedContent.angle_used,
-            toneOpener: toneOpener,
-            ctaType: ctaType,
-            aiMode: aiMode
-          });
         
         // Update email with generated content
         // Ensure ownership fields are preserved/set
@@ -2186,10 +1964,8 @@ export default async function handler(req, res) {
         await emailDoc.ref.update(updateData);
         
         generatedCount++;
-        logger.debug('[GenerateScheduledEmails] ✓ Generated email:', emailDoc.id);
         
       } catch (error) {
-        logger.error('[GenerateScheduledEmails] Failed to generate email:', emailDoc.id, error);
         errors.push({
           emailId: emailDoc.id,
           error: error.message
@@ -2203,19 +1979,16 @@ export default async function handler(req, res) {
             generatedAt: Date.now()
           });
         } catch (updateError) {
-          logger.error('[GenerateScheduledEmails] Failed to update error status:', updateError);
+          // Failed to update error status
         }
       }
     })); // End Promise.all
       
       // Add delay between batches to respect rate limit (except after last batch)
       if (batchEnd < docs.length) {
-        logger.debug(`[GenerateScheduledEmails] Waiting ${DELAY_BETWEEN_BATCHES/1000}s before next batch to respect rate limit...`);
         await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
       }
     } // End batch loop
-    
-    logger.debug('[GenerateScheduledEmails] Generation complete. Generated:', generatedCount, 'Errors:', errors.length);
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -2226,7 +1999,6 @@ export default async function handler(req, res) {
     }));
     
   } catch (error) {
-    logger.error('[GenerateScheduledEmails] Fatal error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: false,
