@@ -3533,6 +3533,10 @@ CRITICAL RULES:
 }
 
 export default async function handler(req, res) {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3535',message:'Handler entry',data:{method:req.method,hasBody:!!req.body,mode:req.body?.mode,templateType:req.body?.templateType,hasRecipient:!!req.body?.recipient},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+  
   if (cors(req, res)) return;
   if (req.method !== 'POST') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
@@ -3601,7 +3605,11 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields, researchContext } = await buildSystemPrompt({ 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3597',message:'About to call buildSystemPrompt',data:{mode,templateType,hasRecipient:!!recipient,selectedAngleId:selectedAngle?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    
+    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields, researchContext } = await buildSystemPrompt({
       mode, 
       recipient, 
       to, 
@@ -3617,6 +3625,10 @@ CRITICAL: Use these EXACT meeting times in your CTA.
       emailPosition,
       previousAngles
     });
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3623',message:'buildSystemPrompt returned',data:{hasResearchContext:!!researchContext,hasRecentActivity:!!researchContext?.recentActivityContext,hasLinkedIn:!!researchContext?.linkedinContext,hasWebsite:!!researchContext?.websiteContext,hasTriggerEvents:!!researchContext?.triggerEvents,triggerEventCount:researchContext?.triggerEvents?.length||0,selectedAngleId:selectedAngle?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     
     // #region agent log
     const logDataPerplexity = {location:'perplexity-email.js:3201',message:'System prompt built',data:{hasToneOpenerRule:systemPrompt.includes('TONE OPENER'),toneOpenerProvided:toneOpener?.substring(0,30)||null,angleId:selectedAngle?.id||null,templateType:templateType||null,systemPromptLength:systemPrompt.length,systemPromptPreview:systemPrompt.substring(0,500)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'};

@@ -357,6 +357,10 @@ async function generatePreviewEmail(emailData) {
   const baseUrl = (process.env.PUBLIC_BASE_URL && process.env.PUBLIC_BASE_URL.replace(/\/$/, ''))
     || 'http://localhost:3000';
 
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:360',message:'Calling perplexity-email API (preview mode)',data:{aiMode,mode:aiMode,isColdStep,emailPosition,selectedAngleId:selectedAngle?.id,toneOpener,hasRecipient:!!recipient,recipientCompany:recipient?.company,recipientIndustry:recipient?.industry},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+
   const perplexityResponse = await fetch(`${baseUrl}/api/perplexity-email`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -378,6 +382,11 @@ async function generatePreviewEmail(emailData) {
   }
 
   const perplexityResult = await perplexityResponse.json();
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:380',message:'Perplexity API response received (preview mode)',data:{ok:perplexityResult.ok,hasOutput:!!perplexityResult.output,outputPreview:perplexityResult.output?.substring(0,200)||null,error:perplexityResult.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+  
   if (!perplexityResult.ok) {
     throw new Error(`Perplexity email API failed: ${perplexityResult.error || 'Unknown error'}`);
   }
