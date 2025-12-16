@@ -1853,6 +1853,119 @@ function getContractUrgencyLevel(contractEndDate) {
   }
 }
 
+// Research Relevance Validation Function
+// Validates if research data (hiring, activity, etc.) is actually relevant to energy/electricity procurement
+function validateResearchRelevance(activityText, company, industry) {
+  if (!activityText) return { relevant: false, reason: 'No activity text' };
+  
+  const activityLower = String(activityText).toLowerCase();
+  const companyLower = String(company || '').toLowerCase();
+  const industryLower = String(industry || '').toLowerCase();
+  
+  // Keywords that indicate activity is NOT relevant to energy/electricity procurement
+  const irrelevantKeywords = [
+    // Product/software launches
+    'product launch', 'software release', 'app release', 'platform launch', 'system deployment',
+    'technology platform', 'tech platform', 'digital platform', 'software platform',
+    // Aviation-specific (not electricity)
+    'aviation fueling', 'airline operations', 'cargo services', 'airport operations',
+    'fuel farm', 'fueling automation', 'aviation services', 'aircraft fueling',
+    // Tech development (not operations)
+    'tech development', 'development team', 'engineering team', 'product development',
+    'software development', 'engineering', 'programming', 'coding',
+    // Strategy/consulting roles (not procurement)
+    'strategy', 'consulting', 'advisory', 'corporate strategy',
+    // Marketing/sales
+    'marketing', 'sales team', 'business development', 'customer acquisition',
+    // Hiring patterns that don't affect energy
+    'hired.*vp.*(strategy|product|technology|software|development|engineering|marketing|sales)',
+    'added.*(strategy|product|technology|software|development|engineering|marketing|sales).*executive',
+    'appointed.*(strategy|product|technology|software|development|engineering|marketing|sales)',
+    // Scaling products (not facilities)
+    'scaling.*(product|platform|software|technology|service)',
+    'expanding.*(product|platform|software|technology|service)',
+    'launching.*(product|platform|software|technology|service)'
+  ];
+  
+  // Keywords that indicate activity IS relevant to energy/electricity procurement
+  const relevantKeywords = [
+    // Facility/operations expansion
+    'new facility', 'new location', 'new office', 'new site', 'additional facility',
+    'additional location', 'additional site', 'facility opening', 'office opening',
+    'facility expansion', 'location expansion', 'site expansion',
+    // Operational growth (that affects energy)
+    'operational growth', 'capacity increase', 'production increase', 'manufacturing expansion',
+    'warehouse expansion', 'distribution center', 'data center', 'server expansion',
+    // Energy-relevant roles
+    'facilities', 'operations', 'procurement', 'finance', 'controller', 'cfo',
+    'vp.*(operations|facilities|procurement|finance)', 'director.*(operations|facilities|procurement)',
+    // Energy-intensive operations
+    'manufacturing', 'production', 'warehouse', 'distribution', 'logistics',
+    'data center', 'server farm', 'hosting', 'cloud infrastructure'
+  ];
+  
+  // Check for irrelevant patterns first
+  for (const pattern of irrelevantKeywords) {
+    const regex = new RegExp(pattern, 'i');
+    if (regex.test(activityLower)) {
+      // Special case: if it's aviation-related AND the company is clearly aviation-focused, definitely irrelevant
+      if (pattern.includes('aviation') || pattern.includes('fuel')) {
+        if (companyLower.includes('aviation') || companyLower.includes('fuel') || 
+            industryLower.includes('aviation') || activityLower.includes('fuel farm')) {
+          return { 
+            relevant: false, 
+            reason: `Activity mentions "${pattern}" which is not relevant to electricity procurement (aviation/fuel operations)` 
+          };
+        }
+      }
+      // For other irrelevant patterns, check if they're the main focus
+      if (activityLower.includes(pattern.split(' ')[0])) {
+        return { 
+          relevant: false, 
+          reason: `Activity mentions "${pattern}" which is not relevant to electricity procurement` 
+        };
+      }
+    }
+  }
+  
+  // Check for relevant patterns
+  for (const pattern of relevantKeywords) {
+    const regex = new RegExp(pattern, 'i');
+    if (regex.test(activityLower)) {
+      return { relevant: true, reason: `Activity mentions "${pattern}" which is relevant to electricity procurement` };
+    }
+  }
+  
+  // If we have hiring information, check if roles are energy-relevant
+  const hiringMatch = activityLower.match(/(?:hired|added|appointed|brought on).*?(?:vp|vice president|director|executive|manager).*?(\w+(?:\s+\w+){0,3})/i);
+  if (hiringMatch) {
+    const roleText = hiringMatch[1] || '';
+    const roleLower = roleText.toLowerCase();
+    
+    // Check if role is energy-irrelevant
+    const irrelevantRoles = ['strategy', 'product', 'technology', 'software', 'development', 'engineering', 
+                            'marketing', 'sales', 'business development', 'corporate strategy'];
+    if (irrelevantRoles.some(irr => roleLower.includes(irr))) {
+      return { 
+        relevant: false, 
+        reason: `Hiring is for "${roleText}" role which is not relevant to electricity procurement` 
+      };
+    }
+    
+    // Check if role is energy-relevant
+    const relevantRoles = ['operations', 'facilities', 'procurement', 'finance', 'controller', 'cfo', 'operations manager'];
+    if (relevantRoles.some(rel => roleLower.includes(rel))) {
+      return { 
+        relevant: true, 
+        reason: `Hiring is for "${roleText}" role which is relevant to electricity procurement` 
+      };
+    }
+  }
+  
+  // Default: if uncertain, don't use it (better to skip than mislead)
+  return { relevant: false, reason: 'Activity relevance uncertain - skipping to avoid misleading personalization' };
+}
+
 // Trigger Event Detection Function
 function detectTriggerEvents(companyData, recipient) {
   const events = [];
@@ -2155,7 +2268,21 @@ async function buildSystemPrompt({
           contactLinkedinContext = data;
           break;
         case 'recentActivity':
-          recentActivityContext = data;
+          if (data) {
+            // Validate relevance before using
+            const validation = validateResearchRelevance(data, company, industry);
+            if (validation.relevant) {
+              recentActivityContext = data;
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2273',message:'Research activity validated as relevant',data:{activityPreview:data.substring(0,150),company,industry,reason:validation.reason},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
+              // #endregion
+            } else {
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2278',message:'Research activity filtered out as irrelevant',data:{activityPreview:data.substring(0,150),company,industry,reason:validation.reason},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
+              // #endregion
+              // Don't set recentActivityContext - it will be null and system will fall back to next tier
+            }
+          }
           break;
         case 'location':
           locationContextData = data;
@@ -2322,7 +2449,26 @@ async function buildSystemPrompt({
   const contractUrgency = getContractUrgencyLevel(energy.contractEnd);
   
   // Detect trigger events
-  const triggerEvents = detectTriggerEvents(r.account || {}, recipient);
+  let triggerEvents = detectTriggerEvents(r.account || {}, recipient);
+  
+  // Validate trigger events for relevance to energy/electricity
+  if (triggerEvents && triggerEvents.length > 0) {
+    const validatedEvents = [];
+    for (const event of triggerEvents) {
+      const validation = validateResearchRelevance(event.description || event.type || '', company, industry);
+      if (validation.relevant) {
+        validatedEvents.push(event);
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2457',message:'Trigger event validated as relevant',data:{eventType:event.type,eventDescription:event.description?.substring(0,100),company,industry,reason:validation.reason},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
+        // #endregion
+      } else {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2462',message:'Trigger event filtered out as irrelevant',data:{eventType:event.type,eventDescription:event.description?.substring(0,100),company,industry,reason:validation.reason},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
+        // #endregion
+      }
+    }
+    triggerEvents = validatedEvents;
+  }
   
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2258',message:'Research data availability check',data:{hasTriggerEvents:triggerEvents.length>0,triggerEventCount:triggerEvents.length,hasRecentActivity:!!recentActivityContext,hasLinkedIn:!!linkedinContext,hasWebsite:!!websiteContext,hasLocationContext:!!locationContextData,hasAccountDescription:!!accountDescription,selectedAngleId:selectedAngle?.id,priorityLevel:triggerEvents.length>0||recentActivityContext||linkedinContext||websiteContext?'GOLD_SILVER':accountDescription?'BRONZE_DESC':'BRONZE_INDUSTRY'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
@@ -2369,7 +2515,7 @@ RESEARCH DATA:
 ${linkedinContext ? '- Company LinkedIn: ' + linkedinContext : ''}
 ${websiteContext ? '- Company Website: ' + websiteContext : ''}
 ${contactLinkedinContext ? '- Contact LinkedIn Profile: ' + contactLinkedinContext + ' (use for tenure, career background, recent posts)' : ''}
-${recentActivityContext ? '- Recent Company Activity: ' + recentActivityContext + ' (reference naturally through questions, not "I noticed" or "I saw"). IMPORTANT: If activity mentions "new" facilities/offices, verify timing - if it\'s from 2022 or earlier, frame as "your [location] facility" not "new facility" to avoid sounding outdated.' : ''}
+${recentActivityContext ? '- Recent Company Activity: ' + recentActivityContext + ' (reference naturally through questions, not "I noticed" or "I saw"). IMPORTANT: This activity has been validated as relevant to energy/electricity procurement. If activity mentions "new" facilities/offices, verify timing - if it\'s from 2022 or earlier, frame as "your [location] facility" not "new facility" to avoid sounding outdated. DO NOT use activity about product launches, software releases, or non-energy-related hiring.' : ''}
 ${locationContextData ? '- Regional Energy Market: ' + locationContextData + ' (use for location-specific context)' : ''}
 
 ENERGY DATA:
@@ -2408,7 +2554,7 @@ CONTRACT URGENCY LEVEL:
 - Language: ${contractUrgency.language}
 
 TRIGGER EVENTS:
-${triggerEvents.length > 0 ? triggerEvents.map(event => '- ' + event.type + ': ' + event.description + ' (' + event.relevance + ' relevance)').join('\n') : '- No recent trigger events detected'}
+${triggerEvents.length > 0 ? triggerEvents.map(event => '- ' + event.type + ': ' + event.description + ' (' + event.relevance + ' relevance)').join('\n') + '\n**IMPORTANT:** These trigger events have been validated as relevant to energy/electricity procurement. Use them in your email.' : '- No recent trigger events detected (or events were filtered out as irrelevant to energy procurement)'}
 
 DEEP PERSONALIZATION:
 ${deepPersonalization.achievements.length > 0 ? '- Company Achievements: ' + deepPersonalization.achievements.join(', ') : ''}
@@ -2469,7 +2615,7 @@ ${angleOpening ? '- Example opening pattern: "' + angleOpening + '"' : ''}
 ${angleValue ? '- Primary value proposition: "' + angleValue + '"' : ''}
 
 **ANGLE USAGE (BRONZE STANDARD - Only if no research):**
-${triggerEvents.length > 0 || recentActivityContext || linkedinContext || websiteContext ? '**CRITICAL OVERRIDE:** Research data (trigger events, recent activity, LinkedIn, website) takes ABSOLUTE PRIORITY over this angle. If research exists, USE THE RESEARCH FIRST and ignore this angle if it doesn't fit. The news/research IS your angle.' : '**USE THIS ANGLE:** Since no research data is available, structure the email around this specific angle (${angleFocus}).'}
+${triggerEvents.length > 0 || recentActivityContext || linkedinContext || websiteContext ? '**CRITICAL OVERRIDE:** Research data (trigger events, recent activity, LinkedIn, website) takes ABSOLUTE PRIORITY over this angle. If research exists, USE THE RESEARCH FIRST and ignore this angle if it doesn't fit. The news/research IS your angle. **IMPORTANT:** All research has been validated as relevant to energy/electricity procurement - irrelevant research (product launches, software releases, aviation operations, non-energy hiring) has been filtered out.' : '**USE THIS ANGLE:** Since no research data is available (or research was filtered out as irrelevant), structure the email around this specific angle (${angleFocus}).'}
 - If angle is "timing_strategy" → focus on contract renewal timing, early renewal benefits, renewal windows
 - If angle is "cost_control" → focus on rising electricity costs, budget pressure, cost predictability
 - If angle is "exemption_recovery" → focus on tax exemptions, unclaimed exemptions, exemption certificates
@@ -2608,7 +2754,7 @@ Generate text for these fields:
   **NATURALNESS OVER MATCHING**: The goal is natural, human-sounding openers that vary across emails. Use the tone opener style as your guide, but don't force-match it if a different natural phrasing works better. Just don't default to "Quick question". Then continue with problem awareness (1-2 sentences total).
   
   **PERSONALIZATION PRIORITY FOR OPENING HOOK**:
-  1. **If you have research data** (recentActivityContext, linkedinContext, websiteContext): Reference specific details through questions (e.g., "With your recent expansion in [City], how are you handling..."). DO NOT say "I noticed" - use questions.
+  1. **If you have research data** (recentActivityContext, linkedinContext, websiteContext): Reference specific details through questions (e.g., "With your recent expansion in [City], how are you handling..."). DO NOT say "I noticed" - use questions. **CRITICAL:** Only use research that is relevant to energy/electricity procurement. If research mentions product launches, software releases, aviation operations, or hiring for non-energy roles (strategy, product, technology, marketing), DO NOT use it - skip to the next tier (company description or industry information). The system has already filtered irrelevant research, so if you see recentActivityContext, it's been validated as relevant.
   2. **If no research but you have accountDescription**: Use the business type naturally (e.g., "How are ${industry ? getIndustryPhrase(industry, 'industry_companies') : 'companies'} like [company] handling..."). For Education, use "schools" instead of "education companies". DO NOT copy the description text verbatim - it sounds like an encyclopedia.
   3. **If no research and no description**: Use industry-specific challenges (e.g., "How are ${industry ? getIndustryPhrase(industry, 'industry_companies') : 'companies'} handling rising energy costs?").
   
@@ -2802,7 +2948,7 @@ PERSONALIZATION PRIORITY (CRITICAL - Follow This Order):
 3. **INDUSTRY INFORMATION (FINAL FALLBACK)**: If no research and no description, use industry-specific challenges and pain points. Reference their industry naturally through questions.
 
 COMPANY RESEARCH HIGHLIGHTS (Use These First - Company Over Market):
-${triggerEvents.length > 0 ? '🚨 **COMPANY NEWS DETECTED - USE THIS FIRST:**\n' + triggerEvents.map(event => `- ${event.type.toUpperCase()}: ${event.description} - OPEN WITH THIS COMPANY NEWS`).join('\n') + '\n**CRITICAL:** Company news takes absolute priority. Connect it to their energy needs in simple terms.' : ''}
+${triggerEvents.length > 0 ? '🚨 **COMPANY NEWS DETECTED - USE THIS FIRST:**\n' + triggerEvents.map(event => `- ${event.type.toUpperCase()}: ${event.description} - OPEN WITH THIS COMPANY NEWS`).join('\n') + '\n**CRITICAL:** Company news takes absolute priority. Connect it to their energy needs in simple terms. **IMPORTANT:** This news has been validated as relevant to energy/electricity procurement - irrelevant news (product launches, software releases, aviation operations, non-energy hiring) has been filtered out.' : ''}
 ${websiteContext ? '✓ **PRIORITY 1 - COMPANY WEBSITE**: ' + websiteContext.substring(0, 200) + '\n   → Use: What does their website say about their business? What services/products? What challenges do they mention?\n   → Example: "With [company] focusing on [service from website], how are you handling energy costs?"' : ''}
 ${linkedinContext ? '✓ **PRIORITY 1 - COMPANY LINKEDIN**: ' + linkedinContext.substring(0, 200) + '\n   → Use: Recent company posts, team updates, announcements\n   → Example: "I saw [company] posted about [topic]. How has that affected your operations?"' : ''}
 ${recentActivityContext ? '✓ **PRIORITY 1 - COMPANY ACTIVITY**: ' + recentActivityContext + '\n   → Use: Recent expansions, hires, projects\n   → Example: "With [company] expanding into [location], how are you managing energy needs?"' : ''}
@@ -3330,11 +3476,11 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Show you did homework: When you have specific data, use QUESTIONS instead of observations:
   
   **PERSONALIZATION PRIORITY FOR OPENING HOOK**:
-  1. **If you have research data** (recentActivityContext, linkedinContext, websiteContext): Reference specific details through questions (e.g., "With your recent expansion in [City], how are you handling..."). DO NOT say "I noticed" - use questions.
+  1. **If you have research data** (recentActivityContext, linkedinContext, websiteContext): Reference specific details through questions (e.g., "With your recent expansion in [City], how are you handling..."). DO NOT say "I noticed" - use questions. **CRITICAL:** Only use research that is relevant to energy/electricity procurement. If research mentions product launches, software releases, aviation operations, or hiring for non-energy roles (strategy, product, technology, marketing), DO NOT use it - skip to the next tier (company description or industry information). The system has already filtered irrelevant research, so if you see recentActivityContext, it's been validated as relevant.
   2. **If no research but you have accountDescription**: Use the business type naturally (e.g., "How are ${industry ? getIndustryPhrase(industry, 'industry_companies') : 'companies'} like [company] handling..."). For Education, use "schools" instead of "education companies". DO NOT copy the description text verbatim - it sounds like an encyclopedia.
   3. **If no research and no description**: Use industry-specific challenges (e.g., "How are ${industry ? getIndustryPhrase(industry, 'industry_companies') : 'companies'} handling rising energy costs?").
   
-  ${recentActivityContext ? '* **PRIORITY 1**: Ask about ' + recentActivityContext.substring(0, 60) + '...: "With [recent activity], how has that impacted your planning?" (you have recent activity - USE THIS FIRST)' : ''}
+  ${recentActivityContext ? '* **PRIORITY 1**: Ask about ' + recentActivityContext.substring(0, 60) + '...: "With [recent activity], how has that impacted your planning?" (you have recent activity - USE THIS FIRST - this activity has been validated as relevant to energy/electricity procurement)' : ''}
   ${linkedinContext ? '* **PRIORITY 1**: Reference company LinkedIn through questions: "How are you handling [challenge from LinkedIn post]?" (you have LinkedIn context - USE THIS FIRST)' : ''}
   ${websiteContext ? '* **PRIORITY 1**: Reference website through questions: "How are you handling [specific challenge from website]?" (you have website context - USE THIS FIRST)' : ''}
   ${accountDescription ? '* **PRIORITY 2**: Use business focus naturally (NOT encyclopedia style): The business focus tells you their business type. Ask about their industry-specific challenges (e.g., "How are manufacturing companies like ' + company + ' handling energy costs?") but DO NOT mention the business focus text itself. Use this when no research data is available.' : '* Ask about [specific detail about their company]: "How is [specific detail] affecting your energy costs?"'}

@@ -430,9 +430,17 @@ async function generatePreviewEmail(emailData) {
     } catch (e) {
       jsonData = null;
     }
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:432',message:'Standard mode JSON parsing',data:{hasRaw:!!raw,rawLength:raw.length,rawPreview:raw.substring(0,200),hasJsonData:!!jsonData,jsonDataKeys:jsonData?Object.keys(jsonData):null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'J'})}).catch(()=>{});
+    // #endregion
 
     let subject = emailData.subject || 'Energy update';
     let bodyText = removeEmDashes(raw); // Remove em dashes from full body text
+    
+    // Clean up any trailing tone opener text that might have leaked into the output
+    // Remove standalone "Curious", "Curious if", etc. at the end of the text
+    bodyText = bodyText.replace(/\s+(Curious|Curious if|Curious,|Curious—)$/gi, '').trim();
 
     const enforceFirstNameOnly = (greeting) => {
       if (!greeting || typeof greeting !== 'string') return greeting;
@@ -523,6 +531,16 @@ async function generatePreviewEmail(emailData) {
         parts.push(`Best regards,\n${senderFirstName}`);
       }
       bodyText = parts.join('\n\n') || raw;
+      
+      // Clean up any trailing tone opener text that might have leaked into the output
+      bodyText = bodyText.replace(/\s+(Curious|Curious if|Curious,|Curious—)$/gi, '').trim();
+      
+      // Normalize non-breaking hyphens and other special characters
+      bodyText = bodyText
+        .replace(/\u2011/g, '-')  // Non-breaking hyphen → regular hyphen
+        .replace(/\u2013/g, '-')  // En dash → hyphen
+        .replace(/\u2014/g, ', ')  // Em dash → comma
+        .replace(/\u00A0/g, ' '); // Non-breaking space → regular space
       
       // CRITICAL: Replace "Wondering how..." in bodyText if present (preview path, after joining)
       if (bodyText && toneOpener) {
@@ -719,6 +737,16 @@ async function generatePreviewEmail(emailData) {
       .join('');
 
     textContent = removeEmDashes(bodyText); // Ensure em dashes are removed from final text
+    
+    // Final cleanup: Remove any trailing tone opener text and normalize special characters
+    textContent = textContent
+      .replace(/\s+(Curious|Curious if|Curious,|Curious—)$/gi, '')  // Remove trailing "Curious" variants
+      .replace(/\u2011/g, '-')  // Non-breaking hyphen → regular hyphen
+      .replace(/\u2013/g, '-')  // En dash → hyphen  
+      .replace(/\u2014/g, ', ')  // Em dash → comma
+      .replace(/\u00A0/g, ' ')   // Non-breaking space → regular space
+      .trim();
+    
     emailData.generatedSubject = subject;
   }
 
