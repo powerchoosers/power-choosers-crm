@@ -585,7 +585,8 @@ async function researchLocationContext(city, state, industry) {
   }
   
   try {
-    const locationPrompt = `Research energy market context for ${city}, ${state}${industry ? ' for ' + industry + ' companies' : ''}.
+    const industryPhrase = industry ? getIndustryPhrase(industry, 'companies_in') : '';
+    const locationPrompt = `Research energy market context for ${city}, ${state}${industryPhrase ? ' for ' + industryPhrase : ''}.
     Focus on:
     - Regional energy market trends and competitive landscape
     - Local supplier landscape and market dynamics
@@ -666,6 +667,53 @@ function removeEmDashes(text) {
 }
 
 // Industry/size-aware post-processor to avoid generic "your industry" and inaccurate size references
+// Map industry names to natural language for better phrasing
+function getIndustryNaturalLanguage(industry) {
+  if (!industry) return null;
+  
+  const industryLower = industry.toLowerCase();
+  const industryMap = {
+    'education': 'schools',
+    'healthcare': 'healthcare facilities',
+    'retail': 'retailers',
+    'hospitality': 'hotels',
+    'nonprofit': 'nonprofits',
+    'manufacturing': 'manufacturing companies',
+    'logistics': 'logistics companies',
+    'datacenter': 'data centers',
+    'construction': 'construction companies',
+    'government': 'government organizations'
+  };
+  
+  return industryMap[industryLower] || null;
+}
+
+// Get natural phrase for "companies in [industry]" or "[industry] companies"
+function getIndustryPhrase(industry, pattern = 'companies_in') {
+  const natural = getIndustryNaturalLanguage(industry);
+  if (!natural) return industry ? `companies in ${industry}` : 'companies like yours';
+  
+  // For Education: "schools" instead of "education companies"
+  // For Healthcare: "healthcare facilities" instead of "healthcare companies"
+  // For Retail: "retailers" instead of "retail companies"
+  // etc.
+  if (pattern === 'companies_in') {
+    return natural;
+  } else if (pattern === 'industry_companies') {
+    return natural;
+  } else if (pattern === 'as_company') {
+    // For "As a [industry] company"
+    if (industry.toLowerCase() === 'education') return 'As a school';
+    if (industry.toLowerCase() === 'healthcare') return 'As a healthcare facility';
+    if (industry.toLowerCase() === 'retail') return 'As a retailer';
+    if (industry.toLowerCase() === 'hospitality') return 'As a hotel';
+    if (industry.toLowerCase() === 'nonprofit') return 'As a nonprofit';
+    return `As a ${industry} company`;
+  }
+  
+  return natural;
+}
+
 function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory, job }) {
   if (!text) return text;
   let out = String(text);
@@ -691,16 +739,17 @@ function personalizeIndustryAndSize(text, { industry, companyName, sizeCategory,
 
   // Remove ALL size assumptions - "small company/business" can be insulting to business owners
   // Use neutral, empowering language regardless of actual size
-  const neutralGroup = industry ? `companies in ${industry}` : 'companies like yours';
+  // Use natural language mapping for better phrasing (e.g., "schools" instead of "education companies")
+  const neutralGroup = getIndustryPhrase(industry, 'companies_in');
   
   // Aggressive removal of "small" language - assume nothing about company size
   // Replace with industry-based or role-based language
-  const industryBased = industry ? `companies in ${industry}` : 'companies like yours';
-  const roleBased = job ? `As ${job}` : (industry ? `As a ${industry} company` : 'As a company');
+  const industryBased = getIndustryPhrase(industry, 'companies_in');
+  const roleBased = job ? `As ${job}` : (getIndustryPhrase(industry, 'as_company') || 'As a company');
   
   out = out
     // Catch "as a small" patterns first (most common)
-    .replace(/\bAs a small (?:company|business|firm|organization|operation)\b/gi, industry ? `As a ${industry} company` : 'As a company')
+    .replace(/\bAs a small (?:company|business|firm|organization|operation)\b/gi, getIndustryPhrase(industry, 'as_company') || 'As a company')
     .replace(/\bAs a small\b/gi, roleBased)
     .replace(/\bas a small (?:company|business|firm|organization|operation)\b/gi, industry ? `as a ${industry} company` : 'as a company')
     .replace(/\bas a small\b/gi, roleBased.toLowerCase())
@@ -2373,8 +2422,8 @@ ${energy.supplier ? '- Current Supplier: "With ' + energy.supplier + ' as your c
 ${energy.currentRate ? '- Current Rate: "At ' + energy.currentRate + '/kWh, there\'s likely room for improvement..."' : ''}
 ${contractEndLabel ? '- Contract Timing: "With your contract ending ' + contractEndLabel + ', timing is critical..."' : ''}
 ${accountDescription ? '- Business Focus (CONTEXT ONLY): "' + accountDescription + '" - Use this for context, but DO NOT copy it into the email. Instead, reference ONE short detail naturally.' : ''}
-${industryContent ? '- Industry Focus: "Manufacturing companies like ' + company + ' typically face ' + industryContent.painPoints[0] + '..."' : ''}
-${companySizeContext && companySizeContext.size === 'large' ? '- Size Context: "As a large ' + (industry || 'company') + ', ' + companySizeContext.focus + ' is key..."' : ''}
+${industryContent ? '- Industry Focus: "' + (getIndustryPhrase(industry, 'industry_companies') || 'companies') + ' like ' + company + ' typically face ' + industryContent.painPoints[0] + '..."' : ''}
+${companySizeContext && companySizeContext.size === 'large' ? '- Size Context: "As a large ' + (getIndustryPhrase(industry, 'as_company') || industry || 'company') + ', ' + companySizeContext.focus + ' is key..."' : ''}
 ${companySizeContext && companySizeContext.size !== 'large' ? '- Industry Context: "As a ' + (industry || 'company') + ', ' + companySizeContext.focus + ' is key..." (NEVER say "small company" or "small business" - use industry instead)' : ''}
 ${contractUrgency ? '- Urgency Level: "With ' + contractUrgency.level + ' timing, ' + contractUrgency.focus + '..."' : ''}
 
@@ -2560,8 +2609,8 @@ Generate text for these fields:
   
   **PERSONALIZATION PRIORITY FOR OPENING HOOK**:
   1. **If you have research data** (recentActivityContext, linkedinContext, websiteContext): Reference specific details through questions (e.g., "With your recent expansion in [City], how are you handling..."). DO NOT say "I noticed" - use questions.
-  2. **If no research but you have accountDescription**: Use the business type naturally (e.g., "How are manufacturing companies like [company] handling..."). DO NOT copy the description text verbatim - it sounds like an encyclopedia.
-  3. **If no research and no description**: Use industry-specific challenges (e.g., "How are [industry] companies handling rising energy costs?").
+  2. **If no research but you have accountDescription**: Use the business type naturally (e.g., "How are ${industry ? getIndustryPhrase(industry, 'industry_companies') : 'companies'} like [company] handling..."). For Education, use "schools" instead of "education companies". DO NOT copy the description text verbatim - it sounds like an encyclopedia.
+  3. **If no research and no description**: Use industry-specific challenges (e.g., "How are ${industry ? getIndustryPhrase(industry, 'industry_companies') : 'companies'} handling rising energy costs?").
   
   ${selectedAngle && typeof selectedAngle === 'object' ? `**CRITICAL - USE THE SELECTED ANGLE**: This email MUST focus on "${selectedAngle.primaryMessage || selectedAngle.label || 'the selected angle'}". ${selectedAngle.id === 'demand_efficiency' ? 'You CAN mention demand charges since this angle is about demand efficiency.' : 'DO NOT mention "demand charges" or "delivery charges" - this angle is NOT about demand. Focus on ' + (selectedAngle.primaryMessage || selectedAngle.label) + ' instead. For example, if angle is "timing_strategy", focus on contract renewal timing. If angle is "cost_control", focus on rising electricity costs or budget pressure. If angle is "exemption_recovery", focus on tax exemptions. If angle is "consolidation", focus on multi-location management.'} ${selectedAngle.openingTemplate ? 'Use this angle\'s opening pattern as inspiration: "' + selectedAngle.openingTemplate + '"' : ''}` : '**DO NOT default to "demand charges"** - vary the pain points you mention.'} ${accountDescription ? `**CRITICAL - DO NOT USE THE BUSINESS FOCUS TEXT**: The "Business Focus" (${accountDescription}) is ONLY for you to understand their business type. DO NOT copy it, quote it, or reference it directly in the email. Instead, use industry-specific language naturally. GOOD: "Most ${industryLower || 'manufacturing'} companies I work with..." or "Companies like ${company} typically..." BAD: "${accountDescription}..." or "As a ${accountDescription}..." or any variation that includes the business focus text.` : 'Reference their specific business challenges.'} Focus on industry-specific energy challenges:
   **CRITICAL PUNCTUATION RULE: NEVER use em dashes (—) or en dashes (–) in the opening_hook. Use commas or natural flow instead. Examples: "Curious, " (NOT "Curious—"), "Question for you, " (NOT "Question for you—"), "Real question, " (NOT "Real question—"). This is mandatory - em dashes will be rejected.**
@@ -2699,7 +2748,7 @@ ${ctaEscalation}
 HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
 - Write like a knowledgeable energy expert who researched their company deeply
 - Show you did homework: When you have specific data, use QUESTIONS instead of observations:
-  * Ask about their business type naturally: "How are ${industry || 'manufacturing'} companies like ${company} handling energy costs?" (DO NOT mention the business focus text - use industry/company name instead)
+  * Ask about their business type naturally: "How are ${industry ? getIndustryPhrase(industry, 'industry_companies') : 'companies'} like ${company} handling energy costs?" (DO NOT mention the business focus text - use industry/company name instead)
   ${recentActivityContext ? '* Ask about ' + recentActivityContext.substring(0, 60) + '...: "With [recent activity], how has that affected your energy planning?" (if recent activity found)' : '* DO NOT mention recent activity, recent news, or recent public activity - there is none available'}
   * Reference website naturally: "On your website, I see..." → "How are you handling [specific challenge mentioned on website]?" (if website context available)
   * "Given ${city ? city + '\'s' : '[location]\'s'} energy market conditions..." (if location context available)
@@ -2748,7 +2797,7 @@ CTA GUIDANCE:
 PERSONALIZATION PRIORITY (CRITICAL - Follow This Order):
 1. **INTERNET RESEARCH (HIGHEST PRIORITY)**: If you have recentActivityContext, linkedinContext, or websiteContext, USE THESE FIRST. Reference specific details naturally through questions (e.g., "With your recent expansion in [City], how has that affected..."). DO NOT use forbidden phrases (see FORBIDDEN PHRASES in CREATIVE FREEDOM section above) - use questions instead.
 
-2. **COMPANY DESCRIPTION (SECOND PRIORITY)**: If no research data is available, use accountDescription naturally. DO NOT copy it verbatim or make it sound like an encyclopedia entry. Instead, extract the business type and use industry-specific language (e.g., "manufacturing companies like [company]" not "As a leading provider of manufacturing services...").
+2. **COMPANY DESCRIPTION (SECOND PRIORITY)**: If no research data is available, use accountDescription naturally. DO NOT copy it verbatim or make it sound like an encyclopedia entry. Instead, extract the business type and use industry-specific language (e.g., "${industry ? getIndustryPhrase(industry, 'industry_companies') : 'companies'} like [company]" not "As a leading provider of manufacturing services..."). For Education industry, use "schools" instead of "education companies". For Healthcare, use "healthcare facilities" instead of "healthcare companies".
 
 3. **INDUSTRY INFORMATION (FINAL FALLBACK)**: If no research and no description, use industry-specific challenges and pain points. Reference their industry naturally through questions.
 
@@ -2803,7 +2852,7 @@ CRITICAL QUALITY RULES:
 - PROPER ENDINGS: All CTAs must end with proper punctuation (? or .)
 - EMAIL LENGTH: Keep total email body 75-120 words (see CREATIVE FREEDOM section above for natural flow guidance)
 - CTA LENGTH: CTAs should be 8-12 words maximum
-- VALUE PROP MUST: Include HOW we help AND WHAT results using CONDITIONAL language (e.g., "We help [industry] companies secure better rates before contracts expire. Early renewal often gives more optionality and can reduce renewal risk.") Do NOT assert specific percentages as facts unless you have verified data.
+- VALUE PROP MUST: Include HOW we help AND WHAT results using CONDITIONAL language (e.g., "We help ${industry ? getIndustryPhrase(industry, 'industry_companies') : 'companies'} secure better rates before contracts expire. Early renewal often gives more optionality and can reduce renewal risk.") Do NOT assert specific percentages as facts unless you have verified data.
 - MOBILE OPTIMIZATION: Keep paragraphs short (2-3 sentences max), use clear CTA placement, optimize for mobile preview text (52% of emails opened on mobile)
 - LENGTH VALIDATION: If email exceeds 125 words, prioritize: greeting + opening hook + value prop + CTA only
 - COMPANY DATA USAGE: MUST use current supplier, rate, contract timing, recent achievements when available
@@ -2857,13 +2906,13 @@ FORBIDDEN CTAs (CRITICAL - DO NOT USE THESE):
 These old CTAs are FORBIDDEN. You MUST use the angle-based CTA provided above.
 
 PREFERRED LANGUAGE:
-- "Companies in [industry] are facing rising electricity costs..."
+- "${industry ? getIndustryPhrase(industry, 'companies_in') : 'Companies'} are facing rising electricity costs..."
 - "[Company] likely sees energy as a significant operational expense..."
 - "With contracts renewing in 2025, [company] may be facing higher energy rates..."
 - "Given [company]'s focus on [business aspect], energy costs are probably on your radar..."
-- "[Company]'s [industry] operations typically require significant energy consumption..."
-- "As a [industry] company, [company] is probably seeing electricity rate increases..."
-- "Current market conditions are driving up energy costs for [industry] operations..."
+- "[Company]'s ${industry || '[industry]'} operations typically require significant energy consumption..."
+- "${getIndustryPhrase(industry, 'as_company') || 'As a company'}, [company] is probably seeing electricity rate increases..."
+- "Current market conditions are driving up energy costs for ${industry ? getIndustryPhrase(industry, 'companies_in') : '[industry]'} operations..."
 
 STYLE RULES:
   - Use first-person voice ("we"/"I") instead of brand-first phrasing.
@@ -3282,8 +3331,8 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
   
   **PERSONALIZATION PRIORITY FOR OPENING HOOK**:
   1. **If you have research data** (recentActivityContext, linkedinContext, websiteContext): Reference specific details through questions (e.g., "With your recent expansion in [City], how are you handling..."). DO NOT say "I noticed" - use questions.
-  2. **If no research but you have accountDescription**: Use the business type naturally (e.g., "How are manufacturing companies like [company] handling..."). DO NOT copy the description text verbatim - it sounds like an encyclopedia.
-  3. **If no research and no description**: Use industry-specific challenges (e.g., "How are [industry] companies handling rising energy costs?").
+  2. **If no research but you have accountDescription**: Use the business type naturally (e.g., "How are ${industry ? getIndustryPhrase(industry, 'industry_companies') : 'companies'} like [company] handling..."). For Education, use "schools" instead of "education companies". DO NOT copy the description text verbatim - it sounds like an encyclopedia.
+  3. **If no research and no description**: Use industry-specific challenges (e.g., "How are ${industry ? getIndustryPhrase(industry, 'industry_companies') : 'companies'} handling rising energy costs?").
   
   ${recentActivityContext ? '* **PRIORITY 1**: Ask about ' + recentActivityContext.substring(0, 60) + '...: "With [recent activity], how has that impacted your planning?" (you have recent activity - USE THIS FIRST)' : ''}
   ${linkedinContext ? '* **PRIORITY 1**: Reference company LinkedIn through questions: "How are you handling [challenge from LinkedIn post]?" (you have LinkedIn context - USE THIS FIRST)' : ''}
@@ -3303,7 +3352,7 @@ ${tenure ? '- Use tenure naturally: "In your ' + tenure + ' as ' + job + ', how 
 PERSONALIZATION PRIORITY (CRITICAL - Follow This Order):
 1. **INTERNET RESEARCH (HIGHEST PRIORITY)**: If you have recentActivityContext, linkedinContext, or websiteContext, USE THESE FIRST. Reference specific details naturally through questions (e.g., "With your recent expansion in [City], how has that affected..."). DO NOT use forbidden phrases (see FORBIDDEN PHRASES in CREATIVE FREEDOM section above) - use questions instead.
 
-2. **COMPANY DESCRIPTION (SECOND PRIORITY)**: If no research data is available, use accountDescription naturally. DO NOT copy it verbatim or make it sound like an encyclopedia entry. Instead, extract the business type and use industry-specific language (e.g., "manufacturing companies like [company]" not "As a leading provider of manufacturing services...").
+2. **COMPANY DESCRIPTION (SECOND PRIORITY)**: If no research data is available, use accountDescription naturally. DO NOT copy it verbatim or make it sound like an encyclopedia entry. Instead, extract the business type and use industry-specific language (e.g., "${industry ? getIndustryPhrase(industry, 'industry_companies') : 'companies'} like [company]" not "As a leading provider of manufacturing services..."). For Education industry, use "schools" instead of "education companies". For Healthcare, use "healthcare facilities" instead of "healthcare companies".
 
 3. **INDUSTRY INFORMATION (FINAL FALLBACK)**: If no research and no description, use industry-specific challenges and pain points. Reference their industry naturally through questions.
 
