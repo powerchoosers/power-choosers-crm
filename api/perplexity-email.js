@@ -2589,6 +2589,11 @@ ${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo')
       const angleFocus = selectedAngle.primaryMessage || selectedAngle.label || 'primary focus';
       const angleOpening = selectedAngle.openingTemplate || '';
       const angleValue = selectedAngle.primaryValue || '';
+      const hasResearch = triggerEvents.length > 0 || recentActivityContext || linkedinContext || websiteContext;
+      const angleUsageText = hasResearch 
+        ? '**CRITICAL OVERRIDE:** Research data (trigger events, recent activity, LinkedIn, website) takes ABSOLUTE PRIORITY over this angle. If research exists, USE THE RESEARCH FIRST and ignore this angle if it doesn\'t fit. The news/research IS your angle. **IMPORTANT:** All research has been validated as relevant to energy/electricity procurement - irrelevant research (product launches, software releases, aviation operations, non-energy hiring) has been filtered out.'
+        : `**USE THIS ANGLE:** Since no research data is available (or research was filtered out as irrelevant), structure the email around this specific angle (${angleFocus}).`;
+      
       angleContextBlock = `
 
 PRIMARY ANGLE FOR THIS EMAIL (USE WHEN NO RESEARCH DATA AVAILABLE):
@@ -2598,7 +2603,7 @@ ${angleOpening ? '- Example opening pattern: "' + angleOpening + '"' : ''}
 ${angleValue ? '- Primary value proposition: "' + angleValue + '"' : ''}
 
 **ANGLE USAGE (BRONZE STANDARD - Only if no research):**
-${triggerEvents.length > 0 || recentActivityContext || linkedinContext || websiteContext ? '**CRITICAL OVERRIDE:** Research data (trigger events, recent activity, LinkedIn, website) takes ABSOLUTE PRIORITY over this angle. If research exists, USE THE RESEARCH FIRST and ignore this angle if it doesn't fit. The news/research IS your angle. **IMPORTANT:** All research has been validated as relevant to energy/electricity procurement - irrelevant research (product launches, software releases, aviation operations, non-energy hiring) has been filtered out.' : '**USE THIS ANGLE:** Since no research data is available (or research was filtered out as irrelevant), structure the email around this specific angle (${angleFocus}).'}
+${angleUsageText}
 - If angle is "timing_strategy" → focus on contract renewal timing, early renewal benefits, renewal windows
 - If angle is "cost_control" → focus on rising electricity costs, budget pressure, cost predictability
 - If angle is "exemption_recovery" → focus on tax exemptions, unclaimed exemptions, exemption certificates
