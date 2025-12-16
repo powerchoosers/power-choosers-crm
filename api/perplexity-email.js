@@ -78,7 +78,7 @@ const angleCtaMap = {
   'timing_strategy': {
     opening: 'The 2026 ERCOT capacity cliff is already pushing forward curves higher.',
     value: 'Locking in 12-24 months early is currently saving clients 15-20% vs. waiting for the renewal window.',
-    full: 'Futures are rising due to the 2026 capacity cliff. Are you floating or fixed right now?',
+    full: 'Given rising delivery costs, does your current contract cover you through next summer?',
     angleId: 'timing_strategy'
   },
   'exemption_recovery': {
@@ -2257,6 +2257,10 @@ async function buildSystemPrompt({
   // Detect trigger events
   const triggerEvents = detectTriggerEvents(r.account || {}, recipient);
   
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2258',message:'Research data availability check',data:{hasTriggerEvents:triggerEvents.length>0,triggerEventCount:triggerEvents.length,hasRecentActivity:!!recentActivityContext,hasLinkedIn:!!linkedinContext,hasWebsite:!!websiteContext,hasLocationContext:!!locationContextData,hasAccountDescription:!!accountDescription,selectedAngleId:selectedAngle?.id,priorityLevel:triggerEvents.length>0||recentActivityContext||linkedinContext||websiteContext?'GOLD_SILVER':accountDescription?'BRONZE_DESC':'BRONZE_INDUSTRY'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  
   // Get deep personalization
   const deepPersonalization = getDeepPersonalization(r.account || {}, recipient);
   
@@ -2389,16 +2393,14 @@ ${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo')
       const angleValue = selectedAngle.primaryValue || '';
       angleContextBlock = `
 
-PRIMARY ANGLE FOR THIS EMAIL (CRITICAL - USE THIS AS YOUR LENS - DO NOT IGNORE):
+PRIMARY ANGLE FOR THIS EMAIL (USE WHEN NO RESEARCH DATA AVAILABLE):
 - Angle ID: ${angleId}
 - Focus: ${angleFocus}
 ${angleOpening ? '- Example opening pattern: "' + angleOpening + '"' : ''}
 ${angleValue ? '- Primary value proposition: "' + angleValue + '"' : ''}
 
-**MANDATORY ANGLE USAGE:**
-- You MUST structure the ENTIRE email around this specific angle (${angleFocus})
-- The opening_hook MUST focus on this angle's specific problem/challenge
-- DO NOT default to generic "demand charges" or "delivery charges" unless the angle is specifically about demand efficiency
+**ANGLE USAGE (BRONZE STANDARD - Only if no research):**
+${triggerEvents.length > 0 || recentActivityContext || linkedinContext || websiteContext ? '**CRITICAL OVERRIDE:** Research data (trigger events, recent activity, LinkedIn, website) takes ABSOLUTE PRIORITY over this angle. If research exists, USE THE RESEARCH FIRST and ignore this angle if it doesn't fit. The news/research IS your angle.' : '**USE THIS ANGLE:** Since no research data is available, structure the email around this specific angle (${angleFocus}).'}
 - If angle is "timing_strategy" → focus on contract renewal timing, early renewal benefits, renewal windows
 - If angle is "cost_control" → focus on rising electricity costs, budget pressure, cost predictability
 - If angle is "exemption_recovery" → focus on tax exemptions, unclaimed exemptions, exemption certificates
@@ -2698,16 +2700,17 @@ PERSONALIZATION PRIORITY (CRITICAL - Follow This Order):
 
 3. **INDUSTRY INFORMATION (FINAL FALLBACK)**: If no research and no description, use industry-specific challenges and pain points. Reference their industry naturally through questions.
 
-EVIDENCE OF RESEARCH (Show You Know Their Business):
-${recentActivityContext ? '✓ **PRIORITY 1**: Use recent activity: Ask "With ' + recentActivityContext.substring(0, 60) + '..., how has that impacted..." (DO NOT say "I saw") - USE THIS FIRST' : ''}
-${linkedinContext ? '✓ **PRIORITY 1**: Use company LinkedIn: Reference recent company posts or announcements through questions - USE THIS FIRST' : ''}
-${websiteContext ? '✓ **PRIORITY 1**: Use website info: Ask about specific challenges mentioned on their website (DO NOT say "I noticed") - USE THIS FIRST' : ''}
-${accountDescription ? '✓ **PRIORITY 2**: Use business focus naturally (NOT encyclopedia style): The business focus tells you their business type. Use industry-specific language (e.g., "manufacturing companies", "restaurant chains") but DO NOT mention the business focus text itself. Use this when no research data is available.' : ''}
-${locationContextData ? '✓ Use location context: "Given ' + (city || '[location]') + '\'s energy market..."' : ''}
+RESEARCH HIGHLIGHTS (Use These When Available - Override Angle):
+${triggerEvents.length > 0 ? '🚨 **TRIGGER EVENTS DETECTED - USE THESE FIRST (OVERRIDE ANGLE):**\n' + triggerEvents.map(event => `- ${event.type.toUpperCase()}: ${event.description} (${event.relevance} relevance) - OPEN WITH THIS NEWS`).join('\n') + '\n**CRITICAL:** If trigger events exist, they take absolute priority over the selected angle. The news IS your angle.' : ''}
+${recentActivityContext ? '✓ **GOLD STANDARD**: RECENT NEWS: ' + recentActivityContext + ' - OPEN WITH THIS. Connect it to energy impact (demand charges, usage spikes, contract timing).' : ''}
+${linkedinContext ? '✓ **SILVER STANDARD**: LINKEDIN: ' + linkedinContext.substring(0, 150) + ' - Use specific operational details from company posts.' : ''}
+${websiteContext ? '✓ **SILVER STANDARD**: WEBSITE: ' + websiteContext.substring(0, 150) + ' - Use specific challenges mentioned on their website.' : ''}
+${locationContextData ? '✓ **SILVER STANDARD**: LOCAL MARKET: ' + locationContextData.substring(0, 150) + ' - Use regional energy market context.' : ''}
+${accountDescription ? '✓ **BRONZE STANDARD**: Use business focus naturally (NOT encyclopedia style): The business focus tells you their business type. Use industry-specific language (e.g., "manufacturing companies", "restaurant chains") but DO NOT mention the business focus text itself. Use this when no research data is available.' : ''}
 ${contractEndLabel ? '✓ Use contract timing: "With your contract ending ' + contractEndLabel + '..." - strong hook when no research data' : ''}
 ${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
 ${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant for context' : ''}
-${industry ? '✓ **PRIORITY 3**: Use industry context: Reference ' + industry + ' industry challenges naturally through questions - Use this when no research and no description available' : ''}
+${industry ? '✓ **BRONZE STANDARD**: Use industry context: Reference ' + industry + ' industry challenges naturally through questions - Use this when no research and no description available' : ''}
 
 CONVERSATIONAL FLOW PATTERNS:
 ✓ GOOD: "With ${company} operating in ${industryLower || '[industry]'}, how are you handling energy costs for facilities like yours?"
@@ -2984,7 +2987,14 @@ CRITICAL RULES:
       prompt: basePrompt + (templateInstructions[templateType] || templateInstructions.general),
       researchData: researchData,
       openingStyle: openingStyle?.type || null,
-      dynamicFields: dynamicFields
+      dynamicFields: dynamicFields,
+      researchContext: {
+        recentActivityContext,
+        linkedinContext,
+        websiteContext,
+        locationContextData,
+        triggerEvents: triggerEvents.length > 0 ? triggerEvents : null
+      }
     };
   }
 
@@ -3089,11 +3099,15 @@ OUTPUT FORMAT (JSON):
   "closing": "Best regards,\\n${senderName ? senderName.split(' ')[0] : 'Lewis'}"
 }
 
-⚠️ CRITICAL REQUIREMENTS:
-1. TOTAL word count (greeting + paragraph1 + paragraph2 + paragraph3) must be 50-70 words MAXIMUM. Count carefully.
-2. At least ONE question mark (?) is required somewhere in the email (preferably in paragraph1 or paragraph3)
-3. Natural, conversational tone is preferred - don't force questions if they don't fit naturally
-4. Value-verification questions work well in the CTA (e.g., "Are you currently floating or fixed on your index?")
+⚠️ RELAXED REQUIREMENTS (Natural Flow):
+1. TOTAL word count (greeting + paragraph1 + paragraph2 + paragraph3) should be 75-115 words. Maximum 125 words.
+2. You have freedom to distribute text between paragraph1 and paragraph2:
+   - paragraph1 can be the research hook AND the problem statement combined
+   - paragraph2 can be the solution and value proposition
+   - Blend sections naturally - connect research directly to value without forced breaks
+3. At least ONE question mark (?) is required somewhere in the email (preferably in paragraph1 or paragraph3)
+4. Natural, conversational tone is preferred - write like texting a colleague
+5. Value-verification questions work well in the CTA (e.g., "Given rising delivery costs, does your current contract cover you through next summer?")
 
 EXAMPLE STRUCTURE:
 paragraph1: "Noticed Cypress is navigating shifting rates in Leander. How are you handling that?" (18 words, ends with ?)
@@ -3114,33 +3128,30 @@ IMPORTANT: The closing field must include a newline between "Best regards," and 
     const coldEmailRules = `
 EMAIL TYPE: Cold Email (Never Spoke Before)
 
-## ABSOLUTELY CRITICAL - SECTION WORD LIMITS (HARD ENFORCED)
+## RELAXED WORD COUNT POLICY (Natural Flow Allowed)
 
 **Greeting:** 2 words MAX
   Example: "Hi Greg,"
 
-**Opening Hook:** 15-20 words EXACTLY
-  Rule: One sentence problem statement or context.
-  Structure: "Problem + relevant context"
-  Example: "Noticed Cypress is navigating shifting rates in Leander."
-  STOP immediately when you hit 20 words - do not continue.
+**Body Content:** You have freedom to distribute text between paragraph1 and paragraph2.
+  - paragraph1 can be the research hook AND the problem statement combined
+  - paragraph2 can be the solution and value proposition
+  - Blend sections naturally - connect research directly to value without forced breaks
+  - Target: 75-115 words total (greeting + paragraph1 + paragraph2 + paragraph3)
+  - Maximum: 125 words (only truncate if truly rambling)
 
-**Value Proposition:** 20-30 words EXACTLY
-  Rule: One sentence solution + specific outcome.
-  Example: "Manufacturers typically lock in 6 months early to secure a 10-20% drop before hikes hit."
-  STOP immediately when you hit 30 words - do not continue.
-
-**CTA:** 8-15 words EXACTLY
-  Rule: Direct, value-verification question (No meeting asks).
+**CTA:** 8-15 words
+  Rule: Context-wrapped, value-verification question (No meeting asks).
   - BAD: "Is this on your radar?" (Too passive)
+  - BAD: "When does your contract expire?" (Too commodity-like)
+  - GOOD: "Given rising delivery costs, does your current contract cover you through next summer?"
   - GOOD (General): "Are you open to a quick audit to check for hidden riders?"
   - GOOD (Industrial): "Do you have an updated peak demand strategy for this summer?"
   - GOOD (Finance): "Are you currently floating or fixed on your index?"
   - GOOD (Owner): "Has anyone reviewed your rate structure since the market shifted?"
-  STOP immediately when you hit 15 words - do not continue.
 
-**Total Email:** 50-70 words MAXIMUM
-  Structure: Greeting (2) + Hook (18) + Value (25) + CTA (10) = ~55 words.
+**Total Email:** 75-115 words TARGET, 125 words MAXIMUM
+  Use the extra space to explain *why* the research matters.
 
 ## QUESTIONS (Natural Tone - At Least 1 Required)
 - **Preferred:** Include a problem-awareness question in the Opening Hook (15-20 words) OR a qualifying question in the CTA (8-15 words)
@@ -3398,22 +3409,26 @@ TONE: Write like a 29-year-old Texas business pro - conversational, confident, d
 
     // WORD COUNT MUST BE FIRST - highest priority (add before everything else)
     const wordLimitSection = templateType === 'cold_email' ? `
-## ABSOLUTELY CRITICAL - SECTION WORD LIMITS (READ FIRST)
+## RELAXED WORD COUNT POLICY (Natural Flow Allowed)
 
 GREETING: "Hi [FirstName]," (2 words)
-OPENING: 15-20 words - single sentence context.
-VALUE: 20-30 words - single sentence value.
-CTA: 8-12 words - soft interest question.
-TOTAL: 50-70 words maximum.
+BODY CONTENT: You have freedom to distribute text between paragraph1 and paragraph2. 
+- paragraph1 can be the research hook AND the problem statement combined
+- paragraph2 can be the solution and value proposition
+- Blend sections naturally - it's okay to combine observation and question
+- Target: 75-115 words total (greeting + paragraph1 + paragraph2 + paragraph3)
+- Maximum: 125 words (only truncate if truly rambling)
 
-VISUALS: Use line breaks between EVERY section. Make it look like a text message format.
+CTA: 8-15 words - Context-wrapped question with value (e.g., "Given rising delivery costs, does your current contract cover you through next summer?")
+
+VISUALS: Use line breaks between sections for scannable format. Make it look like a text message.
 
 QUESTIONS: Include at least ONE question somewhere in the email (preferably in Opening Hook or CTA).
 - Natural, conversational tone is preferred
-- Value-verification questions work well (e.g., "Are you currently floating or fixed on your index?")
+- Value-verification questions work well
 - Don't force multiple questions if one flows naturally
 
-DO NOT EXCEED THESE LIMITS. If you do, your email fails validation.
+**CREATIVE FREEDOM:** Vary your structure. Write like you're texting a colleague, not writing a press release. Use the extra space (75-115 words) to explain *why* the research matters.
 
 ` : '';
     
@@ -3586,7 +3601,7 @@ CRITICAL: Use these EXACT meeting times in your CTA.
 
 `;
     
-    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields } = await buildSystemPrompt({ 
+    const { prompt: systemPrompt, researchData, openingStyle: openingStyleUsed, dynamicFields, researchContext } = await buildSystemPrompt({ 
       mode, 
       recipient, 
       to, 
@@ -3685,6 +3700,17 @@ CRITICAL: Use these EXACT meeting times in your CTA.
     if (mode === 'html' && content) {
       try {
         const jsonData = JSON.parse(content);
+        
+        // #region agent log
+        const hasResearchData = !!(researchContext?.recentActivityContext || researchContext?.linkedinContext || researchContext?.websiteContext);
+        const hookLower = jsonData.opening_hook?.toLowerCase() || '';
+        const researchInHook = hasResearchData && (
+          (researchContext?.recentActivityContext && hookLower.includes(researchContext.recentActivityContext.substring(0, 20).toLowerCase())) ||
+          (researchContext?.linkedinContext && hookLower.includes(researchContext.linkedinContext.substring(0, 20).toLowerCase())) ||
+          (researchContext?.websiteContext && hookLower.includes(researchContext.websiteContext.substring(0, 20).toLowerCase()))
+        );
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3696',message:'Generated email content (before validation)',data:{openingHook:jsonData.opening_hook?.substring(0,100),valueProp:jsonData.value_proposition?.substring(0,100),cta:jsonData.cta_text,hasResearchData,hasTriggerEvents:!!researchContext?.triggerEvents,researchInHook,selectedAngleId:selectedAngle?.id,priorityUsed:hasResearchData||researchContext?.triggerEvents?'RESEARCH_FIRST':'ANGLE_FALLBACK'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         
         // Validate value proposition completeness for cold emails
         if (templateType === 'cold_email' && jsonData.value_proposition) {
@@ -3849,36 +3875,43 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           const ctaCount = countWords(jsonData.cta_text);
           const totalCount = greetingCount + hookCount + valueCount + ctaCount;
           
-          // ENFORCE SECTION LIMITS - AGGRESSIVE TRUNCATION (50-70 word target)
-          if (hookCount > 22) {
-            const words = String(jsonData.opening_hook).split(/\s+/);
-            jsonData.opening_hook = words.slice(0, 20).join(' ').replace(/[,;]\s*$/, '').replace(/\s+$/, '') + (words[19]?.endsWith('?') || words[19]?.endsWith('.') ? '' : '.');
-          }
-          
-          if (valueCount > 32) {
-            const words = String(jsonData.value_proposition).split(/\s+/);
-            jsonData.value_proposition = words.slice(0, 30).join(' ').replace(/[,;]\s*$/, '').replace(/\s+$/, '') + '.';
-          }
-          
-          if (ctaCount > 14) {
-            const words = String(jsonData.cta_text).split(/\s+/);
-            jsonData.cta_text = words.slice(0, 12).join(' ').replace(/[,;]\s*$/, '').replace(/\s+$/, '') + (words[11]?.endsWith('?') ? '' : '?');
-          }
-          
-          // Calculate final count after truncation
+          // RELAXED WORD COUNT POLICY - Only check total, not per-section
+          // Calculate total count
           const finalTotal = countWords(jsonData.greeting) + countWords(jsonData.opening_hook) + 
                              countWords(jsonData.value_proposition) + countWords(jsonData.cta_text);
           
-          // LAST RESORT: If still over 75, remove value prop social proof clause
-          if (finalTotal > 75) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3850',message:'Word count check before truncation',data:{greetingCount,hookCount,valueCount,ctaCount,finalTotal,hasResearch:!!(recentActivityContext||linkedinContext||websiteContext),hasTriggerEvents:triggerEvents?.length>0,selectedAngleId:selectedAngle?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
+          
+          // Only truncate if truly rambling (over 125 words)
+          if (finalTotal > 125) {
             // Remove "Most clients save X%" if present
             jsonData.value_proposition = jsonData.value_proposition
               .replace(/Most clients save[^.]*\.?/i, '')
               .replace(/Clients typically[^.]*\.?/i, '')
               .replace(/\s+$/, '');
+            
+            // Recalculate after removal
+            const newTotal = countWords(jsonData.greeting) + countWords(jsonData.opening_hook) + 
+                             countWords(jsonData.value_proposition) + countWords(jsonData.cta_text);
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3865',message:'Word count after truncation',data:{originalTotal:finalTotal,newTotal,truncated:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
+          } else {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3870',message:'Word count within limits',data:{finalTotal,withinTarget:finalTotal>=75&&finalTotal<=115,withinMax:finalTotal<=125},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
           }
           
           // Email length validation complete
+          
+          // #region agent log
+          const finalWordCount = countWords(jsonData.greeting) + countWords(jsonData.opening_hook) + 
+                                 countWords(jsonData.value_proposition) + countWords(jsonData.cta_text);
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3895',message:'Final email word count after validation',data:{finalWordCount,withinTarget:finalWordCount>=75&&finalWordCount<=115,withinMax:finalWordCount<=125,ctaText:jsonData.cta_text,hasContextWrappedCta:jsonData.cta_text?.includes('Given')||jsonData.cta_text?.includes('rising')||jsonData.cta_text?.includes('delivery costs')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
         }
         
         // Final language polishing: de-salesify and personalize industry/size

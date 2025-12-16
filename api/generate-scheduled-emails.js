@@ -1358,10 +1358,10 @@ export default async function handler(req, res) {
                   // Failed to get account data
                 }
               }
-          }
-        } catch (error) {
+            }
+          } catch (error) {
           // Failed to get contact data
-        }
+          }
         }
         
         // Get previous sequence emails for context
