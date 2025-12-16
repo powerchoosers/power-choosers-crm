@@ -2273,13 +2273,7 @@ async function buildSystemPrompt({
             const validation = validateResearchRelevance(data, company, industry);
             if (validation.relevant) {
               recentActivityContext = data;
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2273',message:'Research activity validated as relevant',data:{activityPreview:data.substring(0,150),company,industry,reason:validation.reason},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
-              // #endregion
             } else {
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2278',message:'Research activity filtered out as irrelevant',data:{activityPreview:data.substring(0,150),company,industry,reason:validation.reason},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
-              // #endregion
               // Don't set recentActivityContext - it will be null and system will fall back to next tier
             }
           }
@@ -2458,21 +2452,10 @@ async function buildSystemPrompt({
       const validation = validateResearchRelevance(event.description || event.type || '', company, industry);
       if (validation.relevant) {
         validatedEvents.push(event);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2457',message:'Trigger event validated as relevant',data:{eventType:event.type,eventDescription:event.description?.substring(0,100),company,industry,reason:validation.reason},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
-        // #endregion
-      } else {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2462',message:'Trigger event filtered out as irrelevant',data:{eventType:event.type,eventDescription:event.description?.substring(0,100),company,industry,reason:validation.reason},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'N'})}).catch(()=>{});
-        // #endregion
       }
     }
     triggerEvents = validatedEvents;
   }
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:2258',message:'Research data availability check',data:{hasTriggerEvents:triggerEvents.length>0,triggerEventCount:triggerEvents.length,hasRecentActivity:!!recentActivityContext,hasLinkedIn:!!linkedinContext,hasWebsite:!!websiteContext,hasLocationContext:!!locationContextData,hasAccountDescription:!!accountDescription,selectedAngleId:selectedAngle?.id,priorityLevel:triggerEvents.length>0||recentActivityContext||linkedinContext||websiteContext?'GOLD_SILVER':accountDescription?'BRONZE_DESC':'BRONZE_INDUSTRY'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   
   // Get deep personalization
   const deepPersonalization = getDeepPersonalization(r.account || {}, recipient);
