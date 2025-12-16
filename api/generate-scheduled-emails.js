@@ -307,7 +307,14 @@ async function generatePreviewEmail(emailData) {
 
   // Detect industry (same priority as main flow)
   let recipientIndustry = accountData.industry || contactData.industry || '';
+  const industryDebug = {
+    accountIndustry: accountData.industry || null,
+    contactIndustry: contactData.industry || null,
+    inferredFromCompany: null,
+    inferredFromDescription: null
+  };
   if (!recipientIndustry && (emailData.contactCompany || contactData.company)) {
+    industryDebug.inferredFromCompany = true;
     recipientIndustry = IndustryDetection.inferIndustryFromCompanyName(emailData.contactCompany || contactData.company);
   }
   if (!recipientIndustry) {
@@ -315,6 +322,7 @@ async function generatePreviewEmail(emailData) {
       accountData.descriptionShort || accountData.description ||
       accountData.companyDescription || accountData.accountDescription || '';
     if (accountDesc) {
+      industryDebug.inferredFromDescription = true;
       recipientIndustry = IndustryDetection.inferIndustryFromDescription(accountDesc);
     }
   }
@@ -365,6 +373,10 @@ async function generatePreviewEmail(emailData) {
   const selectedAngle = selectRandomizedAngle(recipientIndustry, null, recipient, usedAngles);
   // CRITICAL: Remove any em dashes from tone opener immediately after selection
   const toneOpener = removeEmDashes(selectRandomToneOpener(selectedAngle?.id));
+
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:preview-angle-cta',message:'Preview angle + industry selection',data:{aiMode:(emailData.aiMode||'').toLowerCase()==='html'?'html':'standard',stepIndex:emailData.stepIndex,finalIndustry:recipientIndustry,industryDebug,usedAnglesCount:Array.isArray(usedAngles)?usedAngles.length:0,selectedAngleId:selectedAngle?.id||null,selectedAngleOpeningTemplate:selectedAngle?.openingTemplate||null,toneOpener},timestamp:Date.now(),sessionId:'debug-session',runId:'cta-1',hypothesisId:'CTA-ANGLE'})}).catch(()=>{});
+  // #endregion
 
   const aiMode = (emailData.aiMode || '').toLowerCase() === 'html' ? 'html' : 'standard';
   const isColdStep = (
