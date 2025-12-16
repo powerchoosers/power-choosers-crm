@@ -2685,6 +2685,11 @@
       return;
     }
 
+    // CRITICAL FIX: Clear previous state to prevent stale data from persisting
+    state.contact = null;
+    state.account = null;
+    state._taskAccountFound = false;
+    state._taskAccountNotFound = false;
     state.loadingTask = true;
 
     try {
@@ -3312,6 +3317,7 @@
     if (task.accountId || task.account) {
       try {
         let account = null;
+        const taskHasAccountName = !!(task.account && task.account.trim());
 
         // Try to find by accountId first
         if (task.accountId && accountsData.length > 0) {
@@ -3374,13 +3380,26 @@
 
         if (account) {
           state.account = account;
+          // Mark that we successfully found the account for this task
+          state._taskAccountFound = true;
           console.log('[TaskDetail] ✓ Loaded account data:', account.id, account.accountName || account.name);
         } else {
-          console.warn('[TaskDetail] ✗ Could not find account:', task.accountId || task.account, '(searched', accountsData.length, 'accounts + Firebase)');
+          // CRITICAL FIX: Explicitly set state.account to null when account is not found
+          // This prevents stale account data from previous tasks from persisting
+          state.account = null;
+          // Mark that the task's account was not found - prevents findAssociatedAccount from using stale data
+          state._taskAccountNotFound = taskHasAccountName;
+          console.warn('[TaskDetail] ✗ Could not find account:', task.accountId || task.account, '(searched', accountsData.length, 'accounts + Firebase). Cleared state.account to prevent stale data.');
         }
       } catch (e) {
         console.warn('[TaskDetail] Error loading account data:', e);
+        state.account = null;
+        state._taskAccountNotFound = !!(task.account && task.account.trim());
       }
+    } else {
+      // No account specified in task - allow findAssociatedAccount to work normally
+      state._taskAccountNotFound = false;
+      state._taskAccountFound = false;
     }
   }
 
@@ -3996,7 +4015,8 @@
       let contactDetailsHTML = '';
       
       // CRITICAL FIX: Use state.account if available (already loaded by loadContactAccountData) for most reliable account data
-      const linkedAccount = state.account || findAssociatedAccount(person) || null;
+      // Don't use findAssociatedAccount if task's account was explicitly not found (prevents stale data)
+      const linkedAccount = state.account || (state._taskAccountNotFound ? null : findAssociatedAccount(person)) || null;
       const accountId = linkedAccount?.id || '';
       const companyLink = company ? `<a href="#account-details" class="company-link" id="task-header-company-link" title="View account details" data-account-id="${escapeHtml(accountId)}" data-account-name="${escapeHtml(company)}">${escapeHtml(company)}</a>` : '';
       
@@ -4625,8 +4645,9 @@
     const companyName = person.companyName || accountName;
 
     // CRITICAL FIX: Use state.account if available (already loaded by loadContactAccountData)
-    // Only fall back to findAssociatedAccount if state.account is not set
-    const linkedAccount = state.account || findAssociatedAccount(person) || null;
+    // Only fall back to findAssociatedAccount if state.account is not set AND task didn't explicitly have an account that wasn't found
+    // This prevents showing stale/deleted account data when the task's account was not found
+    const linkedAccount = state.account || (state._taskAccountNotFound ? null : findAssociatedAccount(person)) || null;
 
     // Get location data from both contact and account
     const finalCity = city || linkedAccount?.city || linkedAccount?.locationCity || '';
@@ -4953,8 +4974,9 @@
     const linkedinUrl = person.linkedin || '';
 
     // CRITICAL FIX: Use state.account if available (already loaded by loadContactAccountData)
-    // Only fall back to findAssociatedAccount if state.account is not set
-    const linkedAccount = state.account || findAssociatedAccount(person) || null;
+    // Only fall back to findAssociatedAccount if state.account is not set AND task didn't explicitly have an account that wasn't found
+    // This prevents showing stale/deleted account data when the task's account was not found
+    const linkedAccount = state.account || (state._taskAccountNotFound ? null : findAssociatedAccount(person)) || null;
 
     // Get location data from both contact and account
     const finalCity = city || linkedAccount?.city || linkedAccount?.locationCity || '';
@@ -6558,6 +6580,8 @@
 
     init: function () {
       if (!initDomRefs()) return;
+      // CRITICAL FIX: Inject styles immediately on init to prevent unstyled header on cold start
+      injectTaskDetailStyles();
       attachEvents();
       setupContactLinkHandlers();
       setupPhoneClickHandlers();

@@ -2411,10 +2411,67 @@ var console = {
         // Process deletions sequentially to show progress
         for (const id of ids) {
           try {
+            // CRITICAL: Cascade delete all contacts associated with this account
+            let contactsDeleted = 0;
+            try {
+              const contactsSnapshot = await window.firebaseDB.collection('contacts')
+                .where('accountId', '==', id)
+                .get();
+              
+              if (!contactsSnapshot.empty) {
+                // Delete contacts in batches (Firestore batch limit is 500)
+                const contactIds = [];
+                contactsSnapshot.forEach(doc => {
+                  contactIds.push(doc.id);
+                });
+                
+                // Delete contacts in batches
+                for (let i = 0; i < contactIds.length; i += 500) {
+                  const batch = window.firebaseDB.batch();
+                  const chunk = contactIds.slice(i, i + 500);
+                  chunk.forEach(contactId => {
+                    batch.delete(window.firebaseDB.collection('contacts').doc(contactId));
+                  });
+                  await batch.commit();
+                }
+                
+                contactsDeleted = contactIds.length;
+                
+                // Clean up caches
+                contactIds.forEach(contactId => {
+                  // Remove from BackgroundContactsLoader cache
+                  try {
+                    if (window.BackgroundContactsLoader?.getContactsData) {
+                      const contacts = window.BackgroundContactsLoader.getContactsData() || [];
+                      const idx = contacts.findIndex(c => c.id === contactId);
+                      if (idx >= 0) contacts.splice(idx, 1);
+                    }
+                  } catch (_) { /* best-effort cache cleanup */ }
+                  
+                  // Delete from CacheManager cache
+                  try {
+                    if (window.CacheManager?.deleteRecord) {
+                      window.CacheManager.deleteRecord('contacts', contactId).catch(() => {});
+                    }
+                  } catch (_) { /* ignore cache errors */ }
+                });
+                
+                console.log(`[Accounts] Deleted ${contactsDeleted} contact(s) associated with account ${id}`);
+              }
+            } catch (contactDeleteError) {
+              console.warn(`[Accounts] Failed to delete contacts for account ${id}:`, contactDeleteError);
+              // Continue with account deletion even if contact deletion fails
+            }
+            
+            // Delete the account
             await window.firebaseDB.collection('accounts').doc(id).delete();
             completed++;
+            
             if (progressToast) {
-              progressToast.update(completed, ids.length);
+              const message = contactsDeleted > 0 
+                ? `Deleted account and ${contactsDeleted} contact${contactsDeleted === 1 ? '' : 's'}` 
+                : 'Deleted account';
+              progressToast.update(completed, ids.length, message);
             }
           } catch (e) {
             failed++;
