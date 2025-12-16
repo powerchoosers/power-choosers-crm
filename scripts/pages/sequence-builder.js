@@ -3830,6 +3830,7 @@ PERSONALIZATION PRIORITY (ABSOLUTE RULE - Research Overrides Angle):
    - Recent Activity: Expansions, new hires, projects, funding
    - Reference specific company details naturally through questions (e.g., "With [company] expanding into [location], how has that affected your energy needs?")
    - **CRITICAL: Company research takes absolute priority over market data and angles.**
+   - **IMPORTANT: Research data has been validated as relevant to energy/electricity procurement. Irrelevant research (product launches, software releases, aviation operations, non-energy hiring) has been filtered out before reaching you.**
 
 2. **COMPANY DESCRIPTION (SECOND PRIORITY)**: If no website/LinkedIn research, use accountDescription naturally. Extract the business type and use simple language (e.g., "manufacturing companies like [company]" not "As a leading provider..."). DO NOT copy it verbatim.
 
@@ -8287,12 +8288,35 @@ PURPOSE: Clear final touchpoint - give them an out or a last chance to engage`;
               account = selectedContact.account;
             }
 
+            // Extract company name from multiple sources
+            let companyName = selectedContact.company || selectedContact.companyName || selectedContact.accountName || '';
+            if (!companyName && account) {
+              companyName = account.companyName || account.name || account.accountName || '';
+            }
+            // Also check if getAccountFieldFromContact function exists and use it
+            if (!companyName && typeof getAccountFieldFromContact === 'function') {
+              companyName = getAccountFieldFromContact(selectedContact, 'name') || '';
+            }
+            
+            // Extract firstName from full name if needed
+            let contactFirstName = selectedContact.firstName || selectedContact.first_name || '';
+            if (!contactFirstName) {
+              const fullName = selectedContact.full_name || selectedContact.fullName || selectedContact.name || '';
+              if (fullName) {
+                contactFirstName = fullName.split(' ')[0].trim();
+              }
+            }
+            
             const emailPayload = {
               aiMode: mode,
               aiPrompt: substitutedPrompt,
-              contactName: selectedContact.full_name || selectedContact.name || '',
-              contactCompany: selectedContact.company || selectedContact.accountName || '',
-              contactData: selectedContact,
+              contactName: selectedContact.full_name || selectedContact.name || contactFirstName || '',
+              contactCompany: companyName,
+              contactData: {
+                ...selectedContact,
+                firstName: contactFirstName || selectedContact.firstName || selectedContact.first_name || '',
+                company: companyName || selectedContact.company || ''
+              },
               accountData: account || {},
               stepIndex: typeof step?.order === 'number' ? step.order : (typeof step?.sequenceIndex === 'number' ? step.sequenceIndex : 0),
               stepType: step?.type || step?.template || '',
