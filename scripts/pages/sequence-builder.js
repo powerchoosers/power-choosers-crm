@@ -3793,29 +3793,39 @@ class FreeSequenceAutomation {
   // Build improved first email introduction prompt - "Scannable" style (50-70 words)
   function buildFirstEmailIntroPrompt(ctaVariant = true, role = 'all') {
     return `Write a "Scannable" cold email with Texas market context.
-Target length: 50-70 words total.
+Target length: 75-115 words total (maximum 125 words).
 
-STRUCTURE:
+STRUCTURE (Natural Flow Allowed):
 1. Greeting (Hi [Name],)
-2. Opening Hook (15-20 words): Reference a specific observation about [company] or [industry] challenge, then ask about it.
-   Example: "With Cypress navigating shifting rates in Leander, how are you handling that?"
-   Example: "Given the recent volatility in ERCOT, how are you managing contract renewals?"
-   Example: "How are manufacturing companies like [company] handling rising energy costs?"
-   NOTE: Use questions, not "I noticed" or "I saw" - reference details naturally through questions.
+2. Body Content: You have freedom to distribute text between paragraph1 and paragraph2.
+   - paragraph1 can be the research hook AND the problem statement combined
+   - paragraph2 can be the solution and value proposition
+   - Blend sections naturally - connect research directly to value without forced breaks
+   - Use the extra space (75-115 words) to explain *why* the research matters
 3. [LINE BREAK]
-4. Value Prop (20-30 words): How we help [industry] companies avoid [problem] and save [amount].
-   Use Texas-specific context: ERCOT volatility, peak demand charges, TDU delivery costs, forward curves.
-5. [LINE BREAK]
-6. CTA (8-15 words): Direct, value-verification question (not passive).
-   Example: "Are you currently floating or fixed on your index?" (Finance)
-   Example: "Do you have an updated peak demand strategy for this summer?" (Industrial)
-   Example: "Has anyone reviewed your rate structure since the market shifted?" (Owner)
-   Example: "Are you open to a quick audit to check for hidden riders?" (General)
+4. CTA (8-15 words): Context-wrapped, value-verification question (not passive, not commodity-like).
+   - BAD: "When does your contract expire?" (Too commodity-like)
+   - GOOD: "Given rising delivery costs, does your current contract cover you through next summer?"
+   - GOOD: "Are you currently floating or fixed on your index?" (Finance)
+   - GOOD: "Do you have an updated peak demand strategy for this summer?" (Industrial)
+   - GOOD: "Has anyone reviewed your rate structure since the market shifted?" (Owner)
 
-PERSONALIZATION PRIORITY (System will use available data in this order):
-1. Internet research (recent activity, LinkedIn, website) - used FIRST when available
-2. Company description - used naturally (not encyclopedia style) when no research
-3. Industry information - used as final fallback when no research and no description
+PERSONALIZATION PRIORITY (ABSOLUTE RULE - Research Overrides Angle):
+1. **TRIGGER EVENTS (GOLD STANDARD):** If research contains specific news (Expansion, New Facility, Funding, Acquisition, New Hire, Project Launch), YOU MUST OPEN WITH THIS.
+   - Example: "Texas Aero just opened the new hangar in San Marcos. New square footage usually means a significant jump in peak demand charges."
+   - Connect it: Link the news directly to energy impact (demand charges, usage spikes, contract timing).
+   - **CRITICAL: Ignore the 'Angle' if it doesn't fit the news. The news IS the angle.** Research data takes absolute priority over selected angle.
+
+2. **COMPANY SPECIFICS (SILVER STANDARD):** If no news, use specific operational details from research (Fleet size, specific locations, shift schedules, facility details).
+   - Example: "With your fleet of 50+ trucks operating out of the DFW hub..."
+   - Use LinkedIn, website, or location context for specific operational details.
+
+3. **ROLE/INDUSTRY (BRONZE STANDARD):** Only if NO research is available, fall back to the Role/Industry angle. Use company description naturally (not encyclopedia style) or industry-specific challenges.
+
+**CREATIVE FREEDOM INSTRUCTION:**
+- **Vary Your Structure:** Do not always use "Greeting -> Question -> Value -> CTA."
+- **Blend Sections:** It is okay to combine the observation and the question. paragraph1 can be the research hook AND the problem statement. paragraph2 can be the solution.
+- **Be Conversational:** Write like you are texting a colleague, not writing a press release.
 
 QUESTIONS: Include at least ONE question somewhere in the email (preferably in Opening Hook or CTA).
 - Natural, conversational tone is preferred
@@ -3839,6 +3849,7 @@ VISUALS:
 AVOID:
 - "Hope this email finds you well"
 - "I noticed", "I saw", "I read" (use questions instead)
+- "When does your contract expire?" (too commodity-like - wrap in value context)
 - Long paragraphs
 - Scheduling asks ("15 minutes", "schedule a call", "book a meeting")
 - Passive CTAs like "Is this on your radar?" (too weak)
