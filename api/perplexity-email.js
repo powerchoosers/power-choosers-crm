@@ -1957,8 +1957,19 @@ async function buildSystemPrompt({
   // Extract recipient data
   const r = recipient || {};
   const name = r.fullName || r.full_name || r.name || '';
-  const firstName = r.firstName || r.first_name || (name ? String(name).split(' ')[0] : '');
-  const company = r.company || r.accountName || '';
+  // Extract firstName - handle both firstName field and full name splitting
+  let firstName = r.firstName || r.first_name || '';
+  if (!firstName && name) {
+    firstName = String(name).split(' ')[0].trim();
+  }
+  if (!firstName) firstName = 'there';
+  
+  // Extract company - check multiple possible fields including account object
+  let company = r.company || r.companyName || r.accountName || '';
+  if (!company && r.account) {
+    company = r.account.companyName || r.account.name || r.account.accountName || '';
+  }
+  
   const job = r.title || r.job || r.role || '';
   // Normalize industry using shared detection helpers when missing
   let industry = r.industry || '';
@@ -3813,7 +3824,9 @@ CRITICAL: Use these EXACT meeting times in your CTA.
         const companyName = recipient?.company || '';
         const hasCompanyNameInHook = companyName && hookLower.includes(companyName.toLowerCase());
         const hasFirstNameCompanyPattern = recipient?.firstName && hookLower.includes(recipient.firstName.toLowerCase() + "'s company");
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3696',message:'Generated email content (before validation)',data:{openingHook:jsonData.opening_hook?.substring(0,100),valueProp:jsonData.value_proposition?.substring(0,100),cta:jsonData.cta_text,hasResearchData,hasTriggerEvents:!!researchContext?.triggerEvents,researchInHook,selectedAngleId:selectedAngle?.id,priorityUsed:hasResearchData||researchContext?.triggerEvents?'RESEARCH_FIRST':'ANGLE_FALLBACK',companyName,hasCompanyName:!!companyName,hasCompanyNameInHook,hasFirstNameCompanyPattern,companyNameIssue:hasFirstNameCompanyPattern&&!hasCompanyNameInHook},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        const hasCompanyInSubject = companyName && (jsonData.subject?.toLowerCase().includes(companyName.toLowerCase()) || false);
+        const hasNameInSubject = recipient?.firstName && (jsonData.subject?.toLowerCase().includes(recipient.firstName.toLowerCase()) || false);
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3696',message:'Generated email content (before validation)',data:{openingHook:jsonData.opening_hook?.substring(0,100),valueProp:jsonData.value_proposition?.substring(0,100),cta:jsonData.cta_text,subject:jsonData.subject,hasResearchData,hasTriggerEvents:!!researchContext?.triggerEvents,researchInHook,selectedAngleId:selectedAngle?.id,priorityUsed:hasResearchData||researchContext?.triggerEvents?'RESEARCH_FIRST':'ANGLE_FALLBACK',companyName,hasCompanyName:!!companyName,hasCompanyNameInHook,hasFirstNameCompanyPattern,companyNameIssue:hasFirstNameCompanyPattern&&!hasCompanyNameInHook,hasCompanyInSubject,hasNameInSubject,recipientFirstName:recipient?.firstName,subjectIssue:!hasCompanyInSubject&&!hasNameInSubject&&companyName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
         // #endregion
         
         // Validate value proposition completeness for cold emails

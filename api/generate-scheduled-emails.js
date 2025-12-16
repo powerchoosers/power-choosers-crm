@@ -321,9 +321,31 @@ async function generatePreviewEmail(emailData) {
   if (!recipientIndustry) recipientIndustry = 'Default';
 
   // Build recipient object (mirrors production generation path)
+  // Extract firstName - handle both firstName field and full name splitting
+  let extractedFirstName = contactData.firstName || contactData.first_name || '';
+  if (!extractedFirstName) {
+    const nameSource = contactData.name || contactData.full_name || contactData.fullName || emailData.contactName || '';
+    if (nameSource) {
+      extractedFirstName = nameSource.split(' ')[0].trim();
+    }
+  }
+  if (!extractedFirstName) extractedFirstName = 'there';
+  
+  // Extract company name - prioritize account data, then contact data, then emailData
+  let extractedCompany = '';
+  if (accountData && (accountData.companyName || accountData.name)) {
+    extractedCompany = accountData.companyName || accountData.name || '';
+  }
+  if (!extractedCompany) {
+    extractedCompany = contactData.company || contactData.companyName || contactData.accountName || '';
+  }
+  if (!extractedCompany) {
+    extractedCompany = emailData.contactCompany || '';
+  }
+  
   const recipient = {
-    firstName: contactData.firstName || contactData.first_name || contactData.name || emailData.contactName || 'there',
-    company: contactData.company || accountData.companyName || accountData.name || emailData.contactCompany || '',
+    firstName: extractedFirstName,
+    company: extractedCompany,
     title: contactData.role || contactData.title || contactData.job || '',
     industry: recipientIndustry,
     account: accountData,
@@ -358,7 +380,7 @@ async function generatePreviewEmail(emailData) {
     || 'http://localhost:3000';
 
   // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:360',message:'Calling perplexity-email API (preview mode)',data:{aiMode,mode:aiMode,isColdStep,emailPosition,selectedAngleId:selectedAngle?.id,toneOpener,hasRecipient:!!recipient,recipientCompany:recipient?.company,recipientIndustry:recipient?.industry},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'generate-scheduled-emails.js:360',message:'Calling perplexity-email API (preview mode)',data:{aiMode,mode:aiMode,isColdStep,emailPosition,selectedAngleId:selectedAngle?.id,toneOpener,hasRecipient:!!recipient,recipientCompany:recipient?.company,recipientFirstName:recipient?.firstName,recipientIndustry:recipient?.industry,emailDataContactName:emailData.contactName,emailDataContactCompany:emailData.contactCompany,contactDataCompany:contactData?.company,accountDataCompanyName:accountData?.companyName,accountDataName:accountData?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
   // #endregion
 
   const perplexityResponse = await fetch(`${baseUrl}/api/perplexity-email`, {
