@@ -3792,16 +3792,28 @@ class FreeSequenceAutomation {
   // Build improved first email introduction prompt with dynamic CTA
   // Build improved first email introduction prompt - "Scannable" style (50-70 words)
   function buildFirstEmailIntroPrompt(ctaVariant = true, role = 'all') {
-    return `Write a "Scannable" cold email with Texas market context.
-Target length: 75-115 words total (maximum 125 words).
+    return `Write a personalized, peer-to-peer cold email introduction.
 
-STRUCTURE (Natural Flow Allowed):
+TARGET WORD COUNT: 75-120 words (natural flow, not choppy)
+OPTIMAL: 6-8 sentences
+TONE: Peer-to-peer, consultative, helpful
+
+INSTRUCTIONS:
+1. Write naturally. Don't force short paragraphs or hit exact word counts.
+2. Start with their specific situation (contract date, industry, problem they face).
+3. Explain WHY it matters NOW (don't just state the data).
+4. Reference their common issue (shows you understand their business).
+5. Include ONE discovery question (low friction CTA).
+6. End with peer-to-peer closing.
+
+STRUCTURE (Natural, not rigid):
 1. Greeting (Hi [Name],)
 2. Body Content: You have freedom to distribute text between paragraph1 and paragraph2.
    - paragraph1 can be the research hook AND the problem statement combined
    - paragraph2 can be the solution and value proposition
    - Blend sections naturally - connect research directly to value without forced breaks
-   - Use the extra space (75-115 words) to explain *why* the research matters
+   - Write 2-3 paragraphs that flow naturally - avoid choppy 1-sentence paragraphs
+   - Use the extra space (75-120 words) to explain *why* the research matters
 3. [LINE BREAK]
 4. CTA (8-15 words): Context-wrapped, value-verification question (not passive, not commodity-like).
    - BAD: "When does your contract expire?" (Too commodity-like)
@@ -3809,18 +3821,26 @@ STRUCTURE (Natural Flow Allowed):
    - GOOD: "Are you currently floating or fixed on your index?" (Finance)
    - GOOD: "Do you have an updated peak demand strategy for this summer?" (Industrial)
    - GOOD: "Has anyone reviewed your rate structure since the market shifted?" (Owner)
+   - Discovery questions work well: "Is X on your radar?", "Have you explored Y?", "Worth looking into before 2026?"
 
 PERSONALIZATION PRIORITY (ABSOLUTE RULE - Research Overrides Angle):
-1. **TRIGGER EVENTS (GOLD STANDARD):** If research contains specific news (Expansion, New Facility, Funding, Acquisition, New Hire, Project Launch), YOU MUST OPEN WITH THIS.
-   - Example: "Texas Aero just opened the new hangar in San Marcos. New square footage usually means a significant jump in peak demand charges."
-   - Connect it: Link the news directly to energy impact (demand charges, usage spikes, contract timing).
-   - **CRITICAL: Ignore the 'Angle' if it doesn't fit the news. The news IS the angle.** Research data takes absolute priority over selected angle.
+1. **COMPANY-SPECIFIC RESEARCH (HIGHEST PRIORITY)**: Website, LinkedIn, recent activity - Focus on what makes THIS COMPANY unique:
+   - Website: What services/products do they offer? What challenges do they mention?
+   - LinkedIn: Recent company posts, announcements, team updates
+   - Recent Activity: Expansions, new hires, projects, funding
+   - Reference specific company details naturally through questions (e.g., "With [company] expanding into [location], how has that affected your energy needs?")
+   - **CRITICAL: Company research takes absolute priority over market data and angles.**
 
-2. **COMPANY SPECIFICS (SILVER STANDARD):** If no news, use specific operational details from research (Fleet size, specific locations, shift schedules, facility details).
-   - Example: "With your fleet of 50+ trucks operating out of the DFW hub..."
-   - Use LinkedIn, website, or location context for specific operational details.
+2. **COMPANY DESCRIPTION (SECOND PRIORITY)**: If no website/LinkedIn research, use accountDescription naturally. Extract the business type and use simple language (e.g., "manufacturing companies like [company]" not "As a leading provider..."). DO NOT copy it verbatim.
 
-3. **ROLE/INDUSTRY (BRONZE STANDARD):** Only if NO research is available, fall back to the Role/Industry angle. Use company description naturally (not encyclopedia style) or industry-specific challenges.
+3. **SIMPLE MARKET CONTEXT (SUPPORTING ROLE ONLY)**: Use market information ONLY to support company-specific points. Keep it simple and in plain English:
+   - GOOD: "Energy costs are rising" (simple, clear)
+   - GOOD: "With rates going up, how are you handling..." (connects to their situation)
+   - BAD: "Forward curves above $50/MWh" (too technical)
+   - BAD: "Peak forecasts hitting 88-90 GW" (too advanced)
+   - BAD: "Solar and wind covering 36%" (too detailed)
+
+4. **INDUSTRY INFORMATION (FINAL FALLBACK)**: Only if no company research and no description, use simple industry challenges. Keep it conversational.
 
 **CREATIVE FREEDOM INSTRUCTION:**
 - **Vary Your Structure:** Do not always use "Greeting -> Question -> Value -> CTA."
@@ -3837,22 +3857,38 @@ TONE (Adaptive by Role):
 - Industrial/Manufacturing: Technical authority. Use: Load Factor, Demand Ratchets, TDU charges. Focus: Operational impact.
 - Finance: Financial risk manager. Use: Forward curves, Futures, Risk mitigation, Fixed vs Float. Focus: EBITDA impact.
 
-TEXAS CONTEXT (ALWAYS APPLY):
-- Mention ERCOT volatility (it's the common enemy)
-- Mention TDU Delivery Charges (Oncor/CenterPoint) only if relevant to cost increases
+TEXAS CONTEXT (Keep It Simple - Plain English Only):
+- Mention energy costs are rising (simple, clear language)
+- Mention ERCOT volatility ONLY if it directly relates to their company situation
+- Use plain English: "Energy costs are going up" NOT "Forward curves above $50/MWh"
+- Use plain English: "Rates are rising" NOT "Peak forecasts hitting 88-90 GW"
 - Write like you're trying to save them from making a costly mistake, not just selling a contract
+- Focus on THEIR company situation first, market context second
 
 VISUALS:
 - Use white space. It should read in 8 seconds on a mobile phone.
 - Double line breaks between sections for scannable format.
 
-AVOID:
+FORBIDDEN PHRASES (Remove these):
+- "I wanted to reach out"
 - "Hope this email finds you well"
 - "I noticed", "I saw", "I read" (use questions instead)
+- "Quick one:", "Here's the thing:", "Bottom line:"
+- "--" or em-dashes between sentences
+- "Let me ask you"
+- "We help companies"
+- Generic openers that sound templated
 - "When does your contract expire?" (too commodity-like - wrap in value context)
 - Long paragraphs
 - Scheduling asks ("15 minutes", "schedule a call", "book a meeting")
 - Passive CTAs like "Is this on your radar?" (too weak)
+
+CRITICAL: EXPLAIN WHY IT MATTERS
+- DON'T: "I noticed your contract expires June 2026."
+- DO: "With your contract ending June 2026, you're in the perfect window for renewal planning. Most manufacturing companies start these conversations 6 months out to avoid last-minute negotiations."
+- DON'T: "You might be paying too much."
+- DO: "Delivery charges can quietly eat into budgets without attention. Worth auditing before your 2026 renewal."
+- Connect facts to their situation and urgency - show the "why" behind the data
 `;
   }
 
