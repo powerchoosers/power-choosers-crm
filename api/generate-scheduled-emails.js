@@ -565,65 +565,109 @@ async function generatePreviewEmail(emailData) {
           `${firstNameForSubject}, when does your contract expire?`,
           `${firstNameForSubject}, rate lock timing question`,
           `${companyForSubject} renewal timing question`,
-          `${firstNameForSubject}, contract renewal window?`
+          `${firstNameForSubject}, contract renewal window?`,
+          `Contract planning for ${companyForSubject}?`,
+          `${firstNameForSubject}, when's your renewal window?`,
+          `${companyForSubject} contract timing question`,
+          `${firstNameForSubject}, renewal planning for 2026?`
         ],
         exemption_recovery: [
           `${firstNameForSubject}, are you claiming exemptions?`,
           `${firstNameForSubject}, tax exemption question`,
           `${companyForSubject} exemption recovery question`,
-          `${firstNameForSubject}, electricity exemptions?`
+          `${firstNameForSubject}, electricity exemptions?`,
+          `Tax exemptions at ${companyForSubject}?`,
+          `${firstNameForSubject}, unclaimed exemptions?`,
+          `${companyForSubject} sales tax audit question`,
+          `${firstNameForSubject}, exemption recovery opportunity?`
         ],
         consolidation: [
           `${firstNameForSubject}, how many locations are you managing?`,
           `${firstNameForSubject}, multi-site energy question`,
           `${companyForSubject} consolidation opportunity?`,
-          `${firstNameForSubject}, multiple locations?`
+          `${firstNameForSubject}, multiple locations?`,
+          `Multi-site energy at ${companyForSubject}?`,
+          `${firstNameForSubject}, consolidating suppliers?`,
+          `${companyForSubject} multiple locations question`,
+          `${firstNameForSubject}, unified energy management?`
         ],
         demand_efficiency: [
           `${firstNameForSubject}, optimizing before renewal?`,
           `${firstNameForSubject}, consumption efficiency question`,
           `${companyForSubject} pre-renewal optimization?`,
-          `${firstNameForSubject}, efficiency before renewal?`
+          `${firstNameForSubject}, efficiency before renewal?`,
+          `Pre-renewal optimization for ${companyForSubject}?`,
+          `${firstNameForSubject}, consumption efficiency?`,
+          `${companyForSubject} efficiency opportunity?`,
+          `${firstNameForSubject}, optimizing energy usage?`
         ],
         operational_continuity: [
           `${firstNameForSubject}, peak demand handling?`,
           `${firstNameForSubject}, uptime vs savings?`,
           `${companyForSubject} operational continuity question`,
-          `${firstNameForSubject}, demand charge question?`
+          `${firstNameForSubject}, demand charge question?`,
+          `Peak demand at ${companyForSubject}?`,
+          `${firstNameForSubject}, operational continuity?`,
+          `${companyForSubject} uptime strategy question`,
+          `${firstNameForSubject}, peak demand strategy?`
         ],
         mission_funding: [
           `${firstNameForSubject}, redirecting funds to mission?`,
           `${companyForSubject} mission funding question`,
           `${firstNameForSubject}, vendor cost question?`,
-          `${firstNameForSubject}, program funding?`
+          `${firstNameForSubject}, program funding?`,
+          `Mission funding at ${companyForSubject}?`,
+          `${firstNameForSubject}, redirecting vendor costs?`,
+          `${companyForSubject} vendor cost reduction?`,
+          `${firstNameForSubject}, program funding opportunity?`
         ],
         budget_stability: [
           `${firstNameForSubject}, locking in energy costs?`,
           `${companyForSubject} budget stability question`,
           `${firstNameForSubject}, cost predictability?`,
-          `${firstNameForSubject}, budget volatility?`
+          `${firstNameForSubject}, budget volatility?`,
+          `Budget stability for ${companyForSubject}?`,
+          `${firstNameForSubject}, locking in rates?`,
+          `${companyForSubject} cost predictability question`,
+          `${firstNameForSubject}, budget planning for 2026?`
         ],
         operational_simplicity: [
           `${firstNameForSubject}, managing multiple suppliers?`,
           `${companyForSubject} vendor consolidation question`,
           `${firstNameForSubject}, unified billing?`,
-          `${firstNameForSubject}, supplier management?`
+          `${firstNameForSubject}, supplier management?`,
+          `Vendor consolidation at ${companyForSubject}?`,
+          `${firstNameForSubject}, simplifying suppliers?`,
+          `${companyForSubject} unified billing question`,
+          `${firstNameForSubject}, supplier consolidation?`
         ],
         cost_control: [
           `${firstNameForSubject}, energy cost predictability?`,
           `${companyForSubject} budget planning question`,
           `${firstNameForSubject}, rate volatility?`,
-          `${firstNameForSubject}, cost control?`
+          `${firstNameForSubject}, cost control?`,
+          `Cost control at ${companyForSubject}?`,
+          `${firstNameForSubject}, energy budget planning?`,
+          `${companyForSubject} rate volatility question`,
+          `${firstNameForSubject}, 2026 energy strategy?`
         ],
         operational_efficiency: [
           `${firstNameForSubject}, energy costs impacting efficiency?`,
           `${companyForSubject} operational efficiency question`,
-          `${firstNameForSubject}, cost reduction opportunity?`
+          `${firstNameForSubject}, cost reduction opportunity?`,
+          `Operational efficiency at ${companyForSubject}?`,
+          `${firstNameForSubject}, energy efficiency?`,
+          `${companyForSubject} cost reduction question`,
+          `${firstNameForSubject}, efficiency opportunity?`
         ],
         data_governance: [
           `${firstNameForSubject}, visibility into energy usage?`,
           `${companyForSubject} energy reporting question`,
-          `${firstNameForSubject}, centralized metering?`
+          `${firstNameForSubject}, centralized metering?`,
+          `Energy reporting at ${companyForSubject}?`,
+          `${firstNameForSubject}, energy visibility?`,
+          `${companyForSubject} centralized metering question`,
+          `${firstNameForSubject}, usage reporting?`
         ]
       };
       const angleId = selectedAngle.id || 'timing_strategy';
@@ -1813,35 +1857,59 @@ export default async function handler(req, res) {
                 `${firstNameForSubject}, redirecting funds to mission?`,
                 `${companyForSubject} mission funding question`,
                 `${firstNameForSubject}, vendor cost question?`,
-                `${firstNameForSubject}, program funding?`
+                `${firstNameForSubject}, program funding?`,
+                `Mission funding at ${companyForSubject}?`,
+                `${firstNameForSubject}, redirecting vendor costs?`,
+                `${companyForSubject} vendor cost reduction?`,
+                `${firstNameForSubject}, program funding opportunity?`
               ],
               budget_stability: [
                 `${firstNameForSubject}, locking in energy costs?`,
                 `${companyForSubject} budget stability question`,
                 `${firstNameForSubject}, cost predictability?`,
-                `${firstNameForSubject}, budget volatility?`
+                `${firstNameForSubject}, budget volatility?`,
+                `Budget stability for ${companyForSubject}?`,
+                `${firstNameForSubject}, locking in rates?`,
+                `${companyForSubject} cost predictability question`,
+                `${firstNameForSubject}, budget planning for 2026?`
               ],
               operational_simplicity: [
                 `${firstNameForSubject}, managing multiple suppliers?`,
                 `${companyForSubject} vendor consolidation question`,
                 `${firstNameForSubject}, unified billing?`,
-                `${firstNameForSubject}, supplier management?`
+                `${firstNameForSubject}, supplier management?`,
+                `Vendor consolidation at ${companyForSubject}?`,
+                `${firstNameForSubject}, simplifying suppliers?`,
+                `${companyForSubject} unified billing question`,
+                `${firstNameForSubject}, supplier consolidation?`
               ],
               cost_control: [
                 `${firstNameForSubject}, energy cost predictability?`,
                 `${companyForSubject} budget planning question`,
                 `${firstNameForSubject}, rate volatility?`,
-                `${firstNameForSubject}, cost control?`
+                `${firstNameForSubject}, cost control?`,
+                `Cost control at ${companyForSubject}?`,
+                `${firstNameForSubject}, energy budget planning?`,
+                `${companyForSubject} rate volatility question`,
+                `${firstNameForSubject}, 2026 energy strategy?`
               ],
               operational_efficiency: [
                 `${firstNameForSubject}, energy costs impacting efficiency?`,
                 `${companyForSubject} operational efficiency question`,
-                `${firstNameForSubject}, cost reduction opportunity?`
+                `${firstNameForSubject}, cost reduction opportunity?`,
+                `Operational efficiency at ${companyForSubject}?`,
+                `${firstNameForSubject}, energy efficiency?`,
+                `${companyForSubject} cost reduction question`,
+                `${firstNameForSubject}, efficiency opportunity?`
               ],
               data_governance: [
                 `${firstNameForSubject}, visibility into energy usage?`,
                 `${companyForSubject} energy reporting question`,
-                `${firstNameForSubject}, centralized metering?`
+                `${firstNameForSubject}, centralized metering?`,
+                `Energy reporting at ${companyForSubject}?`,
+                `${firstNameForSubject}, energy visibility?`,
+                `${companyForSubject} centralized metering question`,
+                `${firstNameForSubject}, usage reporting?`
               ]
             };
             
