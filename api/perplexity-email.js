@@ -1944,6 +1944,13 @@ async function buildSystemPrompt({
   emailPosition = 1, // 1, 2, or 3 for CTA escalation and subject progression
   previousAngles = [] // Array of angle IDs used in previous emails
 }) {
+  // Get current date context for planning awareness
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1; // 1-12
+  const nextYear = currentYear + 1;
+  const planningYear = currentMonth === 12 ? nextYear : currentYear; // December = planning for next year, otherwise current year
+  
   // Analyze manual prompt for enhanced context understanding
   const promptAnalysis = analyzeManualPrompt(prompt);
   
@@ -2360,7 +2367,7 @@ ${companySizeContext && companySizeContext.size !== 'large' ? '- Industry Contex
 ${contractUrgency ? '- Urgency Level: "With ' + contractUrgency.level + ' timing, ' + contractUrgency.focus + '..."' : ''}
 
 ROLE-SPECIFIC OPENING HOOK EXAMPLES:
-${job?.toLowerCase().includes('cfo') || job?.toLowerCase().includes('finance') ? '- CFO: "As CFO of ' + company + ', you\'re likely planning 2025 budgets with energy costs rising..."' : ''}
+${job?.toLowerCase().includes('cfo') || job?.toLowerCase().includes('finance') ? '- CFO: "As CFO of ' + company + ', you\'re likely planning ' + planningYear + ' budgets with energy costs rising..."' : ''}
 ${job?.toLowerCase().includes('facilities') || job?.toLowerCase().includes('maintenance') ? '- Facilities: "Managing energy procurement on top of facilities operations can be time-consuming..."' : ''}
 ${job?.toLowerCase().includes('procurement') || job?.toLowerCase().includes('purchasing') ? '- Procurement: "As procurement manager, you know the energy market is competitive..."' : ''}
 ${job?.toLowerCase().includes('operations') || job?.toLowerCase().includes('manager') ? '- Operations: "Energy costs can be one of the most unpredictable operational expenses..."' : ''}
@@ -2700,17 +2707,19 @@ PERSONALIZATION PRIORITY (CRITICAL - Follow This Order):
 
 3. **INDUSTRY INFORMATION (FINAL FALLBACK)**: If no research and no description, use industry-specific challenges and pain points. Reference their industry naturally through questions.
 
-RESEARCH HIGHLIGHTS (Use These When Available - Override Angle):
-${triggerEvents.length > 0 ? '🚨 **TRIGGER EVENTS DETECTED - USE THESE FIRST (OVERRIDE ANGLE):**\n' + triggerEvents.map(event => `- ${event.type.toUpperCase()}: ${event.description} (${event.relevance} relevance) - OPEN WITH THIS NEWS`).join('\n') + '\n**CRITICAL:** If trigger events exist, they take absolute priority over the selected angle. The news IS your angle.' : ''}
-${recentActivityContext ? '✓ **GOLD STANDARD**: RECENT NEWS: ' + recentActivityContext + ' - OPEN WITH THIS. Connect it to energy impact (demand charges, usage spikes, contract timing).' : ''}
-${linkedinContext ? '✓ **SILVER STANDARD**: LINKEDIN: ' + linkedinContext.substring(0, 150) + ' - Use specific operational details from company posts.' : ''}
-${websiteContext ? '✓ **SILVER STANDARD**: WEBSITE: ' + websiteContext.substring(0, 150) + ' - Use specific challenges mentioned on their website.' : ''}
-${locationContextData ? '✓ **SILVER STANDARD**: LOCAL MARKET: ' + locationContextData.substring(0, 150) + ' - Use regional energy market context.' : ''}
-${accountDescription ? '✓ **BRONZE STANDARD**: Use business focus naturally (NOT encyclopedia style): The business focus tells you their business type. Use industry-specific language (e.g., "manufacturing companies", "restaurant chains") but DO NOT mention the business focus text itself. Use this when no research data is available.' : ''}
-${contractEndLabel ? '✓ Use contract timing: "With your contract ending ' + contractEndLabel + '..." - strong hook when no research data' : ''}
-${squareFootage ? '✓ Use facility size: Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
-${employees ? '✓ Use scale: Reference ' + employees + ' employees when relevant for context' : ''}
-${industry ? '✓ **BRONZE STANDARD**: Use industry context: Reference ' + industry + ' industry challenges naturally through questions - Use this when no research and no description available' : ''}
+COMPANY RESEARCH HIGHLIGHTS (Use These First - Company Over Market):
+${triggerEvents.length > 0 ? '🚨 **COMPANY NEWS DETECTED - USE THIS FIRST:**\n' + triggerEvents.map(event => `- ${event.type.toUpperCase()}: ${event.description} - OPEN WITH THIS COMPANY NEWS`).join('\n') + '\n**CRITICAL:** Company news takes absolute priority. Connect it to their energy needs in simple terms.' : ''}
+${websiteContext ? '✓ **PRIORITY 1 - COMPANY WEBSITE**: ' + websiteContext.substring(0, 200) + '\n   → Use: What does their website say about their business? What services/products? What challenges do they mention?\n   → Example: "With [company] focusing on [service from website], how are you handling energy costs?"' : ''}
+${linkedinContext ? '✓ **PRIORITY 1 - COMPANY LINKEDIN**: ' + linkedinContext.substring(0, 200) + '\n   → Use: Recent company posts, team updates, announcements\n   → Example: "I saw [company] posted about [topic]. How has that affected your operations?"' : ''}
+${recentActivityContext ? '✓ **PRIORITY 1 - COMPANY ACTIVITY**: ' + recentActivityContext + '\n   → Use: Recent expansions, hires, projects\n   → Example: "With [company] expanding into [location], how are you managing energy needs?"' : ''}
+${accountDescription ? '✓ **PRIORITY 2 - COMPANY DESCRIPTION**: ' + accountDescription.substring(0, 100) + '\n   → Use: Extract business type naturally (e.g., "manufacturing companies like [company]") NOT encyclopedia style\n   → Use this when no website/LinkedIn research available' : ''}
+${contractEndLabel ? '✓ **COMPANY DATA**: Contract timing - "With your contract ending ' + contractEndLabel + '..." - strong hook when no company research' : ''}
+${squareFootage ? '✓ **COMPANY DATA**: Facility size - Reference ' + squareFootage.toLocaleString() + ' sq ft facility when relevant' : ''}
+${employees ? '✓ **COMPANY DATA**: Scale - Reference ' + employees + ' employees when relevant' : ''}
+${industry ? '✓ **FALLBACK**: Industry context - Reference ' + industry + ' industry challenges simply (only if no company research available)' : ''}
+
+**MARKET CONTEXT (Supporting Role Only - Keep Simple):**
+${marketContext?.enabled ? '- Market context is ENABLED - Use simple market info to support company points:\n  ✓ GOOD: "Energy costs are rising" (simple)\n  ✓ GOOD: "With rates going up, how are you handling..." (connects to their situation)\n  ✗ BAD: "Forward curves above $50/MWh" (too technical)\n  ✗ BAD: "Peak forecasts hitting 88-90 GW" (too advanced)\n  ✗ BAD: "Solar and wind covering 36%" (too detailed)' : '- Market context is DISABLED - Focus ONLY on company-specific information'}
 
 CONVERSATIONAL FLOW PATTERNS:
 ✓ GOOD: "With ${company} operating in ${industryLower || '[industry]'}, how are you handling energy costs for facilities like yours?"
@@ -3068,10 +3077,13 @@ You must adjust your vocabulary based on the recipient's role and industry.
 - **Focus:** Risk mitigation, variance, EBITDA impact, forecasting.
 - **Keywords:** "Forward curves," "Futures," "Risk mitigation," "Fixed vs Float."
 
-**THE TEXAS CONTEXT (ALWAYS APPLY):**
-- Mention **ERCOT** volatility (it's the common enemy).
-- Mention **TDU Delivery Charges** (Oncor/CenterPoint) only if relevant to cost increases.
+**THE TEXAS CONTEXT (Keep It Simple - Plain English Only):**
+- Mention energy costs are rising (simple, clear language)
+- Mention ERCOT volatility ONLY if it directly relates to their company situation
+- Use plain English: "Energy costs are going up" NOT "Forward curves above $50/MWh"
+- Use plain English: "Rates are rising" NOT "Peak forecasts hitting 88-90 GW"
 - Write like you are trying to save them from making a costly mistake, not just selling a contract.
+- Focus on THEIR company situation first, market context second
 
 Write in first person ("we"/"I"). Do NOT use brand-first openers like "At Power Choosers," or "Power Choosers helps" - prefer "We help" or "I help".
 
@@ -3083,10 +3095,12 @@ ${job ? '- Acknowledge their role as ' + job : ''}
 - Make it feel like you just spoke with them
 
 ${marketContext?.enabled ? `
-KEY CONTEXT:
-- Electricity rates rising ${marketContext.rateIncrease || '15-25%'} ${marketContext.marketInsights || 'due to data center demand'}
-- Companies with contracts ending ${marketContext.renewalYears || '2025-2026'} face higher renewal rates
-- Early renewals often give more optionality and can reduce renewal risk compared with waiting` : ''}`;
+SIMPLE MARKET CONTEXT (Supporting Role Only - Plain English):
+- Energy costs are rising (keep it simple - don't use technical percentages or advanced market data)
+- Companies with contracts ending soon may face higher rates (simple language)
+- Early renewals can help lock in better rates (simple benefit)
+- DO NOT use: "Forward curves", "$50/MWh", "88-90 GW", "solar and wind covering 36%" - these are too technical
+- DO use: "Energy costs are rising", "Rates are going up", "With costs increasing" - plain English` : ''}`;
 
   const outputFormat = `
 OUTPUT FORMAT (JSON):
@@ -3189,10 +3203,12 @@ CRITICAL QUALITY RULES:
 ${selectedAngle && typeof selectedAngle === 'object' ? `- **USE THE SELECTED ANGLE**: This email MUST focus on "${selectedAngle.primaryMessage || selectedAngle.label}". ${selectedAngle.id === 'demand_efficiency' ? 'You CAN mention demand charges since this angle is about demand efficiency.' : 'DO NOT mention "demand charges" or "delivery charges" - focus on ' + (selectedAngle.primaryMessage || selectedAngle.label) + ' instead. For example: timing_strategy → contract renewal timing; cost_control → rising electricity costs/budget pressure; exemption_recovery → tax exemptions; consolidation → multi-location management.'}` : '- DO NOT default to "demand charges" - vary the pain points you mention.'}
 - OBSERVATION-BASED OPENING: MUST start with SPECIFIC observation about ${company || 'their company'}, NOT generic market facts
   ${marketContext?.enabled ? `
-  - Market context is ENABLED - you may reference general market trends if relevant
-  - BUT: Still lead with specific observation about ${company} first` : `
-  - Market context is DISABLED - DO NOT use generic market statistics like "rates rising 15-25%"
-  - DO NOT mention "data center demand" or generic rate increases
+  - Market context is ENABLED - Use simple market info to support company points (plain English only)
+  - DO NOT use advanced technical terms: "Forward curves", "$50/MWh", "88-90 GW", "solar and wind covering 36%"
+  - DO use simple language: "Energy costs are rising", "Rates are going up", "With costs increasing"
+  - Always lead with COMPANY-specific information first, then use simple market context to support it` : `
+  - Market context is DISABLED - Focus ONLY on company-specific information
+  - DO NOT use generic market statistics or advanced technical terms
   - Focus ONLY on ${company}'s specific situation, industry challenges they face, or operational details
   - Use questions like "How is ${company} handling operations..." or "With ${accountDescription ? accountDescription.substring(0, 60) + '...' : 'your facilities'}, how are you..." (DO NOT use "I noticed")`}
 - SPECIFIC VALUE: Include concrete numbers in value prop (percentages, dollar amounts, outcomes)
@@ -3222,7 +3238,7 @@ HUMAN TOUCH REQUIREMENTS (CRITICAL - Write Like an Expert Human, Not AI):
   ${linkedinContext ? '* **PRIORITY 1**: Reference company LinkedIn through questions: "How are you handling [challenge from LinkedIn post]?" (you have LinkedIn context - USE THIS FIRST)' : ''}
   ${websiteContext ? '* **PRIORITY 1**: Reference website through questions: "How are you handling [specific challenge from website]?" (you have website context - USE THIS FIRST)' : ''}
   ${accountDescription ? '* **PRIORITY 2**: Use business focus naturally (NOT encyclopedia style): The business focus tells you their business type. Ask about their industry-specific challenges (e.g., "How are manufacturing companies like ' + company + ' handling energy costs?") but DO NOT mention the business focus text itself. Use this when no research data is available.' : '* Ask about [specific detail about their company]: "How is [specific detail] affecting your energy costs?"'}
-  ${city && marketContext?.enabled ? '* "Given ' + city + '\'s energy market conditions..." (you have location)' : ''}
+  ${city && marketContext?.enabled ? '* "Given energy costs in ' + city + '..." (simple language, not "market conditions")' : ''}
   ${contractEndLabel && !marketContext?.enabled ? '* Use contract timing: "With your contract ending ' + contractEndLabel + '..." (strong hook when no research data)' : ''}
 - Use natural transitions: "That's why...", "Given that...", "With ${contractEndLabel ? ('your contract ending ' + contractEndLabel) : '[specific situation]'}..."
 - Include micro-observations: Reference their website, recent posts, industry trends they'd recognize through QUESTIONS
@@ -3575,6 +3591,11 @@ export default async function handler(req, res) {
     
     // Build system prompt with TODAY context and suggested meeting times
     const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1; // 1-12
+    const currentDay = today.getDate();
+    const nextYear = currentYear + 1;
+    
     const todayLabel = today.toLocaleDateString('en-US', { 
       weekday: 'long',
       year: 'numeric', 
@@ -3582,10 +3603,39 @@ export default async function handler(req, res) {
       day: 'numeric' 
     });
     
+    // Determine planning context based on date
+    let planningContext = '';
+    if (currentMonth === 12) {
+      // December = planning for next year
+      planningContext = `\nPLANNING CONTEXT (CRITICAL - Use This in Your Emails):
+- We are currently in December ${currentYear}
+- People are actively planning for ${nextYear} budgets and contracts
+- Reference "${nextYear} planning", "${nextYear} budgets", "planning for ${nextYear}", etc.
+- Example: "As you're planning for ${nextYear}, how are you handling energy costs?"
+- Example: "With ${nextYear} budget planning underway, are you reviewing your energy contracts?"
+- DO NOT reference "${currentYear} planning" - that's in the past now`;
+    } else if (currentMonth === 1) {
+      // January = new year, planning is done, focus on execution
+      planningContext = `\nPLANNING CONTEXT (CRITICAL - Use This in Your Emails):
+- We are currently in January ${currentYear}
+- ${currentYear} budgets are finalized, people are executing plans
+- Reference "${currentYear} execution", "${currentYear} operations", "this year's plans", etc.
+- Example: "Now that ${currentYear} budgets are set, how are you managing energy costs?"
+- Example: "With ${currentYear} underway, are you reviewing your energy contracts?"`;
+    } else {
+      // Mid-year = current year operations
+      planningContext = `\nPLANNING CONTEXT (CRITICAL - Use This in Your Emails):
+- We are currently in ${today.toLocaleDateString('en-US', { month: 'long' })} ${currentYear}
+- People are focused on ${currentYear} operations and may be planning for ${nextYear}
+- Reference "${currentYear} operations", "this year", or "${nextYear} planning" if relevant
+- Example: "How are you handling energy costs for ${currentYear}?"
+- Example: "Are you already planning for ${nextYear} contracts?"`;
+    }
+    
     const meetingTimes = getSuggestedMeetingTimes(meetingPreferences);
     
     // Only suggest meeting times for follow-up emails, not cold emails
-    const dateContext = templateType === 'cold_email' ? `TODAY'S DATE: ${todayLabel}
+    const dateContext = templateType === 'cold_email' ? `TODAY'S DATE: ${todayLabel} (Year: ${currentYear}, Month: ${currentMonth}, Day: ${currentDay})${planningContext}
 
 COLD EMAIL RULES:
 - Use qualifying questions only (NO meeting requests)
@@ -3593,7 +3643,7 @@ COLD EMAIL RULES:
 - Keep CTAs under 12 words
 - Use role-specific qualifying questions
 
-` : `TODAY'S DATE: ${todayLabel}
+` : `TODAY'S DATE: ${todayLabel} (Year: ${currentYear}, Month: ${currentMonth}, Day: ${currentDay})${planningContext}
 
 SUGGESTED MEETING TIMES (2+ business days out):
 - Option 1: ${meetingTimes.slot1} ${meetingTimes.slot1Time}
