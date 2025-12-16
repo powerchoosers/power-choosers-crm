@@ -3798,17 +3798,24 @@ Target length: 50-70 words total.
 STRUCTURE:
 1. Greeting (Hi [Name],)
 2. Opening Hook (15-20 words): Reference a specific observation about [company] or [industry] challenge, then ask about it.
-   Example: "I noticed Cypress is navigating shifting rates in Leander. How are you handling that?"
+   Example: "With Cypress navigating shifting rates in Leander, how are you handling that?"
    Example: "Given the recent volatility in ERCOT, how are you managing contract renewals?"
+   Example: "How are manufacturing companies like [company] handling rising energy costs?"
+   NOTE: Use questions, not "I noticed" or "I saw" - reference details naturally through questions.
 3. [LINE BREAK]
 4. Value Prop (20-30 words): How we help [industry] companies avoid [problem] and save [amount].
-   Use Texas-specific context: ERCOT volatility, 4CP charges, TDU delivery costs, forward curves.
+   Use Texas-specific context: ERCOT volatility, peak demand charges, TDU delivery costs, forward curves.
 5. [LINE BREAK]
 6. CTA (8-15 words): Direct, value-verification question (not passive).
    Example: "Are you currently floating or fixed on your index?" (Finance)
-   Example: "Do you have an updated 4CP strategy for this summer?" (Industrial)
+   Example: "Do you have an updated peak demand strategy for this summer?" (Industrial)
    Example: "Has anyone reviewed your rate structure since the market shifted?" (Owner)
    Example: "Are you open to a quick audit to check for hidden riders?" (General)
+
+PERSONALIZATION PRIORITY (System will use available data in this order):
+1. Internet research (recent activity, LinkedIn, website) - used FIRST when available
+2. Company description - used naturally (not encyclopedia style) when no research
+3. Industry information - used as final fallback when no research and no description
 
 QUESTIONS: Include at least ONE question somewhere in the email (preferably in Opening Hook or CTA).
 - Natural, conversational tone is preferred
@@ -3831,6 +3838,7 @@ VISUALS:
 
 AVOID:
 - "Hope this email finds you well"
+- "I noticed", "I saw", "I read" (use questions instead)
 - Long paragraphs
 - Scheduling asks ("15 minutes", "schedule a call", "book a meeting")
 - Passive CTAs like "Is this on your radar?" (too weak)
