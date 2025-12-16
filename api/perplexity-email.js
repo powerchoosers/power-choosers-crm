@@ -4077,7 +4077,10 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           const willOverrideCta = hasMultipleQuestions || hasMeetingRequest || hasTimeSlot || hasOldCta || (shouldUseAngleCta && !hasAngleCta);
 
           // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:cta-override-check',message:'CTA validation summary (cold_email)',data:{selectedAngleId:selectedAngle?.id||null,shouldUseAngleCta:!!shouldUseAngleCta,hasAngleCta:!!hasAngleCta,hasMultipleQuestions,hasMeetingRequest,hasTimeSlot,hasOldCta,willOverrideCta,ctaLen:String(jsonData.cta_text||'').length,ctaHasContractExpire:/contract expire|renewal window|when does your contract expire/i.test(String(jsonData.cta_text||'').toLowerCase()),ctaHasConsolidat:/consolidat|multi-?site|multiple locations|bulk/i.test(String(jsonData.cta_text||'').toLowerCase())},timestamp:Date.now(),sessionId:'debug-session',runId:'cta-1',hypothesisId:'CTA-OVERRIDE'})}).catch(()=>{});
+          const ctaTextLower = String(jsonData.cta_text || '').toLowerCase();
+          const ctaHasContractExpire = /contract expire|renewal window|when does your contract expire/i.test(ctaTextLower);
+          const ctaHasConsolidat = /consolidat|multi-?site|multiple locations|bulk/i.test(ctaTextLower);
+          fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:cta-override-check',message:'CTA validation summary (cold_email)',data:{selectedAngleId:selectedAngle?.id||null,shouldUseAngleCta:!!shouldUseAngleCta,hasAngleCta:!!hasAngleCta,hasMultipleQuestions,hasMeetingRequest,hasTimeSlot,hasOldCta,willOverrideCta,ctaLen:String(jsonData.cta_text||'').length,ctaHasContractExpire,ctaHasConsolidat},timestamp:Date.now(),sessionId:'debug-session',runId:'cta-1',hypothesisId:'CTA-OVERRIDE'})}).catch(()=>{});
           // #endregion
 
           if (willOverrideCta) {
