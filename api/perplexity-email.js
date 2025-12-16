@@ -2290,6 +2290,7 @@ async function buildSystemPrompt({
   const recipientContext = `
 RECIPIENT INFORMATION:
 - Name: ${firstName || 'there'} ${company ? 'at ' + company : ''}
+${company ? `- Company Name: ${company} (CRITICAL: ALWAYS use "${company}" in emails, NEVER use "${firstName}'s company" or "your company" - use the actual company name "${company}")` : '- Company Name: NOT PROVIDED'}
 ${job ? '- Role: ' + job + ' (focus on ' + (roleContext?.language || 'business operations') + ')' : ''}
 ${tenure ? '- Tenure: ' + tenure + ' in current role (use naturally: "In your ' + tenure + ' as ' + job + '...")' : ''}
 ${r.seniority ? '- Seniority Level: ' + r.seniority : ''}
@@ -2367,11 +2368,12 @@ ${companySizeContext && companySizeContext.size !== 'large' ? '- Industry Contex
 ${contractUrgency ? '- Urgency Level: "With ' + contractUrgency.level + ' timing, ' + contractUrgency.focus + '..."' : ''}
 
 ROLE-SPECIFIC OPENING HOOK EXAMPLES:
-${job?.toLowerCase().includes('cfo') || job?.toLowerCase().includes('finance') ? '- CFO: "As CFO of ' + company + ', you\'re likely planning ' + planningYear + ' budgets with energy costs rising..."' : ''}
+${job?.toLowerCase().includes('cfo') || job?.toLowerCase().includes('finance') ? (company ? '- CFO: "As CFO of ' + company + ', you\'re likely planning ' + planningYear + ' budgets with energy costs rising..."' : '- CFO: "As CFO, you\'re likely planning ' + planningYear + ' budgets with energy costs rising..."') : ''}
+${job?.toLowerCase().includes('controller') && company ? '- Controller: "As Controller at ' + company + ', how are you handling upcoming contract renewals while energy costs are rising?"' : ''}
 ${job?.toLowerCase().includes('facilities') || job?.toLowerCase().includes('maintenance') ? '- Facilities: "Managing energy procurement on top of facilities operations can be time-consuming..."' : ''}
 ${job?.toLowerCase().includes('procurement') || job?.toLowerCase().includes('purchasing') ? '- Procurement: "As procurement manager, you know the energy market is competitive..."' : ''}
 ${job?.toLowerCase().includes('operations') || job?.toLowerCase().includes('manager') ? '- Operations: "Energy costs can be one of the most unpredictable operational expenses..."' : ''}
-${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo') ? '- Executive: "As President of ' + company + ', you understand the importance of managing operational costs..."' : ''}
+${job?.toLowerCase().includes('president') || job?.toLowerCase().includes('ceo') ? (company ? '- Executive: "As President of ' + company + ', you understand the importance of managing operational costs..."' : '- Executive: "As President, you understand the importance of managing operational costs..."') : ''}
 `;
 
   // Recipient context
@@ -2749,7 +2751,8 @@ CRITICAL QUALITY RULES:
 - USE ACCOUNT DESCRIPTION: ${accountDescription ? 'MUST naturally reference: "' + accountDescription + '"' : 'Reference their specific business'}
 - NATURAL LANGUAGE: Write like a real person researching their company
 - SPECIFIC TO THEM: Reference actual company details, not generic industry statements
-- COMPANY SPECIFICITY: ALWAYS reference ${company} specifically. NEVER mention other companies by name in this email.
+- COMPANY SPECIFICITY: ALWAYS reference ${company || 'the company'} specifically. NEVER mention other companies by name in this email.
+- CRITICAL COMPANY NAME RULE: ${company ? `If company name is "${company}", you MUST use "${company}" in the email. NEVER use "${firstName}'s company", "your company", or "[name]'s company" - ALWAYS use the actual company name "${company}". Example: "As Controller at ${company}" NOT "As Controller at ${firstName}'s company".` : 'Company name not provided - use generic references if needed.'}
 - TONE CONSISTENCY: Use professional but conversational tone throughout. Avoid mixing formal and casual language.
 - PERSONALIZATION DEPTH: Reference specific company data (supplier, rate, contract timing, recent achievements) when available.
 - COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
@@ -3218,7 +3221,8 @@ ${selectedAngle && typeof selectedAngle === 'object' ? `- **USE THE SELECTED ANG
 - SOCIAL PROOF: Use real outcomes when mentioning similar companies
 - USE ACCOUNT DESCRIPTION: ${accountDescription ? 'Must naturally reference: "' + accountDescription + '"' : 'Reference their specific business'}
 - NATURAL LANGUAGE: Write like a real person researching their company
-- COMPANY SPECIFICITY: ALWAYS reference ${company} specifically. NEVER mention other companies by name in this email.
+- COMPANY SPECIFICITY: ALWAYS reference ${company || 'the company'} specifically. NEVER mention other companies by name in this email.
+- CRITICAL COMPANY NAME RULE: ${company ? `If company name is "${company}", you MUST use "${company}" in the email. NEVER use "${firstName}'s company", "your company", or "[name]'s company" - ALWAYS use the actual company name "${company}". Example: "As Controller at ${company}" NOT "As Controller at ${firstName}'s company".` : 'Company name not provided - use generic references if needed.'}
 - NO SIZE ASSUMPTIONS: NEVER use "small company", "small business", "as a small company", "as a small business", "limited resources" - these can insult business owners. Use role/industry focus instead: "As CEO", "As a ${industry} company", "companies in ${industry}". Only use "large" if you have clear evidence it's a large enterprise.
 - COMPLETE CTAs: CTA must be a complete sentence, not cut off or incomplete
 - SINGLE CTA: Generate exactly ONE call to action per email
@@ -3771,7 +3775,10 @@ CRITICAL: Use these EXACT meeting times in your CTA.
           (researchContext?.linkedinContext && hookLower.includes(researchContext.linkedinContext.substring(0, 20).toLowerCase())) ||
           (researchContext?.websiteContext && hookLower.includes(researchContext.websiteContext.substring(0, 20).toLowerCase()))
         );
-        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3696',message:'Generated email content (before validation)',data:{openingHook:jsonData.opening_hook?.substring(0,100),valueProp:jsonData.value_proposition?.substring(0,100),cta:jsonData.cta_text,hasResearchData,hasTriggerEvents:!!researchContext?.triggerEvents,researchInHook,selectedAngleId:selectedAngle?.id,priorityUsed:hasResearchData||researchContext?.triggerEvents?'RESEARCH_FIRST':'ANGLE_FALLBACK'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        const companyName = recipient?.company || '';
+        const hasCompanyNameInHook = companyName && hookLower.includes(companyName.toLowerCase());
+        const hasFirstNameCompanyPattern = recipient?.firstName && hookLower.includes(recipient.firstName.toLowerCase() + "'s company");
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3696',message:'Generated email content (before validation)',data:{openingHook:jsonData.opening_hook?.substring(0,100),valueProp:jsonData.value_proposition?.substring(0,100),cta:jsonData.cta_text,hasResearchData,hasTriggerEvents:!!researchContext?.triggerEvents,researchInHook,selectedAngleId:selectedAngle?.id,priorityUsed:hasResearchData||researchContext?.triggerEvents?'RESEARCH_FIRST':'ANGLE_FALLBACK',companyName,hasCompanyName:!!companyName,hasCompanyNameInHook,hasFirstNameCompanyPattern,companyNameIssue:hasFirstNameCompanyPattern&&!hasCompanyNameInHook},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
         // #endregion
         
         // Validate value proposition completeness for cold emails
@@ -3922,6 +3929,29 @@ CRITICAL: Use these EXACT meeting times in your CTA.
               .replace(/20-30%/gi, 'considerably')
               .replace(/10-20%/gi, 'substantially');
           }
+          
+          // Remove advanced technical market data (keep it simple)
+          jsonData.opening_hook = jsonData.opening_hook
+            .replace(/\$?\d+[\/\-]MWh/gi, 'rates')
+            .replace(/forward curves?/gi, 'market rates')
+            .replace(/peak forecasts?.*\d+.*GW/gi, 'demand')
+            .replace(/\d+[-–]\d+\s*GW/gi, 'demand')
+            .replace(/solar and wind covering \d+%/gi, 'renewable energy')
+            .replace(/\d+% year over year/gi, 'significantly');
+        }
+        
+        // Also sanitize value_proposition and cta_text
+        if (templateType === 'cold_email') {
+          ['value_proposition', 'cta_text'].forEach(field => {
+            if (jsonData[field]) {
+              jsonData[field] = jsonData[field]
+                .replace(/\$?\d+[\/\-]MWh/gi, 'rates')
+                .replace(/forward curves?/gi, 'market rates')
+                .replace(/peak forecasts?.*\d+.*GW/gi, 'demand')
+                .replace(/\d+[-–]\d+\s*GW/gi, 'demand')
+                .replace(/solar and wind covering \d+%/gi, 'renewable energy');
+            }
+          });
         }
         
         // AGGRESSIVE WORD COUNT ENFORCEMENT FOR COLD EMAILS
@@ -3974,6 +4004,41 @@ CRITICAL: Use these EXACT meeting times in your CTA.
                                  countWords(jsonData.value_proposition) + countWords(jsonData.cta_text);
           fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3895',message:'Final email word count after validation',data:{finalWordCount,withinTarget:finalWordCount>=75&&finalWordCount<=115,withinMax:finalWordCount<=125,ctaText:jsonData.cta_text,hasContextWrappedCta:jsonData.cta_text?.includes('Given')||jsonData.cta_text?.includes('rising')||jsonData.cta_text?.includes('delivery costs')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
           // #endregion
+        }
+        
+        // Fix "[name]'s company" pattern - replace with actual company name
+        const companyName = recipient?.company || '';
+        const firstName = recipient?.firstName || '';
+        if (companyName && firstName) {
+          const firstNameCompanyPattern = new RegExp(`\\b${firstName}'s company\\b`, 'gi');
+          const nameCompanyPattern = new RegExp(`\\b${firstName}\\s+company\\b`, 'gi');
+          const yourCompanyPattern = /\byour company\b/gi;
+          
+          // Fix in all fields
+          if (jsonData.opening_hook) {
+            const beforeHook = jsonData.opening_hook;
+            jsonData.opening_hook = jsonData.opening_hook
+              .replace(firstNameCompanyPattern, companyName)
+              .replace(nameCompanyPattern, companyName)
+              .replace(yourCompanyPattern, companyName);
+            if (beforeHook !== jsonData.opening_hook) {
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:3990',message:'Fixed company name in opening_hook',data:{before:beforeHook.substring(0,100),after:jsonData.opening_hook.substring(0,100),companyName,firstName},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+              // #endregion
+            }
+          }
+          if (jsonData.value_proposition) {
+            jsonData.value_proposition = jsonData.value_proposition
+              .replace(firstNameCompanyPattern, companyName)
+              .replace(nameCompanyPattern, companyName)
+              .replace(yourCompanyPattern, companyName);
+          }
+          if (jsonData.cta_text) {
+            jsonData.cta_text = jsonData.cta_text
+              .replace(firstNameCompanyPattern, companyName)
+              .replace(nameCompanyPattern, companyName)
+              .replace(yourCompanyPattern, companyName);
+          }
         }
         
         // Final language polishing: de-salesify and personalize industry/size
@@ -4061,6 +4126,28 @@ CRITICAL: Use these EXACT meeting times in your CTA.
     
     // Standard mode
     res.writeHead(200, { 'Content-Type': 'application/json' });
+    
+    // Fix "[name]'s company" pattern in standard mode - replace with actual company name
+    const companyNameStd = recipient?.company || '';
+    const firstNameStd = recipient?.firstName || '';
+    if (companyNameStd && firstNameStd) {
+      const firstNameCompanyPattern = new RegExp(`\\b${firstNameStd}'s company\\b`, 'gi');
+      const nameCompanyPattern = new RegExp(`\\b${firstNameStd}\\s+company\\b`, 'gi');
+      const yourCompanyPattern = /\byour company\b/gi;
+      
+      const beforeContent = content;
+      content = content
+        .replace(firstNameCompanyPattern, companyNameStd)
+        .replace(nameCompanyPattern, companyNameStd)
+        .replace(yourCompanyPattern, companyNameStd);
+      
+      if (beforeContent !== content) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4284a946-be5e-44ea-bda2-f1146ae8caca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'perplexity-email.js:4110',message:'Fixed company name in standard mode content',data:{before:beforeContent.substring(0,200),after:content.substring(0,200),companyName:companyNameStd,firstName:firstNameStd},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
+      }
+    }
+    
     // Standard mode: de-salesify and personalize industry/size in the raw content string
     const sizeCategoryStd = (recipient?.account ? (recipient.account.annualUsage ? (recipient.account.annualUsage < 500000 ? 'small' : (recipient.account.annualUsage < 5000000 ? 'medium' : 'large')) : null) : null);
     const personalizeCtxStd = { 
@@ -4073,7 +4160,15 @@ CRITICAL: Use these EXACT meeting times in your CTA.
     let polished = removeCitationBrackets(deSalesify(personalizeIndustryAndSize(content, personalizeCtxStd)));
     polished = polished
       .replace(/15-20%/gi, '10-20%')
-      .replace(/15-25%/gi, '10-20%');
+      .replace(/15-25%/gi, '10-20%')
+      // Remove advanced technical market data (keep it simple)
+      .replace(/\$?\d+[\/\-]MWh/gi, 'rates')
+      .replace(/forward curves?/gi, 'market rates')
+      .replace(/peak forecasts?.*\d+.*GW/gi, 'demand')
+      .replace(/\d+[-–]\d+\s*GW/gi, 'demand')
+      .replace(/solar and wind covering \d+%/gi, 'renewable energy')
+      .replace(/\d+% year over year/gi, 'significantly')
+      .replace(/up \d+% year over year/gi, 'rising significantly');
     return res.end(JSON.stringify({ 
       ok: true, 
       output: polished,
